@@ -13,7 +13,6 @@ protocol OAuthHandling: Actor {
     func handleOAuthCallback(url: URL) async throws
 }
 
-
 actor AuthenticationService {
     private var networkManager: NetworkManaging
     private var tokenManager: TokenManaging
@@ -31,7 +30,7 @@ actor AuthenticationService {
     }
 
     func setOAuthHandler(_ handler: OAuthHandling) {
-        self.oauthHandler = handler
+        oauthHandler = handler
     }
 
     func createSession(identifier: String, password: String) async throws {
@@ -73,7 +72,7 @@ actor AuthenticationService {
 
         LogManager.logInfo("AuthenticationService - Tokens saved successfully.")
     }
-    
+
     func authenticateWithOAuth(identifier: String) async throws {
         guard let handler = oauthHandler else {
             throw AuthenticationError.oauthHandlerNotSet
@@ -176,4 +175,3 @@ actor AuthenticationService {
     //        return false
     //    }
 }
-
