@@ -21,16 +21,6 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
         init() {
             var decoders: [String: DecoderFunction] = [:]
 
-            decoders["tools.ozone.team.defs#member"] = { decoder in
-                do {
-                    let decodedObject = try ToolsOzoneTeamDefs.Member(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logError("Error decoding ToolsOzoneTeamDefs.Member: \(error)")
-                    return .decodeError("Error decoding ToolsOzoneTeamDefs.Member: \(error)")
-                }
-            }
-
             decoders["tools.ozone.server.getConfig#serviceConfig"] = { decoder in
                 do {
                     let decodedObject = try ToolsOzoneServerGetConfig.ServiceConfig(from: decoder)
@@ -48,6 +38,16 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 } catch {
                     LogManager.logError("Error decoding ToolsOzoneServerGetConfig.ViewerConfig: \(error)")
                     return .decodeError("Error decoding ToolsOzoneServerGetConfig.ViewerConfig: \(error)")
+                }
+            }
+
+            decoders["tools.ozone.team.defs#member"] = { decoder in
+                do {
+                    let decodedObject = try ToolsOzoneTeamDefs.Member(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding ToolsOzoneTeamDefs.Member: \(error)")
+                    return .decodeError("Error decoding ToolsOzoneTeamDefs.Member: \(error)")
                 }
             }
 
@@ -1361,16 +1361,6 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
 
-            decoders["app.bsky.labeler.service"] = { decoder in
-                do {
-                    let decodedObject = try AppBskyLabelerService(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logError("Error decoding AppBskyLabelerService: \(error)")
-                    return .decodeError("Error decoding AppBskyLabelerService: \(error)")
-                }
-            }
-
             decoders["app.bsky.labeler.defs#labelerView"] = { decoder in
                 do {
                     let decodedObject = try AppBskyLabelerDefs.LabelerView(from: decoder)
@@ -1408,6 +1398,16 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 } catch {
                     LogManager.logError("Error decoding AppBskyLabelerDefs.LabelerPolicies: \(error)")
                     return .decodeError("Error decoding AppBskyLabelerDefs.LabelerPolicies: \(error)")
+                }
+            }
+
+            decoders["app.bsky.labeler.service"] = { decoder in
+                do {
+                    let decodedObject = try AppBskyLabelerService(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding AppBskyLabelerService: \(error)")
+                    return .decodeError("Error decoding AppBskyLabelerService: \(error)")
                 }
             }
 
