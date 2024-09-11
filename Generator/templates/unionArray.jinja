@@ -1,0 +1,103 @@
+// Union Array Type
+
+public struct {{ union_name | convertRefToSwift }}: Codable, ATProtocolCodable, ATProtocolValue {
+    public let items: [{{ union_name | convertRefToSwift }}ForUnionArray]
+
+    public init(from decoder: Decoder) throws {
+        var container = try decoder.unkeyedContainer()
+        var items = [{{ union_name | convertRefToSwift }}ForUnionArray]()
+        while !container.isAtEnd {
+            let item = try container.decode({{ union_name | convertRefToSwift }}ForUnionArray.self)
+            items.append(item)
+        }
+        self.items = items
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.unkeyedContainer()
+        for item in items {
+            try container.encode(item)
+        }
+    }
+
+    public func isEqual(to other: any ATProtocolValue) -> Bool {
+        guard let other = other as? Self else { return false }
+        
+        if self.items != other.items {
+            return false
+        }
+
+        return true
+    }
+
+}
+
+public enum {{ union_name | convertRefToSwift }}ForUnionArray: Codable, ATProtocolCodable, ATProtocolValue {
+    {%- for ref in refs %}
+    case {{ ref.camel_case_label | lowerCamelCase }}({{ ref.swift_ref }})
+    {%- endfor %}
+    case unexpected(ATProtocolValueContainer)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let typeValue = try container.decode(String.self, forKey: .type)
+
+        switch typeValue {
+        {%- for ref in refs %}
+        case "{{ ref.ref }}":
+            let value = try {{ ref.swift_ref }}(from: decoder)
+            self = .{{ ref.camel_case_label | lowerCamelCase }}(value)
+        {%- endfor %}
+        default:
+            let unknownValue = try ATProtocolValueContainer(from: decoder)
+            self = .unexpected(unknownValue)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+
+        switch self {
+        {%- for ref in refs %}
+        case .{{ ref.camel_case_label | lowerCamelCase }}(let value):
+            try container.encode("{{ ref.ref }}", forKey: .type)
+            try value.encode(to: encoder)
+        {%- endfor %}
+        case .unexpected(let ATProtocolValueContainer):
+            try ATProtocolValueContainer.encode(to: encoder)
+        }
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        switch self {
+        {%- for ref in refs %}
+        case .{{ ref.camel_case_label | lowerCamelCase }}(let value):
+            hasher.combine("{{ ref.ref }}")
+            hasher.combine(value)
+        {%- endfor %}
+        case .unexpected(let ATProtocolValueContainer):
+            hasher.combine("unexpected")
+            hasher.combine(ATProtocolValueContainer)
+        }
+    }
+
+    public func isEqual(to other: any ATProtocolValue) -> Bool {
+        guard let otherValue = other as? {{ union_name | convertRefToSwift }}ForUnionArray else { return false }
+
+        switch (self, otherValue) {
+        {%- for ref in refs %}
+        case (.{{ ref.camel_case_label | lowerCamelCase }}(let selfValue), 
+              .{{ ref.camel_case_label | lowerCamelCase }}(let otherValue)):
+            return selfValue == otherValue
+        {%- endfor %}
+        case (.unexpected(let selfValue), .unexpected(let otherValue)):
+            return selfValue.isEqual(to: otherValue)
+        default:
+            return false
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case type = "$type"
+    }
+}

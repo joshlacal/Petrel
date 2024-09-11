@@ -1,0 +1,51 @@
+{
+  "originHash" : "cb9e94a15fc0b802e32e2d6809f024fdac1356f9cc2890237fca7e501f1c53b0",
+  "pins" : [
+    {
+      "identity" : "jjliso8601dateformatter",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/michaeleisel/JJLISO8601DateFormatter",
+      "state" : {
+        "revision" : "741a9e45db01148a8ac60c5e12f7c978181a22d3",
+        "version" : "0.1.8"
+      }
+    },
+    {
+      "identity" : "jwt-kit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/vapor/jwt-kit.git",
+      "state" : {
+        "revision" : "c2595b9ad7f512d7f334830b4df1fed6e917946a",
+        "version" : "4.13.4"
+      }
+    },
+    {
+      "identity" : "swift-crypto",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-crypto.git",
+      "state" : {
+        "revision" : "9f95b4d033a4edd3814b48608db3f2ca90c7218b",
+        "version" : "3.7.0"
+      }
+    },
+    {
+      "identity" : "zippyjson",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/michaeleisel/ZippyJSON.git",
+      "state" : {
+        "revision" : "ddbbc024ba5a826f9676035a0a090a0bc2d40755",
+        "version" : "1.2.15"
+      }
+    },
+    {
+      "identity" : "zippyjsoncfamily",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/michaeleisel/ZippyJSONCFamily",
+      "state" : {
+        "revision" : "c1c0f88977359ea85b81e128b2d988e8250dfdae",
+        "version" : "1.2.14"
+      }
+    }
+  ],
+  "version" : 3
+}

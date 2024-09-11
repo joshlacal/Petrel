@@ -1,0 +1,46 @@
+name: Generate Swift Code
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+jobs:
+  generate_swift:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Clone external repository
+        run: |
+          git clone --depth=1 https://github.com/bluesky-social/atproto.git
+          mkdir -p Generator/lexicons
+          rsync -a --delete atproto/lexicons/ Generator/lexicons/
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.x"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r Generator/requirements.txt
+      - name: Generate Swift code
+        run: |
+          python Generator/Generator.py Generator/lexicons Sources/Petrel/Generated
+      - name: Install SwiftFormat
+        run: |
+          brew update
+          brew install swiftformat
+      - name: Run SwiftFormat
+        run: |
+          swiftformat .
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "Update and format generated Swift code"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,188 @@
+        {%- for name, def_schema in lex_definitions.items() %}
+        public struct {{ name }}{{ def_schema.conformance }} {
+            public static let typeIdentifier = "{{ lexicon_id }}#{{ name|lowerCamelCase }}"
+
+        {%- for prop in def_schema.properties %}
+            public let {{ prop.name }}: {{ prop.type }}{% if prop.optional %}?{% endif %}
+        {%- endfor %}
+
+        // Standard initializer
+        public init(
+            {% for prop in def_schema.properties -%}
+            {{ prop.name }}: {{ prop.type }}{% if prop.optional %}?{% endif %}{% if not loop.last %}, {% endif %}
+            {%- endfor %}
+        ) {
+            {% for prop in def_schema.properties %}
+            self.{{ prop.name }} = {{ prop.name }}
+            {%- endfor %}
+        }
+
+        // Codable initializer
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            {%- for prop in def_schema.properties %}
+            do {
+                {% if prop.optional %}
+                self.{{ prop.name }} = try container.decodeIfPresent({{ prop.type }}.self, forKey: .{{ prop.name }})
+                {% else %}
+                self.{{ prop.name }} = try container.decode({{ prop.type }}.self, forKey: .{{ prop.name }})
+                {% endif %}
+            } catch {
+                LogManager.logError("Decoding error for property '{{ prop.name }}': \(error)")
+                throw error
+            }
+            {%- endfor %}
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            {%- for prop in def_schema.properties %}
+            {% if prop.optional %}
+            if let value = {{ prop.name }} {
+                try container.encode(value, forKey: .{{ prop.name }})
+            }
+            {% else %}
+            try container.encode({{ prop.name }}, forKey: .{{ prop.name }})
+            {% endif %}
+            {%- endfor %}
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            {%- for prop in def_schema.properties %}
+            {%- if prop.optional %}
+            if let value = {{ prop.name }} {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            {%- else %}
+            hasher.combine({{ prop.name }})
+            {%- endif %}
+            {%- endfor %}
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+            {%- for prop in def_schema.properties %}
+            {% if prop.optional %}
+            if {{ prop.name }} != other.{{ prop.name }} {
+                return false
+            }
+            {% else %}
+            if self.{{ prop.name }} != other.{{ prop.name }} {
+                return false
+            }
+            {% endif %}
+            {%- endfor %}
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            {%- for prop in def_schema.properties %}
+            case {{ prop.name }}
+            {%- endfor %}
+        }
+
+        {%- for sub_struct_name, sub_struct in def_schema.sub_structs.items() %}
+        public struct {{ sub_struct_name }}{{ sub_struct.conformance }} {
+            public static let typeIdentifier = "{{ lexicon_id }}#{{ sub_struct_name|lowerCamelCase }}"
+
+            {%- for prop in sub_struct.properties %}
+            public let {{ prop.name }}: {{ prop.type }}{% if prop.optional %}?{% endif %}
+            {%- endfor %}
+
+            // Standard initializer for sub-struct
+            public init({% for prop in sub_struct.properties -%}
+                {{ prop.name }}: {{ prop.type }}{% if prop.optional %}?{% endif %}{% if not loop.last %}, {% endif %}
+                {%- endfor %}) {
+                {% for prop in sub_struct.properties -%}
+                self.{{ prop.name }} = {{ prop.name }}
+                {%- endfor %}
+            }
+
+            // Codable initializer for sub-struct
+            {%- if sub_struct.properties %}
+            public init(from decoder: Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                {%- for prop in sub_struct.properties %}
+                do {
+                    {% if prop.optional %}
+                    self.{{ prop.name }} = try container.decodeIfPresent({{ prop.type }}.self, forKey: .{{ prop.name }})
+                    {% else %}
+                    self.{{ prop.name }} = try container.decode({{ prop.type }}.self, forKey: .{{ prop.name }})
+                    {% endif %}
+                } catch {
+                    LogManager.logError("Decoding error for sub-struct property '{{ prop.name }}': \(error)")
+                    throw error
+                }
+                {%- endfor %}
+            }
+            {%- endif %}
+
+            public func encode(to encoder: Encoder) throws {
+                var container = encoder.container(keyedBy: CodingKeys.self)
+                // Encode the $type field for sub-struct
+                try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+                {%- for prop in sub_struct.properties %}
+                {% if prop.optional %}
+                if let value = {{ prop.name }} {
+                    try container.encode(value, forKey: .{{ prop.name }})
+                }
+                {% else %}
+                try container.encode({{ prop.name }}, forKey: .{{ prop.name }})
+                {% endif %}
+                {%- endfor %}
+            }
+
+            public func hash(into hasher: inout Hasher) {
+                {%- for prop in sub_struct.properties %}
+                {%- if prop.optional %}
+                if let value = {{ prop.name }} {
+                    hasher.combine(value)
+                } else {
+                    hasher.combine(nil as Int?)
+                }
+                {%- else %}
+                hasher.combine({{ prop.name }})
+                {%- endif %}
+                {%- endfor %}
+            }
+
+            public func isEqual(to other: any ATProtocolValue) -> Bool {
+                guard let other = other as? Self else { return false }
+                {%- for prop in sub_struct.properties %}
+                {%- if prop.optional %}
+                if {{ prop.name }} != other.{{ prop.name }} {
+                    return false
+                }
+                {%- else %}
+                if self.{{ prop.name }} != other.{{ prop.name }} {
+                    return false
+                }
+                {%- endif %}
+                {%- endfor %}
+                return true
+            }
+
+            public static func == (lhs: Self, rhs: Self) -> Bool {
+                return lhs.isEqual(to: rhs)
+            }
+
+
+            private enum CodingKeys: String, CodingKey {
+                case typeIdentifier = "$type"
+                {%- for prop in sub_struct.properties %}
+                case {{ prop.name }}
+                {%- endfor %}
+            }
+
+        }
+        {%- endfor %}
+    }
+    {%- endfor %}

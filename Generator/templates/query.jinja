@@ -1,0 +1,32 @@
+extension ATProtoClient.{{ template_namespace_name }} {
+    /// {{ description }}
+    public func {{ query_name | lowerCamelCase }}({% if input_struct_name %}input: {{ input_struct_name }}{% endif %}) async throws -> (responseCode: Int, data: {{ output_type }}?) {
+        let endpoint = "{{ endpoint }}"
+        
+        {% if input_struct_name %}
+        let queryItems = input.asQueryItems()
+        let urlRequest = try await networkManager.createURLRequest(
+            endpoint: endpoint,
+            method: "GET",
+            headers: [:],
+            body: nil,
+            queryItems: queryItems
+        )
+        {% else %}
+        let urlRequest = try await networkManager.createURLRequest(
+            endpoint: endpoint,
+            method: "GET",
+            headers: [:],
+            body: nil,
+            queryItems: nil
+        )
+        {% endif %}
+        
+        let (responseData, response) = try await networkManager.performRequest(urlRequest, retryCount: 0, duringInitialSetup: {% if during_initial_setup %}true{% else %}false{% endif %})
+        let responseCode = response.statusCode
+
+        let decoder = ZippyJSONDecoder()
+        let decodedData = try? decoder.decode({{ output_type }}.self, from: responseData)
+        return (responseCode, decodedData)
+    }
+}

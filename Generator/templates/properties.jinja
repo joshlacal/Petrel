@@ -1,0 +1,77 @@
+        {%- for prop in properties %}
+        public let {{ prop.name }}: {{ prop.type }}{% if prop.optional %}?{% endif %}
+        {%- endfor %}
+
+        public init({% for prop in properties -%}
+            {{ prop.name }}: {{ prop.type }}{% if prop.optional %}?{% endif %}{% if not loop.last %}, {% endif %}
+            {%- endfor %}) {
+            {% for prop in properties -%}
+            self.{{ prop.name }} = {{ prop.name }}
+            {% endfor %}
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            {%- for prop in properties %}
+            {% if prop.optional %}
+            self.{{ prop.name }} = try container.decodeIfPresent({{ prop.type }}.self, forKey: .{{ prop.name }})
+            {% else %}
+            self.{{ prop.name }} = try container.decode({{ prop.type }}.self, forKey: .{{ prop.name }})
+            {% endif %}
+            {%- endfor %}
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            {%- for prop in properties %}
+            {% if prop.optional %}
+            if let value = {{ prop.name }} {
+                try container.encode(value, forKey: .{{ prop.name }})
+            }
+            {% else %}
+            try container.encode({{ prop.name }}, forKey: .{{ prop.name }})
+            {% endif %}
+            {%- endfor %}
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            {%- for prop in properties %}
+            {%- if prop.optional %}
+            if let value = {{ prop.name }} {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            {%- else %}
+            hasher.combine({{ prop.name }})
+            {%- endif %}
+            {%- endfor %}
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+            {%- for prop in properties %}
+            {%- if prop.optional %}
+            if {{ prop.name }} != other.{{ prop.name }} {
+                return false
+            }
+            {%- else %}
+            if self.{{ prop.name }} != other.{{ prop.name }} {
+                return false
+            }
+            {%- endif %}
+            {%- endfor %}
+            return true
+        }
+ 
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+
+
+        private enum CodingKeys: String, CodingKey {
+            {%- for prop in properties %}
+            case {{ prop.name }}
+            {%- endfor %}
+        }

@@ -1,0 +1,112 @@
+{%- if is_array %}
+public struct {{ enum_struct_name }}: Codable, ATProtocolCodable, ATProtocolValue {
+    public var items: [{{ name }}]
+
+    public init(items: [{{ name }}]) {
+        self.items = items
+    }
+
+    public init(from decoder: Decoder) throws {
+        var container = try decoder.unkeyedContainer()
+        var items: [{{ name }}] = []
+        while !container.isAtEnd {
+            let item = try container.decode({{ name }}.self)
+            items.append(item)
+        }
+        self.items = items
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.unkeyedContainer()
+        for item in items {
+            try container.encode(item)
+        }
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        for item in items {
+            hasher.combine(item)
+        }
+    }
+
+    public func isEqual(to other: any ATProtocolValue) -> Bool {
+        guard let otherValue = other as? {{ enum_struct_name }} else { return false }
+        return self.items == otherValue.items
+    }
+}
+{%- endif %}
+
+public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProtocolCodable, ATProtocolValue {
+    {%- for variant in variants %}
+    case {{ variant | convertRefToSwift | lowerCamelCase }}({{ variant | convertRefToSwift }})
+    {%- endfor %}
+    case unexpected(ATProtocolValueContainer)
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let typeValue = try container.decode(String.self, forKey: .type)
+        LogManager.logDebug("{{ name }} decoding: \(typeValue)")
+
+        switch typeValue {
+        {%- for variant in variants %}
+        case "{{ variant }}":
+            LogManager.logDebug("Decoding as {{ variant }}")
+            let value = try {{ variant | convertRefToSwift }}(from: decoder)
+            self = .{{ variant | convertRefToSwift | lowerCamelCase }}(value)
+        {%- endfor %}
+        default:
+            LogManager.logDebug("{{ name }} decoding encountered an unexpected type: \(typeValue)")
+            let unknownValue = try ATProtocolValueContainer(from: decoder)
+            self = .unexpected(unknownValue)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+
+        switch self {
+        {%- for variant in variants %}
+        case .{{ variant | convertRefToSwift | lowerCamelCase }}(let value):
+            LogManager.logDebug("Encoding {{ variant }}")
+            try container.encode("{{ variant }}", forKey: .type)
+            try value.encode(to: encoder)
+        {%- endfor %}
+        case .unexpected(let ATProtocolValueContainer):
+            LogManager.logDebug("{{ name }} encoding unexpected value")
+            try ATProtocolValueContainer.encode(to: encoder)
+        }
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        switch self {
+        {%- for variant in variants %}
+        case .{{ variant | convertRefToSwift | lowerCamelCase }}(let value):
+            hasher.combine("{{ variant }}")
+            hasher.combine(value)
+        {%- endfor %}
+        case .unexpected(let ATProtocolValueContainer):
+            hasher.combine("unexpected")
+            hasher.combine(ATProtocolValueContainer)
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case type = "$type"
+    }
+    
+    public func isEqual(to other: any ATProtocolValue) -> Bool {
+        guard let otherValue = other as? {{ name }} else { return false }
+
+        switch (self, otherValue) {
+            {%- for variant in variants %}
+            case (.{{ variant | convertRefToSwift | lowerCamelCase }}(let selfValue), 
+                .{{ variant | convertRefToSwift | lowerCamelCase }}(let otherValue)):
+                return selfValue == otherValue
+            {%- endfor %}
+            case (.unexpected(let selfValue), .unexpected(let otherValue)):
+                return selfValue.isEqual(to: otherValue)
+            default:
+                return false
+        }
+    }
+}

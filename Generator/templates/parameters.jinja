@@ -1,0 +1,14 @@
+    public struct Parameters: Parametrizable {
+    {%- for prop in properties %}
+        public let {{ prop.name }}: {{ prop.type }}{% if prop.optional %}?{% endif %}
+    {%- endfor %}
+        
+        public init({% for prop in properties %}
+            {{ prop.name }}: {{ prop.type }}{% if prop.optional %}? = nil{% endif %}{% if not loop.last %}, {% endif %}
+        {%- endfor %}
+            ) {
+            {% for prop in properties -%}
+            self.{{ prop.name }} = {{ prop.name }}
+            {% endfor %}
+        }
+    }
