@@ -41,36 +41,36 @@ public actor TokenManager: TokenManaging {
     public func fetchAuthServerMetadataAndJWKS(baseURL: URL) async throws {
         let metadataURL = baseURL.appendingPathComponent(".well-known/oauth-authorization-server")
         let (metadataData, _) = try await URLSession.shared.data(from: metadataURL)
-        self.authServerMetadata = try JSONDecoder().decode(AuthorizationServerMetadata.self, from: metadataData)
-        
+        authServerMetadata = try JSONDecoder().decode(AuthorizationServerMetadata.self, from: metadataData)
+
         guard let jwksUri = authServerMetadata?.jwksUri,
-              let jwksURL = URL(string: jwksUri) else {
+              let jwksURL = URL(string: jwksUri)
+        else {
             throw TokenError.missingJWKSURI
         }
-        
+
         let (jwksData, _) = try await URLSession.shared.data(from: jwksURL)
-        self.jwks = try JSONDecoder().decode(JWKS.self, from: jwksData)
+        jwks = try JSONDecoder().decode(JWKS.self, from: jwksData)
     }
 
     // Update token verification methods to use JWKS
     private func verifyToken(_ token: String) throws -> OAuthJWTPayload {
-        guard let jwks = self.jwks else {
+        guard let jwks = jwks else {
             throw TokenError.missingJWKS
         }
-        
+
         let signers = JWTSigners()
-        
+
         try jwks.keys.forEach { key in
             try signers.use(jwk: key)
         }
-        
+
         return try signers.verify(token, as: OAuthJWTPayload.self)
     }
-    
+
     func setDelegate(_ delegate: TokenDelegate?) {
         self.delegate = delegate
     }
-    
 
     public func hasValidTokens() async -> Bool {
         LogManager.logDebug("TokenManager - Checking token validity.")
@@ -104,7 +104,7 @@ public actor TokenManager: TokenManaging {
             return false
         }
     }
-    
+
     func isTokenExpired(token: String) async -> Bool {
         do {
             let payload = try verifyToken(token)
@@ -219,7 +219,7 @@ public actor TokenManager: TokenManaging {
             return true
         }
     }
-    
+
     public func decodeJWT(token: String) async -> OAuthJWTPayload? {
         do {
             let signers = JWTSigners()
@@ -229,6 +229,7 @@ public actor TokenManager: TokenManaging {
             return nil
         }
     }
+
     public func storeState(_ state: String) async throws {
         try await storeValue(state, for: "oauth_state")
     }
@@ -240,7 +241,7 @@ public actor TokenManager: TokenManaging {
     public func deleteState() async throws {
         try await deleteValue(for: "oauth_state")
     }
-    
+
     public func storeCodeVerifier(_ codeVerifier: String) async throws {
         try await storeValue(codeVerifier, for: "oauth_code_verifier")
     }
@@ -293,14 +294,13 @@ public struct OAuthJWTPayload: JWTPayload, @unchecked Sendable {
     public let scope: String
     public let aud: AudienceClaim
 
-    public func verify(using signer: JWTSigner) throws {
+    public func verify(using _: JWTSigner) throws {
         try exp.verifyNotExpired()
     }
 }
 
-
 ////  "alg": "ES256K"
-//public struct JWTPayload: Codable, Sendable {
+// public struct JWTPayload: Codable, Sendable {
 //    let scope: String
 //    let sub: String
 //    let exp: Int
@@ -308,4 +308,4 @@ public struct OAuthJWTPayload: JWTPayload, @unchecked Sendable {
 //    let aud: String
 //    var expirationDate: Date { Date(timeIntervalSince1970: Double(exp)) }
 //    var issuedAtDate: Date { Date(timeIntervalSince1970: Double(iat)) }
-//}
+// }

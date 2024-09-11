@@ -27,7 +27,7 @@ public actor NetworkManager: NetworkManaging, BaseURLUpdateDelegate {
     private var middlewares: [NetworkMiddleware] = []
     var middlewareService: MiddlewareService?
     private var isMiddlewareConfigured = false
-    
+
     var oauthManager: OAuthManager?
 
     init(baseURL: URL, configurationManager: ConfigurationManaging) {
@@ -38,7 +38,7 @@ public actor NetworkManager: NetworkManaging, BaseURLUpdateDelegate {
     func setOAuthManager(oauthManager: OAuthManager) {
         self.oauthManager = oauthManager
     }
-    
+
     func setMiddlewareService(middlewareService: MiddlewareService) {
         self.middlewareService = middlewareService
         configureMiddlewares()
@@ -169,19 +169,19 @@ public actor NetworkManager: NetworkManaging, BaseURLUpdateDelegate {
             throw error
         }
     }
-    
+
     func performRequestWithDPoP(endpoint: String, method: String, headers: [String: String], body: Data?, queryItems: [URLQueryItem]?) async throws -> (Data, HTTPURLResponse) {
-        guard let oauthManager = self.oauthManager else {
+        guard let oauthManager = oauthManager else {
             throw NetworkError.oauthManagerNotSet
         }
-        
+
         var retries = 0
         while retries < 3 {
             do {
                 let dpopProof = try await oauthManager.createDPoPProof(for: method, url: endpoint)
                 var updatedHeaders = headers
                 updatedHeaders["DPoP"] = dpopProof
-                
+
                 let request = try await createURLRequest(
                     endpoint: endpoint,
                     method: method,
@@ -189,20 +189,20 @@ public actor NetworkManager: NetworkManaging, BaseURLUpdateDelegate {
                     body: body,
                     queryItems: queryItems
                 )
-                
+
                 let (data, response) = try await performRequest(request, retryCount: 0, duringInitialSetup: false)
-                
+
                 await oauthManager.updateDPoPNonce(from: response.allHeaderFields as? [String: String] ?? [:])
-                    
+
                 if response.statusCode == 401 {
-                        // Token might be expired, try to refresh
-                        if retries == 0 {
-                            try await middlewareService?.validateAndRefreshSession()
-                            retries += 1
-                            continue
-                        }
+                    // Token might be expired, try to refresh
+                    if retries == 0 {
+                        try await middlewareService?.validateAndRefreshSession()
+                        retries += 1
+                        continue
                     }
-                
+                }
+
                 return (data, response)
             } catch {
                 if retries >= 2 {
@@ -213,7 +213,7 @@ public actor NetworkManager: NetworkManaging, BaseURLUpdateDelegate {
         }
         throw NetworkError.maxRetryAttemptsReached
     }
-    
+
     func refreshSessionToken(refreshToken: String, tokenManager: TokenManaging) async throws -> Bool {
         let endpoint = "/xrpc/com.atproto.server.refreshSession"
         let url = baseURL.appendingPathComponent(endpoint)
