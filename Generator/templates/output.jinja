@@ -1,18 +1,30 @@
     {% if is_type_alias %}
     public typealias Output = {{ type_alias_target }}
     {% else %}
-    public struct Output: ATProtocolCodable { 
+    public struct Output: ATProtocolCodable {
+        {% if properties %}
         {% for prop in properties %}
         public let {{ prop.name }}: {{ prop.type }}{% if prop.optional %}?{% endif %}
         {% endfor %}
+        {% else %}
+        public let data: Data
+        {% endif %}
         
         // Standard public initializer
-        public init({% for prop in properties %}
-            {{ prop.name }}: {{ prop.type }}{% if prop.optional %}? = nil{% endif %}{% if not loop.last %}, {% endif %}
-        {% endfor %}) {
+        public init(
+            {% for prop in properties %}
+            {{ prop.name }}: {{ prop.type }}{% if prop.optional %}? = nil{% endif %}{% if not loop.last %},{% endif %}
+            {% endfor %}
+            {% if not properties %}
+            data: Data
+            {% endif %}
+        ) {
             {% for prop in properties %}
             self.{{ prop.name }} = {{ prop.name }}
             {% endfor %}
+            {% if not properties %}
+            self.data = data
+            {% endif %}
         }
     }
-    {% endif %}
+{% endif %}

@@ -17,8 +17,12 @@ public enum NetworkError: Error {
     case expiredToken
     case authenticationRequired
     case retryRequest
+    case invalidRequest
     case oauthManagerNotSet
     case maxRetryAttemptsReached
+    case invalidContentType(expected: String, actual: String)
+    case authenticationFailed
+    case badRequest(description: String)
 }
 
 extension NetworkError: LocalizedError {
@@ -46,6 +50,14 @@ extension NetworkError: LocalizedError {
             return "OAuth is not set up."
         case .maxRetryAttemptsReached:
             return "Max retry attempts reached."
+        case .invalidContentType(let expected, let actual):
+            return "Invalid Content-Type received from the server. Expected: \(expected), got \(actual)."
+        case .authenticationFailed:
+            return "Authentication failed."
+        case .badRequest(description: let description):
+            return "Received bad request. \(description)."
+        case .invalidRequest:
+            return "The request was invalid."
         }
     }
 }

@@ -1,43 +1,85 @@
 import Foundation
-internal import ZippyJSON
+import ZippyJSON
+
 
 // lexicon: 1, id: com.atproto.server.requestEmailUpdate
 
-public enum ComAtprotoServerRequestEmailUpdate {
-    public static let typeIdentifier = "com.atproto.server.requestEmailUpdate"
 
-    public struct Output: ATProtocolCodable {
+public struct ComAtprotoServerRequestEmailUpdate { 
+
+    public static let typeIdentifier = "com.atproto.server.requestEmailUpdate"    
+    
+public struct Output: ATProtocolCodable {
+        
+        
         public let tokenRequired: Bool
-
+        
+        
+        
         // Standard public initializer
         public init(
+            
             tokenRequired: Bool
+            
+            
         ) {
+            
             self.tokenRequired = tokenRequired
+            
+            
         }
     }
+
+
+
+
 }
 
-public extension ATProtoClient.Com.Atproto.Server {
+extension ATProtoClient.Com.Atproto.Server {
     /// Request a token in order to update email.
-    func requestEmailUpdate(
-        duringInitialSetup: Bool = false
+    public func requestEmailUpdate(
+        
     ) async throws -> (responseCode: Int, data: ComAtprotoServerRequestEmailUpdate.Output?) {
-        let endpoint = "/com.atproto.server.requestEmailUpdate"
-
+        let endpoint = "com.atproto.server.requestEmailUpdate"
+        
+        var headers: [String: String] = [:]
+        
+        
+        
+        headers["Accept"] = "application/json"
+        
+        
         let requestData: Data? = nil
         let urlRequest = try await networkManager.createURLRequest(
             endpoint: endpoint,
             method: "POST",
-            headers: ["Content-Type": "application/json"],
+            headers: headers, 
             body: requestData,
             queryItems: nil
         )
-
-        let (responseData, response) = try await networkManager.performRequest(urlRequest, retryCount: 0, duringInitialSetup: duringInitialSetup)
+        
+        
+        let (responseData, response) = try await networkManager.performRequest(urlRequest)
         let responseCode = response.statusCode
 
-        let decodedData = try? ZippyJSONDecoder().decode(ComAtprotoServerRequestEmailUpdate.Output.self, from: responseData)
+        // Content-Type validation
+        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
+        
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
+
+        // Data decoding and validation
+        
+        let decoder = ZippyJSONDecoder()
+        let decodedData = try? decoder.decode(ComAtprotoServerRequestEmailUpdate.Output.self, from: responseData)
+        
+        
         return (responseCode, decodedData)
+        
     }
+    
 }
+                           

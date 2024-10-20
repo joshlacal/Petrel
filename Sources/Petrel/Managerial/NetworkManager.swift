@@ -6,268 +6,552 @@
 //
 
 import Foundation
-internal import ZippyJSON
+import ZippyJSON
 
-protocol NetworkManaging: Actor, BaseURLUpdateDelegate {
-    func performRequest(_ request: URLRequest, retryCount: Int, duringInitialSetup: Bool) async throws
-        -> (Data, HTTPURLResponse)
+// MARK: - NetworkManaging Protocol
+
+/// Protocol defining the interface for NetworkManager.
+protocol NetworkManaging: Actor {
+    func setAuthenticationProvider(_ provider: AuthenticationProvider)
+    func setAuthorizationServerMetadata(_ metadata: AuthorizationServerMetadata) 
+
+    func setProtectedResourceMetadata(_ metadata: ProtectedResourceMetadata)
+
+    /// Notifies the network manager that the base URL has been updated
+    func updateBaseURL(_ newBaseURL: URL) async
+
+    /// Performs a network request.
+    ///
+    /// - Parameter request: The URLRequest to perform.
+    /// - Returns: A tuple containing the response data and HTTPURLResponse.
+    func performRequest(_ request: URLRequest) async throws -> (Data, HTTPURLResponse)
+    
+    /// Creates a URLRequest with the given parameters.
+    ///
+    /// - Parameters:
+    ///   - endpoint: The API endpoint.
+    ///   - method: The HTTP method (e.g., GET, POST).
+    ///   - headers: Additional HTTP headers.
+    ///   - body: The HTTP body data.
+    ///   - queryItems: URL query parameters.
+    /// - Returns: A configured URLRequest.
     func createURLRequest(
-        endpoint: String, method: String, headers: [String: String], body: Data?,
+        endpoint: String,
+        method: String,
+        headers: [String: String],
+        body: Data?,
         queryItems: [URLQueryItem]?
     ) async throws -> URLRequest
-    func refreshSessionToken(refreshToken: String, tokenManager: TokenManaging) async throws -> Bool
-    func setMiddlewareService(middlewareService: MiddlewareService) async
+    
+    /// Refreshes the session token using a provided refresh token and token manager.
+    ///
+    /// - Parameters:
+    ///   - refreshToken: The refresh token used to obtain new access and refresh tokens.
+    ///   - tokenManager: The token manager responsible for storing the new tokens.
+    /// - Returns: A boolean indicating whether the token refresh was successful.
+    /// - Throws: Throws an error if the token refresh fails.
+    func refreshLegacySessionToken(refreshToken: String, tokenManager: TokenManaging) async throws -> Bool
 }
 
-public actor NetworkManager: NetworkManaging, BaseURLUpdateDelegate {
+// MARK: - NetworkManager Actor
+
+/// Actor responsible for managing network requests and handling authentication.
+actor NetworkManager: NetworkManaging {
+    // MARK: - Properties
+    
     private var baseURL: URL
+    private var authorizationServerMetadata: AuthorizationServerMetadata?
+    private var protectedResourceMetadata: ProtectedResourceMetadata?
+    
     private let configurationManager: ConfigurationManaging
     private let maxRetryLimit: Int = 3
-
+    
     private var middlewares: [NetworkMiddleware] = []
-    var middlewareService: MiddlewareService?
     private var isMiddlewareConfigured = false
+//    private var authenticationService: AuthenticationService?
+    private var tokenManager: TokenManaging
 
-    var oauthManager: OAuthManager?
+    // Custom URLSession with hardened configuration
+    private let session: URLSession
+    private var accessTokenContinuation: CheckedContinuation<String, Error>?
+    private var authProvider: AuthenticationProvider?
 
-    init(baseURL: URL, configurationManager: ConfigurationManaging) {
+    enum EndpointType {
+        case authorizationServer
+        case protectedResource
+        case other
+    }
+    
+    func setAuthorizationServerMetadata(_ metadata: AuthorizationServerMetadata) {
+        self.authorizationServerMetadata = metadata
+    }
+
+    func setProtectedResourceMetadata(_ metadata: ProtectedResourceMetadata) {
+        self.protectedResourceMetadata = metadata
+    }
+
+    
+    func determineEndpointTypeAndAuthRequirement(for url: URL) -> (EndpointType, Bool) {
+        if let authServerMetadata = authorizationServerMetadata,
+           url.absoluteString.hasPrefix(authServerMetadata.issuer) {
+            // Check if it's a token endpoint or other auth-related endpoint
+            if url.absoluteString == authServerMetadata.tokenEndpoint ||
+               url.absoluteString == authServerMetadata.authorizationEndpoint ||
+               url.absoluteString == authServerMetadata.pushedAuthorizationRequestEndpoint {
+                return (.authorizationServer, false) // Auth server endpoints typically don't need authentication
+            } else {
+                return (.authorizationServer, true) // Other auth server endpoints might need authentication
+            }
+        } else if let protectedResourceMetadata = protectedResourceMetadata,
+                  url.absoluteString.hasPrefix(protectedResourceMetadata.resource.absoluteString) {
+            return (.protectedResource, true) // Protected resources always need authentication
+        } else {
+            return (.other, false) // Default to not requiring authentication for other endpoints
+        }
+    }
+
+    
+    // MARK: - Initialization
+    
+    /// Initializes the NetworkManager with the specified base URL and configuration manager.
+    ///
+    /// - Parameters:
+    ///   - baseURL: The base URL for the API.
+    ///   - configurationManager: The ConfigurationManaging instance.
+    init(baseURL: URL, configurationManager: ConfigurationManaging, tokenManager: TokenManaging) async {
         self.baseURL = baseURL
         self.configurationManager = configurationManager
-    }
+        self.tokenManager = tokenManager
+        
+        // Initialize the custom URLSession
+        let sessionConfiguration = URLSessionConfiguration.default
+        sessionConfiguration.timeoutIntervalForRequest = 30.0 // 30 seconds
+        sessionConfiguration.timeoutIntervalForResource = 60.0 // 60 seconds
+        sessionConfiguration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        sessionConfiguration.httpShouldSetCookies = false
+        sessionConfiguration.httpAdditionalHeaders = [
+            "X-Requested-With": "XMLHttpRequest",
+            "Accept": "application/json"
+        ]
+        sessionConfiguration.httpMaximumConnectionsPerHost = 5
+        sessionConfiguration.httpShouldUsePipelining = true
+        
+        // Initialize the custom delegate for security features
+        let sessionDelegate = HardenedURLSessionDelegate()
+        self.session = URLSession(configuration: sessionConfiguration, delegate: sessionDelegate, delegateQueue: nil)
 
-    func setOAuthManager(oauthManager: OAuthManager) {
-        self.oauthManager = oauthManager
-    }
+        // Subscribe to relevant events
+//            await self.subscribeToEvents()
+        LogManager.logDebug("Network Manager initialized")
 
-    func setMiddlewareService(middlewareService: MiddlewareService) {
-        self.middlewareService = middlewareService
-        configureMiddlewares()
-        isMiddlewareConfigured = true
     }
-
-    func baseURLDidUpdate(_ newBaseURL: URL) async {
-        baseURL = newBaseURL
-    }
-
-    private func configureMiddlewares() {
-        if let middlewareService = middlewareService {
-            let authMiddleware = AuthenticationMiddleware(
-                middlewareService: middlewareService, configurationManager: configurationManager
-            )
-            let loggingMiddleware = LoggingMiddleware()
-            middlewares.append(loggingMiddleware)
-            middlewares.append(authMiddleware)
-        } else {
-            // Handle the case where middlewareService is nil, maybe log an error or set up a fallback
-            print("Error: MiddlewareService is nil")
-        }
-    }
-
-    public func createURLRequest(
-        endpoint: String, method: String, headers: [String: String], body: Data?,
-        queryItems: [URLQueryItem]?
-    ) async throws -> URLRequest {
-        var url = baseURL.appendingPathComponent("xrpc").appendingPathComponent(endpoint)
-        if let queryItems = queryItems, !queryItems.isEmpty {
-            var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
-            components?.queryItems = queryItems
-            if let urlFromComponents = components?.url {
-                url = urlFromComponents
+    
+    // MARK: - Event Subscription
+    
+    private func subscribeToEvents() async {
+        let eventStream = await EventBus.shared.subscribe()
+        for await event in eventStream {
+            switch event {
+//            case .accessTokenFetched(let result):
+//                handleAccessTokenResponse(result)
+//            case .tokenRefreshCompleted(let result):
+//                switch result {
+//                case .success(let tokens):
+//                    // Update stored tokens if needed
+//                    LogManager.logInfo("Tokens refreshed successfully")
+//                case .failure(let error):
+//                    LogManager.logError("Token refresh failed: \(error)")
+//                }
+//            case .tokenExpired:
+//                // Handle token expiration, possibly by triggering a refresh
+//                LogManager.logInfo("Token expired, initiating refresh")
+//                await EventBus.shared.publish(.tokenRefreshStarted)
+//
+//            case .authenticationRequired:
+//                // Handle authentication required (e.g., pause requests, notify UI)
+//                LogManager.logInfo("NetworkManager - Received authenticationRequired event.")
+//                
+//            case .logMessage(let level, let message):
+//                // Handle log messages if centralized logging is desired
+//                // For example, send logs to a remote server or display in a debugging console
+//                print("Log [\(level)]: \(message)")
+                
+            default:
+                break
             }
         }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = method
-
-        for (headerField, headerValue) in headers {
-            request.setValue(headerValue, forHTTPHeaderField: headerField)
-        }
-
-        if let authHeader = headers["Authorization"] {
-            LogManager.logDebug("Using Authorization Header: \(authHeader.prefix(30))")
-        }
-
-        // Set the body if provided and ensure correct Content-Type
-        if let body = body {
-            request.httpBody = body
-            if headers["Content-Type"] == nil {
-                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            }
-        }
-        request.httpBody = body
-
-        return request
+    }
+    
+    func setAuthenticationProvider(_ provider: AuthenticationProvider) {
+        self.authProvider = provider
     }
 
-    public func performRequest(
-        _ request: URLRequest, retryCount: Int = 0, duringInitialSetup: Bool = false
-    ) async throws -> (Data, HTTPURLResponse) {
-        while !isMiddlewareConfigured {
-            await Task.yield()
-        }
-
-        LogManager.logDebug(
-            "NetworkManager - Preparing to perform request to \(request.url?.absoluteString ?? "unknown URL") with retryCount: \(retryCount)"
-        )
-        LogManager.logRequest(request)
-
-        // Apply middleware conditionally
-        var modifiedRequest = request
-        if !duringInitialSetup {
-            for middleware in middlewares {
-                LogManager.logDebug("Applying middleware: \(type(of: middleware))")
-                modifiedRequest = try await middleware.prepare(request: modifiedRequest)
-            }
-        } else {
-            LogManager.logDebug("Skipping middleware during initial setup.")
-        }
-        LogManager.logDebug(
-            "NetworkManager - Middleware modified request to \(request.url?.absoluteString ?? "unknown URL") with retryCount: \(retryCount)"
-        )
-        LogManager.logRequest(modifiedRequest)
-
-        do {
-            // Perform the actual network request
-            let (data, response) = try await URLSession.shared.data(for: modifiedRequest)
-            guard let httpResponse = response as? HTTPURLResponse else {
-                throw NetworkError.requestFailed
-            }
-
-            LogManager.logDebug(
-                "NetworkManager - Received HTTP response with status code: \(httpResponse.statusCode) from \(httpResponse.url?.absoluteString ?? "unknown URL")"
-            )
-            LogManager.logResponse(httpResponse, data: data)
-
-            // Process the response through each middleware
-            var finalData = data
-            var finalResponse = httpResponse
-            for middleware in middlewares.reversed() {
-                (finalResponse, finalData) = try await middleware.handle(
-                    response: finalResponse, data: finalData, request: modifiedRequest
-                )
-                LogManager.logDebug(
-                    "NetworkManager - Middleware \(type(of: middleware)) processed the response.")
-            }
-            LogManager.logResponse(finalResponse, data: finalData)
-
-            // Retry logic for 401 Unauthorized response
-            if finalResponse.statusCode == 401 && retryCount < maxRetryLimit {
-                LogManager.logDebug(
-                    "NetworkManager - Received 401 status, attempting to retry request. Retry attempt: \(retryCount + 1)"
-                )
-                return try await performRequest(modifiedRequest, retryCount: retryCount + 1) // Ensuring modifiedRequest is used for retry
-            }
-
-            LogManager.logDebug(
-                "NetworkManager - Request to \(finalResponse.url?.absoluteString ?? "unknown URL") completed successfully with status code \(finalResponse.statusCode)"
-            )
-            return (finalData, finalResponse)
-        } catch {
-            LogManager.logError(
-                "NetworkManager - Request to \(modifiedRequest.url?.absoluteString ?? "unknown URL") failed with error: \(error.localizedDescription)"
-            )
-            throw error
+    private func handleAccessTokenResponse(_ result: Result<String, Error>) {
+        if let continuation = accessTokenContinuation {
+            continuation.resume(with: result)
+            accessTokenContinuation = nil
         }
     }
 
-    func performRequestWithDPoP(endpoint: String, method: String, headers: [String: String], body: Data?, queryItems: [URLQueryItem]?) async throws -> (Data, HTTPURLResponse) {
-        guard let oauthManager = oauthManager else {
-            throw NetworkError.oauthManagerNotSet
+    private func fetchAccessToken() async throws -> String {
+        return try await withCheckedThrowingContinuation { continuation in
+            accessTokenContinuation = continuation
+            Task {
+                await EventBus.shared.publish(.accessTokenRequested)
+            }
         }
+    }
 
-        var retries = 0
-        while retries < 3 {
+    // MARK: - BaseURLUpdateDelegate Protocol Method
+    
+    /// Updates the base URL when required.
+    ///
+    /// - Parameter newBaseURL: The new base URL to update.
+    func updateBaseURL(_ newBaseURL: URL) async {
+        self.baseURL = newBaseURL
+        LogManager.logInfo("NetworkManager - Base URL updated to: \(newBaseURL)")
+        // Optionally, you can reset or reconfigure session/middleware here
+    }
+    
+    
+
+    // MARK: - Perform Request
+    
+    /// Performs a network request, applying authentication headers and handling token refresh if necessary.
+    ///
+    /// - Parameter request: The URLRequest to perform.
+    /// - Returns: A tuple containing the response data and HTTPURLResponse.
+    func performRequest(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        var currentRequest = request
+        var retryCount = 0
+        let maxRetries = 3
+
+        while retryCount < maxRetries {
             do {
-                let dpopProof = try await oauthManager.createDPoPProof(for: method, url: endpoint)
-                var updatedHeaders = headers
-                updatedHeaders["DPoP"] = dpopProof
+                // Always attempt to refresh tokens for OAuth
+                if await tokenManager.hasAnyTokens() && authProvider is OAuthManager {
+                    _ = try await authProvider?.refreshTokenIfNeeded()
+                }
 
-                let request = try await createURLRequest(
-                    endpoint: endpoint,
-                    method: method,
-                    headers: updatedHeaders,
-                    body: body,
-                    queryItems: queryItems
-                )
+                // Prepare the authenticated request
+                currentRequest = try await authProvider?.prepareAuthenticatedRequest(currentRequest) ?? currentRequest
+                
+                LogManager.logRequest(currentRequest)
+                let (data, response) = try await session.data(for: currentRequest)
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    throw NetworkError.requestFailed
+                }
+                LogManager.logResponse(httpResponse, data: data)
 
-                let (data, response) = try await performRequest(request, retryCount: 0, duringInitialSetup: false)
-
-                await oauthManager.updateDPoPNonce(from: response.allHeaderFields as? [String: String] ?? [:])
-
-                if response.statusCode == 401 {
-                    // Token might be expired, try to refresh
-                    if retries == 0 {
-                        try await middlewareService?.validateAndRefreshSession()
-                        retries += 1
-                        continue
+                if httpResponse.statusCode == 401 {
+                    // Handle 401 errors, including DPoP nonce updates
+                    if let authProvider = authProvider {
+                        do {
+                            let (retryResponse, retryData) = try await authProvider.handleUnauthorizedResponse(httpResponse, data: data, for: currentRequest)
+                            LogManager.logResponse(retryResponse, data: retryData)
+                            return (retryData, retryResponse)
+                        } catch {
+                            if retryCount == maxRetries - 1 {
+                                throw error
+                            }
+                            retryCount += 1
+                            continue
+                        }
+                    } else {
+                        throw NetworkError.authenticationRequired
                     }
                 }
 
-                return (data, response)
+                return (data, httpResponse)
             } catch {
-                if retries >= 2 {
+                if retryCount == maxRetries - 1 {
                     throw error
                 }
-                retries += 1
+                retryCount += 1
+                LogManager.logError("NetworkManager - Retry \(retryCount) due to error: \(error)")
             }
         }
+
         throw NetworkError.maxRetryAttemptsReached
     }
+    
+    /// Applies all configured middlewares to the given request.
+    ///
+    /// - Parameter request: The original URLRequest.
+    /// - Returns: The modified URLRequest after passing through all middlewares.
+    /// - Throws: An error if any middleware processing fails.
+    private func applyMiddlewares(to request: URLRequest) async throws -> URLRequest {
+        var modifiedRequest = request
+        for middleware in middlewares {
+            modifiedRequest = try await middleware.prepare(request: modifiedRequest)
+        }
+        return modifiedRequest
+    }
+    
+    /// Applies all configured middlewares' handle methods to the response.
+    ///
+    /// - Parameters:
+    ///   - response: The HTTPURLResponse received.
+    ///   - data: The data received.
+    ///   - request: The original URLRequest.
+    /// - Returns: A tuple containing the possibly modified response and data.
+    /// - Throws: An error if any middleware processing fails.
+    private func applyMiddlewaresHandle(to response: HTTPURLResponse, data: Data, request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        var currentResponse = response
+        var currentData = data
 
-    func refreshSessionToken(refreshToken: String, tokenManager: TokenManaging) async throws -> Bool {
+        for middleware in middlewares {
+            (currentResponse, currentData) = try await middleware.handle(response: currentResponse, data: currentData, request: request)
+        }
+
+        return (currentData, currentResponse)
+    }
+    
+    // MARK: - Middleware Management
+    
+    /// Adds a middleware to the NetworkManager.
+    ///
+    /// - Parameter middleware: The middleware to add.
+    func addMiddleware(_ middleware: NetworkMiddleware) async {
+        middlewares.append(middleware)
+    }
+    
+    /// Removes a middleware from the NetworkManager.
+    ///
+    /// - Parameter middleware: The middleware to remove.
+    func removeMiddleware(_ middleware: NetworkMiddleware) async {
+        middlewares.removeAll { $0 === middleware }
+    }
+    
+    // MARK: - Create URLRequest
+    
+    /// Creates a URLRequest with the specified parameters.
+    ///
+    /// - Parameters:
+    ///   - endpoint: The API endpoint.
+    ///   - method: The HTTP method (e.g., GET, POST).
+    ///   - headers: Additional HTTP headers.
+    ///   - body: The HTTP body data.
+    ///   - queryItems: URL query parameters.
+    /// - Returns: A configured URLRequest.
+    func createURLRequest(endpoint: String, method: String, headers: [String: String], body: Data?, queryItems: [URLQueryItem]?) async throws -> URLRequest {
+        var url: URL
+        if endpoint.lowercased().starts(with: "http://") || endpoint.lowercased().starts(with: "https://") {
+            guard let endpointURL = URL(string: endpoint) else {
+                throw NetworkError.invalidURL
+            }
+            url = endpointURL
+        } else {
+            let (endpointType, _) = determineEndpointTypeAndAuthRequirement(for: baseURL.appendingPathComponent(endpoint))
+            switch endpointType {
+            case .authorizationServer:
+                if let issuer = authorizationServerMetadata?.issuer,
+                   let issuerURL = URL(string: issuer) {
+                    url = issuerURL.appendingPathComponent("xrpc").appendingPathComponent(endpoint)
+                } else {
+                    url = baseURL.appendingPathComponent("xrpc").appendingPathComponent(endpoint)
+                }
+            case .protectedResource:
+                url = protectedResourceMetadata?.resource.appendingPathComponent("xrpc").appendingPathComponent(endpoint) ?? baseURL.appendingPathComponent("xrpc").appendingPathComponent(endpoint)
+            case .other:
+                url = baseURL.appendingPathComponent("xrpc").appendingPathComponent(endpoint)
+            }
+        }
+
+
+        if let queryItems = queryItems, !queryItems.isEmpty {
+            var components = URLComponents(url: url, resolvingAgainstBaseURL: true)
+            components?.queryItems = queryItems
+            url = components?.url ?? url
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        
+        for (key, value) in headers {
+            request.setValue(value, forHTTPHeaderField: key)
+        }
+        
+        request.httpBody = body
+        
+        return request
+    }
+    
+    // MARK: - Refresh Session Token
+    
+    /// Refreshes the session token using a provided refresh token and token manager.
+    ///
+    /// - Parameters:
+    ///   - refreshToken: The refresh token used to obtain new access and refresh tokens.
+    ///   - tokenManager: The token manager responsible for storing the new tokens.
+    /// - Returns: A boolean indicating whether the token refresh was successful.
+    /// - Throws: Throws an error if the token refresh fails.
+    func refreshLegacySessionToken(refreshToken: String, tokenManager: TokenManaging) async throws -> Bool {
         let endpoint = "/xrpc/com.atproto.server.refreshSession"
         let url = baseURL.appendingPathComponent(endpoint)
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("Bearer \(refreshToken)", forHTTPHeaderField: "Authorization")
-
+        
         // Perform the network request
-        let (responseData, response) = try await performRequest(
-            request, retryCount: 0, duringInitialSetup: true
-        )
-
-        LogManager.logDebug(
-            "NetworkManager - Received response for token refresh with status code: \(response.statusCode)"
-        )
-
+        let (responseData, response) = try await performRequest(request)
+        
+        LogManager.logDebug("NetworkManager - Received response for token refresh with status code: \(response.statusCode)")
+        
         if response.statusCode == 200 {
             // Decode the response using your specific output structure
             let decoder = ZippyJSONDecoder()
-            guard
-                let tokenResponse = try? decoder.decode(
-                    ComAtprotoServerRefreshSession.Output.self, from: responseData
-                )
-            else {
+            guard let tokenResponse = try? decoder.decode(ComAtprotoServerRefreshSession.Output.self, from: responseData) else {
                 throw NetworkError.decodingError
             }
-
+            
             // Update stored tokens using the token manager
             try await tokenManager.saveTokens(
-                accessJwt: tokenResponse.accessJwt, refreshJwt: tokenResponse.refreshJwt
+                accessJwt: tokenResponse.accessJwt,
+                refreshJwt: tokenResponse.refreshJwt,
+                type: .bearer // Assuming legacy; adjust based on context
             )
+            
+            // Update user configuration with the new DID and service endpoint
             try await configurationManager.updateUserConfiguration(
                 did: tokenResponse.did,
-                serviceEndpoint: tokenResponse.didDoc?.service.first?.serviceEndpoint
-                    ?? baseURL.absoluteString
+                handle: tokenResponse.handle,
+                serviceEndpoint: tokenResponse.didDoc?.service.first?.serviceEndpoint ?? baseURL.absoluteString
             )
+            
+            // Publish token updated event
+            await EventBus.shared.publish(.tokensUpdated(accessToken: tokenResponse.accessJwt, refreshToken: tokenResponse.refreshJwt))
+            
             return true
         } else if response.statusCode == 401 {
             LogManager.logError("NetworkManager - Refresh token is invalid or expired")
             return false
         } else {
-            LogManager.logError(
-                "NetworkManager - Failed to refresh token with status code: \(response.statusCode)")
-
+            LogManager.logError("NetworkManager - Failed to refresh token with status code: \(response.statusCode)")
             throw NetworkError.responseError(statusCode: response.statusCode)
         }
     }
-
-    private func prepareRequestWithMiddleware(_ request: URLRequest) async throws -> URLRequest {
-        var modifiedRequest = request
-        // Assume middleware array
-        for middleware in middlewares {
-            modifiedRequest = try await middleware.prepare(request: modifiedRequest)
+    
+    // MARK: - Utility Methods
+    
+    /// Validates the URL for security.
+    ///
+    /// - Parameter url: The URL to validate.
+    /// - Returns: A boolean indicating whether the URL is valid.
+    func validateURL(_ url: URL) -> Bool {
+        // Ensure only http or https schemes are allowed
+        guard url.scheme == "https" || url.scheme == "http" else {
+            LogManager.logError("Invalid URL scheme: \(url.scheme ?? "nil")")
+            return false
         }
-        return modifiedRequest
+
+        // Check for IP addresses that shouldn't be accessed
+        if let host = url.host {
+            let privateIPRanges = [
+                "10.0.0.0/8",
+                "172.16.0.0/12",
+                "192.168.0.0/16",
+                "127.0.0.0/8",
+                "169.254.0.0/16"
+            ]
+            
+            for range in privateIPRanges {
+                if IPAddress(host)?.isInRange(range) == true {
+                    LogManager.logError("Attempted access to private IP range: \(host)")
+                    return false
+                }
+            }
+        }
+
+        // Additional validation checks can be added here
+
+        return true
+    }
+    
+    /// Sanitizes the input by removing or escaping potentially harmful characters.
+    ///
+    /// - Parameter input: The input string to sanitize.
+    /// - Returns: The sanitized string, or nil if sanitization fails.
+    func sanitizeInput(_ input: String) -> String? {
+        // Remove or escape potentially harmful characters
+        return input.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
+    }
+    
+    /// Validates the Content-Type of the HTTP response.
+    ///
+    /// - Parameters:
+    ///   - response: The HTTPURLResponse to validate.
+    ///   - expectedTypes: An array of expected Content-Type strings.
+    /// - Returns: A boolean indicating whether the Content-Type is valid.
+    func validateContentType(_ response: HTTPURLResponse, expectedTypes: [String]) throws {
+        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+            LogManager.logError("Missing Content-Type header")
+            throw NetworkError.badRequest(description: "Missing Content-Type header")
+        }
+        // Check if any of the expected types are contained within the Content-Type header
+        let isValid = expectedTypes.contains { contentType.lowercased().contains($0.lowercased()) }
+        if !isValid {
+            LogManager.logError("Invalid Content-Type: \(contentType). Expected: \(expectedTypes.joined(separator: ", "))")
+            throw NetworkError.badRequest(description: "Invalid Content-Type: \(contentType). Expected: \(expectedTypes.joined(separator: ", "))")
+        }
+    }
+    
+    /// Handles network errors by logging appropriate messages.
+    ///
+    /// - Parameter error: The error to handle.
+    func handleNetworkError(_ error: Error) {
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .timedOut:
+                LogManager.logError("Network Error: Request timed out")
+            case .notConnectedToInternet:
+                LogManager.logError("Network Error: No internet connection")
+            case .cannotFindHost:
+                LogManager.logError("Network Error: Cannot find host")
+            case .cannotConnectToHost:
+                LogManager.logError("Network Error: Cannot connect to host")
+            case .dnsLookupFailed:
+                LogManager.logError("Network Error: DNS lookup failed")
+            case .networkConnectionLost:
+                LogManager.logError("Network Error: Network connection lost")
+            default:
+                LogManager.logError("Network Error: \(urlError.localizedDescription)")
+            }
+        } else if let apiError = error as? APIError {
+            switch apiError {
+            case .expiredToken:
+                LogManager.logError("API Error: Token has expired. Attempting to refresh the token.")
+            case .invalidToken:
+                LogManager.logError("API Error: Token is invalid. Possible tampering detected.")
+            case .invalidResponse:
+                LogManager.logError("API Error: Received an invalid response from the authentication server.")
+            case .invalidPDSURL:
+                LogManager.logError("API Error: The provided PDS URL is invalid or malformed.")
+            case .authorizationFailed:
+                LogManager.logError("API Error: Authorization failed. Check client credentials and permissions.")
+            case .methodNotSupported:
+                LogManager.logError("API Error: Method not supported.")
+            case .serviceNotInitialized:
+                LogManager.logError("API Error: AuthenticationService not initialized.")
+            }
+        } else {
+            LogManager.logError("Unexpected Error: \(error.localizedDescription)")
+        }
+    }
+    
+    // MARK: - Access Token Retrieval
+    
+    
+    // MARK: - Helper Methods
+    
+    /// Handles a failed request by logging and publishing network error events.
+    ///
+    /// - Parameter error: The error encountered during the request.
+    func handleFailedRequest(_ error: Error) {
+        handleNetworkError(error)
+        // Optionally, publish a network error event
+        Task {
+            await EventBus.shared.publish(.networkError(error))
+        }
     }
 }

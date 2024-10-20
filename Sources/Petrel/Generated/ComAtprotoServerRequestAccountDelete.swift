@@ -1,31 +1,45 @@
 import Foundation
-internal import ZippyJSON
+import ZippyJSON
+
 
 // lexicon: 1, id: com.atproto.server.requestAccountDelete
 
-public enum ComAtprotoServerRequestAccountDelete {
+
+public struct ComAtprotoServerRequestAccountDelete { 
+
     public static let typeIdentifier = "com.atproto.server.requestAccountDelete"
+
+
+
 }
 
-public extension ATProtoClient.Com.Atproto.Server {
+extension ATProtoClient.Com.Atproto.Server {
     /// Initiate a user account deletion via email.
-    func requestAccountDelete(
-        duringInitialSetup: Bool = false
+    public func requestAccountDelete(
+        
     ) async throws -> Int {
-        let endpoint = "/com.atproto.server.requestAccountDelete"
-
+        let endpoint = "com.atproto.server.requestAccountDelete"
+        
+        var headers: [String: String] = [:]
+        
+        
+        
+        
         let requestData: Data? = nil
         let urlRequest = try await networkManager.createURLRequest(
             endpoint: endpoint,
             method: "POST",
-            headers: ["Content-Type": "application/json"],
+            headers: headers, 
             body: requestData,
             queryItems: nil
         )
-
-        let (_, response) = try await networkManager.performRequest(urlRequest, retryCount: 0, duringInitialSetup: duringInitialSetup)
+        
+        
+        let (_, response) = try await networkManager.performRequest(urlRequest)
         let responseCode = response.statusCode
-
         return responseCode
+        
     }
+    
 }
+                           

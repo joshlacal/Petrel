@@ -1,21 +1,25 @@
 import Foundation
-internal import ZippyJSON
+import ZippyJSON
+
 
 // lexicon: 1, id: com.atproto.server.listAppPasswords
 
-public enum ComAtprotoServerListAppPasswords {
-    public static let typeIdentifier = "com.atproto.server.listAppPasswords"
 
-    public struct AppPassword: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "com.atproto.server.listAppPasswords#appPassword"
-        public let name: String
-        public let createdAt: ATProtocolDate
-        public let privileged: Bool?
+public struct ComAtprotoServerListAppPasswords { 
+
+    public static let typeIdentifier = "com.atproto.server.listAppPasswords"
+        
+public struct AppPassword: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "com.atproto.server.listAppPasswords#appPassword"
+            public let name: String
+            public let createdAt: ATProtocolDate
+            public let privileged: Bool?
 
         // Standard initializer
         public init(
             name: String, createdAt: ATProtocolDate, privileged: Bool?
         ) {
+            
             self.name = name
             self.createdAt = createdAt
             self.privileged = privileged
@@ -25,22 +29,25 @@ public enum ComAtprotoServerListAppPasswords {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                name = try container.decode(String.self, forKey: .name)
-
+                
+                self.name = try container.decode(String.self, forKey: .name)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'name': \(error)")
                 throw error
             }
             do {
-                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
-
+                
+                self.createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'createdAt': \(error)")
                 throw error
             }
             do {
-                privileged = try container.decodeIfPresent(Bool.self, forKey: .privileged)
-
+                
+                self.privileged = try container.decodeIfPresent(Bool.self, forKey: .privileged)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'privileged': \(error)")
                 throw error
@@ -50,14 +57,17 @@ public enum ComAtprotoServerListAppPasswords {
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
             try container.encode(name, forKey: .name)
-
+            
+            
             try container.encode(createdAt, forKey: .createdAt)
-
+            
+            
             if let value = privileged {
                 try container.encode(value, forKey: .privileged)
             }
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -72,19 +82,21 @@ public enum ComAtprotoServerListAppPasswords {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-
-            if name != other.name {
+            
+            if self.name != other.name {
                 return false
             }
-
-            if createdAt != other.createdAt {
+            
+            
+            if self.createdAt != other.createdAt {
                 return false
             }
-
+            
+            
             if privileged != other.privileged {
                 return false
             }
-
+            
             return true
         }
 
@@ -98,45 +110,75 @@ public enum ComAtprotoServerListAppPasswords {
             case createdAt
             case privileged
         }
-    }
-
-    public struct Output: ATProtocolCodable {
+    }    
+    
+public struct Output: ATProtocolCodable {
+        
+        
         public let passwords: [AppPassword]
-
+        
+        
+        
         // Standard public initializer
         public init(
+            
             passwords: [AppPassword]
+            
+            
         ) {
+            
             self.passwords = passwords
+            
+            
         }
     }
+        
+public enum Error: String, Swift.Error, CustomStringConvertible {
+                case accountTakedown = "AccountTakedown."
+            public var description: String {
+                return self.rawValue
+            }
+        }
 
-    public enum Error: String, Swift.Error, CustomStringConvertible {
-        case accountTakedown = "AccountTakedown."
-        public var description: String {
-            return rawValue
-        }
-    }
+
+
 }
 
-public extension ATProtoClient.Com.Atproto.Server {
-    /// List all App Passwords.
-    func listAppPasswords() async throws -> (responseCode: Int, data: ComAtprotoServerListAppPasswords.Output?) {
-        let endpoint = "/com.atproto.server.listAppPasswords"
 
+extension ATProtoClient.Com.Atproto.Server {
+    /// List all App Passwords.
+    public func listAppPasswords() async throws -> (responseCode: Int, data: ComAtprotoServerListAppPasswords.Output?) {
+        let endpoint = "com.atproto.server.listAppPasswords"
+        
+        
+        let queryItems: [URLQueryItem]? = nil
+        
         let urlRequest = try await networkManager.createURLRequest(
             endpoint: endpoint,
             method: "GET",
-            headers: [:],
+            headers: ["Accept": "application/json"],
             body: nil,
-            queryItems: nil
+            queryItems: queryItems
         )
-
-        let (responseData, response) = try await networkManager.performRequest(urlRequest, retryCount: 0, duringInitialSetup: false)
+        
+        let (responseData, response) = try await networkManager.performRequest(urlRequest)
         let responseCode = response.statusCode
 
+        // Content-Type validation
+        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
+        
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
+
+        // Data decoding and validation
+        
         let decoder = ZippyJSONDecoder()
         let decodedData = try? decoder.decode(ComAtprotoServerListAppPasswords.Output.self, from: responseData)
+        
+        
         return (responseCode, decodedData)
     }
-}
+}                           

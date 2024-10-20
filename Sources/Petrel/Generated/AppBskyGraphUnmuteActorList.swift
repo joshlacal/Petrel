@@ -1,41 +1,58 @@
 import Foundation
-internal import ZippyJSON
+import ZippyJSON
+
 
 // lexicon: 1, id: app.bsky.graph.unmuteActorList
 
-public enum AppBskyGraphUnmuteActorList {
-    public static let typeIdentifier = "app.bsky.graph.unmuteActorList"
-    public struct Input: ATProtocolCodable {
-        public let list: ATProtocolURI
 
-        // Standard public initializer
-        public init(list: ATProtocolURI) {
-            self.list = list
+public struct AppBskyGraphUnmuteActorList { 
+
+    public static let typeIdentifier = "app.bsky.graph.unmuteActorList"        
+public struct Input: ATProtocolCodable {
+            public let list: ATProtocolURI
+
+            // Standard public initializer
+            public init(list: ATProtocolURI) {
+                self.list = list
+                
+            }
         }
-    }
+
+
+
 }
 
-public extension ATProtoClient.App.Bsky.Graph {
+extension ATProtoClient.App.Bsky.Graph {
     /// Unmutes the specified list of accounts. Requires auth.
-    func unmuteActorList(
-        input: AppBskyGraphUnmuteActorList.Input,
-
-        duringInitialSetup: Bool = false
+    public func unmuteActorList(
+        
+        input: AppBskyGraphUnmuteActorList.Input
+        
     ) async throws -> Int {
-        let endpoint = "/app.bsky.graph.unmuteActorList"
-
+        let endpoint = "app.bsky.graph.unmuteActorList"
+        
+        var headers: [String: String] = [:]
+        
+        headers["Content-Type"] = "application/json"
+        
+        
+        
+        
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkManager.createURLRequest(
             endpoint: endpoint,
             method: "POST",
-            headers: ["Content-Type": "application/json"],
+            headers: headers, 
             body: requestData,
             queryItems: nil
         )
-
-        let (_, response) = try await networkManager.performRequest(urlRequest, retryCount: 0, duringInitialSetup: duringInitialSetup)
+        
+        
+        let (_, response) = try await networkManager.performRequest(urlRequest)
         let responseCode = response.statusCode
-
         return responseCode
+        
     }
+    
 }
+                           

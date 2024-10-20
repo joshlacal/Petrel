@@ -1,11 +1,14 @@
 import Foundation
-internal import ZippyJSON
+import ZippyJSON
+
 
 // lexicon: 1, id: tools.ozone.moderation.queryStatuses
 
-public enum ToolsOzoneModerationQueryStatuses {
-    public static let typeIdentifier = "tools.ozone.moderation.queryStatuses"
-    public struct Parameters: Parametrizable {
+
+public struct ToolsOzoneModerationQueryStatuses { 
+
+    public static let typeIdentifier = "tools.ozone.moderation.queryStatuses"    
+public struct Parameters: Parametrizable {
         public let subject: URI?
         public let comment: String?
         public let reportedAfter: ATProtocolDate?
@@ -25,28 +28,28 @@ public enum ToolsOzoneModerationQueryStatuses {
         public let tags: [String]?
         public let excludeTags: [String]?
         public let cursor: String?
-
+        
         public init(
-            subject: URI? = nil,
-            comment: String? = nil,
-            reportedAfter: ATProtocolDate? = nil,
-            reportedBefore: ATProtocolDate? = nil,
-            reviewedAfter: ATProtocolDate? = nil,
-            reviewedBefore: ATProtocolDate? = nil,
-            includeMuted: Bool? = nil,
-            onlyMuted: Bool? = nil,
-            reviewState: String? = nil,
-            ignoreSubjects: [URI]? = nil,
-            lastReviewedBy: String? = nil,
-            sortField: String? = nil,
-            sortDirection: String? = nil,
-            takendown: Bool? = nil,
-            appealed: Bool? = nil,
-            limit: Int? = nil,
-            tags: [String]? = nil,
-            excludeTags: [String]? = nil,
+            subject: URI? = nil, 
+            comment: String? = nil, 
+            reportedAfter: ATProtocolDate? = nil, 
+            reportedBefore: ATProtocolDate? = nil, 
+            reviewedAfter: ATProtocolDate? = nil, 
+            reviewedBefore: ATProtocolDate? = nil, 
+            includeMuted: Bool? = nil, 
+            onlyMuted: Bool? = nil, 
+            reviewState: String? = nil, 
+            ignoreSubjects: [URI]? = nil, 
+            lastReviewedBy: String? = nil, 
+            sortField: String? = nil, 
+            sortDirection: String? = nil, 
+            takendown: Bool? = nil, 
+            appealed: Bool? = nil, 
+            limit: Int? = nil, 
+            tags: [String]? = nil, 
+            excludeTags: [String]? = nil, 
             cursor: String? = nil
-        ) {
+            ) {
             self.subject = subject
             self.comment = comment
             self.reportedAfter = reportedAfter
@@ -66,46 +69,77 @@ public enum ToolsOzoneModerationQueryStatuses {
             self.tags = tags
             self.excludeTags = excludeTags
             self.cursor = cursor
+            
         }
-    }
-
-    public struct Output: ATProtocolCodable {
+    }    
+    
+public struct Output: ATProtocolCodable {
+        
+        
         public let cursor: String?
-
+        
         public let subjectStatuses: [ToolsOzoneModerationDefs.SubjectStatusView]
-
+        
+        
+        
         // Standard public initializer
         public init(
+            
             cursor: String? = nil,
-
+            
             subjectStatuses: [ToolsOzoneModerationDefs.SubjectStatusView]
+            
+            
         ) {
+            
             self.cursor = cursor
-
+            
             self.subjectStatuses = subjectStatuses
+            
+            
         }
     }
+
+
+
+
 }
 
-public extension ATProtoClient.Tools.Ozone.Moderation {
-    /// View moderation statuses of subjects (record or repo).
-    func queryStatuses(input: ToolsOzoneModerationQueryStatuses.Parameters) async throws -> (responseCode: Int, data: ToolsOzoneModerationQueryStatuses.Output?) {
-        let endpoint = "/tools.ozone.moderation.queryStatuses"
 
+extension ATProtoClient.Tools.Ozone.Moderation {
+    /// View moderation statuses of subjects (record or repo).
+    public func queryStatuses(input: ToolsOzoneModerationQueryStatuses.Parameters) async throws -> (responseCode: Int, data: ToolsOzoneModerationQueryStatuses.Output?) {
+        let endpoint = "tools.ozone.moderation.queryStatuses"
+        
+        
         let queryItems = input.asQueryItems()
+        
         let urlRequest = try await networkManager.createURLRequest(
             endpoint: endpoint,
             method: "GET",
-            headers: [:],
+            headers: ["Accept": "application/json"],
             body: nil,
             queryItems: queryItems
         )
-
-        let (responseData, response) = try await networkManager.performRequest(urlRequest, retryCount: 0, duringInitialSetup: false)
+        
+        let (responseData, response) = try await networkManager.performRequest(urlRequest)
         let responseCode = response.statusCode
 
+        // Content-Type validation
+        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
+        
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
+
+        // Data decoding and validation
+        
         let decoder = ZippyJSONDecoder()
         let decodedData = try? decoder.decode(ToolsOzoneModerationQueryStatuses.Output.self, from: responseData)
+        
+        
         return (responseCode, decodedData)
     }
-}
+}                           

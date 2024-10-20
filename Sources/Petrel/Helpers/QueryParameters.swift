@@ -7,7 +7,7 @@
 
 import Foundation
 
-public protocol Parametrizable {}
+public protocol Parametrizable: Sendable {}
 
 public extension Parametrizable {
     func asQueryItems() -> [URLQueryItem] {

@@ -1,19 +1,23 @@
 import Foundation
-internal import ZippyJSON
+import ZippyJSON
+
 
 // lexicon: 1, id: app.bsky.unspecced.defs
 
-public enum AppBskyUnspeccedDefs {
-    public static let typeIdentifier = "app.bsky.unspecced.defs"
 
-    public struct SkeletonSearchPost: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.unspecced.defs#skeletonSearchPost"
-        public let uri: ATProtocolURI
+public struct AppBskyUnspeccedDefs { 
+
+    public static let typeIdentifier = "app.bsky.unspecced.defs"
+        
+public struct SkeletonSearchPost: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.unspecced.defs#skeletonSearchPost"
+            public let uri: ATProtocolURI
 
         // Standard initializer
         public init(
             uri: ATProtocolURI
         ) {
+            
             self.uri = uri
         }
 
@@ -21,8 +25,9 @@ public enum AppBskyUnspeccedDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-
+                
+                self.uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'uri': \(error)")
                 throw error
@@ -32,8 +37,9 @@ public enum AppBskyUnspeccedDefs {
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
             try container.encode(uri, forKey: .uri)
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -42,11 +48,11 @@ public enum AppBskyUnspeccedDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-
-            if uri != other.uri {
+            
+            if self.uri != other.uri {
                 return false
             }
-
+            
             return true
         }
 
@@ -59,15 +65,16 @@ public enum AppBskyUnspeccedDefs {
             case uri
         }
     }
-
-    public struct SkeletonSearchActor: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.unspecced.defs#skeletonSearchActor"
-        public let did: String
+        
+public struct SkeletonSearchActor: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.unspecced.defs#skeletonSearchActor"
+            public let did: String
 
         // Standard initializer
         public init(
             did: String
         ) {
+            
             self.did = did
         }
 
@@ -75,8 +82,9 @@ public enum AppBskyUnspeccedDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                did = try container.decode(String.self, forKey: .did)
-
+                
+                self.did = try container.decode(String.self, forKey: .did)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'did': \(error)")
                 throw error
@@ -86,8 +94,9 @@ public enum AppBskyUnspeccedDefs {
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
             try container.encode(did, forKey: .did)
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -96,11 +105,11 @@ public enum AppBskyUnspeccedDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-
-            if did != other.did {
+            
+            if self.did != other.did {
                 return false
             }
-
+            
             return true
         }
 
@@ -113,4 +122,10 @@ public enum AppBskyUnspeccedDefs {
             case did
         }
     }
+
+
+
 }
+
+
+                           

@@ -16,14 +16,14 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/michaeleisel/ZippyJSON.git", from: "1.2.15"),
-        .package(url: "https://github.com/vapor/jwt-kit.git", from: "4.13.4"),
+        .package(url: "https://github.com/beatt83/jose-swift.git", .upToNextMajor(from: "4.0.0")),
     ],
     targets: [
         .target(
             name: "Petrel",
             dependencies: [
-                .product(name: "ZippyJSON", package: "ZippyJSON"),
-                .product(name: "JWTKit", package: "jwt-kit"),
+                "jose-swift",
+                .product(name: "ZippyJSON", package: "ZippyJSON")
             ]
         ),
         .testTarget(

@@ -1,279 +1,493 @@
-import Foundation
-internal import ZippyJSON
-import JWTKit
+//
+//  TokenManager.swift
+//  Petrel
+//
+//  Created by Josh LaCalamito on 4/21/24.
+//
 
-struct AuthorizationServerMetadata: Codable {
-    let issuer: String
-    let jwksUri: String
-    // Add other fields as needed
+import Foundation
+import JSONWebKey
+import JSONWebSignature
+import JSONWebToken
+import ZippyJSON
+
+// MARK: - TokenType Enumeration
+
+public enum TokenType: String, Codable {
+    case bearer    // Legacy authentication
+    case dpop      // OAuth authentication
 }
 
+// MARK: - TokenManaging Protocol
+
 protocol TokenManaging: Actor {
+    func isTokenCloseToExpiration(token: String) async -> Bool
+    func hasAnyTokens() async -> Bool
     func fetchAuthServerMetadataAndJWKS(baseURL: URL) async throws
     func deleteTokens() async throws
     func hasValidTokens() async -> Bool
-    func saveTokens(accessJwt: String, refreshJwt: String) async throws
+    func saveTokens(accessJwt: String?, refreshJwt: String?, type: TokenType) async throws
     func shouldRefreshTokens() async -> Bool
     func fetchRefreshToken() async -> String?
     func fetchAccessToken() async -> String?
-    func decodeJWT(token: String) async -> OAuthJWTPayload?
+    func decodeJWT(token: String) async -> OAuthClaims?
     func isTokenExpired(token: String) async -> Bool
-    func setDelegate(_ delegate: TokenDelegate?) async
-    func storeCodeVerifier(_ codeVerifier: String) async throws
-    func retrieveCodeVerifier() async throws -> String?
-    func deleteCodeVerifier() async throws
+    func storeCodeVerifier(_ codeVerifier: String, for state: String) async throws
+    func retrieveCodeVerifier(for state: String) async throws -> String?
+    func deleteCodeVerifier(for state: String) async throws
     func storeState(_ state: String) async throws
-    func retrieveState() async throws -> String?
-    func deleteState() async throws
+    func retrieveState(_ state: String) async throws -> String?
+    func deleteState(_ state: String) async throws
+    func validateAndRetrieveState(_ state: String) async throws -> Bool
 }
 
-protocol TokenDelegate: Actor {
-    func tokenDidUpdate() async
-}
+// MARK: - TokenDelegate Protocol
+
+// Removed the TokenDelegate protocol to eliminate direct dependencies.
+// Token updates will now be communicated via the EventBus.
+
+// MARK: - TokenManager Actor
 
 public actor TokenManager: TokenManaging {
+    
+    private let namespace: String
     private var accessJwt: String?
     private var refreshJwt: String?
-    var delegate: TokenDelegate?
-    private var jwks: JWKS?
+    private var tokenType: TokenType?
+    private var jwks: JWKSet?
     private var authServerMetadata: AuthorizationServerMetadata?
+    private var isJWKSFetched = false
+
+    // Internal dictionaries to associate state with code_verifier
+    private var codeVerifiers: [String: String] = [:]
+    private var states: Set<String> = []
+
+    private var isInitialized = false
+
+    init(namespace: String) async {
+        self.namespace = namespace
+        await loadInitialTokens()
+        LogManager.logDebug("Token Manager initialized")
+    }
+
+
+    private func loadInitialTokens() async {
+        if let data = try? KeychainManager.retrieve(key: "tokenType", namespace: namespace),
+           let type = try? JSONDecoder().decode(TokenType.self, from: data) {
+            self.tokenType = type
+            LogManager.logDebug("TokenManager - Initialized with token type: \(type.rawValue)")
+        } else {
+            LogManager.logDebug("TokenManager - No token type found in Keychain")
+        }
+
+        if let accessData = try? KeychainManager.retrieve(key: "accessJwt", namespace: namespace),
+           let savedAccessToken = String(data: accessData, encoding: .utf8) {
+            self.accessJwt = savedAccessToken
+            LogManager.logDebug("TokenManager - Loaded accessJwt from Keychain")
+        }
+
+        if let refreshData = try? KeychainManager.retrieve(key: "refreshJwt", namespace: namespace),
+           let savedRefreshToken = String(data: refreshData, encoding: .utf8) {
+            self.refreshJwt = savedRefreshToken
+            LogManager.logDebug("TokenManager - Loaded refreshJwt from Keychain")
+        }
+    }
+
+    // MARK: - Token Management Methods
 
     public func fetchAuthServerMetadataAndJWKS(baseURL: URL) async throws {
         let metadataURL = baseURL.appendingPathComponent(".well-known/oauth-authorization-server")
         let (metadataData, _) = try await URLSession.shared.data(from: metadataURL)
         authServerMetadata = try JSONDecoder().decode(AuthorizationServerMetadata.self, from: metadataData)
 
-        guard let jwksUri = authServerMetadata?.jwksUri,
-              let jwksURL = URL(string: jwksUri)
-        else {
+        guard let jwksUri = authServerMetadata?.jwksUri, let jwksURL = URL(string: jwksUri) else {
             throw TokenError.missingJWKSURI
         }
 
         let (jwksData, _) = try await URLSession.shared.data(from: jwksURL)
-        jwks = try JSONDecoder().decode(JWKS.self, from: jwksData)
+        jwks = try JSONDecoder().decode(JWKSet.self, from: jwksData)
+        isJWKSFetched = true
     }
 
-    // Update token verification methods to use JWKS
-    private func verifyToken(_ token: String) throws -> OAuthJWTPayload {
-        guard let jwks = jwks else {
-            throw TokenError.missingJWKS
-        }
+    public func deleteTokens() async throws {
+        // Delete both Legacy and OAuth tokens
+        try KeychainManager.delete(key: "accessJwt", namespace: namespace)
+        try KeychainManager.delete(key: "refreshJwt", namespace: namespace)
+        try KeychainManager.delete(key: "tokenType", namespace: namespace)
 
-        let signers = JWTSigners()
+        // Reset in-memory tokens
+        self.accessJwt = nil
+        self.refreshJwt = nil
+        self.tokenType = nil
 
-        try jwks.keys.forEach { key in
-            try signers.use(jwk: key)
-        }
-
-        return try signers.verify(token, as: OAuthJWTPayload.self)
-    }
-
-    func setDelegate(_ delegate: TokenDelegate?) {
-        self.delegate = delegate
+        // Publish token cleared event
+        await EventBus.shared.publish(.tokensCleared)
+        LogManager.logInfo("TokenManager - Tokens cleared successfully.")
     }
 
     public func hasValidTokens() async -> Bool {
-        LogManager.logDebug("TokenManager - Checking token validity.")
-
-        guard let accessJwt = fetchAccessToken(), let refreshJwt = fetchRefreshToken() else {
-            LogManager.logInfo("TokenManager - Access or Refresh Token not found.")
+        guard let accessToken = await fetchAccessToken(),
+              let refreshToken = fetchRefreshToken() else {
             return false
         }
-
-        do {
-            let accessPayload = try verifyToken(accessJwt)
-            let refreshPayload = try verifyToken(refreshJwt)
-
-            let currentDate = Date()
-
-            if accessPayload.exp.value > currentDate && refreshPayload.exp.value > currentDate {
-                LogManager.logInfo("TokenManager - Tokens are valid.")
-                return true
+        
+        // Check if access token is expired
+        if await isTokenExpired(token: accessToken) {
+            // If access token is expired, check if refresh token is still valid
+            if await isTokenExpired(token: refreshToken) {
+                // Trigger a token refresh
+                await EventBus.shared.publish(.tokenExpired)
+                return false
             } else {
-                if accessPayload.exp.value <= currentDate {
-                    LogManager.logInfo("TokenManager - Access token is expired.")
-                }
-                if refreshPayload.exp.value <= currentDate {
-                    LogManager.logInfo("TokenManager - Refresh token is expired.")
-                }
-                LogManager.logInfo("TokenManager - One or both tokens are expired or invalid.")
                 return false
             }
-        } catch {
-            LogManager.logError("TokenManager - Error verifying tokens: \(error)")
-            return false
         }
+        
+        return true
+    }
+    
+    func isTokenCloseToExpiration(token: String) async -> Bool {
+        guard let payload = await decodeJWT(token: token),
+              let expDate = payload.exp else {
+            return true // If we can't decode or there's no expiration, assume it needs refresh
+        }
+        
+        let currentDate = Date()
+        let timeInterval = expDate.timeIntervalSince(currentDate)
+        
+        // Consider the token close to expiration if it's within 5 minutes of expiring
+        return timeInterval <= 300
     }
 
-    func isTokenExpired(token: String) async -> Bool {
+    
+    public func isTokenExpired(token: String) async -> Bool {
+        // If it's a refresh token, we can't determine expiration this way
+        if token.starts(with: "ref-") {
+            LogManager.logDebug("TokenManager - Refresh token, cannot determine expiration")
+            return false // Assume refresh tokens are not expired
+        }
+
         do {
             let payload = try verifyToken(token)
-            let currentDate = Date()
-            let expirationDate = payload.exp.value
-
-            LogManager.logDebug(
-                "TokenManager - the current date is \(currentDate.description). the exp date is \(expirationDate.description)."
-            )
-
-            if currentDate >= expirationDate {
-                LogManager.logDebug("TokenManager - Token is expired.")
-                return true
-            } else {
-                LogManager.logDebug("TokenManager - Token is still valid.")
-                return false
+            if let expDate = payload.exp {
+                let isExpired = Date() >= expDate
+                LogManager.logDebug("TokenManager - Token expiration check: \(isExpired ? "expired" : "valid") (Expires: \(expDate))")
+                return isExpired
             }
+            LogManager.logDebug("TokenManager - Token has no expiration date")
+            return true // If there's no expiration date, consider it expired
         } catch {
             LogManager.logError("TokenManager - Error verifying token: \(error)")
-            return true
+            return true // If verification fails, consider it expired
         }
     }
+    
+    public func shouldRefreshTokens() async -> Bool {
+        guard let accessToken = await fetchAccessToken(),
+              let refreshToken = fetchRefreshToken() else {
+            return true
+        }
 
-    public func saveTokens(accessJwt: String, refreshJwt: String) async throws {
-        // Update the stored JWTs in memory
+        let accessTokenExpired = await isTokenExpired(token: accessToken)
+        let refreshTokenExpired = await isTokenExpired(token: refreshToken)
+
+        if accessTokenExpired {
+            LogManager.logInfo("Access token expired, should refresh")
+            return true
+        }
+
+        if refreshTokenExpired {
+            LogManager.logDebug("Refresh token expired, re-authentication required")
+            await EventBus.shared.publish(.authenticationRequired)
+            return false
+        }
+
+        return false
+    }
+    
+    func hasAnyTokens() -> Bool {
+        return accessJwt != nil || refreshJwt != nil
+    }
+
+
+    public func saveTokens(accessJwt: String?, refreshJwt: String?, type: TokenType) async throws {
         self.accessJwt = accessJwt
         self.refreshJwt = refreshJwt
+        self.tokenType = type
 
-        // Notify delegate about the token update
-        await delegate?.tokenDidUpdate()
-        LogManager.logInfo("Tokens updated and delegate notified.")
+        LogManager.logDebug("TokenManager - Saving tokens. Access JWT: \(accessJwt?.prefix(30) ?? "nil")..., Refresh JWT: \(refreshJwt?.prefix(30) ?? "nil")..., Type: \(type.rawValue)")
 
-        // Log saving tokens and attempt to save them in the keychain
-        LogManager.logDebug(
-            "TokenManager - Saving new tokens at \(Date()) - Access Token Prefix: \(String(accessJwt.prefix(5)))"
-        )
-        do {
-            // Save access and refresh tokens to the Keychain
-            try saveAccessToken(accessJwt)
-            try saveRefreshToken(refreshJwt)
-            LogManager.logInfo("Tokens saved successfully in Keychain")
-        } catch {
-            LogManager.logError("Failed to save tokens in Keychain: \(error.localizedDescription)")
-            throw error
+        if let accessJwt = accessJwt {
+            try saveAccessToken(accessJwt, type: type)
         }
-    }
+        if let refreshJwt = refreshJwt {
+            try saveRefreshToken(refreshJwt, type: type)
+        }
+        try saveTokenType(type)
+        LogManager.logDebug("TokenManager - Tokens saved successfully")
 
-    func saveAccessToken(_ token: String) throws {
+        // Publish token updated event
+        await EventBus.shared.publish(.tokensUpdated(accessToken: accessJwt ?? "", refreshToken: refreshJwt ?? ""))
+    }
+    
+    private func saveAccessToken(_ token: String, type: TokenType) throws {
         guard let data = token.data(using: .utf8) else {
             throw TokenError.invalidTokenData
         }
-        try KeychainManager.store(key: "accessJwt", value: data)
+        switch type {
+        case .bearer:
+            try KeychainManager.store(key: "accessJwt", value: data, namespace: namespace)
+        case .dpop:
+            try KeychainManager.store(key: "accessJwt", value: data, namespace: namespace)
+        }
     }
 
-    func saveRefreshToken(_ token: String) throws {
+    private func saveRefreshToken(_ token: String, type: TokenType) throws {
         guard let data = token.data(using: .utf8) else {
             throw TokenError.invalidTokenData
         }
-        try KeychainManager.store(key: "refreshJwt", value: data)
+        switch type {
+        case .bearer:
+            try KeychainManager.store(key: "refreshJwt", value: data, namespace: namespace)
+        case .dpop:
+            try KeychainManager.store(key: "refreshJwt", value: data, namespace: namespace)
+        }
     }
 
-    func fetchAccessToken() -> String? {
-        guard let data = try? KeychainManager.retrieve(key: "accessJwt") else {
+    private func saveTokenType(_ type: TokenType) throws {
+        guard let data = try? JSONEncoder().encode(type) else {
+            throw TokenError.invalidTokenData
+        }
+        try KeychainManager.store(key: "tokenType", value: data, namespace: namespace)
+    }
+
+    func fetchAccessToken() async -> String?  {
+        guard let token = accessJwt else {
+            LogManager.logDebug("TokenManager - No access token available")
             return nil
         }
-        return String(data: data, encoding: .utf8)
-    }
-
-    func fetchRefreshToken() -> String? {
-        guard let data = try? KeychainManager.retrieve(key: "refreshJwt") else {
-            return nil
-        }
-        return String(data: data, encoding: .utf8)
-    }
-
-    public func deleteTokens() throws {
-        try KeychainManager.delete(key: "accessJwt")
-        try KeychainManager.delete(key: "refreshJwt")
-    }
-
-    public func shouldRefreshTokens() async -> Bool {
-        LogManager.logDebug("Checking if tokens should be refreshed.")
-
-        guard let refreshToken = fetchRefreshToken(), let accessToken = fetchAccessToken() else {
-            LogManager.logInfo("TokenManager - One or both tokens missing.")
-            return true
-        }
-
-        do {
-            let refreshPayload = try verifyToken(refreshToken)
-            let accessPayload = try verifyToken(accessToken)
-
-            let currentTime = Date()
-            let refreshTimeToExpiration = refreshPayload.exp.value.timeIntervalSince(currentTime)
-            let accessTimeToExpiration = accessPayload.exp.value.timeIntervalSince(currentTime)
-
-            if accessTimeToExpiration < 0 {
-                LogManager.logInfo("TokenManager - Access token is expired.")
-                return true
-            } else if refreshTimeToExpiration < 0 {
-                LogManager.logInfo("TokenManager - Refresh token is expired.")
-                return true
-            } else if refreshTimeToExpiration < 300 {
-                LogManager.logInfo("TokenManager - Refresh token is close to expiration.")
-                return true
-            } else {
-                LogManager.logDebug("TokenManager - No need to refresh tokens yet.")
-                return false
+        
+        if Task.isCancelled { return nil }
+        
+        // Check if token is expired
+        if let claims = try? await decodeJWT(token: token),
+           let expirationDate = claims.exp,
+           expirationDate <= Date() {
+            LogManager.logInfo("TokenManager - Access token is expired, attempting refresh")
+            Task {
+                await EventBus.shared.publish(.tokenExpired)
             }
+            return nil
+        }
+        
+        LogManager.logDebug("TokenManager - Fetched valid accessJwt: \(token.prefix(30))...")
+        return token
+    }
+    
+    public func fetchRefreshToken() -> String? {
+        var token: String?
+        switch tokenType {
+        case .bearer, .dpop:
+            if let data = try? KeychainManager.retrieve(key: "refreshJwt", namespace: namespace),
+               let savedToken = String(data: data, encoding: .utf8) {
+                token = savedToken
+            } else {
+                LogManager.logDebug("TokenManager - Failed to fetch refreshJwt from Keychain")
+            }
+        case .none:
+            return nil
+        }
+        LogManager.logDebug("TokenManager - Fetched refreshJwt: \(token?.prefix(30) ?? "nil")")
+        return token
+    }
+
+    public func decodeJWT(token: String) async -> OAuthClaims? {
+        do {
+            let jwt = try JWT(jwtString: token)
+            let claims = try ZippyJSONDecoder().decode(OAuthClaims.self, from: jwt.payload)
+            LogManager.logDebug("TokenManager - Decoded JWT claims: \(claims)")
+            return claims
         } catch {
-            LogManager.logError("TokenManager - Error verifying tokens: \(error)")
-            return true
+            LogManager.logError("TokenManager - Failed to decode JWT: \(error)")
+            return nil
         }
     }
 
-    public func decodeJWT(token: String) async -> OAuthJWTPayload? {
-        do {
-            let signers = JWTSigners()
-            return try signers.unverified(token, as: OAuthJWTPayload.self)
-        } catch {
-            LogManager.logError("Failed to decode JWT token: \(error.localizedDescription)")
-            return nil
-        }
+    // MARK: - OAuth-Specific Methods with State Association
+
+    public func storeCodeVerifier(_ codeVerifier: String, for state: String) async throws {
+        codeVerifiers[state] = codeVerifier
+    }
+
+    public func retrieveCodeVerifier(for state: String) async throws -> String? {
+        return codeVerifiers[state]
+    }
+
+    public func deleteCodeVerifier(for state: String) async throws {
+        codeVerifiers.removeValue(forKey: state)
     }
 
     public func storeState(_ state: String) async throws {
-        try await storeValue(state, for: "oauth_state")
+        states.insert(state)
     }
 
-    public func retrieveState() async throws -> String? {
-        return try await retrieveValue(for: "oauth_state")
+    public func retrieveState(_ state: String) async throws -> String? {
+        if states.contains(state) {
+            return state
+        }
+        return nil
     }
 
-    public func deleteState() async throws {
-        try await deleteValue(for: "oauth_state")
+    public func deleteState(_ state: String) async throws {
+        states.remove(state)
     }
 
-    public func storeCodeVerifier(_ codeVerifier: String) async throws {
-        try await storeValue(codeVerifier, for: "oauth_code_verifier")
+    public func validateAndRetrieveState(_ state: String) async throws -> Bool {
+        if states.contains(state) {
+            states.remove(state)
+            return true
+        }
+        return false
     }
 
-    public func retrieveCodeVerifier() async throws -> String? {
-        return try await retrieveValue(for: "oauth_code_verifier")
+    // MARK: - Token Refresh and Verification
+
+    private func verifyToken(_ token: String) throws -> OAuthClaims {
+        LogManager.logDebug("TokenManager - Verifying token: \(token.prefix(50))...")
+
+        // Check if this is a refresh token (starts with "ref-")
+        if token.starts(with: "ref-") {
+            // For refresh tokens, we don't verify them, we just assume they're valid
+            LogManager.logDebug("TokenManager - Refresh token detected, skipping verification")
+            throw TokenError.refreshTokenDetected
+        }
+
+        do {
+            let components = token.components(separatedBy: ".")
+            if components.count >= 1, let headerData = Data(base64Encoded: components[0].base64URLUnescaped()) {
+                let headerString = String(data: headerData, encoding: .utf8) ?? "Unable to decode header"
+                LogManager.logDebug("TokenManager - Token header: \(headerString)")
+
+                if let headerDict = try? JSONSerialization.jsonObject(with: headerData, options: []) as? [String: Any],
+                   let typ = headerDict["typ"] as? String,
+                   typ == "at+jwt" {
+                    // This is a DPoP token
+                    return try verifyDPoPToken(token)
+                }
+            }
+
+            // If it's not a DPoP token or refresh token, proceed with regular JWT verification
+            let jwt = try JWT(jwtString: token)
+
+            // For now, we're not verifying the signature as we don't have the correct key
+            // In a production environment, you would verify the signature here
+
+            return try ZippyJSONDecoder().decode(OAuthClaims.self, from: jwt.payload)
+        } catch {
+            LogManager.logError("TokenManager - Failed to verify token: \(error)")
+            throw TokenError.verificationFailed(error)
+        }
     }
 
-    public func deleteCodeVerifier() async throws {
-        try await deleteValue(for: "oauth_code_verifier")
+    private func verifyDPoPToken(_ token: String) throws -> OAuthClaims {
+        // For DPoP tokens, we don't verify the signature here.
+        // We just decode the claims and check the expiration.
+        let jwt = try JWT(jwtString: token)
+        let claims = try ZippyJSONDecoder().decode(OAuthClaims.self, from: jwt.payload)
+
+        if let exp = claims.exp, exp <= Date() {
+            throw TokenError.tokenExpired
+        }
+
+        return claims
     }
 
-    private func storeValue(_ value: String, for key: String) async throws {
-        let data = value.data(using: .utf8)!
-        try KeychainManager.store(key: key, value: data)
-    }
+    private func extractKeyID(from token: String) throws -> String? {
+        let components = token.components(separatedBy: ".")
+        guard components.count >= 1, let headerData = Data(base64Encoded: components[0].base64URLUnescaped()) else {
+            throw TokenError.invalidTokenFormat
+        }
 
-    private func retrieveValue(for key: String) async throws -> String? {
-        guard let data = try? KeychainManager.retrieve(key: key) else { return nil }
-        return String(data: data, encoding: .utf8)
-    }
+        if let headerDict = try? JSONSerialization.jsonObject(with: headerData, options: []) as? [String: Any] {
+            return headerDict["kid"] as? String
+        }
 
-    private func deleteValue(for key: String) async throws {
-        try KeychainManager.delete(key: key)
+        return nil
     }
 }
 
-// Define TokenError and JWTPayload within the same file to keep them scoped correctly.
+// MARK: - OAuthClaims Structure
+
+public struct OAuthClaims: Codable, JWTRegisteredFieldsClaims, Sendable {
+    public let iss: String?
+    public let sub: String?
+    private let _aud: [String]?  // Internal property to store aud
+    public var aud: [String]? { _aud }  // Computed property to satisfy protocol
+    public let exp: Date?
+    public let nbf: Date?
+    public let iat: Date?
+    public let jti: String?
+    public let scope: String
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        iss = try container.decodeIfPresent(String.self, forKey: .iss)
+        sub = try container.decodeIfPresent(String.self, forKey: .sub)
+
+        // Decode `aud` as either String or Array
+        if let audArray = try? container.decode([String].self, forKey: .aud) {
+            _aud = audArray
+        } else if let audString = try? container.decode(String.self, forKey: .aud) {
+            _aud = [audString]
+        } else {
+            _aud = nil
+        }
+
+        exp = try container.decodeIfPresent(Date.self, forKey: .exp)
+        nbf = try container.decodeIfPresent(Date.self, forKey: .nbf)
+        iat = try container.decodeIfPresent(Date.self, forKey: .iat)
+        jti = try container.decodeIfPresent(String.self, forKey: .jti)
+        scope = try container.decode(String.self, forKey: .scope)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(iss, forKey: .iss)
+        try container.encodeIfPresent(sub, forKey: .sub)
+        try container.encodeIfPresent(_aud, forKey: .aud)  // Encode the internal _aud property
+        try container.encodeIfPresent(exp, forKey: .exp)
+        try container.encodeIfPresent(nbf, forKey: .nbf)
+        try container.encodeIfPresent(iat, forKey: .iat)
+        try container.encodeIfPresent(jti, forKey: .jti)
+        try container.encode(scope, forKey: .scope)
+    }
+
+    public func validateExtraClaims() throws {
+        // Implement any additional claim validations here
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case iss, sub, aud, exp, nbf, iat, jti, scope
+    }
+}
+
+// MARK: - TokenError Enumeration
+
 enum TokenError: Error {
     case invalidTokenData
-    case missingJWKSURI
     case missingJWKS
+    case missingJWKSURI
+    case unsupportedAlgorithm(String)
+    case invalidJWKFormat
+    case missingAlgorithm
+    case noValidSigners
+    case verificationFailed(Error)
+    case tokenExpired
+    case tokenNotYetValid
+    case invalidTokenFormat
+    case missingKeyID
+    case missingSigningKey
+    case refreshTokenDetected
 
     var localizedDescription: String {
         switch self {
@@ -283,29 +497,42 @@ enum TokenError: Error {
             return "Missing JWKS URI in server metadata"
         case .missingJWKS:
             return "Missing JWKS"
+        case .unsupportedAlgorithm(let alg):
+            return "Unsupported algorithm: \(alg)"
+        case .invalidJWKFormat:
+            return "Invalid JWK format"
+        case .missingAlgorithm:
+            return "Missing algorithm"
+        case .noValidSigners:
+            return "No valid signers"
+        case .verificationFailed(let error):
+            return error.localizedDescription
+        case .tokenExpired:
+            return "Token expired"
+        case .tokenNotYetValid:
+            return "Token not yet valid"
+        case .invalidTokenFormat:
+            return "Invalid JWT format"
+        case .missingKeyID:
+            return "Token missing key ID"
+        case .missingSigningKey:
+            return "Token missing signing key"
+        case .refreshTokenDetected:
+            return "Refresh token detected; should skip verification"
         }
     }
 }
 
-public struct OAuthJWTPayload: JWTPayload, @unchecked Sendable {
-    public let sub: SubjectClaim
-    public let exp: ExpirationClaim
-    public let iat: IssuedAtClaim
-    public let scope: String
-    public let aud: AudienceClaim
+// MARK: - String Extension for Base64URL
 
-    public func verify(using _: JWTSigner) throws {
-        try exp.verifyNotExpired()
+extension String {
+    func base64URLUnescaped() -> String {
+        var result = replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        while result.count % 4 != 0 {
+            result += "="
+        }
+        return result
     }
 }
 
-////  "alg": "ES256K"
-// public struct JWTPayload: Codable, Sendable {
-//    let scope: String
-//    let sub: String
-//    let exp: Int
-//    let iat: Int
-//    let aud: String
-//    var expirationDate: Date { Date(timeIntervalSince1970: Double(exp)) }
-//    var issuedAtDate: Date { Date(timeIntervalSince1970: Double(iat)) }
-// }

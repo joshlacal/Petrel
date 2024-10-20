@@ -27,7 +27,7 @@ jobs:
           pip install -r Generator/requirements.txt
       - name: Generate Swift code
         run: |
-          python Generator/Generator.py Generator/lexicons Sources/Petrel/Generated
+          python run.py Generator/lexicons Sources/Petrel/Generated
       - name: Install SwiftFormat
         run: |
           brew update

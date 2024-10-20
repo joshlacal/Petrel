@@ -1,26 +1,30 @@
 import Foundation
-internal import ZippyJSON
+import ZippyJSON
+
 
 // lexicon: 1, id: chat.bsky.actor.defs
 
-public enum ChatBskyActorDefs {
-    public static let typeIdentifier = "chat.bsky.actor.defs"
 
-    public struct ProfileViewBasic: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "chat.bsky.actor.defs#profileViewBasic"
-        public let did: String
-        public let handle: String
-        public let displayName: String?
-        public let avatar: URI?
-        public let associated: AppBskyActorDefs.ProfileAssociated?
-        public let viewer: AppBskyActorDefs.ViewerState?
-        public let labels: [ComAtprotoLabelDefs.Label]?
-        public let chatDisabled: Bool?
+public struct ChatBskyActorDefs { 
+
+    public static let typeIdentifier = "chat.bsky.actor.defs"
+        
+public struct ProfileViewBasic: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "chat.bsky.actor.defs#profileViewBasic"
+            public let did: String
+            public let handle: String
+            public let displayName: String?
+            public let avatar: URI?
+            public let associated: AppBskyActorDefs.ProfileAssociated?
+            public let viewer: AppBskyActorDefs.ViewerState?
+            public let labels: [ComAtprotoLabelDefs.Label]?
+            public let chatDisabled: Bool?
 
         // Standard initializer
         public init(
             did: String, handle: String, displayName: String?, avatar: URI?, associated: AppBskyActorDefs.ProfileAssociated?, viewer: AppBskyActorDefs.ViewerState?, labels: [ComAtprotoLabelDefs.Label]?, chatDisabled: Bool?
         ) {
+            
             self.did = did
             self.handle = handle
             self.displayName = displayName
@@ -35,57 +39,65 @@ public enum ChatBskyActorDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                did = try container.decode(String.self, forKey: .did)
-
+                
+                self.did = try container.decode(String.self, forKey: .did)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'did': \(error)")
                 throw error
             }
             do {
-                handle = try container.decode(String.self, forKey: .handle)
-
+                
+                self.handle = try container.decode(String.self, forKey: .handle)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'handle': \(error)")
                 throw error
             }
             do {
-                displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
-
+                
+                self.displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'displayName': \(error)")
                 throw error
             }
             do {
-                avatar = try container.decodeIfPresent(URI.self, forKey: .avatar)
-
+                
+                self.avatar = try container.decodeIfPresent(URI.self, forKey: .avatar)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'avatar': \(error)")
                 throw error
             }
             do {
-                associated = try container.decodeIfPresent(AppBskyActorDefs.ProfileAssociated.self, forKey: .associated)
-
+                
+                self.associated = try container.decodeIfPresent(AppBskyActorDefs.ProfileAssociated.self, forKey: .associated)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'associated': \(error)")
                 throw error
             }
             do {
-                viewer = try container.decodeIfPresent(AppBskyActorDefs.ViewerState.self, forKey: .viewer)
-
+                
+                self.viewer = try container.decodeIfPresent(AppBskyActorDefs.ViewerState.self, forKey: .viewer)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'viewer': \(error)")
                 throw error
             }
             do {
-                labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
-
+                
+                self.labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'labels': \(error)")
                 throw error
             }
             do {
-                chatDisabled = try container.decodeIfPresent(Bool.self, forKey: .chatDisabled)
-
+                
+                self.chatDisabled = try container.decodeIfPresent(Bool.self, forKey: .chatDisabled)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'chatDisabled': \(error)")
                 throw error
@@ -95,34 +107,42 @@ public enum ChatBskyActorDefs {
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
             try container.encode(did, forKey: .did)
-
+            
+            
             try container.encode(handle, forKey: .handle)
-
+            
+            
             if let value = displayName {
                 try container.encode(value, forKey: .displayName)
             }
-
+            
+            
             if let value = avatar {
                 try container.encode(value, forKey: .avatar)
             }
-
+            
+            
             if let value = associated {
                 try container.encode(value, forKey: .associated)
             }
-
+            
+            
             if let value = viewer {
                 try container.encode(value, forKey: .viewer)
             }
-
+            
+            
             if let value = labels {
                 try container.encode(value, forKey: .labels)
             }
-
+            
+            
             if let value = chatDisabled {
                 try container.encode(value, forKey: .chatDisabled)
             }
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -162,39 +182,46 @@ public enum ChatBskyActorDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-
-            if did != other.did {
+            
+            if self.did != other.did {
                 return false
             }
-
-            if handle != other.handle {
+            
+            
+            if self.handle != other.handle {
                 return false
             }
-
+            
+            
             if displayName != other.displayName {
                 return false
             }
-
+            
+            
             if avatar != other.avatar {
                 return false
             }
-
+            
+            
             if associated != other.associated {
                 return false
             }
-
+            
+            
             if viewer != other.viewer {
                 return false
             }
-
+            
+            
             if labels != other.labels {
                 return false
             }
-
+            
+            
             if chatDisabled != other.chatDisabled {
                 return false
             }
-
+            
             return true
         }
 
@@ -214,4 +241,10 @@ public enum ChatBskyActorDefs {
             case chatDisabled
         }
     }
+
+
+
 }
+
+
+                           

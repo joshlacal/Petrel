@@ -46,13 +46,10 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
         if let typeName = container.allKeys.first(where: { $0.stringValue == "$type" }),
            let typeValue = try? container.decode(String.self, forKey: typeName) {
 
-            LogManager.logDebug("Attempting to decode type: \(typeValue)")
 
             if let decoderFunction = ATProtocolValueContainer.decoderFactory.decoder(for: typeValue) {
                 self = try decoderFunction(decoder)
-                LogManager.logDebug("Attempting to decode type: \(typeValue)")
             } else {
-                LogManager.logDebug("Attempting to decode type: \(typeValue)")
                 let unknownObject = try ATProtocolValueContainer.decodeAny(from: container)
                 self = .unknownType(typeValue, unknownObject)
             }
@@ -69,28 +66,22 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
     private static func decodeSingleValue(from decoder: Decoder) throws -> ATProtocolValueContainer {
         let container = try decoder.singleValueContainer()
 
-        LogManager.logDebug("Attempting to decode as String")
         if let stringValue = try? container.decode(String.self) {
             return .string(stringValue)
         }
-        LogManager.logDebug("Failed to decode as String, attempting to decode as Int")
         if let intValue = try? container.decode(Int.self) {
             return .number(intValue)
         }
-        LogManager.logDebug("Failed to decode as Int, attempting to decode as BigNumber")
         if let bigNumberString = try? container.decode(String.self) {
             return .bigNumber(bigNumberString)
         }
-        LogManager.logDebug("Failed to decode as BigNumber, attempting to decode as Bool")
         if let boolValue = try? container.decode(Bool.self) {
             return .bool(boolValue)
         }
-        LogManager.logDebug("Failed to decode as Bool, attempting to decode as Null")
         if container.decodeNil() {
             return .null
         }
 
-        LogManager.logDebug("Failed to decode as basic type, attempting to decode as Array or Object")
 
         if var arrayContainer = try? decoder.unkeyedContainer() {
             return .array(try decodeAny(from: &arrayContainer))
@@ -159,7 +150,6 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
     private static func decodeAny(from container: KeyedDecodingContainer<DynamicCodingKeys>) throws -> ATProtocolValueContainer {
         var dictionary = [String: ATProtocolValueContainer]()
         for key in container.allKeys {
-            LogManager.logDebug("Decoding key: \(key.stringValue)")
             if let boolValue = try? container.decode(Bool.self, forKey: key) {
                 dictionary[key.stringValue] = .bool(boolValue)
             } else if let intValue = try? container.decode(Int.self, forKey: key) {
@@ -173,7 +163,6 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
             } else if var arrayContainer = try? container.nestedUnkeyedContainer(forKey: key) {
                 var array = [ATProtocolValueContainer]()
                 while !arrayContainer.isAtEnd {
-                    LogManager.logDebug("Decoding array element at index \(arrayContainer.currentIndex)")
                     let value = try arrayContainer.decode(ATProtocolValueContainer.self)
                     array.append(value)
                 }
@@ -189,7 +178,6 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
     private static func decodeAny(from unkeyedContainer: inout UnkeyedDecodingContainer) throws -> [ATProtocolValueContainer] {
         var array = [ATProtocolValueContainer]()
         while !unkeyedContainer.isAtEnd {
-            LogManager.logDebug("Decoding array element at index \(unkeyedContainer.currentIndex)")
             if let value = try? unkeyedContainer.decode(Bool.self) {
                 array.append(.bool(value))
             } else if let value = try? unkeyedContainer.decode(Int.self) {

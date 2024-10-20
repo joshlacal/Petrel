@@ -4,77 +4,88 @@ extension ATProtoClient.{{ template_namespace_name }} {
         {% if is_blob_upload %}
         data: Data,
         mimeType: String,
-        stripMetadata: Bool = true,
+        stripMetadata: Bool = true
         {% elif input_struct_name %}
-        input: {{ input_struct_name }},
+        input: {{ input_struct_name }}
         {% endif %}
-        duringInitialSetup: Bool = {% if during_initial_setup %}true{% else %}false{% endif %}
     ) async throws -> {% if output_type %}(responseCode: Int, data: {{ output_type }}?){% else %}Int{% endif %} {
         let endpoint = "{{ endpoint }}"
-
         {% if is_blob_upload %}
         var dataToUpload = data
-
         if stripMetadata, let strippedData = ImageMetadataStripper.stripMetadata(from: dataToUpload) {
             dataToUpload = strippedData
         }
-
         if mimeType.starts(with: "image/"), let compressedData = compressImage(dataToUpload) {
             dataToUpload = compressedData
         }
-
-        var urlRequest = try await networkManager.createURLRequest(
-            endpoint: endpoint,
-            method: "POST",
-            headers: ["Content-Type": mimeType, "Content-Length": "\(dataToUpload.count)"],
-            body: dataToUpload,
-            queryItems: nil
-        )
+        var headers: [String: String] = [
+            "Content-Type": mimeType,
+            "Content-Length": "\(dataToUpload.count)"
+        ]
         {% else %}
+        var headers: [String: String] = [:]
+        {% if input_encoding %}
+        headers["Content-Type"] = "{{ input_encoding }}"
+        {% endif %}
+        {% endif %}
+        {% if output_encoding %}
+        headers["Accept"] = "{{ output_encoding }}"
+        {% endif %}
+        
         let requestData: Data? = {% if input_struct_name %}try JSONEncoder().encode(input){% else %}nil{% endif %}
         let urlRequest = try await networkManager.createURLRequest(
             endpoint: endpoint,
             method: "POST",
-            headers: ["Content-Type": "application/json"],
-            body: requestData,
+            headers: headers, 
+            body: {% if is_blob_upload %}dataToUpload{% else %}requestData{% endif %},
             queryItems: nil
         )
-        {% endif %}
-
-
+        
         {% if output_type %}
-                let (responseData, response) = try await networkManager.performRequest(urlRequest, retryCount: 0, duringInitialSetup: duringInitialSetup)
+        let (responseData, response) = try await networkManager.performRequest(urlRequest)
         let responseCode = response.statusCode
 
-        let decodedData = try? ZippyJSONDecoder().decode({{ output_type }}.self, from: responseData)
+        // Content-Type validation
+        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+            throw NetworkError.invalidContentType(expected: "{{ output_encoding }}", actual: "nil")
+        }
+        
+        if !contentType.lowercased().contains("{{ output_encoding.lower() }}") {
+            throw NetworkError.invalidContentType(expected: "{{ output_encoding }}", actual: contentType)
+        }
+
+        // Data decoding and validation
+        {% if output_encoding == "application/json" %}
+        let decoder = ZippyJSONDecoder()
+        let decodedData = try? decoder.decode({{ output_type }}.self, from: responseData)
+        {% elif output_encoding in ["*/*", "application/vnd.ipld.car", "application/jsonl"] %}
+        let decodedData = {{ output_type }}(data: responseData)
+        {% else %}
+        let decodedData = {{ output_type }}(data: responseData)
+        {% endif %}
+        
         return (responseCode, decodedData)
         {% else %}
-        
-        let (_, response) = try await networkManager.performRequest(urlRequest, retryCount: 0, duringInitialSetup: duringInitialSetup)
+        let (_, response) = try await networkManager.performRequest(urlRequest)
         let responseCode = response.statusCode
-
         return responseCode
         {% endif %}
     }
-
     {% if is_blob_upload %}
     private func compressImage(_ imageData: Data, maxSizeInBytes: Int = 1000000) -> Data? {
         #if canImport(UIKit)
         guard let image = UIImage(data: imageData) else { return nil }
         var compression: CGFloat = 1.0
         var compressedData = image.jpegData(compressionQuality: compression)
-
         while (compressedData?.count ?? 0) > maxSizeInBytes && compression > 0.1 {
             compression -= 0.1
             compressedData = image.jpegData(compressionQuality: compression)
         }
-
         return compressedData
         #elseif canImport(AppKit)
         guard let image = NSImage(data: imageData) else { return nil }
         var compression: CGFloat = 1.0
         var compressedData: Data?
-
         repeat {
             if let tiffRepresentation = image.tiffRepresentation,
                let bitmapImage = NSBitmapImageRep(data: tiffRepresentation) {
@@ -82,7 +93,6 @@ extension ATProtoClient.{{ template_namespace_name }} {
             }
             compression -= 0.1
         } while (compressedData?.count ?? 0) > maxSizeInBytes && compression > 0.1
-
         return compressedData
         #else
         LogManager.logError("Image compression not supported on this platform")

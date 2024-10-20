@@ -5,28 +5,39 @@ extension ATProtoClient.{{ template_namespace_name }} {
         
         {% if input_struct_name %}
         let queryItems = input.asQueryItems()
+        {% else %}
+        let queryItems: [URLQueryItem]? = nil
+        {% endif %}
         let urlRequest = try await networkManager.createURLRequest(
             endpoint: endpoint,
             method: "GET",
-            headers: [:],
+            headers: ["Accept": "{{ output_encoding }}"],
             body: nil,
             queryItems: queryItems
         )
-        {% else %}
-        let urlRequest = try await networkManager.createURLRequest(
-            endpoint: endpoint,
-            method: "GET",
-            headers: [:],
-            body: nil,
-            queryItems: nil
-        )
-        {% endif %}
         
-        let (responseData, response) = try await networkManager.performRequest(urlRequest, retryCount: 0, duringInitialSetup: {% if during_initial_setup %}true{% else %}false{% endif %})
+        let (responseData, response) = try await networkManager.performRequest(urlRequest)
         let responseCode = response.statusCode
 
+        // Content-Type validation
+        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+            throw NetworkError.invalidContentType(expected: "{{ output_encoding }}", actual: "nil")
+        }
+        
+        if !contentType.lowercased().contains("{{ output_encoding.lower() }}") {
+            throw NetworkError.invalidContentType(expected: "{{ output_encoding }}", actual: contentType)
+        }
+
+        // Data decoding and validation
+        {% if output_encoding == "application/json" %}
         let decoder = ZippyJSONDecoder()
         let decodedData = try? decoder.decode({{ output_type }}.self, from: responseData)
+        {% elif output_encoding in ["*/*", "application/vnd.ipld.car", "application/jsonl"] %}
+        let decodedData = {{ output_type }}(data: responseData)
+        {% else %}
+        let decodedData = {{ output_type }}(data: responseData)
+        {% endif %}
+        
         return (responseCode, decodedData)
     }
 }

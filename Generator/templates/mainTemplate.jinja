@@ -1,5 +1,5 @@
 import Foundation
-internal import ZippyJSON
+import ZippyJSON
 {% if is_blob_upload %}
 #if canImport(UIKit)
 import UIKit
@@ -26,6 +26,7 @@ public struct {{ struct_name }}{{ conformance }} {
 
 {{ enums }}
 }
+
 {{ procedure }}
 {{ query }}                           
 

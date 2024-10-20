@@ -11,53 +11,87 @@ public protocol AuthenticationDelegate: AnyObject, Sendable {
     func authenticationRequired(client: ATProtoClient) async
 }
 
-protocol AuthenticationManaging: Sendable, SessionDelegate {
+/// Protocol defining the interface for managing authentication.
+protocol AuthenticationManaging: Sendable {
     func createSession(identifier: String, password: String) async throws
     func reauthenticate() async throws
-    func setClient(_ client: ATProtoClient)
+    func setClient(_ client: ATProtoClient) async
 }
 
-actor AuthenticationManager: AuthenticationManaging, SessionDelegate {
-    private var authService: AuthenticationService
-    weak var client: ATProtoClient?
-
-    init(authService: AuthenticationService, client: ATProtoClient? = nil) {
-        self.authService = authService
+/// Actor responsible for managing authentication flows.
+actor AuthenticationManager: AuthenticationManaging {
+    // MARK: - Properties
+    
+    private let authenticationService: AuthenticationService
+    private weak var client: ATProtoClient?
+    
+    // MARK: - Initialization
+    
+    /// Initializes the AuthenticationManager with the AuthenticationService.
+    ///
+    /// - Parameters:
+    ///   - authenticationService: The unified authentication service.
+    ///   - client: The ATProtoClient instance.
+    public init(
+        authenticationService: AuthenticationService,
+        client: ATProtoClient
+    ) async {
+        self.authenticationService = authenticationService
         self.client = client
     }
-
-    func setClient(_ client: ATProtoClient) {
+    
+    // MARK: - AuthenticationManaging Protocol Methods
+    
+    /// Sets the ATProtoClient instance.
+    ///
+    /// - Parameter client: The ATProtoClient instance.
+    public func setClient(_ client: ATProtoClient) {
         self.client = client
     }
-
-    func createSession(identifier: String, password: String) async throws {
+    
+    /// Creates a new session using the appropriate authentication method.
+    ///
+    /// - Parameters:
+    ///   - identifier: The user's identifier (e.g., handle).
+    ///   - password: The user's password.
+    public func createSession(identifier: String, password: String) async throws {
         do {
-            try await authService.createSession(identifier: identifier, password: password)
+            try await authenticationService.login(identifier: identifier, password: password)
         } catch {
-            print("Failed to create session: \(error)")
+            LogManager.logError("AuthenticationManager - Failed to create session: \(error)")
             throw error
         }
     }
-
-    func reauthenticate() async throws {
-        guard let client = client else {
-            print("Client is nil, cannot reauthenticate.")
-            return
-        }
-
+    
+    /// Reauthenticates the user.
+    public func reauthenticate() async throws {
         do {
-            let success = try await authService.refreshTokenIfNeeded()
-            if !success {
-                await client.authDelegate?.authenticationRequired(client: client)
+            let refreshed = try await authenticationService.refreshTokenIfNeeded()
+            if !refreshed {
+                await notifyAuthenticationRequired()
             }
         } catch {
-            print("Reauthentication failed: \(error)")
-            await client.authDelegate?.authenticationRequired(client: client)
+            LogManager.logError("AuthenticationManager - Reauthentication failed: \(error)")
+            await notifyAuthenticationRequired()
             throw error
         }
     }
-
-    func sessionRequiresReauthentication(sessionManager _: SessionManager) async throws {
+    
+    /// Handles session reauthentication requests from SessionManager.
+    ///
+    /// - Parameter sessionManager: The SessionManager requesting reauthentication.
+    func sessionRequiresReauthentication(sessionManager: SessionManager) async throws {
         try await reauthenticate()
+    }
+    
+    // MARK: - Helper Methods
+    
+    /// Notifies the ATProtoClient that authentication is required.
+    private func notifyAuthenticationRequired() async {
+        guard let client = client else {
+            LogManager.logError("AuthenticationManager - ATProtoClient is not set.")
+            return
+        }
+        await client.authDelegate?.authenticationRequired(client: client)
     }
 }

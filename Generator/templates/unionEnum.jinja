@@ -45,17 +45,14 @@ public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProt
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let typeValue = try container.decode(String.self, forKey: .type)
-        LogManager.logDebug("{{ name }} decoding: \(typeValue)")
 
         switch typeValue {
         {%- for variant in variants %}
         case "{{ variant }}":
-            LogManager.logDebug("Decoding as {{ variant }}")
             let value = try {{ variant | convertRefToSwift }}(from: decoder)
             self = .{{ variant | convertRefToSwift | lowerCamelCase }}(value)
         {%- endfor %}
         default:
-            LogManager.logDebug("{{ name }} decoding encountered an unexpected type: \(typeValue)")
             let unknownValue = try ATProtocolValueContainer(from: decoder)
             self = .unexpected(unknownValue)
         }
@@ -67,12 +64,10 @@ public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProt
         switch self {
         {%- for variant in variants %}
         case .{{ variant | convertRefToSwift | lowerCamelCase }}(let value):
-            LogManager.logDebug("Encoding {{ variant }}")
             try container.encode("{{ variant }}", forKey: .type)
             try value.encode(to: encoder)
         {%- endfor %}
         case .unexpected(let ATProtocolValueContainer):
-            LogManager.logDebug("{{ name }} encoding unexpected value")
             try ATProtocolValueContainer.encode(to: encoder)
         }
     }

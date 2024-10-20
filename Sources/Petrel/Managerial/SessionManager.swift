@@ -7,151 +7,137 @@
 
 import Foundation
 
-protocol SessionManaging: Actor, TokenDelegate {
+// MARK: - SessionManaging Protocol
+
+protocol SessionManaging: Actor {
     func hasValidSession() async -> Bool
+    func isUserLoggedIn() async -> Bool
     func initializeIfNeeded() async throws
-    func clearSession() async
-    func setSessionDelegate(with delegate: SessionDelegate) async
+    func clearSession() async throws
 }
 
-protocol SessionDelegate: Actor {
-    func sessionRequiresReauthentication(sessionManager: SessionManager) async throws
-}
+// MARK: - SessionManager Actor
 
-actor SessionManager: SessionManaging, TokenDelegate {
-    private var tokenManager: TokenManaging
-    private var authService: AuthenticationService
-    private var sessionState: SessionState = .uninitialized
-    var sessionDelegate: SessionDelegate?
-
-    init(tokenManager: TokenManaging, authService: AuthenticationService) {
+actor SessionManager: SessionManaging {
+    
+    // MARK: - Properties
+    
+    private let tokenManager: TokenManaging
+    private let middlewareService: MiddlewareServicing
+    private var lastSessionCheckTime: Date = .distantPast
+    private let sessionCheckInterval: TimeInterval = 5 // 5 seconds
+    private(set) var isAuthenticated: Bool = false
+    private var isInitializing: Bool = false
+    
+    // MARK: - Initialization
+    
+    init(tokenManager: TokenManaging, middlewareService: MiddlewareServicing) async {
         self.tokenManager = tokenManager
-        self.authService = authService
+        self.middlewareService = middlewareService
+
+//            await self.subscribeToEvents()
     }
-
-    func setSessionDelegate(with delegate: SessionDelegate) {
-        sessionDelegate = delegate
-    }
-
-    public enum SessionState: Equatable {
-        case uninitialized
-        case initializing
-        case valid
-        case expired
-        case failed(Error)
-
-        public static func == (lhs: SessionState, rhs: SessionState) -> Bool {
-            switch (lhs, rhs) {
-            case (.uninitialized, .uninitialized),
-                 (.initializing, .initializing),
-                 (.valid, .valid),
-                 (.expired, .expired):
-                return true
-            case let (.failed(lhsError), .failed(rhsError)):
-                return lhsError.localizedDescription == rhsError.localizedDescription
+    
+    // MARK: - Event Subscription
+    
+    private func subscribeToEvents() async {
+        let eventStream = await EventBus.shared.subscribe()
+        for await event in eventStream {
+            switch event {
+//            case .tokensUpdated:
+//                Task { try await self.initializeIfNeeded() }
+//            case .tokenRefreshCompleted(let result):
+//                await self.handleTokenRefreshCompletion(result)
+//            case .authenticationRequired:
+//                await self.setAuthenticatedState(false)
+//            case .networkError(let error):
+//                LogManager.logError("SessionManager - Received networkError event: \(error)")
             default:
+                break
+            }
+        }
+    }
+    
+    // MARK: - SessionManaging Protocol Methods
+    
+    func hasValidSession() async -> Bool {
+        let now = Date()
+        if now.timeIntervalSince(lastSessionCheckTime) < sessionCheckInterval {
+            return isAuthenticated
+        }
+        
+        lastSessionCheckTime = now
+        
+        do {
+            let hasValidTokens = await tokenManager.hasValidTokens()
+            if !hasValidTokens {
+                // Instead of publishing an event, just return false
                 return false
             }
+            await setAuthenticatedState(true)
+            return true
+        } catch {
+            await setAuthenticatedState(false)
+            return false
         }
     }
-
-    public enum SessionError: Error {
-        case tokenRefreshFailed
-        case tokenUnavailable
+    
+    func isUserLoggedIn() async -> Bool {
+        return await hasValidSession()
     }
-
-    private var initializationTask: Task<Void, Error>?
 
     func initializeIfNeeded() async throws {
-        switch sessionState {
-        case .valid:
-            LogManager.logDebug("Session already valid.")
-            return
-        case let .failed(error):
-            LogManager.logDebug("Previous initialization failed, retrying. Error: \(error)")
-            fallthrough
-        case .uninitialized, .initializing, .expired:
-            try await refreshTokenFlow()
-        }
-    }
-
-    private func refreshTokenFlow() async throws {
-        // Use a serial task to avoid race conditions
-        initializationTask = Task {
-            do {
-                try await validateAndRefreshTokens()
-                sessionState = .valid
-            } catch {
-                sessionState = .failed(error)
-                LogManager.logError("SessionManager - Initialization failed with error: \(error)")
-                throw error
-            }
-        }
-        try await initializationTask?.value
-    }
-
-    // Checks token validity and triggers a refresh if needed.
-    private func validateAndRefreshTokens() async throws {
-        if !(await tokenManager.hasValidTokens()) {
-            try await handleTokenRefresh()
-        } else {
-            sessionState = .valid
-        }
-    }
-
-    // Refreshes tokens using authService and updates the state based on success or failure.
-    private func handleTokenRefresh() async throws {
-        if await tokenManager.shouldRefreshTokens() {
-            do {
-                let refreshed = try await authService.refreshTokenIfNeeded()
-                if refreshed {
-                    sessionState = .valid
-                } else {
-                    sessionState = .expired
-                    throw SessionError.tokenRefreshFailed
-                }
-            } catch {
-                sessionState = .failed(error)
-                throw error
-            }
-        } else {
-            sessionState = .expired
-            throw SessionError.tokenUnavailable
-        }
-    }
-
-    public func hasValidSession() async -> Bool {
-        LogManager.logDebug("SessionManager - Checking for valid session")
-        let tokensValid = await tokenManager.hasValidTokens()
-        if tokensValid {
-            if sessionState != .valid {
-                LogManager.logInfo("SessionManager - Tokens are valid, updating session state")
-                sessionState = .valid
-            }
-        } else {
-            if sessionState == .valid {
-                LogManager.logInfo("SessionManager - Tokens are invalid, updating session state")
-                sessionState = .expired
-            }
-        }
-        LogManager.logDebug(
-            "SessionManager - Session is \(sessionState == .valid ? "valid" : "invalid")")
-        return sessionState == .valid
-    }
-
-    func tokenDidUpdate() async {
-        LogManager.logDebug("SessionManager - Tokens updated, rechecking session validity")
-        _ = await hasValidSession()
-    }
-
-    public func clearSession() async {
-        LogManager.logInfo("Clearing session")
+        if isInitializing { return }
+        
+        isInitializing = true
+        defer { isInitializing = false }
+        
         do {
-            try await tokenManager.deleteTokens()
-            sessionState = .uninitialized
-            LogManager.logInfo("Session cleared successfully")
+            let hasValidSession = await self.hasValidSession()
+            if hasValidSession {
+                await EventBus.shared.publish(.sessionInitialized)
+                return
+            }
+            
+            try await middlewareService.validateAndRefreshSession()
+            
+            let refreshedSession = await self.hasValidSession()
+            if refreshedSession {
+                await EventBus.shared.publish(.sessionInitialized)
+            } else {
+                await EventBus.shared.publish(.sessionExpired)
+                await EventBus.shared.publish(.authenticationRequired)
+            }
         } catch {
-            LogManager.logError("Failed to clear tokens: \(error)")
+            await EventBus.shared.publish(.networkError(error))
+            throw error
+        }
+    }
+
+    func clearSession() async throws {
+        try await middlewareService.clearSession()
+        await EventBus.shared.publish(.sessionExpired)
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func setAuthenticatedState(_ authenticated: Bool) async {
+        self.isAuthenticated = authenticated
+        await MainActor.run {
+            UserDefaults.standard.set(authenticated, forKey: "isAuthenticated")
+            UserDefaults.standard.synchronize()
+        }
+    }
+    
+    private func handleTokenRefreshCompletion(_ result: Result<(accessToken: String, refreshToken: String), Error>) async {
+        switch result {
+        case .success:
+            await setAuthenticatedState(true)
+            await EventBus.shared.publish(.sessionInitialized)
+        case .failure(let error):
+            await setAuthenticatedState(false)
+            await EventBus.shared.publish(.authenticationRequired)
+            LogManager.logError("SessionManager - Token refresh failed: \(error)")
         }
     }
 }
