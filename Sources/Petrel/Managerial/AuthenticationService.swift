@@ -188,6 +188,10 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
     func prepareAuthenticatedRequest(_ request: URLRequest) async throws -> URLRequest {
         var modifiedRequest = request
 
+        // Determine if the request is to the token endpoint
+        let authServerMetadata = await configurationManager.getAuthorizationServerMetadata()
+        let isTokenEndpoint = authServerMetadata?.tokenEndpoint == request.url?.absoluteString
+
         switch authMethod {
         case .legacy:
             if let accessToken = await tokenManager.fetchAccessToken() {
@@ -195,10 +199,14 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
             }
         case .oauth:
             guard let accessToken = await tokenManager.fetchAccessToken() else {
-                return request // If no access token, let's just return the request and hope this is an unauthenticated request
+                return request // If no access token, return the request as is
             }
             // Generate DPoP proof using OAuthManager
-            let dpopProof = try await oauthManager?.generateDPoPProof(for: modifiedRequest.httpMethod ?? "GET", url: modifiedRequest.url?.absoluteString ?? "", accessToken: accessToken) ?? ""
+            let dpopProof = try await oauthManager?.generateDPoPProof(
+                for: modifiedRequest.httpMethod ?? "GET",
+                url: modifiedRequest.url?.absoluteString ?? "",
+                accessToken: isTokenEndpoint ? nil : accessToken // Pass nil for token endpoint
+            ) ?? ""
             modifiedRequest.setValue("DPoP \(accessToken)", forHTTPHeaderField: "Authorization")
             modifiedRequest.setValue(dpopProof, forHTTPHeaderField: "DPoP")
         }
