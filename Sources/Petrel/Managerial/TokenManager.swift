@@ -14,8 +14,8 @@ import ZippyJSON
 // MARK: - TokenType Enumeration
 
 public enum TokenType: String, Codable {
-    case bearer    // Legacy authentication
-    case dpop      // OAuth authentication
+    case bearer // Legacy authentication
+    case dpop // OAuth authentication
 }
 
 // MARK: - TokenManaging Protocol
@@ -49,7 +49,6 @@ protocol TokenManaging: Actor {
 // MARK: - TokenManager Actor
 
 public actor TokenManager: TokenManaging {
-    
     private let namespace: String
     private var accessJwt: String?
     private var refreshJwt: String?
@@ -70,25 +69,27 @@ public actor TokenManager: TokenManaging {
         LogManager.logDebug("Token Manager initialized")
     }
 
-
     private func loadInitialTokens() async {
         if let data = try? KeychainManager.retrieve(key: "tokenType", namespace: namespace),
-           let type = try? JSONDecoder().decode(TokenType.self, from: data) {
-            self.tokenType = type
+           let type = try? JSONDecoder().decode(TokenType.self, from: data)
+        {
+            tokenType = type
             LogManager.logDebug("TokenManager - Initialized with token type: \(type.rawValue)")
         } else {
             LogManager.logDebug("TokenManager - No token type found in Keychain")
         }
 
         if let accessData = try? KeychainManager.retrieve(key: "accessJwt", namespace: namespace),
-           let savedAccessToken = String(data: accessData, encoding: .utf8) {
-            self.accessJwt = savedAccessToken
+           let savedAccessToken = String(data: accessData, encoding: .utf8)
+        {
+            accessJwt = savedAccessToken
             LogManager.logDebug("TokenManager - Loaded accessJwt from Keychain")
         }
 
         if let refreshData = try? KeychainManager.retrieve(key: "refreshJwt", namespace: namespace),
-           let savedRefreshToken = String(data: refreshData, encoding: .utf8) {
-            self.refreshJwt = savedRefreshToken
+           let savedRefreshToken = String(data: refreshData, encoding: .utf8)
+        {
+            refreshJwt = savedRefreshToken
             LogManager.logDebug("TokenManager - Loaded refreshJwt from Keychain")
         }
     }
@@ -116,9 +117,9 @@ public actor TokenManager: TokenManaging {
         try KeychainManager.delete(key: "tokenType", namespace: namespace)
 
         // Reset in-memory tokens
-        self.accessJwt = nil
-        self.refreshJwt = nil
-        self.tokenType = nil
+        accessJwt = nil
+        refreshJwt = nil
+        tokenType = nil
 
         // Publish token cleared event
         await EventBus.shared.publish(.tokensCleared)
@@ -127,10 +128,11 @@ public actor TokenManager: TokenManaging {
 
     public func hasValidTokens() async -> Bool {
         guard let accessToken = await fetchAccessToken(),
-              let refreshToken = fetchRefreshToken() else {
+              let refreshToken = fetchRefreshToken()
+        else {
             return false
         }
-        
+
         // Check if access token is expired
         if await isTokenExpired(token: accessToken) {
             // If access token is expired, check if refresh token is still valid
@@ -142,24 +144,24 @@ public actor TokenManager: TokenManaging {
                 return false
             }
         }
-        
+
         return true
     }
-    
+
     func isTokenCloseToExpiration(token: String) async -> Bool {
         guard let payload = await decodeJWT(token: token),
-              let expDate = payload.exp else {
+              let expDate = payload.exp
+        else {
             return true // If we can't decode or there's no expiration, assume it needs refresh
         }
-        
+
         let currentDate = Date()
         let timeInterval = expDate.timeIntervalSince(currentDate)
-        
+
         // Consider the token close to expiration if it's within 5 minutes of expiring
         return timeInterval <= 300
     }
 
-    
     public func isTokenExpired(token: String) async -> Bool {
         // If it's a refresh token, we can't determine expiration this way
         if token.starts(with: "ref-") {
@@ -181,10 +183,11 @@ public actor TokenManager: TokenManaging {
             return true // If verification fails, consider it expired
         }
     }
-    
+
     public func shouldRefreshTokens() async -> Bool {
         guard let accessToken = await fetchAccessToken(),
-              let refreshToken = fetchRefreshToken() else {
+              let refreshToken = fetchRefreshToken()
+        else {
             return true
         }
 
@@ -204,16 +207,15 @@ public actor TokenManager: TokenManaging {
 
         return false
     }
-    
+
     func hasAnyTokens() -> Bool {
         return accessJwt != nil || refreshJwt != nil
     }
 
-
     public func saveTokens(accessJwt: String?, refreshJwt: String?, type: TokenType) async throws {
         self.accessJwt = accessJwt
         self.refreshJwt = refreshJwt
-        self.tokenType = type
+        tokenType = type
 
         LogManager.logDebug("TokenManager - Saving tokens. Access JWT: \(accessJwt?.prefix(30) ?? "nil")..., Refresh JWT: \(refreshJwt?.prefix(30) ?? "nil")..., Type: \(type.rawValue)")
 
@@ -229,7 +231,7 @@ public actor TokenManager: TokenManaging {
         // Publish token updated event
         await EventBus.shared.publish(.tokensUpdated(accessToken: accessJwt ?? "", refreshToken: refreshJwt ?? ""))
     }
-    
+
     private func saveAccessToken(_ token: String, type: TokenType) throws {
         guard let data = token.data(using: .utf8) else {
             throw TokenError.invalidTokenData
@@ -261,35 +263,37 @@ public actor TokenManager: TokenManaging {
         try KeychainManager.store(key: "tokenType", value: data, namespace: namespace)
     }
 
-    func fetchAccessToken() async -> String?  {
+    func fetchAccessToken() async -> String? {
         guard let token = accessJwt else {
             LogManager.logDebug("TokenManager - No access token available")
             return nil
         }
-        
+
         if Task.isCancelled { return nil }
-        
+
         // Check if token is expired
         if let claims = try? await decodeJWT(token: token),
            let expirationDate = claims.exp,
-           expirationDate <= Date() {
+           expirationDate <= Date()
+        {
             LogManager.logInfo("TokenManager - Access token is expired, attempting refresh")
             Task {
                 await EventBus.shared.publish(.tokenExpired)
             }
             return nil
         }
-        
+
         LogManager.logDebug("TokenManager - Fetched valid accessJwt: \(token.prefix(30))...")
         return token
     }
-    
+
     public func fetchRefreshToken() -> String? {
         var token: String?
         switch tokenType {
         case .bearer, .dpop:
             if let data = try? KeychainManager.retrieve(key: "refreshJwt", namespace: namespace),
-               let savedToken = String(data: data, encoding: .utf8) {
+               let savedToken = String(data: data, encoding: .utf8)
+            {
                 token = savedToken
             } else {
                 LogManager.logDebug("TokenManager - Failed to fetch refreshJwt from Keychain")
@@ -370,7 +374,8 @@ public actor TokenManager: TokenManaging {
 
                 if let headerDict = try? JSONSerialization.jsonObject(with: headerData, options: []) as? [String: Any],
                    let typ = headerDict["typ"] as? String,
-                   typ == "at+jwt" {
+                   typ == "at+jwt"
+                {
                     // This is a DPoP token
                     return try verifyDPoPToken(token)
                 }
@@ -421,8 +426,8 @@ public actor TokenManager: TokenManaging {
 public struct OAuthClaims: Codable, JWTRegisteredFieldsClaims, Sendable {
     public let iss: String?
     public let sub: String?
-    private let _aud: [String]?  // Internal property to store aud
-    public var aud: [String]? { _aud }  // Computed property to satisfy protocol
+    private let _aud: [String]? // Internal property to store aud
+    public var aud: [String]? { _aud } // Computed property to satisfy protocol
     public let exp: Date?
     public let nbf: Date?
     public let iat: Date?
@@ -454,7 +459,7 @@ public struct OAuthClaims: Codable, JWTRegisteredFieldsClaims, Sendable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encodeIfPresent(iss, forKey: .iss)
         try container.encodeIfPresent(sub, forKey: .sub)
-        try container.encodeIfPresent(_aud, forKey: .aud)  // Encode the internal _aud property
+        try container.encodeIfPresent(_aud, forKey: .aud) // Encode the internal _aud property
         try container.encodeIfPresent(exp, forKey: .exp)
         try container.encodeIfPresent(nbf, forKey: .nbf)
         try container.encodeIfPresent(iat, forKey: .iat)
@@ -497,7 +502,7 @@ enum TokenError: Error {
             return "Missing JWKS URI in server metadata"
         case .missingJWKS:
             return "Missing JWKS"
-        case .unsupportedAlgorithm(let alg):
+        case let .unsupportedAlgorithm(alg):
             return "Unsupported algorithm: \(alg)"
         case .invalidJWKFormat:
             return "Invalid JWK format"
@@ -505,7 +510,7 @@ enum TokenError: Error {
             return "Missing algorithm"
         case .noValidSigners:
             return "No valid signers"
-        case .verificationFailed(let error):
+        case let .verificationFailed(error):
             return error.localizedDescription
         case .tokenExpired:
             return "Token expired"
@@ -535,4 +540,3 @@ extension String {
         return result
     }
 }
-

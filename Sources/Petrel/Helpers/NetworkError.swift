@@ -50,11 +50,11 @@ extension NetworkError: LocalizedError {
             return "OAuth is not set up."
         case .maxRetryAttemptsReached:
             return "Max retry attempts reached."
-        case .invalidContentType(let expected, let actual):
+        case let .invalidContentType(expected, actual):
             return "Invalid Content-Type received from the server. Expected: \(expected), got \(actual)."
         case .authenticationFailed:
             return "Authentication failed."
-        case .badRequest(description: let description):
+        case let .badRequest(description: description):
             return "Received bad request. \(description)."
         case .invalidRequest:
             return "The request was invalid."

@@ -1,59 +1,47 @@
 import Foundation
 import ZippyJSON
 
-
 // lexicon: 1, id: chat.bsky.convo.deleteMessageForSelf
 
+public enum ChatBskyConvoDeleteMessageForSelf {
+    public static let typeIdentifier = "chat.bsky.convo.deleteMessageForSelf"
+    public struct Input: ATProtocolCodable {
+        public let convoId: String
+        public let messageId: String
 
-public struct ChatBskyConvoDeleteMessageForSelf { 
+        // Standard public initializer
+        public init(convoId: String, messageId: String) {
+            self.convoId = convoId
+            self.messageId = messageId
+        }
+    }
 
-    public static let typeIdentifier = "chat.bsky.convo.deleteMessageForSelf"        
-public struct Input: ATProtocolCodable {
-            public let convoId: String
-            public let messageId: String
-
-            // Standard public initializer
-            public init(convoId: String, messageId: String) {
-                self.convoId = convoId
-                self.messageId = messageId
-                
-            }
-        }    
     public typealias Output = ChatBskyConvoDefs.DeletedMessageView
-    
-
-
-
 }
 
-extension ATProtoClient.Chat.Bsky.Convo {
-    /// 
-    public func deleteMessageForSelf(
-        
+public extension ATProtoClient.Chat.Bsky.Convo {
+    ///
+    func deleteMessageForSelf(
         input: ChatBskyConvoDeleteMessageForSelf.Input
-        
+
     ) async throws -> (responseCode: Int, data: ChatBskyConvoDeleteMessageForSelf.Output?) {
         let endpoint = "chat.bsky.convo.deleteMessageForSelf"
-        
+
         var headers: [String: String] = [:]
-        
+
         headers["Content-Type"] = "application/json"
-        
-        
-        
+
         headers["Accept"] = "application/json"
-        
-        
+
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkManager.createURLRequest(
             endpoint: endpoint,
             method: "POST",
-            headers: headers, 
+            headers: headers,
             body: requestData,
             queryItems: nil
         )
-        
-        
+
         let (responseData, response) = try await networkManager.performRequest(urlRequest)
         let responseCode = response.statusCode
 
@@ -61,20 +49,16 @@ extension ATProtoClient.Chat.Bsky.Convo {
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
-        
+
         if !contentType.lowercased().contains("application/json") {
             throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
         }
 
         // Data decoding and validation
-        
+
         let decoder = ZippyJSONDecoder()
         let decodedData = try? decoder.decode(ChatBskyConvoDeleteMessageForSelf.Output.self, from: responseData)
-        
-        
+
         return (responseCode, decodedData)
-        
     }
-    
 }
-                           

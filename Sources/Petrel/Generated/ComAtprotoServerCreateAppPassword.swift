@@ -1,26 +1,22 @@
 import Foundation
 import ZippyJSON
 
-
 // lexicon: 1, id: com.atproto.server.createAppPassword
 
-
-public struct ComAtprotoServerCreateAppPassword { 
-
+public enum ComAtprotoServerCreateAppPassword {
     public static let typeIdentifier = "com.atproto.server.createAppPassword"
-        
-public struct AppPassword: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "com.atproto.server.createAppPassword#appPassword"
-            public let name: String
-            public let password: String
-            public let createdAt: ATProtocolDate
-            public let privileged: Bool?
+
+    public struct AppPassword: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "com.atproto.server.createAppPassword#appPassword"
+        public let name: String
+        public let password: String
+        public let createdAt: ATProtocolDate
+        public let privileged: Bool?
 
         // Standard initializer
         public init(
             name: String, password: String, createdAt: ATProtocolDate, privileged: Bool?
         ) {
-            
             self.name = name
             self.password = password
             self.createdAt = createdAt
@@ -31,33 +27,29 @@ public struct AppPassword: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                
-                self.name = try container.decode(String.self, forKey: .name)
-                
+                name = try container.decode(String.self, forKey: .name)
+
             } catch {
                 LogManager.logError("Decoding error for property 'name': \(error)")
                 throw error
             }
             do {
-                
-                self.password = try container.decode(String.self, forKey: .password)
-                
+                password = try container.decode(String.self, forKey: .password)
+
             } catch {
                 LogManager.logError("Decoding error for property 'password': \(error)")
                 throw error
             }
             do {
-                
-                self.createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
-                
+                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+
             } catch {
                 LogManager.logError("Decoding error for property 'createdAt': \(error)")
                 throw error
             }
             do {
-                
-                self.privileged = try container.decodeIfPresent(Bool.self, forKey: .privileged)
-                
+                privileged = try container.decodeIfPresent(Bool.self, forKey: .privileged)
+
             } catch {
                 LogManager.logError("Decoding error for property 'privileged': \(error)")
                 throw error
@@ -67,20 +59,16 @@ public struct AppPassword: ATProtocolCodable, ATProtocolValue {
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            
+
             try container.encode(name, forKey: .name)
-            
-            
+
             try container.encode(password, forKey: .password)
-            
-            
+
             try container.encode(createdAt, forKey: .createdAt)
-            
-            
+
             if let value = privileged {
                 try container.encode(value, forKey: .privileged)
             }
-            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -96,26 +84,23 @@ public struct AppPassword: ATProtocolCodable, ATProtocolValue {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            
-            if self.name != other.name {
+
+            if name != other.name {
                 return false
             }
-            
-            
-            if self.password != other.password {
+
+            if password != other.password {
                 return false
             }
-            
-            
-            if self.createdAt != other.createdAt {
+
+            if createdAt != other.createdAt {
                 return false
             }
-            
-            
+
             if privileged != other.privileged {
                 return false
             }
-            
+
             return true
         }
 
@@ -130,59 +115,52 @@ public struct AppPassword: ATProtocolCodable, ATProtocolValue {
             case createdAt
             case privileged
         }
-    }        
-public struct Input: ATProtocolCodable {
-            public let name: String
-            public let privileged: Bool?
+    }
 
-            // Standard public initializer
-            public init(name: String, privileged: Bool? = nil) {
-                self.name = name
-                self.privileged = privileged
-                
-            }
-        }    
-    public typealias Output = AppPassword
-            
-public enum Error: String, Swift.Error, CustomStringConvertible {
-                case accountTakedown = "AccountTakedown."
-            public var description: String {
-                return self.rawValue
-            }
+    public struct Input: ATProtocolCodable {
+        public let name: String
+        public let privileged: Bool?
+
+        // Standard public initializer
+        public init(name: String, privileged: Bool? = nil) {
+            self.name = name
+            self.privileged = privileged
         }
+    }
 
+    public typealias Output = AppPassword
 
-
+    public enum Error: String, Swift.Error, CustomStringConvertible {
+        case accountTakedown = "AccountTakedown."
+        public var description: String {
+            return rawValue
+        }
+    }
 }
 
-extension ATProtoClient.Com.Atproto.Server {
+public extension ATProtoClient.Com.Atproto.Server {
     /// Create an App Password.
-    public func createAppPassword(
-        
+    func createAppPassword(
         input: ComAtprotoServerCreateAppPassword.Input
-        
+
     ) async throws -> (responseCode: Int, data: ComAtprotoServerCreateAppPassword.Output?) {
         let endpoint = "com.atproto.server.createAppPassword"
-        
+
         var headers: [String: String] = [:]
-        
+
         headers["Content-Type"] = "application/json"
-        
-        
-        
+
         headers["Accept"] = "application/json"
-        
-        
+
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkManager.createURLRequest(
             endpoint: endpoint,
             method: "POST",
-            headers: headers, 
+            headers: headers,
             body: requestData,
             queryItems: nil
         )
-        
-        
+
         let (responseData, response) = try await networkManager.performRequest(urlRequest)
         let responseCode = response.statusCode
 
@@ -190,20 +168,16 @@ extension ATProtoClient.Com.Atproto.Server {
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
-        
+
         if !contentType.lowercased().contains("application/json") {
             throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
         }
 
         // Data decoding and validation
-        
+
         let decoder = ZippyJSONDecoder()
         let decodedData = try? decoder.decode(ComAtprotoServerCreateAppPassword.Output.self, from: responseData)
-        
-        
+
         return (responseCode, decodedData)
-        
     }
-    
 }
-                           

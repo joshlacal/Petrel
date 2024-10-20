@@ -5,11 +5,11 @@
 //  Created by Josh LaCalamito on 9/9/24.
 //
 
-import Foundation
-import JSONWebKey
-import JSONWebAlgorithms
-import JSONWebSignature
 import CryptoKit
+import Foundation
+import JSONWebAlgorithms
+import JSONWebKey
+import JSONWebSignature
 import ZippyJSON
 
 // MARK: - AuthorizationServerMetadata Structure
@@ -155,8 +155,7 @@ enum OAuthError: Error, LocalizedError {
 
 extension String {
     func base64URLEscaped() -> String {
-        return self
-            .replacingOccurrences(of: "+", with: "-")
+        return replacingOccurrences(of: "+", with: "-")
             .replacingOccurrences(of: "/", with: "_")
             .replacingOccurrences(of: "=", with: "")
     }
@@ -166,13 +165,12 @@ extension String {
 
 extension Data {
     func base64URLEscaped() -> String {
-        return self.base64EncodedString()
+        return base64EncodedString()
             .replacingOccurrences(of: "+", with: "-")
             .replacingOccurrences(of: "/", with: "_")
             .replacingOccurrences(of: "=", with: "")
     }
 }
-
 
 // MARK: - OAuthManager Actor
 
@@ -190,37 +188,39 @@ actor OAuthManager {
     private let namespace: String
     private let dpopKeyTag: String
 
-    public init(oauthConfig: OAuthConfiguration,
-                networkManager: NetworkManaging,
-                configurationManager: ConfigurationManaging,
-                tokenManager: TokenManaging,
-                didResolver: DIDResolving,
-                namespace: String) async {
+    public init(
+        oauthConfig: OAuthConfiguration,
+        networkManager: NetworkManaging,
+        configurationManager: ConfigurationManaging,
+        tokenManager: TokenManaging,
+        didResolver: DIDResolving,
+        namespace: String
+    ) async {
         self.oauthConfig = oauthConfig
         self.networkManager = networkManager
         self.configurationManager = configurationManager
         self.tokenManager = tokenManager
         self.didResolver = didResolver
         self.namespace = namespace
-        self.dpopKeyTag = "\(namespace).dpopkeypair"
-        
+        dpopKeyTag = "\(namespace).dpopkeypair"
+
         // Initialize stored properties
-        self.lastKeyRegenerationTime = Date()
-        self.dpopNonces = [:]
-        self.dpopKeyPair = nil
-        self.authorizationServerMetadata = await configurationManager.getAuthorizationServerMetadata()
-        self.protectedResourceMetadata = await configurationManager.getProtectedResourceMetadata()
+        lastKeyRegenerationTime = Date()
+        dpopNonces = [:]
+        dpopKeyPair = nil
+        authorizationServerMetadata = await configurationManager.getAuthorizationServerMetadata()
+        protectedResourceMetadata = await configurationManager.getProtectedResourceMetadata()
 
         // Attempt to load existing DPoP key pair
         do {
-            self.dpopKeyPair = try KeychainManager.retrieveDPoPKey(namespace: namespace)
+            dpopKeyPair = try KeychainManager.retrieveDPoPKey(namespace: namespace)
             LogManager.logInfo("Loaded existing DPoP key pair from keychain.")
         } catch {
             // Generate new DPoP key pair if not found
-            self.dpopKeyPair = P256.Signing.PrivateKey()
-            self.lastKeyRegenerationTime = Date()
+            dpopKeyPair = P256.Signing.PrivateKey()
+            lastKeyRegenerationTime = Date()
             do {
-                try KeychainManager.storeDPoPKey(self.dpopKeyPair!, namespace: namespace)
+                try KeychainManager.storeDPoPKey(dpopKeyPair!, namespace: namespace)
                 LogManager.logInfo("Generated new DPoP key pair and stored in keychain.")
             } catch {
                 LogManager.logError("Failed to store DPoP key pair: \(error)")
@@ -308,7 +308,7 @@ actor OAuthManager {
 
         // Step 6: Fetch Authorization Server Metadata
         let authServerMetadata = try await fetchAuthorizationServerMetadata(authServerURL: authorizationServerURL)
-        self.authorizationServerMetadata = authServerMetadata
+        authorizationServerMetadata = authServerMetadata
 
         // Step 7: Generate PKCE code verifier and challenge
         let codeVerifier = generateCodeVerifier()
@@ -337,17 +337,17 @@ actor OAuthManager {
         components.queryItems = [
             URLQueryItem(name: "request_uri", value: requestURI),
             URLQueryItem(name: "client_id", value: oauthConfig.clientId),
-            URLQueryItem(name: "redirect_uri", value: oauthConfig.redirectUri)
+            URLQueryItem(name: "redirect_uri", value: oauthConfig.redirectUri),
         ]
 
         guard let authorizationURL = components.url else {
             throw OAuthError.invalidPDSURL
         }
-        
+
         await EventBus.shared.publish(.oauthFlowStarted(authorizationURL))
         return authorizationURL
     }
-    
+
     func pushAuthorizationRequest(
         codeChallenge: String,
         identifier: String,
@@ -366,7 +366,7 @@ actor OAuthManager {
             "state": state,
             "redirect_uri": oauthConfig.redirectUri,
             "response_type": "code",
-            "login_hint": identifier
+            "login_hint": identifier,
         ]
 
         let body = parameters.percentEncoded()
@@ -385,7 +385,7 @@ actor OAuthManager {
                     method: "POST",
                     headers: [
                         "Content-Type": "application/x-www-form-urlencoded",
-                        "DPoP": dpopProof
+                        "DPoP": dpopProof,
                     ],
                     body: body,
                     queryItems: nil
@@ -407,7 +407,8 @@ actor OAuthManager {
 
                     // Safely extract the DPoP-Nonce and convert endpoint to URL
                     if let newNonce = httpResponse.value(forHTTPHeaderField: "DPoP-Nonce"),
-                       let endpointURL = URL(string: endpoint) {
+                       let endpointURL = URL(string: endpoint)
+                    {
                         // Update the DPoP nonce for the specific domain
                         await updateDPoPNonce(for: endpointURL, from: httpResponse.allHeaderFields as! [String: String])
                         LogManager.logInfo("Received new DPoP nonce from server: \(newNonce)")
@@ -476,8 +477,6 @@ actor OAuthManager {
         throw OAuthError.authorizationFailed
     }
 
-
-
     private func resetOAuthFlow() {
         regenerateDPoPKeyPair()
     }
@@ -543,7 +542,7 @@ actor OAuthManager {
         await networkManager.setProtectedResourceMetadata(metadata)
         return metadata
     }
-    
+
     private func fetchAuthorizationServerMetadata(authServerURL: URL) async throws -> AuthorizationServerMetadata {
         let endpoint = "\(authServerURL.absoluteString)/.well-known/oauth-authorization-server"
         let request = try await networkManager.createURLRequest(
@@ -598,25 +597,24 @@ actor OAuthManager {
             .first(where: { $0.name == "state" })?
             .value
     }
-    
+
     func hasValidDPoPKeyPair() async throws -> Bool {
         guard let keyPair = dpopKeyPair else {
             return false
         }
-        
+
         // Optionally, add more validation logic here
         // For example, check if the key was regenerated recently
         let timeSinceLastRegeneration = Date().timeIntervalSince(lastKeyRegenerationTime)
         let maxKeyAge: TimeInterval = 60 * 60 * 24 // 24 hours
-        
+
         if timeSinceLastRegeneration > maxKeyAge {
             LogManager.logInfo("OAuthManager - DPoP key pair is older than \(maxKeyAge) seconds, considered invalid.")
             return false
         }
-        
+
         return true
     }
-
 
     private func exchangeCodeForTokens(code: String, codeVerifier: String) async throws -> (String, String) {
         guard let metadata = authorizationServerMetadata else {
@@ -657,13 +655,14 @@ actor OAuthManager {
         if let httpResponse = response as? HTTPURLResponse {
             if let dpopNonce = httpResponse.value(forHTTPHeaderField: "DPoP-Nonce"),
                let tokenEndpointURL = URL(string: metadata.tokenEndpoint),
-               let headers = httpResponse.allHeaderFields as? [String: String] {
+               let headers = httpResponse.allHeaderFields as? [String: String]
+            {
                 await updateDPoPNonce(for: tokenEndpointURL, from: headers)
                 LogManager.logInfo("Received new DPoP nonce from server: \(dpopNonce)")
             }
 
             // Check for HTTP errors
-            if !(200...299).contains(httpResponse.statusCode) {
+            if !(200 ... 299).contains(httpResponse.statusCode) {
                 // Attempt to decode the error response
                 if let oauthError = try? ZippyJSONDecoder().decode(OAuthErrorResponse.self, from: data) {
                     throw NSError(domain: "OAuthError", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "\(oauthError.error): \(oauthError.error_description ?? "No description")"])
@@ -687,7 +686,6 @@ actor OAuthManager {
         await configurationManager.updatePDSURL(pdsURL)
         await EventBus.shared.publish(.baseURLUpdated(pdsURL))
 
-
         LogManager.logInfo("Switched back to PDS URL: \(pdsURL.absoluteString)")
 
         return (tokenResponse.access_token, tokenResponse.refresh_token)
@@ -704,7 +702,7 @@ actor OAuthManager {
             "refresh_token": refreshToken,
             "client_id": oauthConfig.clientId,
         ]
-        
+
         LogManager.logDebug("Refresh token parameters: \(parameters)")
 
         let body = parameters.percentEncoded()
@@ -739,14 +737,15 @@ actor OAuthManager {
 
         // Handle DPoP nonce update
         if let newNonce = httpResponse.value(forHTTPHeaderField: "DPoP-Nonce"),
-           let tokenEndpointURL = URL(string: metadata.tokenEndpoint) {
+           let tokenEndpointURL = URL(string: metadata.tokenEndpoint)
+        {
             await updateDPoPNonce(for: tokenEndpointURL, from: ["DPoP-Nonce": newNonce])
             LogManager.logInfo("Received new DPoP nonce: \(newNonce)")
         }
 
         if httpResponse.statusCode == 200 {
             let tokenResponse = try ZippyJSONDecoder().decode(TokenResponse.self, from: data)
-            
+
             // Verify the 'sub' claim
             guard let sub = tokenResponse.sub, sub.starts(with: "did:") else {
                 throw OAuthError.invalidSubClaim
@@ -771,7 +770,7 @@ actor OAuthManager {
             throw OAuthError.tokenRefreshFailed
         }
     }
-    
+
     func initializeDPoPState() async throws {
         // Fetch the authorization server metadata if not already available
         if authorizationServerMetadata == nil {
@@ -789,7 +788,7 @@ actor OAuthManager {
         guard let tokenEndpoint = authorizationServerMetadata?.tokenEndpoint else {
             throw OAuthError.missingServerMetadata
         }
-        
+
         let request = try await networkManager.createURLRequest(
             endpoint: tokenEndpoint,
             method: "POST",
@@ -797,12 +796,13 @@ actor OAuthManager {
             body: nil,
             queryItems: nil
         )
-        
+
         do {
             let (_, response) = try await networkManager.performRequest(request)
             if let httpResponse = response as? HTTPURLResponse,
                let newNonce = httpResponse.value(forHTTPHeaderField: "DPoP-Nonce"),
-               let tokenEndpointURL = URL(string: tokenEndpoint) {
+               let tokenEndpointURL = URL(string: tokenEndpoint)
+            {
                 await updateDPoPNonce(for: tokenEndpointURL, from: ["DPoP-Nonce": newNonce])
             }
         } catch {
@@ -815,11 +815,10 @@ actor OAuthManager {
         }
     }
 
-    
-
     func switchToBackupAuthorizationServer() async throws {
         guard let protectedResourceMetadata = await configurationManager.getProtectedResourceMetadata(),
-              let currentServer = await configurationManager.getCurrentAuthorizationServer() else {
+              let currentServer = await configurationManager.getCurrentAuthorizationServer()
+        else {
             throw OAuthError.missingServerMetadata
         }
 
@@ -829,7 +828,7 @@ actor OAuthManager {
         }
 
         let newMetadata = try await fetchAuthorizationServerMetadata(authServerURL: newServer)
-        self.authorizationServerMetadata = newMetadata
+        authorizationServerMetadata = newMetadata
 
         LogManager.logInfo("Switched to backup authorization server: \(newServer.absoluteString)")
     }
@@ -848,7 +847,7 @@ actor OAuthManager {
             y: y
         )
     }
-    
+
     func regenerateDPoPProof() async throws {
         // Regenerate the DPoP key pair
         regenerateDPoPKeyPair()
@@ -864,7 +863,7 @@ actor OAuthManager {
             let newKeyPair = P256.Signing.PrivateKey()
             try KeychainManager.storeDPoPKey(newKeyPair, namespace: namespace)
             dpopKeyPair = newKeyPair
-            dpopNonces = [:]  // Clear all nonces when generating a new key pair
+            dpopNonces = [:] // Clear all nonces when generating a new key pair
             LogManager.logInfo("Regenerated DPoP key pair and cleared all nonces")
             // Optionally publish an event
             Task {
@@ -921,11 +920,12 @@ actor OAuthManager {
             "jti": UUID().uuidString,
             "htm": httpMethod,
             "htu": url,
-            "iat": Int(Date().timeIntervalSince1970)
+            "iat": Int(Date().timeIntervalSince1970),
         ]
 
         if let domain = URL(string: url)?.host?.lowercased(),
-           let nonce = dpopNonces[domain] {
+           let nonce = dpopNonces[domain]
+        {
             payload["nonce"] = nonce
             LogManager.logInfo("Including nonce in DPoP proof for domain \(domain): \(nonce)")
         } else {
@@ -940,7 +940,7 @@ actor OAuthManager {
         }
 
         let jws = try JWS(
-            payload: try JSONSerialization.data(withJSONObject: payload),
+            payload: JSONSerialization.data(withJSONObject: payload),
             protectedHeader: header,
             key: privateKey
         )
@@ -951,22 +951,22 @@ actor OAuthManager {
 
     func generateDPoPProof(for httpMethod: String, url: String, accessToken: String? = nil) throws -> String {
         var additionalClaims: [String: Any] = [:]
-        
+
         let domain = URL(string: url)?.host?.lowercased() ?? "unknown"
         if let nonce = getDPoPNonce(for: domain) {
             additionalClaims["nonce"] = nonce
         }
-        
+
         if let token = accessToken {
             let athHash = calculateATH(from: token)
             additionalClaims["ath"] = athHash
         }
-        
+
         return try createDPoPProof(for: httpMethod, url: url, additionalClaims: additionalClaims)
     }
 
     private func generateCodeVerifier() -> String {
-        let verifierData = Data((0..<32).map { _ in UInt8.random(in: 0...255) })
+        let verifierData = Data((0 ..< 32).map { _ in UInt8.random(in: 0 ... 255) })
         let verifier = verifierData.base64URLEscaped()
         assert(verifier.count >= 43 && verifier.count <= 128, "code_verifier length out of bounds")
         return verifier
@@ -989,8 +989,6 @@ actor OAuthManager {
     func getDPoPNonce(for domain: String) -> String? {
         return dpopNonces[domain.lowercased()]
     }
-
-
 
     private func resolvePDSURL(for identifier: String) async throws -> URL {
         if identifier.starts(with: "did:") {
@@ -1029,7 +1027,8 @@ actor OAuthManager {
 
         let response = try ZippyJSONDecoder().decode(DIDDocument.self, from: data)
         guard let serviceURLString = response.service.first(where: { $0.type == "AtprotoPersonalDataServer" })?.serviceEndpoint,
-              let serviceURL = URL(string: serviceURLString) else {
+              let serviceURL = URL(string: serviceURLString)
+        else {
             throw OAuthError.invalidPDSURL
         }
 
@@ -1053,7 +1052,8 @@ actor OAuthManager {
 
         // Extract the PDS service URL from the array of services
         guard let serviceURLString = didDocument.service.first(where: { $0.type == "AtprotoPersonalDataServer" })?.serviceEndpoint,
-              let serviceURL = URL(string: serviceURLString) else {
+              let serviceURL = URL(string: serviceURLString)
+        else {
             throw OAuthError.invalidPDSURL
         }
 
@@ -1068,7 +1068,6 @@ actor OAuthManager {
 
         return pdsURL
     }
-
 
     // MARK: - Helper Structures
 

@@ -13,7 +13,7 @@ import ZippyJSON
 /// Protocol defining the interface for NetworkManager.
 protocol NetworkManaging: Actor {
     func setAuthenticationProvider(_ provider: AuthenticationProvider)
-    func setAuthorizationServerMetadata(_ metadata: AuthorizationServerMetadata) 
+    func setAuthorizationServerMetadata(_ metadata: AuthorizationServerMetadata)
 
     func setProtectedResourceMetadata(_ metadata: ProtectedResourceMetadata)
 
@@ -25,7 +25,7 @@ protocol NetworkManaging: Actor {
     /// - Parameter request: The URLRequest to perform.
     /// - Returns: A tuple containing the response data and HTTPURLResponse.
     func performRequest(_ request: URLRequest) async throws -> (Data, HTTPURLResponse)
-    
+
     /// Creates a URLRequest with the given parameters.
     ///
     /// - Parameters:
@@ -42,7 +42,7 @@ protocol NetworkManaging: Actor {
         body: Data?,
         queryItems: [URLQueryItem]?
     ) async throws -> URLRequest
-    
+
     /// Refreshes the session token using a provided refresh token and token manager.
     ///
     /// - Parameters:
@@ -58,14 +58,14 @@ protocol NetworkManaging: Actor {
 /// Actor responsible for managing network requests and handling authentication.
 actor NetworkManager: NetworkManaging {
     // MARK: - Properties
-    
+
     private var baseURL: URL
     private var authorizationServerMetadata: AuthorizationServerMetadata?
     private var protectedResourceMetadata: ProtectedResourceMetadata?
-    
+
     private let configurationManager: ConfigurationManaging
     private let maxRetryLimit: Int = 3
-    
+
     private var middlewares: [NetworkMiddleware] = []
     private var isMiddlewareConfigured = false
 //    private var authenticationService: AuthenticationService?
@@ -81,38 +81,39 @@ actor NetworkManager: NetworkManaging {
         case protectedResource
         case other
     }
-    
+
     func setAuthorizationServerMetadata(_ metadata: AuthorizationServerMetadata) {
-        self.authorizationServerMetadata = metadata
+        authorizationServerMetadata = metadata
     }
 
     func setProtectedResourceMetadata(_ metadata: ProtectedResourceMetadata) {
-        self.protectedResourceMetadata = metadata
+        protectedResourceMetadata = metadata
     }
 
-    
     func determineEndpointTypeAndAuthRequirement(for url: URL) -> (EndpointType, Bool) {
         if let authServerMetadata = authorizationServerMetadata,
-           url.absoluteString.hasPrefix(authServerMetadata.issuer) {
+           url.absoluteString.hasPrefix(authServerMetadata.issuer)
+        {
             // Check if it's a token endpoint or other auth-related endpoint
             if url.absoluteString == authServerMetadata.tokenEndpoint ||
-               url.absoluteString == authServerMetadata.authorizationEndpoint ||
-               url.absoluteString == authServerMetadata.pushedAuthorizationRequestEndpoint {
+                url.absoluteString == authServerMetadata.authorizationEndpoint ||
+                url.absoluteString == authServerMetadata.pushedAuthorizationRequestEndpoint
+            {
                 return (.authorizationServer, false) // Auth server endpoints typically don't need authentication
             } else {
                 return (.authorizationServer, true) // Other auth server endpoints might need authentication
             }
         } else if let protectedResourceMetadata = protectedResourceMetadata,
-                  url.absoluteString.hasPrefix(protectedResourceMetadata.resource.absoluteString) {
+                  url.absoluteString.hasPrefix(protectedResourceMetadata.resource.absoluteString)
+        {
             return (.protectedResource, true) // Protected resources always need authentication
         } else {
             return (.other, false) // Default to not requiring authentication for other endpoints
         }
     }
 
-    
     // MARK: - Initialization
-    
+
     /// Initializes the NetworkManager with the specified base URL and configuration manager.
     ///
     /// - Parameters:
@@ -122,7 +123,7 @@ actor NetworkManager: NetworkManaging {
         self.baseURL = baseURL
         self.configurationManager = configurationManager
         self.tokenManager = tokenManager
-        
+
         // Initialize the custom URLSession
         let sessionConfiguration = URLSessionConfiguration.default
         sessionConfiguration.timeoutIntervalForRequest = 30.0 // 30 seconds
@@ -131,23 +132,22 @@ actor NetworkManager: NetworkManaging {
         sessionConfiguration.httpShouldSetCookies = false
         sessionConfiguration.httpAdditionalHeaders = [
             "X-Requested-With": "XMLHttpRequest",
-            "Accept": "application/json"
+            "Accept": "application/json",
         ]
         sessionConfiguration.httpMaximumConnectionsPerHost = 5
         sessionConfiguration.httpShouldUsePipelining = true
-        
+
         // Initialize the custom delegate for security features
         let sessionDelegate = HardenedURLSessionDelegate()
-        self.session = URLSession(configuration: sessionConfiguration, delegate: sessionDelegate, delegateQueue: nil)
+        session = URLSession(configuration: sessionConfiguration, delegate: sessionDelegate, delegateQueue: nil)
 
         // Subscribe to relevant events
 //            await self.subscribeToEvents()
         LogManager.logDebug("Network Manager initialized")
-
     }
-    
+
     // MARK: - Event Subscription
-    
+
     private func subscribeToEvents() async {
         let eventStream = await EventBus.shared.subscribe()
         for await event in eventStream {
@@ -170,20 +170,20 @@ actor NetworkManager: NetworkManaging {
 //            case .authenticationRequired:
 //                // Handle authentication required (e.g., pause requests, notify UI)
 //                LogManager.logInfo("NetworkManager - Received authenticationRequired event.")
-//                
+//
 //            case .logMessage(let level, let message):
 //                // Handle log messages if centralized logging is desired
 //                // For example, send logs to a remote server or display in a debugging console
 //                print("Log [\(level)]: \(message)")
-                
+
             default:
                 break
             }
         }
     }
-    
+
     func setAuthenticationProvider(_ provider: AuthenticationProvider) {
-        self.authProvider = provider
+        authProvider = provider
     }
 
     private func handleAccessTokenResponse(_ result: Result<String, Error>) {
@@ -203,20 +203,18 @@ actor NetworkManager: NetworkManaging {
     }
 
     // MARK: - BaseURLUpdateDelegate Protocol Method
-    
+
     /// Updates the base URL when required.
     ///
     /// - Parameter newBaseURL: The new base URL to update.
     func updateBaseURL(_ newBaseURL: URL) async {
-        self.baseURL = newBaseURL
+        baseURL = newBaseURL
         LogManager.logInfo("NetworkManager - Base URL updated to: \(newBaseURL)")
         // Optionally, you can reset or reconfigure session/middleware here
     }
-    
-    
 
     // MARK: - Perform Request
-    
+
     /// Performs a network request, applying authentication headers and handling token refresh if necessary.
     ///
     /// - Parameter request: The URLRequest to perform.
@@ -235,7 +233,7 @@ actor NetworkManager: NetworkManaging {
 
                 // Prepare the authenticated request
                 currentRequest = try await authProvider?.prepareAuthenticatedRequest(currentRequest) ?? currentRequest
-                
+
                 LogManager.logRequest(currentRequest)
                 let (data, response) = try await session.data(for: currentRequest)
                 guard let httpResponse = response as? HTTPURLResponse else {
@@ -274,7 +272,7 @@ actor NetworkManager: NetworkManaging {
 
         throw NetworkError.maxRetryAttemptsReached
     }
-    
+
     /// Applies all configured middlewares to the given request.
     ///
     /// - Parameter request: The original URLRequest.
@@ -287,7 +285,7 @@ actor NetworkManager: NetworkManaging {
         }
         return modifiedRequest
     }
-    
+
     /// Applies all configured middlewares' handle methods to the response.
     ///
     /// - Parameters:
@@ -306,25 +304,25 @@ actor NetworkManager: NetworkManaging {
 
         return (currentData, currentResponse)
     }
-    
+
     // MARK: - Middleware Management
-    
+
     /// Adds a middleware to the NetworkManager.
     ///
     /// - Parameter middleware: The middleware to add.
     func addMiddleware(_ middleware: NetworkMiddleware) async {
         middlewares.append(middleware)
     }
-    
+
     /// Removes a middleware from the NetworkManager.
     ///
     /// - Parameter middleware: The middleware to remove.
     func removeMiddleware(_ middleware: NetworkMiddleware) async {
         middlewares.removeAll { $0 === middleware }
     }
-    
+
     // MARK: - Create URLRequest
-    
+
     /// Creates a URLRequest with the specified parameters.
     ///
     /// - Parameters:
@@ -346,7 +344,8 @@ actor NetworkManager: NetworkManaging {
             switch endpointType {
             case .authorizationServer:
                 if let issuer = authorizationServerMetadata?.issuer,
-                   let issuerURL = URL(string: issuer) {
+                   let issuerURL = URL(string: issuer)
+                {
                     url = issuerURL.appendingPathComponent("xrpc").appendingPathComponent(endpoint)
                 } else {
                     url = baseURL.appendingPathComponent("xrpc").appendingPathComponent(endpoint)
@@ -358,27 +357,26 @@ actor NetworkManager: NetworkManaging {
             }
         }
 
-
         if let queryItems = queryItems, !queryItems.isEmpty {
             var components = URLComponents(url: url, resolvingAgainstBaseURL: true)
             components?.queryItems = queryItems
             url = components?.url ?? url
         }
-        
+
         var request = URLRequest(url: url)
         request.httpMethod = method
-        
+
         for (key, value) in headers {
             request.setValue(value, forHTTPHeaderField: key)
         }
-        
+
         request.httpBody = body
-        
+
         return request
     }
-    
+
     // MARK: - Refresh Session Token
-    
+
     /// Refreshes the session token using a provided refresh token and token manager.
     ///
     /// - Parameters:
@@ -392,36 +390,36 @@ actor NetworkManager: NetworkManaging {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("Bearer \(refreshToken)", forHTTPHeaderField: "Authorization")
-        
+
         // Perform the network request
         let (responseData, response) = try await performRequest(request)
-        
+
         LogManager.logDebug("NetworkManager - Received response for token refresh with status code: \(response.statusCode)")
-        
+
         if response.statusCode == 200 {
             // Decode the response using your specific output structure
             let decoder = ZippyJSONDecoder()
             guard let tokenResponse = try? decoder.decode(ComAtprotoServerRefreshSession.Output.self, from: responseData) else {
                 throw NetworkError.decodingError
             }
-            
+
             // Update stored tokens using the token manager
             try await tokenManager.saveTokens(
                 accessJwt: tokenResponse.accessJwt,
                 refreshJwt: tokenResponse.refreshJwt,
                 type: .bearer // Assuming legacy; adjust based on context
             )
-            
+
             // Update user configuration with the new DID and service endpoint
             try await configurationManager.updateUserConfiguration(
                 did: tokenResponse.did,
                 handle: tokenResponse.handle,
                 serviceEndpoint: tokenResponse.didDoc?.service.first?.serviceEndpoint ?? baseURL.absoluteString
             )
-            
+
             // Publish token updated event
             await EventBus.shared.publish(.tokensUpdated(accessToken: tokenResponse.accessJwt, refreshToken: tokenResponse.refreshJwt))
-            
+
             return true
         } else if response.statusCode == 401 {
             LogManager.logError("NetworkManager - Refresh token is invalid or expired")
@@ -431,9 +429,9 @@ actor NetworkManager: NetworkManaging {
             throw NetworkError.responseError(statusCode: response.statusCode)
         }
     }
-    
+
     // MARK: - Utility Methods
-    
+
     /// Validates the URL for security.
     ///
     /// - Parameter url: The URL to validate.
@@ -452,9 +450,9 @@ actor NetworkManager: NetworkManaging {
                 "172.16.0.0/12",
                 "192.168.0.0/16",
                 "127.0.0.0/8",
-                "169.254.0.0/16"
+                "169.254.0.0/16",
             ]
-            
+
             for range in privateIPRanges {
                 if IPAddress(host)?.isInRange(range) == true {
                     LogManager.logError("Attempted access to private IP range: \(host)")
@@ -467,7 +465,7 @@ actor NetworkManager: NetworkManaging {
 
         return true
     }
-    
+
     /// Sanitizes the input by removing or escaping potentially harmful characters.
     ///
     /// - Parameter input: The input string to sanitize.
@@ -476,7 +474,7 @@ actor NetworkManager: NetworkManaging {
         // Remove or escape potentially harmful characters
         return input.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
     }
-    
+
     /// Validates the Content-Type of the HTTP response.
     ///
     /// - Parameters:
@@ -495,7 +493,7 @@ actor NetworkManager: NetworkManaging {
             throw NetworkError.badRequest(description: "Invalid Content-Type: \(contentType). Expected: \(expectedTypes.joined(separator: ", "))")
         }
     }
-    
+
     /// Handles network errors by logging appropriate messages.
     ///
     /// - Parameter error: The error to handle.
@@ -538,12 +536,11 @@ actor NetworkManager: NetworkManaging {
             LogManager.logError("Unexpected Error: \(error.localizedDescription)")
         }
     }
-    
+
     // MARK: - Access Token Retrieval
-    
-    
+
     // MARK: - Helper Methods
-    
+
     /// Handles a failed request by logging and publishing network error events.
     ///
     /// - Parameter error: The error encountered during the request.

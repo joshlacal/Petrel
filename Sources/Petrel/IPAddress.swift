@@ -5,7 +5,6 @@
 //  Created by Josh LaCalamito on 9/16/24.
 //
 
-
 import Foundation
 import Network
 
@@ -28,7 +27,8 @@ struct IPAddress {
         guard parts.count == 2,
               let cidrAddress = IPv4Address(String(parts[0])),
               let prefixLength = UInt8(String(parts[1])),
-              let ip = IPv4Address(address) else {
+              let ip = IPv4Address(address)
+        else {
             return false
         }
 
@@ -39,7 +39,7 @@ struct IPAddress {
         let remainingBits = Int(prefixLength) % 8
 
         // Compare full bytes
-        for i in 0..<fullBytes {
+        for i in 0 ..< fullBytes {
             if cidrOctets[i] != ipOctets[i] {
                 return false
             }

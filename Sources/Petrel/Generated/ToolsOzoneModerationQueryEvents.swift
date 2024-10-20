@@ -1,14 +1,11 @@
 import Foundation
 import ZippyJSON
 
-
 // lexicon: 1, id: tools.ozone.moderation.queryEvents
 
-
-public struct ToolsOzoneModerationQueryEvents { 
-
-    public static let typeIdentifier = "tools.ozone.moderation.queryEvents"    
-public struct Parameters: Parametrizable {
+public enum ToolsOzoneModerationQueryEvents {
+    public static let typeIdentifier = "tools.ozone.moderation.queryEvents"
+    public struct Parameters: Parametrizable {
         public let types: [String]?
         public let createdBy: String?
         public let sortDirection: String?
@@ -25,25 +22,25 @@ public struct Parameters: Parametrizable {
         public let removedTags: [String]?
         public let reportTypes: [String]?
         public let cursor: String?
-        
+
         public init(
-            types: [String]? = nil, 
-            createdBy: String? = nil, 
-            sortDirection: String? = nil, 
-            createdAfter: ATProtocolDate? = nil, 
-            createdBefore: ATProtocolDate? = nil, 
-            subject: URI? = nil, 
-            includeAllUserRecords: Bool? = nil, 
-            limit: Int? = nil, 
-            hasComment: Bool? = nil, 
-            comment: String? = nil, 
-            addedLabels: [String]? = nil, 
-            removedLabels: [String]? = nil, 
-            addedTags: [String]? = nil, 
-            removedTags: [String]? = nil, 
-            reportTypes: [String]? = nil, 
+            types: [String]? = nil,
+            createdBy: String? = nil,
+            sortDirection: String? = nil,
+            createdAfter: ATProtocolDate? = nil,
+            createdBefore: ATProtocolDate? = nil,
+            subject: URI? = nil,
+            includeAllUserRecords: Bool? = nil,
+            limit: Int? = nil,
+            hasComment: Bool? = nil,
+            comment: String? = nil,
+            addedLabels: [String]? = nil,
+            removedLabels: [String]? = nil,
+            addedTags: [String]? = nil,
+            removedTags: [String]? = nil,
+            reportTypes: [String]? = nil,
             cursor: String? = nil
-            ) {
+        ) {
             self.types = types
             self.createdBy = createdBy
             self.sortDirection = sortDirection
@@ -60,51 +57,35 @@ public struct Parameters: Parametrizable {
             self.removedTags = removedTags
             self.reportTypes = reportTypes
             self.cursor = cursor
-            
-        }
-    }    
-    
-public struct Output: ATProtocolCodable {
-        
-        
-        public let cursor: String?
-        
-        public let events: [ToolsOzoneModerationDefs.ModEventView]
-        
-        
-        
-        // Standard public initializer
-        public init(
-            
-            cursor: String? = nil,
-            
-            events: [ToolsOzoneModerationDefs.ModEventView]
-            
-            
-        ) {
-            
-            self.cursor = cursor
-            
-            self.events = events
-            
-            
         }
     }
 
+    public struct Output: ATProtocolCodable {
+        public let cursor: String?
 
+        public let events: [ToolsOzoneModerationDefs.ModEventView]
 
+        // Standard public initializer
+        public init(
+            cursor: String? = nil,
 
+            events: [ToolsOzoneModerationDefs.ModEventView]
+
+        ) {
+            self.cursor = cursor
+
+            self.events = events
+        }
+    }
 }
 
-
-extension ATProtoClient.Tools.Ozone.Moderation {
+public extension ATProtoClient.Tools.Ozone.Moderation {
     /// List moderation events related to a subject.
-    public func queryEvents(input: ToolsOzoneModerationQueryEvents.Parameters) async throws -> (responseCode: Int, data: ToolsOzoneModerationQueryEvents.Output?) {
+    func queryEvents(input: ToolsOzoneModerationQueryEvents.Parameters) async throws -> (responseCode: Int, data: ToolsOzoneModerationQueryEvents.Output?) {
         let endpoint = "tools.ozone.moderation.queryEvents"
-        
-        
+
         let queryItems = input.asQueryItems()
-        
+
         let urlRequest = try await networkManager.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -112,7 +93,7 @@ extension ATProtoClient.Tools.Ozone.Moderation {
             body: nil,
             queryItems: queryItems
         )
-        
+
         let (responseData, response) = try await networkManager.performRequest(urlRequest)
         let responseCode = response.statusCode
 
@@ -120,17 +101,16 @@ extension ATProtoClient.Tools.Ozone.Moderation {
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
-        
+
         if !contentType.lowercased().contains("application/json") {
             throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
         }
 
         // Data decoding and validation
-        
+
         let decoder = ZippyJSONDecoder()
         let decodedData = try? decoder.decode(ToolsOzoneModerationQueryEvents.Output.self, from: responseData)
-        
-        
+
         return (responseCode, decodedData)
     }
-}                           
+}

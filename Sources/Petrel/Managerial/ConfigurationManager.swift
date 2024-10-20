@@ -30,8 +30,8 @@ protocol ConfigurationManaging: Actor {
 // MARK: - ConfigurationManager Actor
 
 actor ConfigurationManager: ConfigurationManaging {
-    
     // MARK: - Properties
+
     private var isUpdating = false
 
     private let namespace: String
@@ -43,21 +43,18 @@ actor ConfigurationManager: ConfigurationManaging {
     private var protectedResourceMetadata: ProtectedResourceMetadata?
     private var authorizationServerMetadata: AuthorizationServerMetadata?
     private var currentAuthorizationServer: URL?
-    
 
     // MARK: - Initialization
-    
+
     init(baseURL: URL, namespace: String) async {
         self.namespace = namespace
         self.baseURL = baseURL
         LogManager.logDebug("ConfigurationManager initialized with baseURL: \(baseURL), namespace: \(namespace)")
-            await loadSettings()
+        await loadSettings()
 //            await subscribeToEvents()
 //            await markInitializationComplete()
     }
 
-
-    
     // MARK: - Event Subscription
 
     // ConfigurationManager.swift
@@ -115,8 +112,8 @@ actor ConfigurationManager: ConfigurationManaging {
     /// Note: PDS and Service Endpoint are the same
     func updatePDSURL(_ url: URL) async {
         LogManager.logInfo("ConfigurationManager - Updating PDS URL to: \(url)")
-        self.pdsURL = url
-        self.baseURL = url
+        pdsURL = url
+        baseURL = url
         UserDefaults.standard.set(url.absoluteString, forKey: key("pdsURL"))
         await EventBus.shared.publish(.pdsURLResolved(url))
     }
@@ -126,8 +123,7 @@ actor ConfigurationManager: ConfigurationManaging {
         UserDefaults.standard.set(did, forKey: key("did"))
         await EventBus.shared.publish(.didResolved(did: did))
     }
-    
-    
+
     /// Updates the user's handle.
     ///
     /// - Parameter handle: The user's handle.
@@ -137,21 +133,20 @@ actor ConfigurationManager: ConfigurationManaging {
         await EventBus.shared.publish(.handleResolved(handle: handle))
     }
 
-
     func setProtectedResourceMetadata(_ metadata: ProtectedResourceMetadata) async {
         LogManager.logInfo("ConfigurationManager - Setting ProtectedResourceMetadata with resource: \(metadata.resource)")
-        self.protectedResourceMetadata = metadata
+        protectedResourceMetadata = metadata
         saveMetadata()
     }
 
     func setAuthorizationServerMetadata(_ metadata: AuthorizationServerMetadata) async {
-        self.authorizationServerMetadata = metadata
+        authorizationServerMetadata = metadata
         saveMetadata()
 //        await EventBus.shared.publish(.authorizationServerMetadataUpdated(metadata))
     }
 
     func setCurrentAuthorizationServer(_ url: URL) async {
-        self.currentAuthorizationServer = url
+        currentAuthorizationServer = url
         UserDefaults.standard.set(url.absoluteString, forKey: key("currentAuthorizationServer"))
 //        await EventBus.shared.publish(.currentAuthorizationServerUpdated(url))
     }
@@ -187,7 +182,6 @@ actor ConfigurationManager: ConfigurationManaging {
 
     // MARK: - Configuration Methods
 
-
     private func key(_ name: String) -> String {
         return "\(namespace).\(name)"
     }
@@ -197,13 +191,14 @@ actor ConfigurationManager: ConfigurationManaging {
     private func loadSettings() async {
         LogManager.logDebug("ConfigurationManager - Loading settings")
         if let metadata = await getProtectedResourceMetadata() {
-            self.pdsURL = metadata.resource
-            self.baseURL = metadata.resource
+            pdsURL = metadata.resource
+            baseURL = metadata.resource
             LogManager.logInfo("ConfigurationManager - Loaded PDS URL from ProtectedResourceMetadata: \(metadata.resource)")
         } else if let pdsURLString = UserDefaults.standard.string(forKey: key("pdsURL")),
-                  let pdsURL = URL(string: pdsURLString) {
+                  let pdsURL = URL(string: pdsURLString)
+        {
             self.pdsURL = pdsURL
-            self.baseURL = pdsURL
+            baseURL = pdsURL
             LogManager.logInfo("ConfigurationManager - Loaded PDS URL from UserDefaults: \(pdsURL)")
         } else {
             LogManager.logError("ConfigurationManager - No PDS URL found in ProtectedResourceMetadata or UserDefaults")
@@ -211,25 +206,27 @@ actor ConfigurationManager: ConfigurationManaging {
 
         did = UserDefaults.standard.string(forKey: key("did"))
         handle = UserDefaults.standard.string(forKey: key("handle"))
-        
+
         if let authServerURLString = UserDefaults.standard.string(forKey: key("currentAuthorizationServer")) {
             currentAuthorizationServer = URL(string: authServerURLString)
             LogManager.logInfo("ConfigurationManager - Loaded Authorization Server: \(authServerURLString)")
         }
-        
+
         await loadMetadata()
-        
+
         LogManager.logDebug("ConfigurationManager - Settings loaded. Current state: baseURL: \(baseURL), pdsURL: \(String(describing: pdsURL)), did: \(String(describing: did)), handle: \(String(describing: handle))")
     }
 
     private func loadMetadata() async {
         if let protectedResourceData = UserDefaults.standard.data(forKey: key("protectedResourceMetadata")),
-           let metadata = try? JSONDecoder().decode(ProtectedResourceMetadata.self, from: protectedResourceData) {
+           let metadata = try? JSONDecoder().decode(ProtectedResourceMetadata.self, from: protectedResourceData)
+        {
             protectedResourceMetadata = metadata
             // Optionally, publish an event if needed
         }
         if let authServerData = UserDefaults.standard.data(forKey: key("authorizationServerMetadata")),
-           let metadata = try? JSONDecoder().decode(AuthorizationServerMetadata.self, from: authServerData) {
+           let metadata = try? JSONDecoder().decode(AuthorizationServerMetadata.self, from: authServerData)
+        {
             authorizationServerMetadata = metadata
             // Optionally, publish an event if needed
         }
@@ -248,15 +245,15 @@ actor ConfigurationManager: ConfigurationManaging {
         }
     }
 
-    
     func getPDSURL() async -> URL? {
-        if let pdsURL = self.pdsURL {
+        if let pdsURL = pdsURL {
             LogManager.logDebug("ConfigurationManager - Returning cached PDS URL: \(pdsURL)")
             return pdsURL
         }
         if let pdsURLString = UserDefaults.standard.string(forKey: key("pdsURL")),
-           let url = URL(string: pdsURLString) {
-            self.pdsURL = url
+           let url = URL(string: pdsURLString)
+        {
+            pdsURL = url
             LogManager.logDebug("ConfigurationManager - Loaded PDS URL from UserDefaults: \(url)")
             return url
         }
@@ -270,7 +267,8 @@ actor ConfigurationManager: ConfigurationManaging {
             return metadata
         }
         if let data = UserDefaults.standard.data(forKey: key("protectedResourceMetadata")),
-           let metadata = try? JSONDecoder().decode(ProtectedResourceMetadata.self, from: data) {
+           let metadata = try? JSONDecoder().decode(ProtectedResourceMetadata.self, from: data)
+        {
             LogManager.logDebug("ConfigurationManager - Loaded ProtectedResourceMetadata from UserDefaults")
             return metadata
         }
@@ -290,11 +288,9 @@ actor ConfigurationManager: ConfigurationManaging {
         return did
     }
 
-
     func getAuthorizationServerMetadata() async -> AuthorizationServerMetadata? {
         return authorizationServerMetadata
     }
-
 
     func getCurrentAuthorizationServer() async -> URL? {
         return currentAuthorizationServer

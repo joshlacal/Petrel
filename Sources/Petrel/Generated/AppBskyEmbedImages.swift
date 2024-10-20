@@ -1,67 +1,58 @@
 import Foundation
 import ZippyJSON
 
-
 // lexicon: 1, id: app.bsky.embed.images
 
-
-public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue { 
-
+public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "app.bsky.embed.images"
-        public let images: [Image]
+    public let images: [Image]
 
-        public init(images: [Image]) {
-            self.images = images
-            
+    public init(images: [Image]) {
+        self.images = images
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        images = try container.decode([Image].self, forKey: .images)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+
+        try container.encode(images, forKey: .images)
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(images)
+    }
+
+    public func isEqual(to other: any ATProtocolValue) -> Bool {
+        guard let other = other as? Self else { return false }
+        if images != other.images {
+            return false
         }
+        return true
+    }
 
-        public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            
-            self.images = try container.decode([Image].self, forKey: .images)
-            
-        }
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        return lhs.isEqual(to: rhs)
+    }
 
-        public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-            
-            try container.encode(images, forKey: .images)
-            
-        }
+    private enum CodingKeys: String, CodingKey {
+        case images
+    }
 
-        public func hash(into hasher: inout Hasher) {
-            hasher.combine(images)
-        }
-
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let other = other as? Self else { return false }
-            if self.images != other.images {
-                return false
-            }
-            return true
-        }
- 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
-
-
-        private enum CodingKeys: String, CodingKey {
-            case images
-        }
-        
-public struct Image: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.embed.images#image"
-            public let image: Blob
-            public let alt: String
-            public let aspectRatio: AppBskyEmbedDefs.AspectRatio?
+    public struct Image: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.embed.images#image"
+        public let image: Blob
+        public let alt: String
+        public let aspectRatio: AppBskyEmbedDefs.AspectRatio?
 
         // Standard initializer
         public init(
             image: Blob, alt: String, aspectRatio: AppBskyEmbedDefs.AspectRatio?
         ) {
-            
             self.image = image
             self.alt = alt
             self.aspectRatio = aspectRatio
@@ -71,25 +62,22 @@ public struct Image: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                
-                self.image = try container.decode(Blob.self, forKey: .image)
-                
+                image = try container.decode(Blob.self, forKey: .image)
+
             } catch {
                 LogManager.logError("Decoding error for property 'image': \(error)")
                 throw error
             }
             do {
-                
-                self.alt = try container.decode(String.self, forKey: .alt)
-                
+                alt = try container.decode(String.self, forKey: .alt)
+
             } catch {
                 LogManager.logError("Decoding error for property 'alt': \(error)")
                 throw error
             }
             do {
-                
-                self.aspectRatio = try container.decodeIfPresent(AppBskyEmbedDefs.AspectRatio.self, forKey: .aspectRatio)
-                
+                aspectRatio = try container.decodeIfPresent(AppBskyEmbedDefs.AspectRatio.self, forKey: .aspectRatio)
+
             } catch {
                 LogManager.logError("Decoding error for property 'aspectRatio': \(error)")
                 throw error
@@ -99,17 +87,14 @@ public struct Image: ATProtocolCodable, ATProtocolValue {
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            
+
             try container.encode(image, forKey: .image)
-            
-            
+
             try container.encode(alt, forKey: .alt)
-            
-            
+
             if let value = aspectRatio {
                 try container.encode(value, forKey: .aspectRatio)
             }
-            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -124,21 +109,19 @@ public struct Image: ATProtocolCodable, ATProtocolValue {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            
-            if self.image != other.image {
+
+            if image != other.image {
                 return false
             }
-            
-            
-            if self.alt != other.alt {
+
+            if alt != other.alt {
                 return false
             }
-            
-            
+
             if aspectRatio != other.aspectRatio {
                 return false
             }
-            
+
             return true
         }
 
@@ -153,16 +136,15 @@ public struct Image: ATProtocolCodable, ATProtocolValue {
             case aspectRatio
         }
     }
-        
-public struct View: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.embed.images#view"
-            public let images: [ViewImage]
+
+    public struct View: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.embed.images#view"
+        public let images: [ViewImage]
 
         // Standard initializer
         public init(
             images: [ViewImage]
         ) {
-            
             self.images = images
         }
 
@@ -170,9 +152,8 @@ public struct View: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                
-                self.images = try container.decode([ViewImage].self, forKey: .images)
-                
+                images = try container.decode([ViewImage].self, forKey: .images)
+
             } catch {
                 LogManager.logError("Decoding error for property 'images': \(error)")
                 throw error
@@ -182,9 +163,8 @@ public struct View: ATProtocolCodable, ATProtocolValue {
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            
+
             try container.encode(images, forKey: .images)
-            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -193,11 +173,11 @@ public struct View: ATProtocolCodable, ATProtocolValue {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            
-            if self.images != other.images {
+
+            if images != other.images {
                 return false
             }
-            
+
             return true
         }
 
@@ -210,19 +190,18 @@ public struct View: ATProtocolCodable, ATProtocolValue {
             case images
         }
     }
-        
-public struct ViewImage: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.embed.images#viewImage"
-            public let thumb: URI
-            public let fullsize: URI
-            public let alt: String
-            public let aspectRatio: AppBskyEmbedDefs.AspectRatio?
+
+    public struct ViewImage: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.embed.images#viewImage"
+        public let thumb: URI
+        public let fullsize: URI
+        public let alt: String
+        public let aspectRatio: AppBskyEmbedDefs.AspectRatio?
 
         // Standard initializer
         public init(
             thumb: URI, fullsize: URI, alt: String, aspectRatio: AppBskyEmbedDefs.AspectRatio?
         ) {
-            
             self.thumb = thumb
             self.fullsize = fullsize
             self.alt = alt
@@ -233,33 +212,29 @@ public struct ViewImage: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                
-                self.thumb = try container.decode(URI.self, forKey: .thumb)
-                
+                thumb = try container.decode(URI.self, forKey: .thumb)
+
             } catch {
                 LogManager.logError("Decoding error for property 'thumb': \(error)")
                 throw error
             }
             do {
-                
-                self.fullsize = try container.decode(URI.self, forKey: .fullsize)
-                
+                fullsize = try container.decode(URI.self, forKey: .fullsize)
+
             } catch {
                 LogManager.logError("Decoding error for property 'fullsize': \(error)")
                 throw error
             }
             do {
-                
-                self.alt = try container.decode(String.self, forKey: .alt)
-                
+                alt = try container.decode(String.self, forKey: .alt)
+
             } catch {
                 LogManager.logError("Decoding error for property 'alt': \(error)")
                 throw error
             }
             do {
-                
-                self.aspectRatio = try container.decodeIfPresent(AppBskyEmbedDefs.AspectRatio.self, forKey: .aspectRatio)
-                
+                aspectRatio = try container.decodeIfPresent(AppBskyEmbedDefs.AspectRatio.self, forKey: .aspectRatio)
+
             } catch {
                 LogManager.logError("Decoding error for property 'aspectRatio': \(error)")
                 throw error
@@ -269,20 +244,16 @@ public struct ViewImage: ATProtocolCodable, ATProtocolValue {
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            
+
             try container.encode(thumb, forKey: .thumb)
-            
-            
+
             try container.encode(fullsize, forKey: .fullsize)
-            
-            
+
             try container.encode(alt, forKey: .alt)
-            
-            
+
             if let value = aspectRatio {
                 try container.encode(value, forKey: .aspectRatio)
             }
-            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -298,26 +269,23 @@ public struct ViewImage: ATProtocolCodable, ATProtocolValue {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            
-            if self.thumb != other.thumb {
+
+            if thumb != other.thumb {
                 return false
             }
-            
-            
-            if self.fullsize != other.fullsize {
+
+            if fullsize != other.fullsize {
                 return false
             }
-            
-            
-            if self.alt != other.alt {
+
+            if alt != other.alt {
                 return false
             }
-            
-            
+
             if aspectRatio != other.aspectRatio {
                 return false
             }
-            
+
             return true
         }
 
@@ -333,10 +301,4 @@ public struct ViewImage: ATProtocolCodable, ATProtocolValue {
             case aspectRatio
         }
     }
-
-
-
 }
-
-
-                           

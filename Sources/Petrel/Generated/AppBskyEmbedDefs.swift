@@ -1,24 +1,20 @@
 import Foundation
 import ZippyJSON
 
-
 // lexicon: 1, id: app.bsky.embed.defs
 
-
-public struct AppBskyEmbedDefs { 
-
+public enum AppBskyEmbedDefs {
     public static let typeIdentifier = "app.bsky.embed.defs"
-        
-public struct AspectRatio: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.embed.defs#aspectRatio"
-            public let width: Int
-            public let height: Int
+
+    public struct AspectRatio: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.embed.defs#aspectRatio"
+        public let width: Int
+        public let height: Int
 
         // Standard initializer
         public init(
             width: Int, height: Int
         ) {
-            
             self.width = width
             self.height = height
         }
@@ -27,17 +23,15 @@ public struct AspectRatio: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                
-                self.width = try container.decode(Int.self, forKey: .width)
-                
+                width = try container.decode(Int.self, forKey: .width)
+
             } catch {
                 LogManager.logError("Decoding error for property 'width': \(error)")
                 throw error
             }
             do {
-                
-                self.height = try container.decode(Int.self, forKey: .height)
-                
+                height = try container.decode(Int.self, forKey: .height)
+
             } catch {
                 LogManager.logError("Decoding error for property 'height': \(error)")
                 throw error
@@ -47,12 +41,10 @@ public struct AspectRatio: ATProtocolCodable, ATProtocolValue {
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            
+
             try container.encode(width, forKey: .width)
-            
-            
+
             try container.encode(height, forKey: .height)
-            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -62,16 +54,15 @@ public struct AspectRatio: ATProtocolCodable, ATProtocolValue {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            
-            if self.width != other.width {
+
+            if width != other.width {
                 return false
             }
-            
-            
-            if self.height != other.height {
+
+            if height != other.height {
                 return false
             }
-            
+
             return true
         }
 
@@ -85,10 +76,4 @@ public struct AspectRatio: ATProtocolCodable, ATProtocolValue {
             case height
         }
     }
-
-
-
 }
-
-
-                           

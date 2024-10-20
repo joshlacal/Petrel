@@ -89,7 +89,8 @@ final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, URLSession
     ) {
         Task {
             guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
-                  let serverTrust = challenge.protectionSpace.serverTrust else {
+                  let serverTrust = challenge.protectionSpace.serverTrust
+            else {
                 LogManager.logError("Authentication challenge is not for server trust.")
                 completionHandler(.performDefaultHandling, nil)
                 return
@@ -104,17 +105,17 @@ final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, URLSession
 
             // Optional: Restrict to allowed hostnames (uncomment and customize if needed)
             /*
-            let allowedHostnames: Set<String> = [
-                "bsky.social",
-                // Add other pre-trusted hostnames here
-            ]
-            let host = challenge.protectionSpace.host.lowercased()
-            if !allowedHostnames.contains(host) {
-                LogManager.logError("Host \(host) is not in the list of allowed hostnames.")
-                completionHandler(.cancelAuthenticationChallenge, nil)
-                return
-            }
-            */
+             let allowedHostnames: Set<String> = [
+                 "bsky.social",
+                 // Add other pre-trusted hostnames here
+             ]
+             let host = challenge.protectionSpace.host.lowercased()
+             if !allowedHostnames.contains(host) {
+                 LogManager.logError("Host \(host) is not in the list of allowed hostnames.")
+                 completionHandler(.cancelAuthenticationChallenge, nil)
+                 return
+             }
+             */
 
             // Evaluate server trust
             let policy = SecPolicyCreateSSL(true, challenge.protectionSpace.host as CFString)

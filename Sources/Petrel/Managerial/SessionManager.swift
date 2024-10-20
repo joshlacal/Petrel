@@ -19,27 +19,26 @@ protocol SessionManaging: Actor {
 // MARK: - SessionManager Actor
 
 actor SessionManager: SessionManaging {
-    
     // MARK: - Properties
-    
+
     private let tokenManager: TokenManaging
     private let middlewareService: MiddlewareServicing
     private var lastSessionCheckTime: Date = .distantPast
     private let sessionCheckInterval: TimeInterval = 5 // 5 seconds
     private(set) var isAuthenticated: Bool = false
     private var isInitializing: Bool = false
-    
+
     // MARK: - Initialization
-    
+
     init(tokenManager: TokenManaging, middlewareService: MiddlewareServicing) async {
         self.tokenManager = tokenManager
         self.middlewareService = middlewareService
 
 //            await self.subscribeToEvents()
     }
-    
+
     // MARK: - Event Subscription
-    
+
     private func subscribeToEvents() async {
         let eventStream = await EventBus.shared.subscribe()
         for await event in eventStream {
@@ -57,17 +56,17 @@ actor SessionManager: SessionManaging {
             }
         }
     }
-    
+
     // MARK: - SessionManaging Protocol Methods
-    
+
     func hasValidSession() async -> Bool {
         let now = Date()
         if now.timeIntervalSince(lastSessionCheckTime) < sessionCheckInterval {
             return isAuthenticated
         }
-        
+
         lastSessionCheckTime = now
-        
+
         do {
             let hasValidTokens = await tokenManager.hasValidTokens()
             if !hasValidTokens {
@@ -81,26 +80,26 @@ actor SessionManager: SessionManaging {
             return false
         }
     }
-    
+
     func isUserLoggedIn() async -> Bool {
         return await hasValidSession()
     }
 
     func initializeIfNeeded() async throws {
         if isInitializing { return }
-        
+
         isInitializing = true
         defer { isInitializing = false }
-        
+
         do {
             let hasValidSession = await self.hasValidSession()
             if hasValidSession {
                 await EventBus.shared.publish(.sessionInitialized)
                 return
             }
-            
+
             try await middlewareService.validateAndRefreshSession()
-            
+
             let refreshedSession = await self.hasValidSession()
             if refreshedSession {
                 await EventBus.shared.publish(.sessionInitialized)
@@ -118,23 +117,23 @@ actor SessionManager: SessionManaging {
         try await middlewareService.clearSession()
         await EventBus.shared.publish(.sessionExpired)
     }
-    
+
     // MARK: - Helper Methods
-    
+
     private func setAuthenticatedState(_ authenticated: Bool) async {
-        self.isAuthenticated = authenticated
+        isAuthenticated = authenticated
         await MainActor.run {
             UserDefaults.standard.set(authenticated, forKey: "isAuthenticated")
             UserDefaults.standard.synchronize()
         }
     }
-    
+
     private func handleTokenRefreshCompletion(_ result: Result<(accessToken: String, refreshToken: String), Error>) async {
         switch result {
         case .success:
             await setAuthenticatedState(true)
             await EventBus.shared.publish(.sessionInitialized)
-        case .failure(let error):
+        case let .failure(error):
             await setAuthenticatedState(false)
             await EventBus.shared.publish(.authenticationRequired)
             LogManager.logError("SessionManager - Token refresh failed: \(error)")

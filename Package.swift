@@ -23,7 +23,7 @@ let package = Package(
             name: "Petrel",
             dependencies: [
                 "jose-swift",
-                .product(name: "ZippyJSON", package: "ZippyJSON")
+                .product(name: "ZippyJSON", package: "ZippyJSON"),
             ]
         ),
         .testTarget(

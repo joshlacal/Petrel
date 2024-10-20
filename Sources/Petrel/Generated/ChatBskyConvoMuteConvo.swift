@@ -1,77 +1,55 @@
 import Foundation
 import ZippyJSON
 
-
 // lexicon: 1, id: chat.bsky.convo.muteConvo
 
+public enum ChatBskyConvoMuteConvo {
+    public static let typeIdentifier = "chat.bsky.convo.muteConvo"
+    public struct Input: ATProtocolCodable {
+        public let convoId: String
 
-public struct ChatBskyConvoMuteConvo { 
-
-    public static let typeIdentifier = "chat.bsky.convo.muteConvo"        
-public struct Input: ATProtocolCodable {
-            public let convoId: String
-
-            // Standard public initializer
-            public init(convoId: String) {
-                self.convoId = convoId
-                
-            }
-        }    
-    
-public struct Output: ATProtocolCodable {
-        
-        
-        public let convo: ChatBskyConvoDefs.ConvoView
-        
-        
-        
         // Standard public initializer
-        public init(
-            
-            convo: ChatBskyConvoDefs.ConvoView
-            
-            
-        ) {
-            
-            self.convo = convo
-            
-            
+        public init(convoId: String) {
+            self.convoId = convoId
         }
     }
 
+    public struct Output: ATProtocolCodable {
+        public let convo: ChatBskyConvoDefs.ConvoView
 
+        // Standard public initializer
+        public init(
+            convo: ChatBskyConvoDefs.ConvoView
 
-
+        ) {
+            self.convo = convo
+        }
+    }
 }
 
-extension ATProtoClient.Chat.Bsky.Convo {
-    /// 
-    public func muteConvo(
-        
+public extension ATProtoClient.Chat.Bsky.Convo {
+    ///
+    func muteConvo(
         input: ChatBskyConvoMuteConvo.Input
-        
+
     ) async throws -> (responseCode: Int, data: ChatBskyConvoMuteConvo.Output?) {
         let endpoint = "chat.bsky.convo.muteConvo"
-        
+
         var headers: [String: String] = [:]
-        
+
         headers["Content-Type"] = "application/json"
-        
-        
-        
+
         headers["Accept"] = "application/json"
-        
-        
+
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkManager.createURLRequest(
             endpoint: endpoint,
             method: "POST",
-            headers: headers, 
+            headers: headers,
             body: requestData,
             queryItems: nil
         )
-        
-        
+
         let (responseData, response) = try await networkManager.performRequest(urlRequest)
         let responseCode = response.statusCode
 
@@ -79,20 +57,16 @@ extension ATProtoClient.Chat.Bsky.Convo {
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
-        
+
         if !contentType.lowercased().contains("application/json") {
             throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
         }
 
         // Data decoding and validation
-        
+
         let decoder = ZippyJSONDecoder()
         let decodedData = try? decoder.decode(ChatBskyConvoMuteConvo.Output.self, from: responseData)
-        
-        
+
         return (responseCode, decodedData)
-        
     }
-    
 }
-                           

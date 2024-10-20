@@ -5,7 +5,6 @@
 //  Created by Josh LaCalamito on 10/19/24.
 //
 
-
 import Foundation
 import ZippyJSON
 
@@ -34,17 +33,16 @@ actor DIDResolutionService: DIDResolving {
 
     init(networkManager: NetworkManaging) async {
         self.networkManager = networkManager
-        self.cache = NSCache<NSString, CacheEntry>()
-        self.cache.countLimit = 100 // Adjust as needed
+        cache = NSCache<NSString, CacheEntry>()
+        cache.countLimit = 100 // Adjust as needed
     }
 
     public func resolveHandleToDID(handle: String) async throws -> String {
         let input = ComAtprotoIdentityResolveHandle.Parameters(handle: handle)
         let endpoint = "com.atproto.identity.resolveHandle"
-        
-        
+
         let queryItems = input.asQueryItems()
-        
+
         let urlRequest = try await networkManager.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -52,7 +50,7 @@ actor DIDResolutionService: DIDResolving {
             body: nil,
             queryItems: queryItems
         )
-        
+
         let (responseData, response) = try await networkManager.performRequest(urlRequest)
         let responseCode = response.statusCode
 
@@ -60,17 +58,16 @@ actor DIDResolutionService: DIDResolving {
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
-        
+
         if !contentType.lowercased().contains("application/json") {
             throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
         }
 
         // Data decoding and validation
-        
+
         let decoder = ZippyJSONDecoder()
         let decodedData = try? decoder.decode(ComAtprotoIdentityResolveHandle.Output.self, from: responseData)
-        
-        
+
         guard responseCode == 200, let did = decodedData?.did else {
             throw APIError.invalidPDSURL
         }
@@ -119,7 +116,8 @@ actor DIDResolutionService: DIDResolving {
         let didDocument = try decoder.decode(DIDDocument.self, from: data)
 
         guard let pdsEndpoint = didDocument.service.first(where: { $0.type == "AtprotoPersonalDataServer" })?.serviceEndpoint,
-              let pdsURL = URL(string: pdsEndpoint) else {
+              let pdsURL = URL(string: pdsEndpoint)
+        else {
             throw DIDResolutionError.missingPDSEndpoint
         }
 
@@ -151,7 +149,8 @@ actor DIDResolutionService: DIDResolving {
         let didDocument = try decoder.decode(DIDDocument.self, from: data)
 
         guard let pdsEndpoint = didDocument.service.first(where: { $0.type == "AtprotoPersonalDataServer" })?.serviceEndpoint,
-              let pdsURL = URL(string: pdsEndpoint) else {
+              let pdsURL = URL(string: pdsEndpoint)
+        else {
             throw DIDResolutionError.missingPDSEndpoint
         }
 
@@ -179,16 +178,14 @@ actor DIDResolutionService: DIDResolving {
 
 // MARK: - Helper Structures
 
-fileprivate class CacheEntry {}
+private class CacheEntry {}
 
-fileprivate class DIDCacheEntry: CacheEntry {
+private class DIDCacheEntry: CacheEntry {
     let did: String
     init(did: String) { self.did = did }
 }
 
-fileprivate class PDSURLCacheEntry: CacheEntry {
+private class PDSURLCacheEntry: CacheEntry {
     let url: URL
     init(url: URL) { self.url = url }
 }
-
-

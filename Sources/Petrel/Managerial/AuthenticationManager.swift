@@ -21,12 +21,12 @@ protocol AuthenticationManaging: Sendable {
 /// Actor responsible for managing authentication flows.
 actor AuthenticationManager: AuthenticationManaging {
     // MARK: - Properties
-    
+
     private let authenticationService: AuthenticationService
     private weak var client: ATProtoClient?
-    
+
     // MARK: - Initialization
-    
+
     /// Initializes the AuthenticationManager with the AuthenticationService.
     ///
     /// - Parameters:
@@ -39,16 +39,16 @@ actor AuthenticationManager: AuthenticationManaging {
         self.authenticationService = authenticationService
         self.client = client
     }
-    
+
     // MARK: - AuthenticationManaging Protocol Methods
-    
+
     /// Sets the ATProtoClient instance.
     ///
     /// - Parameter client: The ATProtoClient instance.
     public func setClient(_ client: ATProtoClient) {
         self.client = client
     }
-    
+
     /// Creates a new session using the appropriate authentication method.
     ///
     /// - Parameters:
@@ -62,7 +62,7 @@ actor AuthenticationManager: AuthenticationManaging {
             throw error
         }
     }
-    
+
     /// Reauthenticates the user.
     public func reauthenticate() async throws {
         do {
@@ -76,16 +76,16 @@ actor AuthenticationManager: AuthenticationManaging {
             throw error
         }
     }
-    
+
     /// Handles session reauthentication requests from SessionManager.
     ///
     /// - Parameter sessionManager: The SessionManager requesting reauthentication.
     func sessionRequiresReauthentication(sessionManager: SessionManager) async throws {
         try await reauthenticate()
     }
-    
+
     // MARK: - Helper Methods
-    
+
     /// Notifies the ATProtoClient that authentication is required.
     private func notifyAuthenticationRequired() async {
         guard let client = client else {

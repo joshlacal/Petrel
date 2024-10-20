@@ -40,7 +40,7 @@ public struct OAuthConfiguration: Sendable {
         self.redirectUri = redirectUri
         self.scope = scope
     }
-    
+
     public var redirectUriScheme: String {
         return URL(string: redirectUri)?.scheme ?? ""
     }
@@ -66,6 +66,7 @@ public enum ClientEnvironment: Sendable {
 
 public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
     // MARK: - Properties
+
     private let namespace: String
 
     public var baseURL: URL
@@ -80,19 +81,19 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
 
     private(set) var initState: InitializationState = .uninitialized
     public weak var authDelegate: AuthenticationDelegate?
-    
+
     // User-related properties
     private var did: String?
     private var handle: String?
-    
+
     private var authorizationServerURL: URL
 
     // MARK: - Authentication
-    
+
     private var selectedAuthMethod: AuthMethod
 
     // MARK: - Initialization
-    
+
     /// Initializes the ATProtoClient with the specified authentication method.
     ///
     /// - Parameters:
@@ -111,16 +112,16 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
         self.oauthConfig = oauthConfig
         self.namespace = namespace
         self.baseURL = baseURL
-        self.authorizationServerURL = baseURL
-        self.selectedAuthMethod = authMethod
+        authorizationServerURL = baseURL
+        selectedAuthMethod = authMethod
 
-        self.configManager = await ConfigurationManager(baseURL: baseURL, namespace: namespace)
-        self.tokenManager = await TokenManager(namespace: namespace)
-        self.networkManager = await NetworkManager(baseURL: baseURL, configurationManager: configManager, tokenManager: tokenManager)
-        self.middlewareService = await MiddlewareService(tokenManager: tokenManager)
-        self.sessionManager = await SessionManager(tokenManager: tokenManager, middlewareService: middlewareService)
+        configManager = await ConfigurationManager(baseURL: baseURL, namespace: namespace)
+        tokenManager = await TokenManager(namespace: namespace)
+        networkManager = await NetworkManager(baseURL: baseURL, configurationManager: configManager, tokenManager: tokenManager)
+        middlewareService = await MiddlewareService(tokenManager: tokenManager)
+        sessionManager = await SessionManager(tokenManager: tokenManager, middlewareService: middlewareService)
         let didResolutionService = await DIDResolutionService(networkManager: networkManager)
-        self.authenticationService = await AuthenticationService(
+        authenticationService = await AuthenticationService(
             authMethod: authMethod,
             networkManager: networkManager,
             tokenManager: tokenManager,
@@ -133,10 +134,10 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
             // Initialize TokenManager first
             LogManager.logDebug("ATProtoClient - TokenManager initialized.")
 
-            await networkManager.setAuthenticationProvider(self.authenticationService)
+            await networkManager.setAuthenticationProvider(authenticationService)
             await middlewareService.setSessionManager(sessionManager)
 //            await configManager.waitForInitialization()
-            
+
             if let savedPDSURL = await configManager.getPDSURL() {
                 LogManager.logInfo("ATProtoClient - Using saved PDS URL: \(savedPDSURL)")
                 self.baseURL = savedPDSURL
@@ -153,8 +154,7 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
             if try await authenticationService.refreshTokenIfNeeded() {
                 LogManager.logInfo("Token refreshed successfully")
             }
-            
-            
+
             // Attempt to make a simple authenticated request to verify everything is working
             do {
                 let _ = try await com.atproto.server.describeServer()
@@ -168,52 +168,51 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
             LogManager.logError("ATProtoClient - Failed to fetch session: \(error)")
             await EventBus.shared.publish(.authenticationFailed(error))
         }
-        
+
         // Publish an initialization completed event
         await EventBus.shared.publish(.initializationCompleted)
-
     }
-    
+
     // MARK: - Initialization Helper Methods
-    
+
     private func publishInitializationStarted() async {
         await EventBus.shared.publish(.initializationStarted)
     }
-    
-    
+
     private func updateAllComponentsWithNewURL(_ newURL: URL) async {
         LogManager.logInfo("ATProtoClient - Updating all components with new URL: \(newURL)")
 
-        self.baseURL = newURL
-        self.pdsURL = newURL
+        baseURL = newURL
+        pdsURL = newURL
         await configManager.updatePDSURL(newURL)
         await networkManager.updateBaseURL(newURL)
-        
+
         LogManager.logInfo("ATProtoClient - Base URL updated to: \(newURL)")
     }
 
     // Modify other methods that might change the PDS URL to use updatePDSURL
     private func getSession() async throws -> ComAtprotoServerGetSession.Output {
         let sessionResponse = try await com.atproto.server.getSession()
-        
+
         guard let sessionInfo = sessionResponse.data,
               let endpoint = sessionInfo.didDoc?.service.first?.serviceEndpoint,
-              let serviceURL = URL(string: endpoint) else {
+              let serviceURL = URL(string: endpoint)
+        else {
             throw APIError.authorizationFailed
         }
-        
+
         // Update PDS URL
         await updateAllComponentsWithNewURL(serviceURL)
-        
+
         try await configManager.updateUserConfiguration(
             did: sessionInfo.did,
             handle: sessionInfo.handle,
             serviceEndpoint: endpoint
         )
-        
-        self.did = sessionInfo.did
-        self.handle = sessionInfo.handle
-        
+
+        did = sessionInfo.did
+        handle = sessionInfo.handle
+
         return sessionInfo
     }
 
@@ -225,7 +224,7 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
 //        await middlewareService.setSessionManager(sessionManager)
 //        // Publish configuration updated event if needed
 //    }
-    
+
 //    private func getAuthenticationService() throws -> AuthenticationService {
 //        guard let authService = authenticationService else {
 //            LogManager.logError("AuthenticationService not initialized")
@@ -235,7 +234,7 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
 //    }
 
     // MARK: - Authentication Delegate Protocol Methods
-    
+
     /// Notifies when authentication is required.
     ///
     /// - Parameter client: The ATProtoClient instance requiring authentication.
@@ -243,7 +242,7 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
         // Publish an authentication required event
         await EventBus.shared.publish(.authenticationRequired)
     }
-    
+
     private func handleAuthenticationError() async {
         LogManager.logInfo("ATProtoClient - Handling authentication error")
         do {
@@ -256,8 +255,9 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
             await authDelegate?.authenticationRequired(client: self)
         }
     }
+
     // MARK: - OAuth Flow Methods
-    
+
     /// Starts the OAuth flow by obtaining the authorization URL.
     ///
     /// - Parameter identifier: The user's identifier.
@@ -269,14 +269,13 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
         return authURL
     }
 
-
     /// Handles the OAuth callback by processing the redirect URL.
     ///
     /// - Parameter url: The callback URL containing authorization data.
     public func handleOAuthCallback(url: URL) async throws {
         try await authenticationService.handleOAuthCallback(url: url)
         // Publish OAuth callback received event
-        
+
         // After successful OAuth, save the PDS URL
         if let pdsURL = await configManager.getPDSURL() {
             await configManager.updatePDSURL(pdsURL)
@@ -286,7 +285,7 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
     }
 
     // MARK: - Login Method
-    
+
     /// Logs in the user using the specified identifier and password.
     ///
     /// - Parameters:
@@ -294,39 +293,40 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
     ///   - password: The user's password.
     public func login(identifier: String, password: String) async throws {
         try await authenticationService.login(identifier: identifier, password: password)
-        
+
         // After login, set DID and handle
-        self.did = try await resolveHandleToDID(handle: identifier)
-        self.handle = identifier
+        did = try await resolveHandleToDID(handle: identifier)
+        handle = identifier
 
         // Publish token updated event
         if let accessToken = await tokenManager.fetchAccessToken(),
-           let refreshToken = await tokenManager.fetchRefreshToken() {
+           let refreshToken = await tokenManager.fetchRefreshToken()
+        {
             await EventBus.shared.publish(.tokensUpdated(accessToken: accessToken, refreshToken: refreshToken))
         }
     }
 
     // MARK: - Logout Method
-    
+
     /// Logs out the user by clearing tokens and session data.
     public func logout() async throws {
         try await authenticationService.logout()
-        
+
         // Clear session and tokens
         try await middlewareService.clearSession()
         try await tokenManager.deleteTokens()
         await authenticationService.deleteDPoPKey()
         try await sessionManager.clearSession()
-        
+
         // Publish logout event
         await EventBus.shared.publish(.sessionExpired)
-        
+
         // Notify delegate that authentication is required
         await authDelegate?.authenticationRequired(client: self)
     }
 
     // MARK: - Utility Functions
-    
+
     /// Resolves a user's handle to their DID.
     ///
     /// - Parameter handle: The user's handle.
@@ -355,23 +355,25 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
         )
         let (data, _) = try await networkManager.performRequest(request)
         let didDocument = try ZippyJSONDecoder().decode(DIDDocument.self, from: data)
-        
+
         guard let serviceURLString = didDocument.service.first(where: { $0.type == "AtprotoPersonalDataServer" })?.serviceEndpoint,
-              let serviceURL = URL(string: serviceURLString) else {
+              let serviceURL = URL(string: serviceURLString)
+        else {
             throw APIError.invalidPDSURL
         }
-        
-        self.pdsURL = serviceURL
+
+        pdsURL = serviceURL
         // Publish PDS URL updated event
         await EventBus.shared.publish(.baseURLUpdated(serviceURL))
         return serviceURL
     }
-    
+
     private func updateNetworkManagerBaseURL() async {
         if let pdsURL = pdsURL {
             await EventBus.shared.publish(.baseURLUpdated(pdsURL))
         }
     }
+
     /// Retrieves the current user's handle.
     ///
     /// - Returns: The user's handle, if available.
@@ -381,7 +383,7 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
         }
         return handle
     }
-    
+
     /// Retrieves the current user's DID.
     ///
     /// - Returns: The user's DID, if available.
@@ -392,7 +394,7 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
 
         return did
     }
-    
+
     /// Refreshes the access token if necessary.
     ///
     /// - Returns: A boolean indicating whether the refresh was successful.
@@ -400,7 +402,8 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
         let refreshed = try await authenticationService.refreshTokenIfNeeded()
         if refreshed {
             if let accessToken = await tokenManager.fetchAccessToken(),
-               let refreshToken = await tokenManager.fetchRefreshToken() {
+               let refreshToken = await tokenManager.fetchRefreshToken()
+            {
                 await EventBus.shared.publish(.tokensUpdated(accessToken: accessToken, refreshToken: refreshToken))
             }
         }
@@ -423,7 +426,7 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
             return false
         }
     }
-    
+
     /// Initializes the session by fetching metadata and validating tokens.
     public func initializeSession() async throws {
         LogManager.logDebug("ATProtoClient - Initializing session.")
@@ -431,10 +434,10 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
             await baseURL = configManager.getPDSURL() ?? baseURL
             try await tokenManager.fetchAuthServerMetadataAndJWKS(baseURL: baseURL)
             LogManager.logDebug("ATProtoClient - Authorization Server Metadata and JWKS fetched.")
-            
+
             try await sessionManager.initializeIfNeeded()
             LogManager.logDebug("ATProtoClient - SessionManager initialized.")
-            
+
             let isValid = await hasValidSession()
             if isValid {
                 did = await configManager.getDID()
@@ -460,7 +463,7 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
     }
 
     // MARK: - SessionDelegate Protocol Methods
-    
+
     /// Notifies that the session requires reauthentication.
     ///
     /// - Parameter sessionManager: The session manager requiring reauthentication.
@@ -468,9 +471,9 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
         // Publish an authentication required event
         await EventBus.shared.publish(.authenticationRequired)
     }
-    
+
     // MARK: - Event Subscription
-    
+
     private func subscribeToEvents() async {
         let eventStream = await EventBus.shared.subscribe()
         for await event in eventStream {
@@ -479,7 +482,7 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
 //                // Handle token refreshed event
 //                LogManager.logDebug("ATProtoClient - Received tokenRefreshed event.")
 //                // Update internal state if necessary
-////                self.baseURL = await configManager.getPDSURL() ?? self.baseURL
+            ////                self.baseURL = await configManager.getPDSURL() ?? self.baseURL
 //            case .sessionExpired:
 //                // Handle session expired event
 //                LogManager.logInfo("ATProtoClient - Session expired. Requiring authentication.")
@@ -514,392 +517,312 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
             }
         }
     }
-    
+
     // MARK: - Generated Classes
 
-    public lazy var tools: Tools = {
-    return Tools(networkManager: self.networkManager)
-}()
+    public lazy var tools: Tools = .init(networkManager: self.networkManager)
 
-public final class Tools: @unchecked Sendable {
-    internal let networkManager: NetworkManaging
-    internal init(networkManager: NetworkManaging) {
-        self.networkManager = networkManager
-    }
-
-    public lazy var ozone: Ozone = {
-        return Ozone(networkManager: self.networkManager)
-    }()
-
-    public final class Ozone: @unchecked Sendable {
-        internal let networkManager: NetworkManaging
-        internal init(networkManager: NetworkManaging) {
+    public final class Tools: @unchecked Sendable {
+        let networkManager: NetworkManaging
+        init(networkManager: NetworkManaging) {
             self.networkManager = networkManager
         }
 
-        public lazy var team: Team = {
-            return Team(networkManager: self.networkManager)
-        }()
+        public lazy var ozone: Ozone = .init(networkManager: self.networkManager)
 
-        public final class Team: @unchecked Sendable {
-            internal let networkManager: NetworkManaging
-            internal init(networkManager: NetworkManaging) {
+        public final class Ozone: @unchecked Sendable {
+            let networkManager: NetworkManaging
+            init(networkManager: NetworkManaging) {
                 self.networkManager = networkManager
             }
 
-        }
+            public lazy var server: Server = .init(networkManager: self.networkManager)
 
-        public lazy var communication: Communication = {
-            return Communication(networkManager: self.networkManager)
-        }()
-
-        public final class Communication: @unchecked Sendable {
-            internal let networkManager: NetworkManaging
-            internal init(networkManager: NetworkManaging) {
-                self.networkManager = networkManager
+            public final class Server: @unchecked Sendable {
+                let networkManager: NetworkManaging
+                init(networkManager: NetworkManaging) {
+                    self.networkManager = networkManager
+                }
             }
 
-        }
+            public lazy var signature: Signature = .init(networkManager: self.networkManager)
 
-        public lazy var moderation: Moderation = {
-            return Moderation(networkManager: self.networkManager)
-        }()
-
-        public final class Moderation: @unchecked Sendable {
-            internal let networkManager: NetworkManaging
-            internal init(networkManager: NetworkManaging) {
-                self.networkManager = networkManager
+            public final class Signature: @unchecked Sendable {
+                let networkManager: NetworkManaging
+                init(networkManager: NetworkManaging) {
+                    self.networkManager = networkManager
+                }
             }
 
-        }
+            public lazy var team: Team = .init(networkManager: self.networkManager)
 
-        public lazy var server: Server = {
-            return Server(networkManager: self.networkManager)
-        }()
-
-        public final class Server: @unchecked Sendable {
-            internal let networkManager: NetworkManaging
-            internal init(networkManager: NetworkManaging) {
-                self.networkManager = networkManager
+            public final class Team: @unchecked Sendable {
+                let networkManager: NetworkManaging
+                init(networkManager: NetworkManaging) {
+                    self.networkManager = networkManager
+                }
             }
 
-        }
+            public lazy var communication: Communication = .init(networkManager: self.networkManager)
 
+            public final class Communication: @unchecked Sendable {
+                let networkManager: NetworkManaging
+                init(networkManager: NetworkManaging) {
+                    self.networkManager = networkManager
+                }
+            }
+
+            public lazy var set: Set = .init(networkManager: self.networkManager)
+
+            public final class Set: @unchecked Sendable {
+                let networkManager: NetworkManaging
+                init(networkManager: NetworkManaging) {
+                    self.networkManager = networkManager
+                }
+            }
+
+            public lazy var moderation: Moderation = .init(networkManager: self.networkManager)
+
+            public final class Moderation: @unchecked Sendable {
+                let networkManager: NetworkManaging
+                init(networkManager: NetworkManaging) {
+                    self.networkManager = networkManager
+                }
+            }
+        }
     }
 
-}
+    public lazy var app: App = .init(networkManager: self.networkManager)
 
-public lazy var app: App = {
-    return App(networkManager: self.networkManager)
-}()
-
-public final class App: @unchecked Sendable {
-    internal let networkManager: NetworkManaging
-    internal init(networkManager: NetworkManaging) {
-        self.networkManager = networkManager
-    }
-
-    public lazy var bsky: Bsky = {
-        return Bsky(networkManager: self.networkManager)
-    }()
-
-    public final class Bsky: @unchecked Sendable {
-        internal let networkManager: NetworkManaging
-        internal init(networkManager: NetworkManaging) {
+    public final class App: @unchecked Sendable {
+        let networkManager: NetworkManaging
+        init(networkManager: NetworkManaging) {
             self.networkManager = networkManager
         }
 
-        public lazy var notification: Notification = {
-            return Notification(networkManager: self.networkManager)
-        }()
+        public lazy var bsky: Bsky = .init(networkManager: self.networkManager)
 
-        public final class Notification: @unchecked Sendable {
-            internal let networkManager: NetworkManaging
-            internal init(networkManager: NetworkManaging) {
+        public final class Bsky: @unchecked Sendable {
+            let networkManager: NetworkManaging
+            init(networkManager: NetworkManaging) {
                 self.networkManager = networkManager
             }
 
-        }
+            public lazy var video: Video = .init(networkManager: self.networkManager)
 
-        public lazy var video: Video = {
-            return Video(networkManager: self.networkManager)
-        }()
-
-        public final class Video: @unchecked Sendable {
-            internal let networkManager: NetworkManaging
-            internal init(networkManager: NetworkManaging) {
-                self.networkManager = networkManager
+            public final class Video: @unchecked Sendable {
+                let networkManager: NetworkManaging
+                init(networkManager: NetworkManaging) {
+                    self.networkManager = networkManager
+                }
             }
 
-        }
+            public lazy var notification: Notification = .init(networkManager: self.networkManager)
 
-        public lazy var embed: Embed = {
-            return Embed(networkManager: self.networkManager)
-        }()
-
-        public final class Embed: @unchecked Sendable {
-            internal let networkManager: NetworkManaging
-            internal init(networkManager: NetworkManaging) {
-                self.networkManager = networkManager
+            public final class Notification: @unchecked Sendable {
+                let networkManager: NetworkManaging
+                init(networkManager: NetworkManaging) {
+                    self.networkManager = networkManager
+                }
             }
 
-        }
+            public lazy var embed: Embed = .init(networkManager: self.networkManager)
 
-        public lazy var unspecced: Unspecced = {
-            return Unspecced(networkManager: self.networkManager)
-        }()
-
-        public final class Unspecced: @unchecked Sendable {
-            internal let networkManager: NetworkManaging
-            internal init(networkManager: NetworkManaging) {
-                self.networkManager = networkManager
+            public final class Embed: @unchecked Sendable {
+                let networkManager: NetworkManaging
+                init(networkManager: NetworkManaging) {
+                    self.networkManager = networkManager
+                }
             }
 
-        }
+            public lazy var unspecced: Unspecced = .init(networkManager: self.networkManager)
 
-        public lazy var graph: Graph = {
-            return Graph(networkManager: self.networkManager)
-        }()
-
-        public final class Graph: @unchecked Sendable {
-            internal let networkManager: NetworkManaging
-            internal init(networkManager: NetworkManaging) {
-                self.networkManager = networkManager
+            public final class Unspecced: @unchecked Sendable {
+                let networkManager: NetworkManaging
+                init(networkManager: NetworkManaging) {
+                    self.networkManager = networkManager
+                }
             }
 
-        }
+            public lazy var graph: Graph = .init(networkManager: self.networkManager)
 
-        public lazy var feed: Feed = {
-            return Feed(networkManager: self.networkManager)
-        }()
-
-        public final class Feed: @unchecked Sendable {
-            internal let networkManager: NetworkManaging
-            internal init(networkManager: NetworkManaging) {
-                self.networkManager = networkManager
+            public final class Graph: @unchecked Sendable {
+                let networkManager: NetworkManaging
+                init(networkManager: NetworkManaging) {
+                    self.networkManager = networkManager
+                }
             }
 
-        }
+            public lazy var feed: Feed = .init(networkManager: self.networkManager)
 
-        public lazy var actor: Actor = {
-            return Actor(networkManager: self.networkManager)
-        }()
-
-        public final class Actor: @unchecked Sendable {
-            internal let networkManager: NetworkManaging
-            internal init(networkManager: NetworkManaging) {
-                self.networkManager = networkManager
+            public final class Feed: @unchecked Sendable {
+                let networkManager: NetworkManaging
+                init(networkManager: NetworkManaging) {
+                    self.networkManager = networkManager
+                }
             }
 
-        }
+            public lazy var richtext: Richtext = .init(networkManager: self.networkManager)
 
-        public lazy var richtext: Richtext = {
-            return Richtext(networkManager: self.networkManager)
-        }()
-
-        public final class Richtext: @unchecked Sendable {
-            internal let networkManager: NetworkManaging
-            internal init(networkManager: NetworkManaging) {
-                self.networkManager = networkManager
+            public final class Richtext: @unchecked Sendable {
+                let networkManager: NetworkManaging
+                init(networkManager: NetworkManaging) {
+                    self.networkManager = networkManager
+                }
             }
 
-        }
+            public lazy var actor: Actor = .init(networkManager: self.networkManager)
 
-        public lazy var labeler: Labeler = {
-            return Labeler(networkManager: self.networkManager)
-        }()
-
-        public final class Labeler: @unchecked Sendable {
-            internal let networkManager: NetworkManaging
-            internal init(networkManager: NetworkManaging) {
-                self.networkManager = networkManager
+            public final class Actor: @unchecked Sendable {
+                let networkManager: NetworkManaging
+                init(networkManager: NetworkManaging) {
+                    self.networkManager = networkManager
+                }
             }
 
-        }
+            public lazy var labeler: Labeler = .init(networkManager: self.networkManager)
 
+            public final class Labeler: @unchecked Sendable {
+                let networkManager: NetworkManaging
+                init(networkManager: NetworkManaging) {
+                    self.networkManager = networkManager
+                }
+            }
+        }
     }
 
-}
+    public lazy var chat: Chat = .init(networkManager: self.networkManager)
 
-public lazy var chat: Chat = {
-    return Chat(networkManager: self.networkManager)
-}()
-
-public final class Chat: @unchecked Sendable {
-    internal let networkManager: NetworkManaging
-    internal init(networkManager: NetworkManaging) {
-        self.networkManager = networkManager
-    }
-
-    public lazy var bsky: Bsky = {
-        return Bsky(networkManager: self.networkManager)
-    }()
-
-    public final class Bsky: @unchecked Sendable {
-        internal let networkManager: NetworkManaging
-        internal init(networkManager: NetworkManaging) {
+    public final class Chat: @unchecked Sendable {
+        let networkManager: NetworkManaging
+        init(networkManager: NetworkManaging) {
             self.networkManager = networkManager
         }
 
-        public lazy var convo: Convo = {
-            return Convo(networkManager: self.networkManager)
-        }()
+        public lazy var bsky: Bsky = .init(networkManager: self.networkManager)
 
-        public final class Convo: @unchecked Sendable {
-            internal let networkManager: NetworkManaging
-            internal init(networkManager: NetworkManaging) {
+        public final class Bsky: @unchecked Sendable {
+            let networkManager: NetworkManaging
+            init(networkManager: NetworkManaging) {
                 self.networkManager = networkManager
             }
 
-        }
+            public lazy var convo: Convo = .init(networkManager: self.networkManager)
 
-        public lazy var moderation: Moderation = {
-            return Moderation(networkManager: self.networkManager)
-        }()
-
-        public final class Moderation: @unchecked Sendable {
-            internal let networkManager: NetworkManaging
-            internal init(networkManager: NetworkManaging) {
-                self.networkManager = networkManager
+            public final class Convo: @unchecked Sendable {
+                let networkManager: NetworkManaging
+                init(networkManager: NetworkManaging) {
+                    self.networkManager = networkManager
+                }
             }
 
-        }
+            public lazy var actor: Actor = .init(networkManager: self.networkManager)
 
-        public lazy var actor: Actor = {
-            return Actor(networkManager: self.networkManager)
-        }()
-
-        public final class Actor: @unchecked Sendable {
-            internal let networkManager: NetworkManaging
-            internal init(networkManager: NetworkManaging) {
-                self.networkManager = networkManager
+            public final class Actor: @unchecked Sendable {
+                let networkManager: NetworkManaging
+                init(networkManager: NetworkManaging) {
+                    self.networkManager = networkManager
+                }
             }
 
-        }
+            public lazy var moderation: Moderation = .init(networkManager: self.networkManager)
 
+            public final class Moderation: @unchecked Sendable {
+                let networkManager: NetworkManaging
+                init(networkManager: NetworkManaging) {
+                    self.networkManager = networkManager
+                }
+            }
+        }
     }
 
-}
+    public lazy var com: Com = .init(networkManager: self.networkManager)
 
-public lazy var com: Com = {
-    return Com(networkManager: self.networkManager)
-}()
-
-public final class Com: @unchecked Sendable {
-    internal let networkManager: NetworkManaging
-    internal init(networkManager: NetworkManaging) {
-        self.networkManager = networkManager
-    }
-
-    public lazy var atproto: Atproto = {
-        return Atproto(networkManager: self.networkManager)
-    }()
-
-    public final class Atproto: @unchecked Sendable {
-        internal let networkManager: NetworkManaging
-        internal init(networkManager: NetworkManaging) {
+    public final class Com: @unchecked Sendable {
+        let networkManager: NetworkManaging
+        init(networkManager: NetworkManaging) {
             self.networkManager = networkManager
         }
 
-        public lazy var admin: Admin = {
-            return Admin(networkManager: self.networkManager)
-        }()
+        public lazy var atproto: Atproto = .init(networkManager: self.networkManager)
 
-        public final class Admin: @unchecked Sendable {
-            internal let networkManager: NetworkManaging
-            internal init(networkManager: NetworkManaging) {
+        public final class Atproto: @unchecked Sendable {
+            let networkManager: NetworkManaging
+            init(networkManager: NetworkManaging) {
                 self.networkManager = networkManager
             }
 
-        }
+            public lazy var temp: Temp = .init(networkManager: self.networkManager)
 
-        public lazy var temp: Temp = {
-            return Temp(networkManager: self.networkManager)
-        }()
-
-        public final class Temp: @unchecked Sendable {
-            internal let networkManager: NetworkManaging
-            internal init(networkManager: NetworkManaging) {
-                self.networkManager = networkManager
+            public final class Temp: @unchecked Sendable {
+                let networkManager: NetworkManaging
+                init(networkManager: NetworkManaging) {
+                    self.networkManager = networkManager
+                }
             }
 
-        }
+            public lazy var identity: Identity = .init(networkManager: self.networkManager)
 
-        public lazy var identity: Identity = {
-            return Identity(networkManager: self.networkManager)
-        }()
-
-        public final class Identity: @unchecked Sendable {
-            internal let networkManager: NetworkManaging
-            internal init(networkManager: NetworkManaging) {
-                self.networkManager = networkManager
+            public final class Identity: @unchecked Sendable {
+                let networkManager: NetworkManaging
+                init(networkManager: NetworkManaging) {
+                    self.networkManager = networkManager
+                }
             }
 
-        }
+            public lazy var admin: Admin = .init(networkManager: self.networkManager)
 
-        public lazy var server: Server = {
-            return Server(networkManager: self.networkManager)
-        }()
-
-        public final class Server: @unchecked Sendable {
-            internal let networkManager: NetworkManaging
-            internal init(networkManager: NetworkManaging) {
-                self.networkManager = networkManager
+            public final class Admin: @unchecked Sendable {
+                let networkManager: NetworkManaging
+                init(networkManager: NetworkManaging) {
+                    self.networkManager = networkManager
+                }
             }
 
-        }
+            public lazy var label: Label = .init(networkManager: self.networkManager)
 
-        public lazy var label: Label = {
-            return Label(networkManager: self.networkManager)
-        }()
-
-        public final class Label: @unchecked Sendable {
-            internal let networkManager: NetworkManaging
-            internal init(networkManager: NetworkManaging) {
-                self.networkManager = networkManager
+            public final class Label: @unchecked Sendable {
+                let networkManager: NetworkManaging
+                init(networkManager: NetworkManaging) {
+                    self.networkManager = networkManager
+                }
             }
 
-        }
+            public lazy var server: Server = .init(networkManager: self.networkManager)
 
-        public lazy var sync: Sync = {
-            return Sync(networkManager: self.networkManager)
-        }()
-
-        public final class Sync: @unchecked Sendable {
-            internal let networkManager: NetworkManaging
-            internal init(networkManager: NetworkManaging) {
-                self.networkManager = networkManager
+            public final class Server: @unchecked Sendable {
+                let networkManager: NetworkManaging
+                init(networkManager: NetworkManaging) {
+                    self.networkManager = networkManager
+                }
             }
 
-        }
+            public lazy var sync: Sync = .init(networkManager: self.networkManager)
 
-        public lazy var repo: Repo = {
-            return Repo(networkManager: self.networkManager)
-        }()
-
-        public final class Repo: @unchecked Sendable {
-            internal let networkManager: NetworkManaging
-            internal init(networkManager: NetworkManaging) {
-                self.networkManager = networkManager
+            public final class Sync: @unchecked Sendable {
+                let networkManager: NetworkManaging
+                init(networkManager: NetworkManaging) {
+                    self.networkManager = networkManager
+                }
             }
 
-        }
+            public lazy var repo: Repo = .init(networkManager: self.networkManager)
 
-        public lazy var moderation: Moderation = {
-            return Moderation(networkManager: self.networkManager)
-        }()
-
-        public final class Moderation: @unchecked Sendable {
-            internal let networkManager: NetworkManaging
-            internal init(networkManager: NetworkManaging) {
-                self.networkManager = networkManager
+            public final class Repo: @unchecked Sendable {
+                let networkManager: NetworkManaging
+                init(networkManager: NetworkManaging) {
+                    self.networkManager = networkManager
+                }
             }
 
-        }
+            public lazy var moderation: Moderation = .init(networkManager: self.networkManager)
 
+            public final class Moderation: @unchecked Sendable {
+                let networkManager: NetworkManaging
+                init(networkManager: NetworkManaging) {
+                    self.networkManager = networkManager
+                }
+            }
+        }
     }
-
-}
-
-
 }
