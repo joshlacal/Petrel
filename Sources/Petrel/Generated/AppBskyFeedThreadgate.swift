@@ -134,6 +134,39 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
         }
     }
 
+    public struct FollowerRule: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.feed.threadgate#followerRule"
+
+        // Standard initializer
+        public init(
+        ) {}
+
+        // Codable initializer
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+        }
+
+        public func hash(into hasher: inout Hasher) {}
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+        }
+    }
+
     public struct FollowingRule: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.feed.threadgate#followingRule"
 
@@ -223,6 +256,7 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
 
     public enum AppBskyFeedThreadgateAllowUnion: Codable, ATProtocolCodable, ATProtocolValue {
         case appBskyFeedThreadgateMentionRule(AppBskyFeedThreadgate.MentionRule)
+        case appBskyFeedThreadgateFollowerRule(AppBskyFeedThreadgate.FollowerRule)
         case appBskyFeedThreadgateFollowingRule(AppBskyFeedThreadgate.FollowingRule)
         case appBskyFeedThreadgateListRule(AppBskyFeedThreadgate.ListRule)
         case unexpected(ATProtocolValueContainer)
@@ -235,6 +269,9 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
             case "app.bsky.feed.threadgate#mentionRule":
                 let value = try AppBskyFeedThreadgate.MentionRule(from: decoder)
                 self = .appBskyFeedThreadgateMentionRule(value)
+            case "app.bsky.feed.threadgate#followerRule":
+                let value = try AppBskyFeedThreadgate.FollowerRule(from: decoder)
+                self = .appBskyFeedThreadgateFollowerRule(value)
             case "app.bsky.feed.threadgate#followingRule":
                 let value = try AppBskyFeedThreadgate.FollowingRule(from: decoder)
                 self = .appBskyFeedThreadgateFollowingRule(value)
@@ -254,6 +291,9 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
             case let .appBskyFeedThreadgateMentionRule(value):
                 try container.encode("app.bsky.feed.threadgate#mentionRule", forKey: .type)
                 try value.encode(to: encoder)
+            case let .appBskyFeedThreadgateFollowerRule(value):
+                try container.encode("app.bsky.feed.threadgate#followerRule", forKey: .type)
+                try value.encode(to: encoder)
             case let .appBskyFeedThreadgateFollowingRule(value):
                 try container.encode("app.bsky.feed.threadgate#followingRule", forKey: .type)
                 try value.encode(to: encoder)
@@ -269,6 +309,9 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
             switch self {
             case let .appBskyFeedThreadgateMentionRule(value):
                 hasher.combine("app.bsky.feed.threadgate#mentionRule")
+                hasher.combine(value)
+            case let .appBskyFeedThreadgateFollowerRule(value):
+                hasher.combine("app.bsky.feed.threadgate#followerRule")
                 hasher.combine(value)
             case let .appBskyFeedThreadgateFollowingRule(value):
                 hasher.combine("app.bsky.feed.threadgate#followingRule")
@@ -292,19 +335,21 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
             switch (self, otherValue) {
             case let (
                 .appBskyFeedThreadgateMentionRule(selfValue),
-
                 .appBskyFeedThreadgateMentionRule(otherValue)
             ):
                 return selfValue == otherValue
             case let (
+                .appBskyFeedThreadgateFollowerRule(selfValue),
+                .appBskyFeedThreadgateFollowerRule(otherValue)
+            ):
+                return selfValue == otherValue
+            case let (
                 .appBskyFeedThreadgateFollowingRule(selfValue),
-
                 .appBskyFeedThreadgateFollowingRule(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyFeedThreadgateListRule(selfValue),
-
                 .appBskyFeedThreadgateListRule(otherValue)
             ):
                 return selfValue == otherValue

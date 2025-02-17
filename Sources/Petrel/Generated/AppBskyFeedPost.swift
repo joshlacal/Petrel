@@ -517,31 +517,26 @@ public struct AppBskyFeedPost: ATProtocolCodable, ATProtocolValue {
             switch (self, otherValue) {
             case let (
                 .appBskyEmbedImages(selfValue),
-
                 .appBskyEmbedImages(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyEmbedVideo(selfValue),
-
                 .appBskyEmbedVideo(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyEmbedExternal(selfValue),
-
                 .appBskyEmbedExternal(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyEmbedRecord(selfValue),
-
                 .appBskyEmbedRecord(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyEmbedRecordWithMedia(selfValue),
-
                 .appBskyEmbedRecordWithMedia(otherValue)
             ):
                 return selfValue == otherValue
@@ -604,7 +599,6 @@ public struct AppBskyFeedPost: ATProtocolCodable, ATProtocolValue {
             switch (self, otherValue) {
             case let (
                 .comAtprotoLabelDefsSelfLabels(selfValue),
-
                 .comAtprotoLabelDefsSelfLabels(otherValue)
             ):
                 return selfValue == otherValue

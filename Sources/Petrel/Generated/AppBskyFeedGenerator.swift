@@ -12,10 +12,11 @@ public struct AppBskyFeedGenerator: ATProtocolCodable, ATProtocolValue {
     public let avatar: Blob?
     public let acceptsInteractions: Bool?
     public let labels: AppBskyFeedGeneratorLabelsUnion?
+    public let contentMode: String?
     public let createdAt: ATProtocolDate
 
     // Standard initializer
-    public init(did: String, displayName: String, description: String?, descriptionFacets: [AppBskyRichtextFacet]?, avatar: Blob?, acceptsInteractions: Bool?, labels: AppBskyFeedGeneratorLabelsUnion?, createdAt: ATProtocolDate) {
+    public init(did: String, displayName: String, description: String?, descriptionFacets: [AppBskyRichtextFacet]?, avatar: Blob?, acceptsInteractions: Bool?, labels: AppBskyFeedGeneratorLabelsUnion?, contentMode: String?, createdAt: ATProtocolDate) {
         self.did = did
 
         self.displayName = displayName
@@ -29,6 +30,8 @@ public struct AppBskyFeedGenerator: ATProtocolCodable, ATProtocolValue {
         self.acceptsInteractions = acceptsInteractions
 
         self.labels = labels
+
+        self.contentMode = contentMode
 
         self.createdAt = createdAt
     }
@@ -50,6 +53,8 @@ public struct AppBskyFeedGenerator: ATProtocolCodable, ATProtocolValue {
         acceptsInteractions = try container.decodeIfPresent(Bool.self, forKey: .acceptsInteractions)
 
         labels = try container.decodeIfPresent(AppBskyFeedGeneratorLabelsUnion.self, forKey: .labels)
+
+        contentMode = try container.decodeIfPresent(String.self, forKey: .contentMode)
 
         createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
     }
@@ -81,6 +86,10 @@ public struct AppBskyFeedGenerator: ATProtocolCodable, ATProtocolValue {
 
         if let value = labels {
             try container.encode(value, forKey: .labels)
+        }
+
+        if let value = contentMode {
+            try container.encode(value, forKey: .contentMode)
         }
 
         try container.encode(createdAt, forKey: .createdAt)
@@ -121,6 +130,10 @@ public struct AppBskyFeedGenerator: ATProtocolCodable, ATProtocolValue {
             return false
         }
 
+        if contentMode != other.contentMode {
+            return false
+        }
+
         if createdAt != other.createdAt {
             return false
         }
@@ -156,6 +169,11 @@ public struct AppBskyFeedGenerator: ATProtocolCodable, ATProtocolValue {
         } else {
             hasher.combine(nil as Int?) // Placeholder for nil
         }
+        if let value = contentMode {
+            hasher.combine(value)
+        } else {
+            hasher.combine(nil as Int?) // Placeholder for nil
+        }
         hasher.combine(createdAt)
     }
 
@@ -168,6 +186,7 @@ public struct AppBskyFeedGenerator: ATProtocolCodable, ATProtocolValue {
         case avatar
         case acceptsInteractions
         case labels
+        case contentMode
         case createdAt
     }
 
@@ -222,7 +241,6 @@ public struct AppBskyFeedGenerator: ATProtocolCodable, ATProtocolValue {
             switch (self, otherValue) {
             case let (
                 .comAtprotoLabelDefsSelfLabels(selfValue),
-
                 .comAtprotoLabelDefsSelfLabels(otherValue)
             ):
                 return selfValue == otherValue

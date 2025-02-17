@@ -97,7 +97,7 @@ struct ProtectedResourceMetadata: Codable {
 struct OAuthErrorResponse: Codable {
     let error: String
     let errorDescription: String?
-    
+
     enum CodingKeys: String, CodingKey {
         case error
         case errorDescription = "error_description"
@@ -361,7 +361,7 @@ actor OAuthManager {
         state: String
     ) async throws -> String {
         LogManager.logInfo("Starting PAR request. Current DPoP nonce: \(dpopNonces["bsky.social"] ?? "nil")")
-        
+
         let parameters: [String: String] = [
             "client_id": oauthConfig.clientId,
             "code_challenge": codeChallenge,
@@ -370,57 +370,58 @@ actor OAuthManager {
             "state": state,
             "redirect_uri": oauthConfig.redirectUri,
             "response_type": "code",
-            "login_hint": identifier
+            "login_hint": identifier,
         ]
-        
+
         let body = parameters.percentEncoded()
         var attempt = 0
         let maxRetries = 3
-        
+
         while attempt < maxRetries {
             do {
                 // Generate a new DPoP proof for each attempt - without ath claim
                 let dpopProof = try createDPoPProof(for: "POST", url: endpoint)
-                
+
                 var request = try await networkManager.createURLRequest(
                     endpoint: endpoint,
                     method: "POST",
                     headers: [
                         "Content-Type": "application/x-www-form-urlencoded",
-                        "DPoP": dpopProof
+                        "DPoP": dpopProof,
                     ],
                     body: body,
                     queryItems: nil
                 )
-                
+
                 LogManager.logDebug("PAR Request Headers: \(request.allHTTPHeaderFields ?? [:])")
-                
+
                 let (data, response) = try await networkManager.performRequest(request)
                 guard let httpResponse = response as? HTTPURLResponse else {
                     throw NetworkError.requestFailed
                 }
-                
+
                 // Handle DPoP nonce updates
                 if let newNonce = httpResponse.value(forHTTPHeaderField: "DPoP-Nonce"),
-                   let endpointURL = URL(string: endpoint) {
+                   let endpointURL = URL(string: endpoint)
+                {
                     await updateDPoPNonce(for: endpointURL, from: ["DPoP-Nonce": newNonce])
                     LogManager.logInfo("Received new DPoP nonce from server: \(newNonce)")
                 }
-                
+
                 switch httpResponse.statusCode {
                 case 200, 201:
                     guard let parResponse = try? ZippyJSONDecoder().decode(PARResponse.self, from: data) else {
                         throw OAuthError.authorizationFailed
                     }
                     return parResponse.requestURI
-                    
+
                 case 400, 401:
                     if let errorDetails = try? ZippyJSONDecoder().decode(OAuthErrorResponse.self, from: data) {
                         switch errorDetails.error {
                         case "use_dpop_nonce":
                             attempt += 1
                             continue
-                            
+
                         case "invalid_dpop_proof":
                             // Clear stale state and retry
                             LogManager.logInfo("Invalid DPoP proof, regenerating state")
@@ -428,13 +429,13 @@ actor OAuthManager {
                             dpopNonces.removeAll()
                             attempt += 1
                             continue
-                            
+
                         default:
                             throw OAuthError.authorizationFailed
                         }
                     }
                     throw OAuthError.authorizationFailed
-                    
+
                 default:
                     throw OAuthError.authorizationFailed
                 }
@@ -447,10 +448,10 @@ actor OAuthManager {
                 try? await Task.sleep(nanoseconds: UInt64(pow(2.0, Double(attempt)) * 1_000_000_000))
             }
         }
-        
+
         throw OAuthError.maxRetriesReached
     }
-    
+
     func regenerateDPoPKeyPair() {
         do {
             let newKeyPair = P256.Signing.PrivateKey()
@@ -462,7 +463,7 @@ actor OAuthManager {
             LogManager.logError("Failed to regenerate DPoP key pair: \(error)")
         }
     }
-    
+
     private func resetOAuthFlow() {
         regenerateDPoPKeyPair()
     }
@@ -682,22 +683,22 @@ actor OAuthManager {
         guard let metadata = authorizationServerMetadata else {
             throw OAuthError.missingServerMetadata
         }
-        
+
         let parameters: [String: String] = [
             "grant_type": "refresh_token",
             "refresh_token": refreshToken,
             "client_id": oauthConfig.clientId,
         ]
-        
+
         let body = parameters.percentEncoded()
-        
+
         // Use the specialized refresh DPoP proof creator
         let dpopProof = try await createDPoPProofForRefresh(
             for: "POST",
             url: metadata.tokenEndpoint,
             refreshToken: refreshToken
         )
-        
+
         var request = try await networkManager.createURLRequest(
             endpoint: metadata.tokenEndpoint,
             method: "POST",
@@ -708,8 +709,6 @@ actor OAuthManager {
             body: body,
             queryItems: nil
         )
-
-
 
         // Log the request for debugging
         LogManager.logDebug("Refresh Token Request: \(request)")
@@ -735,30 +734,30 @@ actor OAuthManager {
 
         if httpResponse.statusCode == 200 {
             let tokenResponse = try ZippyJSONDecoder().decode(TokenResponse.self, from: data)
-            
+
             // Verify the 'sub' claim
             guard let sub = tokenResponse.sub, sub.starts(with: "did:") else {
                 throw OAuthError.invalidSubClaim
             }
-            
+
             // Update PDS URL
             let pdsURL = try await didResolver.resolveDIDToPDSURL(did: sub)
             await configurationManager.updatePDSURL(pdsURL)
             await networkManager.updateBaseURL(pdsURL)
             await EventBus.shared.publish(.baseURLUpdated(pdsURL))
-            
+
             LogManager.logInfo("Token refreshed successfully. New PDS URL: \(pdsURL.absoluteString)")
-            
+
             return (tokenResponse.accessToken, tokenResponse.refreshToken)
         } else if httpResponse.statusCode == 400 {
-                if let errorResponse = try? ZippyJSONDecoder().decode(OAuthErrorResponse.self, from: data) {
-                    LogManager.logError("Token refresh failed: \(errorResponse.error) - \(errorResponse.errorDescription ?? "")")
-                    if errorResponse.error == "invalid_grant" {
-                        // Token is expired, need to re-authenticate
-                        await EventBus.shared.publish(.authenticationRequired)
-                    }
+            if let errorResponse = try? ZippyJSONDecoder().decode(OAuthErrorResponse.self, from: data) {
+                LogManager.logError("Token refresh failed: \(errorResponse.error) - \(errorResponse.errorDescription ?? "")")
+                if errorResponse.error == "invalid_grant" {
+                    // Token is expired, need to re-authenticate
+                    await EventBus.shared.publish(.authenticationRequired)
                 }
-                throw OAuthError.tokenRefreshFailed
+            }
+            throw OAuthError.tokenRefreshFailed
         } else {
             // Log the error response for debugging
             if let errorBody = try? JSONDecoder().decode(OAuthErrorResponse.self, from: data) {
@@ -769,31 +768,29 @@ actor OAuthManager {
             throw OAuthError.tokenRefreshFailed
         }
     }
-    
-    
-    
+
     private func createDPoPProofForRefresh(for httpMethod: String, url: String, refreshToken: String) async throws -> String {
         guard let privateKey = dpopKeyPair else {
             throw OAuthError.noDPoPKeyPair
         }
-        
+
         let jwk = try createJWK(from: privateKey)
         let domain = URL(string: url)?.host ?? "unknown"
-        
+
         // Get the DPoP binding for the domain
         var additionalClaims: [String: Any] = [:]
         if let binding = await tokenManager.getDPoPBinding(for: domain) {
             additionalClaims["cnf"] = ["jkt": binding]
             LogManager.logDebug("Including DPoP binding \(binding) for domain \(domain)")
         }
-        
+
         return try createDPoPProof(
             for: httpMethod,
             url: url,
             additionalClaims: additionalClaims
         )
     }
-    
+
     func initializeDPoPState() async throws {
         // Fetch the authorization server metadata if not already available
         if authorizationServerMetadata == nil {
@@ -881,7 +878,6 @@ actor OAuthManager {
         LogManager.logInfo("OAuthManager - DPoP proof regenerated successfully")
     }
 
-
     private func getOrCreateDPoPKeyPair() throws -> P256.Signing.PrivateKey {
         if let existingKeyPair = dpopKeyPair {
             return existingKeyPair
@@ -912,36 +908,37 @@ actor OAuthManager {
             LogManager.logError("OAuthManager - No DPoP key pair available")
             throw OAuthError.noDPoPKeyPair
         }
-        
+
         let jwk = try createJWK(from: privateKey)
-        
+
         let header = DefaultJWSHeaderImpl(
             algorithm: .ES256,
             jwk: jwk,
             type: "dpop+jwt"
         )
-        
+
         // Basic payload - always include these
         var payload: [String: Any] = [
             "jti": UUID().uuidString,
             "htm": httpMethod,
             "htu": url,
-            "iat": Int(Date().timeIntervalSince1970)
+            "iat": Int(Date().timeIntervalSince1970),
         ]
-        
+
         // Add nonce if available
         if let domain = URL(string: url)?.host?.lowercased(),
-           let nonce = dpopNonces[domain] {
+           let nonce = dpopNonces[domain]
+        {
             payload["nonce"] = nonce
             LogManager.logInfo("Including nonce in DPoP proof for domain \(domain): \(nonce)")
         }
-        
+
         // Only include 'ath' claim for resource requests, not auth-related endpoints
         if let additional = additionalClaims {
             let isAuthEndpoint = url.contains("/oauth/") ||
-            url.contains("/.well-known/oauth-authorization-server") ||
-            url.contains("/.well-known/oauth-protected-resource")
-            
+                url.contains("/.well-known/oauth-authorization-server") ||
+                url.contains("/.well-known/oauth-protected-resource")
+
             for (key, value) in additional {
                 if key == "ath" && isAuthEndpoint {
                     LogManager.logDebug("Skipping ath claim for auth endpoint")
@@ -950,17 +947,17 @@ actor OAuthManager {
                 payload[key] = value
             }
         }
-        
+
         let jws = try JWS(
-            payload: try JSONSerialization.data(withJSONObject: payload),
+            payload: JSONSerialization.data(withJSONObject: payload),
             protectedHeader: header,
             key: privateKey
         )
-        
+
         LogManager.logDebug("OAuthManager - Created DPoP proof for \(httpMethod) \(url)")
         return jws.compactSerialization
     }
-    
+
     func generateDPoPProof(for httpMethod: String, url: String, accessToken: String? = nil) throws -> String {
         var additionalClaims: [String: Any] = [:]
 
@@ -1086,7 +1083,7 @@ actor OAuthManager {
     struct PARResponse: Codable {
         let requestURI: String
         let expiresIn: Int
-        
+
         enum CodingKeys: String, CodingKey {
             case requestURI = "request_uri"
             case expiresIn = "expires_in"
@@ -1100,14 +1097,14 @@ actor OAuthManager {
         let refreshToken: String
         let scope: String
         let sub: String?
-        
+
         enum CodingKeys: String, CodingKey {
             case accessToken = "access_token"
             case tokenType = "token_type"
             case expiresIn = "expires_in"
             case refreshToken = "refresh_token"
-            case scope = "scope"
-            case sub = "sub"
+            case scope
+            case sub
         }
     }
 

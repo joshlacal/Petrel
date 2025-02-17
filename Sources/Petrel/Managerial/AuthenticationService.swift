@@ -272,22 +272,18 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
         }
     }
 
-    
-    
-    
-    
     private func startRefreshIfNotInProgress() -> Bool {
         guard !isRefreshing else { return false }
         isRefreshing = true
         return true
     }
-    
+
     func refreshTokenIfNeeded() async throws -> Bool {
         guard await tokensExist() else {
             LogManager.logInfo("AuthenticationService - No tokens to refresh")
             return false
         }
-        
+
         // Get the current access token and check if it's close to expiration
         if let accessToken = await tokenManager.fetchAccessToken() {
             if await tokenManager.shouldRefreshTokens() {
@@ -295,7 +291,7 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
                 return try await refreshTokens() // This now handles the locking
             }
         }
-        
+
         return false
     }
 
@@ -342,7 +338,7 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
                 type: .dpop,
                 domain: configurationManager.baseURL.host // Get domain from current base URL
             )
-            
+
             // Update user configuration
             if let did = try? await extractDIDFromToken(accessToken), let handle = await configurationManager.getHandle() {
                 let pdsURL = try await didResolver.resolveDIDToPDSURL(did: did)
@@ -393,7 +389,6 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
         return accessToken != nil && refreshToken != nil
     }
 
-
     func initializeOAuthState() async throws {
         if authMethod == .oauth {
             try await oauthManager?.initializeDPoPState()
@@ -405,16 +400,16 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
         guard await tokensExist() else {
             return false
         }
-        
+
         // Atomic check-and-set for refresh state
         guard await startRefreshIfNotInProgress() else {
             LogManager.logInfo("AuthenticationService - Refresh already in progress")
             return false
         }
-        
+
         // Make sure we clear the flag when done
         defer { isRefreshing = false }
-        
+
         do {
             switch authMethod {
             case .legacy:
@@ -427,6 +422,7 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
             throw error
         }
     }
+
     // MARK: - Legacy Authentication Methods
 
     /// Creates a new session using the provided identifier and password.
@@ -576,7 +572,6 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
 
     // MARK: - OAuth Authentication Methods
 
-
     private func refreshOAuthTokens() async throws -> Bool {
         guard let oauthManager = oauthManager,
               let refreshToken = await tokenManager.fetchRefreshToken()
@@ -584,14 +579,14 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
             LogManager.logError("AuthenticationService - Unable to refresh OAuth tokens: missing OAuth manager or refresh token")
             throw AuthenticationError.tokenMissingOrCorrupted
         }
-        
+
         do {
             LogManager.logInfo("AuthenticationService - Attempting to refresh OAuth tokens")
             let (newAccessToken, newRefreshToken) = try await oauthManager.refreshToken(refreshToken: refreshToken)
-            
+
             // Get the domain from the current base URL
             let domain = await configurationManager.baseURL.host
-            
+
             // Pass the domain when saving tokens
             try await tokenManager.saveTokens(
                 accessJwt: newAccessToken,
@@ -599,7 +594,7 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
                 type: .dpop,
                 domain: domain
             )
-            
+
             await EventBus.shared.publish(.tokensUpdated(accessToken: newAccessToken, refreshToken: newRefreshToken))
             LogManager.logInfo("AuthenticationService - OAuth tokens refreshed and saved successfully")
             return true

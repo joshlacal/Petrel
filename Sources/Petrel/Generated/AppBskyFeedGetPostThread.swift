@@ -117,19 +117,16 @@ public struct AppBskyFeedGetPostThread {
             switch (self, otherValue) {
             case let (
                 .appBskyFeedDefsThreadViewPost(selfValue),
-
                 .appBskyFeedDefsThreadViewPost(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyFeedDefsNotFoundPost(selfValue),
-
                 .appBskyFeedDefsNotFoundPost(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyFeedDefsBlockedPost(selfValue),
-
                 .appBskyFeedDefsBlockedPost(otherValue)
             ):
                 return selfValue == otherValue

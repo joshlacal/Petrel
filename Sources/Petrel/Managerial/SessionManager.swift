@@ -34,12 +34,12 @@ actor SessionManager: SessionManaging {
     init(tokenManager: TokenManaging, middlewareService: MiddlewareServicing) async {
         self.tokenManager = tokenManager
         self.middlewareService = middlewareService
-        self.isAuthenticated = await tokenManager.hasValidTokens()
-        self.startPeriodicTokenCheck()
+        isAuthenticated = await tokenManager.hasValidTokens()
+        startPeriodicTokenCheck()
 
 //            await self.subscribeToEvents()
     }
-    
+
     deinit {
         tokenCheckTask?.cancel()
     }
@@ -61,7 +61,7 @@ actor SessionManager: SessionManaging {
             }
         }
     }
-    
+
     // MARK: - Event Subscription
 
     private func subscribeToEvents() async {

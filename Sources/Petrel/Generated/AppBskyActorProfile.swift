@@ -240,7 +240,6 @@ public struct AppBskyActorProfile: ATProtocolCodable, ATProtocolValue {
             switch (self, otherValue) {
             case let (
                 .comAtprotoLabelDefsSelfLabels(selfValue),
-
                 .comAtprotoLabelDefsSelfLabels(otherValue)
             ):
                 return selfValue == otherValue

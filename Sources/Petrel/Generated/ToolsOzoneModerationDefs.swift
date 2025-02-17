@@ -334,12 +334,14 @@ public struct ToolsOzoneModerationDefs {
         public static let typeIdentifier = "tools.ozone.moderation.defs#subjectStatusView"
         public let id: Int
         public let subject: SubjectStatusViewSubjectUnion
+        public let hosting: SubjectStatusViewHostingUnion?
         public let subjectBlobCids: [String]?
         public let subjectRepoHandle: String?
         public let updatedAt: ATProtocolDate
         public let createdAt: ATProtocolDate
         public let reviewState: SubjectReviewState
         public let comment: String?
+        public let priorityScore: Int?
         public let muteUntil: ATProtocolDate?
         public let muteReportingUntil: ATProtocolDate?
         public let lastReviewedBy: String?
@@ -350,19 +352,23 @@ public struct ToolsOzoneModerationDefs {
         public let appealed: Bool?
         public let suspendUntil: ATProtocolDate?
         public let tags: [String]?
+        public let accountStats: AccountStats?
+        public let recordsStats: RecordsStats?
 
         // Standard initializer
         public init(
-            id: Int, subject: SubjectStatusViewSubjectUnion, subjectBlobCids: [String]?, subjectRepoHandle: String?, updatedAt: ATProtocolDate, createdAt: ATProtocolDate, reviewState: SubjectReviewState, comment: String?, muteUntil: ATProtocolDate?, muteReportingUntil: ATProtocolDate?, lastReviewedBy: String?, lastReviewedAt: ATProtocolDate?, lastReportedAt: ATProtocolDate?, lastAppealedAt: ATProtocolDate?, takendown: Bool?, appealed: Bool?, suspendUntil: ATProtocolDate?, tags: [String]?
+            id: Int, subject: SubjectStatusViewSubjectUnion, hosting: SubjectStatusViewHostingUnion?, subjectBlobCids: [String]?, subjectRepoHandle: String?, updatedAt: ATProtocolDate, createdAt: ATProtocolDate, reviewState: SubjectReviewState, comment: String?, priorityScore: Int?, muteUntil: ATProtocolDate?, muteReportingUntil: ATProtocolDate?, lastReviewedBy: String?, lastReviewedAt: ATProtocolDate?, lastReportedAt: ATProtocolDate?, lastAppealedAt: ATProtocolDate?, takendown: Bool?, appealed: Bool?, suspendUntil: ATProtocolDate?, tags: [String]?, accountStats: AccountStats?, recordsStats: RecordsStats?
         ) {
             self.id = id
             self.subject = subject
+            self.hosting = hosting
             self.subjectBlobCids = subjectBlobCids
             self.subjectRepoHandle = subjectRepoHandle
             self.updatedAt = updatedAt
             self.createdAt = createdAt
             self.reviewState = reviewState
             self.comment = comment
+            self.priorityScore = priorityScore
             self.muteUntil = muteUntil
             self.muteReportingUntil = muteReportingUntil
             self.lastReviewedBy = lastReviewedBy
@@ -373,6 +379,8 @@ public struct ToolsOzoneModerationDefs {
             self.appealed = appealed
             self.suspendUntil = suspendUntil
             self.tags = tags
+            self.accountStats = accountStats
+            self.recordsStats = recordsStats
         }
 
         // Codable initializer
@@ -390,6 +398,13 @@ public struct ToolsOzoneModerationDefs {
 
             } catch {
                 LogManager.logError("Decoding error for property 'subject': \(error)")
+                throw error
+            }
+            do {
+                hosting = try container.decodeIfPresent(SubjectStatusViewHostingUnion.self, forKey: .hosting)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'hosting': \(error)")
                 throw error
             }
             do {
@@ -432,6 +447,13 @@ public struct ToolsOzoneModerationDefs {
 
             } catch {
                 LogManager.logError("Decoding error for property 'comment': \(error)")
+                throw error
+            }
+            do {
+                priorityScore = try container.decodeIfPresent(Int.self, forKey: .priorityScore)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'priorityScore': \(error)")
                 throw error
             }
             do {
@@ -504,6 +526,20 @@ public struct ToolsOzoneModerationDefs {
                 LogManager.logError("Decoding error for property 'tags': \(error)")
                 throw error
             }
+            do {
+                accountStats = try container.decodeIfPresent(AccountStats.self, forKey: .accountStats)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'accountStats': \(error)")
+                throw error
+            }
+            do {
+                recordsStats = try container.decodeIfPresent(RecordsStats.self, forKey: .recordsStats)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'recordsStats': \(error)")
+                throw error
+            }
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -513,6 +549,10 @@ public struct ToolsOzoneModerationDefs {
             try container.encode(id, forKey: .id)
 
             try container.encode(subject, forKey: .subject)
+
+            if let value = hosting {
+                try container.encode(value, forKey: .hosting)
+            }
 
             if let value = subjectBlobCids {
                 try container.encode(value, forKey: .subjectBlobCids)
@@ -530,6 +570,10 @@ public struct ToolsOzoneModerationDefs {
 
             if let value = comment {
                 try container.encode(value, forKey: .comment)
+            }
+
+            if let value = priorityScore {
+                try container.encode(value, forKey: .priorityScore)
             }
 
             if let value = muteUntil {
@@ -571,11 +615,24 @@ public struct ToolsOzoneModerationDefs {
             if let value = tags {
                 try container.encode(value, forKey: .tags)
             }
+
+            if let value = accountStats {
+                try container.encode(value, forKey: .accountStats)
+            }
+
+            if let value = recordsStats {
+                try container.encode(value, forKey: .recordsStats)
+            }
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(id)
             hasher.combine(subject)
+            if let value = hosting {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
             if let value = subjectBlobCids {
                 hasher.combine(value)
             } else {
@@ -590,6 +647,11 @@ public struct ToolsOzoneModerationDefs {
             hasher.combine(createdAt)
             hasher.combine(reviewState)
             if let value = comment {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = priorityScore {
                 hasher.combine(value)
             } else {
                 hasher.combine(nil as Int?)
@@ -644,6 +706,16 @@ public struct ToolsOzoneModerationDefs {
             } else {
                 hasher.combine(nil as Int?)
             }
+            if let value = accountStats {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = recordsStats {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -654,6 +726,10 @@ public struct ToolsOzoneModerationDefs {
             }
 
             if subject != other.subject {
+                return false
+            }
+
+            if hosting != other.hosting {
                 return false
             }
 
@@ -678,6 +754,10 @@ public struct ToolsOzoneModerationDefs {
             }
 
             if comment != other.comment {
+                return false
+            }
+
+            if priorityScore != other.priorityScore {
                 return false
             }
 
@@ -721,6 +801,14 @@ public struct ToolsOzoneModerationDefs {
                 return false
             }
 
+            if accountStats != other.accountStats {
+                return false
+            }
+
+            if recordsStats != other.recordsStats {
+                return false
+            }
+
             return true
         }
 
@@ -732,12 +820,14 @@ public struct ToolsOzoneModerationDefs {
             case typeIdentifier = "$type"
             case id
             case subject
+            case hosting
             case subjectBlobCids
             case subjectRepoHandle
             case updatedAt
             case createdAt
             case reviewState
             case comment
+            case priorityScore
             case muteUntil
             case muteReportingUntil
             case lastReviewedBy
@@ -748,6 +838,381 @@ public struct ToolsOzoneModerationDefs {
             case appealed
             case suspendUntil
             case tags
+            case accountStats
+            case recordsStats
+        }
+    }
+
+    public struct AccountStats: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "tools.ozone.moderation.defs#accountStats"
+        public let reportCount: Int?
+        public let appealCount: Int?
+        public let suspendCount: Int?
+        public let escalateCount: Int?
+        public let takedownCount: Int?
+
+        // Standard initializer
+        public init(
+            reportCount: Int?, appealCount: Int?, suspendCount: Int?, escalateCount: Int?, takedownCount: Int?
+        ) {
+            self.reportCount = reportCount
+            self.appealCount = appealCount
+            self.suspendCount = suspendCount
+            self.escalateCount = escalateCount
+            self.takedownCount = takedownCount
+        }
+
+        // Codable initializer
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                reportCount = try container.decodeIfPresent(Int.self, forKey: .reportCount)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'reportCount': \(error)")
+                throw error
+            }
+            do {
+                appealCount = try container.decodeIfPresent(Int.self, forKey: .appealCount)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'appealCount': \(error)")
+                throw error
+            }
+            do {
+                suspendCount = try container.decodeIfPresent(Int.self, forKey: .suspendCount)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'suspendCount': \(error)")
+                throw error
+            }
+            do {
+                escalateCount = try container.decodeIfPresent(Int.self, forKey: .escalateCount)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'escalateCount': \(error)")
+                throw error
+            }
+            do {
+                takedownCount = try container.decodeIfPresent(Int.self, forKey: .takedownCount)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'takedownCount': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+
+            if let value = reportCount {
+                try container.encode(value, forKey: .reportCount)
+            }
+
+            if let value = appealCount {
+                try container.encode(value, forKey: .appealCount)
+            }
+
+            if let value = suspendCount {
+                try container.encode(value, forKey: .suspendCount)
+            }
+
+            if let value = escalateCount {
+                try container.encode(value, forKey: .escalateCount)
+            }
+
+            if let value = takedownCount {
+                try container.encode(value, forKey: .takedownCount)
+            }
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            if let value = reportCount {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = appealCount {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = suspendCount {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = escalateCount {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = takedownCount {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+
+            if reportCount != other.reportCount {
+                return false
+            }
+
+            if appealCount != other.appealCount {
+                return false
+            }
+
+            if suspendCount != other.suspendCount {
+                return false
+            }
+
+            if escalateCount != other.escalateCount {
+                return false
+            }
+
+            if takedownCount != other.takedownCount {
+                return false
+            }
+
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case reportCount
+            case appealCount
+            case suspendCount
+            case escalateCount
+            case takedownCount
+        }
+    }
+
+    public struct RecordsStats: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "tools.ozone.moderation.defs#recordsStats"
+        public let totalReports: Int?
+        public let reportedCount: Int?
+        public let escalatedCount: Int?
+        public let appealedCount: Int?
+        public let subjectCount: Int?
+        public let pendingCount: Int?
+        public let processedCount: Int?
+        public let takendownCount: Int?
+
+        // Standard initializer
+        public init(
+            totalReports: Int?, reportedCount: Int?, escalatedCount: Int?, appealedCount: Int?, subjectCount: Int?, pendingCount: Int?, processedCount: Int?, takendownCount: Int?
+        ) {
+            self.totalReports = totalReports
+            self.reportedCount = reportedCount
+            self.escalatedCount = escalatedCount
+            self.appealedCount = appealedCount
+            self.subjectCount = subjectCount
+            self.pendingCount = pendingCount
+            self.processedCount = processedCount
+            self.takendownCount = takendownCount
+        }
+
+        // Codable initializer
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                totalReports = try container.decodeIfPresent(Int.self, forKey: .totalReports)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'totalReports': \(error)")
+                throw error
+            }
+            do {
+                reportedCount = try container.decodeIfPresent(Int.self, forKey: .reportedCount)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'reportedCount': \(error)")
+                throw error
+            }
+            do {
+                escalatedCount = try container.decodeIfPresent(Int.self, forKey: .escalatedCount)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'escalatedCount': \(error)")
+                throw error
+            }
+            do {
+                appealedCount = try container.decodeIfPresent(Int.self, forKey: .appealedCount)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'appealedCount': \(error)")
+                throw error
+            }
+            do {
+                subjectCount = try container.decodeIfPresent(Int.self, forKey: .subjectCount)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'subjectCount': \(error)")
+                throw error
+            }
+            do {
+                pendingCount = try container.decodeIfPresent(Int.self, forKey: .pendingCount)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'pendingCount': \(error)")
+                throw error
+            }
+            do {
+                processedCount = try container.decodeIfPresent(Int.self, forKey: .processedCount)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'processedCount': \(error)")
+                throw error
+            }
+            do {
+                takendownCount = try container.decodeIfPresent(Int.self, forKey: .takendownCount)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'takendownCount': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+
+            if let value = totalReports {
+                try container.encode(value, forKey: .totalReports)
+            }
+
+            if let value = reportedCount {
+                try container.encode(value, forKey: .reportedCount)
+            }
+
+            if let value = escalatedCount {
+                try container.encode(value, forKey: .escalatedCount)
+            }
+
+            if let value = appealedCount {
+                try container.encode(value, forKey: .appealedCount)
+            }
+
+            if let value = subjectCount {
+                try container.encode(value, forKey: .subjectCount)
+            }
+
+            if let value = pendingCount {
+                try container.encode(value, forKey: .pendingCount)
+            }
+
+            if let value = processedCount {
+                try container.encode(value, forKey: .processedCount)
+            }
+
+            if let value = takendownCount {
+                try container.encode(value, forKey: .takendownCount)
+            }
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            if let value = totalReports {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = reportedCount {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = escalatedCount {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = appealedCount {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = subjectCount {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = pendingCount {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = processedCount {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = takendownCount {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+
+            if totalReports != other.totalReports {
+                return false
+            }
+
+            if reportedCount != other.reportedCount {
+                return false
+            }
+
+            if escalatedCount != other.escalatedCount {
+                return false
+            }
+
+            if appealedCount != other.appealedCount {
+                return false
+            }
+
+            if subjectCount != other.subjectCount {
+                return false
+            }
+
+            if pendingCount != other.pendingCount {
+                return false
+            }
+
+            if processedCount != other.processedCount {
+                return false
+            }
+
+            if takendownCount != other.takendownCount {
+                return false
+            }
+
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case totalReports
+            case reportedCount
+            case escalatedCount
+            case appealedCount
+            case subjectCount
+            case pendingCount
+            case processedCount
+            case takendownCount
         }
     }
 
@@ -756,14 +1221,16 @@ public struct ToolsOzoneModerationDefs {
         public let comment: String?
         public let durationInHours: Int?
         public let acknowledgeAccountSubjects: Bool?
+        public let policies: [String]?
 
         // Standard initializer
         public init(
-            comment: String?, durationInHours: Int?, acknowledgeAccountSubjects: Bool?
+            comment: String?, durationInHours: Int?, acknowledgeAccountSubjects: Bool?, policies: [String]?
         ) {
             self.comment = comment
             self.durationInHours = durationInHours
             self.acknowledgeAccountSubjects = acknowledgeAccountSubjects
+            self.policies = policies
         }
 
         // Codable initializer
@@ -790,6 +1257,13 @@ public struct ToolsOzoneModerationDefs {
                 LogManager.logError("Decoding error for property 'acknowledgeAccountSubjects': \(error)")
                 throw error
             }
+            do {
+                policies = try container.decodeIfPresent([String].self, forKey: .policies)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'policies': \(error)")
+                throw error
+            }
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -807,6 +1281,10 @@ public struct ToolsOzoneModerationDefs {
             if let value = acknowledgeAccountSubjects {
                 try container.encode(value, forKey: .acknowledgeAccountSubjects)
             }
+
+            if let value = policies {
+                try container.encode(value, forKey: .policies)
+            }
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -821,6 +1299,11 @@ public struct ToolsOzoneModerationDefs {
                 hasher.combine(nil as Int?)
             }
             if let value = acknowledgeAccountSubjects {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = policies {
                 hasher.combine(value)
             } else {
                 hasher.combine(nil as Int?)
@@ -842,6 +1325,10 @@ public struct ToolsOzoneModerationDefs {
                 return false
             }
 
+            if policies != other.policies {
+                return false
+            }
+
             return true
         }
 
@@ -854,6 +1341,7 @@ public struct ToolsOzoneModerationDefs {
             case comment
             case durationInHours
             case acknowledgeAccountSubjects
+            case policies
         }
     }
 
@@ -1159,14 +1647,16 @@ public struct ToolsOzoneModerationDefs {
         public let comment: String?
         public let createLabelVals: [String]
         public let negateLabelVals: [String]
+        public let durationInHours: Int?
 
         // Standard initializer
         public init(
-            comment: String?, createLabelVals: [String], negateLabelVals: [String]
+            comment: String?, createLabelVals: [String], negateLabelVals: [String], durationInHours: Int?
         ) {
             self.comment = comment
             self.createLabelVals = createLabelVals
             self.negateLabelVals = negateLabelVals
+            self.durationInHours = durationInHours
         }
 
         // Codable initializer
@@ -1193,6 +1683,13 @@ public struct ToolsOzoneModerationDefs {
                 LogManager.logError("Decoding error for property 'negateLabelVals': \(error)")
                 throw error
             }
+            do {
+                durationInHours = try container.decodeIfPresent(Int.self, forKey: .durationInHours)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'durationInHours': \(error)")
+                throw error
+            }
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -1206,6 +1703,10 @@ public struct ToolsOzoneModerationDefs {
             try container.encode(createLabelVals, forKey: .createLabelVals)
 
             try container.encode(negateLabelVals, forKey: .negateLabelVals)
+
+            if let value = durationInHours {
+                try container.encode(value, forKey: .durationInHours)
+            }
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1216,6 +1717,11 @@ public struct ToolsOzoneModerationDefs {
             }
             hasher.combine(createLabelVals)
             hasher.combine(negateLabelVals)
+            if let value = durationInHours {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -1233,65 +1739,7 @@ public struct ToolsOzoneModerationDefs {
                 return false
             }
 
-            return true
-        }
-
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
-        private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
-            case comment
-            case createLabelVals
-            case negateLabelVals
-        }
-    }
-
-    public struct ModEventAcknowledge: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "tools.ozone.moderation.defs#modEventAcknowledge"
-        public let comment: String?
-
-        // Standard initializer
-        public init(
-            comment: String?
-        ) {
-            self.comment = comment
-        }
-
-        // Codable initializer
-        public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                comment = try container.decodeIfPresent(String.self, forKey: .comment)
-
-            } catch {
-                LogManager.logError("Decoding error for property 'comment': \(error)")
-                throw error
-            }
-        }
-
-        public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
-            if let value = comment {
-                try container.encode(value, forKey: .comment)
-            }
-        }
-
-        public func hash(into hasher: inout Hasher) {
-            if let value = comment {
-                hasher.combine(value)
-            } else {
-                hasher.combine(nil as Int?)
-            }
-        }
-
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let other = other as? Self else { return false }
-
-            if comment != other.comment {
+            if durationInHours != other.durationInHours {
                 return false
             }
 
@@ -1305,6 +1753,169 @@ public struct ToolsOzoneModerationDefs {
         private enum CodingKeys: String, CodingKey {
             case typeIdentifier = "$type"
             case comment
+            case createLabelVals
+            case negateLabelVals
+            case durationInHours
+        }
+    }
+
+    public struct ModEventPriorityScore: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "tools.ozone.moderation.defs#modEventPriorityScore"
+        public let comment: String?
+        public let score: Int
+
+        // Standard initializer
+        public init(
+            comment: String?, score: Int
+        ) {
+            self.comment = comment
+            self.score = score
+        }
+
+        // Codable initializer
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                comment = try container.decodeIfPresent(String.self, forKey: .comment)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'comment': \(error)")
+                throw error
+            }
+            do {
+                score = try container.decode(Int.self, forKey: .score)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'score': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+
+            if let value = comment {
+                try container.encode(value, forKey: .comment)
+            }
+
+            try container.encode(score, forKey: .score)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            if let value = comment {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            hasher.combine(score)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+
+            if comment != other.comment {
+                return false
+            }
+
+            if score != other.score {
+                return false
+            }
+
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case comment
+            case score
+        }
+    }
+
+    public struct ModEventAcknowledge: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "tools.ozone.moderation.defs#modEventAcknowledge"
+        public let comment: String?
+        public let acknowledgeAccountSubjects: Bool?
+
+        // Standard initializer
+        public init(
+            comment: String?, acknowledgeAccountSubjects: Bool?
+        ) {
+            self.comment = comment
+            self.acknowledgeAccountSubjects = acknowledgeAccountSubjects
+        }
+
+        // Codable initializer
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                comment = try container.decodeIfPresent(String.self, forKey: .comment)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'comment': \(error)")
+                throw error
+            }
+            do {
+                acknowledgeAccountSubjects = try container.decodeIfPresent(Bool.self, forKey: .acknowledgeAccountSubjects)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'acknowledgeAccountSubjects': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+
+            if let value = comment {
+                try container.encode(value, forKey: .comment)
+            }
+
+            if let value = acknowledgeAccountSubjects {
+                try container.encode(value, forKey: .acknowledgeAccountSubjects)
+            }
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            if let value = comment {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = acknowledgeAccountSubjects {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+
+            if comment != other.comment {
+                return false
+            }
+
+            if acknowledgeAccountSubjects != other.acknowledgeAccountSubjects {
+                return false
+            }
+
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case comment
+            case acknowledgeAccountSubjects
         }
     }
 
@@ -1508,11 +2119,11 @@ public struct ToolsOzoneModerationDefs {
     public struct ModEventMuteReporter: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "tools.ozone.moderation.defs#modEventMuteReporter"
         public let comment: String?
-        public let durationInHours: Int
+        public let durationInHours: Int?
 
         // Standard initializer
         public init(
-            comment: String?, durationInHours: Int
+            comment: String?, durationInHours: Int?
         ) {
             self.comment = comment
             self.durationInHours = durationInHours
@@ -1529,7 +2140,7 @@ public struct ToolsOzoneModerationDefs {
                 throw error
             }
             do {
-                durationInHours = try container.decode(Int.self, forKey: .durationInHours)
+                durationInHours = try container.decodeIfPresent(Int.self, forKey: .durationInHours)
 
             } catch {
                 LogManager.logError("Decoding error for property 'durationInHours': \(error)")
@@ -1545,7 +2156,9 @@ public struct ToolsOzoneModerationDefs {
                 try container.encode(value, forKey: .comment)
             }
 
-            try container.encode(durationInHours, forKey: .durationInHours)
+            if let value = durationInHours {
+                try container.encode(value, forKey: .durationInHours)
+            }
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1554,7 +2167,11 @@ public struct ToolsOzoneModerationDefs {
             } else {
                 hasher.combine(nil as Int?)
             }
-            hasher.combine(durationInHours)
+            if let value = durationInHours {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -1896,6 +2513,386 @@ public struct ToolsOzoneModerationDefs {
         }
     }
 
+    public struct AccountEvent: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "tools.ozone.moderation.defs#accountEvent"
+        public let comment: String?
+        public let active: Bool
+        public let status: String?
+        public let timestamp: ATProtocolDate
+
+        // Standard initializer
+        public init(
+            comment: String?, active: Bool, status: String?, timestamp: ATProtocolDate
+        ) {
+            self.comment = comment
+            self.active = active
+            self.status = status
+            self.timestamp = timestamp
+        }
+
+        // Codable initializer
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                comment = try container.decodeIfPresent(String.self, forKey: .comment)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'comment': \(error)")
+                throw error
+            }
+            do {
+                active = try container.decode(Bool.self, forKey: .active)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'active': \(error)")
+                throw error
+            }
+            do {
+                status = try container.decodeIfPresent(String.self, forKey: .status)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'status': \(error)")
+                throw error
+            }
+            do {
+                timestamp = try container.decode(ATProtocolDate.self, forKey: .timestamp)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'timestamp': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+
+            if let value = comment {
+                try container.encode(value, forKey: .comment)
+            }
+
+            try container.encode(active, forKey: .active)
+
+            if let value = status {
+                try container.encode(value, forKey: .status)
+            }
+
+            try container.encode(timestamp, forKey: .timestamp)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            if let value = comment {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            hasher.combine(active)
+            if let value = status {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            hasher.combine(timestamp)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+
+            if comment != other.comment {
+                return false
+            }
+
+            if active != other.active {
+                return false
+            }
+
+            if status != other.status {
+                return false
+            }
+
+            if timestamp != other.timestamp {
+                return false
+            }
+
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case comment
+            case active
+            case status
+            case timestamp
+        }
+    }
+
+    public struct IdentityEvent: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "tools.ozone.moderation.defs#identityEvent"
+        public let comment: String?
+        public let handle: String?
+        public let pdsHost: URI?
+        public let tombstone: Bool?
+        public let timestamp: ATProtocolDate
+
+        // Standard initializer
+        public init(
+            comment: String?, handle: String?, pdsHost: URI?, tombstone: Bool?, timestamp: ATProtocolDate
+        ) {
+            self.comment = comment
+            self.handle = handle
+            self.pdsHost = pdsHost
+            self.tombstone = tombstone
+            self.timestamp = timestamp
+        }
+
+        // Codable initializer
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                comment = try container.decodeIfPresent(String.self, forKey: .comment)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'comment': \(error)")
+                throw error
+            }
+            do {
+                handle = try container.decodeIfPresent(String.self, forKey: .handle)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'handle': \(error)")
+                throw error
+            }
+            do {
+                pdsHost = try container.decodeIfPresent(URI.self, forKey: .pdsHost)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'pdsHost': \(error)")
+                throw error
+            }
+            do {
+                tombstone = try container.decodeIfPresent(Bool.self, forKey: .tombstone)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'tombstone': \(error)")
+                throw error
+            }
+            do {
+                timestamp = try container.decode(ATProtocolDate.self, forKey: .timestamp)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'timestamp': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+
+            if let value = comment {
+                try container.encode(value, forKey: .comment)
+            }
+
+            if let value = handle {
+                try container.encode(value, forKey: .handle)
+            }
+
+            if let value = pdsHost {
+                try container.encode(value, forKey: .pdsHost)
+            }
+
+            if let value = tombstone {
+                try container.encode(value, forKey: .tombstone)
+            }
+
+            try container.encode(timestamp, forKey: .timestamp)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            if let value = comment {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = handle {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = pdsHost {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = tombstone {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            hasher.combine(timestamp)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+
+            if comment != other.comment {
+                return false
+            }
+
+            if handle != other.handle {
+                return false
+            }
+
+            if pdsHost != other.pdsHost {
+                return false
+            }
+
+            if tombstone != other.tombstone {
+                return false
+            }
+
+            if timestamp != other.timestamp {
+                return false
+            }
+
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case comment
+            case handle
+            case pdsHost
+            case tombstone
+            case timestamp
+        }
+    }
+
+    public struct RecordEvent: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "tools.ozone.moderation.defs#recordEvent"
+        public let comment: String?
+        public let op: String
+        public let cid: String?
+        public let timestamp: ATProtocolDate
+
+        // Standard initializer
+        public init(
+            comment: String?, op: String, cid: String?, timestamp: ATProtocolDate
+        ) {
+            self.comment = comment
+            self.op = op
+            self.cid = cid
+            self.timestamp = timestamp
+        }
+
+        // Codable initializer
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                comment = try container.decodeIfPresent(String.self, forKey: .comment)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'comment': \(error)")
+                throw error
+            }
+            do {
+                op = try container.decode(String.self, forKey: .op)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'op': \(error)")
+                throw error
+            }
+            do {
+                cid = try container.decodeIfPresent(String.self, forKey: .cid)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'cid': \(error)")
+                throw error
+            }
+            do {
+                timestamp = try container.decode(ATProtocolDate.self, forKey: .timestamp)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'timestamp': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+
+            if let value = comment {
+                try container.encode(value, forKey: .comment)
+            }
+
+            try container.encode(op, forKey: .op)
+
+            if let value = cid {
+                try container.encode(value, forKey: .cid)
+            }
+
+            try container.encode(timestamp, forKey: .timestamp)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            if let value = comment {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            hasher.combine(op)
+            if let value = cid {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            hasher.combine(timestamp)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+
+            if comment != other.comment {
+                return false
+            }
+
+            if op != other.op {
+                return false
+            }
+
+            if cid != other.cid {
+                return false
+            }
+
+            if timestamp != other.timestamp {
+                return false
+            }
+
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case comment
+            case op
+            case cid
+            case timestamp
+        }
+    }
+
     public struct RepoView: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "tools.ozone.moderation.defs#repoView"
         public let did: String
@@ -1908,10 +2905,11 @@ public struct ToolsOzoneModerationDefs {
         public let invitesDisabled: Bool?
         public let inviteNote: String?
         public let deactivatedAt: ATProtocolDate?
+        public let threatSignatures: [ComAtprotoAdminDefs.ThreatSignature]?
 
         // Standard initializer
         public init(
-            did: String, handle: String, email: String?, relatedRecords: [ATProtocolValueContainer], indexedAt: ATProtocolDate, moderation: Moderation, invitedBy: ComAtprotoServerDefs.InviteCode?, invitesDisabled: Bool?, inviteNote: String?, deactivatedAt: ATProtocolDate?
+            did: String, handle: String, email: String?, relatedRecords: [ATProtocolValueContainer], indexedAt: ATProtocolDate, moderation: Moderation, invitedBy: ComAtprotoServerDefs.InviteCode?, invitesDisabled: Bool?, inviteNote: String?, deactivatedAt: ATProtocolDate?, threatSignatures: [ComAtprotoAdminDefs.ThreatSignature]?
         ) {
             self.did = did
             self.handle = handle
@@ -1923,6 +2921,7 @@ public struct ToolsOzoneModerationDefs {
             self.invitesDisabled = invitesDisabled
             self.inviteNote = inviteNote
             self.deactivatedAt = deactivatedAt
+            self.threatSignatures = threatSignatures
         }
 
         // Codable initializer
@@ -1998,6 +2997,13 @@ public struct ToolsOzoneModerationDefs {
                 LogManager.logError("Decoding error for property 'deactivatedAt': \(error)")
                 throw error
             }
+            do {
+                threatSignatures = try container.decodeIfPresent([ComAtprotoAdminDefs.ThreatSignature].self, forKey: .threatSignatures)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'threatSignatures': \(error)")
+                throw error
+            }
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -2033,6 +3039,10 @@ public struct ToolsOzoneModerationDefs {
             if let value = deactivatedAt {
                 try container.encode(value, forKey: .deactivatedAt)
             }
+
+            if let value = threatSignatures {
+                try container.encode(value, forKey: .threatSignatures)
+            }
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -2062,6 +3072,11 @@ public struct ToolsOzoneModerationDefs {
                 hasher.combine(nil as Int?)
             }
             if let value = deactivatedAt {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = threatSignatures {
                 hasher.combine(value)
             } else {
                 hasher.combine(nil as Int?)
@@ -2111,6 +3126,10 @@ public struct ToolsOzoneModerationDefs {
                 return false
             }
 
+            if threatSignatures != other.threatSignatures {
+                return false
+            }
+
             return true
         }
 
@@ -2130,6 +3149,7 @@ public struct ToolsOzoneModerationDefs {
             case invitesDisabled
             case inviteNote
             case deactivatedAt
+            case threatSignatures
         }
     }
 
@@ -2148,10 +3168,11 @@ public struct ToolsOzoneModerationDefs {
         public let inviteNote: String?
         public let emailConfirmedAt: ATProtocolDate?
         public let deactivatedAt: ATProtocolDate?
+        public let threatSignatures: [ComAtprotoAdminDefs.ThreatSignature]?
 
         // Standard initializer
         public init(
-            did: String, handle: String, email: String?, relatedRecords: [ATProtocolValueContainer], indexedAt: ATProtocolDate, moderation: ModerationDetail, labels: [ComAtprotoLabelDefs.Label]?, invitedBy: ComAtprotoServerDefs.InviteCode?, invites: [ComAtprotoServerDefs.InviteCode]?, invitesDisabled: Bool?, inviteNote: String?, emailConfirmedAt: ATProtocolDate?, deactivatedAt: ATProtocolDate?
+            did: String, handle: String, email: String?, relatedRecords: [ATProtocolValueContainer], indexedAt: ATProtocolDate, moderation: ModerationDetail, labels: [ComAtprotoLabelDefs.Label]?, invitedBy: ComAtprotoServerDefs.InviteCode?, invites: [ComAtprotoServerDefs.InviteCode]?, invitesDisabled: Bool?, inviteNote: String?, emailConfirmedAt: ATProtocolDate?, deactivatedAt: ATProtocolDate?, threatSignatures: [ComAtprotoAdminDefs.ThreatSignature]?
         ) {
             self.did = did
             self.handle = handle
@@ -2166,6 +3187,7 @@ public struct ToolsOzoneModerationDefs {
             self.inviteNote = inviteNote
             self.emailConfirmedAt = emailConfirmedAt
             self.deactivatedAt = deactivatedAt
+            self.threatSignatures = threatSignatures
         }
 
         // Codable initializer
@@ -2262,6 +3284,13 @@ public struct ToolsOzoneModerationDefs {
                 LogManager.logError("Decoding error for property 'deactivatedAt': \(error)")
                 throw error
             }
+            do {
+                threatSignatures = try container.decodeIfPresent([ComAtprotoAdminDefs.ThreatSignature].self, forKey: .threatSignatures)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'threatSignatures': \(error)")
+                throw error
+            }
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -2309,6 +3338,10 @@ public struct ToolsOzoneModerationDefs {
             if let value = deactivatedAt {
                 try container.encode(value, forKey: .deactivatedAt)
             }
+
+            if let value = threatSignatures {
+                try container.encode(value, forKey: .threatSignatures)
+            }
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -2353,6 +3386,11 @@ public struct ToolsOzoneModerationDefs {
                 hasher.combine(nil as Int?)
             }
             if let value = deactivatedAt {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = threatSignatures {
                 hasher.combine(value)
             } else {
                 hasher.combine(nil as Int?)
@@ -2414,6 +3452,10 @@ public struct ToolsOzoneModerationDefs {
                 return false
             }
 
+            if threatSignatures != other.threatSignatures {
+                return false
+            }
+
             return true
         }
 
@@ -2436,6 +3478,7 @@ public struct ToolsOzoneModerationDefs {
             case inviteNote
             case emailConfirmedAt
             case deactivatedAt
+            case threatSignatures
         }
     }
 
@@ -3312,6 +4355,298 @@ public struct ToolsOzoneModerationDefs {
         }
     }
 
+    public struct AccountHosting: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "tools.ozone.moderation.defs#accountHosting"
+        public let status: String
+        public let updatedAt: ATProtocolDate?
+        public let createdAt: ATProtocolDate?
+        public let deletedAt: ATProtocolDate?
+        public let deactivatedAt: ATProtocolDate?
+        public let reactivatedAt: ATProtocolDate?
+
+        // Standard initializer
+        public init(
+            status: String, updatedAt: ATProtocolDate?, createdAt: ATProtocolDate?, deletedAt: ATProtocolDate?, deactivatedAt: ATProtocolDate?, reactivatedAt: ATProtocolDate?
+        ) {
+            self.status = status
+            self.updatedAt = updatedAt
+            self.createdAt = createdAt
+            self.deletedAt = deletedAt
+            self.deactivatedAt = deactivatedAt
+            self.reactivatedAt = reactivatedAt
+        }
+
+        // Codable initializer
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                status = try container.decode(String.self, forKey: .status)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'status': \(error)")
+                throw error
+            }
+            do {
+                updatedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .updatedAt)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'updatedAt': \(error)")
+                throw error
+            }
+            do {
+                createdAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .createdAt)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'createdAt': \(error)")
+                throw error
+            }
+            do {
+                deletedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .deletedAt)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'deletedAt': \(error)")
+                throw error
+            }
+            do {
+                deactivatedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .deactivatedAt)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'deactivatedAt': \(error)")
+                throw error
+            }
+            do {
+                reactivatedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .reactivatedAt)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'reactivatedAt': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+
+            try container.encode(status, forKey: .status)
+
+            if let value = updatedAt {
+                try container.encode(value, forKey: .updatedAt)
+            }
+
+            if let value = createdAt {
+                try container.encode(value, forKey: .createdAt)
+            }
+
+            if let value = deletedAt {
+                try container.encode(value, forKey: .deletedAt)
+            }
+
+            if let value = deactivatedAt {
+                try container.encode(value, forKey: .deactivatedAt)
+            }
+
+            if let value = reactivatedAt {
+                try container.encode(value, forKey: .reactivatedAt)
+            }
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(status)
+            if let value = updatedAt {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = createdAt {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = deletedAt {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = deactivatedAt {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = reactivatedAt {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+
+            if status != other.status {
+                return false
+            }
+
+            if updatedAt != other.updatedAt {
+                return false
+            }
+
+            if createdAt != other.createdAt {
+                return false
+            }
+
+            if deletedAt != other.deletedAt {
+                return false
+            }
+
+            if deactivatedAt != other.deactivatedAt {
+                return false
+            }
+
+            if reactivatedAt != other.reactivatedAt {
+                return false
+            }
+
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case status
+            case updatedAt
+            case createdAt
+            case deletedAt
+            case deactivatedAt
+            case reactivatedAt
+        }
+    }
+
+    public struct RecordHosting: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "tools.ozone.moderation.defs#recordHosting"
+        public let status: String
+        public let updatedAt: ATProtocolDate?
+        public let createdAt: ATProtocolDate?
+        public let deletedAt: ATProtocolDate?
+
+        // Standard initializer
+        public init(
+            status: String, updatedAt: ATProtocolDate?, createdAt: ATProtocolDate?, deletedAt: ATProtocolDate?
+        ) {
+            self.status = status
+            self.updatedAt = updatedAt
+            self.createdAt = createdAt
+            self.deletedAt = deletedAt
+        }
+
+        // Codable initializer
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                status = try container.decode(String.self, forKey: .status)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'status': \(error)")
+                throw error
+            }
+            do {
+                updatedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .updatedAt)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'updatedAt': \(error)")
+                throw error
+            }
+            do {
+                createdAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .createdAt)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'createdAt': \(error)")
+                throw error
+            }
+            do {
+                deletedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .deletedAt)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'deletedAt': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+
+            try container.encode(status, forKey: .status)
+
+            if let value = updatedAt {
+                try container.encode(value, forKey: .updatedAt)
+            }
+
+            if let value = createdAt {
+                try container.encode(value, forKey: .createdAt)
+            }
+
+            if let value = deletedAt {
+                try container.encode(value, forKey: .deletedAt)
+            }
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(status)
+            if let value = updatedAt {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = createdAt {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = deletedAt {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+
+            if status != other.status {
+                return false
+            }
+
+            if updatedAt != other.updatedAt {
+                return false
+            }
+
+            if createdAt != other.createdAt {
+                return false
+            }
+
+            if deletedAt != other.deletedAt {
+                return false
+            }
+
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case status
+            case updatedAt
+            case createdAt
+            case deletedAt
+        }
+    }
+
     public enum ModEventViewEventUnion: Codable, ATProtocolCodable, ATProtocolValue {
         case toolsOzoneModerationDefsModEventTakedown(ToolsOzoneModerationDefs.ModEventTakedown)
         case toolsOzoneModerationDefsModEventReverseTakedown(ToolsOzoneModerationDefs.ModEventReverseTakedown)
@@ -3328,6 +4663,10 @@ public struct ToolsOzoneModerationDefs {
         case toolsOzoneModerationDefsModEventResolveAppeal(ToolsOzoneModerationDefs.ModEventResolveAppeal)
         case toolsOzoneModerationDefsModEventDivert(ToolsOzoneModerationDefs.ModEventDivert)
         case toolsOzoneModerationDefsModEventTag(ToolsOzoneModerationDefs.ModEventTag)
+        case toolsOzoneModerationDefsAccountEvent(ToolsOzoneModerationDefs.AccountEvent)
+        case toolsOzoneModerationDefsIdentityEvent(ToolsOzoneModerationDefs.IdentityEvent)
+        case toolsOzoneModerationDefsRecordEvent(ToolsOzoneModerationDefs.RecordEvent)
+        case toolsOzoneModerationDefsModEventPriorityScore(ToolsOzoneModerationDefs.ModEventPriorityScore)
         case unexpected(ATProtocolValueContainer)
 
         public init(from decoder: Decoder) throws {
@@ -3380,6 +4719,18 @@ public struct ToolsOzoneModerationDefs {
             case "tools.ozone.moderation.defs#modEventTag":
                 let value = try ToolsOzoneModerationDefs.ModEventTag(from: decoder)
                 self = .toolsOzoneModerationDefsModEventTag(value)
+            case "tools.ozone.moderation.defs#accountEvent":
+                let value = try ToolsOzoneModerationDefs.AccountEvent(from: decoder)
+                self = .toolsOzoneModerationDefsAccountEvent(value)
+            case "tools.ozone.moderation.defs#identityEvent":
+                let value = try ToolsOzoneModerationDefs.IdentityEvent(from: decoder)
+                self = .toolsOzoneModerationDefsIdentityEvent(value)
+            case "tools.ozone.moderation.defs#recordEvent":
+                let value = try ToolsOzoneModerationDefs.RecordEvent(from: decoder)
+                self = .toolsOzoneModerationDefsRecordEvent(value)
+            case "tools.ozone.moderation.defs#modEventPriorityScore":
+                let value = try ToolsOzoneModerationDefs.ModEventPriorityScore(from: decoder)
+                self = .toolsOzoneModerationDefsModEventPriorityScore(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
                 self = .unexpected(unknownValue)
@@ -3435,6 +4786,18 @@ public struct ToolsOzoneModerationDefs {
             case let .toolsOzoneModerationDefsModEventTag(value):
                 try container.encode("tools.ozone.moderation.defs#modEventTag", forKey: .type)
                 try value.encode(to: encoder)
+            case let .toolsOzoneModerationDefsAccountEvent(value):
+                try container.encode("tools.ozone.moderation.defs#accountEvent", forKey: .type)
+                try value.encode(to: encoder)
+            case let .toolsOzoneModerationDefsIdentityEvent(value):
+                try container.encode("tools.ozone.moderation.defs#identityEvent", forKey: .type)
+                try value.encode(to: encoder)
+            case let .toolsOzoneModerationDefsRecordEvent(value):
+                try container.encode("tools.ozone.moderation.defs#recordEvent", forKey: .type)
+                try value.encode(to: encoder)
+            case let .toolsOzoneModerationDefsModEventPriorityScore(value):
+                try container.encode("tools.ozone.moderation.defs#modEventPriorityScore", forKey: .type)
+                try value.encode(to: encoder)
             case let .unexpected(ATProtocolValueContainer):
                 try ATProtocolValueContainer.encode(to: encoder)
             }
@@ -3487,6 +4850,18 @@ public struct ToolsOzoneModerationDefs {
             case let .toolsOzoneModerationDefsModEventTag(value):
                 hasher.combine("tools.ozone.moderation.defs#modEventTag")
                 hasher.combine(value)
+            case let .toolsOzoneModerationDefsAccountEvent(value):
+                hasher.combine("tools.ozone.moderation.defs#accountEvent")
+                hasher.combine(value)
+            case let .toolsOzoneModerationDefsIdentityEvent(value):
+                hasher.combine("tools.ozone.moderation.defs#identityEvent")
+                hasher.combine(value)
+            case let .toolsOzoneModerationDefsRecordEvent(value):
+                hasher.combine("tools.ozone.moderation.defs#recordEvent")
+                hasher.combine(value)
+            case let .toolsOzoneModerationDefsModEventPriorityScore(value):
+                hasher.combine("tools.ozone.moderation.defs#modEventPriorityScore")
+                hasher.combine(value)
             case let .unexpected(ATProtocolValueContainer):
                 hasher.combine("unexpected")
                 hasher.combine(ATProtocolValueContainer)
@@ -3503,92 +4878,97 @@ public struct ToolsOzoneModerationDefs {
             switch (self, otherValue) {
             case let (
                 .toolsOzoneModerationDefsModEventTakedown(selfValue),
-
                 .toolsOzoneModerationDefsModEventTakedown(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventReverseTakedown(selfValue),
-
                 .toolsOzoneModerationDefsModEventReverseTakedown(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventComment(selfValue),
-
                 .toolsOzoneModerationDefsModEventComment(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventReport(selfValue),
-
                 .toolsOzoneModerationDefsModEventReport(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventLabel(selfValue),
-
                 .toolsOzoneModerationDefsModEventLabel(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventAcknowledge(selfValue),
-
                 .toolsOzoneModerationDefsModEventAcknowledge(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventEscalate(selfValue),
-
                 .toolsOzoneModerationDefsModEventEscalate(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventMute(selfValue),
-
                 .toolsOzoneModerationDefsModEventMute(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventUnmute(selfValue),
-
                 .toolsOzoneModerationDefsModEventUnmute(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventMuteReporter(selfValue),
-
                 .toolsOzoneModerationDefsModEventMuteReporter(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventUnmuteReporter(selfValue),
-
                 .toolsOzoneModerationDefsModEventUnmuteReporter(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventEmail(selfValue),
-
                 .toolsOzoneModerationDefsModEventEmail(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventResolveAppeal(selfValue),
-
                 .toolsOzoneModerationDefsModEventResolveAppeal(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventDivert(selfValue),
-
                 .toolsOzoneModerationDefsModEventDivert(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventTag(selfValue),
-
                 .toolsOzoneModerationDefsModEventTag(otherValue)
+            ):
+                return selfValue == otherValue
+            case let (
+                .toolsOzoneModerationDefsAccountEvent(selfValue),
+                .toolsOzoneModerationDefsAccountEvent(otherValue)
+            ):
+                return selfValue == otherValue
+            case let (
+                .toolsOzoneModerationDefsIdentityEvent(selfValue),
+                .toolsOzoneModerationDefsIdentityEvent(otherValue)
+            ):
+                return selfValue == otherValue
+            case let (
+                .toolsOzoneModerationDefsRecordEvent(selfValue),
+                .toolsOzoneModerationDefsRecordEvent(otherValue)
+            ):
+                return selfValue == otherValue
+            case let (
+                .toolsOzoneModerationDefsModEventPriorityScore(selfValue),
+                .toolsOzoneModerationDefsModEventPriorityScore(otherValue)
             ):
                 return selfValue == otherValue
             case let (.unexpected(selfValue), .unexpected(otherValue)):
@@ -3670,19 +5050,16 @@ public struct ToolsOzoneModerationDefs {
             switch (self, otherValue) {
             case let (
                 .comAtprotoAdminDefsRepoRef(selfValue),
-
                 .comAtprotoAdminDefsRepoRef(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .comAtprotoRepoStrongRef(selfValue),
-
                 .comAtprotoRepoStrongRef(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .chatBskyConvoDefsMessageRef(selfValue),
-
                 .chatBskyConvoDefsMessageRef(otherValue)
             ):
                 return selfValue == otherValue
@@ -3710,6 +5087,10 @@ public struct ToolsOzoneModerationDefs {
         case toolsOzoneModerationDefsModEventResolveAppeal(ToolsOzoneModerationDefs.ModEventResolveAppeal)
         case toolsOzoneModerationDefsModEventDivert(ToolsOzoneModerationDefs.ModEventDivert)
         case toolsOzoneModerationDefsModEventTag(ToolsOzoneModerationDefs.ModEventTag)
+        case toolsOzoneModerationDefsAccountEvent(ToolsOzoneModerationDefs.AccountEvent)
+        case toolsOzoneModerationDefsIdentityEvent(ToolsOzoneModerationDefs.IdentityEvent)
+        case toolsOzoneModerationDefsRecordEvent(ToolsOzoneModerationDefs.RecordEvent)
+        case toolsOzoneModerationDefsModEventPriorityScore(ToolsOzoneModerationDefs.ModEventPriorityScore)
         case unexpected(ATProtocolValueContainer)
 
         public init(from decoder: Decoder) throws {
@@ -3762,6 +5143,18 @@ public struct ToolsOzoneModerationDefs {
             case "tools.ozone.moderation.defs#modEventTag":
                 let value = try ToolsOzoneModerationDefs.ModEventTag(from: decoder)
                 self = .toolsOzoneModerationDefsModEventTag(value)
+            case "tools.ozone.moderation.defs#accountEvent":
+                let value = try ToolsOzoneModerationDefs.AccountEvent(from: decoder)
+                self = .toolsOzoneModerationDefsAccountEvent(value)
+            case "tools.ozone.moderation.defs#identityEvent":
+                let value = try ToolsOzoneModerationDefs.IdentityEvent(from: decoder)
+                self = .toolsOzoneModerationDefsIdentityEvent(value)
+            case "tools.ozone.moderation.defs#recordEvent":
+                let value = try ToolsOzoneModerationDefs.RecordEvent(from: decoder)
+                self = .toolsOzoneModerationDefsRecordEvent(value)
+            case "tools.ozone.moderation.defs#modEventPriorityScore":
+                let value = try ToolsOzoneModerationDefs.ModEventPriorityScore(from: decoder)
+                self = .toolsOzoneModerationDefsModEventPriorityScore(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
                 self = .unexpected(unknownValue)
@@ -3817,6 +5210,18 @@ public struct ToolsOzoneModerationDefs {
             case let .toolsOzoneModerationDefsModEventTag(value):
                 try container.encode("tools.ozone.moderation.defs#modEventTag", forKey: .type)
                 try value.encode(to: encoder)
+            case let .toolsOzoneModerationDefsAccountEvent(value):
+                try container.encode("tools.ozone.moderation.defs#accountEvent", forKey: .type)
+                try value.encode(to: encoder)
+            case let .toolsOzoneModerationDefsIdentityEvent(value):
+                try container.encode("tools.ozone.moderation.defs#identityEvent", forKey: .type)
+                try value.encode(to: encoder)
+            case let .toolsOzoneModerationDefsRecordEvent(value):
+                try container.encode("tools.ozone.moderation.defs#recordEvent", forKey: .type)
+                try value.encode(to: encoder)
+            case let .toolsOzoneModerationDefsModEventPriorityScore(value):
+                try container.encode("tools.ozone.moderation.defs#modEventPriorityScore", forKey: .type)
+                try value.encode(to: encoder)
             case let .unexpected(ATProtocolValueContainer):
                 try ATProtocolValueContainer.encode(to: encoder)
             }
@@ -3869,6 +5274,18 @@ public struct ToolsOzoneModerationDefs {
             case let .toolsOzoneModerationDefsModEventTag(value):
                 hasher.combine("tools.ozone.moderation.defs#modEventTag")
                 hasher.combine(value)
+            case let .toolsOzoneModerationDefsAccountEvent(value):
+                hasher.combine("tools.ozone.moderation.defs#accountEvent")
+                hasher.combine(value)
+            case let .toolsOzoneModerationDefsIdentityEvent(value):
+                hasher.combine("tools.ozone.moderation.defs#identityEvent")
+                hasher.combine(value)
+            case let .toolsOzoneModerationDefsRecordEvent(value):
+                hasher.combine("tools.ozone.moderation.defs#recordEvent")
+                hasher.combine(value)
+            case let .toolsOzoneModerationDefsModEventPriorityScore(value):
+                hasher.combine("tools.ozone.moderation.defs#modEventPriorityScore")
+                hasher.combine(value)
             case let .unexpected(ATProtocolValueContainer):
                 hasher.combine("unexpected")
                 hasher.combine(ATProtocolValueContainer)
@@ -3885,92 +5302,97 @@ public struct ToolsOzoneModerationDefs {
             switch (self, otherValue) {
             case let (
                 .toolsOzoneModerationDefsModEventTakedown(selfValue),
-
                 .toolsOzoneModerationDefsModEventTakedown(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventReverseTakedown(selfValue),
-
                 .toolsOzoneModerationDefsModEventReverseTakedown(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventComment(selfValue),
-
                 .toolsOzoneModerationDefsModEventComment(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventReport(selfValue),
-
                 .toolsOzoneModerationDefsModEventReport(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventLabel(selfValue),
-
                 .toolsOzoneModerationDefsModEventLabel(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventAcknowledge(selfValue),
-
                 .toolsOzoneModerationDefsModEventAcknowledge(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventEscalate(selfValue),
-
                 .toolsOzoneModerationDefsModEventEscalate(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventMute(selfValue),
-
                 .toolsOzoneModerationDefsModEventMute(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventUnmute(selfValue),
-
                 .toolsOzoneModerationDefsModEventUnmute(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventMuteReporter(selfValue),
-
                 .toolsOzoneModerationDefsModEventMuteReporter(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventUnmuteReporter(selfValue),
-
                 .toolsOzoneModerationDefsModEventUnmuteReporter(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventEmail(selfValue),
-
                 .toolsOzoneModerationDefsModEventEmail(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventResolveAppeal(selfValue),
-
                 .toolsOzoneModerationDefsModEventResolveAppeal(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventDivert(selfValue),
-
                 .toolsOzoneModerationDefsModEventDivert(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventTag(selfValue),
-
                 .toolsOzoneModerationDefsModEventTag(otherValue)
+            ):
+                return selfValue == otherValue
+            case let (
+                .toolsOzoneModerationDefsAccountEvent(selfValue),
+                .toolsOzoneModerationDefsAccountEvent(otherValue)
+            ):
+                return selfValue == otherValue
+            case let (
+                .toolsOzoneModerationDefsIdentityEvent(selfValue),
+                .toolsOzoneModerationDefsIdentityEvent(otherValue)
+            ):
+                return selfValue == otherValue
+            case let (
+                .toolsOzoneModerationDefsRecordEvent(selfValue),
+                .toolsOzoneModerationDefsRecordEvent(otherValue)
+            ):
+                return selfValue == otherValue
+            case let (
+                .toolsOzoneModerationDefsModEventPriorityScore(selfValue),
+                .toolsOzoneModerationDefsModEventPriorityScore(otherValue)
             ):
                 return selfValue == otherValue
             case let (.unexpected(selfValue), .unexpected(otherValue)):
@@ -4062,25 +5484,21 @@ public struct ToolsOzoneModerationDefs {
             switch (self, otherValue) {
             case let (
                 .toolsOzoneModerationDefsRepoView(selfValue),
-
                 .toolsOzoneModerationDefsRepoView(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsRepoViewNotFound(selfValue),
-
                 .toolsOzoneModerationDefsRepoViewNotFound(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsRecordView(selfValue),
-
                 .toolsOzoneModerationDefsRecordView(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsRecordViewNotFound(selfValue),
-
                 .toolsOzoneModerationDefsRecordViewNotFound(otherValue)
             ):
                 return selfValue == otherValue
@@ -4153,14 +5571,89 @@ public struct ToolsOzoneModerationDefs {
             switch (self, otherValue) {
             case let (
                 .comAtprotoAdminDefsRepoRef(selfValue),
-
                 .comAtprotoAdminDefsRepoRef(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .comAtprotoRepoStrongRef(selfValue),
-
                 .comAtprotoRepoStrongRef(otherValue)
+            ):
+                return selfValue == otherValue
+            case let (.unexpected(selfValue), .unexpected(otherValue)):
+                return selfValue.isEqual(to: otherValue)
+            default:
+                return false
+            }
+        }
+    }
+
+    public enum SubjectStatusViewHostingUnion: Codable, ATProtocolCodable, ATProtocolValue {
+        case toolsOzoneModerationDefsAccountHosting(ToolsOzoneModerationDefs.AccountHosting)
+        case toolsOzoneModerationDefsRecordHosting(ToolsOzoneModerationDefs.RecordHosting)
+        case unexpected(ATProtocolValueContainer)
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let typeValue = try container.decode(String.self, forKey: .type)
+
+            switch typeValue {
+            case "tools.ozone.moderation.defs#accountHosting":
+                let value = try ToolsOzoneModerationDefs.AccountHosting(from: decoder)
+                self = .toolsOzoneModerationDefsAccountHosting(value)
+            case "tools.ozone.moderation.defs#recordHosting":
+                let value = try ToolsOzoneModerationDefs.RecordHosting(from: decoder)
+                self = .toolsOzoneModerationDefsRecordHosting(value)
+            default:
+                let unknownValue = try ATProtocolValueContainer(from: decoder)
+                self = .unexpected(unknownValue)
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            switch self {
+            case let .toolsOzoneModerationDefsAccountHosting(value):
+                try container.encode("tools.ozone.moderation.defs#accountHosting", forKey: .type)
+                try value.encode(to: encoder)
+            case let .toolsOzoneModerationDefsRecordHosting(value):
+                try container.encode("tools.ozone.moderation.defs#recordHosting", forKey: .type)
+                try value.encode(to: encoder)
+            case let .unexpected(ATProtocolValueContainer):
+                try ATProtocolValueContainer.encode(to: encoder)
+            }
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            switch self {
+            case let .toolsOzoneModerationDefsAccountHosting(value):
+                hasher.combine("tools.ozone.moderation.defs#accountHosting")
+                hasher.combine(value)
+            case let .toolsOzoneModerationDefsRecordHosting(value):
+                hasher.combine("tools.ozone.moderation.defs#recordHosting")
+                hasher.combine(value)
+            case let .unexpected(ATProtocolValueContainer):
+                hasher.combine("unexpected")
+                hasher.combine(ATProtocolValueContainer)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case type = "$type"
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? SubjectStatusViewHostingUnion else { return false }
+
+            switch (self, otherValue) {
+            case let (
+                .toolsOzoneModerationDefsAccountHosting(selfValue),
+                .toolsOzoneModerationDefsAccountHosting(otherValue)
+            ):
+                return selfValue == otherValue
+            case let (
+                .toolsOzoneModerationDefsRecordHosting(selfValue),
+                .toolsOzoneModerationDefsRecordHosting(otherValue)
             ):
                 return selfValue == otherValue
             case let (.unexpected(selfValue), .unexpected(otherValue)):
@@ -4248,13 +5741,11 @@ public struct ToolsOzoneModerationDefs {
             switch (self, otherValue) {
             case let (
                 .toolsOzoneModerationDefsImageDetails(selfValue),
-
                 .toolsOzoneModerationDefsImageDetails(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsVideoDetails(selfValue),
-
                 .toolsOzoneModerationDefsVideoDetails(otherValue)
             ):
                 return selfValue == otherValue

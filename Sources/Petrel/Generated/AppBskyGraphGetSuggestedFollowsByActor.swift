@@ -20,16 +20,22 @@ public enum AppBskyGraphGetSuggestedFollowsByActor {
 
         public let isFallback: Bool?
 
+        public let recId: Int?
+
         // Standard public initializer
         public init(
             suggestions: [AppBskyActorDefs.ProfileView],
 
-            isFallback: Bool? = nil
+            isFallback: Bool? = nil,
+
+            recId: Int? = nil
 
         ) {
             self.suggestions = suggestions
 
             self.isFallback = isFallback
+
+            self.recId = recId
         }
     }
 }

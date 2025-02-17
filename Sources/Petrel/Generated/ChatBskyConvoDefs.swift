@@ -528,17 +528,19 @@ public struct ChatBskyConvoDefs {
         public let members: [ChatBskyActorDefs.ProfileViewBasic]
         public let lastMessage: ConvoViewLastMessageUnion?
         public let muted: Bool
+        public let opened: Bool?
         public let unreadCount: Int
 
         // Standard initializer
         public init(
-            id: String, rev: String, members: [ChatBskyActorDefs.ProfileViewBasic], lastMessage: ConvoViewLastMessageUnion?, muted: Bool, unreadCount: Int
+            id: String, rev: String, members: [ChatBskyActorDefs.ProfileViewBasic], lastMessage: ConvoViewLastMessageUnion?, muted: Bool, opened: Bool?, unreadCount: Int
         ) {
             self.id = id
             self.rev = rev
             self.members = members
             self.lastMessage = lastMessage
             self.muted = muted
+            self.opened = opened
             self.unreadCount = unreadCount
         }
 
@@ -581,6 +583,13 @@ public struct ChatBskyConvoDefs {
                 throw error
             }
             do {
+                opened = try container.decodeIfPresent(Bool.self, forKey: .opened)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'opened': \(error)")
+                throw error
+            }
+            do {
                 unreadCount = try container.decode(Int.self, forKey: .unreadCount)
 
             } catch {
@@ -605,6 +614,10 @@ public struct ChatBskyConvoDefs {
 
             try container.encode(muted, forKey: .muted)
 
+            if let value = opened {
+                try container.encode(value, forKey: .opened)
+            }
+
             try container.encode(unreadCount, forKey: .unreadCount)
         }
 
@@ -618,6 +631,11 @@ public struct ChatBskyConvoDefs {
                 hasher.combine(nil as Int?)
             }
             hasher.combine(muted)
+            if let value = opened {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
             hasher.combine(unreadCount)
         }
 
@@ -644,6 +662,10 @@ public struct ChatBskyConvoDefs {
                 return false
             }
 
+            if opened != other.opened {
+                return false
+            }
+
             if unreadCount != other.unreadCount {
                 return false
             }
@@ -662,6 +684,7 @@ public struct ChatBskyConvoDefs {
             case members
             case lastMessage
             case muted
+            case opened
             case unreadCount
         }
     }
@@ -1035,7 +1058,6 @@ public struct ChatBskyConvoDefs {
             switch (self, otherValue) {
             case let (
                 .appBskyEmbedRecord(selfValue),
-
                 .appBskyEmbedRecord(otherValue)
             ):
                 return selfValue == otherValue
@@ -1098,7 +1120,6 @@ public struct ChatBskyConvoDefs {
             switch (self, otherValue) {
             case let (
                 .appBskyEmbedRecordView(selfValue),
-
                 .appBskyEmbedRecordView(otherValue)
             ):
                 return selfValue == otherValue
@@ -1171,13 +1192,11 @@ public struct ChatBskyConvoDefs {
             switch (self, otherValue) {
             case let (
                 .chatBskyConvoDefsMessageView(selfValue),
-
                 .chatBskyConvoDefsMessageView(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .chatBskyConvoDefsDeletedMessageView(selfValue),
-
                 .chatBskyConvoDefsDeletedMessageView(otherValue)
             ):
                 return selfValue == otherValue
@@ -1250,13 +1269,11 @@ public struct ChatBskyConvoDefs {
             switch (self, otherValue) {
             case let (
                 .chatBskyConvoDefsMessageView(selfValue),
-
                 .chatBskyConvoDefsMessageView(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .chatBskyConvoDefsDeletedMessageView(selfValue),
-
                 .chatBskyConvoDefsDeletedMessageView(otherValue)
             ):
                 return selfValue == otherValue
@@ -1329,13 +1346,11 @@ public struct ChatBskyConvoDefs {
             switch (self, otherValue) {
             case let (
                 .chatBskyConvoDefsMessageView(selfValue),
-
                 .chatBskyConvoDefsMessageView(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .chatBskyConvoDefsDeletedMessageView(selfValue),
-
                 .chatBskyConvoDefsDeletedMessageView(otherValue)
             ):
                 return selfValue == otherValue

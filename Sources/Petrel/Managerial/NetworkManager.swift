@@ -272,7 +272,7 @@ actor NetworkManager: NetworkManaging {
 
         throw NetworkError.maxRetryAttemptsReached
     }
-    
+
     /// Applies all configured middlewares to the given request.
     ///
     /// - Parameter request: The original URLRequest.
@@ -401,10 +401,10 @@ actor NetworkManager: NetworkManaging {
             guard let tokenResponse = try? decoder.decode(ComAtprotoServerRefreshSession.Output.self, from: responseData) else {
                 throw NetworkError.decodingError
             }
-            
+
             // Get domain from the base URL
             let domain = baseURL.host
-            
+
             // Pass domain when saving tokens
             try await tokenManager.saveTokens(
                 accessJwt: tokenResponse.accessJwt,

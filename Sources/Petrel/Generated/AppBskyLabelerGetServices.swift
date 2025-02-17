@@ -91,13 +91,11 @@ public struct AppBskyLabelerGetServices {
             switch (self, otherValue) {
             case let (
                 .appBskyLabelerDefsLabelerView(selfValue),
-
                 .appBskyLabelerDefsLabelerView(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyLabelerDefsLabelerViewDetailed(selfValue),
-
                 .appBskyLabelerDefsLabelerViewDetailed(otherValue)
             ):
                 return selfValue == otherValue

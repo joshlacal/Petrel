@@ -104,13 +104,11 @@ public struct AppBskyGraphGetRelationships {
             switch (self, otherValue) {
             case let (
                 .appBskyGraphDefsRelationship(selfValue),
-
                 .appBskyGraphDefsRelationship(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyGraphDefsNotFoundActor(selfValue),
-
                 .appBskyGraphDefsNotFoundActor(otherValue)
             ):
                 return selfValue == otherValue

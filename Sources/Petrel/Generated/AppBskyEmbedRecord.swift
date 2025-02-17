@@ -708,49 +708,41 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
             switch (self, otherValue) {
             case let (
                 .appBskyEmbedRecordViewRecord(selfValue),
-
                 .appBskyEmbedRecordViewRecord(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyEmbedRecordViewNotFound(selfValue),
-
                 .appBskyEmbedRecordViewNotFound(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyEmbedRecordViewBlocked(selfValue),
-
                 .appBskyEmbedRecordViewBlocked(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyEmbedRecordViewDetached(selfValue),
-
                 .appBskyEmbedRecordViewDetached(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyFeedDefsGeneratorView(selfValue),
-
                 .appBskyFeedDefsGeneratorView(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyGraphDefsListView(selfValue),
-
                 .appBskyGraphDefsListView(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyLabelerDefsLabelerView(selfValue),
-
                 .appBskyLabelerDefsLabelerView(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyGraphDefsStarterPackViewBasic(selfValue),
-
                 .appBskyGraphDefsStarterPackViewBasic(otherValue)
             ):
                 return selfValue == otherValue
@@ -853,31 +845,26 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
             switch (self, otherValue) {
             case let (
                 .appBskyEmbedImagesView(selfValue),
-
                 .appBskyEmbedImagesView(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyEmbedVideoView(selfValue),
-
                 .appBskyEmbedVideoView(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyEmbedExternalView(selfValue),
-
                 .appBskyEmbedExternalView(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyEmbedRecordView(selfValue),
-
                 .appBskyEmbedRecordView(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyEmbedRecordWithMediaView(selfValue),
-
                 .appBskyEmbedRecordWithMediaView(otherValue)
             ):
                 return selfValue == otherValue

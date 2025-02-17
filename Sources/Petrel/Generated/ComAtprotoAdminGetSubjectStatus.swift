@@ -116,19 +116,16 @@ public struct ComAtprotoAdminGetSubjectStatus {
             switch (self, otherValue) {
             case let (
                 .comAtprotoAdminDefsRepoRef(selfValue),
-
                 .comAtprotoAdminDefsRepoRef(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .comAtprotoRepoStrongRef(selfValue),
-
                 .comAtprotoRepoStrongRef(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .comAtprotoAdminDefsRepoBlobRef(selfValue),
-
                 .comAtprotoAdminDefsRepoBlobRef(otherValue)
             ):
                 return selfValue == otherValue

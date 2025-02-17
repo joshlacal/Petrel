@@ -182,15 +182,15 @@ public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConve
             return components.string ?? "invalid-uri"
         }
     }
-    
+
     // Initializer to create URI from URL
     public init(url: URL) {
-        self.isDID = false
-        self.scheme = url.scheme ?? "https"
-        self.authority = url.host ?? ""
-        self.path = url.path.isEmpty ? nil : url.path
-        self.query = url.query
-        self.fragment = url.fragment
+        isDID = false
+        scheme = url.scheme ?? "https"
+        authority = url.host ?? ""
+        path = url.path.isEmpty ? nil : url.path
+        query = url.query
+        fragment = url.fragment
     }
 
     // Computed property to get URL from URI
@@ -204,7 +204,6 @@ public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConve
         components.fragment = fragment
         return components.url
     }
-
 
     public init(stringLiteral value: String) {
         self.init(uriString: value)

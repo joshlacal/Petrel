@@ -121,13 +121,11 @@ public struct ComAtprotoModerationCreateReport {
             switch (self, otherValue) {
             case let (
                 .comAtprotoAdminDefsRepoRef(selfValue),
-
                 .comAtprotoAdminDefsRepoRef(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .comAtprotoRepoStrongRef(selfValue),
-
                 .comAtprotoRepoStrongRef(otherValue)
             ):
                 return selfValue == otherValue
@@ -200,13 +198,11 @@ public struct ComAtprotoModerationCreateReport {
             switch (self, otherValue) {
             case let (
                 .comAtprotoAdminDefsRepoRef(selfValue),
-
                 .comAtprotoAdminDefsRepoRef(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .comAtprotoRepoStrongRef(selfValue),
-
                 .comAtprotoRepoStrongRef(otherValue)
             ):
                 return selfValue == otherValue
@@ -279,13 +275,11 @@ public struct ComAtprotoModerationCreateReport {
             switch (self, otherValue) {
             case let (
                 .comAtprotoAdminDefsRepoRef(selfValue),
-
                 .comAtprotoAdminDefsRepoRef(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .comAtprotoRepoStrongRef(selfValue),
-
                 .comAtprotoRepoStrongRef(otherValue)
             ):
                 return selfValue == otherValue

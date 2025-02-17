@@ -31,13 +31,17 @@ public enum AppBskyUnspeccedGetSuggestionsSkeleton {
 
         public let relativeToDid: String?
 
+        public let recId: Int?
+
         // Standard public initializer
         public init(
             cursor: String? = nil,
 
             actors: [AppBskyUnspeccedDefs.SkeletonSearchActor],
 
-            relativeToDid: String? = nil
+            relativeToDid: String? = nil,
+
+            recId: Int? = nil
 
         ) {
             self.cursor = cursor
@@ -45,6 +49,8 @@ public enum AppBskyUnspeccedGetSuggestionsSkeleton {
             self.actors = actors
 
             self.relativeToDid = relativeToDid
+
+            self.recId = recId
         }
     }
 }

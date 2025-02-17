@@ -2761,6 +2761,89 @@ public struct AppBskyActorDefs {
         }
     }
 
+    public struct PostInteractionSettingsPref: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.actor.defs#postInteractionSettingsPref"
+        public let threadgateAllowRules: [PostInteractionSettingsPrefThreadgateAllowRulesUnion]?
+        public let postgateEmbeddingRules: [PostInteractionSettingsPrefPostgateEmbeddingRulesUnion]?
+
+        // Standard initializer
+        public init(
+            threadgateAllowRules: [PostInteractionSettingsPrefThreadgateAllowRulesUnion]?, postgateEmbeddingRules: [PostInteractionSettingsPrefPostgateEmbeddingRulesUnion]?
+        ) {
+            self.threadgateAllowRules = threadgateAllowRules
+            self.postgateEmbeddingRules = postgateEmbeddingRules
+        }
+
+        // Codable initializer
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                threadgateAllowRules = try container.decodeIfPresent([PostInteractionSettingsPrefThreadgateAllowRulesUnion].self, forKey: .threadgateAllowRules)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'threadgateAllowRules': \(error)")
+                throw error
+            }
+            do {
+                postgateEmbeddingRules = try container.decodeIfPresent([PostInteractionSettingsPrefPostgateEmbeddingRulesUnion].self, forKey: .postgateEmbeddingRules)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'postgateEmbeddingRules': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+
+            if let value = threadgateAllowRules {
+                try container.encode(value, forKey: .threadgateAllowRules)
+            }
+
+            if let value = postgateEmbeddingRules {
+                try container.encode(value, forKey: .postgateEmbeddingRules)
+            }
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            if let value = threadgateAllowRules {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = postgateEmbeddingRules {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+
+            if threadgateAllowRules != other.threadgateAllowRules {
+                return false
+            }
+
+            if postgateEmbeddingRules != other.postgateEmbeddingRules {
+                return false
+            }
+
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case threadgateAllowRules
+            case postgateEmbeddingRules
+        }
+    }
+
     // Union Array Type
 
     public struct Preferences: Codable, ATProtocolCodable, ATProtocolValue {
@@ -2807,6 +2890,7 @@ public struct AppBskyActorDefs {
         case hiddenPostsPref(HiddenPostsPref)
         case bskyAppStatePref(BskyAppStatePref)
         case labelersPref(LabelersPref)
+        case postInteractionSettingsPref(PostInteractionSettingsPref)
         case unexpected(ATProtocolValueContainer)
 
         public init(from decoder: Decoder) throws {
@@ -2850,6 +2934,9 @@ public struct AppBskyActorDefs {
             case "app.bsky.actor.defs#labelersPref":
                 let value = try LabelersPref(from: decoder)
                 self = .labelersPref(value)
+            case "app.bsky.actor.defs#postInteractionSettingsPref":
+                let value = try PostInteractionSettingsPref(from: decoder)
+                self = .postInteractionSettingsPref(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
                 self = .unexpected(unknownValue)
@@ -2896,6 +2983,9 @@ public struct AppBskyActorDefs {
             case let .labelersPref(value):
                 try container.encode("app.bsky.actor.defs#labelersPref", forKey: .type)
                 try value.encode(to: encoder)
+            case let .postInteractionSettingsPref(value):
+                try container.encode("app.bsky.actor.defs#postInteractionSettingsPref", forKey: .type)
+                try value.encode(to: encoder)
             case let .unexpected(ATProtocolValueContainer):
                 try ATProtocolValueContainer.encode(to: encoder)
             }
@@ -2939,6 +3029,9 @@ public struct AppBskyActorDefs {
             case let .labelersPref(value):
                 hasher.combine("app.bsky.actor.defs#labelersPref")
                 hasher.combine(value)
+            case let .postInteractionSettingsPref(value):
+                hasher.combine("app.bsky.actor.defs#postInteractionSettingsPref")
+                hasher.combine(value)
             case let .unexpected(ATProtocolValueContainer):
                 hasher.combine("unexpected")
                 hasher.combine(ATProtocolValueContainer)
@@ -2951,74 +3044,67 @@ public struct AppBskyActorDefs {
             switch (self, otherValue) {
             case let (
                 .adultContentPref(selfValue),
-
                 .adultContentPref(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .contentLabelPref(selfValue),
-
                 .contentLabelPref(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .savedFeedsPref(selfValue),
-
                 .savedFeedsPref(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .savedFeedsPrefV2(selfValue),
-
                 .savedFeedsPrefV2(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .personalDetailsPref(selfValue),
-
                 .personalDetailsPref(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .feedViewPref(selfValue),
-
                 .feedViewPref(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .threadViewPref(selfValue),
-
                 .threadViewPref(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .interestsPref(selfValue),
-
                 .interestsPref(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .mutedWordsPref(selfValue),
-
                 .mutedWordsPref(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .hiddenPostsPref(selfValue),
-
                 .hiddenPostsPref(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .bskyAppStatePref(selfValue),
-
                 .bskyAppStatePref(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .labelersPref(selfValue),
-
                 .labelersPref(otherValue)
+            ):
+                return selfValue == otherValue
+            case let (
+                .postInteractionSettingsPref(selfValue),
+                .postInteractionSettingsPref(otherValue)
             ):
                 return selfValue == otherValue
             case let (.unexpected(selfValue), .unexpected(otherValue)):
@@ -3042,6 +3128,175 @@ public struct AppBskyActorDefs {
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let otherEnum = other as? MutedWordTarget else { return false }
             return rawValue == otherEnum.rawValue
+        }
+    }
+
+    public enum PostInteractionSettingsPrefThreadgateAllowRulesUnion: Codable, ATProtocolCodable, ATProtocolValue {
+        case appBskyFeedThreadgateMentionRule(AppBskyFeedThreadgate.MentionRule)
+        case appBskyFeedThreadgateFollowerRule(AppBskyFeedThreadgate.FollowerRule)
+        case appBskyFeedThreadgateFollowingRule(AppBskyFeedThreadgate.FollowingRule)
+        case appBskyFeedThreadgateListRule(AppBskyFeedThreadgate.ListRule)
+        case unexpected(ATProtocolValueContainer)
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let typeValue = try container.decode(String.self, forKey: .type)
+
+            switch typeValue {
+            case "app.bsky.feed.threadgate#mentionRule":
+                let value = try AppBskyFeedThreadgate.MentionRule(from: decoder)
+                self = .appBskyFeedThreadgateMentionRule(value)
+            case "app.bsky.feed.threadgate#followerRule":
+                let value = try AppBskyFeedThreadgate.FollowerRule(from: decoder)
+                self = .appBskyFeedThreadgateFollowerRule(value)
+            case "app.bsky.feed.threadgate#followingRule":
+                let value = try AppBskyFeedThreadgate.FollowingRule(from: decoder)
+                self = .appBskyFeedThreadgateFollowingRule(value)
+            case "app.bsky.feed.threadgate#listRule":
+                let value = try AppBskyFeedThreadgate.ListRule(from: decoder)
+                self = .appBskyFeedThreadgateListRule(value)
+            default:
+                let unknownValue = try ATProtocolValueContainer(from: decoder)
+                self = .unexpected(unknownValue)
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            switch self {
+            case let .appBskyFeedThreadgateMentionRule(value):
+                try container.encode("app.bsky.feed.threadgate#mentionRule", forKey: .type)
+                try value.encode(to: encoder)
+            case let .appBskyFeedThreadgateFollowerRule(value):
+                try container.encode("app.bsky.feed.threadgate#followerRule", forKey: .type)
+                try value.encode(to: encoder)
+            case let .appBskyFeedThreadgateFollowingRule(value):
+                try container.encode("app.bsky.feed.threadgate#followingRule", forKey: .type)
+                try value.encode(to: encoder)
+            case let .appBskyFeedThreadgateListRule(value):
+                try container.encode("app.bsky.feed.threadgate#listRule", forKey: .type)
+                try value.encode(to: encoder)
+            case let .unexpected(ATProtocolValueContainer):
+                try ATProtocolValueContainer.encode(to: encoder)
+            }
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            switch self {
+            case let .appBskyFeedThreadgateMentionRule(value):
+                hasher.combine("app.bsky.feed.threadgate#mentionRule")
+                hasher.combine(value)
+            case let .appBskyFeedThreadgateFollowerRule(value):
+                hasher.combine("app.bsky.feed.threadgate#followerRule")
+                hasher.combine(value)
+            case let .appBskyFeedThreadgateFollowingRule(value):
+                hasher.combine("app.bsky.feed.threadgate#followingRule")
+                hasher.combine(value)
+            case let .appBskyFeedThreadgateListRule(value):
+                hasher.combine("app.bsky.feed.threadgate#listRule")
+                hasher.combine(value)
+            case let .unexpected(ATProtocolValueContainer):
+                hasher.combine("unexpected")
+                hasher.combine(ATProtocolValueContainer)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case type = "$type"
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? PostInteractionSettingsPrefThreadgateAllowRulesUnion else { return false }
+
+            switch (self, otherValue) {
+            case let (
+                .appBskyFeedThreadgateMentionRule(selfValue),
+                .appBskyFeedThreadgateMentionRule(otherValue)
+            ):
+                return selfValue == otherValue
+            case let (
+                .appBskyFeedThreadgateFollowerRule(selfValue),
+                .appBskyFeedThreadgateFollowerRule(otherValue)
+            ):
+                return selfValue == otherValue
+            case let (
+                .appBskyFeedThreadgateFollowingRule(selfValue),
+                .appBskyFeedThreadgateFollowingRule(otherValue)
+            ):
+                return selfValue == otherValue
+            case let (
+                .appBskyFeedThreadgateListRule(selfValue),
+                .appBskyFeedThreadgateListRule(otherValue)
+            ):
+                return selfValue == otherValue
+            case let (.unexpected(selfValue), .unexpected(otherValue)):
+                return selfValue.isEqual(to: otherValue)
+            default:
+                return false
+            }
+        }
+    }
+
+    public enum PostInteractionSettingsPrefPostgateEmbeddingRulesUnion: Codable, ATProtocolCodable, ATProtocolValue {
+        case appBskyFeedPostgateDisableRule(AppBskyFeedPostgate.DisableRule)
+        case unexpected(ATProtocolValueContainer)
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let typeValue = try container.decode(String.self, forKey: .type)
+
+            switch typeValue {
+            case "app.bsky.feed.postgate#disableRule":
+                let value = try AppBskyFeedPostgate.DisableRule(from: decoder)
+                self = .appBskyFeedPostgateDisableRule(value)
+            default:
+                let unknownValue = try ATProtocolValueContainer(from: decoder)
+                self = .unexpected(unknownValue)
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            switch self {
+            case let .appBskyFeedPostgateDisableRule(value):
+                try container.encode("app.bsky.feed.postgate#disableRule", forKey: .type)
+                try value.encode(to: encoder)
+            case let .unexpected(ATProtocolValueContainer):
+                try ATProtocolValueContainer.encode(to: encoder)
+            }
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            switch self {
+            case let .appBskyFeedPostgateDisableRule(value):
+                hasher.combine("app.bsky.feed.postgate#disableRule")
+                hasher.combine(value)
+            case let .unexpected(ATProtocolValueContainer):
+                hasher.combine("unexpected")
+                hasher.combine(ATProtocolValueContainer)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case type = "$type"
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? PostInteractionSettingsPrefPostgateEmbeddingRulesUnion else { return false }
+
+            switch (self, otherValue) {
+            case let (
+                .appBskyFeedPostgateDisableRule(selfValue),
+                .appBskyFeedPostgateDisableRule(otherValue)
+            ):
+                return selfValue == otherValue
+            case let (.unexpected(selfValue), .unexpected(otherValue)):
+                return selfValue.isEqual(to: otherValue)
+            default:
+                return false
+            }
         }
     }
 }

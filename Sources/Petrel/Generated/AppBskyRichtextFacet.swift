@@ -358,19 +358,16 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
             switch (self, otherValue) {
             case let (
                 .appBskyRichtextFacetMention(selfValue),
-
                 .appBskyRichtextFacetMention(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyRichtextFacetLink(selfValue),
-
                 .appBskyRichtextFacetLink(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyRichtextFacetTag(selfValue),
-
                 .appBskyRichtextFacetTag(otherValue)
             ):
                 return selfValue == otherValue
@@ -482,19 +479,16 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
             switch (self, otherValue) {
             case let (
                 .mention(selfValue),
-
                 .mention(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .link(selfValue),
-
                 .link(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .tag(selfValue),
-
                 .tag(otherValue)
             ):
                 return selfValue == otherValue

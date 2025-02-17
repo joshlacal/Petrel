@@ -23,16 +23,22 @@ public enum AppBskyActorGetSuggestions {
 
         public let actors: [AppBskyActorDefs.ProfileView]
 
+        public let recId: Int?
+
         // Standard public initializer
         public init(
             cursor: String? = nil,
 
-            actors: [AppBskyActorDefs.ProfileView]
+            actors: [AppBskyActorDefs.ProfileView],
+
+            recId: Int? = nil
 
         ) {
             self.cursor = cursor
 
             self.actors = actors
+
+            self.recId = recId
         }
     }
 }

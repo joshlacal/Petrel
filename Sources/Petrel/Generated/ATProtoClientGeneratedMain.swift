@@ -120,10 +120,12 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
         configManager = await ConfigurationManager(baseURL: baseURL, namespace: namespace)
         tokenManager = await TokenManager(namespace: namespace)
         networkManager = await NetworkManager(
-            baseURL: baseURL, configurationManager: configManager, tokenManager: tokenManager)
+            baseURL: baseURL, configurationManager: configManager, tokenManager: tokenManager
+        )
         middlewareService = await MiddlewareService(tokenManager: tokenManager)
         sessionManager = await SessionManager(
-            tokenManager: tokenManager, middlewareService: middlewareService)
+            tokenManager: tokenManager, middlewareService: middlewareService
+        )
         let didResolutionService = await DIDResolutionService(networkManager: networkManager)
         authenticationService = await AuthenticationService(
             authMethod: authMethod,
@@ -200,8 +202,8 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
         let sessionResponse = try await com.atproto.server.getSession()
 
         guard let sessionInfo = sessionResponse.data,
-            let endpoint = sessionInfo.didDoc?.service.first?.serviceEndpoint,
-            let serviceURL = URL(string: endpoint)
+              let endpoint = sessionInfo.didDoc?.service.first?.serviceEndpoint,
+              let serviceURL = URL(string: endpoint)
         else {
             throw APIError.authorizationFailed
         }
@@ -320,7 +322,7 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
 
         // Publish token updated event
         if let accessToken = await tokenManager.fetchAccessToken(),
-            let refreshToken = await tokenManager.fetchRefreshToken()
+           let refreshToken = await tokenManager.fetchRefreshToken()
         {
             await EventBus.shared.publish(
                 .tokensUpdated(accessToken: accessToken, refreshToken: refreshToken))
@@ -334,17 +336,17 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
         // Clear session and tokens first
         try await middlewareService.clearSession()
         try await tokenManager.deleteTokens()
-        
+
         // Clear DPoP state
         await authenticationService.deleteDPoPKey()
-        
+
 //        // Clear session last
 //        try await sessionManager.clearSession()
-        
+
         // Notify delegate that authentication is required
         await authDelegate?.authenticationRequired(client: self)
     }
-    
+
     // MARK: - Utility Functions
 
     /// Resolves a user's handle to their DID.
@@ -425,7 +427,7 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
         let refreshed = try await authenticationService.refreshTokenIfNeeded()
         if refreshed {
             if let accessToken = await tokenManager.fetchAccessToken(),
-                let refreshToken = await tokenManager.fetchRefreshToken()
+               let refreshToken = await tokenManager.fetchRefreshToken()
             {
                 await EventBus.shared.publish(
                     .tokensUpdated(accessToken: accessToken, refreshToken: refreshToken))
@@ -450,6 +452,7 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
             return false
         }
     }
+
     /// Initializes the session by fetching metadata and validating tokens.
     public func initializeSession() async throws {
         LogManager.logDebug("ATProtoClient - Initializing session.")
@@ -560,6 +563,15 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
                 self.networkManager = networkManager
             }
 
+            public lazy var server: Server = .init(networkManager: self.networkManager)
+
+            public final class Server: @unchecked Sendable {
+                let networkManager: NetworkManaging
+                init(networkManager: NetworkManaging) {
+                    self.networkManager = networkManager
+                }
+            }
+
             public lazy var signature: Signature = .init(networkManager: self.networkManager)
 
             public final class Signature: @unchecked Sendable {
@@ -578,17 +590,6 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
                 }
             }
 
-            public lazy var communication: Communication = .init(
-                networkManager: self.networkManager)
-            public lazy var server: Server = .init(networkManager: self.networkManager)
-
-            public final class Server: @unchecked Sendable {
-                let networkManager: NetworkManaging
-                init(networkManager: NetworkManaging) {
-                    self.networkManager = networkManager
-                }
-            }
-
             public lazy var communication: Communication = .init(networkManager: self.networkManager)
 
             public final class Communication: @unchecked Sendable {
@@ -601,6 +602,15 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
             public lazy var set: Set = .init(networkManager: self.networkManager)
 
             public final class Set: @unchecked Sendable {
+                let networkManager: NetworkManaging
+                init(networkManager: NetworkManaging) {
+                    self.networkManager = networkManager
+                }
+            }
+
+            public lazy var setting: Setting = .init(networkManager: self.networkManager)
+
+            public final class Setting: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
@@ -778,18 +788,18 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
                 self.networkManager = networkManager
             }
 
-            public lazy var identity: Identity = .init(networkManager: self.networkManager)
+            public lazy var temp: Temp = .init(networkManager: self.networkManager)
 
-            public final class Identity: @unchecked Sendable {
+            public final class Temp: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
                 }
             }
 
-            public lazy var temp: Temp = .init(networkManager: self.networkManager)
+            public lazy var identity: Identity = .init(networkManager: self.networkManager)
 
-            public final class Temp: @unchecked Sendable {
+            public final class Identity: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
@@ -817,6 +827,15 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
             public lazy var server: Server = .init(networkManager: self.networkManager)
 
             public final class Server: @unchecked Sendable {
+                let networkManager: NetworkManaging
+                init(networkManager: NetworkManaging) {
+                    self.networkManager = networkManager
+                }
+            }
+
+            public lazy var lexicon: Lexicon = .init(networkManager: self.networkManager)
+
+            public final class Lexicon: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager

@@ -487,6 +487,66 @@ public struct AppBskyFeedDefs {
         }
     }
 
+    public struct ThreadContext: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.feed.defs#threadContext"
+        public let rootAuthorLike: ATProtocolURI?
+
+        // Standard initializer
+        public init(
+            rootAuthorLike: ATProtocolURI?
+        ) {
+            self.rootAuthorLike = rootAuthorLike
+        }
+
+        // Codable initializer
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                rootAuthorLike = try container.decodeIfPresent(ATProtocolURI.self, forKey: .rootAuthorLike)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'rootAuthorLike': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+
+            if let value = rootAuthorLike {
+                try container.encode(value, forKey: .rootAuthorLike)
+            }
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            if let value = rootAuthorLike {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+
+            if rootAuthorLike != other.rootAuthorLike {
+                return false
+            }
+
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case rootAuthorLike
+        }
+    }
+
     public struct FeedViewPost: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.feed.defs#feedViewPost"
         public let post: PostView
@@ -813,14 +873,16 @@ public struct AppBskyFeedDefs {
         public let post: PostView
         public let parent: ThreadViewPostParentUnion?
         public let replies: [ThreadViewPostRepliesUnion]?
+        public let threadContext: ThreadContext?
 
         // Standard initializer
         public init(
-            post: PostView, parent: ThreadViewPostParentUnion?, replies: [ThreadViewPostRepliesUnion]?
+            post: PostView, parent: ThreadViewPostParentUnion?, replies: [ThreadViewPostRepliesUnion]?, threadContext: ThreadContext?
         ) {
             self.post = post
             self.parent = parent
             self.replies = replies
+            self.threadContext = threadContext
         }
 
         // Codable initializer
@@ -847,6 +909,13 @@ public struct AppBskyFeedDefs {
                 LogManager.logError("Decoding error for property 'replies': \(error)")
                 throw error
             }
+            do {
+                threadContext = try container.decodeIfPresent(ThreadContext.self, forKey: .threadContext)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'threadContext': \(error)")
+                throw error
+            }
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -862,6 +931,10 @@ public struct AppBskyFeedDefs {
             if let value = replies {
                 try container.encode(value, forKey: .replies)
             }
+
+            if let value = threadContext {
+                try container.encode(value, forKey: .threadContext)
+            }
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -872,6 +945,11 @@ public struct AppBskyFeedDefs {
                 hasher.combine(nil as Int?)
             }
             if let value = replies {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = threadContext {
                 hasher.combine(value)
             } else {
                 hasher.combine(nil as Int?)
@@ -893,6 +971,10 @@ public struct AppBskyFeedDefs {
                 return false
             }
 
+            if threadContext != other.threadContext {
+                return false
+            }
+
             return true
         }
 
@@ -905,6 +987,7 @@ public struct AppBskyFeedDefs {
             case post
             case parent
             case replies
+            case threadContext
         }
     }
 
@@ -1158,11 +1241,12 @@ public struct AppBskyFeedDefs {
         public let acceptsInteractions: Bool?
         public let labels: [ComAtprotoLabelDefs.Label]?
         public let viewer: GeneratorViewerState?
+        public let contentMode: String?
         public let indexedAt: ATProtocolDate
 
         // Standard initializer
         public init(
-            uri: ATProtocolURI, cid: String, did: String, creator: AppBskyActorDefs.ProfileView, displayName: String, description: String?, descriptionFacets: [AppBskyRichtextFacet]?, avatar: URI?, likeCount: Int?, acceptsInteractions: Bool?, labels: [ComAtprotoLabelDefs.Label]?, viewer: GeneratorViewerState?, indexedAt: ATProtocolDate
+            uri: ATProtocolURI, cid: String, did: String, creator: AppBskyActorDefs.ProfileView, displayName: String, description: String?, descriptionFacets: [AppBskyRichtextFacet]?, avatar: URI?, likeCount: Int?, acceptsInteractions: Bool?, labels: [ComAtprotoLabelDefs.Label]?, viewer: GeneratorViewerState?, contentMode: String?, indexedAt: ATProtocolDate
         ) {
             self.uri = uri
             self.cid = cid
@@ -1176,6 +1260,7 @@ public struct AppBskyFeedDefs {
             self.acceptsInteractions = acceptsInteractions
             self.labels = labels
             self.viewer = viewer
+            self.contentMode = contentMode
             self.indexedAt = indexedAt
         }
 
@@ -1267,6 +1352,13 @@ public struct AppBskyFeedDefs {
                 throw error
             }
             do {
+                contentMode = try container.decodeIfPresent(String.self, forKey: .contentMode)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'contentMode': \(error)")
+                throw error
+            }
+            do {
                 indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
 
             } catch {
@@ -1317,6 +1409,10 @@ public struct AppBskyFeedDefs {
                 try container.encode(value, forKey: .viewer)
             }
 
+            if let value = contentMode {
+                try container.encode(value, forKey: .contentMode)
+            }
+
             try container.encode(indexedAt, forKey: .indexedAt)
         }
 
@@ -1357,6 +1453,11 @@ public struct AppBskyFeedDefs {
                 hasher.combine(nil as Int?)
             }
             if let value = viewer {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = contentMode {
                 hasher.combine(value)
             } else {
                 hasher.combine(nil as Int?)
@@ -1415,6 +1516,10 @@ public struct AppBskyFeedDefs {
                 return false
             }
 
+            if contentMode != other.contentMode {
+                return false
+            }
+
             if indexedAt != other.indexedAt {
                 return false
             }
@@ -1440,6 +1545,7 @@ public struct AppBskyFeedDefs {
             case acceptsInteractions
             case labels
             case viewer
+            case contentMode
             case indexedAt
         }
     }
@@ -2017,31 +2123,26 @@ public struct AppBskyFeedDefs {
             switch (self, otherValue) {
             case let (
                 .appBskyEmbedImagesView(selfValue),
-
                 .appBskyEmbedImagesView(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyEmbedVideoView(selfValue),
-
                 .appBskyEmbedVideoView(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyEmbedExternalView(selfValue),
-
                 .appBskyEmbedExternalView(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyEmbedRecordView(selfValue),
-
                 .appBskyEmbedRecordView(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyEmbedRecordWithMediaView(selfValue),
-
                 .appBskyEmbedRecordWithMediaView(otherValue)
             ):
                 return selfValue == otherValue
@@ -2114,13 +2215,11 @@ public struct AppBskyFeedDefs {
             switch (self, otherValue) {
             case let (
                 .appBskyFeedDefsReasonRepost(selfValue),
-
                 .appBskyFeedDefsReasonRepost(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyFeedDefsReasonPin(selfValue),
-
                 .appBskyFeedDefsReasonPin(otherValue)
             ):
                 return selfValue == otherValue
@@ -2203,19 +2302,16 @@ public struct AppBskyFeedDefs {
             switch (self, otherValue) {
             case let (
                 .appBskyFeedDefsPostView(selfValue),
-
                 .appBskyFeedDefsPostView(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyFeedDefsNotFoundPost(selfValue),
-
                 .appBskyFeedDefsNotFoundPost(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyFeedDefsBlockedPost(selfValue),
-
                 .appBskyFeedDefsBlockedPost(otherValue)
             ):
                 return selfValue == otherValue
@@ -2298,19 +2394,16 @@ public struct AppBskyFeedDefs {
             switch (self, otherValue) {
             case let (
                 .appBskyFeedDefsPostView(selfValue),
-
                 .appBskyFeedDefsPostView(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyFeedDefsNotFoundPost(selfValue),
-
                 .appBskyFeedDefsNotFoundPost(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyFeedDefsBlockedPost(selfValue),
-
                 .appBskyFeedDefsBlockedPost(otherValue)
             ):
                 return selfValue == otherValue
@@ -2393,19 +2486,16 @@ public struct AppBskyFeedDefs {
             switch (self, otherValue) {
             case let (
                 .appBskyFeedDefsThreadViewPost(selfValue),
-
                 .appBskyFeedDefsThreadViewPost(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyFeedDefsNotFoundPost(selfValue),
-
                 .appBskyFeedDefsNotFoundPost(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyFeedDefsBlockedPost(selfValue),
-
                 .appBskyFeedDefsBlockedPost(otherValue)
             ):
                 return selfValue == otherValue
@@ -2488,19 +2578,16 @@ public struct AppBskyFeedDefs {
             switch (self, otherValue) {
             case let (
                 .appBskyFeedDefsThreadViewPost(selfValue),
-
                 .appBskyFeedDefsThreadViewPost(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyFeedDefsNotFoundPost(selfValue),
-
                 .appBskyFeedDefsNotFoundPost(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyFeedDefsBlockedPost(selfValue),
-
                 .appBskyFeedDefsBlockedPost(otherValue)
             ):
                 return selfValue == otherValue
@@ -2573,13 +2660,11 @@ public struct AppBskyFeedDefs {
             switch (self, otherValue) {
             case let (
                 .appBskyFeedDefsSkeletonReasonRepost(selfValue),
-
                 .appBskyFeedDefsSkeletonReasonRepost(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyFeedDefsSkeletonReasonPin(selfValue),
-
                 .appBskyFeedDefsSkeletonReasonPin(otherValue)
             ):
                 return selfValue == otherValue

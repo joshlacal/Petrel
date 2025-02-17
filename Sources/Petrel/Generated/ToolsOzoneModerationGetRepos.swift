@@ -88,13 +88,11 @@ public struct ToolsOzoneModerationGetRepos {
             switch (self, otherValue) {
             case let (
                 .toolsOzoneModerationDefsRepoViewDetail(selfValue),
-
                 .toolsOzoneModerationDefsRepoViewDetail(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsRepoViewNotFound(selfValue),
-
                 .toolsOzoneModerationDefsRepoViewNotFound(otherValue)
             ):
                 return selfValue == otherValue

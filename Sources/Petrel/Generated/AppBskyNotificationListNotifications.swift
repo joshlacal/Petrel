@@ -209,17 +209,20 @@ public enum AppBskyNotificationListNotifications {
     }
 
     public struct Parameters: Parametrizable {
+        public let reasons: [String]?
         public let limit: Int?
         public let priority: Bool?
         public let cursor: String?
         public let seenAt: ATProtocolDate?
 
         public init(
+            reasons: [String]? = nil,
             limit: Int? = nil,
             priority: Bool? = nil,
             cursor: String? = nil,
             seenAt: ATProtocolDate? = nil
         ) {
+            self.reasons = reasons
             self.limit = limit
             self.priority = priority
             self.cursor = cursor

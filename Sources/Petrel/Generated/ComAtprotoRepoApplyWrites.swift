@@ -591,19 +591,16 @@ public struct ComAtprotoRepoApplyWrites {
             switch (self, otherValue) {
             case let (
                 .comAtprotoRepoApplyWritesCreate(selfValue),
-
                 .comAtprotoRepoApplyWritesCreate(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .comAtprotoRepoApplyWritesUpdate(selfValue),
-
                 .comAtprotoRepoApplyWritesUpdate(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .comAtprotoRepoApplyWritesDelete(selfValue),
-
                 .comAtprotoRepoApplyWritesDelete(otherValue)
             ):
                 return selfValue == otherValue
@@ -686,19 +683,16 @@ public struct ComAtprotoRepoApplyWrites {
             switch (self, otherValue) {
             case let (
                 .comAtprotoRepoApplyWritesCreateResult(selfValue),
-
                 .comAtprotoRepoApplyWritesCreateResult(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .comAtprotoRepoApplyWritesUpdateResult(selfValue),
-
                 .comAtprotoRepoApplyWritesUpdateResult(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .comAtprotoRepoApplyWritesDeleteResult(selfValue),
-
                 .comAtprotoRepoApplyWritesDeleteResult(otherValue)
             ):
                 return selfValue == otherValue
@@ -781,19 +775,16 @@ public struct ComAtprotoRepoApplyWrites {
             switch (self, otherValue) {
             case let (
                 .comAtprotoRepoApplyWritesCreate(selfValue),
-
                 .comAtprotoRepoApplyWritesCreate(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .comAtprotoRepoApplyWritesUpdate(selfValue),
-
                 .comAtprotoRepoApplyWritesUpdate(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .comAtprotoRepoApplyWritesDelete(selfValue),
-
                 .comAtprotoRepoApplyWritesDelete(otherValue)
             ):
                 return selfValue == otherValue

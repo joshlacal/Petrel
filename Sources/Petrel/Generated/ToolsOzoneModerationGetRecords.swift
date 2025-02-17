@@ -88,13 +88,11 @@ public struct ToolsOzoneModerationGetRecords {
             switch (self, otherValue) {
             case let (
                 .toolsOzoneModerationDefsRecordViewDetail(selfValue),
-
                 .toolsOzoneModerationDefsRecordViewDetail(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsRecordViewNotFound(selfValue),
-
                 .toolsOzoneModerationDefsRecordViewNotFound(otherValue)
             ):
                 return selfValue == otherValue

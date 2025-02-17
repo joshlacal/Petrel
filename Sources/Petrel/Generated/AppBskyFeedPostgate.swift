@@ -185,7 +185,6 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
             switch (self, otherValue) {
             case let (
                 .appBskyFeedPostgateDisableRule(selfValue),
-
                 .appBskyFeedPostgateDisableRule(otherValue)
             ):
                 return selfValue == otherValue

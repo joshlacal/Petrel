@@ -100,13 +100,11 @@ public struct ChatBskyConvoGetMessages {
             switch (self, otherValue) {
             case let (
                 .chatBskyConvoDefsMessageView(selfValue),
-
                 .chatBskyConvoDefsMessageView(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .chatBskyConvoDefsDeletedMessageView(selfValue),
-
                 .chatBskyConvoDefsDeletedMessageView(otherValue)
             ):
                 return selfValue == otherValue

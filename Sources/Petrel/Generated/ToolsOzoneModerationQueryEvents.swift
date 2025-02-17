@@ -12,6 +12,8 @@ public enum ToolsOzoneModerationQueryEvents {
         public let createdAfter: ATProtocolDate?
         public let createdBefore: ATProtocolDate?
         public let subject: URI?
+        public let collections: [String]?
+        public let subjectType: String?
         public let includeAllUserRecords: Bool?
         public let limit: Int?
         public let hasComment: Bool?
@@ -21,6 +23,7 @@ public enum ToolsOzoneModerationQueryEvents {
         public let addedTags: [String]?
         public let removedTags: [String]?
         public let reportTypes: [String]?
+        public let policies: [String]?
         public let cursor: String?
 
         public init(
@@ -30,6 +33,8 @@ public enum ToolsOzoneModerationQueryEvents {
             createdAfter: ATProtocolDate? = nil,
             createdBefore: ATProtocolDate? = nil,
             subject: URI? = nil,
+            collections: [String]? = nil,
+            subjectType: String? = nil,
             includeAllUserRecords: Bool? = nil,
             limit: Int? = nil,
             hasComment: Bool? = nil,
@@ -39,6 +44,7 @@ public enum ToolsOzoneModerationQueryEvents {
             addedTags: [String]? = nil,
             removedTags: [String]? = nil,
             reportTypes: [String]? = nil,
+            policies: [String]? = nil,
             cursor: String? = nil
         ) {
             self.types = types
@@ -47,6 +53,8 @@ public enum ToolsOzoneModerationQueryEvents {
             self.createdAfter = createdAfter
             self.createdBefore = createdBefore
             self.subject = subject
+            self.collections = collections
+            self.subjectType = subjectType
             self.includeAllUserRecords = includeAllUserRecords
             self.limit = limit
             self.hasComment = hasComment
@@ -56,6 +64,7 @@ public enum ToolsOzoneModerationQueryEvents {
             self.addedTags = addedTags
             self.removedTags = removedTags
             self.reportTypes = reportTypes
+            self.policies = policies
             self.cursor = cursor
         }
     }

@@ -8,7 +8,6 @@
 import Foundation
 import SwiftUI
 
-
 public extension AppBskyFeedPost {
     var facetsAsAttributedString: AttributedString {
         guard let facets = facets, !text.isEmpty else { return AttributedString(text) }

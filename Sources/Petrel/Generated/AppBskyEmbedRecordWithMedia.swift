@@ -196,19 +196,16 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
             switch (self, otherValue) {
             case let (
                 .appBskyEmbedImagesView(selfValue),
-
                 .appBskyEmbedImagesView(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyEmbedVideoView(selfValue),
-
                 .appBskyEmbedVideoView(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyEmbedExternalView(selfValue),
-
                 .appBskyEmbedExternalView(otherValue)
             ):
                 return selfValue == otherValue
@@ -291,19 +288,16 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
             switch (self, otherValue) {
             case let (
                 .appBskyEmbedImages(selfValue),
-
                 .appBskyEmbedImages(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyEmbedVideo(selfValue),
-
                 .appBskyEmbedVideo(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .appBskyEmbedExternal(selfValue),
-
                 .appBskyEmbedExternal(otherValue)
             ):
                 return selfValue == otherValue

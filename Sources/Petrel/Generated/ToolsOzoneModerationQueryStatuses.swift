@@ -6,12 +6,20 @@ import ZippyJSON
 public enum ToolsOzoneModerationQueryStatuses {
     public static let typeIdentifier = "tools.ozone.moderation.queryStatuses"
     public struct Parameters: Parametrizable {
+        public let queueCount: Int?
+        public let queueIndex: Int?
+        public let queueSeed: String?
         public let includeAllUserRecords: Bool?
         public let subject: URI?
         public let comment: String?
         public let reportedAfter: ATProtocolDate?
         public let reportedBefore: ATProtocolDate?
         public let reviewedAfter: ATProtocolDate?
+        public let hostingDeletedAfter: ATProtocolDate?
+        public let hostingDeletedBefore: ATProtocolDate?
+        public let hostingUpdatedAfter: ATProtocolDate?
+        public let hostingUpdatedBefore: ATProtocolDate?
+        public let hostingStatuses: [String]?
         public let reviewedBefore: ATProtocolDate?
         public let includeMuted: Bool?
         public let onlyMuted: Bool?
@@ -26,14 +34,28 @@ public enum ToolsOzoneModerationQueryStatuses {
         public let tags: [String]?
         public let excludeTags: [String]?
         public let cursor: String?
+        public let collections: [String]?
+        public let subjectType: String?
+        public let minAccountSuspendCount: Int?
+        public let minReportedRecordsCount: Int?
+        public let minTakendownRecordsCount: Int?
+        public let minPriorityScore: Int?
 
         public init(
+            queueCount: Int? = nil,
+            queueIndex: Int? = nil,
+            queueSeed: String? = nil,
             includeAllUserRecords: Bool? = nil,
             subject: URI? = nil,
             comment: String? = nil,
             reportedAfter: ATProtocolDate? = nil,
             reportedBefore: ATProtocolDate? = nil,
             reviewedAfter: ATProtocolDate? = nil,
+            hostingDeletedAfter: ATProtocolDate? = nil,
+            hostingDeletedBefore: ATProtocolDate? = nil,
+            hostingUpdatedAfter: ATProtocolDate? = nil,
+            hostingUpdatedBefore: ATProtocolDate? = nil,
+            hostingStatuses: [String]? = nil,
             reviewedBefore: ATProtocolDate? = nil,
             includeMuted: Bool? = nil,
             onlyMuted: Bool? = nil,
@@ -47,14 +69,28 @@ public enum ToolsOzoneModerationQueryStatuses {
             limit: Int? = nil,
             tags: [String]? = nil,
             excludeTags: [String]? = nil,
-            cursor: String? = nil
+            cursor: String? = nil,
+            collections: [String]? = nil,
+            subjectType: String? = nil,
+            minAccountSuspendCount: Int? = nil,
+            minReportedRecordsCount: Int? = nil,
+            minTakendownRecordsCount: Int? = nil,
+            minPriorityScore: Int? = nil
         ) {
+            self.queueCount = queueCount
+            self.queueIndex = queueIndex
+            self.queueSeed = queueSeed
             self.includeAllUserRecords = includeAllUserRecords
             self.subject = subject
             self.comment = comment
             self.reportedAfter = reportedAfter
             self.reportedBefore = reportedBefore
             self.reviewedAfter = reviewedAfter
+            self.hostingDeletedAfter = hostingDeletedAfter
+            self.hostingDeletedBefore = hostingDeletedBefore
+            self.hostingUpdatedAfter = hostingUpdatedAfter
+            self.hostingUpdatedBefore = hostingUpdatedBefore
+            self.hostingStatuses = hostingStatuses
             self.reviewedBefore = reviewedBefore
             self.includeMuted = includeMuted
             self.onlyMuted = onlyMuted
@@ -69,6 +105,12 @@ public enum ToolsOzoneModerationQueryStatuses {
             self.tags = tags
             self.excludeTags = excludeTags
             self.cursor = cursor
+            self.collections = collections
+            self.subjectType = subjectType
+            self.minAccountSuspendCount = minAccountSuspendCount
+            self.minReportedRecordsCount = minReportedRecordsCount
+            self.minTakendownRecordsCount = minTakendownRecordsCount
+            self.minPriorityScore = minPriorityScore
         }
     }
 

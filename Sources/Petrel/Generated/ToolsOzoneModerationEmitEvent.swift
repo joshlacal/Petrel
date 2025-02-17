@@ -44,6 +44,10 @@ public struct ToolsOzoneModerationEmitEvent {
         case toolsOzoneModerationDefsModEventResolveAppeal(ToolsOzoneModerationDefs.ModEventResolveAppeal)
         case toolsOzoneModerationDefsModEventEmail(ToolsOzoneModerationDefs.ModEventEmail)
         case toolsOzoneModerationDefsModEventTag(ToolsOzoneModerationDefs.ModEventTag)
+        case toolsOzoneModerationDefsAccountEvent(ToolsOzoneModerationDefs.AccountEvent)
+        case toolsOzoneModerationDefsIdentityEvent(ToolsOzoneModerationDefs.IdentityEvent)
+        case toolsOzoneModerationDefsRecordEvent(ToolsOzoneModerationDefs.RecordEvent)
+        case toolsOzoneModerationDefsModEventPriorityScore(ToolsOzoneModerationDefs.ModEventPriorityScore)
         case unexpected(ATProtocolValueContainer)
 
         public init(from decoder: Decoder) throws {
@@ -93,6 +97,18 @@ public struct ToolsOzoneModerationEmitEvent {
             case "tools.ozone.moderation.defs#modEventTag":
                 let value = try ToolsOzoneModerationDefs.ModEventTag(from: decoder)
                 self = .toolsOzoneModerationDefsModEventTag(value)
+            case "tools.ozone.moderation.defs#accountEvent":
+                let value = try ToolsOzoneModerationDefs.AccountEvent(from: decoder)
+                self = .toolsOzoneModerationDefsAccountEvent(value)
+            case "tools.ozone.moderation.defs#identityEvent":
+                let value = try ToolsOzoneModerationDefs.IdentityEvent(from: decoder)
+                self = .toolsOzoneModerationDefsIdentityEvent(value)
+            case "tools.ozone.moderation.defs#recordEvent":
+                let value = try ToolsOzoneModerationDefs.RecordEvent(from: decoder)
+                self = .toolsOzoneModerationDefsRecordEvent(value)
+            case "tools.ozone.moderation.defs#modEventPriorityScore":
+                let value = try ToolsOzoneModerationDefs.ModEventPriorityScore(from: decoder)
+                self = .toolsOzoneModerationDefsModEventPriorityScore(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
                 self = .unexpected(unknownValue)
@@ -145,6 +161,18 @@ public struct ToolsOzoneModerationEmitEvent {
             case let .toolsOzoneModerationDefsModEventTag(value):
                 try container.encode("tools.ozone.moderation.defs#modEventTag", forKey: .type)
                 try value.encode(to: encoder)
+            case let .toolsOzoneModerationDefsAccountEvent(value):
+                try container.encode("tools.ozone.moderation.defs#accountEvent", forKey: .type)
+                try value.encode(to: encoder)
+            case let .toolsOzoneModerationDefsIdentityEvent(value):
+                try container.encode("tools.ozone.moderation.defs#identityEvent", forKey: .type)
+                try value.encode(to: encoder)
+            case let .toolsOzoneModerationDefsRecordEvent(value):
+                try container.encode("tools.ozone.moderation.defs#recordEvent", forKey: .type)
+                try value.encode(to: encoder)
+            case let .toolsOzoneModerationDefsModEventPriorityScore(value):
+                try container.encode("tools.ozone.moderation.defs#modEventPriorityScore", forKey: .type)
+                try value.encode(to: encoder)
             case let .unexpected(ATProtocolValueContainer):
                 try ATProtocolValueContainer.encode(to: encoder)
             }
@@ -194,6 +222,18 @@ public struct ToolsOzoneModerationEmitEvent {
             case let .toolsOzoneModerationDefsModEventTag(value):
                 hasher.combine("tools.ozone.moderation.defs#modEventTag")
                 hasher.combine(value)
+            case let .toolsOzoneModerationDefsAccountEvent(value):
+                hasher.combine("tools.ozone.moderation.defs#accountEvent")
+                hasher.combine(value)
+            case let .toolsOzoneModerationDefsIdentityEvent(value):
+                hasher.combine("tools.ozone.moderation.defs#identityEvent")
+                hasher.combine(value)
+            case let .toolsOzoneModerationDefsRecordEvent(value):
+                hasher.combine("tools.ozone.moderation.defs#recordEvent")
+                hasher.combine(value)
+            case let .toolsOzoneModerationDefsModEventPriorityScore(value):
+                hasher.combine("tools.ozone.moderation.defs#modEventPriorityScore")
+                hasher.combine(value)
             case let .unexpected(ATProtocolValueContainer):
                 hasher.combine("unexpected")
                 hasher.combine(ATProtocolValueContainer)
@@ -210,86 +250,92 @@ public struct ToolsOzoneModerationEmitEvent {
             switch (self, otherValue) {
             case let (
                 .toolsOzoneModerationDefsModEventTakedown(selfValue),
-
                 .toolsOzoneModerationDefsModEventTakedown(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventAcknowledge(selfValue),
-
                 .toolsOzoneModerationDefsModEventAcknowledge(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventEscalate(selfValue),
-
                 .toolsOzoneModerationDefsModEventEscalate(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventComment(selfValue),
-
                 .toolsOzoneModerationDefsModEventComment(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventLabel(selfValue),
-
                 .toolsOzoneModerationDefsModEventLabel(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventReport(selfValue),
-
                 .toolsOzoneModerationDefsModEventReport(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventMute(selfValue),
-
                 .toolsOzoneModerationDefsModEventMute(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventUnmute(selfValue),
-
                 .toolsOzoneModerationDefsModEventUnmute(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventMuteReporter(selfValue),
-
                 .toolsOzoneModerationDefsModEventMuteReporter(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventUnmuteReporter(selfValue),
-
                 .toolsOzoneModerationDefsModEventUnmuteReporter(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventReverseTakedown(selfValue),
-
                 .toolsOzoneModerationDefsModEventReverseTakedown(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventResolveAppeal(selfValue),
-
                 .toolsOzoneModerationDefsModEventResolveAppeal(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventEmail(selfValue),
-
                 .toolsOzoneModerationDefsModEventEmail(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventTag(selfValue),
-
                 .toolsOzoneModerationDefsModEventTag(otherValue)
+            ):
+                return selfValue == otherValue
+            case let (
+                .toolsOzoneModerationDefsAccountEvent(selfValue),
+                .toolsOzoneModerationDefsAccountEvent(otherValue)
+            ):
+                return selfValue == otherValue
+            case let (
+                .toolsOzoneModerationDefsIdentityEvent(selfValue),
+                .toolsOzoneModerationDefsIdentityEvent(otherValue)
+            ):
+                return selfValue == otherValue
+            case let (
+                .toolsOzoneModerationDefsRecordEvent(selfValue),
+                .toolsOzoneModerationDefsRecordEvent(otherValue)
+            ):
+                return selfValue == otherValue
+            case let (
+                .toolsOzoneModerationDefsModEventPriorityScore(selfValue),
+                .toolsOzoneModerationDefsModEventPriorityScore(otherValue)
             ):
                 return selfValue == otherValue
             case let (.unexpected(selfValue), .unexpected(otherValue)):
@@ -361,13 +407,11 @@ public struct ToolsOzoneModerationEmitEvent {
             switch (self, otherValue) {
             case let (
                 .comAtprotoAdminDefsRepoRef(selfValue),
-
                 .comAtprotoAdminDefsRepoRef(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .comAtprotoRepoStrongRef(selfValue),
-
                 .comAtprotoRepoStrongRef(otherValue)
             ):
                 return selfValue == otherValue
@@ -394,6 +438,10 @@ public struct ToolsOzoneModerationEmitEvent {
         case toolsOzoneModerationDefsModEventResolveAppeal(ToolsOzoneModerationDefs.ModEventResolveAppeal)
         case toolsOzoneModerationDefsModEventEmail(ToolsOzoneModerationDefs.ModEventEmail)
         case toolsOzoneModerationDefsModEventTag(ToolsOzoneModerationDefs.ModEventTag)
+        case toolsOzoneModerationDefsAccountEvent(ToolsOzoneModerationDefs.AccountEvent)
+        case toolsOzoneModerationDefsIdentityEvent(ToolsOzoneModerationDefs.IdentityEvent)
+        case toolsOzoneModerationDefsRecordEvent(ToolsOzoneModerationDefs.RecordEvent)
+        case toolsOzoneModerationDefsModEventPriorityScore(ToolsOzoneModerationDefs.ModEventPriorityScore)
         case unexpected(ATProtocolValueContainer)
 
         public init(from decoder: Decoder) throws {
@@ -443,6 +491,18 @@ public struct ToolsOzoneModerationEmitEvent {
             case "tools.ozone.moderation.defs#modEventTag":
                 let value = try ToolsOzoneModerationDefs.ModEventTag(from: decoder)
                 self = .toolsOzoneModerationDefsModEventTag(value)
+            case "tools.ozone.moderation.defs#accountEvent":
+                let value = try ToolsOzoneModerationDefs.AccountEvent(from: decoder)
+                self = .toolsOzoneModerationDefsAccountEvent(value)
+            case "tools.ozone.moderation.defs#identityEvent":
+                let value = try ToolsOzoneModerationDefs.IdentityEvent(from: decoder)
+                self = .toolsOzoneModerationDefsIdentityEvent(value)
+            case "tools.ozone.moderation.defs#recordEvent":
+                let value = try ToolsOzoneModerationDefs.RecordEvent(from: decoder)
+                self = .toolsOzoneModerationDefsRecordEvent(value)
+            case "tools.ozone.moderation.defs#modEventPriorityScore":
+                let value = try ToolsOzoneModerationDefs.ModEventPriorityScore(from: decoder)
+                self = .toolsOzoneModerationDefsModEventPriorityScore(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
                 self = .unexpected(unknownValue)
@@ -495,6 +555,18 @@ public struct ToolsOzoneModerationEmitEvent {
             case let .toolsOzoneModerationDefsModEventTag(value):
                 try container.encode("tools.ozone.moderation.defs#modEventTag", forKey: .type)
                 try value.encode(to: encoder)
+            case let .toolsOzoneModerationDefsAccountEvent(value):
+                try container.encode("tools.ozone.moderation.defs#accountEvent", forKey: .type)
+                try value.encode(to: encoder)
+            case let .toolsOzoneModerationDefsIdentityEvent(value):
+                try container.encode("tools.ozone.moderation.defs#identityEvent", forKey: .type)
+                try value.encode(to: encoder)
+            case let .toolsOzoneModerationDefsRecordEvent(value):
+                try container.encode("tools.ozone.moderation.defs#recordEvent", forKey: .type)
+                try value.encode(to: encoder)
+            case let .toolsOzoneModerationDefsModEventPriorityScore(value):
+                try container.encode("tools.ozone.moderation.defs#modEventPriorityScore", forKey: .type)
+                try value.encode(to: encoder)
             case let .unexpected(ATProtocolValueContainer):
                 try ATProtocolValueContainer.encode(to: encoder)
             }
@@ -544,6 +616,18 @@ public struct ToolsOzoneModerationEmitEvent {
             case let .toolsOzoneModerationDefsModEventTag(value):
                 hasher.combine("tools.ozone.moderation.defs#modEventTag")
                 hasher.combine(value)
+            case let .toolsOzoneModerationDefsAccountEvent(value):
+                hasher.combine("tools.ozone.moderation.defs#accountEvent")
+                hasher.combine(value)
+            case let .toolsOzoneModerationDefsIdentityEvent(value):
+                hasher.combine("tools.ozone.moderation.defs#identityEvent")
+                hasher.combine(value)
+            case let .toolsOzoneModerationDefsRecordEvent(value):
+                hasher.combine("tools.ozone.moderation.defs#recordEvent")
+                hasher.combine(value)
+            case let .toolsOzoneModerationDefsModEventPriorityScore(value):
+                hasher.combine("tools.ozone.moderation.defs#modEventPriorityScore")
+                hasher.combine(value)
             case let .unexpected(ATProtocolValueContainer):
                 hasher.combine("unexpected")
                 hasher.combine(ATProtocolValueContainer)
@@ -560,86 +644,92 @@ public struct ToolsOzoneModerationEmitEvent {
             switch (self, otherValue) {
             case let (
                 .toolsOzoneModerationDefsModEventTakedown(selfValue),
-
                 .toolsOzoneModerationDefsModEventTakedown(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventAcknowledge(selfValue),
-
                 .toolsOzoneModerationDefsModEventAcknowledge(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventEscalate(selfValue),
-
                 .toolsOzoneModerationDefsModEventEscalate(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventComment(selfValue),
-
                 .toolsOzoneModerationDefsModEventComment(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventLabel(selfValue),
-
                 .toolsOzoneModerationDefsModEventLabel(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventReport(selfValue),
-
                 .toolsOzoneModerationDefsModEventReport(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventMute(selfValue),
-
                 .toolsOzoneModerationDefsModEventMute(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventUnmute(selfValue),
-
                 .toolsOzoneModerationDefsModEventUnmute(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventMuteReporter(selfValue),
-
                 .toolsOzoneModerationDefsModEventMuteReporter(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventUnmuteReporter(selfValue),
-
                 .toolsOzoneModerationDefsModEventUnmuteReporter(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventReverseTakedown(selfValue),
-
                 .toolsOzoneModerationDefsModEventReverseTakedown(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventResolveAppeal(selfValue),
-
                 .toolsOzoneModerationDefsModEventResolveAppeal(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventEmail(selfValue),
-
                 .toolsOzoneModerationDefsModEventEmail(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .toolsOzoneModerationDefsModEventTag(selfValue),
-
                 .toolsOzoneModerationDefsModEventTag(otherValue)
+            ):
+                return selfValue == otherValue
+            case let (
+                .toolsOzoneModerationDefsAccountEvent(selfValue),
+                .toolsOzoneModerationDefsAccountEvent(otherValue)
+            ):
+                return selfValue == otherValue
+            case let (
+                .toolsOzoneModerationDefsIdentityEvent(selfValue),
+                .toolsOzoneModerationDefsIdentityEvent(otherValue)
+            ):
+                return selfValue == otherValue
+            case let (
+                .toolsOzoneModerationDefsRecordEvent(selfValue),
+                .toolsOzoneModerationDefsRecordEvent(otherValue)
+            ):
+                return selfValue == otherValue
+            case let (
+                .toolsOzoneModerationDefsModEventPriorityScore(selfValue),
+                .toolsOzoneModerationDefsModEventPriorityScore(otherValue)
             ):
                 return selfValue == otherValue
             case let (.unexpected(selfValue), .unexpected(otherValue)):
@@ -711,13 +801,11 @@ public struct ToolsOzoneModerationEmitEvent {
             switch (self, otherValue) {
             case let (
                 .comAtprotoAdminDefsRepoRef(selfValue),
-
                 .comAtprotoAdminDefsRepoRef(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .comAtprotoRepoStrongRef(selfValue),
-
                 .comAtprotoRepoStrongRef(otherValue)
             ):
                 return selfValue == otherValue

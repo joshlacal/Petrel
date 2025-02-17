@@ -114,25 +114,21 @@ public struct ChatBskyConvoGetLog {
             switch (self, otherValue) {
             case let (
                 .chatBskyConvoDefsLogBeginConvo(selfValue),
-
                 .chatBskyConvoDefsLogBeginConvo(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .chatBskyConvoDefsLogLeaveConvo(selfValue),
-
                 .chatBskyConvoDefsLogLeaveConvo(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .chatBskyConvoDefsLogCreateMessage(selfValue),
-
                 .chatBskyConvoDefsLogCreateMessage(otherValue)
             ):
                 return selfValue == otherValue
             case let (
                 .chatBskyConvoDefsLogDeleteMessage(selfValue),
-
                 .chatBskyConvoDefsLogDeleteMessage(otherValue)
             ):
                 return selfValue == otherValue

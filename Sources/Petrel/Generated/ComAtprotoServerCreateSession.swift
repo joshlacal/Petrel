@@ -9,12 +9,14 @@ public enum ComAtprotoServerCreateSession {
         public let identifier: String
         public let password: String
         public let authFactorToken: String?
+        public let allowTakendown: Bool?
 
         // Standard public initializer
-        public init(identifier: String, password: String, authFactorToken: String? = nil) {
+        public init(identifier: String, password: String, authFactorToken: String? = nil, allowTakendown: Bool? = nil) {
             self.identifier = identifier
             self.password = password
             self.authFactorToken = authFactorToken
+            self.allowTakendown = allowTakendown
         }
     }
 
