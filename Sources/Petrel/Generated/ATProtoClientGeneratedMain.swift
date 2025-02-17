@@ -80,7 +80,8 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
     private var authenticationService: AuthenticationService
 
     private(set) var initState: InitializationState = .uninitialized
-    public weak var authDelegate: AuthenticationDelegate?
+    //    public weak var authDelegate: AuthenticationDelegate?
+    private var _authDelegate: AuthenticationDelegate?
 
     // User-related properties
     private var did: String?
@@ -108,7 +109,8 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
         namespace: String,
         environment: ClientEnvironment
     ) async {
-        LogManager.logDebug("ATProtoClient - Initializing with baseURL: \(baseURL), namespace: \(namespace)")
+        LogManager.logDebug(
+            "ATProtoClient - Initializing with baseURL: \(baseURL), namespace: \(namespace)")
         self.oauthConfig = oauthConfig
         self.namespace = namespace
         self.baseURL = baseURL
@@ -117,9 +119,11 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
 
         configManager = await ConfigurationManager(baseURL: baseURL, namespace: namespace)
         tokenManager = await TokenManager(namespace: namespace)
-        networkManager = await NetworkManager(baseURL: baseURL, configurationManager: configManager, tokenManager: tokenManager)
+        networkManager = await NetworkManager(
+            baseURL: baseURL, configurationManager: configManager, tokenManager: tokenManager)
         middlewareService = await MiddlewareService(tokenManager: tokenManager)
-        sessionManager = await SessionManager(tokenManager: tokenManager, middlewareService: middlewareService)
+        sessionManager = await SessionManager(
+            tokenManager: tokenManager, middlewareService: middlewareService)
         let didResolutionService = await DIDResolutionService(networkManager: networkManager)
         authenticationService = await AuthenticationService(
             authMethod: authMethod,
@@ -136,18 +140,19 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
 
             await networkManager.setAuthenticationProvider(authenticationService)
             await middlewareService.setSessionManager(sessionManager)
-//            await configManager.waitForInitialization()
+            //            await configManager.waitForInitialization()
 
             if let savedPDSURL = await configManager.getPDSURL() {
                 LogManager.logInfo("ATProtoClient - Using saved PDS URL: \(savedPDSURL)")
                 self.baseURL = savedPDSURL
                 await updateAllComponentsWithNewURL(savedPDSURL)
             } else {
-                LogManager.logDebug("ATProtoClient - No saved PDS URL found, using default: \(baseURL)")
+                LogManager.logDebug(
+                    "ATProtoClient - No saved PDS URL found, using default: \(baseURL)")
             }
 
-//            _ = try await getSession()
-//            // Then initialize the OAuth state
+            //            _ = try await getSession()
+            //            // Then initialize the OAuth state
             try await authenticationService.initializeOAuthState()
 
             // First, try to refresh the token if needed
@@ -195,8 +200,8 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
         let sessionResponse = try await com.atproto.server.getSession()
 
         guard let sessionInfo = sessionResponse.data,
-              let endpoint = sessionInfo.didDoc?.service.first?.serviceEndpoint,
-              let serviceURL = URL(string: endpoint)
+            let endpoint = sessionInfo.didDoc?.service.first?.serviceEndpoint,
+            let serviceURL = URL(string: endpoint)
         else {
             throw APIError.authorizationFailed
         }
@@ -216,22 +221,22 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
         return sessionInfo
     }
 
-//    private func completeInitialization(authMethod: AuthMethod, oauthConfig: OAuthConfiguration) async {
-//        // Publish an initialization completed event
-//    }
-//
-//    private func setupPostInit() async {
-//        await middlewareService.setSessionManager(sessionManager)
-//        // Publish configuration updated event if needed
-//    }
+    //    private func completeInitialization(authMethod: AuthMethod, oauthConfig: OAuthConfiguration) async {
+    //        // Publish an initialization completed event
+    //    }
+    //
+    //    private func setupPostInit() async {
+    //        await middlewareService.setSessionManager(sessionManager)
+    //        // Publish configuration updated event if needed
+    //    }
 
-//    private func getAuthenticationService() throws -> AuthenticationService {
-//        guard let authService = authenticationService else {
-//            LogManager.logError("AuthenticationService not initialized")
-//            throw APIError.serviceNotInitialized
-//        }
-//        return authService
-//    }
+    //    private func getAuthenticationService() throws -> AuthenticationService {
+    //        guard let authService = authenticationService else {
+    //            LogManager.logError("AuthenticationService not initialized")
+    //            throw APIError.serviceNotInitialized
+    //        }
+    //        return authService
+    //    }
 
     // MARK: - Authentication Delegate Protocol Methods
 
@@ -243,16 +248,31 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
         await EventBus.shared.publish(.authenticationRequired)
     }
 
-    private func handleAuthenticationError() async {
-        LogManager.logInfo("ATProtoClient - Handling authentication error")
+    // Allows setting from main actor
+    @MainActor public func setAuthenticationDelegate(_ delegate: AuthenticationDelegate) {
+        Task { @MainActor in
+            await setAuthDelegateOnActor(delegate)
+        }
+    }
+
+    // Internal method that runs on the actor
+    private func setAuthDelegateOnActor(_ delegate: AuthenticationDelegate) {
+        _authDelegate = delegate
+    }
+
+    // Access via computed property
+    var authDelegate: AuthenticationDelegate? {
+        _authDelegate
+    }
+
+    private func refreshOrRequireAuth() async {
         do {
             let refreshed = try await refreshToken()
             if !refreshed {
-                await authDelegate?.authenticationRequired(client: self)
+                await _authDelegate?.authenticationRequired(client: self)
             }
         } catch {
-            LogManager.logError("ATProtoClient - Failed to refresh token: \(error)")
-            await authDelegate?.authenticationRequired(client: self)
+            await _authDelegate?.authenticationRequired(client: self)
         }
     }
 
@@ -300,9 +320,10 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
 
         // Publish token updated event
         if let accessToken = await tokenManager.fetchAccessToken(),
-           let refreshToken = await tokenManager.fetchRefreshToken()
+            let refreshToken = await tokenManager.fetchRefreshToken()
         {
-            await EventBus.shared.publish(.tokensUpdated(accessToken: accessToken, refreshToken: refreshToken))
+            await EventBus.shared.publish(
+                .tokensUpdated(accessToken: accessToken, refreshToken: refreshToken))
         }
     }
 
@@ -310,21 +331,20 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
 
     /// Logs out the user by clearing tokens and session data.
     public func logout() async throws {
-        try await authenticationService.logout()
-
-        // Clear session and tokens
+        // Clear session and tokens first
         try await middlewareService.clearSession()
         try await tokenManager.deleteTokens()
+        
+        // Clear DPoP state
         await authenticationService.deleteDPoPKey()
-        try await sessionManager.clearSession()
-
-        // Publish logout event
-        await EventBus.shared.publish(.sessionExpired)
-
+        
+//        // Clear session last
+//        try await sessionManager.clearSession()
+        
         // Notify delegate that authentication is required
         await authDelegate?.authenticationRequired(client: self)
     }
-
+    
     // MARK: - Utility Functions
 
     /// Resolves a user's handle to their DID.
@@ -356,8 +376,11 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
         let (data, _) = try await networkManager.performRequest(request)
         let didDocument = try ZippyJSONDecoder().decode(DIDDocument.self, from: data)
 
-        guard let serviceURLString = didDocument.service.first(where: { $0.type == "AtprotoPersonalDataServer" })?.serviceEndpoint,
-              let serviceURL = URL(string: serviceURLString)
+        guard
+            let serviceURLString = didDocument.service.first(where: {
+                $0.type == "AtprotoPersonalDataServer"
+            })?.serviceEndpoint,
+            let serviceURL = URL(string: serviceURLString)
         else {
             throw APIError.invalidPDSURL
         }
@@ -402,9 +425,10 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
         let refreshed = try await authenticationService.refreshTokenIfNeeded()
         if refreshed {
             if let accessToken = await tokenManager.fetchAccessToken(),
-               let refreshToken = await tokenManager.fetchRefreshToken()
+                let refreshToken = await tokenManager.fetchRefreshToken()
             {
-                await EventBus.shared.publish(.tokensUpdated(accessToken: accessToken, refreshToken: refreshToken))
+                await EventBus.shared.publish(
+                    .tokensUpdated(accessToken: accessToken, refreshToken: refreshToken))
             }
         }
         return refreshed
@@ -417,16 +441,15 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
         do {
             let hasValidTokens = await tokenManager.hasValidTokens()
             if !hasValidTokens {
+                await refreshOrRequireAuth()
                 return false
             }
-            // Additional checks if needed
             return true
         } catch {
-            LogManager.logError("Error checking session validity: \(error)")
+            await refreshOrRequireAuth()
             return false
         }
     }
-
     /// Initializes the session by fetching metadata and validating tokens.
     public func initializeSession() async throws {
         LogManager.logDebug("ATProtoClient - Initializing session.")
@@ -445,7 +468,8 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
                 pdsURL = await configManager.getPDSURL()
                 if let pdsURL = pdsURL {
                     await EventBus.shared.publish(.baseURLUpdated(pdsURL))
-                    LogManager.logInfo("ATProtoClient - Updated NetworkManager base URL to PDS URL: \(pdsURL)")
+                    LogManager.logInfo(
+                        "ATProtoClient - Updated NetworkManager base URL to PDS URL: \(pdsURL)")
                 }
                 // Publish session initialized event
                 await EventBus.shared.publish(.sessionInitialized)
@@ -478,40 +502,40 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
         let eventStream = await EventBus.shared.subscribe()
         for await event in eventStream {
             switch event {
-//            case .tokensUpdated(accessToken: let accessToken, refreshToken: let refreshToken):
-//                // Handle token refreshed event
-//                LogManager.logDebug("ATProtoClient - Received tokenRefreshed event.")
-//                // Update internal state if necessary
+            //            case .tokensUpdated(accessToken: let accessToken, refreshToken: let refreshToken):
+            //                // Handle token refreshed event
+            //                LogManager.logDebug("ATProtoClient - Received tokenRefreshed event.")
+            //                // Update internal state if necessary
             ////                self.baseURL = await configManager.getPDSURL() ?? self.baseURL
-//            case .sessionExpired:
-//                // Handle session expired event
-//                LogManager.logInfo("ATProtoClient - Session expired. Requiring authentication.")
-//                await authDelegate?.authenticationRequired(client: self)
-//            case .networkError(let error):
-//                // Handle network errors
-//                LogManager.logError("ATProtoClient - Network error occurred: \(error)")
-//            case .baseURLUpdated(let newURL):
-//                if self.baseURL != newURL {
-//                    LogManager.logInfo("ATProtoClient - Configuration updated with new URL: \(newURL)")
-//                    self.baseURL = newURL
-//                }
-//            case .authenticationRequired:
-//                LogManager.logInfo("ATProtoClient - Authentication required event received.")
-//                await handleAuthenticationError()
-//            case .oauthFlowStarted(let url):
-//                // Handle OAuth flow started
-//                LogManager.logInfo("ATProtoClient - OAuth flow started with URL: \(url)")
-//            case .oauthCallbackReceived(let url):
-//                // Handle OAuth callback received
-//                LogManager.logInfo("ATProtoClient - OAuth callback received with URL: \(url)")
-//            case .tokensUpdated(let accessToken, let refreshToken):
-//                // Handle token updated event
-//                LogManager.logInfo("ATProtoClient - Tokens updated.")
-//                // Update internal state or notify other components if necessary
-//            case .requestCompleted(let request, let data, let response):
-//                // Handle request completed event
-//                LogManager.logDebug("ATProtoClient - Request completed: \(request.url?.absoluteString ?? "") with status: \(response.statusCode)")
-//            // Add cases for additional events as needed
+            //            case .sessionExpired:
+            //                // Handle session expired event
+            //                LogManager.logInfo("ATProtoClient - Session expired. Requiring authentication.")
+            //                await authDelegate?.authenticationRequired(client: self)
+            //            case .networkError(let error):
+            //                // Handle network errors
+            //                LogManager.logError("ATProtoClient - Network error occurred: \(error)")
+            //            case .baseURLUpdated(let newURL):
+            //                if self.baseURL != newURL {
+            //                    LogManager.logInfo("ATProtoClient - Configuration updated with new URL: \(newURL)")
+            //                    self.baseURL = newURL
+            //                }
+            //            case .authenticationRequired:
+            //                LogManager.logInfo("ATProtoClient - Authentication required event received.")
+            //                await handleAuthenticationError()
+            //            case .oauthFlowStarted(let url):
+            //                // Handle OAuth flow started
+            //                LogManager.logInfo("ATProtoClient - OAuth flow started with URL: \(url)")
+            //            case .oauthCallbackReceived(let url):
+            //                // Handle OAuth callback received
+            //                LogManager.logInfo("ATProtoClient - OAuth callback received with URL: \(url)")
+            //            case .tokensUpdated(let accessToken, let refreshToken):
+            //                // Handle token updated event
+            //                LogManager.logInfo("ATProtoClient - Tokens updated.")
+            //                // Update internal state or notify other components if necessary
+            //            case .requestCompleted(let request, let data, let response):
+            //                // Handle request completed event
+            //                LogManager.logDebug("ATProtoClient - Request completed: \(request.url?.absoluteString ?? "") with status: \(response.statusCode)")
+            //            // Add cases for additional events as needed
             default:
                 break
             }
@@ -554,7 +578,8 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
                 }
             }
 
-            public lazy var communication: Communication = .init(networkManager: self.networkManager)
+            public lazy var communication: Communication = .init(
+                networkManager: self.networkManager)
 
             public final class Communication: @unchecked Sendable {
                 let networkManager: NetworkManaging

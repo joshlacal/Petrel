@@ -182,6 +182,29 @@ public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConve
             return components.string ?? "invalid-uri"
         }
     }
+    
+    // Initializer to create URI from URL
+    public init(url: URL) {
+        self.isDID = false
+        self.scheme = url.scheme ?? "https"
+        self.authority = url.host ?? ""
+        self.path = url.path.isEmpty ? nil : url.path
+        self.query = url.query
+        self.fragment = url.fragment
+    }
+
+    // Computed property to get URL from URI
+    public var url: URL? {
+        guard !isDID else { return nil }
+        var components = URLComponents()
+        components.scheme = scheme.isEmpty ? nil : scheme
+        components.host = authority
+        components.path = path ?? ""
+        components.query = query
+        components.fragment = fragment
+        return components.url
+    }
+
 
     public init(stringLiteral value: String) {
         self.init(uriString: value)

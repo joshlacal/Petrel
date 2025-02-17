@@ -158,7 +158,7 @@ actor MiddlewareService: MiddlewareServicing {
             LogManager.logError("MiddlewareService - SessionManager is not set.")
             throw NetworkError.authenticationRequired
         }
-        try await sessionManager.clearSession()
+//        try await sessionManager.clearSession()
         LogManager.logInfo("MiddlewareService - Session cleared successfully.")
 
         // Publish sessionExpired event

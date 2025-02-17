@@ -13,7 +13,7 @@ protocol SessionManaging: Actor {
     func hasValidSession() async -> Bool
     func isUserLoggedIn() async -> Bool
     func initializeIfNeeded() async throws
-    func clearSession() async throws
+//    func clearSession() async throws
 }
 
 // MARK: - SessionManager Actor
@@ -27,16 +27,41 @@ actor SessionManager: SessionManaging {
     private let sessionCheckInterval: TimeInterval = 5 // 5 seconds
     private(set) var isAuthenticated: Bool = false
     private var isInitializing: Bool = false
+    private var tokenCheckTask: Task<Void, Never>?
 
     // MARK: - Initialization
 
     init(tokenManager: TokenManaging, middlewareService: MiddlewareServicing) async {
         self.tokenManager = tokenManager
         self.middlewareService = middlewareService
+        self.isAuthenticated = await tokenManager.hasValidTokens()
+        self.startPeriodicTokenCheck()
 
 //            await self.subscribeToEvents()
     }
+    
+    deinit {
+        tokenCheckTask?.cancel()
+    }
 
+    private func startPeriodicTokenCheck() {
+        tokenCheckTask = Task { [weak self] in
+            while !Task.isCancelled {
+                if await self?.isAuthenticated == true {
+                    do {
+                        let shouldRefresh = await self?.tokenManager.shouldRefreshTokens() ?? false
+                        if shouldRefresh {
+                            try await self?.middlewareService.validateAndRefreshSession()
+                        }
+                    } catch {
+                        LogManager.logError("Failed to refresh session: \(error)")
+                    }
+                }
+                try? await Task.sleep(nanoseconds: UInt64(60 * 1_000_000_000)) // Check every minute
+            }
+        }
+    }
+    
     // MARK: - Event Subscription
 
     private func subscribeToEvents() async {
@@ -113,10 +138,10 @@ actor SessionManager: SessionManaging {
         }
     }
 
-    func clearSession() async throws {
-        try await middlewareService.clearSession()
-        await EventBus.shared.publish(.sessionExpired)
-    }
+//    func clearSession() async throws {
+//        try await middlewareService.clearSession()
+//        await EventBus.shared.publish(.sessionExpired)
+//    }
 
     // MARK: - Helper Methods
 

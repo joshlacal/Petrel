@@ -14,7 +14,7 @@ protocol TokenRefreshing: Actor {
 
 protocol AuthenticationProvider: Sendable {
     func prepareAuthenticatedRequest(_ request: URLRequest) async throws -> URLRequest
-    func handleUnauthorizedResponse(_ response: HTTPURLResponse, data: Data, for request: URLRequest) async throws -> (HTTPURLResponse, Data)
+    func handleUnauthorizedResponse(_ response: HTTPURLResponse, data: Data, for request: URLRequest) async throws -> (Data, HTTPURLResponse)
     func refreshTokenIfNeeded() async throws -> Bool
     func updateDPoPNonce(for url: URL, from headers: [String: String]) async
 }
@@ -65,7 +65,7 @@ protocol AuthenticationServicing: Actor, TokenRefreshing, AuthenticationProvider
     ///   - request: The original `URLRequest` that was made.
     /// - Returns: A tuple containing the new `HTTPURLResponse` and `Data` after retrying the request.
     /// - Throws: `NetworkError.authenticationRequired` if the retry also fails or if the error is not related to DPoP nonce.
-    func handleUnauthorizedResponse(_ response: HTTPURLResponse, data: Data, for request: URLRequest) async throws -> (HTTPURLResponse, Data)
+    func handleUnauthorizedResponse(_ response: HTTPURLResponse, data: Data, for request: URLRequest) async throws -> (Data, HTTPURLResponse)
 
     /// Deletes the DPoP key used for OAuth authentication.
     ///
@@ -138,7 +138,9 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
         }
 
         // Subscribe to relevant events
-//            await self.subscribeToEvents()
+        Task {
+            await self.subscribeToEvents()
+        }
     }
 
     // MARK: - Event Subscription
@@ -147,20 +149,20 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
         let eventStream = await EventBus.shared.subscribe()
         for await event in eventStream {
             switch event {
-//            case .tokenExpired:
-//                // Attempt to refresh token when tokenExpired event is received
-//                Task {
-//                    do {
-//                        let refreshed = try await refreshTokenIfNeeded()
-//                        if refreshed {
-//                            LogManager.logInfo("AuthenticationService - Token refreshed successfully via EventBus.")
-//                        }
-//                    } catch {
-//                        LogManager.logError("AuthenticationService - Failed to refresh token via EventBus: \(error)")
-//                        // Publish authentication required event
-//                        await EventBus.shared.publish(.authenticationRequired)
-//                    }
-//                }
+            case .tokenExpired:
+                // Attempt to refresh token when tokenExpired event is received
+                Task {
+                    do {
+                        let refreshed = try await refreshTokenIfNeeded()
+                        if refreshed {
+                            LogManager.logInfo("AuthenticationService - Token refreshed successfully via EventBus.")
+                        }
+                    } catch {
+                        LogManager.logError("AuthenticationService - Failed to refresh token via EventBus: \(error)")
+                        // Publish authentication required event
+                        await EventBus.shared.publish(.authenticationRequired)
+                    }
+                }
 //
 //            case .authenticationRequired:
 //                // Handle authentication required event if needed
@@ -221,7 +223,7 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
     ///   - data: The data received.
     ///   - request: The original URLRequest that was made.
     /// - Returns: A tuple containing the new HTTPURLResponse and Data.
-    func handleUnauthorizedResponse(_ response: HTTPURLResponse, data: Data, for request: URLRequest) async throws -> (HTTPURLResponse, Data) {
+    func handleUnauthorizedResponse(_ response: HTTPURLResponse, data: Data, for request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         if let wwwAuthenticate = response.value(forHTTPHeaderField: "WWW-Authenticate"),
            wwwAuthenticate.contains("error=\"use_dpop_nonce\""),
            let newNonce = response.value(forHTTPHeaderField: "DPoP-Nonce"),
@@ -249,13 +251,20 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
                 throw NetworkError.authenticationRequired
             }
 
-            return (retryHTTPResponse, retryData)
+            return (retryData, retryResponse)
         } else if let wwwAuthenticate = response.value(forHTTPHeaderField: "WWW-Authenticate"),
                   wwwAuthenticate.contains("error=\"invalid_token\"")
         {
             // This could indicate an expired token, but we'll let the caller handle it
             LogManager.logError("Received invalid_token error")
-            throw NetworkError.authenticationRequired
+            if try await refreshTokenIfNeeded() == true {
+                // Retry the request with the new token
+                var retryRequest = try await prepareAuthenticatedRequest(request)
+                return try await networkManager.performRequest(retryRequest)
+            } else {
+                LogManager.logError("NetworkManager - Token refresh failed")
+                throw NetworkError.authenticationRequired
+            }
         } else {
             // If the error is not related to DPoP nonce or invalid token, propagate it
             LogManager.logError("Unexpected 401 error: \(String(data: data, encoding: .utf8) ?? "")")
@@ -263,46 +272,31 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
         }
     }
 
-//    func refreshTokenIfNeeded() async throws -> Bool {
-//        guard await tokensExist() else {
-//            LogManager.logInfo("AuthenticationService - No tokens to refresh")
-//            return false
-//        }
-//
-//        if let accessToken = await tokenManager.fetchAccessToken() {
-//            if await tokenManager.isTokenExpired(token: accessToken) {
-//                LogManager.logInfo("AuthenticationService - Access token expired, refreshing")
-//                return try await refreshTokens()
-//            }
-//            return false // Token is still valid
-//        } else {
-//            LogManager.logInfo("AuthenticationService - No access token, attempting refresh")
-//            return try await refreshTokens()
-//        }
-//    }
-
+    
+    
+    
+    
+    private func startRefreshIfNotInProgress() -> Bool {
+        guard !isRefreshing else { return false }
+        isRefreshing = true
+        return true
+    }
+    
     func refreshTokenIfNeeded() async throws -> Bool {
         guard await tokensExist() else {
+            LogManager.logInfo("AuthenticationService - No tokens to refresh")
             return false
         }
-
-        // Prevent concurrent refreshes and limit refresh frequency
-        guard !isRefreshing && Date().timeIntervalSince(lastRefreshTime) > 5 else {
-            return false
-        }
-
-        isRefreshing = true
-        defer { isRefreshing = false }
-
-        do {
-            let refreshed = try await performTokenRefresh()
-            if refreshed {
-                lastRefreshTime = Date()
+        
+        // Get the current access token and check if it's close to expiration
+        if let accessToken = await tokenManager.fetchAccessToken() {
+            if await tokenManager.shouldRefreshTokens() {
+                LogManager.logInfo("AuthenticationService - Access token near expiration, refreshing")
+                return try await refreshTokens() // This now handles the locking
             }
-            return refreshed
-        } catch {
-            throw AuthenticationError.tokenRefreshFailed
         }
+        
+        return false
     }
 
     private func performTokenRefresh() async throws -> Bool {
@@ -342,8 +336,13 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
             let (accessToken, refreshToken) = try await oauthManager.handleCallback(url: url)
 
             // Save the tokens
-            try await tokenManager.saveTokens(accessJwt: accessToken, refreshJwt: refreshToken, type: .dpop)
-
+            try await tokenManager.saveTokens(
+                accessJwt: accessToken,
+                refreshJwt: refreshToken,
+                type: .dpop,
+                domain: configurationManager.baseURL.host // Get domain from current base URL
+            )
+            
             // Update user configuration
             if let did = try? await extractDIDFromToken(accessToken), let handle = await configurationManager.getHandle() {
                 let pdsURL = try await didResolver.resolveDIDToPDSURL(did: did)
@@ -394,41 +393,6 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
         return accessToken != nil && refreshToken != nil
     }
 
-//    func refreshTokenIfNeeded() async throws -> Bool {
-//        guard await tokensExist() else {
-//            LogManager.logInfo("AuthenticationService - No tokens to refresh")
-//            return false
-//        }
-//
-//        if let accessToken = await tokenManager.fetchAccessToken() {
-//            if await tokenManager.isTokenExpired(token: accessToken) {
-//                LogManager.logInfo("AuthenticationService - Access token expired, refreshing")
-//                return try await refreshTokens()
-//            }
-//            return false // Token is still valid
-//        } else {
-//            LogManager.logInfo("AuthenticationService - No access token, attempting refresh")
-//            return try await refreshTokens()
-//        }
-//    }
-
-//    func refreshTokenIfNeeded() async throws -> Bool {
-//        guard await tokensExist() else {
-//            LogManager.logInfo("AuthenticationService - No tokens to refresh")
-//            return false
-//        }
-//
-//        if let accessToken = await tokenManager.fetchAccessToken() {
-//            if await tokenManager.isTokenExpired(token: accessToken) {
-//                LogManager.logInfo("AuthenticationService - Access token expired, refreshing")
-//                return try await refreshTokens()
-//            }
-//            return false // Token is still valid
-//        } else {
-//            LogManager.logInfo("AuthenticationService - No access token, attempting refresh")
-//            return try await refreshTokens()
-//        }
-//    }
 
     func initializeOAuthState() async throws {
         if authMethod == .oauth {
@@ -441,15 +405,28 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
         guard await tokensExist() else {
             return false
         }
-
-        switch authMethod {
-        case .legacy:
-            return try await refreshTokenIfNeededLegacy()
-        case .oauth:
-            return try await refreshOAuthTokens()
+        
+        // Atomic check-and-set for refresh state
+        guard await startRefreshIfNotInProgress() else {
+            LogManager.logInfo("AuthenticationService - Refresh already in progress")
+            return false
+        }
+        
+        // Make sure we clear the flag when done
+        defer { isRefreshing = false }
+        
+        do {
+            switch authMethod {
+            case .legacy:
+                return try await refreshTokenIfNeededLegacy()
+            case .oauth:
+                return try await refreshOAuthTokens()
+            }
+        } catch {
+            LogManager.logError("Token refresh failed: \(error)")
+            throw error
         }
     }
-
     // MARK: - Legacy Authentication Methods
 
     /// Creates a new session using the provided identifier and password.
@@ -494,7 +471,8 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
         try await tokenManager.saveTokens(
             accessJwt: sessionOutput.accessJwt,
             refreshJwt: sessionOutput.refreshJwt,
-            type: .bearer
+            type: .bearer,
+            domain: configurationManager.baseURL.host
         )
 
         let baseURL = await configurationManager.baseURL.absoluteString
@@ -598,63 +576,37 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
 
     // MARK: - OAuth Authentication Methods
 
-//    private func refreshTokenIfNeededOAuth() async throws -> Bool {
-//        LogManager.logInfo("AuthenticationService - Checking if OAuth token refresh is needed.")
-//
-//        guard let refreshToken = await tokenManager.fetchRefreshToken() else {
-//            LogManager.logInfo("AuthenticationService - No refresh token available. OAuth flow may not have been completed.")
-//            return false // Return false instead of throwing an error
-//        }
-//
-//        guard let oauthManager = oauthManager else {
-//            throw AuthenticationError.methodNotSupported
-//        }
-//
-//        do {
-//            let (newAccessToken, newRefreshToken) = try await oauthManager.refreshToken(refreshToken: refreshToken)
-//            try await tokenManager.saveTokens(accessJwt: newAccessToken, refreshJwt: newRefreshToken, type: .dpop)
-//            LogManager.logInfo("AuthenticationService - OAuth token refreshed successfully.")
-//
-//            // Publish token updated event
-//            await EventBus.shared.publish(.tokensUpdated(accessToken: newAccessToken, refreshToken: newRefreshToken))
-//
-//            return true
-//        } catch {
-//            LogManager.logError("AuthenticationService - OAuth token refresh failed: \(error)")
-//            throw AuthenticationError.tokenRefreshFailed
-//        }
-//    }
-
-//    private func refreshTokenIfNeededOAuth() async throws -> Bool {
-//        guard let oauthManager = oauthManager,
-//              let refreshToken = await tokenManager.fetchRefreshToken() else {
-//            throw AuthenticationError.tokenMissingOrCorrupted
-//        }
-//
-//        do {
-//            LogManager.logInfo("AuthenticationService - Refreshing OAuth tokens to update DPoP proof")
-//            let (newAccessToken, newRefreshToken) = try await oauthManager.refreshToken(refreshToken: refreshToken)
-//            try await tokenManager.saveTokens(accessJwt: newAccessToken, refreshJwt: newRefreshToken, type: .dpop)
-//            LogManager.logInfo("AuthenticationService - OAuth tokens refreshed successfully")
-//            await EventBus.shared.publish(.tokensUpdated(accessToken: newAccessToken, refreshToken: newRefreshToken))
-//            return true
-//        } catch {
-//            LogManager.logError("AuthenticationService - OAuth token refresh failed: \(error)")
-//            throw AuthenticationError.tokenRefreshFailed
-//        }
-//    }
 
     private func refreshOAuthTokens() async throws -> Bool {
         guard let oauthManager = oauthManager,
               let refreshToken = await tokenManager.fetchRefreshToken()
         else {
+            LogManager.logError("AuthenticationService - Unable to refresh OAuth tokens: missing OAuth manager or refresh token")
             throw AuthenticationError.tokenMissingOrCorrupted
         }
-
-        let (newAccessToken, newRefreshToken) = try await oauthManager.refreshToken(refreshToken: refreshToken)
-        try await tokenManager.saveTokens(accessJwt: newAccessToken, refreshJwt: newRefreshToken, type: .dpop)
-        await EventBus.shared.publish(.tokensUpdated(accessToken: newAccessToken, refreshToken: newRefreshToken))
-        return true
+        
+        do {
+            LogManager.logInfo("AuthenticationService - Attempting to refresh OAuth tokens")
+            let (newAccessToken, newRefreshToken) = try await oauthManager.refreshToken(refreshToken: refreshToken)
+            
+            // Get the domain from the current base URL
+            let domain = await configurationManager.baseURL.host
+            
+            // Pass the domain when saving tokens
+            try await tokenManager.saveTokens(
+                accessJwt: newAccessToken,
+                refreshJwt: newRefreshToken,
+                type: .dpop,
+                domain: domain
+            )
+            
+            await EventBus.shared.publish(.tokensUpdated(accessToken: newAccessToken, refreshToken: newRefreshToken))
+            LogManager.logInfo("AuthenticationService - OAuth tokens refreshed and saved successfully")
+            return true
+        } catch {
+            LogManager.logError("AuthenticationService - Failed to refresh OAuth tokens: \(error)")
+            throw error
+        }
     }
 
     // MARK: - Utility Methods

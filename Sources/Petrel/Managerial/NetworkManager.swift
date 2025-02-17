@@ -245,7 +245,7 @@ actor NetworkManager: NetworkManaging {
                     // Handle 401 errors, including DPoP nonce updates
                     if let authProvider = authProvider {
                         do {
-                            let (retryResponse, retryData) = try await authProvider.handleUnauthorizedResponse(httpResponse, data: data, for: currentRequest)
+                            let (retryData, retryResponse) = try await authProvider.handleUnauthorizedResponse(httpResponse, data: data, for: currentRequest)
                             LogManager.logResponse(retryResponse, data: retryData)
                             return (retryData, retryResponse)
                         } catch {
@@ -272,7 +272,7 @@ actor NetworkManager: NetworkManaging {
 
         throw NetworkError.maxRetryAttemptsReached
     }
-
+    
     /// Applies all configured middlewares to the given request.
     ///
     /// - Parameter request: The original URLRequest.
@@ -397,17 +397,20 @@ actor NetworkManager: NetworkManaging {
         LogManager.logDebug("NetworkManager - Received response for token refresh with status code: \(response.statusCode)")
 
         if response.statusCode == 200 {
-            // Decode the response using your specific output structure
             let decoder = ZippyJSONDecoder()
             guard let tokenResponse = try? decoder.decode(ComAtprotoServerRefreshSession.Output.self, from: responseData) else {
                 throw NetworkError.decodingError
             }
-
-            // Update stored tokens using the token manager
+            
+            // Get domain from the base URL
+            let domain = baseURL.host
+            
+            // Pass domain when saving tokens
             try await tokenManager.saveTokens(
                 accessJwt: tokenResponse.accessJwt,
                 refreshJwt: tokenResponse.refreshJwt,
-                type: .bearer // Assuming legacy; adjust based on context
+                type: .bearer,
+                domain: domain
             )
 
             // Update user configuration with the new DID and service endpoint

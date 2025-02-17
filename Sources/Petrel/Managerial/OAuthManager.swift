@@ -96,7 +96,12 @@ struct ProtectedResourceMetadata: Codable {
 
 struct OAuthErrorResponse: Codable {
     let error: String
-    let error_description: String?
+    let errorDescription: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case error
+        case errorDescription = "error_description"
+    }
 }
 
 // MARK: - OAuthError Enumeration
@@ -356,8 +361,7 @@ actor OAuthManager {
         state: String
     ) async throws -> String {
         LogManager.logInfo("Starting PAR request. Current DPoP nonce: \(dpopNonces["bsky.social"] ?? "nil")")
-
-        // Prepare PAR parameters
+        
         let parameters: [String: String] = [
             "client_id": oauthConfig.clientId,
             "code_challenge": codeChallenge,
@@ -366,117 +370,99 @@ actor OAuthManager {
             "state": state,
             "redirect_uri": oauthConfig.redirectUri,
             "response_type": "code",
-            "login_hint": identifier,
+            "login_hint": identifier
         ]
-
+        
         let body = parameters.percentEncoded()
-
         var attempt = 0
         let maxRetries = 3
-
+        
         while attempt < maxRetries {
             do {
-                // Generate a new DPoP proof for each attempt
+                // Generate a new DPoP proof for each attempt - without ath claim
                 let dpopProof = try createDPoPProof(for: "POST", url: endpoint)
-
-                // Create the request with the current DPoP proof
+                
                 var request = try await networkManager.createURLRequest(
                     endpoint: endpoint,
                     method: "POST",
                     headers: [
                         "Content-Type": "application/x-www-form-urlencoded",
-                        "DPoP": dpopProof,
+                        "DPoP": dpopProof
                     ],
                     body: body,
                     queryItems: nil
                 )
-
+                
                 LogManager.logDebug("PAR Request Headers: \(request.allHTTPHeaderFields ?? [:])")
-                if let bodyData = request.httpBody, let bodyString = String(data: bodyData, encoding: .utf8) {
-                    LogManager.logDebug("PAR Request Body: \(bodyString)")
-                }
-
-                LogManager.logInfo("Attempting PAR request, attempt \(attempt + 1) to endpoint: \(endpoint)")
+                
                 let (data, response) = try await networkManager.performRequest(request)
-
-                // Log response details
-                LogManager.logInfo("PAR Response (Attempt \(attempt + 1)): \(String(data: data, encoding: .utf8) ?? "Unable to decode response")")
-                if let httpResponse = response as? HTTPURLResponse {
-                    LogManager.logInfo("PAR Response Status Code: \(httpResponse.statusCode)")
-                    LogManager.logInfo("PAR Response Headers: \(httpResponse.allHeaderFields)")
-
-                    // Safely extract the DPoP-Nonce and convert endpoint to URL
-                    if let newNonce = httpResponse.value(forHTTPHeaderField: "DPoP-Nonce"),
-                       let endpointURL = URL(string: endpoint)
-                    {
-                        // Update the DPoP nonce for the specific domain
-                        await updateDPoPNonce(for: endpointURL, from: httpResponse.allHeaderFields as! [String: String])
-                        LogManager.logInfo("Received new DPoP nonce from server: \(newNonce)")
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    throw NetworkError.requestFailed
+                }
+                
+                // Handle DPoP nonce updates
+                if let newNonce = httpResponse.value(forHTTPHeaderField: "DPoP-Nonce"),
+                   let endpointURL = URL(string: endpoint) {
+                    await updateDPoPNonce(for: endpointURL, from: ["DPoP-Nonce": newNonce])
+                    LogManager.logInfo("Received new DPoP nonce from server: \(newNonce)")
+                }
+                
+                switch httpResponse.statusCode {
+                case 200, 201:
+                    guard let parResponse = try? ZippyJSONDecoder().decode(PARResponse.self, from: data) else {
+                        throw OAuthError.authorizationFailed
                     }
-
-                    switch httpResponse.statusCode {
-                    case 200, 201:
-                        // Success
-                        guard let parResponse = try? ZippyJSONDecoder().decode(PARResponse.self, from: data) else {
+                    return parResponse.requestURI
+                    
+                case 400, 401:
+                    if let errorDetails = try? ZippyJSONDecoder().decode(OAuthErrorResponse.self, from: data) {
+                        switch errorDetails.error {
+                        case "use_dpop_nonce":
+                            attempt += 1
+                            continue
+                            
+                        case "invalid_dpop_proof":
+                            // Clear stale state and retry
+                            LogManager.logInfo("Invalid DPoP proof, regenerating state")
+                            regenerateDPoPKeyPair()
+                            dpopNonces.removeAll()
+                            attempt += 1
+                            continue
+                            
+                        default:
                             throw OAuthError.authorizationFailed
                         }
-                        LogManager.logInfo("PAR request successful. Received request_uri.")
-                        return parResponse.request_uri
-                    case 400:
-                        // Handle specific errors
-                        if let errorDetails = try? ZippyJSONDecoder().decode([String: String].self, from: data) {
-                            switch errorDetails["error"] {
-                            case "use_dpop_nonce":
-                                // Retry with updated nonce
-                                attempt += 1
-                                let domain = URL(string: endpoint)?.host ?? "unknown"
-                                let currentNonce = dpopNonces[domain] ?? "nil"
-                                LogManager.logInfo("Received use_dpop_nonce error, retrying with nonce: \(currentNonce)")
-                                continue
-                            case "invalid_client_metadata":
-                                if let description = errorDetails["error_description"] {
-                                    LogManager.logError("Invalid client metadata: \(description)")
-                                }
-                                if let moreInfo = errorDetails["more_info"] {
-                                    LogManager.logError("Additional error info: \(moreInfo)")
-                                }
-                                throw OAuthError.invalidClientConfiguration
-                            default:
-                                LogManager.logError("Received 400 Bad Request: \(errorDetails)")
-                                attempt += 1
-                                continue
-                            }
-                        }
-                    default:
-                        LogManager.logError("Unexpected response status code: \(httpResponse.statusCode)")
-                        attempt += 1
-                        continue
                     }
-                } else {
-                    LogManager.logError("Non-HTTP response received.")
-                    attempt += 1
-                    continue
+                    throw OAuthError.authorizationFailed
+                    
+                default:
+                    throw OAuthError.authorizationFailed
                 }
             } catch {
-                LogManager.logError("Failed to complete PAR on attempt \(attempt + 1): \(error.localizedDescription)")
-                if error is OAuthError {
+                if attempt >= maxRetries - 1 {
                     throw error
                 }
                 attempt += 1
-                if attempt >= maxRetries {
-                    throw error
-                }
-                // Add a small delay before retrying (exponential backoff)
-                let delaySeconds = pow(2.0, Double(attempt))
-                LogManager.logInfo("Retrying after \(delaySeconds) seconds...")
-                try? await Task.sleep(nanoseconds: UInt64(1_000_000_000 * delaySeconds))
+                // Add exponential backoff
+                try? await Task.sleep(nanoseconds: UInt64(pow(2.0, Double(attempt)) * 1_000_000_000))
             }
         }
-
-        LogManager.logError("Max retries reached for PAR, aborting OAuth flow.")
-        throw OAuthError.authorizationFailed
+        
+        throw OAuthError.maxRetriesReached
     }
-
+    
+    func regenerateDPoPKeyPair() {
+        do {
+            let newKeyPair = P256.Signing.PrivateKey()
+            try KeychainManager.storeDPoPKey(newKeyPair, namespace: namespace)
+            dpopKeyPair = newKeyPair
+            dpopNonces = [:] // Clear all nonces when generating a new key pair
+            LogManager.logInfo("Regenerated DPoP key pair and cleared all nonces")
+        } catch {
+            LogManager.logError("Failed to regenerate DPoP key pair: \(error)")
+        }
+    }
+    
     private func resetOAuthFlow() {
         regenerateDPoPKeyPair()
     }
@@ -665,7 +651,7 @@ actor OAuthManager {
             if !(200 ... 299).contains(httpResponse.statusCode) {
                 // Attempt to decode the error response
                 if let oauthError = try? ZippyJSONDecoder().decode(OAuthErrorResponse.self, from: data) {
-                    throw NSError(domain: "OAuthError", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "\(oauthError.error): \(oauthError.error_description ?? "No description")"])
+                    throw NSError(domain: "OAuthError", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "\(oauthError.error): \(oauthError.errorDescription ?? "No description")"])
                 } else {
                     let responseString = String(data: data, encoding: .utf8) ?? "No response body"
                     throw NSError(domain: "OAuthError", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "Unexpected error: \(responseString)"])
@@ -688,7 +674,7 @@ actor OAuthManager {
 
         LogManager.logInfo("Switched back to PDS URL: \(pdsURL.absoluteString)")
 
-        return (tokenResponse.access_token, tokenResponse.refresh_token)
+        return (tokenResponse.accessToken, tokenResponse.refreshToken)
     }
 
     func refreshToken(refreshToken: String) async throws -> (String, String) {
@@ -696,20 +682,22 @@ actor OAuthManager {
         guard let metadata = authorizationServerMetadata else {
             throw OAuthError.missingServerMetadata
         }
-
+        
         let parameters: [String: String] = [
             "grant_type": "refresh_token",
             "refresh_token": refreshToken,
             "client_id": oauthConfig.clientId,
         ]
-
-        LogManager.logDebug("Refresh token parameters: \(parameters)")
-
+        
         let body = parameters.percentEncoded()
-
-        // Create DPoP proof
-        let dpopProof = try await createDPoPProof(for: "POST", url: metadata.tokenEndpoint)
-
+        
+        // Use the specialized refresh DPoP proof creator
+        let dpopProof = try await createDPoPProofForRefresh(
+            for: "POST",
+            url: metadata.tokenEndpoint,
+            refreshToken: refreshToken
+        )
+        
         var request = try await networkManager.createURLRequest(
             endpoint: metadata.tokenEndpoint,
             method: "POST",
@@ -720,6 +708,8 @@ actor OAuthManager {
             body: body,
             queryItems: nil
         )
+
+
 
         // Log the request for debugging
         LogManager.logDebug("Refresh Token Request: \(request)")
@@ -745,21 +735,30 @@ actor OAuthManager {
 
         if httpResponse.statusCode == 200 {
             let tokenResponse = try ZippyJSONDecoder().decode(TokenResponse.self, from: data)
-
+            
             // Verify the 'sub' claim
             guard let sub = tokenResponse.sub, sub.starts(with: "did:") else {
                 throw OAuthError.invalidSubClaim
             }
-
+            
             // Update PDS URL
             let pdsURL = try await didResolver.resolveDIDToPDSURL(did: sub)
             await configurationManager.updatePDSURL(pdsURL)
             await networkManager.updateBaseURL(pdsURL)
             await EventBus.shared.publish(.baseURLUpdated(pdsURL))
-
+            
             LogManager.logInfo("Token refreshed successfully. New PDS URL: \(pdsURL.absoluteString)")
-
-            return (tokenResponse.access_token, tokenResponse.refresh_token)
+            
+            return (tokenResponse.accessToken, tokenResponse.refreshToken)
+        } else if httpResponse.statusCode == 400 {
+                if let errorResponse = try? ZippyJSONDecoder().decode(OAuthErrorResponse.self, from: data) {
+                    LogManager.logError("Token refresh failed: \(errorResponse.error) - \(errorResponse.errorDescription ?? "")")
+                    if errorResponse.error == "invalid_grant" {
+                        // Token is expired, need to re-authenticate
+                        await EventBus.shared.publish(.authenticationRequired)
+                    }
+                }
+                throw OAuthError.tokenRefreshFailed
         } else {
             // Log the error response for debugging
             if let errorBody = try? JSONDecoder().decode(OAuthErrorResponse.self, from: data) {
@@ -770,7 +769,31 @@ actor OAuthManager {
             throw OAuthError.tokenRefreshFailed
         }
     }
-
+    
+    
+    
+    private func createDPoPProofForRefresh(for httpMethod: String, url: String, refreshToken: String) async throws -> String {
+        guard let privateKey = dpopKeyPair else {
+            throw OAuthError.noDPoPKeyPair
+        }
+        
+        let jwk = try createJWK(from: privateKey)
+        let domain = URL(string: url)?.host ?? "unknown"
+        
+        // Get the DPoP binding for the domain
+        var additionalClaims: [String: Any] = [:]
+        if let binding = await tokenManager.getDPoPBinding(for: domain) {
+            additionalClaims["cnf"] = ["jkt": binding]
+            LogManager.logDebug("Including DPoP binding \(binding) for domain \(domain)")
+        }
+        
+        return try createDPoPProof(
+            for: httpMethod,
+            url: url,
+            additionalClaims: additionalClaims
+        )
+    }
+    
     func initializeDPoPState() async throws {
         // Fetch the authorization server metadata if not already available
         if authorizationServerMetadata == nil {
@@ -858,24 +881,6 @@ actor OAuthManager {
         LogManager.logInfo("OAuthManager - DPoP proof regenerated successfully")
     }
 
-    private func regenerateDPoPKeyPair() {
-        do {
-            let newKeyPair = P256.Signing.PrivateKey()
-            try KeychainManager.storeDPoPKey(newKeyPair, namespace: namespace)
-            dpopKeyPair = newKeyPair
-            dpopNonces = [:] // Clear all nonces when generating a new key pair
-            LogManager.logInfo("Regenerated DPoP key pair and cleared all nonces")
-            // Optionally publish an event
-            Task {
-                await EventBus.shared.publish(.customEvent(name: "DPoPKeyRegenerated", data: "DPoP key pair regenerated and nonces cleared"))
-            }
-        } catch {
-            LogManager.logError("Failed to regenerate DPoP key pair: \(error)")
-            Task {
-                await EventBus.shared.publish(.oauthFlowFailed(error))
-            }
-        }
-    }
 
     private func getOrCreateDPoPKeyPair() throws -> P256.Signing.PrivateKey {
         if let existingKeyPair = dpopKeyPair {
@@ -907,48 +912,55 @@ actor OAuthManager {
             LogManager.logError("OAuthManager - No DPoP key pair available")
             throw OAuthError.noDPoPKeyPair
         }
-
+        
         let jwk = try createJWK(from: privateKey)
-
+        
         let header = DefaultJWSHeaderImpl(
             algorithm: .ES256,
             jwk: jwk,
             type: "dpop+jwt"
         )
-
+        
+        // Basic payload - always include these
         var payload: [String: Any] = [
             "jti": UUID().uuidString,
             "htm": httpMethod,
             "htu": url,
-            "iat": Int(Date().timeIntervalSince1970),
+            "iat": Int(Date().timeIntervalSince1970)
         ]
-
+        
+        // Add nonce if available
         if let domain = URL(string: url)?.host?.lowercased(),
-           let nonce = dpopNonces[domain]
-        {
+           let nonce = dpopNonces[domain] {
             payload["nonce"] = nonce
             LogManager.logInfo("Including nonce in DPoP proof for domain \(domain): \(nonce)")
-        } else {
-            LogManager.logError("No nonce available for DPoP proof for domain: \(URL(string: url)?.host?.lowercased() ?? "unknown")")
         }
-
-        // Include additional claims if provided
+        
+        // Only include 'ath' claim for resource requests, not auth-related endpoints
         if let additional = additionalClaims {
+            let isAuthEndpoint = url.contains("/oauth/") ||
+            url.contains("/.well-known/oauth-authorization-server") ||
+            url.contains("/.well-known/oauth-protected-resource")
+            
             for (key, value) in additional {
+                if key == "ath" && isAuthEndpoint {
+                    LogManager.logDebug("Skipping ath claim for auth endpoint")
+                    continue
+                }
                 payload[key] = value
             }
         }
-
+        
         let jws = try JWS(
-            payload: JSONSerialization.data(withJSONObject: payload),
+            payload: try JSONSerialization.data(withJSONObject: payload),
             protectedHeader: header,
             key: privateKey
         )
-
+        
         LogManager.logDebug("OAuthManager - Created DPoP proof for \(httpMethod) \(url)")
         return jws.compactSerialization
     }
-
+    
     func generateDPoPProof(for httpMethod: String, url: String, accessToken: String? = nil) throws -> String {
         var additionalClaims: [String: Any] = [:]
 
@@ -1072,17 +1084,31 @@ actor OAuthManager {
     // MARK: - Helper Structures
 
     struct PARResponse: Codable {
-        let request_uri: String
-        let expires_in: Int
+        let requestURI: String
+        let expiresIn: Int
+        
+        enum CodingKeys: String, CodingKey {
+            case requestURI = "request_uri"
+            case expiresIn = "expires_in"
+        }
     }
 
     struct TokenResponse: Codable {
-        let access_token: String
-        let token_type: String
-        let expires_in: Int
-        let refresh_token: String
+        let accessToken: String
+        let tokenType: String
+        let expiresIn: Int
+        let refreshToken: String
         let scope: String
         let sub: String?
+        
+        enum CodingKeys: String, CodingKey {
+            case accessToken = "access_token"
+            case tokenType = "token_type"
+            case expiresIn = "expires_in"
+            case refreshToken = "refresh_token"
+            case scope = "scope"
+            case sub = "sub"
+        }
     }
 
     // MARK: - ProtectedResourceMetadata Structure

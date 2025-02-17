@@ -72,7 +72,7 @@ actor AuthenticationMiddleware: NetworkMiddleware {
                 isRetrying = true
                 let (retryResponse, retryData) = try await authenticationService.handleUnauthorizedResponse(response, data: data, for: request)
                 isRetrying = false
-                return (retryResponse, retryData)
+                return (retryData, retryResponse)
             } catch {
                 isRetrying = false
                 throw error
