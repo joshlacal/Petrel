@@ -33,9 +33,7 @@ actor ConfigurationManager: ConfigurationManaging {
     // MARK: - Properties
 
     private var isUpdating = false
-
     private let namespace: String
-
     private(set) var baseURL: URL
     private var pdsURL: URL?
     private var did: String?
@@ -51,33 +49,14 @@ actor ConfigurationManager: ConfigurationManaging {
         self.baseURL = baseURL
         LogManager.logDebug("ConfigurationManager initialized with baseURL: \(baseURL), namespace: \(namespace)")
         await loadSettings()
-//            await subscribeToEvents()
-//            await markInitializationComplete()
     }
 
     // MARK: - Event Subscription
-
-    // ConfigurationManager.swift
 
     private func subscribeToEvents() async {
         let eventStream = await EventBus.shared.subscribe()
         for await event in eventStream {
             switch event {
-//            case .baseURLUpdated(let newURL):
-//                await updateBaseURL(newURL)
-//            case .pdsURLResolved(let url):
-//                await updatePDSURL(url)
-//            case .didResolved(let did):
-//                await updateDID(did: did)
-//            case .handleResolved(let handle):
-//                await updateHandle(handle)
-//            case .userConfigurationUpdated(let did, let handle, let serviceEndpoint):
-//                // Handle user configuration update if needed
-//                LogManager.logInfo("ConfigurationManager - User configuration updated with DID: \(did), Handle: \(handle), Service Endpoint: \(serviceEndpoint)")
-//            case .sessionInitialized:
-//                await reloadSettings()
-//            case .sessionExpired:
-//                await clearSettings()
             default:
                 break
             }
@@ -85,8 +64,6 @@ actor ConfigurationManager: ConfigurationManaging {
     }
 
     // MARK: - Configuration Methods
-
-    // ConfigurationManager.swift
 
     func updateUserConfiguration(did: String, handle: String, serviceEndpoint: String) async throws {
         await updateDID(did: did)
@@ -105,7 +82,18 @@ actor ConfigurationManager: ConfigurationManaging {
         defer { isUpdating = false }
 
         baseURL = url
-        UserDefaults.standard.set(url.absoluteString, forKey: key("baseURL"))
+        
+        do {
+            try KeychainManager.store(
+                key: key("baseURL"),
+                value: url.absoluteString.data(using: .utf8) ?? Data(),
+                namespace: namespace,
+                accessibility: kSecAttrAccessibleAfterFirstUnlock
+            )
+        } catch {
+            LogManager.logError("ConfigurationManager - Failed to store baseURL in Keychain: \(error)")
+        }
+        
         await EventBus.shared.publish(.baseURLUpdated(url))
     }
 
@@ -114,13 +102,35 @@ actor ConfigurationManager: ConfigurationManaging {
         LogManager.logInfo("ConfigurationManager - Updating PDS URL to: \(url)")
         pdsURL = url
         baseURL = url
-        UserDefaults.standard.set(url.absoluteString, forKey: key("pdsURL"))
+        
+        do {
+            try KeychainManager.store(
+                key: key("pdsURL"),
+                value: url.absoluteString.data(using: .utf8) ?? Data(),
+                namespace: namespace,
+                accessibility: kSecAttrAccessibleAfterFirstUnlock
+            )
+        } catch {
+            LogManager.logError("ConfigurationManager - Failed to store pdsURL in Keychain: \(error)")
+        }
+        
         await EventBus.shared.publish(.pdsURLResolved(url))
     }
 
     func updateDID(did: String) async {
         self.did = did
-        UserDefaults.standard.set(did, forKey: key("did"))
+        
+        do {
+            try KeychainManager.store(
+                key: key("did"),
+                value: did.data(using: .utf8) ?? Data(),
+                namespace: namespace,
+                accessibility: kSecAttrAccessibleAfterFirstUnlock
+            )
+        } catch {
+            LogManager.logError("ConfigurationManager - Failed to store DID in Keychain: \(error)")
+        }
+        
         await EventBus.shared.publish(.didResolved(did: did))
     }
 
@@ -129,44 +139,93 @@ actor ConfigurationManager: ConfigurationManaging {
     /// - Parameter handle: The user's handle.
     func updateHandle(_ handle: String) async {
         self.handle = handle
-        UserDefaults.standard.set(handle, forKey: key("handle"))
+        
+        do {
+            try KeychainManager.store(
+                key: key("handle"),
+                value: handle.data(using: .utf8) ?? Data(),
+                namespace: namespace,
+                accessibility: kSecAttrAccessibleAfterFirstUnlock
+            )
+        } catch {
+            LogManager.logError("ConfigurationManager - Failed to store handle in Keychain: \(error)")
+        }
+        
         await EventBus.shared.publish(.handleResolved(handle: handle))
     }
 
     func setProtectedResourceMetadata(_ metadata: ProtectedResourceMetadata) async {
         LogManager.logInfo("ConfigurationManager - Setting ProtectedResourceMetadata with resource: \(metadata.resource)")
         protectedResourceMetadata = metadata
-        saveMetadata()
+        
+        do {
+            let data = try JSONEncoder().encode(metadata)
+            try KeychainManager.store(
+                key: key("protectedResourceMetadata"),
+                value: data,
+                namespace: namespace,
+                accessibility: kSecAttrAccessibleAfterFirstUnlock
+            )
+            LogManager.logDebug("ConfigurationManager - Saved ProtectedResourceMetadata to Keychain")
+        } catch {
+            LogManager.logError("ConfigurationManager - Failed to store ProtectedResourceMetadata in Keychain: \(error)")
+        }
     }
 
     func setAuthorizationServerMetadata(_ metadata: AuthorizationServerMetadata) async {
         authorizationServerMetadata = metadata
-        saveMetadata()
-//        await EventBus.shared.publish(.authorizationServerMetadataUpdated(metadata))
+        
+        do {
+            let data = try JSONEncoder().encode(metadata)
+            try KeychainManager.store(
+                key: key("authorizationServerMetadata"),
+                value: data,
+                namespace: namespace,
+                accessibility: kSecAttrAccessibleAfterFirstUnlock
+            )
+            LogManager.logDebug("ConfigurationManager - Saved AuthorizationServerMetadata to Keychain")
+        } catch {
+            LogManager.logError("ConfigurationManager - Failed to store AuthorizationServerMetadata in Keychain: \(error)")
+        }
     }
 
     func setCurrentAuthorizationServer(_ url: URL) async {
         currentAuthorizationServer = url
-        UserDefaults.standard.set(url.absoluteString, forKey: key("currentAuthorizationServer"))
-//        await EventBus.shared.publish(.currentAuthorizationServerUpdated(url))
+        
+        do {
+            try KeychainManager.store(
+                key: key("currentAuthorizationServer"),
+                value: url.absoluteString.data(using: .utf8) ?? Data(),
+                namespace: namespace,
+                accessibility: kSecAttrAccessibleAfterFirstUnlock
+            )
+        } catch {
+            LogManager.logError("ConfigurationManager - Failed to store currentAuthorizationServer in Keychain: \(error)")
+        }
     }
 
     // MARK: - Helper Methods
 
     private func reloadSettings() async {
         await loadSettings()
-//        await EventBus.shared.publish(.configurationReloaded)
     }
 
     private func clearSettings() async {
         // Clear all stored settings
-        UserDefaults.standard.removeObject(forKey: key("baseURL"))
-        UserDefaults.standard.removeObject(forKey: key("did"))
-        UserDefaults.standard.removeObject(forKey: key("handle"))
-        UserDefaults.standard.removeObject(forKey: key("pdsURL"))
-        UserDefaults.standard.removeObject(forKey: key("currentAuthorizationServer"))
-        UserDefaults.standard.removeObject(forKey: key("protectedResourceMetadata"))
-        UserDefaults.standard.removeObject(forKey: key("authorizationServerMetadata"))
+        do {
+            // Delete all keychain items
+            try KeychainManager.delete(key: key("baseURL"), namespace: namespace)
+            try KeychainManager.delete(key: key("did"), namespace: namespace)
+            try KeychainManager.delete(key: key("handle"), namespace: namespace)
+            try KeychainManager.delete(key: key("pdsURL"), namespace: namespace)
+            try KeychainManager.delete(key: key("currentAuthorizationServer"), namespace: namespace)
+            try KeychainManager.delete(key: key("protectedResourceMetadata"), namespace: namespace)
+            try KeychainManager.delete(key: key("authorizationServerMetadata"), namespace: namespace)
+            
+            LogManager.logDebug("ConfigurationManager - Cleared all settings from Keychain")
+        } catch {
+            LogManager.logError("ConfigurationManager - Error clearing settings from Keychain: \(error)")
+        }
 
         // Reset properties
         baseURL = URL(string: "https://bsky.social")! // Set to default URL
@@ -176,8 +235,6 @@ actor ConfigurationManager: ConfigurationManaging {
         protectedResourceMetadata = nil
         authorizationServerMetadata = nil
         currentAuthorizationServer = nil
-
-//        await EventBus.shared.publish(.configurationCleared)
     }
 
     // MARK: - Configuration Methods
@@ -186,62 +243,81 @@ actor ConfigurationManager: ConfigurationManaging {
         return "\(namespace).\(name)"
     }
 
-    // ConfigurationManager.swift
-
     private func loadSettings() async {
-        LogManager.logDebug("ConfigurationManager - Loading settings")
+        LogManager.logDebug("ConfigurationManager - Loading settings from Keychain")
+        
+        // Try to load protected resource metadata first
         if let metadata = await getProtectedResourceMetadata() {
             pdsURL = metadata.resource
             baseURL = metadata.resource
             LogManager.logInfo("ConfigurationManager - Loaded PDS URL from ProtectedResourceMetadata: \(metadata.resource)")
-        } else if let pdsURLString = UserDefaults.standard.string(forKey: key("pdsURL")),
-                  let pdsURL = URL(string: pdsURLString)
-        {
-            self.pdsURL = pdsURL
-            baseURL = pdsURL
-            LogManager.logInfo("ConfigurationManager - Loaded PDS URL from UserDefaults: \(pdsURL)")
         } else {
-            LogManager.logError("ConfigurationManager - No PDS URL found in ProtectedResourceMetadata or UserDefaults")
+            // Try to load PDS URL directly
+            do {
+                let pdsURLData = try KeychainManager.retrieve(key: key("pdsURL"), namespace: namespace)
+                if let pdsURLString = String(data: pdsURLData, encoding: .utf8),
+                   let url = URL(string: pdsURLString) {
+                    pdsURL = url
+                    baseURL = url
+                    LogManager.logInfo("ConfigurationManager - Loaded PDS URL from Keychain: \(url)")
+                }
+            } catch {
+                LogManager.logDebug("ConfigurationManager - No PDS URL found in Keychain: \(error)")
+            }
         }
-
-        did = UserDefaults.standard.string(forKey: key("did"))
-        handle = UserDefaults.standard.string(forKey: key("handle"))
-
-        if let authServerURLString = UserDefaults.standard.string(forKey: key("currentAuthorizationServer")) {
-            currentAuthorizationServer = URL(string: authServerURLString)
-            LogManager.logInfo("ConfigurationManager - Loaded Authorization Server: \(authServerURLString)")
+        
+        // Load DID
+        do {
+            let didData = try KeychainManager.retrieve(key: key("did"), namespace: namespace)
+            did = String(data: didData, encoding: .utf8)
+            LogManager.logDebug("ConfigurationManager - Loaded DID from Keychain: \(did ?? "nil")")
+        } catch {
+            LogManager.logDebug("ConfigurationManager - No DID found in Keychain")
         }
-
+        
+        // Load handle
+        do {
+            let handleData = try KeychainManager.retrieve(key: key("handle"), namespace: namespace)
+            handle = String(data: handleData, encoding: .utf8)
+            LogManager.logDebug("ConfigurationManager - Loaded handle from Keychain: \(handle ?? "nil")")
+        } catch {
+            LogManager.logDebug("ConfigurationManager - No handle found in Keychain")
+        }
+        
+        // Load current authorization server
+        do {
+            let authServerData = try KeychainManager.retrieve(key: key("currentAuthorizationServer"), namespace: namespace)
+            if let authServerString = String(data: authServerData, encoding: .utf8) {
+                currentAuthorizationServer = URL(string: authServerString)
+                LogManager.logInfo("ConfigurationManager - Loaded Authorization Server from Keychain: \(authServerString)")
+            }
+        } catch {
+            LogManager.logDebug("ConfigurationManager - No Authorization Server found in Keychain")
+        }
+        
+        // Load metadata objects
         await loadMetadata()
-
+        
         LogManager.logDebug("ConfigurationManager - Settings loaded. Current state: baseURL: \(baseURL), pdsURL: \(String(describing: pdsURL)), did: \(String(describing: did)), handle: \(String(describing: handle))")
     }
 
     private func loadMetadata() async {
-        if let protectedResourceData = UserDefaults.standard.data(forKey: key("protectedResourceMetadata")),
-           let metadata = try? JSONDecoder().decode(ProtectedResourceMetadata.self, from: protectedResourceData)
-        {
-            protectedResourceMetadata = metadata
-            // Optionally, publish an event if needed
+        // Load protected resource metadata
+        do {
+            let data = try KeychainManager.retrieve(key: key("protectedResourceMetadata"), namespace: namespace)
+            protectedResourceMetadata = try JSONDecoder().decode(ProtectedResourceMetadata.self, from: data)
+            LogManager.logDebug("ConfigurationManager - Loaded ProtectedResourceMetadata from Keychain")
+        } catch {
+            LogManager.logDebug("ConfigurationManager - No ProtectedResourceMetadata found in Keychain: \(error)")
         }
-        if let authServerData = UserDefaults.standard.data(forKey: key("authorizationServerMetadata")),
-           let metadata = try? JSONDecoder().decode(AuthorizationServerMetadata.self, from: authServerData)
-        {
-            authorizationServerMetadata = metadata
-            // Optionally, publish an event if needed
-        }
-    }
-
-    private func saveMetadata() {
-        if let protectedResourceData = try? JSONEncoder().encode(protectedResourceMetadata) {
-            UserDefaults.standard.set(protectedResourceData, forKey: key("protectedResourceMetadata"))
-            LogManager.logDebug("ConfigurationManager - Saved ProtectedResourceMetadata to UserDefaults")
-        } else {
-            LogManager.logError("ConfigurationManager - Failed to encode ProtectedResourceMetadata")
-        }
-
-        if let authServerData = try? JSONEncoder().encode(authorizationServerMetadata) {
-            UserDefaults.standard.set(authServerData, forKey: key("authorizationServerMetadata"))
+        
+        // Load authorization server metadata
+        do {
+            let data = try KeychainManager.retrieve(key: key("authorizationServerMetadata"), namespace: namespace)
+            authorizationServerMetadata = try JSONDecoder().decode(AuthorizationServerMetadata.self, from: data)
+            LogManager.logDebug("ConfigurationManager - Loaded AuthorizationServerMetadata from Keychain")
+        } catch {
+            LogManager.logDebug("ConfigurationManager - No AuthorizationServerMetadata found in Keychain: \(error)")
         }
     }
 
@@ -250,14 +326,19 @@ actor ConfigurationManager: ConfigurationManaging {
             LogManager.logDebug("ConfigurationManager - Returning cached PDS URL: \(pdsURL)")
             return pdsURL
         }
-        if let pdsURLString = UserDefaults.standard.string(forKey: key("pdsURL")),
-           let url = URL(string: pdsURLString)
-        {
-            pdsURL = url
-            LogManager.logDebug("ConfigurationManager - Loaded PDS URL from UserDefaults: \(url)")
-            return url
+        
+        do {
+            let pdsURLData = try KeychainManager.retrieve(key: key("pdsURL"), namespace: namespace)
+            if let pdsURLString = String(data: pdsURLData, encoding: .utf8),
+               let url = URL(string: pdsURLString) {
+                pdsURL = url
+                LogManager.logDebug("ConfigurationManager - Loaded PDS URL from Keychain: \(url)")
+                return url
+            }
+        } catch {
+            LogManager.logError("ConfigurationManager - No PDS URL found in Keychain: \(error)")
         }
-        LogManager.logError("ConfigurationManager - No PDS URL found")
+        
         return nil
     }
 
@@ -266,14 +347,17 @@ actor ConfigurationManager: ConfigurationManaging {
             LogManager.logDebug("ConfigurationManager - Returning cached ProtectedResourceMetadata")
             return metadata
         }
-        if let data = UserDefaults.standard.data(forKey: key("protectedResourceMetadata")),
-           let metadata = try? JSONDecoder().decode(ProtectedResourceMetadata.self, from: data)
-        {
-            LogManager.logDebug("ConfigurationManager - Loaded ProtectedResourceMetadata from UserDefaults")
+        
+        do {
+            let data = try KeychainManager.retrieve(key: key("protectedResourceMetadata"), namespace: namespace)
+            let metadata = try JSONDecoder().decode(ProtectedResourceMetadata.self, from: data)
+            LogManager.logDebug("ConfigurationManager - Loaded ProtectedResourceMetadata from Keychain")
+            protectedResourceMetadata = metadata
             return metadata
+        } catch {
+            LogManager.logDebug("ConfigurationManager - No ProtectedResourceMetadata found in Keychain: \(error)")
+            return nil
         }
-        LogManager.logError("ConfigurationManager - No ProtectedResourceMetadata found")
-        return nil
     }
 
     func getBaseURL() async -> URL {
@@ -281,19 +365,70 @@ actor ConfigurationManager: ConfigurationManaging {
     }
 
     func getHandle() async -> String? {
-        return handle
+        if let handle = handle {
+            return handle
+        }
+        
+        do {
+            let handleData = try KeychainManager.retrieve(key: key("handle"), namespace: namespace)
+            let handleString = String(data: handleData, encoding: .utf8)
+            handle = handleString
+            return handleString
+        } catch {
+            LogManager.logDebug("ConfigurationManager - No handle found in Keychain: \(error)")
+            return nil
+        }
     }
 
     func getDID() async -> String? {
-        return did
+        if let did = did {
+            return did
+        }
+        
+        do {
+            let didData = try KeychainManager.retrieve(key: key("did"), namespace: namespace)
+            let didString = String(data: didData, encoding: .utf8)
+            did = didString
+            return didString
+        } catch {
+            LogManager.logDebug("ConfigurationManager - No DID found in Keychain: \(error)")
+            return nil
+        }
     }
 
     func getAuthorizationServerMetadata() async -> AuthorizationServerMetadata? {
-        return authorizationServerMetadata
+        if let metadata = authorizationServerMetadata {
+            return metadata
+        }
+        
+        do {
+            let data = try KeychainManager.retrieve(key: key("authorizationServerMetadata"), namespace: namespace)
+            let metadata = try JSONDecoder().decode(AuthorizationServerMetadata.self, from: data)
+            authorizationServerMetadata = metadata
+            return metadata
+        } catch {
+            LogManager.logDebug("ConfigurationManager - No AuthorizationServerMetadata found in Keychain: \(error)")
+            return nil
+        }
     }
 
     func getCurrentAuthorizationServer() async -> URL? {
-        return currentAuthorizationServer
+        if let server = currentAuthorizationServer {
+            return server
+        }
+        
+        do {
+            let serverData = try KeychainManager.retrieve(key: key("currentAuthorizationServer"), namespace: namespace)
+            if let serverString = String(data: serverData, encoding: .utf8),
+               let serverURL = URL(string: serverString) {
+                currentAuthorizationServer = serverURL
+                return serverURL
+            }
+        } catch {
+            LogManager.logDebug("ConfigurationManager - No current authorization server found in Keychain: \(error)")
+        }
+        
+        return nil
     }
 }
 

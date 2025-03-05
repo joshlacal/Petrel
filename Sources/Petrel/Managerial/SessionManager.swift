@@ -13,7 +13,6 @@ protocol SessionManaging: Actor {
     func hasValidSession() async -> Bool
     func isUserLoggedIn() async -> Bool
     func initializeIfNeeded() async throws
-//    func clearSession() async throws
 }
 
 // MARK: - SessionManager Actor
@@ -23,6 +22,7 @@ actor SessionManager: SessionManaging {
 
     private let tokenManager: TokenManaging
     private let middlewareService: MiddlewareServicing
+    private let namespace: String
     private var lastSessionCheckTime: Date = .distantPast
     private let sessionCheckInterval: TimeInterval = 5 // 5 seconds
     private(set) var isAuthenticated: Bool = false
@@ -31,13 +31,22 @@ actor SessionManager: SessionManaging {
 
     // MARK: - Initialization
 
-    init(tokenManager: TokenManaging, middlewareService: MiddlewareServicing) async {
+    init(tokenManager: TokenManaging, middlewareService: MiddlewareServicing, namespace: String) async {
         self.tokenManager = tokenManager
         self.middlewareService = middlewareService
-        isAuthenticated = await tokenManager.hasValidTokens()
+        self.namespace = namespace
+        
+        // Load authentication state from Keychain
+        isAuthenticated = await loadAuthenticatedState() ?? false
+        
+        // If we don't have a stored state, check token validity
+        if !isAuthenticated {
+            isAuthenticated = await tokenManager.hasValidTokens()
+            // Save this initial state
+            await setAuthenticatedState(isAuthenticated)
+        }
+        
         startPeriodicTokenCheck()
-
-//            await self.subscribeToEvents()
     }
 
     deinit {
@@ -62,26 +71,6 @@ actor SessionManager: SessionManaging {
         }
     }
 
-    // MARK: - Event Subscription
-
-    private func subscribeToEvents() async {
-        let eventStream = await EventBus.shared.subscribe()
-        for await event in eventStream {
-            switch event {
-//            case .tokensUpdated:
-//                Task { try await self.initializeIfNeeded() }
-//            case .tokenRefreshCompleted(let result):
-//                await self.handleTokenRefreshCompletion(result)
-//            case .authenticationRequired:
-//                await self.setAuthenticatedState(false)
-//            case .networkError(let error):
-//                LogManager.logError("SessionManager - Received networkError event: \(error)")
-            default:
-                break
-            }
-        }
-    }
-
     // MARK: - SessionManaging Protocol Methods
 
     func hasValidSession() async -> Bool {
@@ -95,7 +84,7 @@ actor SessionManager: SessionManaging {
         do {
             let hasValidTokens = await tokenManager.hasValidTokens()
             if !hasValidTokens {
-                // Instead of publishing an event, just return false
+                await setAuthenticatedState(false)
                 return false
             }
             await setAuthenticatedState(true)
@@ -138,18 +127,38 @@ actor SessionManager: SessionManaging {
         }
     }
 
-//    func clearSession() async throws {
-//        try await middlewareService.clearSession()
-//        await EventBus.shared.publish(.sessionExpired)
-//    }
-
     // MARK: - Helper Methods
 
     private func setAuthenticatedState(_ authenticated: Bool) async {
         isAuthenticated = authenticated
-        await MainActor.run {
-            UserDefaults.standard.set(authenticated, forKey: "isAuthenticated")
-            UserDefaults.standard.synchronize()
+        
+        do {
+            // Convert boolean to Data and store in Keychain
+            let data = Data([authenticated ? 1 : 0])
+            try KeychainManager.store(
+                key: "isAuthenticated",
+                value: data,
+                namespace: namespace,
+                accessibility: kSecAttrAccessibleAfterFirstUnlock
+            )
+            LogManager.logDebug("SessionManager - Saved authentication state to Keychain: \(authenticated)")
+        } catch {
+            LogManager.logError("SessionManager - Failed to store authentication state in Keychain: \(error)")
+        }
+    }
+    
+    private func loadAuthenticatedState() async -> Bool? {
+        do {
+            let data = try KeychainManager.retrieve(key: "isAuthenticated", namespace: namespace)
+            if data.count > 0 {
+                let authenticated = data[0] == 1
+                LogManager.logDebug("SessionManager - Loaded authentication state from Keychain: \(authenticated)")
+                return authenticated
+            }
+            return nil
+        } catch {
+            LogManager.logDebug("SessionManager - No authentication state found in Keychain: \(error)")
+            return nil
         }
     }
 

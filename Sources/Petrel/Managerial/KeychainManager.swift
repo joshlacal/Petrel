@@ -20,14 +20,15 @@ enum KeychainManager {
     // MARK: - Generic Data Methods
 
     /// Stores data in the keychain with a specified key and namespace.
-    static func store(key: String, value: Data, namespace: String) throws {
+    static func store(key: String, value: Data, namespace: String,
+                     accessibility: CFString = kSecAttrAccessibleAfterFirstUnlock) throws {
         let namespacedKey = "\(namespace).\(key)"
 
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: namespacedKey,
             kSecValueData as String: value,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked, // Explicitly set accessibility
+            kSecAttrAccessible as String: accessibility,
         ]
 
         // Delete any existing item with the same key
@@ -80,6 +81,16 @@ enum KeychainManager {
 
         LogManager.logDebug("KeychainManager - Successfully retrieved item for key \(namespacedKey).")
         return data
+    }
+    
+    static func storeObject<T: Encodable>(_ object: T, key: String, namespace: String) throws {
+        let data = try JSONEncoder().encode(object)
+        try store(key: key, value: data, namespace: namespace)
+    }
+
+    static func retrieveObject<T: Decodable>(key: String, namespace: String) throws -> T {
+        let data = try retrieve(key: key, namespace: namespace)
+        return try JSONDecoder().decode(T.self, from: data)
     }
 
     /// Deletes data from the keychain for a specified key and namespace.

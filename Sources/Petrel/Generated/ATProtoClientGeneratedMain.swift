@@ -124,7 +124,7 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
         )
         middlewareService = await MiddlewareService(tokenManager: tokenManager)
         sessionManager = await SessionManager(
-            tokenManager: tokenManager, middlewareService: middlewareService
+            tokenManager: tokenManager, middlewareService: middlewareService, namespace: namespace
         )
         let didResolutionService = await DIDResolutionService(networkManager: networkManager)
         authenticationService = await AuthenticationService(
