@@ -1,52 +1,43 @@
 import Foundation
 import ZippyJSON
 
-// lexicon: 1, id: chat.bsky.convo.listConvos
+// lexicon: 1, id: chat.bsky.convo.getConvoAvailability
 
-public enum ChatBskyConvoListConvos {
-    public static let typeIdentifier = "chat.bsky.convo.listConvos"
+public enum ChatBskyConvoGetConvoAvailability {
+    public static let typeIdentifier = "chat.bsky.convo.getConvoAvailability"
     public struct Parameters: Parametrizable {
-        public let limit: Int?
-        public let cursor: String?
-        public let readState: String?
-        public let status: String?
+        public let members: [String]
 
         public init(
-            limit: Int? = nil,
-            cursor: String? = nil,
-            readState: String? = nil,
-            status: String? = nil
+            members: [String]
         ) {
-            self.limit = limit
-            self.cursor = cursor
-            self.readState = readState
-            self.status = status
+            self.members = members
         }
     }
 
     public struct Output: ATProtocolCodable {
-        public let cursor: String?
+        public let canChat: Bool
 
-        public let convos: [ChatBskyConvoDefs.ConvoView]
+        public let convo: ChatBskyConvoDefs.ConvoView?
 
         // Standard public initializer
         public init(
-            cursor: String? = nil,
+            canChat: Bool,
 
-            convos: [ChatBskyConvoDefs.ConvoView]
+            convo: ChatBskyConvoDefs.ConvoView? = nil
 
         ) {
-            self.cursor = cursor
+            self.canChat = canChat
 
-            self.convos = convos
+            self.convo = convo
         }
     }
 }
 
 public extension ATProtoClient.Chat.Bsky.Convo {
-    ///
-    func listConvos(input: ChatBskyConvoListConvos.Parameters) async throws -> (responseCode: Int, data: ChatBskyConvoListConvos.Output?) {
-        let endpoint = "chat.bsky.convo.listConvos"
+    /// Get whether the requester and the other members can chat. If an existing convo is found for these members, it is returned.
+    func getConvoAvailability(input: ChatBskyConvoGetConvoAvailability.Parameters) async throws -> (responseCode: Int, data: ChatBskyConvoGetConvoAvailability.Output?) {
+        let endpoint = "chat.bsky.convo.getConvoAvailability"
 
         let queryItems = input.asQueryItems()
 
@@ -73,7 +64,7 @@ public extension ATProtoClient.Chat.Bsky.Convo {
         // Data decoding and validation
 
         let decoder = ZippyJSONDecoder()
-        let decodedData = try? decoder.decode(ChatBskyConvoListConvos.Output.self, from: responseData)
+        let decodedData = try? decoder.decode(ChatBskyConvoGetConvoAvailability.Output.self, from: responseData)
 
         return (responseCode, decodedData)
     }

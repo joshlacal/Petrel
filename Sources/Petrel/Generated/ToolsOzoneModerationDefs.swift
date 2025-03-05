@@ -1467,12 +1467,12 @@ public struct ToolsOzoneModerationDefs {
 
     public struct ModEventComment: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "tools.ozone.moderation.defs#modEventComment"
-        public let comment: String
+        public let comment: String?
         public let sticky: Bool?
 
         // Standard initializer
         public init(
-            comment: String, sticky: Bool?
+            comment: String?, sticky: Bool?
         ) {
             self.comment = comment
             self.sticky = sticky
@@ -1482,7 +1482,7 @@ public struct ToolsOzoneModerationDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                comment = try container.decode(String.self, forKey: .comment)
+                comment = try container.decodeIfPresent(String.self, forKey: .comment)
 
             } catch {
                 LogManager.logError("Decoding error for property 'comment': \(error)")
@@ -1501,7 +1501,9 @@ public struct ToolsOzoneModerationDefs {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
 
-            try container.encode(comment, forKey: .comment)
+            if let value = comment {
+                try container.encode(value, forKey: .comment)
+            }
 
             if let value = sticky {
                 try container.encode(value, forKey: .sticky)
@@ -1509,7 +1511,11 @@ public struct ToolsOzoneModerationDefs {
         }
 
         public func hash(into hasher: inout Hasher) {
-            hasher.combine(comment)
+            if let value = comment {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
             if let value = sticky {
                 hasher.combine(value)
             } else {
@@ -4644,6 +4650,196 @@ public struct ToolsOzoneModerationDefs {
             case updatedAt
             case createdAt
             case deletedAt
+        }
+    }
+
+    public struct ReporterStats: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "tools.ozone.moderation.defs#reporterStats"
+        public let did: String
+        public let accountReportCount: Int
+        public let recordReportCount: Int
+        public let reportedAccountCount: Int
+        public let reportedRecordCount: Int
+        public let takendownAccountCount: Int
+        public let takendownRecordCount: Int
+        public let labeledAccountCount: Int
+        public let labeledRecordCount: Int
+
+        // Standard initializer
+        public init(
+            did: String, accountReportCount: Int, recordReportCount: Int, reportedAccountCount: Int, reportedRecordCount: Int, takendownAccountCount: Int, takendownRecordCount: Int, labeledAccountCount: Int, labeledRecordCount: Int
+        ) {
+            self.did = did
+            self.accountReportCount = accountReportCount
+            self.recordReportCount = recordReportCount
+            self.reportedAccountCount = reportedAccountCount
+            self.reportedRecordCount = reportedRecordCount
+            self.takendownAccountCount = takendownAccountCount
+            self.takendownRecordCount = takendownRecordCount
+            self.labeledAccountCount = labeledAccountCount
+            self.labeledRecordCount = labeledRecordCount
+        }
+
+        // Codable initializer
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                did = try container.decode(String.self, forKey: .did)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'did': \(error)")
+                throw error
+            }
+            do {
+                accountReportCount = try container.decode(Int.self, forKey: .accountReportCount)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'accountReportCount': \(error)")
+                throw error
+            }
+            do {
+                recordReportCount = try container.decode(Int.self, forKey: .recordReportCount)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'recordReportCount': \(error)")
+                throw error
+            }
+            do {
+                reportedAccountCount = try container.decode(Int.self, forKey: .reportedAccountCount)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'reportedAccountCount': \(error)")
+                throw error
+            }
+            do {
+                reportedRecordCount = try container.decode(Int.self, forKey: .reportedRecordCount)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'reportedRecordCount': \(error)")
+                throw error
+            }
+            do {
+                takendownAccountCount = try container.decode(Int.self, forKey: .takendownAccountCount)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'takendownAccountCount': \(error)")
+                throw error
+            }
+            do {
+                takendownRecordCount = try container.decode(Int.self, forKey: .takendownRecordCount)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'takendownRecordCount': \(error)")
+                throw error
+            }
+            do {
+                labeledAccountCount = try container.decode(Int.self, forKey: .labeledAccountCount)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'labeledAccountCount': \(error)")
+                throw error
+            }
+            do {
+                labeledRecordCount = try container.decode(Int.self, forKey: .labeledRecordCount)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'labeledRecordCount': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+
+            try container.encode(did, forKey: .did)
+
+            try container.encode(accountReportCount, forKey: .accountReportCount)
+
+            try container.encode(recordReportCount, forKey: .recordReportCount)
+
+            try container.encode(reportedAccountCount, forKey: .reportedAccountCount)
+
+            try container.encode(reportedRecordCount, forKey: .reportedRecordCount)
+
+            try container.encode(takendownAccountCount, forKey: .takendownAccountCount)
+
+            try container.encode(takendownRecordCount, forKey: .takendownRecordCount)
+
+            try container.encode(labeledAccountCount, forKey: .labeledAccountCount)
+
+            try container.encode(labeledRecordCount, forKey: .labeledRecordCount)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(did)
+            hasher.combine(accountReportCount)
+            hasher.combine(recordReportCount)
+            hasher.combine(reportedAccountCount)
+            hasher.combine(reportedRecordCount)
+            hasher.combine(takendownAccountCount)
+            hasher.combine(takendownRecordCount)
+            hasher.combine(labeledAccountCount)
+            hasher.combine(labeledRecordCount)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+
+            if did != other.did {
+                return false
+            }
+
+            if accountReportCount != other.accountReportCount {
+                return false
+            }
+
+            if recordReportCount != other.recordReportCount {
+                return false
+            }
+
+            if reportedAccountCount != other.reportedAccountCount {
+                return false
+            }
+
+            if reportedRecordCount != other.reportedRecordCount {
+                return false
+            }
+
+            if takendownAccountCount != other.takendownAccountCount {
+                return false
+            }
+
+            if takendownRecordCount != other.takendownRecordCount {
+                return false
+            }
+
+            if labeledAccountCount != other.labeledAccountCount {
+                return false
+            }
+
+            if labeledRecordCount != other.labeledRecordCount {
+                return false
+            }
+
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case did
+            case accountReportCount
+            case recordReportCount
+            case reportedAccountCount
+            case reportedRecordCount
+            case takendownAccountCount
+            case takendownRecordCount
+            case labeledAccountCount
+            case labeledRecordCount
         }
     }
 

@@ -35,6 +35,7 @@ public struct ChatBskyConvoGetLog {
 
     public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue {
         case chatBskyConvoDefsLogBeginConvo(ChatBskyConvoDefs.LogBeginConvo)
+        case chatBskyConvoDefsLogAcceptConvo(ChatBskyConvoDefs.LogAcceptConvo)
         case chatBskyConvoDefsLogLeaveConvo(ChatBskyConvoDefs.LogLeaveConvo)
         case chatBskyConvoDefsLogCreateMessage(ChatBskyConvoDefs.LogCreateMessage)
         case chatBskyConvoDefsLogDeleteMessage(ChatBskyConvoDefs.LogDeleteMessage)
@@ -48,6 +49,9 @@ public struct ChatBskyConvoGetLog {
             case "chat.bsky.convo.defs#logBeginConvo":
                 let value = try ChatBskyConvoDefs.LogBeginConvo(from: decoder)
                 self = .chatBskyConvoDefsLogBeginConvo(value)
+            case "chat.bsky.convo.defs#logAcceptConvo":
+                let value = try ChatBskyConvoDefs.LogAcceptConvo(from: decoder)
+                self = .chatBskyConvoDefsLogAcceptConvo(value)
             case "chat.bsky.convo.defs#logLeaveConvo":
                 let value = try ChatBskyConvoDefs.LogLeaveConvo(from: decoder)
                 self = .chatBskyConvoDefsLogLeaveConvo(value)
@@ -70,6 +74,9 @@ public struct ChatBskyConvoGetLog {
             case let .chatBskyConvoDefsLogBeginConvo(value):
                 try container.encode("chat.bsky.convo.defs#logBeginConvo", forKey: .type)
                 try value.encode(to: encoder)
+            case let .chatBskyConvoDefsLogAcceptConvo(value):
+                try container.encode("chat.bsky.convo.defs#logAcceptConvo", forKey: .type)
+                try value.encode(to: encoder)
             case let .chatBskyConvoDefsLogLeaveConvo(value):
                 try container.encode("chat.bsky.convo.defs#logLeaveConvo", forKey: .type)
                 try value.encode(to: encoder)
@@ -88,6 +95,9 @@ public struct ChatBskyConvoGetLog {
             switch self {
             case let .chatBskyConvoDefsLogBeginConvo(value):
                 hasher.combine("chat.bsky.convo.defs#logBeginConvo")
+                hasher.combine(value)
+            case let .chatBskyConvoDefsLogAcceptConvo(value):
+                hasher.combine("chat.bsky.convo.defs#logAcceptConvo")
                 hasher.combine(value)
             case let .chatBskyConvoDefsLogLeaveConvo(value):
                 hasher.combine("chat.bsky.convo.defs#logLeaveConvo")
@@ -115,6 +125,11 @@ public struct ChatBskyConvoGetLog {
             case let (
                 .chatBskyConvoDefsLogBeginConvo(selfValue),
                 .chatBskyConvoDefsLogBeginConvo(otherValue)
+            ):
+                return selfValue == otherValue
+            case let (
+                .chatBskyConvoDefsLogAcceptConvo(selfValue),
+                .chatBskyConvoDefsLogAcceptConvo(otherValue)
             ):
                 return selfValue == otherValue
             case let (

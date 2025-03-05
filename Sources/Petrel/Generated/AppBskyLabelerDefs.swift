@@ -190,10 +190,13 @@ public enum AppBskyLabelerDefs {
         public let viewer: LabelerViewerState?
         public let indexedAt: ATProtocolDate
         public let labels: [ComAtprotoLabelDefs.Label]?
+        public let reasonTypes: [ComAtprotoModerationDefs.ReasonType]?
+        public let subjectTypes: [ComAtprotoModerationDefs.SubjectType]?
+        public let subjectCollections: [String]?
 
         // Standard initializer
         public init(
-            uri: ATProtocolURI, cid: String, creator: AppBskyActorDefs.ProfileView, policies: AppBskyLabelerDefs.LabelerPolicies, likeCount: Int?, viewer: LabelerViewerState?, indexedAt: ATProtocolDate, labels: [ComAtprotoLabelDefs.Label]?
+            uri: ATProtocolURI, cid: String, creator: AppBskyActorDefs.ProfileView, policies: AppBskyLabelerDefs.LabelerPolicies, likeCount: Int?, viewer: LabelerViewerState?, indexedAt: ATProtocolDate, labels: [ComAtprotoLabelDefs.Label]?, reasonTypes: [ComAtprotoModerationDefs.ReasonType]?, subjectTypes: [ComAtprotoModerationDefs.SubjectType]?, subjectCollections: [String]?
         ) {
             self.uri = uri
             self.cid = cid
@@ -203,6 +206,9 @@ public enum AppBskyLabelerDefs {
             self.viewer = viewer
             self.indexedAt = indexedAt
             self.labels = labels
+            self.reasonTypes = reasonTypes
+            self.subjectTypes = subjectTypes
+            self.subjectCollections = subjectCollections
         }
 
         // Codable initializer
@@ -264,6 +270,27 @@ public enum AppBskyLabelerDefs {
                 LogManager.logError("Decoding error for property 'labels': \(error)")
                 throw error
             }
+            do {
+                reasonTypes = try container.decodeIfPresent([ComAtprotoModerationDefs.ReasonType].self, forKey: .reasonTypes)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'reasonTypes': \(error)")
+                throw error
+            }
+            do {
+                subjectTypes = try container.decodeIfPresent([ComAtprotoModerationDefs.SubjectType].self, forKey: .subjectTypes)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'subjectTypes': \(error)")
+                throw error
+            }
+            do {
+                subjectCollections = try container.decodeIfPresent([String].self, forKey: .subjectCollections)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'subjectCollections': \(error)")
+                throw error
+            }
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -291,6 +318,18 @@ public enum AppBskyLabelerDefs {
             if let value = labels {
                 try container.encode(value, forKey: .labels)
             }
+
+            if let value = reasonTypes {
+                try container.encode(value, forKey: .reasonTypes)
+            }
+
+            if let value = subjectTypes {
+                try container.encode(value, forKey: .subjectTypes)
+            }
+
+            if let value = subjectCollections {
+                try container.encode(value, forKey: .subjectCollections)
+            }
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -310,6 +349,21 @@ public enum AppBskyLabelerDefs {
             }
             hasher.combine(indexedAt)
             if let value = labels {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = reasonTypes {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = subjectTypes {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = subjectCollections {
                 hasher.combine(value)
             } else {
                 hasher.combine(nil as Int?)
@@ -351,6 +405,18 @@ public enum AppBskyLabelerDefs {
                 return false
             }
 
+            if reasonTypes != other.reasonTypes {
+                return false
+            }
+
+            if subjectTypes != other.subjectTypes {
+                return false
+            }
+
+            if subjectCollections != other.subjectCollections {
+                return false
+            }
+
             return true
         }
 
@@ -368,6 +434,9 @@ public enum AppBskyLabelerDefs {
             case viewer
             case indexedAt
             case labels
+            case reasonTypes
+            case subjectTypes
+            case subjectCollections
         }
     }
 

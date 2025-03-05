@@ -43,6 +43,7 @@ public struct ToolsOzoneModerationEmitEvent {
         case toolsOzoneModerationDefsModEventReverseTakedown(ToolsOzoneModerationDefs.ModEventReverseTakedown)
         case toolsOzoneModerationDefsModEventResolveAppeal(ToolsOzoneModerationDefs.ModEventResolveAppeal)
         case toolsOzoneModerationDefsModEventEmail(ToolsOzoneModerationDefs.ModEventEmail)
+        case toolsOzoneModerationDefsModEventDivert(ToolsOzoneModerationDefs.ModEventDivert)
         case toolsOzoneModerationDefsModEventTag(ToolsOzoneModerationDefs.ModEventTag)
         case toolsOzoneModerationDefsAccountEvent(ToolsOzoneModerationDefs.AccountEvent)
         case toolsOzoneModerationDefsIdentityEvent(ToolsOzoneModerationDefs.IdentityEvent)
@@ -94,6 +95,9 @@ public struct ToolsOzoneModerationEmitEvent {
             case "tools.ozone.moderation.defs#modEventEmail":
                 let value = try ToolsOzoneModerationDefs.ModEventEmail(from: decoder)
                 self = .toolsOzoneModerationDefsModEventEmail(value)
+            case "tools.ozone.moderation.defs#modEventDivert":
+                let value = try ToolsOzoneModerationDefs.ModEventDivert(from: decoder)
+                self = .toolsOzoneModerationDefsModEventDivert(value)
             case "tools.ozone.moderation.defs#modEventTag":
                 let value = try ToolsOzoneModerationDefs.ModEventTag(from: decoder)
                 self = .toolsOzoneModerationDefsModEventTag(value)
@@ -158,6 +162,9 @@ public struct ToolsOzoneModerationEmitEvent {
             case let .toolsOzoneModerationDefsModEventEmail(value):
                 try container.encode("tools.ozone.moderation.defs#modEventEmail", forKey: .type)
                 try value.encode(to: encoder)
+            case let .toolsOzoneModerationDefsModEventDivert(value):
+                try container.encode("tools.ozone.moderation.defs#modEventDivert", forKey: .type)
+                try value.encode(to: encoder)
             case let .toolsOzoneModerationDefsModEventTag(value):
                 try container.encode("tools.ozone.moderation.defs#modEventTag", forKey: .type)
                 try value.encode(to: encoder)
@@ -218,6 +225,9 @@ public struct ToolsOzoneModerationEmitEvent {
                 hasher.combine(value)
             case let .toolsOzoneModerationDefsModEventEmail(value):
                 hasher.combine("tools.ozone.moderation.defs#modEventEmail")
+                hasher.combine(value)
+            case let .toolsOzoneModerationDefsModEventDivert(value):
+                hasher.combine("tools.ozone.moderation.defs#modEventDivert")
                 hasher.combine(value)
             case let .toolsOzoneModerationDefsModEventTag(value):
                 hasher.combine("tools.ozone.moderation.defs#modEventTag")
@@ -311,6 +321,11 @@ public struct ToolsOzoneModerationEmitEvent {
             case let (
                 .toolsOzoneModerationDefsModEventEmail(selfValue),
                 .toolsOzoneModerationDefsModEventEmail(otherValue)
+            ):
+                return selfValue == otherValue
+            case let (
+                .toolsOzoneModerationDefsModEventDivert(selfValue),
+                .toolsOzoneModerationDefsModEventDivert(otherValue)
             ):
                 return selfValue == otherValue
             case let (
@@ -437,6 +452,7 @@ public struct ToolsOzoneModerationEmitEvent {
         case toolsOzoneModerationDefsModEventReverseTakedown(ToolsOzoneModerationDefs.ModEventReverseTakedown)
         case toolsOzoneModerationDefsModEventResolveAppeal(ToolsOzoneModerationDefs.ModEventResolveAppeal)
         case toolsOzoneModerationDefsModEventEmail(ToolsOzoneModerationDefs.ModEventEmail)
+        case toolsOzoneModerationDefsModEventDivert(ToolsOzoneModerationDefs.ModEventDivert)
         case toolsOzoneModerationDefsModEventTag(ToolsOzoneModerationDefs.ModEventTag)
         case toolsOzoneModerationDefsAccountEvent(ToolsOzoneModerationDefs.AccountEvent)
         case toolsOzoneModerationDefsIdentityEvent(ToolsOzoneModerationDefs.IdentityEvent)
@@ -488,6 +504,9 @@ public struct ToolsOzoneModerationEmitEvent {
             case "tools.ozone.moderation.defs#modEventEmail":
                 let value = try ToolsOzoneModerationDefs.ModEventEmail(from: decoder)
                 self = .toolsOzoneModerationDefsModEventEmail(value)
+            case "tools.ozone.moderation.defs#modEventDivert":
+                let value = try ToolsOzoneModerationDefs.ModEventDivert(from: decoder)
+                self = .toolsOzoneModerationDefsModEventDivert(value)
             case "tools.ozone.moderation.defs#modEventTag":
                 let value = try ToolsOzoneModerationDefs.ModEventTag(from: decoder)
                 self = .toolsOzoneModerationDefsModEventTag(value)
@@ -552,6 +571,9 @@ public struct ToolsOzoneModerationEmitEvent {
             case let .toolsOzoneModerationDefsModEventEmail(value):
                 try container.encode("tools.ozone.moderation.defs#modEventEmail", forKey: .type)
                 try value.encode(to: encoder)
+            case let .toolsOzoneModerationDefsModEventDivert(value):
+                try container.encode("tools.ozone.moderation.defs#modEventDivert", forKey: .type)
+                try value.encode(to: encoder)
             case let .toolsOzoneModerationDefsModEventTag(value):
                 try container.encode("tools.ozone.moderation.defs#modEventTag", forKey: .type)
                 try value.encode(to: encoder)
@@ -612,6 +634,9 @@ public struct ToolsOzoneModerationEmitEvent {
                 hasher.combine(value)
             case let .toolsOzoneModerationDefsModEventEmail(value):
                 hasher.combine("tools.ozone.moderation.defs#modEventEmail")
+                hasher.combine(value)
+            case let .toolsOzoneModerationDefsModEventDivert(value):
+                hasher.combine("tools.ozone.moderation.defs#modEventDivert")
                 hasher.combine(value)
             case let .toolsOzoneModerationDefsModEventTag(value):
                 hasher.combine("tools.ozone.moderation.defs#modEventTag")
@@ -705,6 +730,11 @@ public struct ToolsOzoneModerationEmitEvent {
             case let (
                 .toolsOzoneModerationDefsModEventEmail(selfValue),
                 .toolsOzoneModerationDefsModEventEmail(otherValue)
+            ):
+                return selfValue == otherValue
+            case let (
+                .toolsOzoneModerationDefsModEventDivert(selfValue),
+                .toolsOzoneModerationDefsModEventDivert(otherValue)
             ):
                 return selfValue == otherValue
             case let (

@@ -9,18 +9,15 @@ public enum ComAtprotoSyncGetRecord {
         public let did: String
         public let collection: String
         public let rkey: String
-        public let commit: String?
 
         public init(
             did: String,
             collection: String,
-            rkey: String,
-            commit: String? = nil
+            rkey: String
         ) {
             self.did = did
             self.collection = collection
             self.rkey = rkey
-            self.commit = commit
         }
     }
 

@@ -27,4 +27,18 @@ public enum ComAtprotoModerationDefs {
             return rawValue == otherEnum.rawValue
         }
     }
+
+    public enum SubjectType: String, Codable, ATProtocolCodable, ATProtocolValue, CaseIterable {
+        //
+        case account
+        //
+        case record
+        //
+        case chat
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherEnum = other as? SubjectType else { return false }
+            return rawValue == otherEnum.rawValue
+        }
+    }
 }

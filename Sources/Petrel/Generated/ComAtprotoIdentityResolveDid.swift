@@ -1,52 +1,45 @@
 import Foundation
 import ZippyJSON
 
-// lexicon: 1, id: chat.bsky.convo.listConvos
+// lexicon: 1, id: com.atproto.identity.resolveDid
 
-public enum ChatBskyConvoListConvos {
-    public static let typeIdentifier = "chat.bsky.convo.listConvos"
+public enum ComAtprotoIdentityResolveDid {
+    public static let typeIdentifier = "com.atproto.identity.resolveDid"
     public struct Parameters: Parametrizable {
-        public let limit: Int?
-        public let cursor: String?
-        public let readState: String?
-        public let status: String?
+        public let did: String
 
         public init(
-            limit: Int? = nil,
-            cursor: String? = nil,
-            readState: String? = nil,
-            status: String? = nil
+            did: String
         ) {
-            self.limit = limit
-            self.cursor = cursor
-            self.readState = readState
-            self.status = status
+            self.did = did
         }
     }
 
     public struct Output: ATProtocolCodable {
-        public let cursor: String?
-
-        public let convos: [ChatBskyConvoDefs.ConvoView]
+        public let didDoc: DIDDocument
 
         // Standard public initializer
         public init(
-            cursor: String? = nil,
-
-            convos: [ChatBskyConvoDefs.ConvoView]
+            didDoc: DIDDocument
 
         ) {
-            self.cursor = cursor
+            self.didDoc = didDoc
+        }
+    }
 
-            self.convos = convos
+    public enum Error: String, Swift.Error, CustomStringConvertible {
+        case didNotFound = "DidNotFound.The DID resolution process confirmed that there is no current DID."
+        case didDeactivated = "DidDeactivated.The DID previously existed, but has been deactivated."
+        public var description: String {
+            return rawValue
         }
     }
 }
 
-public extension ATProtoClient.Chat.Bsky.Convo {
-    ///
-    func listConvos(input: ChatBskyConvoListConvos.Parameters) async throws -> (responseCode: Int, data: ChatBskyConvoListConvos.Output?) {
-        let endpoint = "chat.bsky.convo.listConvos"
+public extension ATProtoClient.Com.Atproto.Identity {
+    /// Resolves DID to DID document. Does not bi-directionally verify handle.
+    func resolveDid(input: ComAtprotoIdentityResolveDid.Parameters) async throws -> (responseCode: Int, data: ComAtprotoIdentityResolveDid.Output?) {
+        let endpoint = "com.atproto.identity.resolveDid"
 
         let queryItems = input.asQueryItems()
 
@@ -73,7 +66,7 @@ public extension ATProtoClient.Chat.Bsky.Convo {
         // Data decoding and validation
 
         let decoder = ZippyJSONDecoder()
-        let decodedData = try? decoder.decode(ChatBskyConvoListConvos.Output.self, from: responseData)
+        let decodedData = try? decoder.decode(ComAtprotoIdentityResolveDid.Output.self, from: responseData)
 
         return (responseCode, decodedData)
     }

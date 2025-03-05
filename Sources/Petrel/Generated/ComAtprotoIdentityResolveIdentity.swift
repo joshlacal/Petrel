@@ -1,34 +1,26 @@
 import Foundation
 import ZippyJSON
 
-// lexicon: 1, id: com.atproto.identity.resolveHandle
+// lexicon: 1, id: com.atproto.identity.resolveIdentity
 
-public enum ComAtprotoIdentityResolveHandle {
-    public static let typeIdentifier = "com.atproto.identity.resolveHandle"
+public enum ComAtprotoIdentityResolveIdentity {
+    public static let typeIdentifier = "com.atproto.identity.resolveIdentity"
     public struct Parameters: Parametrizable {
-        public let handle: String
+        public let identifier: String
 
         public init(
-            handle: String
+            identifier: String
         ) {
-            self.handle = handle
+            self.identifier = identifier
         }
     }
 
-    public struct Output: ATProtocolCodable {
-        public let did: String
-
-        // Standard public initializer
-        public init(
-            did: String
-
-        ) {
-            self.did = did
-        }
-    }
+    public typealias Output = ComAtprotoIdentityDefs.IdentityInfo
 
     public enum Error: String, Swift.Error, CustomStringConvertible {
         case handleNotFound = "HandleNotFound.The resolution process confirmed that the handle does not resolve to any DID."
+        case didNotFound = "DidNotFound.The DID resolution process confirmed that there is no current DID."
+        case didDeactivated = "DidDeactivated.The DID previously existed, but has been deactivated."
         public var description: String {
             return rawValue
         }
@@ -36,9 +28,9 @@ public enum ComAtprotoIdentityResolveHandle {
 }
 
 public extension ATProtoClient.Com.Atproto.Identity {
-    /// Resolves an atproto handle (hostname) to a DID. Does not necessarily bi-directionally verify against the the DID document.
-    func resolveHandle(input: ComAtprotoIdentityResolveHandle.Parameters) async throws -> (responseCode: Int, data: ComAtprotoIdentityResolveHandle.Output?) {
-        let endpoint = "com.atproto.identity.resolveHandle"
+    /// Resolves an identity (DID or Handle) to a full identity (DID document and verified handle).
+    func resolveIdentity(input: ComAtprotoIdentityResolveIdentity.Parameters) async throws -> (responseCode: Int, data: ComAtprotoIdentityResolveIdentity.Output?) {
+        let endpoint = "com.atproto.identity.resolveIdentity"
 
         let queryItems = input.asQueryItems()
 
@@ -65,7 +57,7 @@ public extension ATProtoClient.Com.Atproto.Identity {
         // Data decoding and validation
 
         let decoder = ZippyJSONDecoder()
-        let decodedData = try? decoder.decode(ComAtprotoIdentityResolveHandle.Output.self, from: responseData)
+        let decodedData = try? decoder.decode(ComAtprotoIdentityResolveIdentity.Output.self, from: responseData)
 
         return (responseCode, decodedData)
     }

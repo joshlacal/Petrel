@@ -1,48 +1,30 @@
 import Foundation
 import ZippyJSON
 
-// lexicon: 1, id: com.atproto.repo.listRecords
+// lexicon: 1, id: com.atproto.sync.listReposByCollection
 
-public enum ComAtprotoRepoListRecords {
-    public static let typeIdentifier = "com.atproto.repo.listRecords"
+public enum ComAtprotoSyncListReposByCollection {
+    public static let typeIdentifier = "com.atproto.sync.listReposByCollection"
 
-    public struct Record: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "com.atproto.repo.listRecords#record"
-        public let uri: ATProtocolURI
-        public let cid: String
-        public let value: ATProtocolValueContainer
+    public struct Repo: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "com.atproto.sync.listReposByCollection#repo"
+        public let did: String
 
         // Standard initializer
         public init(
-            uri: ATProtocolURI, cid: String, value: ATProtocolValueContainer
+            did: String
         ) {
-            self.uri = uri
-            self.cid = cid
-            self.value = value
+            self.did = did
         }
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+                did = try container.decode(String.self, forKey: .did)
 
             } catch {
-                LogManager.logError("Decoding error for property 'uri': \(error)")
-                throw error
-            }
-            do {
-                cid = try container.decode(String.self, forKey: .cid)
-
-            } catch {
-                LogManager.logError("Decoding error for property 'cid': \(error)")
-                throw error
-            }
-            do {
-                value = try container.decode(ATProtocolValueContainer.self, forKey: .value)
-
-            } catch {
-                LogManager.logError("Decoding error for property 'value': \(error)")
+                LogManager.logError("Decoding error for property 'did': \(error)")
                 throw error
             }
         }
@@ -51,31 +33,17 @@ public enum ComAtprotoRepoListRecords {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
 
-            try container.encode(uri, forKey: .uri)
-
-            try container.encode(cid, forKey: .cid)
-
-            try container.encode(value, forKey: .value)
+            try container.encode(did, forKey: .did)
         }
 
         public func hash(into hasher: inout Hasher) {
-            hasher.combine(uri)
-            hasher.combine(cid)
-            hasher.combine(value)
+            hasher.combine(did)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
 
-            if uri != other.uri {
-                return false
-            }
-
-            if cid != other.cid {
-                return false
-            }
-
-            if value != other.value {
+            if did != other.did {
                 return false
             }
 
@@ -88,57 +56,49 @@ public enum ComAtprotoRepoListRecords {
 
         private enum CodingKeys: String, CodingKey {
             case typeIdentifier = "$type"
-            case uri
-            case cid
-            case value
+            case did
         }
     }
 
     public struct Parameters: Parametrizable {
-        public let repo: String
         public let collection: String
         public let limit: Int?
         public let cursor: String?
-        public let reverse: Bool?
 
         public init(
-            repo: String,
             collection: String,
             limit: Int? = nil,
-            cursor: String? = nil,
-            reverse: Bool? = nil
+            cursor: String? = nil
         ) {
-            self.repo = repo
             self.collection = collection
             self.limit = limit
             self.cursor = cursor
-            self.reverse = reverse
         }
     }
 
     public struct Output: ATProtocolCodable {
         public let cursor: String?
 
-        public let records: [Record]
+        public let repos: [Repo]
 
         // Standard public initializer
         public init(
             cursor: String? = nil,
 
-            records: [Record]
+            repos: [Repo]
 
         ) {
             self.cursor = cursor
 
-            self.records = records
+            self.repos = repos
         }
     }
 }
 
-public extension ATProtoClient.Com.Atproto.Repo {
-    /// List a range of records in a repository, matching a specific collection. Does not require auth.
-    func listRecords(input: ComAtprotoRepoListRecords.Parameters) async throws -> (responseCode: Int, data: ComAtprotoRepoListRecords.Output?) {
-        let endpoint = "com.atproto.repo.listRecords"
+public extension ATProtoClient.Com.Atproto.Sync {
+    /// Enumerates all the DIDs which have records with the given collection NSID.
+    func listReposByCollection(input: ComAtprotoSyncListReposByCollection.Parameters) async throws -> (responseCode: Int, data: ComAtprotoSyncListReposByCollection.Output?) {
+        let endpoint = "com.atproto.sync.listReposByCollection"
 
         let queryItems = input.asQueryItems()
 
@@ -165,7 +125,7 @@ public extension ATProtoClient.Com.Atproto.Repo {
         // Data decoding and validation
 
         let decoder = ZippyJSONDecoder()
-        let decodedData = try? decoder.decode(ComAtprotoRepoListRecords.Output.self, from: responseData)
+        let decodedData = try? decoder.decode(ComAtprotoSyncListReposByCollection.Output.self, from: responseData)
 
         return (responseCode, decodedData)
     }

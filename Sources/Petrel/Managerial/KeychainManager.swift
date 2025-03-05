@@ -20,8 +20,12 @@ enum KeychainManager {
     // MARK: - Generic Data Methods
 
     /// Stores data in the keychain with a specified key and namespace.
-    static func store(key: String, value: Data, namespace: String,
-                     accessibility: CFString = kSecAttrAccessibleAfterFirstUnlock) throws {
+    static func store(
+        key: String,
+        value: Data,
+        namespace: String,
+        accessibility: CFString = kSecAttrAccessibleAfterFirstUnlock
+    ) throws {
         let namespacedKey = "\(namespace).\(key)"
 
         let query: [String: Any] = [
@@ -82,7 +86,7 @@ enum KeychainManager {
         LogManager.logDebug("KeychainManager - Successfully retrieved item for key \(namespacedKey).")
         return data
     }
-    
+
     static func storeObject<T: Encodable>(_ object: T, key: String, namespace: String) throws {
         let data = try JSONEncoder().encode(object)
         try store(key: key, value: data, namespace: namespace)

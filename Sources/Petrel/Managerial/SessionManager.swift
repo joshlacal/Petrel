@@ -35,17 +35,17 @@ actor SessionManager: SessionManaging {
         self.tokenManager = tokenManager
         self.middlewareService = middlewareService
         self.namespace = namespace
-        
+
         // Load authentication state from Keychain
         isAuthenticated = await loadAuthenticatedState() ?? false
-        
+
         // If we don't have a stored state, check token validity
         if !isAuthenticated {
             isAuthenticated = await tokenManager.hasValidTokens()
             // Save this initial state
             await setAuthenticatedState(isAuthenticated)
         }
-        
+
         startPeriodicTokenCheck()
     }
 
@@ -131,7 +131,7 @@ actor SessionManager: SessionManaging {
 
     private func setAuthenticatedState(_ authenticated: Bool) async {
         isAuthenticated = authenticated
-        
+
         do {
             // Convert boolean to Data and store in Keychain
             let data = Data([authenticated ? 1 : 0])
@@ -146,7 +146,7 @@ actor SessionManager: SessionManaging {
             LogManager.logError("SessionManager - Failed to store authentication state in Keychain: \(error)")
         }
     }
-    
+
     private func loadAuthenticatedState() async -> Bool? {
         do {
             let data = try KeychainManager.retrieve(key: "isAuthenticated", namespace: namespace)

@@ -8,14 +8,23 @@ public struct AppBskyLabelerService: ATProtocolCodable, ATProtocolValue {
     public let policies: AppBskyLabelerDefs.LabelerPolicies
     public let labels: AppBskyLabelerServiceLabelsUnion?
     public let createdAt: ATProtocolDate
+    public let reasonTypes: [ComAtprotoModerationDefs.ReasonType]?
+    public let subjectTypes: [ComAtprotoModerationDefs.SubjectType]?
+    public let subjectCollections: [String]?
 
     // Standard initializer
-    public init(policies: AppBskyLabelerDefs.LabelerPolicies, labels: AppBskyLabelerServiceLabelsUnion?, createdAt: ATProtocolDate) {
+    public init(policies: AppBskyLabelerDefs.LabelerPolicies, labels: AppBskyLabelerServiceLabelsUnion?, createdAt: ATProtocolDate, reasonTypes: [ComAtprotoModerationDefs.ReasonType]?, subjectTypes: [ComAtprotoModerationDefs.SubjectType]?, subjectCollections: [String]?) {
         self.policies = policies
 
         self.labels = labels
 
         self.createdAt = createdAt
+
+        self.reasonTypes = reasonTypes
+
+        self.subjectTypes = subjectTypes
+
+        self.subjectCollections = subjectCollections
     }
 
     // Codable initializer
@@ -27,6 +36,12 @@ public struct AppBskyLabelerService: ATProtocolCodable, ATProtocolValue {
         labels = try container.decodeIfPresent(AppBskyLabelerServiceLabelsUnion.self, forKey: .labels)
 
         createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+
+        reasonTypes = try container.decodeIfPresent([ComAtprotoModerationDefs.ReasonType].self, forKey: .reasonTypes)
+
+        subjectTypes = try container.decodeIfPresent([ComAtprotoModerationDefs.SubjectType].self, forKey: .subjectTypes)
+
+        subjectCollections = try container.decodeIfPresent([String].self, forKey: .subjectCollections)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -41,6 +56,18 @@ public struct AppBskyLabelerService: ATProtocolCodable, ATProtocolValue {
         }
 
         try container.encode(createdAt, forKey: .createdAt)
+
+        if let value = reasonTypes {
+            try container.encode(value, forKey: .reasonTypes)
+        }
+
+        if let value = subjectTypes {
+            try container.encode(value, forKey: .subjectTypes)
+        }
+
+        if let value = subjectCollections {
+            try container.encode(value, forKey: .subjectCollections)
+        }
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -62,6 +89,18 @@ public struct AppBskyLabelerService: ATProtocolCodable, ATProtocolValue {
             return false
         }
 
+        if reasonTypes != other.reasonTypes {
+            return false
+        }
+
+        if subjectTypes != other.subjectTypes {
+            return false
+        }
+
+        if subjectCollections != other.subjectCollections {
+            return false
+        }
+
         return true
     }
 
@@ -73,6 +112,21 @@ public struct AppBskyLabelerService: ATProtocolCodable, ATProtocolValue {
             hasher.combine(nil as Int?) // Placeholder for nil
         }
         hasher.combine(createdAt)
+        if let value = reasonTypes {
+            hasher.combine(value)
+        } else {
+            hasher.combine(nil as Int?) // Placeholder for nil
+        }
+        if let value = subjectTypes {
+            hasher.combine(value)
+        } else {
+            hasher.combine(nil as Int?) // Placeholder for nil
+        }
+        if let value = subjectCollections {
+            hasher.combine(value)
+        } else {
+            hasher.combine(nil as Int?) // Placeholder for nil
+        }
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -80,6 +134,9 @@ public struct AppBskyLabelerService: ATProtocolCodable, ATProtocolValue {
         case policies
         case labels
         case createdAt
+        case reasonTypes
+        case subjectTypes
+        case subjectCollections
     }
 
     public enum AppBskyLabelerServiceLabelsUnion: Codable, ATProtocolCodable, ATProtocolValue {

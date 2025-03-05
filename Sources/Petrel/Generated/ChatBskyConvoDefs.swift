@@ -528,19 +528,19 @@ public struct ChatBskyConvoDefs {
         public let members: [ChatBskyActorDefs.ProfileViewBasic]
         public let lastMessage: ConvoViewLastMessageUnion?
         public let muted: Bool
-        public let opened: Bool?
+        public let status: String?
         public let unreadCount: Int
 
         // Standard initializer
         public init(
-            id: String, rev: String, members: [ChatBskyActorDefs.ProfileViewBasic], lastMessage: ConvoViewLastMessageUnion?, muted: Bool, opened: Bool?, unreadCount: Int
+            id: String, rev: String, members: [ChatBskyActorDefs.ProfileViewBasic], lastMessage: ConvoViewLastMessageUnion?, muted: Bool, status: String?, unreadCount: Int
         ) {
             self.id = id
             self.rev = rev
             self.members = members
             self.lastMessage = lastMessage
             self.muted = muted
-            self.opened = opened
+            self.status = status
             self.unreadCount = unreadCount
         }
 
@@ -583,10 +583,10 @@ public struct ChatBskyConvoDefs {
                 throw error
             }
             do {
-                opened = try container.decodeIfPresent(Bool.self, forKey: .opened)
+                status = try container.decodeIfPresent(String.self, forKey: .status)
 
             } catch {
-                LogManager.logError("Decoding error for property 'opened': \(error)")
+                LogManager.logError("Decoding error for property 'status': \(error)")
                 throw error
             }
             do {
@@ -614,8 +614,8 @@ public struct ChatBskyConvoDefs {
 
             try container.encode(muted, forKey: .muted)
 
-            if let value = opened {
-                try container.encode(value, forKey: .opened)
+            if let value = status {
+                try container.encode(value, forKey: .status)
             }
 
             try container.encode(unreadCount, forKey: .unreadCount)
@@ -631,7 +631,7 @@ public struct ChatBskyConvoDefs {
                 hasher.combine(nil as Int?)
             }
             hasher.combine(muted)
-            if let value = opened {
+            if let value = status {
                 hasher.combine(value)
             } else {
                 hasher.combine(nil as Int?)
@@ -662,7 +662,7 @@ public struct ChatBskyConvoDefs {
                 return false
             }
 
-            if opened != other.opened {
+            if status != other.status {
                 return false
             }
 
@@ -684,7 +684,7 @@ public struct ChatBskyConvoDefs {
             case members
             case lastMessage
             case muted
-            case opened
+            case status
             case unreadCount
         }
     }
@@ -760,8 +760,221 @@ public struct ChatBskyConvoDefs {
         }
     }
 
+    public struct LogAcceptConvo: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "chat.bsky.convo.defs#logAcceptConvo"
+        public let rev: String
+        public let convoId: String
+
+        // Standard initializer
+        public init(
+            rev: String, convoId: String
+        ) {
+            self.rev = rev
+            self.convoId = convoId
+        }
+
+        // Codable initializer
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                rev = try container.decode(String.self, forKey: .rev)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'rev': \(error)")
+                throw error
+            }
+            do {
+                convoId = try container.decode(String.self, forKey: .convoId)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'convoId': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+
+            try container.encode(rev, forKey: .rev)
+
+            try container.encode(convoId, forKey: .convoId)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(rev)
+            hasher.combine(convoId)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+
+            if rev != other.rev {
+                return false
+            }
+
+            if convoId != other.convoId {
+                return false
+            }
+
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case rev
+            case convoId
+        }
+    }
+
     public struct LogLeaveConvo: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#logLeaveConvo"
+        public let rev: String
+        public let convoId: String
+
+        // Standard initializer
+        public init(
+            rev: String, convoId: String
+        ) {
+            self.rev = rev
+            self.convoId = convoId
+        }
+
+        // Codable initializer
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                rev = try container.decode(String.self, forKey: .rev)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'rev': \(error)")
+                throw error
+            }
+            do {
+                convoId = try container.decode(String.self, forKey: .convoId)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'convoId': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+
+            try container.encode(rev, forKey: .rev)
+
+            try container.encode(convoId, forKey: .convoId)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(rev)
+            hasher.combine(convoId)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+
+            if rev != other.rev {
+                return false
+            }
+
+            if convoId != other.convoId {
+                return false
+            }
+
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case rev
+            case convoId
+        }
+    }
+
+    public struct LogMuteConvo: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "chat.bsky.convo.defs#logMuteConvo"
+        public let rev: String
+        public let convoId: String
+
+        // Standard initializer
+        public init(
+            rev: String, convoId: String
+        ) {
+            self.rev = rev
+            self.convoId = convoId
+        }
+
+        // Codable initializer
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                rev = try container.decode(String.self, forKey: .rev)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'rev': \(error)")
+                throw error
+            }
+            do {
+                convoId = try container.decode(String.self, forKey: .convoId)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'convoId': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+
+            try container.encode(rev, forKey: .rev)
+
+            try container.encode(convoId, forKey: .convoId)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(rev)
+            hasher.combine(convoId)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+
+            if rev != other.rev {
+                return false
+            }
+
+            if convoId != other.convoId {
+                return false
+            }
+
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case rev
+            case convoId
+        }
+    }
+
+    public struct LogUnmuteConvo: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "chat.bsky.convo.defs#logUnmuteConvo"
         public let rev: String
         public let convoId: String
 
@@ -953,6 +1166,94 @@ public struct ChatBskyConvoDefs {
             }
             do {
                 message = try container.decode(LogDeleteMessageMessageUnion.self, forKey: .message)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'message': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+
+            try container.encode(rev, forKey: .rev)
+
+            try container.encode(convoId, forKey: .convoId)
+
+            try container.encode(message, forKey: .message)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(rev)
+            hasher.combine(convoId)
+            hasher.combine(message)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+
+            if rev != other.rev {
+                return false
+            }
+
+            if convoId != other.convoId {
+                return false
+            }
+
+            if message != other.message {
+                return false
+            }
+
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case rev
+            case convoId
+            case message
+        }
+    }
+
+    public struct LogReadMessage: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "chat.bsky.convo.defs#logReadMessage"
+        public let rev: String
+        public let convoId: String
+        public let message: LogReadMessageMessageUnion
+
+        // Standard initializer
+        public init(
+            rev: String, convoId: String, message: LogReadMessageMessageUnion
+        ) {
+            self.rev = rev
+            self.convoId = convoId
+            self.message = message
+        }
+
+        // Codable initializer
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                rev = try container.decode(String.self, forKey: .rev)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'rev': \(error)")
+                throw error
+            }
+            do {
+                convoId = try container.decode(String.self, forKey: .convoId)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'convoId': \(error)")
+                throw error
+            }
+            do {
+                message = try container.decode(LogReadMessageMessageUnion.self, forKey: .message)
 
             } catch {
                 LogManager.logError("Decoding error for property 'message': \(error)")
@@ -1342,6 +1643,83 @@ public struct ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let otherValue = other as? LogDeleteMessageMessageUnion else { return false }
+
+            switch (self, otherValue) {
+            case let (
+                .chatBskyConvoDefsMessageView(selfValue),
+                .chatBskyConvoDefsMessageView(otherValue)
+            ):
+                return selfValue == otherValue
+            case let (
+                .chatBskyConvoDefsDeletedMessageView(selfValue),
+                .chatBskyConvoDefsDeletedMessageView(otherValue)
+            ):
+                return selfValue == otherValue
+            case let (.unexpected(selfValue), .unexpected(otherValue)):
+                return selfValue.isEqual(to: otherValue)
+            default:
+                return false
+            }
+        }
+    }
+
+    public enum LogReadMessageMessageUnion: Codable, ATProtocolCodable, ATProtocolValue {
+        case chatBskyConvoDefsMessageView(ChatBskyConvoDefs.MessageView)
+        case chatBskyConvoDefsDeletedMessageView(ChatBskyConvoDefs.DeletedMessageView)
+        case unexpected(ATProtocolValueContainer)
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let typeValue = try container.decode(String.self, forKey: .type)
+
+            switch typeValue {
+            case "chat.bsky.convo.defs#messageView":
+                let value = try ChatBskyConvoDefs.MessageView(from: decoder)
+                self = .chatBskyConvoDefsMessageView(value)
+            case "chat.bsky.convo.defs#deletedMessageView":
+                let value = try ChatBskyConvoDefs.DeletedMessageView(from: decoder)
+                self = .chatBskyConvoDefsDeletedMessageView(value)
+            default:
+                let unknownValue = try ATProtocolValueContainer(from: decoder)
+                self = .unexpected(unknownValue)
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            switch self {
+            case let .chatBskyConvoDefsMessageView(value):
+                try container.encode("chat.bsky.convo.defs#messageView", forKey: .type)
+                try value.encode(to: encoder)
+            case let .chatBskyConvoDefsDeletedMessageView(value):
+                try container.encode("chat.bsky.convo.defs#deletedMessageView", forKey: .type)
+                try value.encode(to: encoder)
+            case let .unexpected(ATProtocolValueContainer):
+                try ATProtocolValueContainer.encode(to: encoder)
+            }
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            switch self {
+            case let .chatBskyConvoDefsMessageView(value):
+                hasher.combine("chat.bsky.convo.defs#messageView")
+                hasher.combine(value)
+            case let .chatBskyConvoDefsDeletedMessageView(value):
+                hasher.combine("chat.bsky.convo.defs#deletedMessageView")
+                hasher.combine(value)
+            case let .unexpected(ATProtocolValueContainer):
+                hasher.combine("unexpected")
+                hasher.combine(ATProtocolValueContainer)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case type = "$type"
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? LogReadMessageMessageUnion else { return false }
 
             switch (self, otherValue) {
             case let (

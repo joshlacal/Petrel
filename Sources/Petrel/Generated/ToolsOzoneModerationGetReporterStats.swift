@@ -1,52 +1,37 @@
 import Foundation
 import ZippyJSON
 
-// lexicon: 1, id: chat.bsky.convo.listConvos
+// lexicon: 1, id: tools.ozone.moderation.getReporterStats
 
-public enum ChatBskyConvoListConvos {
-    public static let typeIdentifier = "chat.bsky.convo.listConvos"
+public enum ToolsOzoneModerationGetReporterStats {
+    public static let typeIdentifier = "tools.ozone.moderation.getReporterStats"
     public struct Parameters: Parametrizable {
-        public let limit: Int?
-        public let cursor: String?
-        public let readState: String?
-        public let status: String?
+        public let dids: [String]
 
         public init(
-            limit: Int? = nil,
-            cursor: String? = nil,
-            readState: String? = nil,
-            status: String? = nil
+            dids: [String]
         ) {
-            self.limit = limit
-            self.cursor = cursor
-            self.readState = readState
-            self.status = status
+            self.dids = dids
         }
     }
 
     public struct Output: ATProtocolCodable {
-        public let cursor: String?
-
-        public let convos: [ChatBskyConvoDefs.ConvoView]
+        public let stats: [ToolsOzoneModerationDefs.ReporterStats]
 
         // Standard public initializer
         public init(
-            cursor: String? = nil,
-
-            convos: [ChatBskyConvoDefs.ConvoView]
+            stats: [ToolsOzoneModerationDefs.ReporterStats]
 
         ) {
-            self.cursor = cursor
-
-            self.convos = convos
+            self.stats = stats
         }
     }
 }
 
-public extension ATProtoClient.Chat.Bsky.Convo {
-    ///
-    func listConvos(input: ChatBskyConvoListConvos.Parameters) async throws -> (responseCode: Int, data: ChatBskyConvoListConvos.Output?) {
-        let endpoint = "chat.bsky.convo.listConvos"
+public extension ATProtoClient.Tools.Ozone.Moderation {
+    /// Get reporter stats for a list of users.
+    func getReporterStats(input: ToolsOzoneModerationGetReporterStats.Parameters) async throws -> (responseCode: Int, data: ToolsOzoneModerationGetReporterStats.Output?) {
+        let endpoint = "tools.ozone.moderation.getReporterStats"
 
         let queryItems = input.asQueryItems()
 
@@ -73,7 +58,7 @@ public extension ATProtoClient.Chat.Bsky.Convo {
         // Data decoding and validation
 
         let decoder = ZippyJSONDecoder()
-        let decodedData = try? decoder.decode(ChatBskyConvoListConvos.Output.self, from: responseData)
+        let decodedData = try? decoder.decode(ToolsOzoneModerationGetReporterStats.Output.self, from: responseData)
 
         return (responseCode, decodedData)
     }
