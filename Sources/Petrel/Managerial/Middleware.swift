@@ -8,7 +8,6 @@
 import Foundation
 import os
 
-
 protocol NetworkMiddleware: Actor {
     /// Prepares the request by adding necessary modifications (e.g., authentication headers).
     ///

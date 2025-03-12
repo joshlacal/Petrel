@@ -7,7 +7,6 @@
 
 import Foundation
 
-
 // MARK: - NetworkManaging Protocol
 
 /// Protocol defining the interface for NetworkManager.

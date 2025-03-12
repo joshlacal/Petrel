@@ -10,7 +10,6 @@ import JSONWebKey
 import JSONWebSignature
 import JSONWebToken
 
-
 // MARK: - TokenType Enumeration
 
 public enum TokenType: String, Codable {

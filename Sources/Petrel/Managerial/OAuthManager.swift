@@ -11,7 +11,6 @@ import JSONWebAlgorithms
 import JSONWebKey
 import JSONWebSignature
 
-
 // MARK: - AuthorizationServerMetadata Structure
 
 struct AuthorizationServerMetadata: Codable {
