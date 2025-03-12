@@ -7,7 +7,6 @@
 
 import Foundation
 
-
 // MARK: - DIDResolving Protocol
 
 public protocol DIDResolving: Sendable, AnyObject {

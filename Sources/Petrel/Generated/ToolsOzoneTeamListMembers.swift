@@ -6,17 +6,20 @@ import ZippyJSON
 public enum ToolsOzoneTeamListMembers {
     public static let typeIdentifier = "tools.ozone.team.listMembers"
     public struct Parameters: Parametrizable {
+        public let q: String?
         public let disabled: Bool?
         public let roles: [String]?
         public let limit: Int?
         public let cursor: String?
 
         public init(
+            q: String? = nil,
             disabled: Bool? = nil,
             roles: [String]? = nil,
             limit: Int? = nil,
             cursor: String? = nil
         ) {
+            self.q = q
             self.disabled = disabled
             self.roles = roles
             self.limit = limit

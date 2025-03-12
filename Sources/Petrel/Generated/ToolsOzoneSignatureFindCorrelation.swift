@@ -1,5 +1,5 @@
 import Foundation
-
+import ZippyJSON
 
 // lexicon: 1, id: tools.ozone.signature.findCorrelation
 
