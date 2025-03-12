@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import ZippyJSON
+
 
 // MARK: - DIDResolving Protocol
 
@@ -65,7 +65,7 @@ actor DIDResolutionService: DIDResolving {
 
         // Data decoding and validation
 
-        let decoder = ZippyJSONDecoder()
+        let decoder = JSONDecoder()
         let decodedData = try? decoder.decode(ComAtprotoIdentityResolveHandle.Output.self, from: responseData)
 
         guard responseCode == 200, let did = decodedData?.did else {

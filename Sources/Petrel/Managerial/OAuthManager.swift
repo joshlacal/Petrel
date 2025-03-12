@@ -410,13 +410,13 @@ actor OAuthManager {
 
                 switch httpResponse.statusCode {
                 case 200, 201:
-                    guard let parResponse = try? ZippyJSONDecoder().decode(PARResponse.self, from: data) else {
+                    guard let parResponse = try? JSONDecoder().decode(PARResponse.self, from: data) else {
                         throw OAuthError.authorizationFailed
                     }
                     return parResponse.requestURI
 
                 case 400, 401:
-                    if let errorDetails = try? ZippyJSONDecoder().decode(OAuthErrorResponse.self, from: data) {
+                    if let errorDetails = try? JSONDecoder().decode(OAuthErrorResponse.self, from: data) {
                         switch errorDetails.error {
                         case "use_dpop_nonce":
                             attempt += 1
@@ -523,7 +523,7 @@ actor OAuthManager {
             endpoint: endpoint, method: "GET", headers: [:], body: nil, queryItems: nil
         )
         let (data, _) = try await networkManager.performRequest(request)
-        let metadata = try ZippyJSONDecoder().decode(ProtectedResourceMetadata.self, from: data)
+        let metadata = try JSONDecoder().decode(ProtectedResourceMetadata.self, from: data)
         LogManager.logInfo("OAuthManager - Fetched ProtectedResourceMetadata with resource: \(metadata.resource)")
         await configurationManager.setProtectedResourceMetadata(metadata)
         await networkManager.setProtectedResourceMetadata(metadata)
@@ -536,7 +536,7 @@ actor OAuthManager {
             endpoint: endpoint, method: "GET", headers: [:], body: nil, queryItems: nil
         )
         let (data, _) = try await networkManager.performRequest(request)
-        let metadata = try ZippyJSONDecoder().decode(AuthorizationServerMetadata.self, from: data)
+        let metadata = try JSONDecoder().decode(AuthorizationServerMetadata.self, from: data)
         await configurationManager.setAuthorizationServerMetadata(metadata)
         await configurationManager.setCurrentAuthorizationServer(authServerURL)
         await networkManager.setAuthorizationServerMetadata(metadata)
@@ -651,7 +651,7 @@ actor OAuthManager {
             // Check for HTTP errors
             if !(200 ... 299).contains(httpResponse.statusCode) {
                 // Attempt to decode the error response
-                if let oauthError = try? ZippyJSONDecoder().decode(OAuthErrorResponse.self, from: data) {
+                if let oauthError = try? JSONDecoder().decode(OAuthErrorResponse.self, from: data) {
                     throw NSError(domain: "OAuthError", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "\(oauthError.error): \(oauthError.errorDescription ?? "No description")"])
                 } else {
                     let responseString = String(data: data, encoding: .utf8) ?? "No response body"
@@ -661,7 +661,7 @@ actor OAuthManager {
         }
 
         // Decode the token response
-        let tokenResponse = try ZippyJSONDecoder().decode(TokenResponse.self, from: data)
+        let tokenResponse = try JSONDecoder().decode(TokenResponse.self, from: data)
 
         // Verify the 'sub' claim
         guard let sub = tokenResponse.sub, sub.starts(with: "did:") else {
@@ -733,7 +733,7 @@ actor OAuthManager {
         }
 
         if httpResponse.statusCode == 200 {
-            let tokenResponse = try ZippyJSONDecoder().decode(TokenResponse.self, from: data)
+            let tokenResponse = try JSONDecoder().decode(TokenResponse.self, from: data)
 
             // Verify the 'sub' claim
             guard let sub = tokenResponse.sub, sub.starts(with: "did:") else {
@@ -750,7 +750,7 @@ actor OAuthManager {
 
             return (tokenResponse.accessToken, tokenResponse.refreshToken)
         } else if httpResponse.statusCode == 400 {
-            if let errorResponse = try? ZippyJSONDecoder().decode(OAuthErrorResponse.self, from: data) {
+            if let errorResponse = try? JSONDecoder().decode(OAuthErrorResponse.self, from: data) {
                 LogManager.logError("Token refresh failed: \(errorResponse.error) - \(errorResponse.errorDescription ?? "")")
                 if errorResponse.error == "invalid_grant" {
                     // Token is expired, need to re-authenticate
@@ -1034,7 +1034,7 @@ actor OAuthManager {
         )
         let (data, _) = try await networkManager.performRequest(request)
 
-        let response = try ZippyJSONDecoder().decode(DIDDocument.self, from: data)
+        let response = try JSONDecoder().decode(DIDDocument.self, from: data)
         guard let serviceURLString = response.service.first(where: { $0.type == "AtprotoPersonalDataServer" })?.serviceEndpoint,
               let serviceURL = URL(string: serviceURLString)
         else {
@@ -1057,7 +1057,7 @@ actor OAuthManager {
         let (data, _) = try await networkManager.performRequest(request)
 
         // Decode the DID document from the response data
-        let didDocument = try ZippyJSONDecoder().decode(DIDDocument.self, from: data)
+        let didDocument = try JSONDecoder().decode(DIDDocument.self, from: data)
 
         // Extract the PDS service URL from the array of services
         guard let serviceURLString = didDocument.service.first(where: { $0.type == "AtprotoPersonalDataServer" })?.serviceEndpoint,

@@ -260,7 +260,7 @@ public actor TokenManager: TokenManaging {
         // Extract and store DPoP binding from access token if present
         if let accessJwt = accessJwt,
            let jwt = try? JWT(jwtString: accessJwt),
-           let claims = try? ZippyJSONDecoder().decode(OAuthClaims.self, from: jwt.payload),
+           let claims = try? JSONDecoder().decode(OAuthClaims.self, from: jwt.payload),
            let cnf = claims.cnf,
            let domain = domain
         {
@@ -353,7 +353,7 @@ public actor TokenManager: TokenManaging {
     public func decodeJWT(token: String) async -> OAuthClaims? {
         do {
             let jwt = try JWT(jwtString: token)
-            let claims = try ZippyJSONDecoder().decode(OAuthClaims.self, from: jwt.payload)
+            let claims = try JSONDecoder().decode(OAuthClaims.self, from: jwt.payload)
             LogManager.logDebug("TokenManager - Decoded JWT claims: \(claims)")
             LogManager.logDebug("TokenManager - Token expiration: \(claims.exp?.description ?? "nil"), Current time: \(Date().description)")
             return claims
@@ -433,7 +433,7 @@ public actor TokenManager: TokenManaging {
             // For now, we're not verifying the signature as we don't have the correct key
             // In a production environment, you would verify the signature here
 
-            return try ZippyJSONDecoder().decode(OAuthClaims.self, from: jwt.payload)
+            return try JSONDecoder().decode(OAuthClaims.self, from: jwt.payload)
         } catch {
             LogManager.logError("TokenManager - Failed to verify token: \(error)")
             throw TokenError.verificationFailed(error)
@@ -444,7 +444,7 @@ public actor TokenManager: TokenManaging {
         // For DPoP tokens, we don't verify the signature here.
         // We just decode the claims and check the expiration.
         let jwt = try JWT(jwtString: token)
-        let claims = try ZippyJSONDecoder().decode(OAuthClaims.self, from: jwt.payload)
+        let claims = try JSONDecoder().decode(OAuthClaims.self, from: jwt.payload)
 
         if let exp = claims.exp, exp <= Date() {
             throw TokenError.tokenExpired

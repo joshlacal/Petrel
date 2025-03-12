@@ -137,7 +137,7 @@ public extension ATProtoClient.App.Bsky.Labeler {
 
         // Data decoding and validation
 
-        let decoder = ZippyJSONDecoder()
+        let decoder = JSONDecoder()
         let decodedData = try? decoder.decode(AppBskyLabelerGetServices.Output.self, from: responseData)
 
         return (responseCode, decodedData)

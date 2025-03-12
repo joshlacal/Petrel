@@ -56,7 +56,7 @@ public extension ATProtoClient.Com.Atproto.Identity {
 
         // Data decoding and validation
 
-        let decoder = ZippyJSONDecoder()
+        let decoder = JSONDecoder()
         let decodedData = try? decoder.decode(ComAtprotoIdentityResolveIdentity.Output.self, from: responseData)
 
         return (responseCode, decodedData)

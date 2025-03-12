@@ -73,7 +73,7 @@ public extension ATProtoClient.Tools.Ozone.Communication {
 
         // Data decoding and validation
 
-        let decoder = ZippyJSONDecoder()
+        let decoder = JSONDecoder()
         let decodedData = try? decoder.decode(ToolsOzoneCommunicationUpdateTemplate.Output.self, from: responseData)
 
         return (responseCode, decodedData)

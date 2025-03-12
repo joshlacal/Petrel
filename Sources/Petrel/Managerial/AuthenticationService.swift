@@ -457,7 +457,7 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
         }
 
         // Decode the response
-        let sessionOutput = try ZippyJSONDecoder().decode(
+        let sessionOutput = try JSONDecoder().decode(
             ComAtprotoServerCreateSession.Output.self,
             from: data
         )

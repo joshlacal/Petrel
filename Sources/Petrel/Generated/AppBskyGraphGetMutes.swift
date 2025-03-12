@@ -66,7 +66,7 @@ public extension ATProtoClient.App.Bsky.Graph {
 
         // Data decoding and validation
 
-        let decoder = ZippyJSONDecoder()
+        let decoder = JSONDecoder()
         let decodedData = try? decoder.decode(AppBskyGraphGetMutes.Output.self, from: responseData)
 
         return (responseCode, decodedData)

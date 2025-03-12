@@ -48,7 +48,7 @@ public extension ATProtoClient.App.Bsky.Unspecced {
 
         // Data decoding and validation
 
-        let decoder = ZippyJSONDecoder()
+        let decoder = JSONDecoder()
         let decodedData = try? decoder.decode(AppBskyUnspeccedGetConfig.Output.self, from: responseData)
 
         return (responseCode, decodedData)

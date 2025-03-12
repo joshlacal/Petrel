@@ -72,7 +72,7 @@ public extension ATProtoClient.App.Bsky.Video {
 
         // Data decoding and validation
 
-        let decoder = ZippyJSONDecoder()
+        let decoder = JSONDecoder()
         let decodedData = try? decoder.decode(AppBskyVideoGetUploadLimits.Output.self, from: responseData)
 
         return (responseCode, decodedData)

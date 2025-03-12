@@ -47,7 +47,7 @@ public extension ATProtoClient.App.Bsky.Actor {
 
         // Data decoding and validation
 
-        let decoder = ZippyJSONDecoder()
+        let decoder = JSONDecoder()
         let decodedData = try? decoder.decode(AppBskyActorGetProfile.Output.self, from: responseData)
 
         return (responseCode, decodedData)

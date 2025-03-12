@@ -376,7 +376,7 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
             queryItems: nil
         )
         let (data, _) = try await networkManager.performRequest(request)
-        let didDocument = try ZippyJSONDecoder().decode(DIDDocument.self, from: data)
+        let didDocument = try JSONDecoder().decode(DIDDocument.self, from: data)
 
         guard
             let serviceURLString = didDocument.service.first(where: {

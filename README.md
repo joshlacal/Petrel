@@ -13,14 +13,6 @@ For the most part, there is a 1:1 Lexicon to Swift file translation. Data models
 
 
 
-## Topics
-
-### JSON Decoding
-
-The library takes advantage of ZippyJSON for faster decoding, but can easily be switched out for the Foundation JSONDecoder.
-
-
-
 License
 
 MIT

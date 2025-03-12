@@ -70,7 +70,7 @@ public extension ATProtoClient.Chat.Bsky.Convo {
 
         // Data decoding and validation
 
-        let decoder = ZippyJSONDecoder()
+        let decoder = JSONDecoder()
         let decodedData = try? decoder.decode(ChatBskyConvoLeaveConvo.Output.self, from: responseData)
 
         return (responseCode, decodedData)

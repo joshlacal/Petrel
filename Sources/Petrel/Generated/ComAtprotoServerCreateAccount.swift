@@ -117,7 +117,7 @@ public extension ATProtoClient.Com.Atproto.Server {
 
         // Data decoding and validation
 
-        let decoder = ZippyJSONDecoder()
+        let decoder = JSONDecoder()
         let decodedData = try? decoder.decode(ComAtprotoServerCreateAccount.Output.self, from: responseData)
 
         return (responseCode, decodedData)

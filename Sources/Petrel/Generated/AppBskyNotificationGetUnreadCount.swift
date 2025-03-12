@@ -60,7 +60,7 @@ public extension ATProtoClient.App.Bsky.Notification {
 
         // Data decoding and validation
 
-        let decoder = ZippyJSONDecoder()
+        let decoder = JSONDecoder()
         let decodedData = try? decoder.decode(AppBskyNotificationGetUnreadCount.Output.self, from: responseData)
 
         return (responseCode, decodedData)

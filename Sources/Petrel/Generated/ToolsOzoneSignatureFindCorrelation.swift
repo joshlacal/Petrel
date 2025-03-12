@@ -1,5 +1,5 @@
 import Foundation
-import ZippyJSON
+
 
 // lexicon: 1, id: tools.ozone.signature.findCorrelation
 
@@ -57,7 +57,7 @@ public extension ATProtoClient.Tools.Ozone.Signature {
 
         // Data decoding and validation
 
-        let decoder = ZippyJSONDecoder()
+        let decoder = JSONDecoder()
         let decodedData = try? decoder.decode(ToolsOzoneSignatureFindCorrelation.Output.self, from: responseData)
 
         return (responseCode, decodedData)

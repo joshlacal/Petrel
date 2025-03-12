@@ -75,7 +75,7 @@ public extension ATProtoClient.Tools.Ozone.Set {
 
         // Data decoding and validation
 
-        let decoder = ZippyJSONDecoder()
+        let decoder = JSONDecoder()
         let decodedData = try? decoder.decode(ToolsOzoneSetQuerySets.Output.self, from: responseData)
 
         return (responseCode, decodedData)

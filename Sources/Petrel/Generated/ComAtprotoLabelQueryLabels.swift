@@ -72,7 +72,7 @@ public extension ATProtoClient.Com.Atproto.Label {
 
         // Data decoding and validation
 
-        let decoder = ZippyJSONDecoder()
+        let decoder = JSONDecoder()
         let decodedData = try? decoder.decode(ComAtprotoLabelQueryLabels.Output.self, from: responseData)
 
         return (responseCode, decodedData)

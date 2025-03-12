@@ -30,7 +30,7 @@ extension ATProtoClient.{{ template_namespace_name }} {
 
         // Data decoding and validation
         {% if output_encoding == "application/json" %}
-        let decoder = ZippyJSONDecoder()
+        let decoder = JSONDecoder()
         let decodedData = try? decoder.decode({{ output_type }}.self, from: responseData)
         {% elif output_encoding in ["*/*", "application/vnd.ipld.car", "application/jsonl"] %}
         let decodedData = {{ output_type }}(data: responseData)

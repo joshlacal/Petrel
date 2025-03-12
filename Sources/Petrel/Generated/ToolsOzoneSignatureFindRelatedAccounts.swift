@@ -147,7 +147,7 @@ public extension ATProtoClient.Tools.Ozone.Signature {
 
         // Data decoding and validation
 
-        let decoder = ZippyJSONDecoder()
+        let decoder = JSONDecoder()
         let decodedData = try? decoder.decode(ToolsOzoneSignatureFindRelatedAccounts.Output.self, from: responseData)
 
         return (responseCode, decodedData)

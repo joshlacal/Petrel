@@ -397,7 +397,7 @@ actor NetworkManager: NetworkManaging {
         LogManager.logDebug("NetworkManager - Received response for token refresh with status code: \(response.statusCode)")
 
         if response.statusCode == 200 {
-            let decoder = ZippyJSONDecoder()
+            let decoder = JSONDecoder()
             guard let tokenResponse = try? decoder.decode(ComAtprotoServerRefreshSession.Output.self, from: responseData) else {
                 throw NetworkError.decodingError
             }

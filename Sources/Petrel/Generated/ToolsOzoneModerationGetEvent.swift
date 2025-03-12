@@ -47,7 +47,7 @@ public extension ATProtoClient.Tools.Ozone.Moderation {
 
         // Data decoding and validation
 
-        let decoder = ZippyJSONDecoder()
+        let decoder = JSONDecoder()
         let decodedData = try? decoder.decode(ToolsOzoneModerationGetEvent.Output.self, from: responseData)
 
         return (responseCode, decodedData)
