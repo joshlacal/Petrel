@@ -9,7 +9,7 @@ import Foundation
 import JSONWebKey
 import JSONWebSignature
 import JSONWebToken
-import ZippyJSON
+
 
 // MARK: - TokenType Enumeration
 

@@ -10,7 +10,7 @@ import Foundation
 import JSONWebAlgorithms
 import JSONWebKey
 import JSONWebSignature
-import ZippyJSON
+
 
 // MARK: - AuthorizationServerMetadata Structure
 

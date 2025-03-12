@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import ZippyJSON
 
 protocol TokenRefreshing: Actor {
     func refreshTokenIfNeeded() async throws -> Bool

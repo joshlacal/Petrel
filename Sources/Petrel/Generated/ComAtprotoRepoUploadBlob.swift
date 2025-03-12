@@ -1,5 +1,4 @@
 import Foundation
-import ZippyJSON
 
 #if canImport(UIKit)
     import UIKit

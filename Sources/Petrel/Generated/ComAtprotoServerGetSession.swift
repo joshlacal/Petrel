@@ -1,5 +1,4 @@
 import Foundation
-import ZippyJSON
 
 // lexicon: 1, id: com.atproto.server.getSession
 
