@@ -35,7 +35,7 @@ public struct ComAtprotoAdminUpdateSubjectStatus {
         }
     }
 
-    public enum InputSubjectUnion: Codable, ATProtocolCodable, ATProtocolValue {
+    public enum InputSubjectUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
         case comAtprotoAdminDefsRepoRef(ComAtprotoAdminDefs.RepoRef)
         case comAtprotoRepoStrongRef(ComAtprotoRepoStrongRef)
         case comAtprotoAdminDefsRepoBlobRef(ComAtprotoAdminDefs.RepoBlobRef)
@@ -74,8 +74,8 @@ public struct ComAtprotoAdminUpdateSubjectStatus {
             case let .comAtprotoAdminDefsRepoBlobRef(value):
                 try container.encode("com.atproto.admin.defs#repoBlobRef", forKey: .type)
                 try value.encode(to: encoder)
-            case let .unexpected(ATProtocolValueContainer):
-                try ATProtocolValueContainer.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
             }
         }
 
@@ -90,14 +90,15 @@ public struct ComAtprotoAdminUpdateSubjectStatus {
             case let .comAtprotoAdminDefsRepoBlobRef(value):
                 hasher.combine("com.atproto.admin.defs#repoBlobRef")
                 hasher.combine(value)
-            case let .unexpected(ATProtocolValueContainer):
+            case let .unexpected(container):
                 hasher.combine("unexpected")
-                hasher.combine(ATProtocolValueContainer)
+                hasher.combine(container)
             }
         }
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
+            case rawContent = "_rawContent"
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -127,7 +128,7 @@ public struct ComAtprotoAdminUpdateSubjectStatus {
         }
     }
 
-    public enum OutputSubjectUnion: Codable, ATProtocolCodable, ATProtocolValue {
+    public enum OutputSubjectUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
         case comAtprotoAdminDefsRepoRef(ComAtprotoAdminDefs.RepoRef)
         case comAtprotoRepoStrongRef(ComAtprotoRepoStrongRef)
         case comAtprotoAdminDefsRepoBlobRef(ComAtprotoAdminDefs.RepoBlobRef)
@@ -166,8 +167,8 @@ public struct ComAtprotoAdminUpdateSubjectStatus {
             case let .comAtprotoAdminDefsRepoBlobRef(value):
                 try container.encode("com.atproto.admin.defs#repoBlobRef", forKey: .type)
                 try value.encode(to: encoder)
-            case let .unexpected(ATProtocolValueContainer):
-                try ATProtocolValueContainer.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
             }
         }
 
@@ -182,14 +183,15 @@ public struct ComAtprotoAdminUpdateSubjectStatus {
             case let .comAtprotoAdminDefsRepoBlobRef(value):
                 hasher.combine("com.atproto.admin.defs#repoBlobRef")
                 hasher.combine(value)
-            case let .unexpected(ATProtocolValueContainer):
+            case let .unexpected(container):
                 hasher.combine("unexpected")
-                hasher.combine(ATProtocolValueContainer)
+                hasher.combine(container)
             }
         }
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
+            case rawContent = "_rawContent"
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -219,7 +221,7 @@ public struct ComAtprotoAdminUpdateSubjectStatus {
         }
     }
 
-    public enum ComAtprotoAdminUpdateSubjectStatusSubjectUnion: Codable, ATProtocolCodable, ATProtocolValue {
+    public enum ComAtprotoAdminUpdateSubjectStatusSubjectUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
         case comAtprotoAdminDefsRepoRef(ComAtprotoAdminDefs.RepoRef)
         case comAtprotoRepoStrongRef(ComAtprotoRepoStrongRef)
         case comAtprotoAdminDefsRepoBlobRef(ComAtprotoAdminDefs.RepoBlobRef)
@@ -258,8 +260,8 @@ public struct ComAtprotoAdminUpdateSubjectStatus {
             case let .comAtprotoAdminDefsRepoBlobRef(value):
                 try container.encode("com.atproto.admin.defs#repoBlobRef", forKey: .type)
                 try value.encode(to: encoder)
-            case let .unexpected(ATProtocolValueContainer):
-                try ATProtocolValueContainer.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
             }
         }
 
@@ -274,14 +276,15 @@ public struct ComAtprotoAdminUpdateSubjectStatus {
             case let .comAtprotoAdminDefsRepoBlobRef(value):
                 hasher.combine("com.atproto.admin.defs#repoBlobRef")
                 hasher.combine(value)
-            case let .unexpected(ATProtocolValueContainer):
+            case let .unexpected(container):
                 hasher.combine("unexpected")
-                hasher.combine(ATProtocolValueContainer)
+                hasher.combine(container)
             }
         }
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
+            case rawContent = "_rawContent"
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {

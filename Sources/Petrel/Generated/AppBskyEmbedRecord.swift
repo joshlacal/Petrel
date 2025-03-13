@@ -586,7 +586,7 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-    public enum ViewRecordUnion: Codable, ATProtocolCodable, ATProtocolValue {
+    public enum ViewRecordUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
         case appBskyEmbedRecordViewRecord(AppBskyEmbedRecord.ViewRecord)
         case appBskyEmbedRecordViewNotFound(AppBskyEmbedRecord.ViewNotFound)
         case appBskyEmbedRecordViewBlocked(AppBskyEmbedRecord.ViewBlocked)
@@ -660,8 +660,8 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
             case let .appBskyGraphDefsStarterPackViewBasic(value):
                 try container.encode("app.bsky.graph.defs#starterPackViewBasic", forKey: .type)
                 try value.encode(to: encoder)
-            case let .unexpected(ATProtocolValueContainer):
-                try ATProtocolValueContainer.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
             }
         }
 
@@ -691,14 +691,15 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
             case let .appBskyGraphDefsStarterPackViewBasic(value):
                 hasher.combine("app.bsky.graph.defs#starterPackViewBasic")
                 hasher.combine(value)
-            case let .unexpected(ATProtocolValueContainer):
+            case let .unexpected(container):
                 hasher.combine("unexpected")
-                hasher.combine(ATProtocolValueContainer)
+                hasher.combine(container)
             }
         }
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
+            case rawContent = "_rawContent"
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -753,7 +754,7 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-    public enum ViewRecordEmbedsUnion: Codable, ATProtocolCodable, ATProtocolValue {
+    public enum ViewRecordEmbedsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
         case appBskyEmbedImagesView(AppBskyEmbedImages.View)
         case appBskyEmbedVideoView(AppBskyEmbedVideo.View)
         case appBskyEmbedExternalView(AppBskyEmbedExternal.View)
@@ -806,8 +807,8 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
             case let .appBskyEmbedRecordWithMediaView(value):
                 try container.encode("app.bsky.embed.recordWithMedia#view", forKey: .type)
                 try value.encode(to: encoder)
-            case let .unexpected(ATProtocolValueContainer):
-                try ATProtocolValueContainer.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
             }
         }
 
@@ -828,14 +829,15 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
             case let .appBskyEmbedRecordWithMediaView(value):
                 hasher.combine("app.bsky.embed.recordWithMedia#view")
                 hasher.combine(value)
-            case let .unexpected(ATProtocolValueContainer):
+            case let .unexpected(container):
                 hasher.combine("unexpected")
-                hasher.combine(ATProtocolValueContainer)
+                hasher.combine(container)
             }
         }
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
+            case rawContent = "_rawContent"
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {

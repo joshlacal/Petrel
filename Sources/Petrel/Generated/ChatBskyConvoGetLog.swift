@@ -32,7 +32,7 @@ public struct ChatBskyConvoGetLog {
         }
     }
 
-    public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue {
+    public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
         case chatBskyConvoDefsLogBeginConvo(ChatBskyConvoDefs.LogBeginConvo)
         case chatBskyConvoDefsLogAcceptConvo(ChatBskyConvoDefs.LogAcceptConvo)
         case chatBskyConvoDefsLogLeaveConvo(ChatBskyConvoDefs.LogLeaveConvo)
@@ -85,8 +85,8 @@ public struct ChatBskyConvoGetLog {
             case let .chatBskyConvoDefsLogDeleteMessage(value):
                 try container.encode("chat.bsky.convo.defs#logDeleteMessage", forKey: .type)
                 try value.encode(to: encoder)
-            case let .unexpected(ATProtocolValueContainer):
-                try ATProtocolValueContainer.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
             }
         }
 
@@ -107,14 +107,15 @@ public struct ChatBskyConvoGetLog {
             case let .chatBskyConvoDefsLogDeleteMessage(value):
                 hasher.combine("chat.bsky.convo.defs#logDeleteMessage")
                 hasher.combine(value)
-            case let .unexpected(ATProtocolValueContainer):
+            case let .unexpected(container):
                 hasher.combine("unexpected")
-                hasher.combine(ATProtocolValueContainer)
+                hasher.combine(container)
             }
         }
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
+            case rawContent = "_rawContent"
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {

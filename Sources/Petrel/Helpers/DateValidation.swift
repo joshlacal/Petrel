@@ -2,17 +2,17 @@ import Foundation
 
 public struct ATProtocolDate: Codable, Hashable, Equatable, Sendable {
     public let date: Date
-    
+
     public var toDate: Date { date }
-    
+
     public init(date: Date) {
         self.date = date
     }
-    
+
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
         let dateString = try container.decode(String.self)
-        
+
         // Try parsing with explicit ISO8601 parsing strategy
         if let date = Self.parseDate(from: dateString) {
             self.date = date
@@ -23,14 +23,14 @@ public struct ATProtocolDate: Codable, Hashable, Equatable, Sendable {
             )
         }
     }
-    
+
     public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encode(iso8601String)
     }
-    
+
     // MARK: - Parsing and Formatting
-    
+
     private static func parseDate(from dateString: String) -> Date? {
         // Create a more flexible ISO8601 parsing strategy
         let strategy = Date.ISO8601FormatStyle(
@@ -41,7 +41,7 @@ public struct ATProtocolDate: Codable, Hashable, Equatable, Sendable {
             includingFractionalSeconds: true,
             timeZone: .gmt
         )
-        
+
         // Try parsing with our format style
         do {
             return try strategy.parse(dateString)
@@ -59,7 +59,7 @@ public struct ATProtocolDate: Codable, Hashable, Equatable, Sendable {
             }
         }
     }
-    
+
     private var formattedDate: String {
         // Configure an ISO8601 format style that guarantees millisecond precision
         let formatStyle = Date.ISO8601FormatStyle(
@@ -70,14 +70,14 @@ public struct ATProtocolDate: Codable, Hashable, Equatable, Sendable {
             includingFractionalSeconds: true,
             timeZone: .gmt
         )
-        
+
         // Format date to ISO8601 string with fractional seconds
         var result = formatStyle.format(date)
-        
+
         // Ensure exactly 3 decimal places for milliseconds
         if let dotIndex = result.firstIndex(of: ".") {
             let fractionalPart = result[result.index(after: dotIndex)...]
-            
+
             if let zIndex = fractionalPart.firstIndex(of: "Z") {
                 let digits = fractionalPart.distance(from: fractionalPart.startIndex, to: zIndex)
                 if digits < 3 {
@@ -89,7 +89,7 @@ public struct ATProtocolDate: Codable, Hashable, Equatable, Sendable {
                     // Truncate to millisecond precision
                     let endIndex = result.index(dotIndex, offsetBy: 4) // dot + 3 digits
                     let zIndex = result.lastIndex(of: "Z")!
-                    result.replaceSubrange(endIndex..<zIndex, with: "")
+                    result.replaceSubrange(endIndex ..< zIndex, with: "")
                 }
             }
         } else if result.hasSuffix("Z") {
@@ -97,7 +97,7 @@ public struct ATProtocolDate: Codable, Hashable, Equatable, Sendable {
             let insertIndex = result.index(before: result.endIndex)
             result.insert(contentsOf: ".000", at: insertIndex)
         }
-        
+
         return result
     }
 }
@@ -111,7 +111,7 @@ public extension ATProtocolDate {
         }
         self.init(date: date)
     }
-    
+
     var iso8601String: String {
         formattedDate
     }

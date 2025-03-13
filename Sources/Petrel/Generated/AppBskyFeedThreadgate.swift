@@ -253,7 +253,7 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-    public enum AppBskyFeedThreadgateAllowUnion: Codable, ATProtocolCodable, ATProtocolValue {
+    public enum AppBskyFeedThreadgateAllowUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
         case appBskyFeedThreadgateMentionRule(AppBskyFeedThreadgate.MentionRule)
         case appBskyFeedThreadgateFollowerRule(AppBskyFeedThreadgate.FollowerRule)
         case appBskyFeedThreadgateFollowingRule(AppBskyFeedThreadgate.FollowingRule)
@@ -299,8 +299,8 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
             case let .appBskyFeedThreadgateListRule(value):
                 try container.encode("app.bsky.feed.threadgate#listRule", forKey: .type)
                 try value.encode(to: encoder)
-            case let .unexpected(ATProtocolValueContainer):
-                try ATProtocolValueContainer.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
             }
         }
 
@@ -318,14 +318,15 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
             case let .appBskyFeedThreadgateListRule(value):
                 hasher.combine("app.bsky.feed.threadgate#listRule")
                 hasher.combine(value)
-            case let .unexpected(ATProtocolValueContainer):
+            case let .unexpected(container):
                 hasher.combine("unexpected")
-                hasher.combine(ATProtocolValueContainer)
+                hasher.combine(container)
             }
         }
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
+            case rawContent = "_rawContent"
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {

@@ -2031,7 +2031,7 @@ public struct AppBskyFeedDefs {
         }
     }
 
-    public enum PostViewEmbedUnion: Codable, ATProtocolCodable, ATProtocolValue {
+    public enum PostViewEmbedUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
         case appBskyEmbedImagesView(AppBskyEmbedImages.View)
         case appBskyEmbedVideoView(AppBskyEmbedVideo.View)
         case appBskyEmbedExternalView(AppBskyEmbedExternal.View)
@@ -2084,8 +2084,8 @@ public struct AppBskyFeedDefs {
             case let .appBskyEmbedRecordWithMediaView(value):
                 try container.encode("app.bsky.embed.recordWithMedia#view", forKey: .type)
                 try value.encode(to: encoder)
-            case let .unexpected(ATProtocolValueContainer):
-                try ATProtocolValueContainer.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
             }
         }
 
@@ -2106,14 +2106,15 @@ public struct AppBskyFeedDefs {
             case let .appBskyEmbedRecordWithMediaView(value):
                 hasher.combine("app.bsky.embed.recordWithMedia#view")
                 hasher.combine(value)
-            case let .unexpected(ATProtocolValueContainer):
+            case let .unexpected(container):
                 hasher.combine("unexpected")
-                hasher.combine(ATProtocolValueContainer)
+                hasher.combine(container)
             }
         }
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
+            case rawContent = "_rawContent"
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -2153,7 +2154,7 @@ public struct AppBskyFeedDefs {
         }
     }
 
-    public enum FeedViewPostReasonUnion: Codable, ATProtocolCodable, ATProtocolValue {
+    public enum FeedViewPostReasonUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
         case appBskyFeedDefsReasonRepost(AppBskyFeedDefs.ReasonRepost)
         case appBskyFeedDefsReasonPin(AppBskyFeedDefs.ReasonPin)
         case unexpected(ATProtocolValueContainer)
@@ -2185,8 +2186,8 @@ public struct AppBskyFeedDefs {
             case let .appBskyFeedDefsReasonPin(value):
                 try container.encode("app.bsky.feed.defs#reasonPin", forKey: .type)
                 try value.encode(to: encoder)
-            case let .unexpected(ATProtocolValueContainer):
-                try ATProtocolValueContainer.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
             }
         }
 
@@ -2198,14 +2199,15 @@ public struct AppBskyFeedDefs {
             case let .appBskyFeedDefsReasonPin(value):
                 hasher.combine("app.bsky.feed.defs#reasonPin")
                 hasher.combine(value)
-            case let .unexpected(ATProtocolValueContainer):
+            case let .unexpected(container):
                 hasher.combine("unexpected")
-                hasher.combine(ATProtocolValueContainer)
+                hasher.combine(container)
             }
         }
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
+            case rawContent = "_rawContent"
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -2230,7 +2232,7 @@ public struct AppBskyFeedDefs {
         }
     }
 
-    public enum ReplyRefRootUnion: Codable, ATProtocolCodable, ATProtocolValue {
+    public enum ReplyRefRootUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
         case appBskyFeedDefsPostView(AppBskyFeedDefs.PostView)
         case appBskyFeedDefsNotFoundPost(AppBskyFeedDefs.NotFoundPost)
         case appBskyFeedDefsBlockedPost(AppBskyFeedDefs.BlockedPost)
@@ -2269,8 +2271,8 @@ public struct AppBskyFeedDefs {
             case let .appBskyFeedDefsBlockedPost(value):
                 try container.encode("app.bsky.feed.defs#blockedPost", forKey: .type)
                 try value.encode(to: encoder)
-            case let .unexpected(ATProtocolValueContainer):
-                try ATProtocolValueContainer.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
             }
         }
 
@@ -2285,14 +2287,15 @@ public struct AppBskyFeedDefs {
             case let .appBskyFeedDefsBlockedPost(value):
                 hasher.combine("app.bsky.feed.defs#blockedPost")
                 hasher.combine(value)
-            case let .unexpected(ATProtocolValueContainer):
+            case let .unexpected(container):
                 hasher.combine("unexpected")
-                hasher.combine(ATProtocolValueContainer)
+                hasher.combine(container)
             }
         }
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
+            case rawContent = "_rawContent"
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -2322,7 +2325,7 @@ public struct AppBskyFeedDefs {
         }
     }
 
-    public enum ReplyRefParentUnion: Codable, ATProtocolCodable, ATProtocolValue {
+    public enum ReplyRefParentUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
         case appBskyFeedDefsPostView(AppBskyFeedDefs.PostView)
         case appBskyFeedDefsNotFoundPost(AppBskyFeedDefs.NotFoundPost)
         case appBskyFeedDefsBlockedPost(AppBskyFeedDefs.BlockedPost)
@@ -2361,8 +2364,8 @@ public struct AppBskyFeedDefs {
             case let .appBskyFeedDefsBlockedPost(value):
                 try container.encode("app.bsky.feed.defs#blockedPost", forKey: .type)
                 try value.encode(to: encoder)
-            case let .unexpected(ATProtocolValueContainer):
-                try ATProtocolValueContainer.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
             }
         }
 
@@ -2377,14 +2380,15 @@ public struct AppBskyFeedDefs {
             case let .appBskyFeedDefsBlockedPost(value):
                 hasher.combine("app.bsky.feed.defs#blockedPost")
                 hasher.combine(value)
-            case let .unexpected(ATProtocolValueContainer):
+            case let .unexpected(container):
                 hasher.combine("unexpected")
-                hasher.combine(ATProtocolValueContainer)
+                hasher.combine(container)
             }
         }
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
+            case rawContent = "_rawContent"
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -2414,15 +2418,39 @@ public struct AppBskyFeedDefs {
         }
     }
 
-    public indirect enum ThreadViewPostParentUnion: Codable, ATProtocolCodable, ATProtocolValue {
+    public indirect enum ThreadViewPostParentUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
         case appBskyFeedDefsThreadViewPost(AppBskyFeedDefs.ThreadViewPost)
         case appBskyFeedDefsNotFoundPost(AppBskyFeedDefs.NotFoundPost)
         case appBskyFeedDefsBlockedPost(AppBskyFeedDefs.BlockedPost)
         case unexpected(ATProtocolValueContainer)
 
+        case pending(PendingDecodeData)
+
+        /// Structure to hold data for deferred decoding
+
+        public struct PendingDecodeData: Codable, Sendable {
+            public let rawData: Data
+            public let type: String
+            public let depth: Int
+        }
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
+
+            let depth = decoder.codingPath.count
+
+            // Check if we're at a recursion depth that might cause stack overflow
+            if depth > RecursionGuard.threshold {
+                if RecursionGuard.debugMode {
+                    print("🔄 Deferring deep decode for ThreadViewPostParentUnion at depth \(depth), type: \(typeValue)")
+                }
+
+                // Extract the raw JSON to decode asynchronously later
+                let rawData = try JSONEncoder().encode(container.decode(JSONValue.self, forKey: .rawContent))
+                self = .pending(PendingDecodeData(rawData: rawData, type: typeValue, depth: depth))
+                return
+            }
 
             switch typeValue {
             case "app.bsky.feed.defs#threadViewPost":
@@ -2453,8 +2481,21 @@ public struct AppBskyFeedDefs {
             case let .appBskyFeedDefsBlockedPost(value):
                 try container.encode("app.bsky.feed.defs#blockedPost", forKey: .type)
                 try value.encode(to: encoder)
-            case let .unexpected(ATProtocolValueContainer):
-                try ATProtocolValueContainer.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
+            case let .pending(pendingData):
+                try container.encode(pendingData.type, forKey: .type)
+                if let jsonObject = try? JSONSerialization.jsonObject(with: pendingData.rawData) {
+                    try container.encode(JSONValue(jsonObject), forKey: .rawContent)
+                } else {
+                    throw EncodingError.invalidValue(
+                        pendingData.rawData,
+                        EncodingError.Context(
+                            codingPath: encoder.codingPath,
+                            debugDescription: "Could not encode pending data as JSON"
+                        )
+                    )
+                }
             }
         }
 
@@ -2469,14 +2510,18 @@ public struct AppBskyFeedDefs {
             case let .appBskyFeedDefsBlockedPost(value):
                 hasher.combine("app.bsky.feed.defs#blockedPost")
                 hasher.combine(value)
-            case let .unexpected(ATProtocolValueContainer):
+            case let .unexpected(container):
                 hasher.combine("unexpected")
-                hasher.combine(ATProtocolValueContainer)
+                hasher.combine(container)
+            case let .pending(pendingData):
+                hasher.combine("pending")
+                hasher.combine(pendingData.type)
             }
         }
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
+            case rawContent = "_rawContent"
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -2500,21 +2545,139 @@ public struct AppBskyFeedDefs {
                 return selfValue == otherValue
             case let (.unexpected(selfValue), .unexpected(otherValue)):
                 return selfValue.isEqual(to: otherValue)
+            case let (.pending(selfData), .pending(otherData)):
+                return selfData.type == otherData.type
             default:
                 return false
             }
         }
+
+        /// Property that indicates if this enum contains pending data that needs loading
+        public var hasPendingData: Bool {
+            switch self {
+            case .pending:
+                return true
+            case let .appBskyFeedDefsThreadViewPost(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .appBskyFeedDefsNotFoundPost(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .appBskyFeedDefsBlockedPost(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case .unexpected:
+                return false
+            }
+        }
+
+        /// Attempts to load any pending data in this enum or its children
+        public mutating func loadPendingData() async {
+            switch self {
+            case let .pending(pendingData):
+                do {
+                    switch pendingData.type {
+                    case "app.bsky.feed.defs#threadViewPost":
+                        let value = try await SafeDecoder.decode(
+                            AppBskyFeedDefs.ThreadViewPost.self,
+                            from: pendingData.rawData,
+                            depth: pendingData.depth
+                        )
+                        self = .appBskyFeedDefsThreadViewPost(value)
+                    case "app.bsky.feed.defs#notFoundPost":
+                        let value = try await SafeDecoder.decode(
+                            AppBskyFeedDefs.NotFoundPost.self,
+                            from: pendingData.rawData,
+                            depth: pendingData.depth
+                        )
+                        self = .appBskyFeedDefsNotFoundPost(value)
+                    case "app.bsky.feed.defs#blockedPost":
+                        let value = try await SafeDecoder.decode(
+                            AppBskyFeedDefs.BlockedPost.self,
+                            from: pendingData.rawData,
+                            depth: pendingData.depth
+                        )
+                        self = .appBskyFeedDefsBlockedPost(value)
+                    default:
+                        let unknownValue = ATProtocolValueContainer.string("Unknown type: \(pendingData.type)")
+                        self = .unexpected(unknownValue)
+                    }
+                } catch {
+                    if RecursionGuard.debugMode {
+                        print("❌ Failed to decode pending data for ThreadViewPostParentUnion: \(error)")
+                    }
+                    self = .unexpected(ATProtocolValueContainer.string("Failed to decode: \(error)"))
+                }
+            case var .appBskyFeedDefsThreadViewPost(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyFeedDefs.ThreadViewPost {
+                        self = .appBskyFeedDefsThreadViewPost(updatedValue)
+                    }
+                }
+            case var .appBskyFeedDefsNotFoundPost(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyFeedDefs.NotFoundPost {
+                        self = .appBskyFeedDefsNotFoundPost(updatedValue)
+                    }
+                }
+            case var .appBskyFeedDefsBlockedPost(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyFeedDefs.BlockedPost {
+                        self = .appBskyFeedDefsBlockedPost(updatedValue)
+                    }
+                }
+            case .unexpected:
+                // Nothing to load for unexpected values
+                break
+            }
+        }
     }
 
-    public indirect enum ThreadViewPostRepliesUnion: Codable, ATProtocolCodable, ATProtocolValue {
+    public indirect enum ThreadViewPostRepliesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
         case appBskyFeedDefsThreadViewPost(AppBskyFeedDefs.ThreadViewPost)
         case appBskyFeedDefsNotFoundPost(AppBskyFeedDefs.NotFoundPost)
         case appBskyFeedDefsBlockedPost(AppBskyFeedDefs.BlockedPost)
         case unexpected(ATProtocolValueContainer)
 
+        case pending(PendingDecodeData)
+
+        /// Structure to hold data for deferred decoding
+
+        public struct PendingDecodeData: Codable, Sendable {
+            public let rawData: Data
+            public let type: String
+            public let depth: Int
+        }
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
+
+            let depth = decoder.codingPath.count
+
+            // Check if we're at a recursion depth that might cause stack overflow
+            if depth > RecursionGuard.threshold {
+                if RecursionGuard.debugMode {
+                    print("🔄 Deferring deep decode for ThreadViewPostRepliesUnion at depth \(depth), type: \(typeValue)")
+                }
+
+                // Extract the raw JSON to decode asynchronously later
+                let rawData = try JSONEncoder().encode(container.decode(JSONValue.self, forKey: .rawContent))
+                self = .pending(PendingDecodeData(rawData: rawData, type: typeValue, depth: depth))
+                return
+            }
 
             switch typeValue {
             case "app.bsky.feed.defs#threadViewPost":
@@ -2545,8 +2708,21 @@ public struct AppBskyFeedDefs {
             case let .appBskyFeedDefsBlockedPost(value):
                 try container.encode("app.bsky.feed.defs#blockedPost", forKey: .type)
                 try value.encode(to: encoder)
-            case let .unexpected(ATProtocolValueContainer):
-                try ATProtocolValueContainer.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
+            case let .pending(pendingData):
+                try container.encode(pendingData.type, forKey: .type)
+                if let jsonObject = try? JSONSerialization.jsonObject(with: pendingData.rawData) {
+                    try container.encode(JSONValue(jsonObject), forKey: .rawContent)
+                } else {
+                    throw EncodingError.invalidValue(
+                        pendingData.rawData,
+                        EncodingError.Context(
+                            codingPath: encoder.codingPath,
+                            debugDescription: "Could not encode pending data as JSON"
+                        )
+                    )
+                }
             }
         }
 
@@ -2561,14 +2737,18 @@ public struct AppBskyFeedDefs {
             case let .appBskyFeedDefsBlockedPost(value):
                 hasher.combine("app.bsky.feed.defs#blockedPost")
                 hasher.combine(value)
-            case let .unexpected(ATProtocolValueContainer):
+            case let .unexpected(container):
                 hasher.combine("unexpected")
-                hasher.combine(ATProtocolValueContainer)
+                hasher.combine(container)
+            case let .pending(pendingData):
+                hasher.combine("pending")
+                hasher.combine(pendingData.type)
             }
         }
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
+            case rawContent = "_rawContent"
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -2592,13 +2772,107 @@ public struct AppBskyFeedDefs {
                 return selfValue == otherValue
             case let (.unexpected(selfValue), .unexpected(otherValue)):
                 return selfValue.isEqual(to: otherValue)
+            case let (.pending(selfData), .pending(otherData)):
+                return selfData.type == otherData.type
             default:
                 return false
             }
         }
+
+        /// Property that indicates if this enum contains pending data that needs loading
+        public var hasPendingData: Bool {
+            switch self {
+            case .pending:
+                return true
+            case let .appBskyFeedDefsThreadViewPost(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .appBskyFeedDefsNotFoundPost(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .appBskyFeedDefsBlockedPost(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case .unexpected:
+                return false
+            }
+        }
+
+        /// Attempts to load any pending data in this enum or its children
+        public mutating func loadPendingData() async {
+            switch self {
+            case let .pending(pendingData):
+                do {
+                    switch pendingData.type {
+                    case "app.bsky.feed.defs#threadViewPost":
+                        let value = try await SafeDecoder.decode(
+                            AppBskyFeedDefs.ThreadViewPost.self,
+                            from: pendingData.rawData,
+                            depth: pendingData.depth
+                        )
+                        self = .appBskyFeedDefsThreadViewPost(value)
+                    case "app.bsky.feed.defs#notFoundPost":
+                        let value = try await SafeDecoder.decode(
+                            AppBskyFeedDefs.NotFoundPost.self,
+                            from: pendingData.rawData,
+                            depth: pendingData.depth
+                        )
+                        self = .appBskyFeedDefsNotFoundPost(value)
+                    case "app.bsky.feed.defs#blockedPost":
+                        let value = try await SafeDecoder.decode(
+                            AppBskyFeedDefs.BlockedPost.self,
+                            from: pendingData.rawData,
+                            depth: pendingData.depth
+                        )
+                        self = .appBskyFeedDefsBlockedPost(value)
+                    default:
+                        let unknownValue = ATProtocolValueContainer.string("Unknown type: \(pendingData.type)")
+                        self = .unexpected(unknownValue)
+                    }
+                } catch {
+                    if RecursionGuard.debugMode {
+                        print("❌ Failed to decode pending data for ThreadViewPostRepliesUnion: \(error)")
+                    }
+                    self = .unexpected(ATProtocolValueContainer.string("Failed to decode: \(error)"))
+                }
+            case var .appBskyFeedDefsThreadViewPost(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyFeedDefs.ThreadViewPost {
+                        self = .appBskyFeedDefsThreadViewPost(updatedValue)
+                    }
+                }
+            case var .appBskyFeedDefsNotFoundPost(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyFeedDefs.NotFoundPost {
+                        self = .appBskyFeedDefsNotFoundPost(updatedValue)
+                    }
+                }
+            case var .appBskyFeedDefsBlockedPost(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyFeedDefs.BlockedPost {
+                        self = .appBskyFeedDefsBlockedPost(updatedValue)
+                    }
+                }
+            case .unexpected:
+                // Nothing to load for unexpected values
+                break
+            }
+        }
     }
 
-    public enum SkeletonFeedPostReasonUnion: Codable, ATProtocolCodable, ATProtocolValue {
+    public enum SkeletonFeedPostReasonUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
         case appBskyFeedDefsSkeletonReasonRepost(AppBskyFeedDefs.SkeletonReasonRepost)
         case appBskyFeedDefsSkeletonReasonPin(AppBskyFeedDefs.SkeletonReasonPin)
         case unexpected(ATProtocolValueContainer)
@@ -2630,8 +2904,8 @@ public struct AppBskyFeedDefs {
             case let .appBskyFeedDefsSkeletonReasonPin(value):
                 try container.encode("app.bsky.feed.defs#skeletonReasonPin", forKey: .type)
                 try value.encode(to: encoder)
-            case let .unexpected(ATProtocolValueContainer):
-                try ATProtocolValueContainer.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
             }
         }
 
@@ -2643,14 +2917,15 @@ public struct AppBskyFeedDefs {
             case let .appBskyFeedDefsSkeletonReasonPin(value):
                 hasher.combine("app.bsky.feed.defs#skeletonReasonPin")
                 hasher.combine(value)
-            case let .unexpected(ATProtocolValueContainer):
+            case let .unexpected(container):
                 hasher.combine("unexpected")
-                hasher.combine(ATProtocolValueContainer)
+                hasher.combine(container)
             }
         }
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
+            case rawContent = "_rawContent"
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {

@@ -42,7 +42,7 @@ public struct AppBskyGraphGetRelationships {
         }
     }
 
-    public enum OutputRelationshipsUnion: Codable, ATProtocolCodable, ATProtocolValue {
+    public enum OutputRelationshipsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
         case appBskyGraphDefsRelationship(AppBskyGraphDefs.Relationship)
         case appBskyGraphDefsNotFoundActor(AppBskyGraphDefs.NotFoundActor)
         case unexpected(ATProtocolValueContainer)
@@ -74,8 +74,8 @@ public struct AppBskyGraphGetRelationships {
             case let .appBskyGraphDefsNotFoundActor(value):
                 try container.encode("app.bsky.graph.defs#notFoundActor", forKey: .type)
                 try value.encode(to: encoder)
-            case let .unexpected(ATProtocolValueContainer):
-                try ATProtocolValueContainer.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
             }
         }
 
@@ -87,14 +87,15 @@ public struct AppBskyGraphGetRelationships {
             case let .appBskyGraphDefsNotFoundActor(value):
                 hasher.combine("app.bsky.graph.defs#notFoundActor")
                 hasher.combine(value)
-            case let .unexpected(ATProtocolValueContainer):
+            case let .unexpected(container):
                 hasher.combine("unexpected")
-                hasher.combine(ATProtocolValueContainer)
+                hasher.combine(container)
             }
         }
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
+            case rawContent = "_rawContent"
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {

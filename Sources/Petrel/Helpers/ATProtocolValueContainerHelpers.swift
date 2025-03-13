@@ -8,6 +8,7 @@
 import Foundation
 
 // MARK: Safe Decoding
+
 // Add this protocol to your project to support pending data loading
 public protocol PendingDataLoadable {
     var hasPendingData: Bool { get }
@@ -17,37 +18,37 @@ public protocol PendingDataLoadable {
 // Add this for handling raw JSON
 public struct JSONValue: Codable {
     let value: Any
-    
+
     public init(_ value: Any) {
         self.value = value
     }
-    
+
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
-        
+
         if container.decodeNil() {
-            self.value = NSNull()
+            value = NSNull()
         } else if let bool = try? container.decode(Bool.self) {
-            self.value = bool
+            value = bool
         } else if let int = try? container.decode(Int.self) {
-            self.value = int
+            value = int
         } else if let double = try? container.decode(Double.self) {
-            self.value = double
+            value = double
         } else if let string = try? container.decode(String.self) {
-            self.value = string
+            value = string
         } else if let array = try? container.decode([JSONValue].self) {
-            self.value = array.map { $0.value }
+            value = array.map { $0.value }
         } else if let dict = try? container.decode([String: JSONValue].self) {
-            self.value = dict.mapValues { $0.value }
+            value = dict.mapValues { $0.value }
         } else {
             throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid JSON value")
         }
     }
-    
+
     public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
-        
-        switch self.value {
+
+        switch value {
         case is NSNull:
             try container.encodeNil()
         case let bool as Bool:
@@ -63,14 +64,13 @@ public struct JSONValue: Codable {
         case let dict as [String: Any]:
             try container.encode(dict.mapValues { JSONValue($0) })
         default:
-            throw EncodingError.invalidValue(self.value, EncodingError.Context(
+            throw EncodingError.invalidValue(value, EncodingError.Context(
                 codingPath: encoder.codingPath,
                 debugDescription: "Invalid JSON value"
             ))
         }
     }
 }
-
 
 public extension ATProtocolValueContainer {
     var textRepresentation: String {

@@ -28,7 +28,7 @@ public struct ToolsOzoneModerationEmitEvent {
         }
     }
 
-    public enum InputEventUnion: Codable, ATProtocolCodable, ATProtocolValue {
+    public enum InputEventUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
         case toolsOzoneModerationDefsModEventTakedown(ToolsOzoneModerationDefs.ModEventTakedown)
         case toolsOzoneModerationDefsModEventAcknowledge(ToolsOzoneModerationDefs.ModEventAcknowledge)
         case toolsOzoneModerationDefsModEventEscalate(ToolsOzoneModerationDefs.ModEventEscalate)
@@ -179,8 +179,8 @@ public struct ToolsOzoneModerationEmitEvent {
             case let .toolsOzoneModerationDefsModEventPriorityScore(value):
                 try container.encode("tools.ozone.moderation.defs#modEventPriorityScore", forKey: .type)
                 try value.encode(to: encoder)
-            case let .unexpected(ATProtocolValueContainer):
-                try ATProtocolValueContainer.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
             }
         }
 
@@ -243,14 +243,15 @@ public struct ToolsOzoneModerationEmitEvent {
             case let .toolsOzoneModerationDefsModEventPriorityScore(value):
                 hasher.combine("tools.ozone.moderation.defs#modEventPriorityScore")
                 hasher.combine(value)
-            case let .unexpected(ATProtocolValueContainer):
+            case let .unexpected(container):
                 hasher.combine("unexpected")
-                hasher.combine(ATProtocolValueContainer)
+                hasher.combine(container)
             }
         }
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
+            case rawContent = "_rawContent"
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -360,7 +361,7 @@ public struct ToolsOzoneModerationEmitEvent {
         }
     }
 
-    public enum InputSubjectUnion: Codable, ATProtocolCodable, ATProtocolValue {
+    public enum InputSubjectUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
         case comAtprotoAdminDefsRepoRef(ComAtprotoAdminDefs.RepoRef)
         case comAtprotoRepoStrongRef(ComAtprotoRepoStrongRef)
         case unexpected(ATProtocolValueContainer)
@@ -392,8 +393,8 @@ public struct ToolsOzoneModerationEmitEvent {
             case let .comAtprotoRepoStrongRef(value):
                 try container.encode("com.atproto.repo.strongRef", forKey: .type)
                 try value.encode(to: encoder)
-            case let .unexpected(ATProtocolValueContainer):
-                try ATProtocolValueContainer.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
             }
         }
 
@@ -405,14 +406,15 @@ public struct ToolsOzoneModerationEmitEvent {
             case let .comAtprotoRepoStrongRef(value):
                 hasher.combine("com.atproto.repo.strongRef")
                 hasher.combine(value)
-            case let .unexpected(ATProtocolValueContainer):
+            case let .unexpected(container):
                 hasher.combine("unexpected")
-                hasher.combine(ATProtocolValueContainer)
+                hasher.combine(container)
             }
         }
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
+            case rawContent = "_rawContent"
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -437,7 +439,7 @@ public struct ToolsOzoneModerationEmitEvent {
         }
     }
 
-    public enum ToolsOzoneModerationEmitEventEventUnion: Codable, ATProtocolCodable, ATProtocolValue {
+    public enum ToolsOzoneModerationEmitEventEventUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
         case toolsOzoneModerationDefsModEventTakedown(ToolsOzoneModerationDefs.ModEventTakedown)
         case toolsOzoneModerationDefsModEventAcknowledge(ToolsOzoneModerationDefs.ModEventAcknowledge)
         case toolsOzoneModerationDefsModEventEscalate(ToolsOzoneModerationDefs.ModEventEscalate)
@@ -588,8 +590,8 @@ public struct ToolsOzoneModerationEmitEvent {
             case let .toolsOzoneModerationDefsModEventPriorityScore(value):
                 try container.encode("tools.ozone.moderation.defs#modEventPriorityScore", forKey: .type)
                 try value.encode(to: encoder)
-            case let .unexpected(ATProtocolValueContainer):
-                try ATProtocolValueContainer.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
             }
         }
 
@@ -652,14 +654,15 @@ public struct ToolsOzoneModerationEmitEvent {
             case let .toolsOzoneModerationDefsModEventPriorityScore(value):
                 hasher.combine("tools.ozone.moderation.defs#modEventPriorityScore")
                 hasher.combine(value)
-            case let .unexpected(ATProtocolValueContainer):
+            case let .unexpected(container):
                 hasher.combine("unexpected")
-                hasher.combine(ATProtocolValueContainer)
+                hasher.combine(container)
             }
         }
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
+            case rawContent = "_rawContent"
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -769,7 +772,7 @@ public struct ToolsOzoneModerationEmitEvent {
         }
     }
 
-    public enum ToolsOzoneModerationEmitEventSubjectUnion: Codable, ATProtocolCodable, ATProtocolValue {
+    public enum ToolsOzoneModerationEmitEventSubjectUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
         case comAtprotoAdminDefsRepoRef(ComAtprotoAdminDefs.RepoRef)
         case comAtprotoRepoStrongRef(ComAtprotoRepoStrongRef)
         case unexpected(ATProtocolValueContainer)
@@ -801,8 +804,8 @@ public struct ToolsOzoneModerationEmitEvent {
             case let .comAtprotoRepoStrongRef(value):
                 try container.encode("com.atproto.repo.strongRef", forKey: .type)
                 try value.encode(to: encoder)
-            case let .unexpected(ATProtocolValueContainer):
-                try ATProtocolValueContainer.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
             }
         }
 
@@ -814,14 +817,15 @@ public struct ToolsOzoneModerationEmitEvent {
             case let .comAtprotoRepoStrongRef(value):
                 hasher.combine("com.atproto.repo.strongRef")
                 hasher.combine(value)
-            case let .unexpected(ATProtocolValueContainer):
+            case let .unexpected(container):
                 hasher.combine("unexpected")
-                hasher.combine(ATProtocolValueContainer)
+                hasher.combine(container)
             }
         }
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
+            case rawContent = "_rawContent"
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {

@@ -519,7 +519,7 @@ public struct ComAtprotoRepoApplyWrites {
         }
     }
 
-    public enum InputWritesUnion: Codable, ATProtocolCodable, ATProtocolValue {
+    public enum InputWritesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
         case comAtprotoRepoApplyWritesCreate(ComAtprotoRepoApplyWrites.Create)
         case comAtprotoRepoApplyWritesUpdate(ComAtprotoRepoApplyWrites.Update)
         case comAtprotoRepoApplyWritesDelete(ComAtprotoRepoApplyWrites.Delete)
@@ -558,8 +558,8 @@ public struct ComAtprotoRepoApplyWrites {
             case let .comAtprotoRepoApplyWritesDelete(value):
                 try container.encode("com.atproto.repo.applyWrites#delete", forKey: .type)
                 try value.encode(to: encoder)
-            case let .unexpected(ATProtocolValueContainer):
-                try ATProtocolValueContainer.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
             }
         }
 
@@ -574,14 +574,15 @@ public struct ComAtprotoRepoApplyWrites {
             case let .comAtprotoRepoApplyWritesDelete(value):
                 hasher.combine("com.atproto.repo.applyWrites#delete")
                 hasher.combine(value)
-            case let .unexpected(ATProtocolValueContainer):
+            case let .unexpected(container):
                 hasher.combine("unexpected")
-                hasher.combine(ATProtocolValueContainer)
+                hasher.combine(container)
             }
         }
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
+            case rawContent = "_rawContent"
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -611,7 +612,7 @@ public struct ComAtprotoRepoApplyWrites {
         }
     }
 
-    public enum OutputResultsUnion: Codable, ATProtocolCodable, ATProtocolValue {
+    public enum OutputResultsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
         case comAtprotoRepoApplyWritesCreateResult(ComAtprotoRepoApplyWrites.CreateResult)
         case comAtprotoRepoApplyWritesUpdateResult(ComAtprotoRepoApplyWrites.UpdateResult)
         case comAtprotoRepoApplyWritesDeleteResult(ComAtprotoRepoApplyWrites.DeleteResult)
@@ -650,8 +651,8 @@ public struct ComAtprotoRepoApplyWrites {
             case let .comAtprotoRepoApplyWritesDeleteResult(value):
                 try container.encode("com.atproto.repo.applyWrites#deleteResult", forKey: .type)
                 try value.encode(to: encoder)
-            case let .unexpected(ATProtocolValueContainer):
-                try ATProtocolValueContainer.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
             }
         }
 
@@ -666,14 +667,15 @@ public struct ComAtprotoRepoApplyWrites {
             case let .comAtprotoRepoApplyWritesDeleteResult(value):
                 hasher.combine("com.atproto.repo.applyWrites#deleteResult")
                 hasher.combine(value)
-            case let .unexpected(ATProtocolValueContainer):
+            case let .unexpected(container):
                 hasher.combine("unexpected")
-                hasher.combine(ATProtocolValueContainer)
+                hasher.combine(container)
             }
         }
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
+            case rawContent = "_rawContent"
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -703,7 +705,7 @@ public struct ComAtprotoRepoApplyWrites {
         }
     }
 
-    public enum ComAtprotoRepoApplyWritesWritesUnion: Codable, ATProtocolCodable, ATProtocolValue {
+    public enum ComAtprotoRepoApplyWritesWritesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
         case comAtprotoRepoApplyWritesCreate(ComAtprotoRepoApplyWrites.Create)
         case comAtprotoRepoApplyWritesUpdate(ComAtprotoRepoApplyWrites.Update)
         case comAtprotoRepoApplyWritesDelete(ComAtprotoRepoApplyWrites.Delete)
@@ -742,8 +744,8 @@ public struct ComAtprotoRepoApplyWrites {
             case let .comAtprotoRepoApplyWritesDelete(value):
                 try container.encode("com.atproto.repo.applyWrites#delete", forKey: .type)
                 try value.encode(to: encoder)
-            case let .unexpected(ATProtocolValueContainer):
-                try ATProtocolValueContainer.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
             }
         }
 
@@ -758,14 +760,15 @@ public struct ComAtprotoRepoApplyWrites {
             case let .comAtprotoRepoApplyWritesDelete(value):
                 hasher.combine("com.atproto.repo.applyWrites#delete")
                 hasher.combine(value)
-            case let .unexpected(ATProtocolValueContainer):
+            case let .unexpected(container):
                 hasher.combine("unexpected")
-                hasher.combine(ATProtocolValueContainer)
+                hasher.combine(container)
             }
         }
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
+            case rawContent = "_rawContent"
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {

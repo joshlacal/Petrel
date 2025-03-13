@@ -3130,7 +3130,7 @@ public struct AppBskyActorDefs {
         }
     }
 
-    public enum PostInteractionSettingsPrefThreadgateAllowRulesUnion: Codable, ATProtocolCodable, ATProtocolValue {
+    public enum PostInteractionSettingsPrefThreadgateAllowRulesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
         case appBskyFeedThreadgateMentionRule(AppBskyFeedThreadgate.MentionRule)
         case appBskyFeedThreadgateFollowerRule(AppBskyFeedThreadgate.FollowerRule)
         case appBskyFeedThreadgateFollowingRule(AppBskyFeedThreadgate.FollowingRule)
@@ -3176,8 +3176,8 @@ public struct AppBskyActorDefs {
             case let .appBskyFeedThreadgateListRule(value):
                 try container.encode("app.bsky.feed.threadgate#listRule", forKey: .type)
                 try value.encode(to: encoder)
-            case let .unexpected(ATProtocolValueContainer):
-                try ATProtocolValueContainer.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
             }
         }
 
@@ -3195,14 +3195,15 @@ public struct AppBskyActorDefs {
             case let .appBskyFeedThreadgateListRule(value):
                 hasher.combine("app.bsky.feed.threadgate#listRule")
                 hasher.combine(value)
-            case let .unexpected(ATProtocolValueContainer):
+            case let .unexpected(container):
                 hasher.combine("unexpected")
-                hasher.combine(ATProtocolValueContainer)
+                hasher.combine(container)
             }
         }
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
+            case rawContent = "_rawContent"
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -3237,7 +3238,7 @@ public struct AppBskyActorDefs {
         }
     }
 
-    public enum PostInteractionSettingsPrefPostgateEmbeddingRulesUnion: Codable, ATProtocolCodable, ATProtocolValue {
+    public enum PostInteractionSettingsPrefPostgateEmbeddingRulesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
         case appBskyFeedPostgateDisableRule(AppBskyFeedPostgate.DisableRule)
         case unexpected(ATProtocolValueContainer)
 
@@ -3262,8 +3263,8 @@ public struct AppBskyActorDefs {
             case let .appBskyFeedPostgateDisableRule(value):
                 try container.encode("app.bsky.feed.postgate#disableRule", forKey: .type)
                 try value.encode(to: encoder)
-            case let .unexpected(ATProtocolValueContainer):
-                try ATProtocolValueContainer.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
             }
         }
 
@@ -3272,14 +3273,15 @@ public struct AppBskyActorDefs {
             case let .appBskyFeedPostgateDisableRule(value):
                 hasher.combine("app.bsky.feed.postgate#disableRule")
                 hasher.combine(value)
-            case let .unexpected(ATProtocolValueContainer):
+            case let .unexpected(container):
                 hasher.combine("unexpected")
-                hasher.combine(ATProtocolValueContainer)
+                hasher.combine(container)
             }
         }
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
+            case rawContent = "_rawContent"
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -3291,8 +3293,10 @@ public struct AppBskyActorDefs {
                 .appBskyFeedPostgateDisableRule(otherValue)
             ):
                 return selfValue == otherValue
+
             case let (.unexpected(selfValue), .unexpected(otherValue)):
                 return selfValue.isEqual(to: otherValue)
+
             default:
                 return false
             }

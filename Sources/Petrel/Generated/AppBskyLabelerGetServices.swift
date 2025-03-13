@@ -29,7 +29,7 @@ public struct AppBskyLabelerGetServices {
         }
     }
 
-    public enum OutputViewsUnion: Codable, ATProtocolCodable, ATProtocolValue {
+    public enum OutputViewsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
         case appBskyLabelerDefsLabelerView(AppBskyLabelerDefs.LabelerView)
         case appBskyLabelerDefsLabelerViewDetailed(AppBskyLabelerDefs.LabelerViewDetailed)
         case unexpected(ATProtocolValueContainer)
@@ -61,8 +61,8 @@ public struct AppBskyLabelerGetServices {
             case let .appBskyLabelerDefsLabelerViewDetailed(value):
                 try container.encode("app.bsky.labeler.defs#labelerViewDetailed", forKey: .type)
                 try value.encode(to: encoder)
-            case let .unexpected(ATProtocolValueContainer):
-                try ATProtocolValueContainer.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
             }
         }
 
@@ -74,14 +74,15 @@ public struct AppBskyLabelerGetServices {
             case let .appBskyLabelerDefsLabelerViewDetailed(value):
                 hasher.combine("app.bsky.labeler.defs#labelerViewDetailed")
                 hasher.combine(value)
-            case let .unexpected(ATProtocolValueContainer):
+            case let .unexpected(container):
                 hasher.combine("unexpected")
-                hasher.combine(ATProtocolValueContainer)
+                hasher.combine(container)
             }
         }
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
+            case rawContent = "_rawContent"
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {

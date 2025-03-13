@@ -59,7 +59,7 @@ public struct ComAtprotoModerationCreateReport {
         }
     }
 
-    public enum InputSubjectUnion: Codable, ATProtocolCodable, ATProtocolValue {
+    public enum InputSubjectUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
         case comAtprotoAdminDefsRepoRef(ComAtprotoAdminDefs.RepoRef)
         case comAtprotoRepoStrongRef(ComAtprotoRepoStrongRef)
         case unexpected(ATProtocolValueContainer)
@@ -91,8 +91,8 @@ public struct ComAtprotoModerationCreateReport {
             case let .comAtprotoRepoStrongRef(value):
                 try container.encode("com.atproto.repo.strongRef", forKey: .type)
                 try value.encode(to: encoder)
-            case let .unexpected(ATProtocolValueContainer):
-                try ATProtocolValueContainer.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
             }
         }
 
@@ -104,14 +104,15 @@ public struct ComAtprotoModerationCreateReport {
             case let .comAtprotoRepoStrongRef(value):
                 hasher.combine("com.atproto.repo.strongRef")
                 hasher.combine(value)
-            case let .unexpected(ATProtocolValueContainer):
+            case let .unexpected(container):
                 hasher.combine("unexpected")
-                hasher.combine(ATProtocolValueContainer)
+                hasher.combine(container)
             }
         }
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
+            case rawContent = "_rawContent"
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -136,7 +137,7 @@ public struct ComAtprotoModerationCreateReport {
         }
     }
 
-    public enum OutputSubjectUnion: Codable, ATProtocolCodable, ATProtocolValue {
+    public enum OutputSubjectUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
         case comAtprotoAdminDefsRepoRef(ComAtprotoAdminDefs.RepoRef)
         case comAtprotoRepoStrongRef(ComAtprotoRepoStrongRef)
         case unexpected(ATProtocolValueContainer)
@@ -168,8 +169,8 @@ public struct ComAtprotoModerationCreateReport {
             case let .comAtprotoRepoStrongRef(value):
                 try container.encode("com.atproto.repo.strongRef", forKey: .type)
                 try value.encode(to: encoder)
-            case let .unexpected(ATProtocolValueContainer):
-                try ATProtocolValueContainer.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
             }
         }
 
@@ -181,14 +182,15 @@ public struct ComAtprotoModerationCreateReport {
             case let .comAtprotoRepoStrongRef(value):
                 hasher.combine("com.atproto.repo.strongRef")
                 hasher.combine(value)
-            case let .unexpected(ATProtocolValueContainer):
+            case let .unexpected(container):
                 hasher.combine("unexpected")
-                hasher.combine(ATProtocolValueContainer)
+                hasher.combine(container)
             }
         }
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
+            case rawContent = "_rawContent"
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -213,7 +215,7 @@ public struct ComAtprotoModerationCreateReport {
         }
     }
 
-    public enum ComAtprotoModerationCreateReportSubjectUnion: Codable, ATProtocolCodable, ATProtocolValue {
+    public enum ComAtprotoModerationCreateReportSubjectUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
         case comAtprotoAdminDefsRepoRef(ComAtprotoAdminDefs.RepoRef)
         case comAtprotoRepoStrongRef(ComAtprotoRepoStrongRef)
         case unexpected(ATProtocolValueContainer)
@@ -245,8 +247,8 @@ public struct ComAtprotoModerationCreateReport {
             case let .comAtprotoRepoStrongRef(value):
                 try container.encode("com.atproto.repo.strongRef", forKey: .type)
                 try value.encode(to: encoder)
-            case let .unexpected(ATProtocolValueContainer):
-                try ATProtocolValueContainer.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
             }
         }
 
@@ -258,14 +260,15 @@ public struct ComAtprotoModerationCreateReport {
             case let .comAtprotoRepoStrongRef(value):
                 hasher.combine("com.atproto.repo.strongRef")
                 hasher.combine(value)
-            case let .unexpected(ATProtocolValueContainer):
+            case let .unexpected(container):
                 hasher.combine("unexpected")
-                hasher.combine(ATProtocolValueContainer)
+                hasher.combine(container)
             }
         }
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
+            case rawContent = "_rawContent"
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
