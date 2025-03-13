@@ -3130,7 +3130,7 @@ public struct AppBskyActorDefs {
         }
     }
 
-    public enum PostInteractionSettingsPrefThreadgateAllowRulesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
+    public enum PostInteractionSettingsPrefThreadgateAllowRulesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case appBskyFeedThreadgateMentionRule(AppBskyFeedThreadgate.MentionRule)
         case appBskyFeedThreadgateFollowerRule(AppBskyFeedThreadgate.FollowerRule)
         case appBskyFeedThreadgateFollowingRule(AppBskyFeedThreadgate.FollowingRule)
@@ -3206,39 +3206,111 @@ public struct AppBskyActorDefs {
             case rawContent = "_rawContent"
         }
 
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? PostInteractionSettingsPrefThreadgateAllowRulesUnion else { return false }
-
-            switch (self, otherValue) {
+        public static func == (lhs: PostInteractionSettingsPrefThreadgateAllowRulesUnion, rhs: PostInteractionSettingsPrefThreadgateAllowRulesUnion) -> Bool {
+            switch (lhs, rhs) {
             case let (
-                .appBskyFeedThreadgateMentionRule(selfValue),
-                .appBskyFeedThreadgateMentionRule(otherValue)
+                .appBskyFeedThreadgateMentionRule(lhsValue),
+                .appBskyFeedThreadgateMentionRule(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyFeedThreadgateFollowerRule(selfValue),
-                .appBskyFeedThreadgateFollowerRule(otherValue)
+                .appBskyFeedThreadgateFollowerRule(lhsValue),
+                .appBskyFeedThreadgateFollowerRule(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyFeedThreadgateFollowingRule(selfValue),
-                .appBskyFeedThreadgateFollowingRule(otherValue)
+                .appBskyFeedThreadgateFollowingRule(lhsValue),
+                .appBskyFeedThreadgateFollowingRule(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyFeedThreadgateListRule(selfValue),
-                .appBskyFeedThreadgateListRule(otherValue)
+                .appBskyFeedThreadgateListRule(lhsValue),
+                .appBskyFeedThreadgateListRule(rhsValue)
             ):
-                return selfValue == otherValue
-            case let (.unexpected(selfValue), .unexpected(otherValue)):
-                return selfValue.isEqual(to: otherValue)
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
             default:
                 return false
             }
         }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? PostInteractionSettingsPrefThreadgateAllowRulesUnion else { return false }
+            return self == otherValue
+        }
+
+        /// Property that indicates if this enum contains pending data that needs loading
+        public var hasPendingData: Bool {
+            switch self {
+            case let .appBskyFeedThreadgateMentionRule(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .appBskyFeedThreadgateFollowerRule(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .appBskyFeedThreadgateFollowingRule(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .appBskyFeedThreadgateListRule(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case .unexpected:
+                return false
+            }
+        }
+
+        /// Attempts to load any pending data in this enum or its children
+        public mutating func loadPendingData() async {
+            switch self {
+            case var .appBskyFeedThreadgateMentionRule(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyFeedThreadgate.MentionRule {
+                        self = .appBskyFeedThreadgateMentionRule(updatedValue)
+                    }
+                }
+            case var .appBskyFeedThreadgateFollowerRule(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyFeedThreadgate.FollowerRule {
+                        self = .appBskyFeedThreadgateFollowerRule(updatedValue)
+                    }
+                }
+            case var .appBskyFeedThreadgateFollowingRule(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyFeedThreadgate.FollowingRule {
+                        self = .appBskyFeedThreadgateFollowingRule(updatedValue)
+                    }
+                }
+            case var .appBskyFeedThreadgateListRule(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyFeedThreadgate.ListRule {
+                        self = .appBskyFeedThreadgateListRule(updatedValue)
+                    }
+                }
+            case .unexpected:
+                // Nothing to load for unexpected values
+                break
+            }
+        }
     }
 
-    public enum PostInteractionSettingsPrefPostgateEmbeddingRulesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
+    public enum PostInteractionSettingsPrefPostgateEmbeddingRulesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case appBskyFeedPostgateDisableRule(AppBskyFeedPostgate.DisableRule)
         case unexpected(ATProtocolValueContainer)
 
@@ -3284,21 +3356,54 @@ public struct AppBskyActorDefs {
             case rawContent = "_rawContent"
         }
 
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? PostInteractionSettingsPrefPostgateEmbeddingRulesUnion else { return false }
-
-            switch (self, otherValue) {
+        public static func == (lhs: PostInteractionSettingsPrefPostgateEmbeddingRulesUnion, rhs: PostInteractionSettingsPrefPostgateEmbeddingRulesUnion) -> Bool {
+            switch (lhs, rhs) {
             case let (
-                .appBskyFeedPostgateDisableRule(selfValue),
-                .appBskyFeedPostgateDisableRule(otherValue)
+                .appBskyFeedPostgateDisableRule(lhsValue),
+                .appBskyFeedPostgateDisableRule(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
 
-            case let (.unexpected(selfValue), .unexpected(otherValue)):
-                return selfValue.isEqual(to: otherValue)
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
 
             default:
                 return false
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? PostInteractionSettingsPrefPostgateEmbeddingRulesUnion else { return false }
+            return self == otherValue
+        }
+
+        /// Property that indicates if this enum contains pending data that needs loading
+        public var hasPendingData: Bool {
+            switch self {
+            case let .appBskyFeedPostgateDisableRule(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case .unexpected:
+                return false
+            }
+        }
+
+        /// Attempts to load any pending data in this enum or its children
+        public mutating func loadPendingData() async {
+            switch self {
+            case var .appBskyFeedPostgateDisableRule(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyFeedPostgate.DisableRule {
+                        self = .appBskyFeedPostgateDisableRule(updatedValue)
+                    }
+                }
+            case .unexpected:
+                // Nothing to load for unexpected values
+                break
             }
         }
     }

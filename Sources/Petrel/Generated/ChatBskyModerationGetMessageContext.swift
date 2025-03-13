@@ -2,7 +2,7 @@ import Foundation
 
 // lexicon: 1, id: chat.bsky.moderation.getMessageContext
 
-public struct ChatBskyModerationGetMessageContext {
+public enum ChatBskyModerationGetMessageContext {
     public static let typeIdentifier = "chat.bsky.moderation.getMessageContext"
     public struct Parameters: Parametrizable {
         public let convoId: String?
@@ -35,7 +35,7 @@ public struct ChatBskyModerationGetMessageContext {
         }
     }
 
-    public enum OutputMessagesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
+    public enum OutputMessagesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case chatBskyConvoDefsMessageView(ChatBskyConvoDefs.MessageView)
         case chatBskyConvoDefsDeletedMessageView(ChatBskyConvoDefs.DeletedMessageView)
         case unexpected(ATProtocolValueContainer)
@@ -91,24 +91,70 @@ public struct ChatBskyModerationGetMessageContext {
             case rawContent = "_rawContent"
         }
 
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? OutputMessagesUnion else { return false }
-
-            switch (self, otherValue) {
+        public static func == (lhs: OutputMessagesUnion, rhs: OutputMessagesUnion) -> Bool {
+            switch (lhs, rhs) {
             case let (
-                .chatBskyConvoDefsMessageView(selfValue),
-                .chatBskyConvoDefsMessageView(otherValue)
+                .chatBskyConvoDefsMessageView(lhsValue),
+                .chatBskyConvoDefsMessageView(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .chatBskyConvoDefsDeletedMessageView(selfValue),
-                .chatBskyConvoDefsDeletedMessageView(otherValue)
+                .chatBskyConvoDefsDeletedMessageView(lhsValue),
+                .chatBskyConvoDefsDeletedMessageView(rhsValue)
             ):
-                return selfValue == otherValue
-            case let (.unexpected(selfValue), .unexpected(otherValue)):
-                return selfValue.isEqual(to: otherValue)
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
             default:
                 return false
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? OutputMessagesUnion else { return false }
+            return self == otherValue
+        }
+
+        /// Property that indicates if this enum contains pending data that needs loading
+        public var hasPendingData: Bool {
+            switch self {
+            case let .chatBskyConvoDefsMessageView(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .chatBskyConvoDefsDeletedMessageView(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case .unexpected:
+                return false
+            }
+        }
+
+        /// Attempts to load any pending data in this enum or its children
+        public mutating func loadPendingData() async {
+            switch self {
+            case var .chatBskyConvoDefsMessageView(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ChatBskyConvoDefs.MessageView {
+                        self = .chatBskyConvoDefsMessageView(updatedValue)
+                    }
+                }
+            case var .chatBskyConvoDefsDeletedMessageView(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ChatBskyConvoDefs.DeletedMessageView {
+                        self = .chatBskyConvoDefsDeletedMessageView(updatedValue)
+                    }
+                }
+            case .unexpected:
+                // Nothing to load for unexpected values
+                break
             }
         }
     }

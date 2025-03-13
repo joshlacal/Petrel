@@ -2,7 +2,7 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.feed.getPostThread
 
-public struct AppBskyFeedGetPostThread {
+public enum AppBskyFeedGetPostThread {
     public static let typeIdentifier = "app.bsky.feed.getPostThread"
     public struct Parameters: Parametrizable {
         public let uri: ATProtocolURI
@@ -45,7 +45,7 @@ public struct AppBskyFeedGetPostThread {
         }
     }
 
-    public indirect enum OutputThreadUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
+    public indirect enum OutputThreadUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case appBskyFeedDefsThreadViewPost(AppBskyFeedDefs.ThreadViewPost)
         case appBskyFeedDefsNotFoundPost(AppBskyFeedDefs.NotFoundPost)
         case appBskyFeedDefsBlockedPost(AppBskyFeedDefs.BlockedPost)
@@ -55,10 +55,13 @@ public struct AppBskyFeedGetPostThread {
 
         /// Structure to hold data for deferred decoding
 
-        public struct PendingDecodeData: Codable, Sendable {
+        public struct PendingDecodeData: Codable, Sendable, Equatable {
             public let rawData: Data
             public let type: String
-            public let depth: Int
+
+            public static func == (lhs: PendingDecodeData, rhs: PendingDecodeData) -> Bool {
+                return lhs.type == rhs.type
+            }
         }
 
         public init(from decoder: Decoder) throws {
@@ -68,14 +71,14 @@ public struct AppBskyFeedGetPostThread {
             let depth = decoder.codingPath.count
 
             // Check if we're at a recursion depth that might cause stack overflow
-            if depth > RecursionGuard.threshold {
-                if RecursionGuard.debugMode {
+            if depth > DecodingConfiguration.standard.threshold {
+                if DecodingConfiguration.standard.debugMode {
                     print("🔄 Deferring deep decode for OutputThreadUnion at depth \(depth), type: \(typeValue)")
                 }
 
                 // Extract the raw JSON to decode asynchronously later
                 let rawData = try JSONEncoder().encode(container.decode(JSONValue.self, forKey: .rawContent))
-                self = .pending(PendingDecodeData(rawData: rawData, type: typeValue, depth: depth))
+                self = .pending(PendingDecodeData(rawData: rawData, type: typeValue))
                 return
             }
 
@@ -151,32 +154,35 @@ public struct AppBskyFeedGetPostThread {
             case rawContent = "_rawContent"
         }
 
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? OutputThreadUnion else { return false }
-
-            switch (self, otherValue) {
+        public static func == (lhs: OutputThreadUnion, rhs: OutputThreadUnion) -> Bool {
+            switch (lhs, rhs) {
             case let (
-                .appBskyFeedDefsThreadViewPost(selfValue),
-                .appBskyFeedDefsThreadViewPost(otherValue)
+                .appBskyFeedDefsThreadViewPost(lhsValue),
+                .appBskyFeedDefsThreadViewPost(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyFeedDefsNotFoundPost(selfValue),
-                .appBskyFeedDefsNotFoundPost(otherValue)
+                .appBskyFeedDefsNotFoundPost(lhsValue),
+                .appBskyFeedDefsNotFoundPost(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyFeedDefsBlockedPost(selfValue),
-                .appBskyFeedDefsBlockedPost(otherValue)
+                .appBskyFeedDefsBlockedPost(lhsValue),
+                .appBskyFeedDefsBlockedPost(rhsValue)
             ):
-                return selfValue == otherValue
-            case let (.unexpected(selfValue), .unexpected(otherValue)):
-                return selfValue.isEqual(to: otherValue)
-            case let (.pending(selfData), .pending(otherData)):
-                return selfData.type == otherData.type
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
+            case let (.pending(lhsData), .pending(rhsData)):
+                return lhsData.type == rhsData.type
             default:
                 return false
             }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? OutputThreadUnion else { return false }
+            return self == otherValue
         }
 
         /// Property that indicates if this enum contains pending data that needs loading
@@ -213,22 +219,19 @@ public struct AppBskyFeedGetPostThread {
                     case "app.bsky.feed.defs#threadViewPost":
                         let value = try await SafeDecoder.decode(
                             AppBskyFeedDefs.ThreadViewPost.self,
-                            from: pendingData.rawData,
-                            depth: pendingData.depth
+                            from: pendingData.rawData
                         )
                         self = .appBskyFeedDefsThreadViewPost(value)
                     case "app.bsky.feed.defs#notFoundPost":
                         let value = try await SafeDecoder.decode(
                             AppBskyFeedDefs.NotFoundPost.self,
-                            from: pendingData.rawData,
-                            depth: pendingData.depth
+                            from: pendingData.rawData
                         )
                         self = .appBskyFeedDefsNotFoundPost(value)
                     case "app.bsky.feed.defs#blockedPost":
                         let value = try await SafeDecoder.decode(
                             AppBskyFeedDefs.BlockedPost.self,
-                            from: pendingData.rawData,
-                            depth: pendingData.depth
+                            from: pendingData.rawData
                         )
                         self = .appBskyFeedDefsBlockedPost(value)
                     default:
@@ -236,7 +239,7 @@ public struct AppBskyFeedGetPostThread {
                         self = .unexpected(unknownValue)
                     }
                 } catch {
-                    if RecursionGuard.debugMode {
+                    if DecodingConfiguration.standard.debugMode {
                         print("❌ Failed to decode pending data for OutputThreadUnion: \(error)")
                     }
                     self = .unexpected(ATProtocolValueContainer.string("Failed to decode: \(error)"))

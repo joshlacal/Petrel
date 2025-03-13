@@ -2,7 +2,7 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.labeler.getServices
 
-public struct AppBskyLabelerGetServices {
+public enum AppBskyLabelerGetServices {
     public static let typeIdentifier = "app.bsky.labeler.getServices"
     public struct Parameters: Parametrizable {
         public let dids: [String]
@@ -29,7 +29,7 @@ public struct AppBskyLabelerGetServices {
         }
     }
 
-    public enum OutputViewsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
+    public enum OutputViewsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case appBskyLabelerDefsLabelerView(AppBskyLabelerDefs.LabelerView)
         case appBskyLabelerDefsLabelerViewDetailed(AppBskyLabelerDefs.LabelerViewDetailed)
         case unexpected(ATProtocolValueContainer)
@@ -85,24 +85,70 @@ public struct AppBskyLabelerGetServices {
             case rawContent = "_rawContent"
         }
 
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? OutputViewsUnion else { return false }
-
-            switch (self, otherValue) {
+        public static func == (lhs: OutputViewsUnion, rhs: OutputViewsUnion) -> Bool {
+            switch (lhs, rhs) {
             case let (
-                .appBskyLabelerDefsLabelerView(selfValue),
-                .appBskyLabelerDefsLabelerView(otherValue)
+                .appBskyLabelerDefsLabelerView(lhsValue),
+                .appBskyLabelerDefsLabelerView(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyLabelerDefsLabelerViewDetailed(selfValue),
-                .appBskyLabelerDefsLabelerViewDetailed(otherValue)
+                .appBskyLabelerDefsLabelerViewDetailed(lhsValue),
+                .appBskyLabelerDefsLabelerViewDetailed(rhsValue)
             ):
-                return selfValue == otherValue
-            case let (.unexpected(selfValue), .unexpected(otherValue)):
-                return selfValue.isEqual(to: otherValue)
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
             default:
                 return false
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? OutputViewsUnion else { return false }
+            return self == otherValue
+        }
+
+        /// Property that indicates if this enum contains pending data that needs loading
+        public var hasPendingData: Bool {
+            switch self {
+            case let .appBskyLabelerDefsLabelerView(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .appBskyLabelerDefsLabelerViewDetailed(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case .unexpected:
+                return false
+            }
+        }
+
+        /// Attempts to load any pending data in this enum or its children
+        public mutating func loadPendingData() async {
+            switch self {
+            case var .appBskyLabelerDefsLabelerView(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyLabelerDefs.LabelerView {
+                        self = .appBskyLabelerDefsLabelerView(updatedValue)
+                    }
+                }
+            case var .appBskyLabelerDefsLabelerViewDetailed(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyLabelerDefs.LabelerViewDetailed {
+                        self = .appBskyLabelerDefsLabelerViewDetailed(updatedValue)
+                    }
+                }
+            case .unexpected:
+                // Nothing to load for unexpected values
+                break
             }
         }
     }

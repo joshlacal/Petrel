@@ -189,7 +189,7 @@ public struct AppBskyFeedGenerator: ATProtocolCodable, ATProtocolValue {
         case createdAt
     }
 
-    public enum AppBskyFeedGeneratorLabelsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
+    public enum AppBskyFeedGeneratorLabelsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case comAtprotoLabelDefsSelfLabels(ComAtprotoLabelDefs.SelfLabels)
         case unexpected(ATProtocolValueContainer)
 
@@ -235,21 +235,54 @@ public struct AppBskyFeedGenerator: ATProtocolCodable, ATProtocolValue {
             case rawContent = "_rawContent"
         }
 
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? AppBskyFeedGeneratorLabelsUnion else { return false }
-
-            switch (self, otherValue) {
+        public static func == (lhs: AppBskyFeedGeneratorLabelsUnion, rhs: AppBskyFeedGeneratorLabelsUnion) -> Bool {
+            switch (lhs, rhs) {
             case let (
-                .comAtprotoLabelDefsSelfLabels(selfValue),
-                .comAtprotoLabelDefsSelfLabels(otherValue)
+                .comAtprotoLabelDefsSelfLabels(lhsValue),
+                .comAtprotoLabelDefsSelfLabels(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
 
-            case let (.unexpected(selfValue), .unexpected(otherValue)):
-                return selfValue.isEqual(to: otherValue)
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
 
             default:
                 return false
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? AppBskyFeedGeneratorLabelsUnion else { return false }
+            return self == otherValue
+        }
+
+        /// Property that indicates if this enum contains pending data that needs loading
+        public var hasPendingData: Bool {
+            switch self {
+            case let .comAtprotoLabelDefsSelfLabels(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case .unexpected:
+                return false
+            }
+        }
+
+        /// Attempts to load any pending data in this enum or its children
+        public mutating func loadPendingData() async {
+            switch self {
+            case var .comAtprotoLabelDefsSelfLabels(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ComAtprotoLabelDefs.SelfLabels {
+                        self = .comAtprotoLabelDefsSelfLabels(updatedValue)
+                    }
+                }
+            case .unexpected:
+                // Nothing to load for unexpected values
+                break
             }
         }
     }

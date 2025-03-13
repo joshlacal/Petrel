@@ -215,11 +215,16 @@ public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProt
             }
         {% endif %}
         {%- for variant in variants %}
-        case .{{ variant | convertRefToSwift | lowerCamelCase }}(var value):
-            if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                await loadable.loadPendingData()
-                // Update value after loading pending data
-                if let updatedValue = loadable as? {{ variant | convertRefToSwift }} {
+        case .{{ variant | convertRefToSwift | lowerCamelCase }}(let value):
+            // Handle nested PendingDataLoadable values
+            if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                // Create a mutable copy we can work with
+                var mutableLoadable = loadableValue
+                await mutableLoadable.loadPendingData()
+                
+                // Only try to cast back if the original value was of the expected type
+                if let originalValue = value as? {{ variant | convertRefToSwift }},
+                   let updatedValue = mutableLoadable as? {{ variant | convertRefToSwift }} {
                     self = .{{ variant | convertRefToSwift | lowerCamelCase }}(updatedValue)
                 }
             }

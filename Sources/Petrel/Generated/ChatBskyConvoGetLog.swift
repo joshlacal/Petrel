@@ -2,7 +2,7 @@ import Foundation
 
 // lexicon: 1, id: chat.bsky.convo.getLog
 
-public struct ChatBskyConvoGetLog {
+public enum ChatBskyConvoGetLog {
     public static let typeIdentifier = "chat.bsky.convo.getLog"
     public struct Parameters: Parametrizable {
         public let cursor: String?
@@ -32,7 +32,7 @@ public struct ChatBskyConvoGetLog {
         }
     }
 
-    public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
+    public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case chatBskyConvoDefsLogBeginConvo(ChatBskyConvoDefs.LogBeginConvo)
         case chatBskyConvoDefsLogAcceptConvo(ChatBskyConvoDefs.LogAcceptConvo)
         case chatBskyConvoDefsLogLeaveConvo(ChatBskyConvoDefs.LogLeaveConvo)
@@ -118,39 +118,124 @@ public struct ChatBskyConvoGetLog {
             case rawContent = "_rawContent"
         }
 
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? OutputLogsUnion else { return false }
-
-            switch (self, otherValue) {
+        public static func == (lhs: OutputLogsUnion, rhs: OutputLogsUnion) -> Bool {
+            switch (lhs, rhs) {
             case let (
-                .chatBskyConvoDefsLogBeginConvo(selfValue),
-                .chatBskyConvoDefsLogBeginConvo(otherValue)
+                .chatBskyConvoDefsLogBeginConvo(lhsValue),
+                .chatBskyConvoDefsLogBeginConvo(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .chatBskyConvoDefsLogAcceptConvo(selfValue),
-                .chatBskyConvoDefsLogAcceptConvo(otherValue)
+                .chatBskyConvoDefsLogAcceptConvo(lhsValue),
+                .chatBskyConvoDefsLogAcceptConvo(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .chatBskyConvoDefsLogLeaveConvo(selfValue),
-                .chatBskyConvoDefsLogLeaveConvo(otherValue)
+                .chatBskyConvoDefsLogLeaveConvo(lhsValue),
+                .chatBskyConvoDefsLogLeaveConvo(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .chatBskyConvoDefsLogCreateMessage(selfValue),
-                .chatBskyConvoDefsLogCreateMessage(otherValue)
+                .chatBskyConvoDefsLogCreateMessage(lhsValue),
+                .chatBskyConvoDefsLogCreateMessage(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .chatBskyConvoDefsLogDeleteMessage(selfValue),
-                .chatBskyConvoDefsLogDeleteMessage(otherValue)
+                .chatBskyConvoDefsLogDeleteMessage(lhsValue),
+                .chatBskyConvoDefsLogDeleteMessage(rhsValue)
             ):
-                return selfValue == otherValue
-            case let (.unexpected(selfValue), .unexpected(otherValue)):
-                return selfValue.isEqual(to: otherValue)
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
             default:
                 return false
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? OutputLogsUnion else { return false }
+            return self == otherValue
+        }
+
+        /// Property that indicates if this enum contains pending data that needs loading
+        public var hasPendingData: Bool {
+            switch self {
+            case let .chatBskyConvoDefsLogBeginConvo(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .chatBskyConvoDefsLogAcceptConvo(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .chatBskyConvoDefsLogLeaveConvo(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .chatBskyConvoDefsLogCreateMessage(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .chatBskyConvoDefsLogDeleteMessage(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case .unexpected:
+                return false
+            }
+        }
+
+        /// Attempts to load any pending data in this enum or its children
+        public mutating func loadPendingData() async {
+            switch self {
+            case var .chatBskyConvoDefsLogBeginConvo(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ChatBskyConvoDefs.LogBeginConvo {
+                        self = .chatBskyConvoDefsLogBeginConvo(updatedValue)
+                    }
+                }
+            case var .chatBskyConvoDefsLogAcceptConvo(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ChatBskyConvoDefs.LogAcceptConvo {
+                        self = .chatBskyConvoDefsLogAcceptConvo(updatedValue)
+                    }
+                }
+            case var .chatBskyConvoDefsLogLeaveConvo(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ChatBskyConvoDefs.LogLeaveConvo {
+                        self = .chatBskyConvoDefsLogLeaveConvo(updatedValue)
+                    }
+                }
+            case var .chatBskyConvoDefsLogCreateMessage(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ChatBskyConvoDefs.LogCreateMessage {
+                        self = .chatBskyConvoDefsLogCreateMessage(updatedValue)
+                    }
+                }
+            case var .chatBskyConvoDefsLogDeleteMessage(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ChatBskyConvoDefs.LogDeleteMessage {
+                        self = .chatBskyConvoDefsLogDeleteMessage(updatedValue)
+                    }
+                }
+            case .unexpected:
+                // Nothing to load for unexpected values
+                break
             }
         }
     }

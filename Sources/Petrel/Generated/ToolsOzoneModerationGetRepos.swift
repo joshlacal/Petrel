@@ -2,7 +2,7 @@ import Foundation
 
 // lexicon: 1, id: tools.ozone.moderation.getRepos
 
-public struct ToolsOzoneModerationGetRepos {
+public enum ToolsOzoneModerationGetRepos {
     public static let typeIdentifier = "tools.ozone.moderation.getRepos"
     public struct Parameters: Parametrizable {
         public let dids: [String]
@@ -26,7 +26,7 @@ public struct ToolsOzoneModerationGetRepos {
         }
     }
 
-    public enum OutputReposUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
+    public enum OutputReposUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case toolsOzoneModerationDefsRepoViewDetail(ToolsOzoneModerationDefs.RepoViewDetail)
         case toolsOzoneModerationDefsRepoViewNotFound(ToolsOzoneModerationDefs.RepoViewNotFound)
         case unexpected(ATProtocolValueContainer)
@@ -82,24 +82,70 @@ public struct ToolsOzoneModerationGetRepos {
             case rawContent = "_rawContent"
         }
 
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? OutputReposUnion else { return false }
-
-            switch (self, otherValue) {
+        public static func == (lhs: OutputReposUnion, rhs: OutputReposUnion) -> Bool {
+            switch (lhs, rhs) {
             case let (
-                .toolsOzoneModerationDefsRepoViewDetail(selfValue),
-                .toolsOzoneModerationDefsRepoViewDetail(otherValue)
+                .toolsOzoneModerationDefsRepoViewDetail(lhsValue),
+                .toolsOzoneModerationDefsRepoViewDetail(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .toolsOzoneModerationDefsRepoViewNotFound(selfValue),
-                .toolsOzoneModerationDefsRepoViewNotFound(otherValue)
+                .toolsOzoneModerationDefsRepoViewNotFound(lhsValue),
+                .toolsOzoneModerationDefsRepoViewNotFound(rhsValue)
             ):
-                return selfValue == otherValue
-            case let (.unexpected(selfValue), .unexpected(otherValue)):
-                return selfValue.isEqual(to: otherValue)
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
             default:
                 return false
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? OutputReposUnion else { return false }
+            return self == otherValue
+        }
+
+        /// Property that indicates if this enum contains pending data that needs loading
+        public var hasPendingData: Bool {
+            switch self {
+            case let .toolsOzoneModerationDefsRepoViewDetail(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .toolsOzoneModerationDefsRepoViewNotFound(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case .unexpected:
+                return false
+            }
+        }
+
+        /// Attempts to load any pending data in this enum or its children
+        public mutating func loadPendingData() async {
+            switch self {
+            case var .toolsOzoneModerationDefsRepoViewDetail(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.RepoViewDetail {
+                        self = .toolsOzoneModerationDefsRepoViewDetail(updatedValue)
+                    }
+                }
+            case var .toolsOzoneModerationDefsRepoViewNotFound(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.RepoViewNotFound {
+                        self = .toolsOzoneModerationDefsRepoViewNotFound(updatedValue)
+                    }
+                }
+            case .unexpected:
+                // Nothing to load for unexpected values
+                break
             }
         }
     }
