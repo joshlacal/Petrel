@@ -143,19 +143,31 @@ public enum AppBskyGraphGetRelationships {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .appBskyGraphDefsRelationship(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? AppBskyGraphDefs.Relationship {
+            case let .appBskyGraphDefsRelationship(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? AppBskyGraphDefs.Relationship,
+                       let updatedValue = mutableLoadable as? AppBskyGraphDefs.Relationship
+                    {
                         self = .appBskyGraphDefsRelationship(updatedValue)
                     }
                 }
-            case var .appBskyGraphDefsNotFoundActor(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? AppBskyGraphDefs.NotFoundActor {
+            case let .appBskyGraphDefsNotFoundActor(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? AppBskyGraphDefs.NotFoundActor,
+                       let updatedValue = mutableLoadable as? AppBskyGraphDefs.NotFoundActor
+                    {
                         self = .appBskyGraphDefsNotFoundActor(updatedValue)
                     }
                 }

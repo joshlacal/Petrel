@@ -127,19 +127,31 @@ public enum ToolsOzoneModerationGetRecords {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .toolsOzoneModerationDefsRecordViewDetail(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.RecordViewDetail {
+            case let .toolsOzoneModerationDefsRecordViewDetail(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.RecordViewDetail,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.RecordViewDetail
+                    {
                         self = .toolsOzoneModerationDefsRecordViewDetail(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsRecordViewNotFound(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.RecordViewNotFound {
+            case let .toolsOzoneModerationDefsRecordViewNotFound(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.RecordViewNotFound,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.RecordViewNotFound
+                    {
                         self = .toolsOzoneModerationDefsRecordViewNotFound(updatedValue)
                     }
                 }

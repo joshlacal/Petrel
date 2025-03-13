@@ -5283,155 +5283,269 @@ public enum ToolsOzoneModerationDefs {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .toolsOzoneModerationDefsModEventTakedown(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventTakedown {
+            case let .toolsOzoneModerationDefsModEventTakedown(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.ModEventTakedown,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.ModEventTakedown
+                    {
                         self = .toolsOzoneModerationDefsModEventTakedown(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventReverseTakedown(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventReverseTakedown {
+            case let .toolsOzoneModerationDefsModEventReverseTakedown(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.ModEventReverseTakedown,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.ModEventReverseTakedown
+                    {
                         self = .toolsOzoneModerationDefsModEventReverseTakedown(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventComment(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventComment {
+            case let .toolsOzoneModerationDefsModEventComment(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.ModEventComment,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.ModEventComment
+                    {
                         self = .toolsOzoneModerationDefsModEventComment(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventReport(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventReport {
+            case let .toolsOzoneModerationDefsModEventReport(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.ModEventReport,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.ModEventReport
+                    {
                         self = .toolsOzoneModerationDefsModEventReport(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventLabel(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventLabel {
+            case let .toolsOzoneModerationDefsModEventLabel(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.ModEventLabel,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.ModEventLabel
+                    {
                         self = .toolsOzoneModerationDefsModEventLabel(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventAcknowledge(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventAcknowledge {
+            case let .toolsOzoneModerationDefsModEventAcknowledge(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.ModEventAcknowledge,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.ModEventAcknowledge
+                    {
                         self = .toolsOzoneModerationDefsModEventAcknowledge(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventEscalate(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventEscalate {
+            case let .toolsOzoneModerationDefsModEventEscalate(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.ModEventEscalate,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.ModEventEscalate
+                    {
                         self = .toolsOzoneModerationDefsModEventEscalate(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventMute(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventMute {
+            case let .toolsOzoneModerationDefsModEventMute(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.ModEventMute,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.ModEventMute
+                    {
                         self = .toolsOzoneModerationDefsModEventMute(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventUnmute(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventUnmute {
+            case let .toolsOzoneModerationDefsModEventUnmute(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.ModEventUnmute,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.ModEventUnmute
+                    {
                         self = .toolsOzoneModerationDefsModEventUnmute(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventMuteReporter(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventMuteReporter {
+            case let .toolsOzoneModerationDefsModEventMuteReporter(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.ModEventMuteReporter,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.ModEventMuteReporter
+                    {
                         self = .toolsOzoneModerationDefsModEventMuteReporter(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventUnmuteReporter(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventUnmuteReporter {
+            case let .toolsOzoneModerationDefsModEventUnmuteReporter(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.ModEventUnmuteReporter,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.ModEventUnmuteReporter
+                    {
                         self = .toolsOzoneModerationDefsModEventUnmuteReporter(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventEmail(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventEmail {
+            case let .toolsOzoneModerationDefsModEventEmail(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.ModEventEmail,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.ModEventEmail
+                    {
                         self = .toolsOzoneModerationDefsModEventEmail(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventResolveAppeal(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventResolveAppeal {
+            case let .toolsOzoneModerationDefsModEventResolveAppeal(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.ModEventResolveAppeal,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.ModEventResolveAppeal
+                    {
                         self = .toolsOzoneModerationDefsModEventResolveAppeal(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventDivert(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventDivert {
+            case let .toolsOzoneModerationDefsModEventDivert(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.ModEventDivert,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.ModEventDivert
+                    {
                         self = .toolsOzoneModerationDefsModEventDivert(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventTag(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventTag {
+            case let .toolsOzoneModerationDefsModEventTag(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.ModEventTag,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.ModEventTag
+                    {
                         self = .toolsOzoneModerationDefsModEventTag(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsAccountEvent(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.AccountEvent {
+            case let .toolsOzoneModerationDefsAccountEvent(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.AccountEvent,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.AccountEvent
+                    {
                         self = .toolsOzoneModerationDefsAccountEvent(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsIdentityEvent(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.IdentityEvent {
+            case let .toolsOzoneModerationDefsIdentityEvent(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.IdentityEvent,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.IdentityEvent
+                    {
                         self = .toolsOzoneModerationDefsIdentityEvent(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsRecordEvent(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.RecordEvent {
+            case let .toolsOzoneModerationDefsRecordEvent(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.RecordEvent,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.RecordEvent
+                    {
                         self = .toolsOzoneModerationDefsRecordEvent(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventPriorityScore(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventPriorityScore {
+            case let .toolsOzoneModerationDefsModEventPriorityScore(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.ModEventPriorityScore,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.ModEventPriorityScore
+                    {
                         self = .toolsOzoneModerationDefsModEventPriorityScore(updatedValue)
                     }
                 }
@@ -5563,27 +5677,45 @@ public enum ToolsOzoneModerationDefs {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .comAtprotoAdminDefsRepoRef(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ComAtprotoAdminDefs.RepoRef {
+            case let .comAtprotoAdminDefsRepoRef(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ComAtprotoAdminDefs.RepoRef,
+                       let updatedValue = mutableLoadable as? ComAtprotoAdminDefs.RepoRef
+                    {
                         self = .comAtprotoAdminDefsRepoRef(updatedValue)
                     }
                 }
-            case var .comAtprotoRepoStrongRef(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ComAtprotoRepoStrongRef {
+            case let .comAtprotoRepoStrongRef(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ComAtprotoRepoStrongRef,
+                       let updatedValue = mutableLoadable as? ComAtprotoRepoStrongRef
+                    {
                         self = .comAtprotoRepoStrongRef(updatedValue)
                     }
                 }
-            case var .chatBskyConvoDefsMessageRef(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ChatBskyConvoDefs.MessageRef {
+            case let .chatBskyConvoDefsMessageRef(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ChatBskyConvoDefs.MessageRef,
+                       let updatedValue = mutableLoadable as? ChatBskyConvoDefs.MessageRef
+                    {
                         self = .chatBskyConvoDefsMessageRef(updatedValue)
                     }
                 }
@@ -6035,155 +6167,269 @@ public enum ToolsOzoneModerationDefs {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .toolsOzoneModerationDefsModEventTakedown(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventTakedown {
+            case let .toolsOzoneModerationDefsModEventTakedown(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.ModEventTakedown,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.ModEventTakedown
+                    {
                         self = .toolsOzoneModerationDefsModEventTakedown(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventReverseTakedown(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventReverseTakedown {
+            case let .toolsOzoneModerationDefsModEventReverseTakedown(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.ModEventReverseTakedown,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.ModEventReverseTakedown
+                    {
                         self = .toolsOzoneModerationDefsModEventReverseTakedown(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventComment(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventComment {
+            case let .toolsOzoneModerationDefsModEventComment(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.ModEventComment,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.ModEventComment
+                    {
                         self = .toolsOzoneModerationDefsModEventComment(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventReport(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventReport {
+            case let .toolsOzoneModerationDefsModEventReport(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.ModEventReport,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.ModEventReport
+                    {
                         self = .toolsOzoneModerationDefsModEventReport(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventLabel(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventLabel {
+            case let .toolsOzoneModerationDefsModEventLabel(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.ModEventLabel,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.ModEventLabel
+                    {
                         self = .toolsOzoneModerationDefsModEventLabel(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventAcknowledge(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventAcknowledge {
+            case let .toolsOzoneModerationDefsModEventAcknowledge(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.ModEventAcknowledge,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.ModEventAcknowledge
+                    {
                         self = .toolsOzoneModerationDefsModEventAcknowledge(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventEscalate(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventEscalate {
+            case let .toolsOzoneModerationDefsModEventEscalate(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.ModEventEscalate,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.ModEventEscalate
+                    {
                         self = .toolsOzoneModerationDefsModEventEscalate(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventMute(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventMute {
+            case let .toolsOzoneModerationDefsModEventMute(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.ModEventMute,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.ModEventMute
+                    {
                         self = .toolsOzoneModerationDefsModEventMute(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventUnmute(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventUnmute {
+            case let .toolsOzoneModerationDefsModEventUnmute(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.ModEventUnmute,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.ModEventUnmute
+                    {
                         self = .toolsOzoneModerationDefsModEventUnmute(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventMuteReporter(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventMuteReporter {
+            case let .toolsOzoneModerationDefsModEventMuteReporter(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.ModEventMuteReporter,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.ModEventMuteReporter
+                    {
                         self = .toolsOzoneModerationDefsModEventMuteReporter(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventUnmuteReporter(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventUnmuteReporter {
+            case let .toolsOzoneModerationDefsModEventUnmuteReporter(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.ModEventUnmuteReporter,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.ModEventUnmuteReporter
+                    {
                         self = .toolsOzoneModerationDefsModEventUnmuteReporter(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventEmail(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventEmail {
+            case let .toolsOzoneModerationDefsModEventEmail(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.ModEventEmail,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.ModEventEmail
+                    {
                         self = .toolsOzoneModerationDefsModEventEmail(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventResolveAppeal(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventResolveAppeal {
+            case let .toolsOzoneModerationDefsModEventResolveAppeal(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.ModEventResolveAppeal,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.ModEventResolveAppeal
+                    {
                         self = .toolsOzoneModerationDefsModEventResolveAppeal(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventDivert(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventDivert {
+            case let .toolsOzoneModerationDefsModEventDivert(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.ModEventDivert,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.ModEventDivert
+                    {
                         self = .toolsOzoneModerationDefsModEventDivert(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventTag(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventTag {
+            case let .toolsOzoneModerationDefsModEventTag(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.ModEventTag,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.ModEventTag
+                    {
                         self = .toolsOzoneModerationDefsModEventTag(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsAccountEvent(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.AccountEvent {
+            case let .toolsOzoneModerationDefsAccountEvent(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.AccountEvent,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.AccountEvent
+                    {
                         self = .toolsOzoneModerationDefsAccountEvent(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsIdentityEvent(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.IdentityEvent {
+            case let .toolsOzoneModerationDefsIdentityEvent(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.IdentityEvent,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.IdentityEvent
+                    {
                         self = .toolsOzoneModerationDefsIdentityEvent(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsRecordEvent(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.RecordEvent {
+            case let .toolsOzoneModerationDefsRecordEvent(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.RecordEvent,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.RecordEvent
+                    {
                         self = .toolsOzoneModerationDefsRecordEvent(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventPriorityScore(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventPriorityScore {
+            case let .toolsOzoneModerationDefsModEventPriorityScore(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.ModEventPriorityScore,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.ModEventPriorityScore
+                    {
                         self = .toolsOzoneModerationDefsModEventPriorityScore(updatedValue)
                     }
                 }
@@ -6335,35 +6581,59 @@ public enum ToolsOzoneModerationDefs {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .toolsOzoneModerationDefsRepoView(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.RepoView {
+            case let .toolsOzoneModerationDefsRepoView(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.RepoView,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.RepoView
+                    {
                         self = .toolsOzoneModerationDefsRepoView(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsRepoViewNotFound(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.RepoViewNotFound {
+            case let .toolsOzoneModerationDefsRepoViewNotFound(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.RepoViewNotFound,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.RepoViewNotFound
+                    {
                         self = .toolsOzoneModerationDefsRepoViewNotFound(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsRecordView(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.RecordView {
+            case let .toolsOzoneModerationDefsRecordView(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.RecordView,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.RecordView
+                    {
                         self = .toolsOzoneModerationDefsRecordView(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsRecordViewNotFound(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.RecordViewNotFound {
+            case let .toolsOzoneModerationDefsRecordViewNotFound(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.RecordViewNotFound,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.RecordViewNotFound
+                    {
                         self = .toolsOzoneModerationDefsRecordViewNotFound(updatedValue)
                     }
                 }
@@ -6475,19 +6745,31 @@ public enum ToolsOzoneModerationDefs {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .comAtprotoAdminDefsRepoRef(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ComAtprotoAdminDefs.RepoRef {
+            case let .comAtprotoAdminDefsRepoRef(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ComAtprotoAdminDefs.RepoRef,
+                       let updatedValue = mutableLoadable as? ComAtprotoAdminDefs.RepoRef
+                    {
                         self = .comAtprotoAdminDefsRepoRef(updatedValue)
                     }
                 }
-            case var .comAtprotoRepoStrongRef(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ComAtprotoRepoStrongRef {
+            case let .comAtprotoRepoStrongRef(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ComAtprotoRepoStrongRef,
+                       let updatedValue = mutableLoadable as? ComAtprotoRepoStrongRef
+                    {
                         self = .comAtprotoRepoStrongRef(updatedValue)
                     }
                 }
@@ -6599,19 +6881,31 @@ public enum ToolsOzoneModerationDefs {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .toolsOzoneModerationDefsAccountHosting(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.AccountHosting {
+            case let .toolsOzoneModerationDefsAccountHosting(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.AccountHosting,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.AccountHosting
+                    {
                         self = .toolsOzoneModerationDefsAccountHosting(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsRecordHosting(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.RecordHosting {
+            case let .toolsOzoneModerationDefsRecordHosting(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.RecordHosting,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.RecordHosting
+                    {
                         self = .toolsOzoneModerationDefsRecordHosting(updatedValue)
                     }
                 }
@@ -6739,19 +7033,31 @@ public enum ToolsOzoneModerationDefs {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .toolsOzoneModerationDefsImageDetails(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ImageDetails {
+            case let .toolsOzoneModerationDefsImageDetails(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.ImageDetails,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.ImageDetails
+                    {
                         self = .toolsOzoneModerationDefsImageDetails(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsVideoDetails(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.VideoDetails {
+            case let .toolsOzoneModerationDefsVideoDetails(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.VideoDetails,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.VideoDetails
+                    {
                         self = .toolsOzoneModerationDefsVideoDetails(updatedValue)
                     }
                 }

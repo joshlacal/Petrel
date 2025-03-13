@@ -130,19 +130,31 @@ public enum AppBskyLabelerGetServices {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .appBskyLabelerDefsLabelerView(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? AppBskyLabelerDefs.LabelerView {
+            case let .appBskyLabelerDefsLabelerView(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? AppBskyLabelerDefs.LabelerView,
+                       let updatedValue = mutableLoadable as? AppBskyLabelerDefs.LabelerView
+                    {
                         self = .appBskyLabelerDefsLabelerView(updatedValue)
                     }
                 }
-            case var .appBskyLabelerDefsLabelerViewDetailed(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? AppBskyLabelerDefs.LabelerViewDetailed {
+            case let .appBskyLabelerDefsLabelerViewDetailed(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? AppBskyLabelerDefs.LabelerViewDetailed,
+                       let updatedValue = mutableLoadable as? AppBskyLabelerDefs.LabelerViewDetailed
+                    {
                         self = .appBskyLabelerDefsLabelerViewDetailed(updatedValue)
                     }
                 }

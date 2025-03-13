@@ -160,19 +160,31 @@ public enum ComAtprotoModerationCreateReport {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .comAtprotoAdminDefsRepoRef(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ComAtprotoAdminDefs.RepoRef {
+            case let .comAtprotoAdminDefsRepoRef(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ComAtprotoAdminDefs.RepoRef,
+                       let updatedValue = mutableLoadable as? ComAtprotoAdminDefs.RepoRef
+                    {
                         self = .comAtprotoAdminDefsRepoRef(updatedValue)
                     }
                 }
-            case var .comAtprotoRepoStrongRef(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ComAtprotoRepoStrongRef {
+            case let .comAtprotoRepoStrongRef(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ComAtprotoRepoStrongRef,
+                       let updatedValue = mutableLoadable as? ComAtprotoRepoStrongRef
+                    {
                         self = .comAtprotoRepoStrongRef(updatedValue)
                     }
                 }
@@ -284,19 +296,31 @@ public enum ComAtprotoModerationCreateReport {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .comAtprotoAdminDefsRepoRef(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ComAtprotoAdminDefs.RepoRef {
+            case let .comAtprotoAdminDefsRepoRef(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ComAtprotoAdminDefs.RepoRef,
+                       let updatedValue = mutableLoadable as? ComAtprotoAdminDefs.RepoRef
+                    {
                         self = .comAtprotoAdminDefsRepoRef(updatedValue)
                     }
                 }
-            case var .comAtprotoRepoStrongRef(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ComAtprotoRepoStrongRef {
+            case let .comAtprotoRepoStrongRef(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ComAtprotoRepoStrongRef,
+                       let updatedValue = mutableLoadable as? ComAtprotoRepoStrongRef
+                    {
                         self = .comAtprotoRepoStrongRef(updatedValue)
                     }
                 }
@@ -408,19 +432,31 @@ public enum ComAtprotoModerationCreateReport {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .comAtprotoAdminDefsRepoRef(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ComAtprotoAdminDefs.RepoRef {
+            case let .comAtprotoAdminDefsRepoRef(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ComAtprotoAdminDefs.RepoRef,
+                       let updatedValue = mutableLoadable as? ComAtprotoAdminDefs.RepoRef
+                    {
                         self = .comAtprotoAdminDefsRepoRef(updatedValue)
                     }
                 }
-            case var .comAtprotoRepoStrongRef(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ComAtprotoRepoStrongRef {
+            case let .comAtprotoRepoStrongRef(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ComAtprotoRepoStrongRef,
+                       let updatedValue = mutableLoadable as? ComAtprotoRepoStrongRef
+                    {
                         self = .comAtprotoRepoStrongRef(updatedValue)
                     }
                 }

@@ -193,43 +193,73 @@ public enum ChatBskyConvoGetLog {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .chatBskyConvoDefsLogBeginConvo(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ChatBskyConvoDefs.LogBeginConvo {
+            case let .chatBskyConvoDefsLogBeginConvo(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ChatBskyConvoDefs.LogBeginConvo,
+                       let updatedValue = mutableLoadable as? ChatBskyConvoDefs.LogBeginConvo
+                    {
                         self = .chatBskyConvoDefsLogBeginConvo(updatedValue)
                     }
                 }
-            case var .chatBskyConvoDefsLogAcceptConvo(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ChatBskyConvoDefs.LogAcceptConvo {
+            case let .chatBskyConvoDefsLogAcceptConvo(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ChatBskyConvoDefs.LogAcceptConvo,
+                       let updatedValue = mutableLoadable as? ChatBskyConvoDefs.LogAcceptConvo
+                    {
                         self = .chatBskyConvoDefsLogAcceptConvo(updatedValue)
                     }
                 }
-            case var .chatBskyConvoDefsLogLeaveConvo(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ChatBskyConvoDefs.LogLeaveConvo {
+            case let .chatBskyConvoDefsLogLeaveConvo(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ChatBskyConvoDefs.LogLeaveConvo,
+                       let updatedValue = mutableLoadable as? ChatBskyConvoDefs.LogLeaveConvo
+                    {
                         self = .chatBskyConvoDefsLogLeaveConvo(updatedValue)
                     }
                 }
-            case var .chatBskyConvoDefsLogCreateMessage(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ChatBskyConvoDefs.LogCreateMessage {
+            case let .chatBskyConvoDefsLogCreateMessage(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ChatBskyConvoDefs.LogCreateMessage,
+                       let updatedValue = mutableLoadable as? ChatBskyConvoDefs.LogCreateMessage
+                    {
                         self = .chatBskyConvoDefsLogCreateMessage(updatedValue)
                     }
                 }
-            case var .chatBskyConvoDefsLogDeleteMessage(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ChatBskyConvoDefs.LogDeleteMessage {
+            case let .chatBskyConvoDefsLogDeleteMessage(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ChatBskyConvoDefs.LogDeleteMessage,
+                       let updatedValue = mutableLoadable as? ChatBskyConvoDefs.LogDeleteMessage
+                    {
                         self = .chatBskyConvoDefsLogDeleteMessage(updatedValue)
                     }
                 }

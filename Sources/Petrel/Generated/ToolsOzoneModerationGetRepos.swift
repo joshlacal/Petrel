@@ -127,19 +127,31 @@ public enum ToolsOzoneModerationGetRepos {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .toolsOzoneModerationDefsRepoViewDetail(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.RepoViewDetail {
+            case let .toolsOzoneModerationDefsRepoViewDetail(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.RepoViewDetail,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.RepoViewDetail
+                    {
                         self = .toolsOzoneModerationDefsRepoViewDetail(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsRepoViewNotFound(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.RepoViewNotFound {
+            case let .toolsOzoneModerationDefsRepoViewNotFound(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ToolsOzoneModerationDefs.RepoViewNotFound,
+                       let updatedValue = mutableLoadable as? ToolsOzoneModerationDefs.RepoViewNotFound
+                    {
                         self = .toolsOzoneModerationDefsRepoViewNotFound(updatedValue)
                     }
                 }

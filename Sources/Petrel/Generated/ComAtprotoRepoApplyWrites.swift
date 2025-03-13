@@ -640,27 +640,45 @@ public enum ComAtprotoRepoApplyWrites {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .comAtprotoRepoApplyWritesCreate(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.Create {
+            case let .comAtprotoRepoApplyWritesCreate(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ComAtprotoRepoApplyWrites.Create,
+                       let updatedValue = mutableLoadable as? ComAtprotoRepoApplyWrites.Create
+                    {
                         self = .comAtprotoRepoApplyWritesCreate(updatedValue)
                     }
                 }
-            case var .comAtprotoRepoApplyWritesUpdate(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.Update {
+            case let .comAtprotoRepoApplyWritesUpdate(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ComAtprotoRepoApplyWrites.Update,
+                       let updatedValue = mutableLoadable as? ComAtprotoRepoApplyWrites.Update
+                    {
                         self = .comAtprotoRepoApplyWritesUpdate(updatedValue)
                     }
                 }
-            case var .comAtprotoRepoApplyWritesDelete(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.Delete {
+            case let .comAtprotoRepoApplyWritesDelete(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ComAtprotoRepoApplyWrites.Delete,
+                       let updatedValue = mutableLoadable as? ComAtprotoRepoApplyWrites.Delete
+                    {
                         self = .comAtprotoRepoApplyWritesDelete(updatedValue)
                     }
                 }
@@ -792,27 +810,45 @@ public enum ComAtprotoRepoApplyWrites {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .comAtprotoRepoApplyWritesCreateResult(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.CreateResult {
+            case let .comAtprotoRepoApplyWritesCreateResult(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ComAtprotoRepoApplyWrites.CreateResult,
+                       let updatedValue = mutableLoadable as? ComAtprotoRepoApplyWrites.CreateResult
+                    {
                         self = .comAtprotoRepoApplyWritesCreateResult(updatedValue)
                     }
                 }
-            case var .comAtprotoRepoApplyWritesUpdateResult(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.UpdateResult {
+            case let .comAtprotoRepoApplyWritesUpdateResult(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ComAtprotoRepoApplyWrites.UpdateResult,
+                       let updatedValue = mutableLoadable as? ComAtprotoRepoApplyWrites.UpdateResult
+                    {
                         self = .comAtprotoRepoApplyWritesUpdateResult(updatedValue)
                     }
                 }
-            case var .comAtprotoRepoApplyWritesDeleteResult(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.DeleteResult {
+            case let .comAtprotoRepoApplyWritesDeleteResult(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ComAtprotoRepoApplyWrites.DeleteResult,
+                       let updatedValue = mutableLoadable as? ComAtprotoRepoApplyWrites.DeleteResult
+                    {
                         self = .comAtprotoRepoApplyWritesDeleteResult(updatedValue)
                     }
                 }
@@ -944,27 +980,45 @@ public enum ComAtprotoRepoApplyWrites {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .comAtprotoRepoApplyWritesCreate(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.Create {
+            case let .comAtprotoRepoApplyWritesCreate(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ComAtprotoRepoApplyWrites.Create,
+                       let updatedValue = mutableLoadable as? ComAtprotoRepoApplyWrites.Create
+                    {
                         self = .comAtprotoRepoApplyWritesCreate(updatedValue)
                     }
                 }
-            case var .comAtprotoRepoApplyWritesUpdate(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.Update {
+            case let .comAtprotoRepoApplyWritesUpdate(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ComAtprotoRepoApplyWrites.Update,
+                       let updatedValue = mutableLoadable as? ComAtprotoRepoApplyWrites.Update
+                    {
                         self = .comAtprotoRepoApplyWritesUpdate(updatedValue)
                     }
                 }
-            case var .comAtprotoRepoApplyWritesDelete(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.Delete {
+            case let .comAtprotoRepoApplyWritesDelete(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ComAtprotoRepoApplyWrites.Delete,
+                       let updatedValue = mutableLoadable as? ComAtprotoRepoApplyWrites.Delete
+                    {
                         self = .comAtprotoRepoApplyWritesDelete(updatedValue)
                     }
                 }

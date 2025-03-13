@@ -407,27 +407,45 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .appBskyRichtextFacetMention(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? AppBskyRichtextFacet.Mention {
+            case let .appBskyRichtextFacetMention(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? AppBskyRichtextFacet.Mention,
+                       let updatedValue = mutableLoadable as? AppBskyRichtextFacet.Mention
+                    {
                         self = .appBskyRichtextFacetMention(updatedValue)
                     }
                 }
-            case var .appBskyRichtextFacetLink(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? AppBskyRichtextFacet.Link {
+            case let .appBskyRichtextFacetLink(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? AppBskyRichtextFacet.Link,
+                       let updatedValue = mutableLoadable as? AppBskyRichtextFacet.Link
+                    {
                         self = .appBskyRichtextFacetLink(updatedValue)
                     }
                 }
-            case var .appBskyRichtextFacetTag(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? AppBskyRichtextFacet.Tag {
+            case let .appBskyRichtextFacetTag(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? AppBskyRichtextFacet.Tag,
+                       let updatedValue = mutableLoadable as? AppBskyRichtextFacet.Tag
+                    {
                         self = .appBskyRichtextFacetTag(updatedValue)
                     }
                 }

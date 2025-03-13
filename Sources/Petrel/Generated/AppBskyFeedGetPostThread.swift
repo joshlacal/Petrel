@@ -244,27 +244,45 @@ public enum AppBskyFeedGetPostThread {
                     }
                     self = .unexpected(ATProtocolValueContainer.string("Failed to decode: \(error)"))
                 }
-            case var .appBskyFeedDefsThreadViewPost(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? AppBskyFeedDefs.ThreadViewPost {
+            case let .appBskyFeedDefsThreadViewPost(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? AppBskyFeedDefs.ThreadViewPost,
+                       let updatedValue = mutableLoadable as? AppBskyFeedDefs.ThreadViewPost
+                    {
                         self = .appBskyFeedDefsThreadViewPost(updatedValue)
                     }
                 }
-            case var .appBskyFeedDefsNotFoundPost(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? AppBskyFeedDefs.NotFoundPost {
+            case let .appBskyFeedDefsNotFoundPost(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? AppBskyFeedDefs.NotFoundPost,
+                       let updatedValue = mutableLoadable as? AppBskyFeedDefs.NotFoundPost
+                    {
                         self = .appBskyFeedDefsNotFoundPost(updatedValue)
                     }
                 }
-            case var .appBskyFeedDefsBlockedPost(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? AppBskyFeedDefs.BlockedPost {
+            case let .appBskyFeedDefsBlockedPost(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? AppBskyFeedDefs.BlockedPost,
+                       let updatedValue = mutableLoadable as? AppBskyFeedDefs.BlockedPost
+                    {
                         self = .appBskyFeedDefsBlockedPost(updatedValue)
                     }
                 }

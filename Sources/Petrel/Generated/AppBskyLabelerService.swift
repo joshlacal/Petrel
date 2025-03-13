@@ -221,11 +221,17 @@ public struct AppBskyLabelerService: ATProtocolCodable, ATProtocolValue {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .comAtprotoLabelDefsSelfLabels(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? ComAtprotoLabelDefs.SelfLabels {
+            case let .comAtprotoLabelDefsSelfLabels(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? ComAtprotoLabelDefs.SelfLabels,
+                       let updatedValue = mutableLoadable as? ComAtprotoLabelDefs.SelfLabels
+                    {
                         self = .comAtprotoLabelDefsSelfLabels(updatedValue)
                     }
                 }

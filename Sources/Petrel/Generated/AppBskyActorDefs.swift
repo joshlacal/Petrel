@@ -3271,35 +3271,59 @@ public struct AppBskyActorDefs {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .appBskyFeedThreadgateMentionRule(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? AppBskyFeedThreadgate.MentionRule {
+            case let .appBskyFeedThreadgateMentionRule(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? AppBskyFeedThreadgate.MentionRule,
+                       let updatedValue = mutableLoadable as? AppBskyFeedThreadgate.MentionRule
+                    {
                         self = .appBskyFeedThreadgateMentionRule(updatedValue)
                     }
                 }
-            case var .appBskyFeedThreadgateFollowerRule(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? AppBskyFeedThreadgate.FollowerRule {
+            case let .appBskyFeedThreadgateFollowerRule(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? AppBskyFeedThreadgate.FollowerRule,
+                       let updatedValue = mutableLoadable as? AppBskyFeedThreadgate.FollowerRule
+                    {
                         self = .appBskyFeedThreadgateFollowerRule(updatedValue)
                     }
                 }
-            case var .appBskyFeedThreadgateFollowingRule(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? AppBskyFeedThreadgate.FollowingRule {
+            case let .appBskyFeedThreadgateFollowingRule(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? AppBskyFeedThreadgate.FollowingRule,
+                       let updatedValue = mutableLoadable as? AppBskyFeedThreadgate.FollowingRule
+                    {
                         self = .appBskyFeedThreadgateFollowingRule(updatedValue)
                     }
                 }
-            case var .appBskyFeedThreadgateListRule(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? AppBskyFeedThreadgate.ListRule {
+            case let .appBskyFeedThreadgateListRule(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? AppBskyFeedThreadgate.ListRule,
+                       let updatedValue = mutableLoadable as? AppBskyFeedThreadgate.ListRule
+                    {
                         self = .appBskyFeedThreadgateListRule(updatedValue)
                     }
                 }
@@ -3393,11 +3417,17 @@ public struct AppBskyActorDefs {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .appBskyFeedPostgateDisableRule(value):
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update value after loading pending data
-                    if let updatedValue = loadable as? AppBskyFeedPostgate.DisableRule {
+            case let .appBskyFeedPostgateDisableRule(value):
+                // Handle nested PendingDataLoadable values
+                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                    // Create a mutable copy we can work with
+                    var mutableLoadable = loadableValue
+                    await mutableLoadable.loadPendingData()
+
+                    // Only try to cast back if the original value was of the expected type
+                    if let originalValue = value as? AppBskyFeedPostgate.DisableRule,
+                       let updatedValue = mutableLoadable as? AppBskyFeedPostgate.DisableRule
+                    {
                         self = .appBskyFeedPostgateDisableRule(updatedValue)
                     }
                 }
