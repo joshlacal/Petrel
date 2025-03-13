@@ -23,69 +23,156 @@ public struct ATProtocolURI: ATProtocolValue, CustomStringConvertible, QueryPara
     public let authority: String
     public let collection: String?
     public let recordKey: String?
-
+    
+    // Store the original string to avoid recomputing
+    private let originalString: String
+    
     public init(from decoder: Decoder) throws {
+        // Use a simpler direct approach to avoid complex decoder internals
         let container = try decoder.singleValueContainer()
         let uriString = try container.decode(String.self)
-
-        try self.init(uriString: uriString)
+        
+        // Store original string
+        self.originalString = uriString
+        
+        // Parse in a very straightforward way with minimal allocations
+        guard uriString.hasPrefix("at://") else {
+            throw ATProtocolError.invalidURI("Invalid AT URI format")
+        }
+        
+        // Use simple string manipulation
+        let parts = uriString.dropFirst(5).split(separator: "/", omittingEmptySubsequences: false)
+        
+        guard !parts.isEmpty else {
+            throw ATProtocolError.invalidURI("Invalid AT URI: missing authority")
+        }
+        
+        self.authority = String(parts[0])
+        self.collection = parts.count > 1 ? (parts[1].isEmpty ? nil : String(parts[1])) : nil
+        self.recordKey = parts.count > 2 ? (parts[2].isEmpty ? nil : String(parts[2])) : nil
     }
-
+    
     public init(uriString: String) throws {
+        self.originalString = uriString
+        
         guard uriString.hasPrefix("at://"),
               uriString.utf8.count <= 8192
         else {
             throw ATProtocolError.invalidURI("Invalid AT URI format or length")
         }
-
+        
         let trimmedString = String(uriString.dropFirst(5)) // Remove "at://"
-        let components = trimmedString.components(separatedBy: "/").filter { !$0.isEmpty }
-
-        guard let authorityComponent = components.first,
-              !authorityComponent.isEmpty
-        else {
+        let components = trimmedString.split(separator: "/", omittingEmptySubsequences: false)
+        
+        guard !components.isEmpty, !components[0].isEmpty else {
             throw ATProtocolError.invalidURI("Invalid AT URI: missing or empty authority")
         }
-
-        authority = authorityComponent
-        collection = components.count > 1 ? components[1] : nil
-        recordKey = components.count > 2 ? components[2] : nil
+        
+        authority = String(components[0])
+        collection = components.count > 1 ? (components[1].isEmpty ? nil : String(components[1])) : nil
+        recordKey = components.count > 2 ? (components[2].isEmpty ? nil : String(components[2])) : nil
     }
-
+    
     public var description: String {
         return uriString()
     }
-
+    
     public func uriString() -> String {
-        var uri = "at://\(authority)"
-        if let collection = collection {
-            uri += "/\(collection)"
-        }
-        if let recordKey = recordKey {
-            uri += "/\(recordKey)"
-        }
-        return uri
+        // Return the original string if we have it
+        return originalString
     }
-
+    
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let otherURI = other as? ATProtocolURI else {
             return false
         }
-
-        return authority == otherURI.authority && collection == otherURI.collection
-            && recordKey == otherURI.recordKey
+        
+        return authority == otherURI.authority &&
+               collection == otherURI.collection &&
+               recordKey == otherURI.recordKey
     }
-
+    
     public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
-        let uriString = self.uriString()
-        try container.encode(uriString)
+        try container.encode(uriString())
     }
-
+    
     func asQueryItem(name: String) -> URLQueryItem? {
         return URLQueryItem(name: name, value: uriString())
     }
 }
+
+
+/*
+ public struct ATProtocolURI: ATProtocolValue, CustomStringConvertible, QueryParameterConvertible {
+     public let authority: String
+     public let collection: String?
+     public let recordKey: String?
+
+     public init(from decoder: Decoder) throws {
+         let container = try decoder.singleValueContainer()
+         let uriString = try container.decode(String.self)
+
+         try self.init(uriString: uriString)
+     }
+
+     public init(uriString: String) throws {
+         guard uriString.hasPrefix("at://"),
+               uriString.utf8.count <= 8192
+         else {
+             throw ATProtocolError.invalidURI("Invalid AT URI format or length")
+         }
+
+         let trimmedString = String(uriString.dropFirst(5)) // Remove "at://"
+         let components = trimmedString.components(separatedBy: "/").filter { !$0.isEmpty }
+
+         guard let authorityComponent = components.first,
+               !authorityComponent.isEmpty
+         else {
+             throw ATProtocolError.invalidURI("Invalid AT URI: missing or empty authority")
+         }
+
+         authority = authorityComponent
+         collection = components.count > 1 ? components[1] : nil
+         recordKey = components.count > 2 ? components[2] : nil
+     }
+
+     public var description: String {
+         return uriString()
+     }
+
+     public func uriString() -> String {
+         var uri = "at://\(authority)"
+         if let collection = collection {
+             uri += "/\(collection)"
+         }
+         if let recordKey = recordKey {
+             uri += "/\(recordKey)"
+         }
+         return uri
+     }
+
+     public func isEqual(to other: any ATProtocolValue) -> Bool {
+         guard let otherURI = other as? ATProtocolURI else {
+             return false
+         }
+
+         return authority == otherURI.authority && collection == otherURI.collection
+             && recordKey == otherURI.recordKey
+     }
+
+     public func encode(to encoder: Encoder) throws {
+         var container = encoder.singleValueContainer()
+         let uriString = self.uriString()
+         try container.encode(uriString)
+     }
+
+     func asQueryItem(name: String) -> URLQueryItem? {
+         return URLQueryItem(name: name, value: uriString())
+     }
+ }
+
+ */
 
 public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConvertible,
     ExpressibleByStringLiteral
