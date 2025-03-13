@@ -425,7 +425,7 @@ public struct AppBskyFeedPost: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-    public enum AppBskyFeedPostEmbedUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
+    public enum AppBskyFeedPostEmbedUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case appBskyEmbedImages(AppBskyEmbedImages)
         case appBskyEmbedVideo(AppBskyEmbedVideo)
         case appBskyEmbedExternal(AppBskyEmbedExternal)
@@ -511,44 +511,129 @@ public struct AppBskyFeedPost: ATProtocolCodable, ATProtocolValue {
             case rawContent = "_rawContent"
         }
 
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? AppBskyFeedPostEmbedUnion else { return false }
-
-            switch (self, otherValue) {
+        public static func == (lhs: AppBskyFeedPostEmbedUnion, rhs: AppBskyFeedPostEmbedUnion) -> Bool {
+            switch (lhs, rhs) {
             case let (
-                .appBskyEmbedImages(selfValue),
-                .appBskyEmbedImages(otherValue)
+                .appBskyEmbedImages(lhsValue),
+                .appBskyEmbedImages(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyEmbedVideo(selfValue),
-                .appBskyEmbedVideo(otherValue)
+                .appBskyEmbedVideo(lhsValue),
+                .appBskyEmbedVideo(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyEmbedExternal(selfValue),
-                .appBskyEmbedExternal(otherValue)
+                .appBskyEmbedExternal(lhsValue),
+                .appBskyEmbedExternal(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyEmbedRecord(selfValue),
-                .appBskyEmbedRecord(otherValue)
+                .appBskyEmbedRecord(lhsValue),
+                .appBskyEmbedRecord(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyEmbedRecordWithMedia(selfValue),
-                .appBskyEmbedRecordWithMedia(otherValue)
+                .appBskyEmbedRecordWithMedia(lhsValue),
+                .appBskyEmbedRecordWithMedia(rhsValue)
             ):
-                return selfValue == otherValue
-            case let (.unexpected(selfValue), .unexpected(otherValue)):
-                return selfValue.isEqual(to: otherValue)
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
             default:
                 return false
             }
         }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? AppBskyFeedPostEmbedUnion else { return false }
+            return self == otherValue
+        }
+
+        /// Property that indicates if this enum contains pending data that needs loading
+        public var hasPendingData: Bool {
+            switch self {
+            case let .appBskyEmbedImages(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .appBskyEmbedVideo(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .appBskyEmbedExternal(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .appBskyEmbedRecord(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .appBskyEmbedRecordWithMedia(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case .unexpected:
+                return false
+            }
+        }
+
+        /// Attempts to load any pending data in this enum or its children
+        public mutating func loadPendingData() async {
+            switch self {
+            case var .appBskyEmbedImages(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyEmbedImages {
+                        self = .appBskyEmbedImages(updatedValue)
+                    }
+                }
+            case var .appBskyEmbedVideo(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyEmbedVideo {
+                        self = .appBskyEmbedVideo(updatedValue)
+                    }
+                }
+            case var .appBskyEmbedExternal(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyEmbedExternal {
+                        self = .appBskyEmbedExternal(updatedValue)
+                    }
+                }
+            case var .appBskyEmbedRecord(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyEmbedRecord {
+                        self = .appBskyEmbedRecord(updatedValue)
+                    }
+                }
+            case var .appBskyEmbedRecordWithMedia(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyEmbedRecordWithMedia {
+                        self = .appBskyEmbedRecordWithMedia(updatedValue)
+                    }
+                }
+            case .unexpected:
+                // Nothing to load for unexpected values
+                break
+            }
+        }
     }
 
-    public enum AppBskyFeedPostLabelsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
+    public enum AppBskyFeedPostLabelsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case comAtprotoLabelDefsSelfLabels(ComAtprotoLabelDefs.SelfLabels)
         case unexpected(ATProtocolValueContainer)
 
@@ -594,21 +679,54 @@ public struct AppBskyFeedPost: ATProtocolCodable, ATProtocolValue {
             case rawContent = "_rawContent"
         }
 
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? AppBskyFeedPostLabelsUnion else { return false }
-
-            switch (self, otherValue) {
+        public static func == (lhs: AppBskyFeedPostLabelsUnion, rhs: AppBskyFeedPostLabelsUnion) -> Bool {
+            switch (lhs, rhs) {
             case let (
-                .comAtprotoLabelDefsSelfLabels(selfValue),
-                .comAtprotoLabelDefsSelfLabels(otherValue)
+                .comAtprotoLabelDefsSelfLabels(lhsValue),
+                .comAtprotoLabelDefsSelfLabels(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
 
-            case let (.unexpected(selfValue), .unexpected(otherValue)):
-                return selfValue.isEqual(to: otherValue)
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
 
             default:
                 return false
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? AppBskyFeedPostLabelsUnion else { return false }
+            return self == otherValue
+        }
+
+        /// Property that indicates if this enum contains pending data that needs loading
+        public var hasPendingData: Bool {
+            switch self {
+            case let .comAtprotoLabelDefsSelfLabels(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case .unexpected:
+                return false
+            }
+        }
+
+        /// Attempts to load any pending data in this enum or its children
+        public mutating func loadPendingData() async {
+            switch self {
+            case var .comAtprotoLabelDefsSelfLabels(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ComAtprotoLabelDefs.SelfLabels {
+                        self = .comAtprotoLabelDefsSelfLabels(updatedValue)
+                    }
+                }
+            case .unexpected:
+                // Nothing to load for unexpected values
+                break
             }
         }
     }

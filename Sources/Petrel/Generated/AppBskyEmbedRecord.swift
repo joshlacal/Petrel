@@ -586,7 +586,7 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-    public enum ViewRecordUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
+    public enum ViewRecordUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case appBskyEmbedRecordViewRecord(AppBskyEmbedRecord.ViewRecord)
         case appBskyEmbedRecordViewNotFound(AppBskyEmbedRecord.ViewNotFound)
         case appBskyEmbedRecordViewBlocked(AppBskyEmbedRecord.ViewBlocked)
@@ -702,59 +702,183 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
             case rawContent = "_rawContent"
         }
 
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? ViewRecordUnion else { return false }
-
-            switch (self, otherValue) {
+        public static func == (lhs: ViewRecordUnion, rhs: ViewRecordUnion) -> Bool {
+            switch (lhs, rhs) {
             case let (
-                .appBskyEmbedRecordViewRecord(selfValue),
-                .appBskyEmbedRecordViewRecord(otherValue)
+                .appBskyEmbedRecordViewRecord(lhsValue),
+                .appBskyEmbedRecordViewRecord(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyEmbedRecordViewNotFound(selfValue),
-                .appBskyEmbedRecordViewNotFound(otherValue)
+                .appBskyEmbedRecordViewNotFound(lhsValue),
+                .appBskyEmbedRecordViewNotFound(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyEmbedRecordViewBlocked(selfValue),
-                .appBskyEmbedRecordViewBlocked(otherValue)
+                .appBskyEmbedRecordViewBlocked(lhsValue),
+                .appBskyEmbedRecordViewBlocked(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyEmbedRecordViewDetached(selfValue),
-                .appBskyEmbedRecordViewDetached(otherValue)
+                .appBskyEmbedRecordViewDetached(lhsValue),
+                .appBskyEmbedRecordViewDetached(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyFeedDefsGeneratorView(selfValue),
-                .appBskyFeedDefsGeneratorView(otherValue)
+                .appBskyFeedDefsGeneratorView(lhsValue),
+                .appBskyFeedDefsGeneratorView(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyGraphDefsListView(selfValue),
-                .appBskyGraphDefsListView(otherValue)
+                .appBskyGraphDefsListView(lhsValue),
+                .appBskyGraphDefsListView(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyLabelerDefsLabelerView(selfValue),
-                .appBskyLabelerDefsLabelerView(otherValue)
+                .appBskyLabelerDefsLabelerView(lhsValue),
+                .appBskyLabelerDefsLabelerView(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyGraphDefsStarterPackViewBasic(selfValue),
-                .appBskyGraphDefsStarterPackViewBasic(otherValue)
+                .appBskyGraphDefsStarterPackViewBasic(lhsValue),
+                .appBskyGraphDefsStarterPackViewBasic(rhsValue)
             ):
-                return selfValue == otherValue
-            case let (.unexpected(selfValue), .unexpected(otherValue)):
-                return selfValue.isEqual(to: otherValue)
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
             default:
                 return false
             }
         }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? ViewRecordUnion else { return false }
+            return self == otherValue
+        }
+
+        /// Property that indicates if this enum contains pending data that needs loading
+        public var hasPendingData: Bool {
+            switch self {
+            case let .appBskyEmbedRecordViewRecord(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .appBskyEmbedRecordViewNotFound(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .appBskyEmbedRecordViewBlocked(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .appBskyEmbedRecordViewDetached(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .appBskyFeedDefsGeneratorView(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .appBskyGraphDefsListView(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .appBskyLabelerDefsLabelerView(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .appBskyGraphDefsStarterPackViewBasic(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case .unexpected:
+                return false
+            }
+        }
+
+        /// Attempts to load any pending data in this enum or its children
+        public mutating func loadPendingData() async {
+            switch self {
+            case var .appBskyEmbedRecordViewRecord(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyEmbedRecord.ViewRecord {
+                        self = .appBskyEmbedRecordViewRecord(updatedValue)
+                    }
+                }
+            case var .appBskyEmbedRecordViewNotFound(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyEmbedRecord.ViewNotFound {
+                        self = .appBskyEmbedRecordViewNotFound(updatedValue)
+                    }
+                }
+            case var .appBskyEmbedRecordViewBlocked(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyEmbedRecord.ViewBlocked {
+                        self = .appBskyEmbedRecordViewBlocked(updatedValue)
+                    }
+                }
+            case var .appBskyEmbedRecordViewDetached(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyEmbedRecord.ViewDetached {
+                        self = .appBskyEmbedRecordViewDetached(updatedValue)
+                    }
+                }
+            case var .appBskyFeedDefsGeneratorView(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyFeedDefs.GeneratorView {
+                        self = .appBskyFeedDefsGeneratorView(updatedValue)
+                    }
+                }
+            case var .appBskyGraphDefsListView(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyGraphDefs.ListView {
+                        self = .appBskyGraphDefsListView(updatedValue)
+                    }
+                }
+            case var .appBskyLabelerDefsLabelerView(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyLabelerDefs.LabelerView {
+                        self = .appBskyLabelerDefsLabelerView(updatedValue)
+                    }
+                }
+            case var .appBskyGraphDefsStarterPackViewBasic(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyGraphDefs.StarterPackViewBasic {
+                        self = .appBskyGraphDefsStarterPackViewBasic(updatedValue)
+                    }
+                }
+            case .unexpected:
+                // Nothing to load for unexpected values
+                break
+            }
+        }
     }
 
-    public enum ViewRecordEmbedsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
+    public enum ViewRecordEmbedsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case appBskyEmbedImagesView(AppBskyEmbedImages.View)
         case appBskyEmbedVideoView(AppBskyEmbedVideo.View)
         case appBskyEmbedExternalView(AppBskyEmbedExternal.View)
@@ -840,39 +964,124 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
             case rawContent = "_rawContent"
         }
 
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? ViewRecordEmbedsUnion else { return false }
-
-            switch (self, otherValue) {
+        public static func == (lhs: ViewRecordEmbedsUnion, rhs: ViewRecordEmbedsUnion) -> Bool {
+            switch (lhs, rhs) {
             case let (
-                .appBskyEmbedImagesView(selfValue),
-                .appBskyEmbedImagesView(otherValue)
+                .appBskyEmbedImagesView(lhsValue),
+                .appBskyEmbedImagesView(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyEmbedVideoView(selfValue),
-                .appBskyEmbedVideoView(otherValue)
+                .appBskyEmbedVideoView(lhsValue),
+                .appBskyEmbedVideoView(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyEmbedExternalView(selfValue),
-                .appBskyEmbedExternalView(otherValue)
+                .appBskyEmbedExternalView(lhsValue),
+                .appBskyEmbedExternalView(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyEmbedRecordView(selfValue),
-                .appBskyEmbedRecordView(otherValue)
+                .appBskyEmbedRecordView(lhsValue),
+                .appBskyEmbedRecordView(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyEmbedRecordWithMediaView(selfValue),
-                .appBskyEmbedRecordWithMediaView(otherValue)
+                .appBskyEmbedRecordWithMediaView(lhsValue),
+                .appBskyEmbedRecordWithMediaView(rhsValue)
             ):
-                return selfValue == otherValue
-            case let (.unexpected(selfValue), .unexpected(otherValue)):
-                return selfValue.isEqual(to: otherValue)
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
             default:
                 return false
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? ViewRecordEmbedsUnion else { return false }
+            return self == otherValue
+        }
+
+        /// Property that indicates if this enum contains pending data that needs loading
+        public var hasPendingData: Bool {
+            switch self {
+            case let .appBskyEmbedImagesView(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .appBskyEmbedVideoView(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .appBskyEmbedExternalView(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .appBskyEmbedRecordView(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .appBskyEmbedRecordWithMediaView(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case .unexpected:
+                return false
+            }
+        }
+
+        /// Attempts to load any pending data in this enum or its children
+        public mutating func loadPendingData() async {
+            switch self {
+            case var .appBskyEmbedImagesView(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyEmbedImages.View {
+                        self = .appBskyEmbedImagesView(updatedValue)
+                    }
+                }
+            case var .appBskyEmbedVideoView(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyEmbedVideo.View {
+                        self = .appBskyEmbedVideoView(updatedValue)
+                    }
+                }
+            case var .appBskyEmbedExternalView(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyEmbedExternal.View {
+                        self = .appBskyEmbedExternalView(updatedValue)
+                    }
+                }
+            case var .appBskyEmbedRecordView(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyEmbedRecord.View {
+                        self = .appBskyEmbedRecordView(updatedValue)
+                    }
+                }
+            case var .appBskyEmbedRecordWithMediaView(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyEmbedRecordWithMedia.View {
+                        self = .appBskyEmbedRecordWithMediaView(updatedValue)
+                    }
+                }
+            case .unexpected:
+                // Nothing to load for unexpected values
+                break
             }
         }
     }

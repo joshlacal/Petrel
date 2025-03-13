@@ -2,7 +2,7 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.graph.getRelationships
 
-public struct AppBskyGraphGetRelationships {
+public enum AppBskyGraphGetRelationships {
     public static let typeIdentifier = "app.bsky.graph.getRelationships"
     public struct Parameters: Parametrizable {
         public let actor: String
@@ -42,7 +42,7 @@ public struct AppBskyGraphGetRelationships {
         }
     }
 
-    public enum OutputRelationshipsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
+    public enum OutputRelationshipsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case appBskyGraphDefsRelationship(AppBskyGraphDefs.Relationship)
         case appBskyGraphDefsNotFoundActor(AppBskyGraphDefs.NotFoundActor)
         case unexpected(ATProtocolValueContainer)
@@ -98,24 +98,70 @@ public struct AppBskyGraphGetRelationships {
             case rawContent = "_rawContent"
         }
 
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? OutputRelationshipsUnion else { return false }
-
-            switch (self, otherValue) {
+        public static func == (lhs: OutputRelationshipsUnion, rhs: OutputRelationshipsUnion) -> Bool {
+            switch (lhs, rhs) {
             case let (
-                .appBskyGraphDefsRelationship(selfValue),
-                .appBskyGraphDefsRelationship(otherValue)
+                .appBskyGraphDefsRelationship(lhsValue),
+                .appBskyGraphDefsRelationship(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyGraphDefsNotFoundActor(selfValue),
-                .appBskyGraphDefsNotFoundActor(otherValue)
+                .appBskyGraphDefsNotFoundActor(lhsValue),
+                .appBskyGraphDefsNotFoundActor(rhsValue)
             ):
-                return selfValue == otherValue
-            case let (.unexpected(selfValue), .unexpected(otherValue)):
-                return selfValue.isEqual(to: otherValue)
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
             default:
                 return false
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? OutputRelationshipsUnion else { return false }
+            return self == otherValue
+        }
+
+        /// Property that indicates if this enum contains pending data that needs loading
+        public var hasPendingData: Bool {
+            switch self {
+            case let .appBskyGraphDefsRelationship(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .appBskyGraphDefsNotFoundActor(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case .unexpected:
+                return false
+            }
+        }
+
+        /// Attempts to load any pending data in this enum or its children
+        public mutating func loadPendingData() async {
+            switch self {
+            case var .appBskyGraphDefsRelationship(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyGraphDefs.Relationship {
+                        self = .appBskyGraphDefsRelationship(updatedValue)
+                    }
+                }
+            case var .appBskyGraphDefsNotFoundActor(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyGraphDefs.NotFoundActor {
+                        self = .appBskyGraphDefsNotFoundActor(updatedValue)
+                    }
+                }
+            case .unexpected:
+                // Nothing to load for unexpected values
+                break
             }
         }
     }

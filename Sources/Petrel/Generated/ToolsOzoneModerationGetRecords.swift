@@ -2,7 +2,7 @@ import Foundation
 
 // lexicon: 1, id: tools.ozone.moderation.getRecords
 
-public struct ToolsOzoneModerationGetRecords {
+public enum ToolsOzoneModerationGetRecords {
     public static let typeIdentifier = "tools.ozone.moderation.getRecords"
     public struct Parameters: Parametrizable {
         public let uris: [ATProtocolURI]
@@ -26,7 +26,7 @@ public struct ToolsOzoneModerationGetRecords {
         }
     }
 
-    public enum OutputRecordsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
+    public enum OutputRecordsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case toolsOzoneModerationDefsRecordViewDetail(ToolsOzoneModerationDefs.RecordViewDetail)
         case toolsOzoneModerationDefsRecordViewNotFound(ToolsOzoneModerationDefs.RecordViewNotFound)
         case unexpected(ATProtocolValueContainer)
@@ -82,24 +82,70 @@ public struct ToolsOzoneModerationGetRecords {
             case rawContent = "_rawContent"
         }
 
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? OutputRecordsUnion else { return false }
-
-            switch (self, otherValue) {
+        public static func == (lhs: OutputRecordsUnion, rhs: OutputRecordsUnion) -> Bool {
+            switch (lhs, rhs) {
             case let (
-                .toolsOzoneModerationDefsRecordViewDetail(selfValue),
-                .toolsOzoneModerationDefsRecordViewDetail(otherValue)
+                .toolsOzoneModerationDefsRecordViewDetail(lhsValue),
+                .toolsOzoneModerationDefsRecordViewDetail(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .toolsOzoneModerationDefsRecordViewNotFound(selfValue),
-                .toolsOzoneModerationDefsRecordViewNotFound(otherValue)
+                .toolsOzoneModerationDefsRecordViewNotFound(lhsValue),
+                .toolsOzoneModerationDefsRecordViewNotFound(rhsValue)
             ):
-                return selfValue == otherValue
-            case let (.unexpected(selfValue), .unexpected(otherValue)):
-                return selfValue.isEqual(to: otherValue)
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
             default:
                 return false
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? OutputRecordsUnion else { return false }
+            return self == otherValue
+        }
+
+        /// Property that indicates if this enum contains pending data that needs loading
+        public var hasPendingData: Bool {
+            switch self {
+            case let .toolsOzoneModerationDefsRecordViewDetail(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .toolsOzoneModerationDefsRecordViewNotFound(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case .unexpected:
+                return false
+            }
+        }
+
+        /// Attempts to load any pending data in this enum or its children
+        public mutating func loadPendingData() async {
+            switch self {
+            case var .toolsOzoneModerationDefsRecordViewDetail(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.RecordViewDetail {
+                        self = .toolsOzoneModerationDefsRecordViewDetail(updatedValue)
+                    }
+                }
+            case var .toolsOzoneModerationDefsRecordViewNotFound(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.RecordViewNotFound {
+                        self = .toolsOzoneModerationDefsRecordViewNotFound(updatedValue)
+                    }
+                }
+            case .unexpected:
+                // Nothing to load for unexpected values
+                break
             }
         }
     }

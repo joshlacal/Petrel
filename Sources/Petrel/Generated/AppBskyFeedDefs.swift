@@ -2,7 +2,7 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.feed.defs
 
-public struct AppBskyFeedDefs {
+public enum AppBskyFeedDefs {
     public static let typeIdentifier = "app.bsky.feed.defs"
 
     public struct PostView: ATProtocolCodable, ATProtocolValue {
@@ -2031,7 +2031,7 @@ public struct AppBskyFeedDefs {
         }
     }
 
-    public enum PostViewEmbedUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
+    public enum PostViewEmbedUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case appBskyEmbedImagesView(AppBskyEmbedImages.View)
         case appBskyEmbedVideoView(AppBskyEmbedVideo.View)
         case appBskyEmbedExternalView(AppBskyEmbedExternal.View)
@@ -2117,44 +2117,129 @@ public struct AppBskyFeedDefs {
             case rawContent = "_rawContent"
         }
 
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? PostViewEmbedUnion else { return false }
-
-            switch (self, otherValue) {
+        public static func == (lhs: PostViewEmbedUnion, rhs: PostViewEmbedUnion) -> Bool {
+            switch (lhs, rhs) {
             case let (
-                .appBskyEmbedImagesView(selfValue),
-                .appBskyEmbedImagesView(otherValue)
+                .appBskyEmbedImagesView(lhsValue),
+                .appBskyEmbedImagesView(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyEmbedVideoView(selfValue),
-                .appBskyEmbedVideoView(otherValue)
+                .appBskyEmbedVideoView(lhsValue),
+                .appBskyEmbedVideoView(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyEmbedExternalView(selfValue),
-                .appBskyEmbedExternalView(otherValue)
+                .appBskyEmbedExternalView(lhsValue),
+                .appBskyEmbedExternalView(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyEmbedRecordView(selfValue),
-                .appBskyEmbedRecordView(otherValue)
+                .appBskyEmbedRecordView(lhsValue),
+                .appBskyEmbedRecordView(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyEmbedRecordWithMediaView(selfValue),
-                .appBskyEmbedRecordWithMediaView(otherValue)
+                .appBskyEmbedRecordWithMediaView(lhsValue),
+                .appBskyEmbedRecordWithMediaView(rhsValue)
             ):
-                return selfValue == otherValue
-            case let (.unexpected(selfValue), .unexpected(otherValue)):
-                return selfValue.isEqual(to: otherValue)
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
             default:
                 return false
             }
         }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? PostViewEmbedUnion else { return false }
+            return self == otherValue
+        }
+
+        /// Property that indicates if this enum contains pending data that needs loading
+        public var hasPendingData: Bool {
+            switch self {
+            case let .appBskyEmbedImagesView(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .appBskyEmbedVideoView(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .appBskyEmbedExternalView(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .appBskyEmbedRecordView(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .appBskyEmbedRecordWithMediaView(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case .unexpected:
+                return false
+            }
+        }
+
+        /// Attempts to load any pending data in this enum or its children
+        public mutating func loadPendingData() async {
+            switch self {
+            case var .appBskyEmbedImagesView(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyEmbedImages.View {
+                        self = .appBskyEmbedImagesView(updatedValue)
+                    }
+                }
+            case var .appBskyEmbedVideoView(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyEmbedVideo.View {
+                        self = .appBskyEmbedVideoView(updatedValue)
+                    }
+                }
+            case var .appBskyEmbedExternalView(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyEmbedExternal.View {
+                        self = .appBskyEmbedExternalView(updatedValue)
+                    }
+                }
+            case var .appBskyEmbedRecordView(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyEmbedRecord.View {
+                        self = .appBskyEmbedRecordView(updatedValue)
+                    }
+                }
+            case var .appBskyEmbedRecordWithMediaView(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyEmbedRecordWithMedia.View {
+                        self = .appBskyEmbedRecordWithMediaView(updatedValue)
+                    }
+                }
+            case .unexpected:
+                // Nothing to load for unexpected values
+                break
+            }
+        }
     }
 
-    public enum FeedViewPostReasonUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
+    public enum FeedViewPostReasonUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case appBskyFeedDefsReasonRepost(AppBskyFeedDefs.ReasonRepost)
         case appBskyFeedDefsReasonPin(AppBskyFeedDefs.ReasonPin)
         case unexpected(ATProtocolValueContainer)
@@ -2210,29 +2295,75 @@ public struct AppBskyFeedDefs {
             case rawContent = "_rawContent"
         }
 
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? FeedViewPostReasonUnion else { return false }
-
-            switch (self, otherValue) {
+        public static func == (lhs: FeedViewPostReasonUnion, rhs: FeedViewPostReasonUnion) -> Bool {
+            switch (lhs, rhs) {
             case let (
-                .appBskyFeedDefsReasonRepost(selfValue),
-                .appBskyFeedDefsReasonRepost(otherValue)
+                .appBskyFeedDefsReasonRepost(lhsValue),
+                .appBskyFeedDefsReasonRepost(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyFeedDefsReasonPin(selfValue),
-                .appBskyFeedDefsReasonPin(otherValue)
+                .appBskyFeedDefsReasonPin(lhsValue),
+                .appBskyFeedDefsReasonPin(rhsValue)
             ):
-                return selfValue == otherValue
-            case let (.unexpected(selfValue), .unexpected(otherValue)):
-                return selfValue.isEqual(to: otherValue)
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
             default:
                 return false
             }
         }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? FeedViewPostReasonUnion else { return false }
+            return self == otherValue
+        }
+
+        /// Property that indicates if this enum contains pending data that needs loading
+        public var hasPendingData: Bool {
+            switch self {
+            case let .appBskyFeedDefsReasonRepost(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .appBskyFeedDefsReasonPin(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case .unexpected:
+                return false
+            }
+        }
+
+        /// Attempts to load any pending data in this enum or its children
+        public mutating func loadPendingData() async {
+            switch self {
+            case var .appBskyFeedDefsReasonRepost(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyFeedDefs.ReasonRepost {
+                        self = .appBskyFeedDefsReasonRepost(updatedValue)
+                    }
+                }
+            case var .appBskyFeedDefsReasonPin(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyFeedDefs.ReasonPin {
+                        self = .appBskyFeedDefsReasonPin(updatedValue)
+                    }
+                }
+            case .unexpected:
+                // Nothing to load for unexpected values
+                break
+            }
+        }
     }
 
-    public enum ReplyRefRootUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
+    public enum ReplyRefRootUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case appBskyFeedDefsPostView(AppBskyFeedDefs.PostView)
         case appBskyFeedDefsNotFoundPost(AppBskyFeedDefs.NotFoundPost)
         case appBskyFeedDefsBlockedPost(AppBskyFeedDefs.BlockedPost)
@@ -2296,36 +2427,95 @@ public struct AppBskyFeedDefs {
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
             case rawContent = "_rawContent"
+        }
+
+        public static func == (lhs: ReplyRefRootUnion, rhs: ReplyRefRootUnion) -> Bool {
+            switch (lhs, rhs) {
+            case let (
+                .appBskyFeedDefsPostView(lhsValue),
+                .appBskyFeedDefsPostView(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .appBskyFeedDefsNotFoundPost(lhsValue),
+                .appBskyFeedDefsNotFoundPost(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .appBskyFeedDefsBlockedPost(lhsValue),
+                .appBskyFeedDefsBlockedPost(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
+            default:
+                return false
+            }
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let otherValue = other as? ReplyRefRootUnion else { return false }
+            return self == otherValue
+        }
 
-            switch (self, otherValue) {
-            case let (
-                .appBskyFeedDefsPostView(selfValue),
-                .appBskyFeedDefsPostView(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .appBskyFeedDefsNotFoundPost(selfValue),
-                .appBskyFeedDefsNotFoundPost(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .appBskyFeedDefsBlockedPost(selfValue),
-                .appBskyFeedDefsBlockedPost(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (.unexpected(selfValue), .unexpected(otherValue)):
-                return selfValue.isEqual(to: otherValue)
-            default:
+        /// Property that indicates if this enum contains pending data that needs loading
+        public var hasPendingData: Bool {
+            switch self {
+            case let .appBskyFeedDefsPostView(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
                 return false
+            case let .appBskyFeedDefsNotFoundPost(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .appBskyFeedDefsBlockedPost(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case .unexpected:
+                return false
+            }
+        }
+
+        /// Attempts to load any pending data in this enum or its children
+        public mutating func loadPendingData() async {
+            switch self {
+            case var .appBskyFeedDefsPostView(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyFeedDefs.PostView {
+                        self = .appBskyFeedDefsPostView(updatedValue)
+                    }
+                }
+            case var .appBskyFeedDefsNotFoundPost(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyFeedDefs.NotFoundPost {
+                        self = .appBskyFeedDefsNotFoundPost(updatedValue)
+                    }
+                }
+            case var .appBskyFeedDefsBlockedPost(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyFeedDefs.BlockedPost {
+                        self = .appBskyFeedDefsBlockedPost(updatedValue)
+                    }
+                }
+            case .unexpected:
+                // Nothing to load for unexpected values
+                break
             }
         }
     }
 
-    public enum ReplyRefParentUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
+    public enum ReplyRefParentUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case appBskyFeedDefsPostView(AppBskyFeedDefs.PostView)
         case appBskyFeedDefsNotFoundPost(AppBskyFeedDefs.NotFoundPost)
         case appBskyFeedDefsBlockedPost(AppBskyFeedDefs.BlockedPost)
@@ -2391,34 +2581,93 @@ public struct AppBskyFeedDefs {
             case rawContent = "_rawContent"
         }
 
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? ReplyRefParentUnion else { return false }
-
-            switch (self, otherValue) {
+        public static func == (lhs: ReplyRefParentUnion, rhs: ReplyRefParentUnion) -> Bool {
+            switch (lhs, rhs) {
             case let (
-                .appBskyFeedDefsPostView(selfValue),
-                .appBskyFeedDefsPostView(otherValue)
+                .appBskyFeedDefsPostView(lhsValue),
+                .appBskyFeedDefsPostView(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyFeedDefsNotFoundPost(selfValue),
-                .appBskyFeedDefsNotFoundPost(otherValue)
+                .appBskyFeedDefsNotFoundPost(lhsValue),
+                .appBskyFeedDefsNotFoundPost(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyFeedDefsBlockedPost(selfValue),
-                .appBskyFeedDefsBlockedPost(otherValue)
+                .appBskyFeedDefsBlockedPost(lhsValue),
+                .appBskyFeedDefsBlockedPost(rhsValue)
             ):
-                return selfValue == otherValue
-            case let (.unexpected(selfValue), .unexpected(otherValue)):
-                return selfValue.isEqual(to: otherValue)
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
             default:
                 return false
             }
         }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? ReplyRefParentUnion else { return false }
+            return self == otherValue
+        }
+
+        /// Property that indicates if this enum contains pending data that needs loading
+        public var hasPendingData: Bool {
+            switch self {
+            case let .appBskyFeedDefsPostView(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .appBskyFeedDefsNotFoundPost(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .appBskyFeedDefsBlockedPost(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case .unexpected:
+                return false
+            }
+        }
+
+        /// Attempts to load any pending data in this enum or its children
+        public mutating func loadPendingData() async {
+            switch self {
+            case var .appBskyFeedDefsPostView(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyFeedDefs.PostView {
+                        self = .appBskyFeedDefsPostView(updatedValue)
+                    }
+                }
+            case var .appBskyFeedDefsNotFoundPost(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyFeedDefs.NotFoundPost {
+                        self = .appBskyFeedDefsNotFoundPost(updatedValue)
+                    }
+                }
+            case var .appBskyFeedDefsBlockedPost(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyFeedDefs.BlockedPost {
+                        self = .appBskyFeedDefsBlockedPost(updatedValue)
+                    }
+                }
+            case .unexpected:
+                // Nothing to load for unexpected values
+                break
+            }
+        }
     }
 
-    public indirect enum ThreadViewPostParentUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
+    public indirect enum ThreadViewPostParentUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case appBskyFeedDefsThreadViewPost(AppBskyFeedDefs.ThreadViewPost)
         case appBskyFeedDefsNotFoundPost(AppBskyFeedDefs.NotFoundPost)
         case appBskyFeedDefsBlockedPost(AppBskyFeedDefs.BlockedPost)
@@ -2428,10 +2677,13 @@ public struct AppBskyFeedDefs {
 
         /// Structure to hold data for deferred decoding
 
-        public struct PendingDecodeData: Codable, Sendable {
+        public struct PendingDecodeData: Codable, Sendable, Equatable {
             public let rawData: Data
             public let type: String
-            public let depth: Int
+
+            public static func == (lhs: PendingDecodeData, rhs: PendingDecodeData) -> Bool {
+                return lhs.type == rhs.type
+            }
         }
 
         public init(from decoder: Decoder) throws {
@@ -2441,14 +2693,14 @@ public struct AppBskyFeedDefs {
             let depth = decoder.codingPath.count
 
             // Check if we're at a recursion depth that might cause stack overflow
-            if depth > RecursionGuard.threshold {
-                if RecursionGuard.debugMode {
+            if depth > DecodingConfiguration.standard.threshold {
+                if DecodingConfiguration.standard.debugMode {
                     print("🔄 Deferring deep decode for ThreadViewPostParentUnion at depth \(depth), type: \(typeValue)")
                 }
 
                 // Extract the raw JSON to decode asynchronously later
                 let rawData = try JSONEncoder().encode(container.decode(JSONValue.self, forKey: .rawContent))
-                self = .pending(PendingDecodeData(rawData: rawData, type: typeValue, depth: depth))
+                self = .pending(PendingDecodeData(rawData: rawData, type: typeValue))
                 return
             }
 
@@ -2524,32 +2776,35 @@ public struct AppBskyFeedDefs {
             case rawContent = "_rawContent"
         }
 
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? ThreadViewPostParentUnion else { return false }
-
-            switch (self, otherValue) {
+        public static func == (lhs: ThreadViewPostParentUnion, rhs: ThreadViewPostParentUnion) -> Bool {
+            switch (lhs, rhs) {
             case let (
-                .appBskyFeedDefsThreadViewPost(selfValue),
-                .appBskyFeedDefsThreadViewPost(otherValue)
+                .appBskyFeedDefsThreadViewPost(lhsValue),
+                .appBskyFeedDefsThreadViewPost(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyFeedDefsNotFoundPost(selfValue),
-                .appBskyFeedDefsNotFoundPost(otherValue)
+                .appBskyFeedDefsNotFoundPost(lhsValue),
+                .appBskyFeedDefsNotFoundPost(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyFeedDefsBlockedPost(selfValue),
-                .appBskyFeedDefsBlockedPost(otherValue)
+                .appBskyFeedDefsBlockedPost(lhsValue),
+                .appBskyFeedDefsBlockedPost(rhsValue)
             ):
-                return selfValue == otherValue
-            case let (.unexpected(selfValue), .unexpected(otherValue)):
-                return selfValue.isEqual(to: otherValue)
-            case let (.pending(selfData), .pending(otherData)):
-                return selfData.type == otherData.type
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
+            case let (.pending(lhsData), .pending(rhsData)):
+                return lhsData.type == rhsData.type
             default:
                 return false
             }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? ThreadViewPostParentUnion else { return false }
+            return self == otherValue
         }
 
         /// Property that indicates if this enum contains pending data that needs loading
@@ -2586,22 +2841,19 @@ public struct AppBskyFeedDefs {
                     case "app.bsky.feed.defs#threadViewPost":
                         let value = try await SafeDecoder.decode(
                             AppBskyFeedDefs.ThreadViewPost.self,
-                            from: pendingData.rawData,
-                            depth: pendingData.depth
+                            from: pendingData.rawData
                         )
                         self = .appBskyFeedDefsThreadViewPost(value)
                     case "app.bsky.feed.defs#notFoundPost":
                         let value = try await SafeDecoder.decode(
                             AppBskyFeedDefs.NotFoundPost.self,
-                            from: pendingData.rawData,
-                            depth: pendingData.depth
+                            from: pendingData.rawData
                         )
                         self = .appBskyFeedDefsNotFoundPost(value)
                     case "app.bsky.feed.defs#blockedPost":
                         let value = try await SafeDecoder.decode(
                             AppBskyFeedDefs.BlockedPost.self,
-                            from: pendingData.rawData,
-                            depth: pendingData.depth
+                            from: pendingData.rawData
                         )
                         self = .appBskyFeedDefsBlockedPost(value)
                     default:
@@ -2609,7 +2861,7 @@ public struct AppBskyFeedDefs {
                         self = .unexpected(unknownValue)
                     }
                 } catch {
-                    if RecursionGuard.debugMode {
+                    if DecodingConfiguration.standard.debugMode {
                         print("❌ Failed to decode pending data for ThreadViewPostParentUnion: \(error)")
                     }
                     self = .unexpected(ATProtocolValueContainer.string("Failed to decode: \(error)"))
@@ -2645,7 +2897,7 @@ public struct AppBskyFeedDefs {
         }
     }
 
-    public indirect enum ThreadViewPostRepliesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
+    public indirect enum ThreadViewPostRepliesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case appBskyFeedDefsThreadViewPost(AppBskyFeedDefs.ThreadViewPost)
         case appBskyFeedDefsNotFoundPost(AppBskyFeedDefs.NotFoundPost)
         case appBskyFeedDefsBlockedPost(AppBskyFeedDefs.BlockedPost)
@@ -2655,10 +2907,13 @@ public struct AppBskyFeedDefs {
 
         /// Structure to hold data for deferred decoding
 
-        public struct PendingDecodeData: Codable, Sendable {
+        public struct PendingDecodeData: Codable, Sendable, Equatable {
             public let rawData: Data
             public let type: String
-            public let depth: Int
+
+            public static func == (lhs: PendingDecodeData, rhs: PendingDecodeData) -> Bool {
+                return lhs.type == rhs.type
+            }
         }
 
         public init(from decoder: Decoder) throws {
@@ -2668,14 +2923,14 @@ public struct AppBskyFeedDefs {
             let depth = decoder.codingPath.count
 
             // Check if we're at a recursion depth that might cause stack overflow
-            if depth > RecursionGuard.threshold {
-                if RecursionGuard.debugMode {
+            if depth > DecodingConfiguration.standard.threshold {
+                if DecodingConfiguration.standard.debugMode {
                     print("🔄 Deferring deep decode for ThreadViewPostRepliesUnion at depth \(depth), type: \(typeValue)")
                 }
 
                 // Extract the raw JSON to decode asynchronously later
                 let rawData = try JSONEncoder().encode(container.decode(JSONValue.self, forKey: .rawContent))
-                self = .pending(PendingDecodeData(rawData: rawData, type: typeValue, depth: depth))
+                self = .pending(PendingDecodeData(rawData: rawData, type: typeValue))
                 return
             }
 
@@ -2751,32 +3006,35 @@ public struct AppBskyFeedDefs {
             case rawContent = "_rawContent"
         }
 
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? ThreadViewPostRepliesUnion else { return false }
-
-            switch (self, otherValue) {
+        public static func == (lhs: ThreadViewPostRepliesUnion, rhs: ThreadViewPostRepliesUnion) -> Bool {
+            switch (lhs, rhs) {
             case let (
-                .appBskyFeedDefsThreadViewPost(selfValue),
-                .appBskyFeedDefsThreadViewPost(otherValue)
+                .appBskyFeedDefsThreadViewPost(lhsValue),
+                .appBskyFeedDefsThreadViewPost(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyFeedDefsNotFoundPost(selfValue),
-                .appBskyFeedDefsNotFoundPost(otherValue)
+                .appBskyFeedDefsNotFoundPost(lhsValue),
+                .appBskyFeedDefsNotFoundPost(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyFeedDefsBlockedPost(selfValue),
-                .appBskyFeedDefsBlockedPost(otherValue)
+                .appBskyFeedDefsBlockedPost(lhsValue),
+                .appBskyFeedDefsBlockedPost(rhsValue)
             ):
-                return selfValue == otherValue
-            case let (.unexpected(selfValue), .unexpected(otherValue)):
-                return selfValue.isEqual(to: otherValue)
-            case let (.pending(selfData), .pending(otherData)):
-                return selfData.type == otherData.type
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
+            case let (.pending(lhsData), .pending(rhsData)):
+                return lhsData.type == rhsData.type
             default:
                 return false
             }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? ThreadViewPostRepliesUnion else { return false }
+            return self == otherValue
         }
 
         /// Property that indicates if this enum contains pending data that needs loading
@@ -2813,22 +3071,19 @@ public struct AppBskyFeedDefs {
                     case "app.bsky.feed.defs#threadViewPost":
                         let value = try await SafeDecoder.decode(
                             AppBskyFeedDefs.ThreadViewPost.self,
-                            from: pendingData.rawData,
-                            depth: pendingData.depth
+                            from: pendingData.rawData
                         )
                         self = .appBskyFeedDefsThreadViewPost(value)
                     case "app.bsky.feed.defs#notFoundPost":
                         let value = try await SafeDecoder.decode(
                             AppBskyFeedDefs.NotFoundPost.self,
-                            from: pendingData.rawData,
-                            depth: pendingData.depth
+                            from: pendingData.rawData
                         )
                         self = .appBskyFeedDefsNotFoundPost(value)
                     case "app.bsky.feed.defs#blockedPost":
                         let value = try await SafeDecoder.decode(
                             AppBskyFeedDefs.BlockedPost.self,
-                            from: pendingData.rawData,
-                            depth: pendingData.depth
+                            from: pendingData.rawData
                         )
                         self = .appBskyFeedDefsBlockedPost(value)
                     default:
@@ -2836,7 +3091,7 @@ public struct AppBskyFeedDefs {
                         self = .unexpected(unknownValue)
                     }
                 } catch {
-                    if RecursionGuard.debugMode {
+                    if DecodingConfiguration.standard.debugMode {
                         print("❌ Failed to decode pending data for ThreadViewPostRepliesUnion: \(error)")
                     }
                     self = .unexpected(ATProtocolValueContainer.string("Failed to decode: \(error)"))
@@ -2872,7 +3127,7 @@ public struct AppBskyFeedDefs {
         }
     }
 
-    public enum SkeletonFeedPostReasonUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
+    public enum SkeletonFeedPostReasonUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case appBskyFeedDefsSkeletonReasonRepost(AppBskyFeedDefs.SkeletonReasonRepost)
         case appBskyFeedDefsSkeletonReasonPin(AppBskyFeedDefs.SkeletonReasonPin)
         case unexpected(ATProtocolValueContainer)
@@ -2928,24 +3183,70 @@ public struct AppBskyFeedDefs {
             case rawContent = "_rawContent"
         }
 
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? SkeletonFeedPostReasonUnion else { return false }
-
-            switch (self, otherValue) {
+        public static func == (lhs: SkeletonFeedPostReasonUnion, rhs: SkeletonFeedPostReasonUnion) -> Bool {
+            switch (lhs, rhs) {
             case let (
-                .appBskyFeedDefsSkeletonReasonRepost(selfValue),
-                .appBskyFeedDefsSkeletonReasonRepost(otherValue)
+                .appBskyFeedDefsSkeletonReasonRepost(lhsValue),
+                .appBskyFeedDefsSkeletonReasonRepost(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyFeedDefsSkeletonReasonPin(selfValue),
-                .appBskyFeedDefsSkeletonReasonPin(otherValue)
+                .appBskyFeedDefsSkeletonReasonPin(lhsValue),
+                .appBskyFeedDefsSkeletonReasonPin(rhsValue)
             ):
-                return selfValue == otherValue
-            case let (.unexpected(selfValue), .unexpected(otherValue)):
-                return selfValue.isEqual(to: otherValue)
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
             default:
                 return false
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? SkeletonFeedPostReasonUnion else { return false }
+            return self == otherValue
+        }
+
+        /// Property that indicates if this enum contains pending data that needs loading
+        public var hasPendingData: Bool {
+            switch self {
+            case let .appBskyFeedDefsSkeletonReasonRepost(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .appBskyFeedDefsSkeletonReasonPin(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case .unexpected:
+                return false
+            }
+        }
+
+        /// Attempts to load any pending data in this enum or its children
+        public mutating func loadPendingData() async {
+            switch self {
+            case var .appBskyFeedDefsSkeletonReasonRepost(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyFeedDefs.SkeletonReasonRepost {
+                        self = .appBskyFeedDefsSkeletonReasonRepost(updatedValue)
+                    }
+                }
+            case var .appBskyFeedDefsSkeletonReasonPin(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyFeedDefs.SkeletonReasonPin {
+                        self = .appBskyFeedDefsSkeletonReasonPin(updatedValue)
+                    }
+                }
+            case .unexpected:
+                // Nothing to load for unexpected values
+                break
             }
         }
     }

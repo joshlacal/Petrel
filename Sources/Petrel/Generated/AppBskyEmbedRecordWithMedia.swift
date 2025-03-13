@@ -124,7 +124,7 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-    public enum ViewMediaUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
+    public enum ViewMediaUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case appBskyEmbedImagesView(AppBskyEmbedImages.View)
         case appBskyEmbedVideoView(AppBskyEmbedVideo.View)
         case appBskyEmbedExternalView(AppBskyEmbedExternal.View)
@@ -190,34 +190,93 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
             case rawContent = "_rawContent"
         }
 
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? ViewMediaUnion else { return false }
-
-            switch (self, otherValue) {
+        public static func == (lhs: ViewMediaUnion, rhs: ViewMediaUnion) -> Bool {
+            switch (lhs, rhs) {
             case let (
-                .appBskyEmbedImagesView(selfValue),
-                .appBskyEmbedImagesView(otherValue)
+                .appBskyEmbedImagesView(lhsValue),
+                .appBskyEmbedImagesView(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyEmbedVideoView(selfValue),
-                .appBskyEmbedVideoView(otherValue)
+                .appBskyEmbedVideoView(lhsValue),
+                .appBskyEmbedVideoView(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyEmbedExternalView(selfValue),
-                .appBskyEmbedExternalView(otherValue)
+                .appBskyEmbedExternalView(lhsValue),
+                .appBskyEmbedExternalView(rhsValue)
             ):
-                return selfValue == otherValue
-            case let (.unexpected(selfValue), .unexpected(otherValue)):
-                return selfValue.isEqual(to: otherValue)
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
             default:
                 return false
             }
         }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? ViewMediaUnion else { return false }
+            return self == otherValue
+        }
+
+        /// Property that indicates if this enum contains pending data that needs loading
+        public var hasPendingData: Bool {
+            switch self {
+            case let .appBskyEmbedImagesView(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .appBskyEmbedVideoView(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .appBskyEmbedExternalView(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case .unexpected:
+                return false
+            }
+        }
+
+        /// Attempts to load any pending data in this enum or its children
+        public mutating func loadPendingData() async {
+            switch self {
+            case var .appBskyEmbedImagesView(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyEmbedImages.View {
+                        self = .appBskyEmbedImagesView(updatedValue)
+                    }
+                }
+            case var .appBskyEmbedVideoView(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyEmbedVideo.View {
+                        self = .appBskyEmbedVideoView(updatedValue)
+                    }
+                }
+            case var .appBskyEmbedExternalView(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyEmbedExternal.View {
+                        self = .appBskyEmbedExternalView(updatedValue)
+                    }
+                }
+            case .unexpected:
+                // Nothing to load for unexpected values
+                break
+            }
+        }
     }
 
-    public enum AppBskyEmbedRecordWithMediaMediaUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
+    public enum AppBskyEmbedRecordWithMediaMediaUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case appBskyEmbedImages(AppBskyEmbedImages)
         case appBskyEmbedVideo(AppBskyEmbedVideo)
         case appBskyEmbedExternal(AppBskyEmbedExternal)
@@ -283,29 +342,88 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
             case rawContent = "_rawContent"
         }
 
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? AppBskyEmbedRecordWithMediaMediaUnion else { return false }
-
-            switch (self, otherValue) {
+        public static func == (lhs: AppBskyEmbedRecordWithMediaMediaUnion, rhs: AppBskyEmbedRecordWithMediaMediaUnion) -> Bool {
+            switch (lhs, rhs) {
             case let (
-                .appBskyEmbedImages(selfValue),
-                .appBskyEmbedImages(otherValue)
+                .appBskyEmbedImages(lhsValue),
+                .appBskyEmbedImages(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyEmbedVideo(selfValue),
-                .appBskyEmbedVideo(otherValue)
+                .appBskyEmbedVideo(lhsValue),
+                .appBskyEmbedVideo(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyEmbedExternal(selfValue),
-                .appBskyEmbedExternal(otherValue)
+                .appBskyEmbedExternal(lhsValue),
+                .appBskyEmbedExternal(rhsValue)
             ):
-                return selfValue == otherValue
-            case let (.unexpected(selfValue), .unexpected(otherValue)):
-                return selfValue.isEqual(to: otherValue)
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
             default:
                 return false
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? AppBskyEmbedRecordWithMediaMediaUnion else { return false }
+            return self == otherValue
+        }
+
+        /// Property that indicates if this enum contains pending data that needs loading
+        public var hasPendingData: Bool {
+            switch self {
+            case let .appBskyEmbedImages(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .appBskyEmbedVideo(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .appBskyEmbedExternal(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case .unexpected:
+                return false
+            }
+        }
+
+        /// Attempts to load any pending data in this enum or its children
+        public mutating func loadPendingData() async {
+            switch self {
+            case var .appBskyEmbedImages(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyEmbedImages {
+                        self = .appBskyEmbedImages(updatedValue)
+                    }
+                }
+            case var .appBskyEmbedVideo(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyEmbedVideo {
+                        self = .appBskyEmbedVideo(updatedValue)
+                    }
+                }
+            case var .appBskyEmbedExternal(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyEmbedExternal {
+                        self = .appBskyEmbedExternal(updatedValue)
+                    }
+                }
+            case .unexpected:
+                // Nothing to load for unexpected values
+                break
             }
         }
     }

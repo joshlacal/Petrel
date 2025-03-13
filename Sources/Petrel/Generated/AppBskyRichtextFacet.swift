@@ -286,7 +286,7 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-    public enum AppBskyRichtextFacetFeaturesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
+    public enum AppBskyRichtextFacetFeaturesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case appBskyRichtextFacetMention(AppBskyRichtextFacet.Mention)
         case appBskyRichtextFacetLink(AppBskyRichtextFacet.Link)
         case appBskyRichtextFacetTag(AppBskyRichtextFacet.Tag)
@@ -352,29 +352,88 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
             case rawContent = "_rawContent"
         }
 
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? AppBskyRichtextFacetFeaturesUnion else { return false }
-
-            switch (self, otherValue) {
+        public static func == (lhs: AppBskyRichtextFacetFeaturesUnion, rhs: AppBskyRichtextFacetFeaturesUnion) -> Bool {
+            switch (lhs, rhs) {
             case let (
-                .appBskyRichtextFacetMention(selfValue),
-                .appBskyRichtextFacetMention(otherValue)
+                .appBskyRichtextFacetMention(lhsValue),
+                .appBskyRichtextFacetMention(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyRichtextFacetLink(selfValue),
-                .appBskyRichtextFacetLink(otherValue)
+                .appBskyRichtextFacetLink(lhsValue),
+                .appBskyRichtextFacetLink(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .appBskyRichtextFacetTag(selfValue),
-                .appBskyRichtextFacetTag(otherValue)
+                .appBskyRichtextFacetTag(lhsValue),
+                .appBskyRichtextFacetTag(rhsValue)
             ):
-                return selfValue == otherValue
-            case let (.unexpected(selfValue), .unexpected(otherValue)):
-                return selfValue.isEqual(to: otherValue)
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
             default:
                 return false
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? AppBskyRichtextFacetFeaturesUnion else { return false }
+            return self == otherValue
+        }
+
+        /// Property that indicates if this enum contains pending data that needs loading
+        public var hasPendingData: Bool {
+            switch self {
+            case let .appBskyRichtextFacetMention(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .appBskyRichtextFacetLink(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .appBskyRichtextFacetTag(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case .unexpected:
+                return false
+            }
+        }
+
+        /// Attempts to load any pending data in this enum or its children
+        public mutating func loadPendingData() async {
+            switch self {
+            case var .appBskyRichtextFacetMention(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyRichtextFacet.Mention {
+                        self = .appBskyRichtextFacetMention(updatedValue)
+                    }
+                }
+            case var .appBskyRichtextFacetLink(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyRichtextFacet.Link {
+                        self = .appBskyRichtextFacetLink(updatedValue)
+                    }
+                }
+            case var .appBskyRichtextFacetTag(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? AppBskyRichtextFacet.Tag {
+                        self = .appBskyRichtextFacetTag(updatedValue)
+                    }
+                }
+            case .unexpected:
+                // Nothing to load for unexpected values
+                break
             }
         }
     }

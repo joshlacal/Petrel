@@ -2,7 +2,7 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.repo.applyWrites
 
-public struct ComAtprotoRepoApplyWrites {
+public enum ComAtprotoRepoApplyWrites {
     public static let typeIdentifier = "com.atproto.repo.applyWrites"
 
     public struct Create: ATProtocolCodable, ATProtocolValue {
@@ -519,7 +519,7 @@ public struct ComAtprotoRepoApplyWrites {
         }
     }
 
-    public enum InputWritesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
+    public enum InputWritesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case comAtprotoRepoApplyWritesCreate(ComAtprotoRepoApplyWrites.Create)
         case comAtprotoRepoApplyWritesUpdate(ComAtprotoRepoApplyWrites.Update)
         case comAtprotoRepoApplyWritesDelete(ComAtprotoRepoApplyWrites.Delete)
@@ -585,34 +585,93 @@ public struct ComAtprotoRepoApplyWrites {
             case rawContent = "_rawContent"
         }
 
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? InputWritesUnion else { return false }
-
-            switch (self, otherValue) {
+        public static func == (lhs: InputWritesUnion, rhs: InputWritesUnion) -> Bool {
+            switch (lhs, rhs) {
             case let (
-                .comAtprotoRepoApplyWritesCreate(selfValue),
-                .comAtprotoRepoApplyWritesCreate(otherValue)
+                .comAtprotoRepoApplyWritesCreate(lhsValue),
+                .comAtprotoRepoApplyWritesCreate(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .comAtprotoRepoApplyWritesUpdate(selfValue),
-                .comAtprotoRepoApplyWritesUpdate(otherValue)
+                .comAtprotoRepoApplyWritesUpdate(lhsValue),
+                .comAtprotoRepoApplyWritesUpdate(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .comAtprotoRepoApplyWritesDelete(selfValue),
-                .comAtprotoRepoApplyWritesDelete(otherValue)
+                .comAtprotoRepoApplyWritesDelete(lhsValue),
+                .comAtprotoRepoApplyWritesDelete(rhsValue)
             ):
-                return selfValue == otherValue
-            case let (.unexpected(selfValue), .unexpected(otherValue)):
-                return selfValue.isEqual(to: otherValue)
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
             default:
                 return false
             }
         }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? InputWritesUnion else { return false }
+            return self == otherValue
+        }
+
+        /// Property that indicates if this enum contains pending data that needs loading
+        public var hasPendingData: Bool {
+            switch self {
+            case let .comAtprotoRepoApplyWritesCreate(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .comAtprotoRepoApplyWritesUpdate(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .comAtprotoRepoApplyWritesDelete(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case .unexpected:
+                return false
+            }
+        }
+
+        /// Attempts to load any pending data in this enum or its children
+        public mutating func loadPendingData() async {
+            switch self {
+            case var .comAtprotoRepoApplyWritesCreate(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.Create {
+                        self = .comAtprotoRepoApplyWritesCreate(updatedValue)
+                    }
+                }
+            case var .comAtprotoRepoApplyWritesUpdate(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.Update {
+                        self = .comAtprotoRepoApplyWritesUpdate(updatedValue)
+                    }
+                }
+            case var .comAtprotoRepoApplyWritesDelete(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.Delete {
+                        self = .comAtprotoRepoApplyWritesDelete(updatedValue)
+                    }
+                }
+            case .unexpected:
+                // Nothing to load for unexpected values
+                break
+            }
+        }
     }
 
-    public enum OutputResultsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
+    public enum OutputResultsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case comAtprotoRepoApplyWritesCreateResult(ComAtprotoRepoApplyWrites.CreateResult)
         case comAtprotoRepoApplyWritesUpdateResult(ComAtprotoRepoApplyWrites.UpdateResult)
         case comAtprotoRepoApplyWritesDeleteResult(ComAtprotoRepoApplyWrites.DeleteResult)
@@ -678,34 +737,93 @@ public struct ComAtprotoRepoApplyWrites {
             case rawContent = "_rawContent"
         }
 
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? OutputResultsUnion else { return false }
-
-            switch (self, otherValue) {
+        public static func == (lhs: OutputResultsUnion, rhs: OutputResultsUnion) -> Bool {
+            switch (lhs, rhs) {
             case let (
-                .comAtprotoRepoApplyWritesCreateResult(selfValue),
-                .comAtprotoRepoApplyWritesCreateResult(otherValue)
+                .comAtprotoRepoApplyWritesCreateResult(lhsValue),
+                .comAtprotoRepoApplyWritesCreateResult(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .comAtprotoRepoApplyWritesUpdateResult(selfValue),
-                .comAtprotoRepoApplyWritesUpdateResult(otherValue)
+                .comAtprotoRepoApplyWritesUpdateResult(lhsValue),
+                .comAtprotoRepoApplyWritesUpdateResult(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .comAtprotoRepoApplyWritesDeleteResult(selfValue),
-                .comAtprotoRepoApplyWritesDeleteResult(otherValue)
+                .comAtprotoRepoApplyWritesDeleteResult(lhsValue),
+                .comAtprotoRepoApplyWritesDeleteResult(rhsValue)
             ):
-                return selfValue == otherValue
-            case let (.unexpected(selfValue), .unexpected(otherValue)):
-                return selfValue.isEqual(to: otherValue)
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
             default:
                 return false
             }
         }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? OutputResultsUnion else { return false }
+            return self == otherValue
+        }
+
+        /// Property that indicates if this enum contains pending data that needs loading
+        public var hasPendingData: Bool {
+            switch self {
+            case let .comAtprotoRepoApplyWritesCreateResult(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .comAtprotoRepoApplyWritesUpdateResult(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .comAtprotoRepoApplyWritesDeleteResult(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case .unexpected:
+                return false
+            }
+        }
+
+        /// Attempts to load any pending data in this enum or its children
+        public mutating func loadPendingData() async {
+            switch self {
+            case var .comAtprotoRepoApplyWritesCreateResult(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.CreateResult {
+                        self = .comAtprotoRepoApplyWritesCreateResult(updatedValue)
+                    }
+                }
+            case var .comAtprotoRepoApplyWritesUpdateResult(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.UpdateResult {
+                        self = .comAtprotoRepoApplyWritesUpdateResult(updatedValue)
+                    }
+                }
+            case var .comAtprotoRepoApplyWritesDeleteResult(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.DeleteResult {
+                        self = .comAtprotoRepoApplyWritesDeleteResult(updatedValue)
+                    }
+                }
+            case .unexpected:
+                // Nothing to load for unexpected values
+                break
+            }
+        }
     }
 
-    public enum ComAtprotoRepoApplyWritesWritesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
+    public enum ComAtprotoRepoApplyWritesWritesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case comAtprotoRepoApplyWritesCreate(ComAtprotoRepoApplyWrites.Create)
         case comAtprotoRepoApplyWritesUpdate(ComAtprotoRepoApplyWrites.Update)
         case comAtprotoRepoApplyWritesDelete(ComAtprotoRepoApplyWrites.Delete)
@@ -771,29 +889,88 @@ public struct ComAtprotoRepoApplyWrites {
             case rawContent = "_rawContent"
         }
 
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? ComAtprotoRepoApplyWritesWritesUnion else { return false }
-
-            switch (self, otherValue) {
+        public static func == (lhs: ComAtprotoRepoApplyWritesWritesUnion, rhs: ComAtprotoRepoApplyWritesWritesUnion) -> Bool {
+            switch (lhs, rhs) {
             case let (
-                .comAtprotoRepoApplyWritesCreate(selfValue),
-                .comAtprotoRepoApplyWritesCreate(otherValue)
+                .comAtprotoRepoApplyWritesCreate(lhsValue),
+                .comAtprotoRepoApplyWritesCreate(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .comAtprotoRepoApplyWritesUpdate(selfValue),
-                .comAtprotoRepoApplyWritesUpdate(otherValue)
+                .comAtprotoRepoApplyWritesUpdate(lhsValue),
+                .comAtprotoRepoApplyWritesUpdate(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .comAtprotoRepoApplyWritesDelete(selfValue),
-                .comAtprotoRepoApplyWritesDelete(otherValue)
+                .comAtprotoRepoApplyWritesDelete(lhsValue),
+                .comAtprotoRepoApplyWritesDelete(rhsValue)
             ):
-                return selfValue == otherValue
-            case let (.unexpected(selfValue), .unexpected(otherValue)):
-                return selfValue.isEqual(to: otherValue)
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
             default:
                 return false
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? ComAtprotoRepoApplyWritesWritesUnion else { return false }
+            return self == otherValue
+        }
+
+        /// Property that indicates if this enum contains pending data that needs loading
+        public var hasPendingData: Bool {
+            switch self {
+            case let .comAtprotoRepoApplyWritesCreate(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .comAtprotoRepoApplyWritesUpdate(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .comAtprotoRepoApplyWritesDelete(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case .unexpected:
+                return false
+            }
+        }
+
+        /// Attempts to load any pending data in this enum or its children
+        public mutating func loadPendingData() async {
+            switch self {
+            case var .comAtprotoRepoApplyWritesCreate(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.Create {
+                        self = .comAtprotoRepoApplyWritesCreate(updatedValue)
+                    }
+                }
+            case var .comAtprotoRepoApplyWritesUpdate(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.Update {
+                        self = .comAtprotoRepoApplyWritesUpdate(updatedValue)
+                    }
+                }
+            case var .comAtprotoRepoApplyWritesDelete(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.Delete {
+                        self = .comAtprotoRepoApplyWritesDelete(updatedValue)
+                    }
+                }
+            case .unexpected:
+                // Nothing to load for unexpected values
+                break
             }
         }
     }

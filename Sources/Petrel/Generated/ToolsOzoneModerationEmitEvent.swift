@@ -2,7 +2,7 @@ import Foundation
 
 // lexicon: 1, id: tools.ozone.moderation.emitEvent
 
-public struct ToolsOzoneModerationEmitEvent {
+public enum ToolsOzoneModerationEmitEvent {
     public static let typeIdentifier = "tools.ozone.moderation.emitEvent"
     public struct Input: ATProtocolCodable {
         public let event: InputEventUnion
@@ -28,7 +28,7 @@ public struct ToolsOzoneModerationEmitEvent {
         }
     }
 
-    public enum InputEventUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
+    public enum InputEventUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case toolsOzoneModerationDefsModEventTakedown(ToolsOzoneModerationDefs.ModEventTakedown)
         case toolsOzoneModerationDefsModEventAcknowledge(ToolsOzoneModerationDefs.ModEventAcknowledge)
         case toolsOzoneModerationDefsModEventEscalate(ToolsOzoneModerationDefs.ModEventEscalate)
@@ -252,116 +252,383 @@ public struct ToolsOzoneModerationEmitEvent {
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
             case rawContent = "_rawContent"
+        }
+
+        public static func == (lhs: InputEventUnion, rhs: InputEventUnion) -> Bool {
+            switch (lhs, rhs) {
+            case let (
+                .toolsOzoneModerationDefsModEventTakedown(lhsValue),
+                .toolsOzoneModerationDefsModEventTakedown(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .toolsOzoneModerationDefsModEventAcknowledge(lhsValue),
+                .toolsOzoneModerationDefsModEventAcknowledge(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .toolsOzoneModerationDefsModEventEscalate(lhsValue),
+                .toolsOzoneModerationDefsModEventEscalate(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .toolsOzoneModerationDefsModEventComment(lhsValue),
+                .toolsOzoneModerationDefsModEventComment(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .toolsOzoneModerationDefsModEventLabel(lhsValue),
+                .toolsOzoneModerationDefsModEventLabel(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .toolsOzoneModerationDefsModEventReport(lhsValue),
+                .toolsOzoneModerationDefsModEventReport(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .toolsOzoneModerationDefsModEventMute(lhsValue),
+                .toolsOzoneModerationDefsModEventMute(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .toolsOzoneModerationDefsModEventUnmute(lhsValue),
+                .toolsOzoneModerationDefsModEventUnmute(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .toolsOzoneModerationDefsModEventMuteReporter(lhsValue),
+                .toolsOzoneModerationDefsModEventMuteReporter(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .toolsOzoneModerationDefsModEventUnmuteReporter(lhsValue),
+                .toolsOzoneModerationDefsModEventUnmuteReporter(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .toolsOzoneModerationDefsModEventReverseTakedown(lhsValue),
+                .toolsOzoneModerationDefsModEventReverseTakedown(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .toolsOzoneModerationDefsModEventResolveAppeal(lhsValue),
+                .toolsOzoneModerationDefsModEventResolveAppeal(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .toolsOzoneModerationDefsModEventEmail(lhsValue),
+                .toolsOzoneModerationDefsModEventEmail(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .toolsOzoneModerationDefsModEventDivert(lhsValue),
+                .toolsOzoneModerationDefsModEventDivert(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .toolsOzoneModerationDefsModEventTag(lhsValue),
+                .toolsOzoneModerationDefsModEventTag(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .toolsOzoneModerationDefsAccountEvent(lhsValue),
+                .toolsOzoneModerationDefsAccountEvent(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .toolsOzoneModerationDefsIdentityEvent(lhsValue),
+                .toolsOzoneModerationDefsIdentityEvent(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .toolsOzoneModerationDefsRecordEvent(lhsValue),
+                .toolsOzoneModerationDefsRecordEvent(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .toolsOzoneModerationDefsModEventPriorityScore(lhsValue),
+                .toolsOzoneModerationDefsModEventPriorityScore(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
+            default:
+                return false
+            }
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let otherValue = other as? InputEventUnion else { return false }
+            return self == otherValue
+        }
 
-            switch (self, otherValue) {
-            case let (
-                .toolsOzoneModerationDefsModEventTakedown(selfValue),
-                .toolsOzoneModerationDefsModEventTakedown(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .toolsOzoneModerationDefsModEventAcknowledge(selfValue),
-                .toolsOzoneModerationDefsModEventAcknowledge(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .toolsOzoneModerationDefsModEventEscalate(selfValue),
-                .toolsOzoneModerationDefsModEventEscalate(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .toolsOzoneModerationDefsModEventComment(selfValue),
-                .toolsOzoneModerationDefsModEventComment(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .toolsOzoneModerationDefsModEventLabel(selfValue),
-                .toolsOzoneModerationDefsModEventLabel(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .toolsOzoneModerationDefsModEventReport(selfValue),
-                .toolsOzoneModerationDefsModEventReport(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .toolsOzoneModerationDefsModEventMute(selfValue),
-                .toolsOzoneModerationDefsModEventMute(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .toolsOzoneModerationDefsModEventUnmute(selfValue),
-                .toolsOzoneModerationDefsModEventUnmute(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .toolsOzoneModerationDefsModEventMuteReporter(selfValue),
-                .toolsOzoneModerationDefsModEventMuteReporter(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .toolsOzoneModerationDefsModEventUnmuteReporter(selfValue),
-                .toolsOzoneModerationDefsModEventUnmuteReporter(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .toolsOzoneModerationDefsModEventReverseTakedown(selfValue),
-                .toolsOzoneModerationDefsModEventReverseTakedown(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .toolsOzoneModerationDefsModEventResolveAppeal(selfValue),
-                .toolsOzoneModerationDefsModEventResolveAppeal(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .toolsOzoneModerationDefsModEventEmail(selfValue),
-                .toolsOzoneModerationDefsModEventEmail(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .toolsOzoneModerationDefsModEventDivert(selfValue),
-                .toolsOzoneModerationDefsModEventDivert(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .toolsOzoneModerationDefsModEventTag(selfValue),
-                .toolsOzoneModerationDefsModEventTag(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .toolsOzoneModerationDefsAccountEvent(selfValue),
-                .toolsOzoneModerationDefsAccountEvent(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .toolsOzoneModerationDefsIdentityEvent(selfValue),
-                .toolsOzoneModerationDefsIdentityEvent(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .toolsOzoneModerationDefsRecordEvent(selfValue),
-                .toolsOzoneModerationDefsRecordEvent(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .toolsOzoneModerationDefsModEventPriorityScore(selfValue),
-                .toolsOzoneModerationDefsModEventPriorityScore(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (.unexpected(selfValue), .unexpected(otherValue)):
-                return selfValue.isEqual(to: otherValue)
-            default:
+        /// Property that indicates if this enum contains pending data that needs loading
+        public var hasPendingData: Bool {
+            switch self {
+            case let .toolsOzoneModerationDefsModEventTakedown(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
                 return false
+            case let .toolsOzoneModerationDefsModEventAcknowledge(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .toolsOzoneModerationDefsModEventEscalate(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .toolsOzoneModerationDefsModEventComment(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .toolsOzoneModerationDefsModEventLabel(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .toolsOzoneModerationDefsModEventReport(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .toolsOzoneModerationDefsModEventMute(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .toolsOzoneModerationDefsModEventUnmute(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .toolsOzoneModerationDefsModEventMuteReporter(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .toolsOzoneModerationDefsModEventUnmuteReporter(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .toolsOzoneModerationDefsModEventReverseTakedown(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .toolsOzoneModerationDefsModEventResolveAppeal(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .toolsOzoneModerationDefsModEventEmail(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .toolsOzoneModerationDefsModEventDivert(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .toolsOzoneModerationDefsModEventTag(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .toolsOzoneModerationDefsAccountEvent(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .toolsOzoneModerationDefsIdentityEvent(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .toolsOzoneModerationDefsRecordEvent(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .toolsOzoneModerationDefsModEventPriorityScore(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case .unexpected:
+                return false
+            }
+        }
+
+        /// Attempts to load any pending data in this enum or its children
+        public mutating func loadPendingData() async {
+            switch self {
+            case var .toolsOzoneModerationDefsModEventTakedown(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventTakedown {
+                        self = .toolsOzoneModerationDefsModEventTakedown(updatedValue)
+                    }
+                }
+            case var .toolsOzoneModerationDefsModEventAcknowledge(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventAcknowledge {
+                        self = .toolsOzoneModerationDefsModEventAcknowledge(updatedValue)
+                    }
+                }
+            case var .toolsOzoneModerationDefsModEventEscalate(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventEscalate {
+                        self = .toolsOzoneModerationDefsModEventEscalate(updatedValue)
+                    }
+                }
+            case var .toolsOzoneModerationDefsModEventComment(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventComment {
+                        self = .toolsOzoneModerationDefsModEventComment(updatedValue)
+                    }
+                }
+            case var .toolsOzoneModerationDefsModEventLabel(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventLabel {
+                        self = .toolsOzoneModerationDefsModEventLabel(updatedValue)
+                    }
+                }
+            case var .toolsOzoneModerationDefsModEventReport(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventReport {
+                        self = .toolsOzoneModerationDefsModEventReport(updatedValue)
+                    }
+                }
+            case var .toolsOzoneModerationDefsModEventMute(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventMute {
+                        self = .toolsOzoneModerationDefsModEventMute(updatedValue)
+                    }
+                }
+            case var .toolsOzoneModerationDefsModEventUnmute(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventUnmute {
+                        self = .toolsOzoneModerationDefsModEventUnmute(updatedValue)
+                    }
+                }
+            case var .toolsOzoneModerationDefsModEventMuteReporter(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventMuteReporter {
+                        self = .toolsOzoneModerationDefsModEventMuteReporter(updatedValue)
+                    }
+                }
+            case var .toolsOzoneModerationDefsModEventUnmuteReporter(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventUnmuteReporter {
+                        self = .toolsOzoneModerationDefsModEventUnmuteReporter(updatedValue)
+                    }
+                }
+            case var .toolsOzoneModerationDefsModEventReverseTakedown(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventReverseTakedown {
+                        self = .toolsOzoneModerationDefsModEventReverseTakedown(updatedValue)
+                    }
+                }
+            case var .toolsOzoneModerationDefsModEventResolveAppeal(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventResolveAppeal {
+                        self = .toolsOzoneModerationDefsModEventResolveAppeal(updatedValue)
+                    }
+                }
+            case var .toolsOzoneModerationDefsModEventEmail(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventEmail {
+                        self = .toolsOzoneModerationDefsModEventEmail(updatedValue)
+                    }
+                }
+            case var .toolsOzoneModerationDefsModEventDivert(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventDivert {
+                        self = .toolsOzoneModerationDefsModEventDivert(updatedValue)
+                    }
+                }
+            case var .toolsOzoneModerationDefsModEventTag(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventTag {
+                        self = .toolsOzoneModerationDefsModEventTag(updatedValue)
+                    }
+                }
+            case var .toolsOzoneModerationDefsAccountEvent(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.AccountEvent {
+                        self = .toolsOzoneModerationDefsAccountEvent(updatedValue)
+                    }
+                }
+            case var .toolsOzoneModerationDefsIdentityEvent(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.IdentityEvent {
+                        self = .toolsOzoneModerationDefsIdentityEvent(updatedValue)
+                    }
+                }
+            case var .toolsOzoneModerationDefsRecordEvent(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.RecordEvent {
+                        self = .toolsOzoneModerationDefsRecordEvent(updatedValue)
+                    }
+                }
+            case var .toolsOzoneModerationDefsModEventPriorityScore(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventPriorityScore {
+                        self = .toolsOzoneModerationDefsModEventPriorityScore(updatedValue)
+                    }
+                }
+            case .unexpected:
+                // Nothing to load for unexpected values
+                break
             }
         }
     }
 
-    public enum InputSubjectUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
+    public enum InputSubjectUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case comAtprotoAdminDefsRepoRef(ComAtprotoAdminDefs.RepoRef)
         case comAtprotoRepoStrongRef(ComAtprotoRepoStrongRef)
         case unexpected(ATProtocolValueContainer)
@@ -417,29 +684,75 @@ public struct ToolsOzoneModerationEmitEvent {
             case rawContent = "_rawContent"
         }
 
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? InputSubjectUnion else { return false }
-
-            switch (self, otherValue) {
+        public static func == (lhs: InputSubjectUnion, rhs: InputSubjectUnion) -> Bool {
+            switch (lhs, rhs) {
             case let (
-                .comAtprotoAdminDefsRepoRef(selfValue),
-                .comAtprotoAdminDefsRepoRef(otherValue)
+                .comAtprotoAdminDefsRepoRef(lhsValue),
+                .comAtprotoAdminDefsRepoRef(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .comAtprotoRepoStrongRef(selfValue),
-                .comAtprotoRepoStrongRef(otherValue)
+                .comAtprotoRepoStrongRef(lhsValue),
+                .comAtprotoRepoStrongRef(rhsValue)
             ):
-                return selfValue == otherValue
-            case let (.unexpected(selfValue), .unexpected(otherValue)):
-                return selfValue.isEqual(to: otherValue)
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
             default:
                 return false
             }
         }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? InputSubjectUnion else { return false }
+            return self == otherValue
+        }
+
+        /// Property that indicates if this enum contains pending data that needs loading
+        public var hasPendingData: Bool {
+            switch self {
+            case let .comAtprotoAdminDefsRepoRef(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .comAtprotoRepoStrongRef(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case .unexpected:
+                return false
+            }
+        }
+
+        /// Attempts to load any pending data in this enum or its children
+        public mutating func loadPendingData() async {
+            switch self {
+            case var .comAtprotoAdminDefsRepoRef(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ComAtprotoAdminDefs.RepoRef {
+                        self = .comAtprotoAdminDefsRepoRef(updatedValue)
+                    }
+                }
+            case var .comAtprotoRepoStrongRef(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ComAtprotoRepoStrongRef {
+                        self = .comAtprotoRepoStrongRef(updatedValue)
+                    }
+                }
+            case .unexpected:
+                // Nothing to load for unexpected values
+                break
+            }
+        }
     }
 
-    public enum ToolsOzoneModerationEmitEventEventUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
+    public enum ToolsOzoneModerationEmitEventEventUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case toolsOzoneModerationDefsModEventTakedown(ToolsOzoneModerationDefs.ModEventTakedown)
         case toolsOzoneModerationDefsModEventAcknowledge(ToolsOzoneModerationDefs.ModEventAcknowledge)
         case toolsOzoneModerationDefsModEventEscalate(ToolsOzoneModerationDefs.ModEventEscalate)
@@ -665,114 +978,381 @@ public struct ToolsOzoneModerationEmitEvent {
             case rawContent = "_rawContent"
         }
 
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? ToolsOzoneModerationEmitEventEventUnion else { return false }
-
-            switch (self, otherValue) {
+        public static func == (lhs: ToolsOzoneModerationEmitEventEventUnion, rhs: ToolsOzoneModerationEmitEventEventUnion) -> Bool {
+            switch (lhs, rhs) {
             case let (
-                .toolsOzoneModerationDefsModEventTakedown(selfValue),
-                .toolsOzoneModerationDefsModEventTakedown(otherValue)
+                .toolsOzoneModerationDefsModEventTakedown(lhsValue),
+                .toolsOzoneModerationDefsModEventTakedown(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .toolsOzoneModerationDefsModEventAcknowledge(selfValue),
-                .toolsOzoneModerationDefsModEventAcknowledge(otherValue)
+                .toolsOzoneModerationDefsModEventAcknowledge(lhsValue),
+                .toolsOzoneModerationDefsModEventAcknowledge(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .toolsOzoneModerationDefsModEventEscalate(selfValue),
-                .toolsOzoneModerationDefsModEventEscalate(otherValue)
+                .toolsOzoneModerationDefsModEventEscalate(lhsValue),
+                .toolsOzoneModerationDefsModEventEscalate(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .toolsOzoneModerationDefsModEventComment(selfValue),
-                .toolsOzoneModerationDefsModEventComment(otherValue)
+                .toolsOzoneModerationDefsModEventComment(lhsValue),
+                .toolsOzoneModerationDefsModEventComment(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .toolsOzoneModerationDefsModEventLabel(selfValue),
-                .toolsOzoneModerationDefsModEventLabel(otherValue)
+                .toolsOzoneModerationDefsModEventLabel(lhsValue),
+                .toolsOzoneModerationDefsModEventLabel(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .toolsOzoneModerationDefsModEventReport(selfValue),
-                .toolsOzoneModerationDefsModEventReport(otherValue)
+                .toolsOzoneModerationDefsModEventReport(lhsValue),
+                .toolsOzoneModerationDefsModEventReport(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .toolsOzoneModerationDefsModEventMute(selfValue),
-                .toolsOzoneModerationDefsModEventMute(otherValue)
+                .toolsOzoneModerationDefsModEventMute(lhsValue),
+                .toolsOzoneModerationDefsModEventMute(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .toolsOzoneModerationDefsModEventUnmute(selfValue),
-                .toolsOzoneModerationDefsModEventUnmute(otherValue)
+                .toolsOzoneModerationDefsModEventUnmute(lhsValue),
+                .toolsOzoneModerationDefsModEventUnmute(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .toolsOzoneModerationDefsModEventMuteReporter(selfValue),
-                .toolsOzoneModerationDefsModEventMuteReporter(otherValue)
+                .toolsOzoneModerationDefsModEventMuteReporter(lhsValue),
+                .toolsOzoneModerationDefsModEventMuteReporter(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .toolsOzoneModerationDefsModEventUnmuteReporter(selfValue),
-                .toolsOzoneModerationDefsModEventUnmuteReporter(otherValue)
+                .toolsOzoneModerationDefsModEventUnmuteReporter(lhsValue),
+                .toolsOzoneModerationDefsModEventUnmuteReporter(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .toolsOzoneModerationDefsModEventReverseTakedown(selfValue),
-                .toolsOzoneModerationDefsModEventReverseTakedown(otherValue)
+                .toolsOzoneModerationDefsModEventReverseTakedown(lhsValue),
+                .toolsOzoneModerationDefsModEventReverseTakedown(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .toolsOzoneModerationDefsModEventResolveAppeal(selfValue),
-                .toolsOzoneModerationDefsModEventResolveAppeal(otherValue)
+                .toolsOzoneModerationDefsModEventResolveAppeal(lhsValue),
+                .toolsOzoneModerationDefsModEventResolveAppeal(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .toolsOzoneModerationDefsModEventEmail(selfValue),
-                .toolsOzoneModerationDefsModEventEmail(otherValue)
+                .toolsOzoneModerationDefsModEventEmail(lhsValue),
+                .toolsOzoneModerationDefsModEventEmail(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .toolsOzoneModerationDefsModEventDivert(selfValue),
-                .toolsOzoneModerationDefsModEventDivert(otherValue)
+                .toolsOzoneModerationDefsModEventDivert(lhsValue),
+                .toolsOzoneModerationDefsModEventDivert(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .toolsOzoneModerationDefsModEventTag(selfValue),
-                .toolsOzoneModerationDefsModEventTag(otherValue)
+                .toolsOzoneModerationDefsModEventTag(lhsValue),
+                .toolsOzoneModerationDefsModEventTag(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .toolsOzoneModerationDefsAccountEvent(selfValue),
-                .toolsOzoneModerationDefsAccountEvent(otherValue)
+                .toolsOzoneModerationDefsAccountEvent(lhsValue),
+                .toolsOzoneModerationDefsAccountEvent(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .toolsOzoneModerationDefsIdentityEvent(selfValue),
-                .toolsOzoneModerationDefsIdentityEvent(otherValue)
+                .toolsOzoneModerationDefsIdentityEvent(lhsValue),
+                .toolsOzoneModerationDefsIdentityEvent(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .toolsOzoneModerationDefsRecordEvent(selfValue),
-                .toolsOzoneModerationDefsRecordEvent(otherValue)
+                .toolsOzoneModerationDefsRecordEvent(lhsValue),
+                .toolsOzoneModerationDefsRecordEvent(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .toolsOzoneModerationDefsModEventPriorityScore(selfValue),
-                .toolsOzoneModerationDefsModEventPriorityScore(otherValue)
+                .toolsOzoneModerationDefsModEventPriorityScore(lhsValue),
+                .toolsOzoneModerationDefsModEventPriorityScore(rhsValue)
             ):
-                return selfValue == otherValue
-            case let (.unexpected(selfValue), .unexpected(otherValue)):
-                return selfValue.isEqual(to: otherValue)
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
             default:
                 return false
             }
         }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? ToolsOzoneModerationEmitEventEventUnion else { return false }
+            return self == otherValue
+        }
+
+        /// Property that indicates if this enum contains pending data that needs loading
+        public var hasPendingData: Bool {
+            switch self {
+            case let .toolsOzoneModerationDefsModEventTakedown(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .toolsOzoneModerationDefsModEventAcknowledge(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .toolsOzoneModerationDefsModEventEscalate(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .toolsOzoneModerationDefsModEventComment(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .toolsOzoneModerationDefsModEventLabel(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .toolsOzoneModerationDefsModEventReport(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .toolsOzoneModerationDefsModEventMute(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .toolsOzoneModerationDefsModEventUnmute(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .toolsOzoneModerationDefsModEventMuteReporter(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .toolsOzoneModerationDefsModEventUnmuteReporter(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .toolsOzoneModerationDefsModEventReverseTakedown(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .toolsOzoneModerationDefsModEventResolveAppeal(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .toolsOzoneModerationDefsModEventEmail(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .toolsOzoneModerationDefsModEventDivert(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .toolsOzoneModerationDefsModEventTag(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .toolsOzoneModerationDefsAccountEvent(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .toolsOzoneModerationDefsIdentityEvent(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .toolsOzoneModerationDefsRecordEvent(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .toolsOzoneModerationDefsModEventPriorityScore(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case .unexpected:
+                return false
+            }
+        }
+
+        /// Attempts to load any pending data in this enum or its children
+        public mutating func loadPendingData() async {
+            switch self {
+            case var .toolsOzoneModerationDefsModEventTakedown(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventTakedown {
+                        self = .toolsOzoneModerationDefsModEventTakedown(updatedValue)
+                    }
+                }
+            case var .toolsOzoneModerationDefsModEventAcknowledge(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventAcknowledge {
+                        self = .toolsOzoneModerationDefsModEventAcknowledge(updatedValue)
+                    }
+                }
+            case var .toolsOzoneModerationDefsModEventEscalate(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventEscalate {
+                        self = .toolsOzoneModerationDefsModEventEscalate(updatedValue)
+                    }
+                }
+            case var .toolsOzoneModerationDefsModEventComment(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventComment {
+                        self = .toolsOzoneModerationDefsModEventComment(updatedValue)
+                    }
+                }
+            case var .toolsOzoneModerationDefsModEventLabel(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventLabel {
+                        self = .toolsOzoneModerationDefsModEventLabel(updatedValue)
+                    }
+                }
+            case var .toolsOzoneModerationDefsModEventReport(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventReport {
+                        self = .toolsOzoneModerationDefsModEventReport(updatedValue)
+                    }
+                }
+            case var .toolsOzoneModerationDefsModEventMute(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventMute {
+                        self = .toolsOzoneModerationDefsModEventMute(updatedValue)
+                    }
+                }
+            case var .toolsOzoneModerationDefsModEventUnmute(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventUnmute {
+                        self = .toolsOzoneModerationDefsModEventUnmute(updatedValue)
+                    }
+                }
+            case var .toolsOzoneModerationDefsModEventMuteReporter(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventMuteReporter {
+                        self = .toolsOzoneModerationDefsModEventMuteReporter(updatedValue)
+                    }
+                }
+            case var .toolsOzoneModerationDefsModEventUnmuteReporter(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventUnmuteReporter {
+                        self = .toolsOzoneModerationDefsModEventUnmuteReporter(updatedValue)
+                    }
+                }
+            case var .toolsOzoneModerationDefsModEventReverseTakedown(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventReverseTakedown {
+                        self = .toolsOzoneModerationDefsModEventReverseTakedown(updatedValue)
+                    }
+                }
+            case var .toolsOzoneModerationDefsModEventResolveAppeal(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventResolveAppeal {
+                        self = .toolsOzoneModerationDefsModEventResolveAppeal(updatedValue)
+                    }
+                }
+            case var .toolsOzoneModerationDefsModEventEmail(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventEmail {
+                        self = .toolsOzoneModerationDefsModEventEmail(updatedValue)
+                    }
+                }
+            case var .toolsOzoneModerationDefsModEventDivert(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventDivert {
+                        self = .toolsOzoneModerationDefsModEventDivert(updatedValue)
+                    }
+                }
+            case var .toolsOzoneModerationDefsModEventTag(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventTag {
+                        self = .toolsOzoneModerationDefsModEventTag(updatedValue)
+                    }
+                }
+            case var .toolsOzoneModerationDefsAccountEvent(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.AccountEvent {
+                        self = .toolsOzoneModerationDefsAccountEvent(updatedValue)
+                    }
+                }
+            case var .toolsOzoneModerationDefsIdentityEvent(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.IdentityEvent {
+                        self = .toolsOzoneModerationDefsIdentityEvent(updatedValue)
+                    }
+                }
+            case var .toolsOzoneModerationDefsRecordEvent(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.RecordEvent {
+                        self = .toolsOzoneModerationDefsRecordEvent(updatedValue)
+                    }
+                }
+            case var .toolsOzoneModerationDefsModEventPriorityScore(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventPriorityScore {
+                        self = .toolsOzoneModerationDefsModEventPriorityScore(updatedValue)
+                    }
+                }
+            case .unexpected:
+                // Nothing to load for unexpected values
+                break
+            }
+        }
     }
 
-    public enum ToolsOzoneModerationEmitEventSubjectUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
+    public enum ToolsOzoneModerationEmitEventSubjectUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case comAtprotoAdminDefsRepoRef(ComAtprotoAdminDefs.RepoRef)
         case comAtprotoRepoStrongRef(ComAtprotoRepoStrongRef)
         case unexpected(ATProtocolValueContainer)
@@ -828,24 +1408,70 @@ public struct ToolsOzoneModerationEmitEvent {
             case rawContent = "_rawContent"
         }
 
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? ToolsOzoneModerationEmitEventSubjectUnion else { return false }
-
-            switch (self, otherValue) {
+        public static func == (lhs: ToolsOzoneModerationEmitEventSubjectUnion, rhs: ToolsOzoneModerationEmitEventSubjectUnion) -> Bool {
+            switch (lhs, rhs) {
             case let (
-                .comAtprotoAdminDefsRepoRef(selfValue),
-                .comAtprotoAdminDefsRepoRef(otherValue)
+                .comAtprotoAdminDefsRepoRef(lhsValue),
+                .comAtprotoAdminDefsRepoRef(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .comAtprotoRepoStrongRef(selfValue),
-                .comAtprotoRepoStrongRef(otherValue)
+                .comAtprotoRepoStrongRef(lhsValue),
+                .comAtprotoRepoStrongRef(rhsValue)
             ):
-                return selfValue == otherValue
-            case let (.unexpected(selfValue), .unexpected(otherValue)):
-                return selfValue.isEqual(to: otherValue)
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
             default:
                 return false
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? ToolsOzoneModerationEmitEventSubjectUnion else { return false }
+            return self == otherValue
+        }
+
+        /// Property that indicates if this enum contains pending data that needs loading
+        public var hasPendingData: Bool {
+            switch self {
+            case let .comAtprotoAdminDefsRepoRef(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .comAtprotoRepoStrongRef(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case .unexpected:
+                return false
+            }
+        }
+
+        /// Attempts to load any pending data in this enum or its children
+        public mutating func loadPendingData() async {
+            switch self {
+            case var .comAtprotoAdminDefsRepoRef(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ComAtprotoAdminDefs.RepoRef {
+                        self = .comAtprotoAdminDefsRepoRef(updatedValue)
+                    }
+                }
+            case var .comAtprotoRepoStrongRef(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ComAtprotoRepoStrongRef {
+                        self = .comAtprotoRepoStrongRef(updatedValue)
+                    }
+                }
+            case .unexpected:
+                // Nothing to load for unexpected values
+                break
             }
         }
     }

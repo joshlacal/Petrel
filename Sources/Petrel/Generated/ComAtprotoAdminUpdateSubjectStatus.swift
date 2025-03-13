@@ -2,7 +2,7 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.admin.updateSubjectStatus
 
-public struct ComAtprotoAdminUpdateSubjectStatus {
+public enum ComAtprotoAdminUpdateSubjectStatus {
     public static let typeIdentifier = "com.atproto.admin.updateSubjectStatus"
     public struct Input: ATProtocolCodable {
         public let subject: InputSubjectUnion
@@ -35,7 +35,7 @@ public struct ComAtprotoAdminUpdateSubjectStatus {
         }
     }
 
-    public enum InputSubjectUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
+    public enum InputSubjectUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case comAtprotoAdminDefsRepoRef(ComAtprotoAdminDefs.RepoRef)
         case comAtprotoRepoStrongRef(ComAtprotoRepoStrongRef)
         case comAtprotoAdminDefsRepoBlobRef(ComAtprotoAdminDefs.RepoBlobRef)
@@ -99,36 +99,95 @@ public struct ComAtprotoAdminUpdateSubjectStatus {
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
             case rawContent = "_rawContent"
+        }
+
+        public static func == (lhs: InputSubjectUnion, rhs: InputSubjectUnion) -> Bool {
+            switch (lhs, rhs) {
+            case let (
+                .comAtprotoAdminDefsRepoRef(lhsValue),
+                .comAtprotoAdminDefsRepoRef(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .comAtprotoRepoStrongRef(lhsValue),
+                .comAtprotoRepoStrongRef(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .comAtprotoAdminDefsRepoBlobRef(lhsValue),
+                .comAtprotoAdminDefsRepoBlobRef(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
+            default:
+                return false
+            }
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let otherValue = other as? InputSubjectUnion else { return false }
+            return self == otherValue
+        }
 
-            switch (self, otherValue) {
-            case let (
-                .comAtprotoAdminDefsRepoRef(selfValue),
-                .comAtprotoAdminDefsRepoRef(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .comAtprotoRepoStrongRef(selfValue),
-                .comAtprotoRepoStrongRef(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .comAtprotoAdminDefsRepoBlobRef(selfValue),
-                .comAtprotoAdminDefsRepoBlobRef(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (.unexpected(selfValue), .unexpected(otherValue)):
-                return selfValue.isEqual(to: otherValue)
-            default:
+        /// Property that indicates if this enum contains pending data that needs loading
+        public var hasPendingData: Bool {
+            switch self {
+            case let .comAtprotoAdminDefsRepoRef(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
                 return false
+            case let .comAtprotoRepoStrongRef(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .comAtprotoAdminDefsRepoBlobRef(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case .unexpected:
+                return false
+            }
+        }
+
+        /// Attempts to load any pending data in this enum or its children
+        public mutating func loadPendingData() async {
+            switch self {
+            case var .comAtprotoAdminDefsRepoRef(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ComAtprotoAdminDefs.RepoRef {
+                        self = .comAtprotoAdminDefsRepoRef(updatedValue)
+                    }
+                }
+            case var .comAtprotoRepoStrongRef(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ComAtprotoRepoStrongRef {
+                        self = .comAtprotoRepoStrongRef(updatedValue)
+                    }
+                }
+            case var .comAtprotoAdminDefsRepoBlobRef(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ComAtprotoAdminDefs.RepoBlobRef {
+                        self = .comAtprotoAdminDefsRepoBlobRef(updatedValue)
+                    }
+                }
+            case .unexpected:
+                // Nothing to load for unexpected values
+                break
             }
         }
     }
 
-    public enum OutputSubjectUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
+    public enum OutputSubjectUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case comAtprotoAdminDefsRepoRef(ComAtprotoAdminDefs.RepoRef)
         case comAtprotoRepoStrongRef(ComAtprotoRepoStrongRef)
         case comAtprotoAdminDefsRepoBlobRef(ComAtprotoAdminDefs.RepoBlobRef)
@@ -192,36 +251,95 @@ public struct ComAtprotoAdminUpdateSubjectStatus {
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
             case rawContent = "_rawContent"
+        }
+
+        public static func == (lhs: OutputSubjectUnion, rhs: OutputSubjectUnion) -> Bool {
+            switch (lhs, rhs) {
+            case let (
+                .comAtprotoAdminDefsRepoRef(lhsValue),
+                .comAtprotoAdminDefsRepoRef(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .comAtprotoRepoStrongRef(lhsValue),
+                .comAtprotoRepoStrongRef(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .comAtprotoAdminDefsRepoBlobRef(lhsValue),
+                .comAtprotoAdminDefsRepoBlobRef(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
+            default:
+                return false
+            }
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let otherValue = other as? OutputSubjectUnion else { return false }
+            return self == otherValue
+        }
 
-            switch (self, otherValue) {
-            case let (
-                .comAtprotoAdminDefsRepoRef(selfValue),
-                .comAtprotoAdminDefsRepoRef(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .comAtprotoRepoStrongRef(selfValue),
-                .comAtprotoRepoStrongRef(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .comAtprotoAdminDefsRepoBlobRef(selfValue),
-                .comAtprotoAdminDefsRepoBlobRef(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (.unexpected(selfValue), .unexpected(otherValue)):
-                return selfValue.isEqual(to: otherValue)
-            default:
+        /// Property that indicates if this enum contains pending data that needs loading
+        public var hasPendingData: Bool {
+            switch self {
+            case let .comAtprotoAdminDefsRepoRef(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
                 return false
+            case let .comAtprotoRepoStrongRef(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .comAtprotoAdminDefsRepoBlobRef(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case .unexpected:
+                return false
+            }
+        }
+
+        /// Attempts to load any pending data in this enum or its children
+        public mutating func loadPendingData() async {
+            switch self {
+            case var .comAtprotoAdminDefsRepoRef(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ComAtprotoAdminDefs.RepoRef {
+                        self = .comAtprotoAdminDefsRepoRef(updatedValue)
+                    }
+                }
+            case var .comAtprotoRepoStrongRef(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ComAtprotoRepoStrongRef {
+                        self = .comAtprotoRepoStrongRef(updatedValue)
+                    }
+                }
+            case var .comAtprotoAdminDefsRepoBlobRef(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ComAtprotoAdminDefs.RepoBlobRef {
+                        self = .comAtprotoAdminDefsRepoBlobRef(updatedValue)
+                    }
+                }
+            case .unexpected:
+                // Nothing to load for unexpected values
+                break
             }
         }
     }
 
-    public enum ComAtprotoAdminUpdateSubjectStatusSubjectUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
+    public enum ComAtprotoAdminUpdateSubjectStatusSubjectUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case comAtprotoAdminDefsRepoRef(ComAtprotoAdminDefs.RepoRef)
         case comAtprotoRepoStrongRef(ComAtprotoRepoStrongRef)
         case comAtprotoAdminDefsRepoBlobRef(ComAtprotoAdminDefs.RepoBlobRef)
@@ -287,29 +405,88 @@ public struct ComAtprotoAdminUpdateSubjectStatus {
             case rawContent = "_rawContent"
         }
 
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? ComAtprotoAdminUpdateSubjectStatusSubjectUnion else { return false }
-
-            switch (self, otherValue) {
+        public static func == (lhs: ComAtprotoAdminUpdateSubjectStatusSubjectUnion, rhs: ComAtprotoAdminUpdateSubjectStatusSubjectUnion) -> Bool {
+            switch (lhs, rhs) {
             case let (
-                .comAtprotoAdminDefsRepoRef(selfValue),
-                .comAtprotoAdminDefsRepoRef(otherValue)
+                .comAtprotoAdminDefsRepoRef(lhsValue),
+                .comAtprotoAdminDefsRepoRef(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .comAtprotoRepoStrongRef(selfValue),
-                .comAtprotoRepoStrongRef(otherValue)
+                .comAtprotoRepoStrongRef(lhsValue),
+                .comAtprotoRepoStrongRef(rhsValue)
             ):
-                return selfValue == otherValue
+                return lhsValue == rhsValue
             case let (
-                .comAtprotoAdminDefsRepoBlobRef(selfValue),
-                .comAtprotoAdminDefsRepoBlobRef(otherValue)
+                .comAtprotoAdminDefsRepoBlobRef(lhsValue),
+                .comAtprotoAdminDefsRepoBlobRef(rhsValue)
             ):
-                return selfValue == otherValue
-            case let (.unexpected(selfValue), .unexpected(otherValue)):
-                return selfValue.isEqual(to: otherValue)
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
             default:
                 return false
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? ComAtprotoAdminUpdateSubjectStatusSubjectUnion else { return false }
+            return self == otherValue
+        }
+
+        /// Property that indicates if this enum contains pending data that needs loading
+        public var hasPendingData: Bool {
+            switch self {
+            case let .comAtprotoAdminDefsRepoRef(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .comAtprotoRepoStrongRef(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .comAtprotoAdminDefsRepoBlobRef(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case .unexpected:
+                return false
+            }
+        }
+
+        /// Attempts to load any pending data in this enum or its children
+        public mutating func loadPendingData() async {
+            switch self {
+            case var .comAtprotoAdminDefsRepoRef(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ComAtprotoAdminDefs.RepoRef {
+                        self = .comAtprotoAdminDefsRepoRef(updatedValue)
+                    }
+                }
+            case var .comAtprotoRepoStrongRef(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ComAtprotoRepoStrongRef {
+                        self = .comAtprotoRepoStrongRef(updatedValue)
+                    }
+                }
+            case var .comAtprotoAdminDefsRepoBlobRef(value):
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update value after loading pending data
+                    if let updatedValue = loadable as? ComAtprotoAdminDefs.RepoBlobRef {
+                        self = .comAtprotoAdminDefsRepoBlobRef(updatedValue)
+                    }
+                }
+            case .unexpected:
+                // Nothing to load for unexpected values
+                break
             }
         }
     }
