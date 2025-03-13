@@ -1307,7 +1307,7 @@ public struct ChatBskyConvoDefs {
         }
     }
 
-    public enum MessageInputEmbedUnion: Codable, ATProtocolCodable, ATProtocolValue {
+    public enum MessageInputEmbedUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
         case appBskyEmbedRecord(AppBskyEmbedRecord)
         case unexpected(ATProtocolValueContainer)
 
@@ -1332,8 +1332,8 @@ public struct ChatBskyConvoDefs {
             case let .appBskyEmbedRecord(value):
                 try container.encode("app.bsky.embed.record", forKey: .type)
                 try value.encode(to: encoder)
-            case let .unexpected(ATProtocolValueContainer):
-                try ATProtocolValueContainer.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
             }
         }
 
@@ -1342,14 +1342,15 @@ public struct ChatBskyConvoDefs {
             case let .appBskyEmbedRecord(value):
                 hasher.combine("app.bsky.embed.record")
                 hasher.combine(value)
-            case let .unexpected(ATProtocolValueContainer):
+            case let .unexpected(container):
                 hasher.combine("unexpected")
-                hasher.combine(ATProtocolValueContainer)
+                hasher.combine(container)
             }
         }
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
+            case rawContent = "_rawContent"
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -1361,15 +1362,17 @@ public struct ChatBskyConvoDefs {
                 .appBskyEmbedRecord(otherValue)
             ):
                 return selfValue == otherValue
+
             case let (.unexpected(selfValue), .unexpected(otherValue)):
                 return selfValue.isEqual(to: otherValue)
+
             default:
                 return false
             }
         }
     }
 
-    public enum MessageViewEmbedUnion: Codable, ATProtocolCodable, ATProtocolValue {
+    public enum MessageViewEmbedUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
         case appBskyEmbedRecordView(AppBskyEmbedRecord.View)
         case unexpected(ATProtocolValueContainer)
 
@@ -1394,8 +1397,8 @@ public struct ChatBskyConvoDefs {
             case let .appBskyEmbedRecordView(value):
                 try container.encode("app.bsky.embed.record#view", forKey: .type)
                 try value.encode(to: encoder)
-            case let .unexpected(ATProtocolValueContainer):
-                try ATProtocolValueContainer.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
             }
         }
 
@@ -1404,14 +1407,15 @@ public struct ChatBskyConvoDefs {
             case let .appBskyEmbedRecordView(value):
                 hasher.combine("app.bsky.embed.record#view")
                 hasher.combine(value)
-            case let .unexpected(ATProtocolValueContainer):
+            case let .unexpected(container):
                 hasher.combine("unexpected")
-                hasher.combine(ATProtocolValueContainer)
+                hasher.combine(container)
             }
         }
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
+            case rawContent = "_rawContent"
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -1423,15 +1427,17 @@ public struct ChatBskyConvoDefs {
                 .appBskyEmbedRecordView(otherValue)
             ):
                 return selfValue == otherValue
+
             case let (.unexpected(selfValue), .unexpected(otherValue)):
                 return selfValue.isEqual(to: otherValue)
+
             default:
                 return false
             }
         }
     }
 
-    public enum ConvoViewLastMessageUnion: Codable, ATProtocolCodable, ATProtocolValue {
+    public enum ConvoViewLastMessageUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
         case chatBskyConvoDefsMessageView(ChatBskyConvoDefs.MessageView)
         case chatBskyConvoDefsDeletedMessageView(ChatBskyConvoDefs.DeletedMessageView)
         case unexpected(ATProtocolValueContainer)
@@ -1463,8 +1469,8 @@ public struct ChatBskyConvoDefs {
             case let .chatBskyConvoDefsDeletedMessageView(value):
                 try container.encode("chat.bsky.convo.defs#deletedMessageView", forKey: .type)
                 try value.encode(to: encoder)
-            case let .unexpected(ATProtocolValueContainer):
-                try ATProtocolValueContainer.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
             }
         }
 
@@ -1476,14 +1482,15 @@ public struct ChatBskyConvoDefs {
             case let .chatBskyConvoDefsDeletedMessageView(value):
                 hasher.combine("chat.bsky.convo.defs#deletedMessageView")
                 hasher.combine(value)
-            case let .unexpected(ATProtocolValueContainer):
+            case let .unexpected(container):
                 hasher.combine("unexpected")
-                hasher.combine(ATProtocolValueContainer)
+                hasher.combine(container)
             }
         }
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
+            case rawContent = "_rawContent"
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -1508,7 +1515,7 @@ public struct ChatBskyConvoDefs {
         }
     }
 
-    public enum LogCreateMessageMessageUnion: Codable, ATProtocolCodable, ATProtocolValue {
+    public enum LogCreateMessageMessageUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
         case chatBskyConvoDefsMessageView(ChatBskyConvoDefs.MessageView)
         case chatBskyConvoDefsDeletedMessageView(ChatBskyConvoDefs.DeletedMessageView)
         case unexpected(ATProtocolValueContainer)
@@ -1540,8 +1547,8 @@ public struct ChatBskyConvoDefs {
             case let .chatBskyConvoDefsDeletedMessageView(value):
                 try container.encode("chat.bsky.convo.defs#deletedMessageView", forKey: .type)
                 try value.encode(to: encoder)
-            case let .unexpected(ATProtocolValueContainer):
-                try ATProtocolValueContainer.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
             }
         }
 
@@ -1553,14 +1560,15 @@ public struct ChatBskyConvoDefs {
             case let .chatBskyConvoDefsDeletedMessageView(value):
                 hasher.combine("chat.bsky.convo.defs#deletedMessageView")
                 hasher.combine(value)
-            case let .unexpected(ATProtocolValueContainer):
+            case let .unexpected(container):
                 hasher.combine("unexpected")
-                hasher.combine(ATProtocolValueContainer)
+                hasher.combine(container)
             }
         }
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
+            case rawContent = "_rawContent"
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -1585,7 +1593,7 @@ public struct ChatBskyConvoDefs {
         }
     }
 
-    public enum LogDeleteMessageMessageUnion: Codable, ATProtocolCodable, ATProtocolValue {
+    public enum LogDeleteMessageMessageUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
         case chatBskyConvoDefsMessageView(ChatBskyConvoDefs.MessageView)
         case chatBskyConvoDefsDeletedMessageView(ChatBskyConvoDefs.DeletedMessageView)
         case unexpected(ATProtocolValueContainer)
@@ -1617,8 +1625,8 @@ public struct ChatBskyConvoDefs {
             case let .chatBskyConvoDefsDeletedMessageView(value):
                 try container.encode("chat.bsky.convo.defs#deletedMessageView", forKey: .type)
                 try value.encode(to: encoder)
-            case let .unexpected(ATProtocolValueContainer):
-                try ATProtocolValueContainer.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
             }
         }
 
@@ -1630,14 +1638,15 @@ public struct ChatBskyConvoDefs {
             case let .chatBskyConvoDefsDeletedMessageView(value):
                 hasher.combine("chat.bsky.convo.defs#deletedMessageView")
                 hasher.combine(value)
-            case let .unexpected(ATProtocolValueContainer):
+            case let .unexpected(container):
                 hasher.combine("unexpected")
-                hasher.combine(ATProtocolValueContainer)
+                hasher.combine(container)
             }
         }
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
+            case rawContent = "_rawContent"
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -1662,7 +1671,7 @@ public struct ChatBskyConvoDefs {
         }
     }
 
-    public enum LogReadMessageMessageUnion: Codable, ATProtocolCodable, ATProtocolValue {
+    public enum LogReadMessageMessageUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
         case chatBskyConvoDefsMessageView(ChatBskyConvoDefs.MessageView)
         case chatBskyConvoDefsDeletedMessageView(ChatBskyConvoDefs.DeletedMessageView)
         case unexpected(ATProtocolValueContainer)
@@ -1694,8 +1703,8 @@ public struct ChatBskyConvoDefs {
             case let .chatBskyConvoDefsDeletedMessageView(value):
                 try container.encode("chat.bsky.convo.defs#deletedMessageView", forKey: .type)
                 try value.encode(to: encoder)
-            case let .unexpected(ATProtocolValueContainer):
-                try ATProtocolValueContainer.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
             }
         }
 
@@ -1707,14 +1716,15 @@ public struct ChatBskyConvoDefs {
             case let .chatBskyConvoDefsDeletedMessageView(value):
                 hasher.combine("chat.bsky.convo.defs#deletedMessageView")
                 hasher.combine(value)
-            case let .unexpected(ATProtocolValueContainer):
+            case let .unexpected(container):
                 hasher.combine("unexpected")
-                hasher.combine(ATProtocolValueContainer)
+                hasher.combine(container)
             }
         }
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
+            case rawContent = "_rawContent"
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {

@@ -26,7 +26,7 @@ public struct ToolsOzoneModerationGetRecords {
         }
     }
 
-    public enum OutputRecordsUnion: Codable, ATProtocolCodable, ATProtocolValue {
+    public enum OutputRecordsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
         case toolsOzoneModerationDefsRecordViewDetail(ToolsOzoneModerationDefs.RecordViewDetail)
         case toolsOzoneModerationDefsRecordViewNotFound(ToolsOzoneModerationDefs.RecordViewNotFound)
         case unexpected(ATProtocolValueContainer)
@@ -58,8 +58,8 @@ public struct ToolsOzoneModerationGetRecords {
             case let .toolsOzoneModerationDefsRecordViewNotFound(value):
                 try container.encode("tools.ozone.moderation.defs#recordViewNotFound", forKey: .type)
                 try value.encode(to: encoder)
-            case let .unexpected(ATProtocolValueContainer):
-                try ATProtocolValueContainer.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
             }
         }
 
@@ -71,14 +71,15 @@ public struct ToolsOzoneModerationGetRecords {
             case let .toolsOzoneModerationDefsRecordViewNotFound(value):
                 hasher.combine("tools.ozone.moderation.defs#recordViewNotFound")
                 hasher.combine(value)
-            case let .unexpected(ATProtocolValueContainer):
+            case let .unexpected(container):
                 hasher.combine("unexpected")
-                hasher.combine(ATProtocolValueContainer)
+                hasher.combine(container)
             }
         }
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
+            case rawContent = "_rawContent"
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {

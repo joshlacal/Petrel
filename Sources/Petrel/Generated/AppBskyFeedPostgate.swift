@@ -133,7 +133,7 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-    public enum AppBskyFeedPostgateEmbeddingRulesUnion: Codable, ATProtocolCodable, ATProtocolValue {
+    public enum AppBskyFeedPostgateEmbeddingRulesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
         case appBskyFeedPostgateDisableRule(AppBskyFeedPostgate.DisableRule)
         case unexpected(ATProtocolValueContainer)
 
@@ -158,8 +158,8 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
             case let .appBskyFeedPostgateDisableRule(value):
                 try container.encode("app.bsky.feed.postgate#disableRule", forKey: .type)
                 try value.encode(to: encoder)
-            case let .unexpected(ATProtocolValueContainer):
-                try ATProtocolValueContainer.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
             }
         }
 
@@ -168,14 +168,15 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
             case let .appBskyFeedPostgateDisableRule(value):
                 hasher.combine("app.bsky.feed.postgate#disableRule")
                 hasher.combine(value)
-            case let .unexpected(ATProtocolValueContainer):
+            case let .unexpected(container):
                 hasher.combine("unexpected")
-                hasher.combine(ATProtocolValueContainer)
+                hasher.combine(container)
             }
         }
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
+            case rawContent = "_rawContent"
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -187,8 +188,10 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
                 .appBskyFeedPostgateDisableRule(otherValue)
             ):
                 return selfValue == otherValue
+
             case let (.unexpected(selfValue), .unexpected(otherValue)):
                 return selfValue.isEqual(to: otherValue)
+
             default:
                 return false
             }

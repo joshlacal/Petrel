@@ -1,5 +1,5 @@
 {%- if is_array %}
-public struct {{ enum_struct_name }}: Codable, ATProtocolCodable, ATProtocolValue, Sendable {
+public struct {{ enum_struct_name }}: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
     public var items: [{{ name }}]
 
     public init(items: [{{ name }}]) {
@@ -50,7 +50,7 @@ public struct {{ enum_struct_name }}: Codable, ATProtocolCodable, ATProtocolValu
 }
 {%- endif %}
 
-public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable {
+public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
     {%- for variant in variants %}
     case {{ variant | convertRefToSwift | lowerCamelCase }}({{ variant | convertRefToSwift }})
     {%- endfor %}
@@ -59,10 +59,13 @@ public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProt
     case pending(PendingDecodeData)
     
     /// Structure to hold data for deferred decoding
-    public struct PendingDecodeData: Codable, Sendable {
+    public struct PendingDecodeData: Codable, Sendable, Equatable {
         public let rawData: Data
         public let type: String
-        public let depth: Int
+        
+        public static func == (lhs: PendingDecodeData, rhs: PendingDecodeData) -> Bool {
+            return lhs.type == rhs.type
+        }
     }
     {% endif %}
 
@@ -73,14 +76,14 @@ public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProt
         let depth = decoder.codingPath.count
         
         // Check if we're at a recursion depth that might cause stack overflow
-        if depth > RecursionGuard.threshold {
-            if RecursionGuard.debugMode {
+        if depth > DecodingConfiguration.standard.threshold {
+            if DecodingConfiguration.standard.debugMode {
                 print("🔄 Deferring deep decode for {{ name }} at depth \(depth), type: \(typeValue)")
             }
             
             // Extract the raw JSON to decode asynchronously later
             let rawData = try JSONEncoder().encode(try container.decode(JSONValue.self, forKey: .rawContent))
-            self = .pending(PendingDecodeData(rawData: rawData, type: typeValue, depth: depth))
+            self = .pending(PendingDecodeData(rawData: rawData, type: typeValue))
             return
         }
         {% endif %}
@@ -145,32 +148,36 @@ public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProt
         case rawContent = "_rawContent"
     }
     
-    public func isEqual(to other: any ATProtocolValue) -> Bool {
-        guard let otherValue = other as? {{ name }} else { return false }
-
-        switch (self, otherValue) {
-            {%- for variant in variants %}
-            case (.{{ variant | convertRefToSwift | lowerCamelCase }}(let selfValue),
-                .{{ variant | convertRefToSwift | lowerCamelCase }}(let otherValue)):
-                return selfValue == otherValue
-            {%- endfor %}
-            case (.unexpected(let selfValue), .unexpected(let otherValue)):
-                return selfValue.isEqual(to: otherValue)
-            {% if is_recursive %}
-            case (.pending(let selfData), .pending(let otherData)):
-                return selfData.type == otherData.type
-            {% endif %}
-            default:
-                return false
+    public static func == (lhs: {{ name }}, rhs: {{ name }}) -> Bool {
+        switch (lhs, rhs) {
+        {%- for variant in variants %}
+        case (.{{ variant | convertRefToSwift | lowerCamelCase }}(let lhsValue),
+              .{{ variant | convertRefToSwift | lowerCamelCase }}(let rhsValue)):
+            return lhsValue == rhsValue
+        {%- endfor %}
+        case (.unexpected(let lhsValue), .unexpected(let rhsValue)):
+            return lhsValue.isEqual(to: rhsValue)
+        {% if is_recursive %}
+        case (.pending(let lhsData), .pending(let rhsData)):
+            return lhsData.type == rhsData.type
+        {% endif %}
+        default:
+            return false
         }
     }
     
-    {% if is_recursive %}
+    public func isEqual(to other: any ATProtocolValue) -> Bool {
+        guard let otherValue = other as? {{ name }} else { return false }
+        return self == otherValue
+    }
+    
     /// Property that indicates if this enum contains pending data that needs loading
     public var hasPendingData: Bool {
         switch self {
+        {% if is_recursive %}
         case .pending:
             return true
+        {% endif %}
         {%- for variant in variants %}
         case .{{ variant | convertRefToSwift | lowerCamelCase }}(let value):
             if let loadable = value as? PendingDataLoadable {
@@ -186,14 +193,14 @@ public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProt
     /// Attempts to load any pending data in this enum or its children
     public mutating func loadPendingData() async {
         switch self {
+        {% if is_recursive %}
         case .pending(let pendingData):
             do {
                 switch pendingData.type {
                 {%- for variant in variants %}
                 case "{{ variant }}":
                     let value = try await SafeDecoder.decode({{ variant | convertRefToSwift }}.self,
-                                                         from: pendingData.rawData,
-                                                         depth: pendingData.depth)
+                                                         from: pendingData.rawData)
                     self = .{{ variant | convertRefToSwift | lowerCamelCase }}(value)
                 {%- endfor %}
                 default:
@@ -201,12 +208,12 @@ public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProt
                     self = .unexpected(unknownValue)
                 }
             } catch {
-                if RecursionGuard.debugMode {
+                if DecodingConfiguration.standard.debugMode {
                     print("❌ Failed to decode pending data for {{ name }}: \(error)")
                 }
                 self = .unexpected(ATProtocolValueContainer.string("Failed to decode: \(error)"))
             }
-            
+        {% endif %}
         {%- for variant in variants %}
         case .{{ variant | convertRefToSwift | lowerCamelCase }}(var value):
             if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
@@ -217,12 +224,9 @@ public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProt
                 }
             }
         {%- endfor %}
-        
         case .unexpected:
             // Nothing to load for unexpected values
             break
         }
     }
-    {% endif %}
 }
-
