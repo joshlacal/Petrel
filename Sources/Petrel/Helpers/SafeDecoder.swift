@@ -242,7 +242,7 @@ public enum SafeDecoder {
             group.addTask {
                 return try await decode(type, from: data)
             }
-            
+
             // Add a timeout task
             group.addTask {
                 try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
