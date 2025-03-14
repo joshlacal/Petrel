@@ -1,15 +1,13 @@
-//
-//  SafeDecoder.swift
-//  Petrel
-//
-//  Created by Josh LaCalamito on 3/13/25.
-//
-
 import Foundation
+
+/// Key for accessing original data in a decoder's userInfo
+extension CodingUserInfoKey {
+    static let originalData = CodingUserInfoKey(rawValue: "originalData")!
+}
 
 /// Thread-safe configuration for controlling recursive decoding behavior
 public struct DecodingConfiguration: Sendable {
-    /// Maximum recursion depth before switching to iterative parsing
+    /// Maximum recursion depth before switching to deferred parsing
     public let threshold: Int
     /// Whether to log detailed information about deep recursion detection
     public let debugMode: Bool
@@ -43,149 +41,50 @@ public actor DecodingConfigurationManager {
     }
 }
 
-/// Container for holding JSON values during iterative decoding
-public struct JSONContainer: Sendable {
-    public enum Value: Sendable {
-        case dictionary([String: JSONContainer])
-        case array([JSONContainer])
-        case string(String)
-        case number(NSNumber)
-        case bool(Bool)
-        case null
+/// Protocol for types that can defer loading of nested content
+public protocol PendingDataLoadable: Sendable {
+    var hasPendingData: Bool { get }
+    mutating func loadPendingData() async
+}
 
-        public var isDictionary: Bool {
-            if case .dictionary = self { return true }
-            return false
-        }
-
-        public var isArray: Bool {
-            if case .array = self { return true }
-            return false
-        }
+/// Wrapper for deferred decoding of deeply nested data
+public struct PendingDecodeData: Codable, Sendable, Equatable {
+    public let rawData: Data
+    public let type: String
+    
+    public init(rawData: Data, type: String) {
+        self.rawData = rawData
+        self.type = type
     }
 
-    public let value: Value
-
-    public init(jsonObject: Any) throws {
-        if let dict = jsonObject as? [String: Any] {
-            var result = [String: JSONContainer]()
-            for (key, value) in dict {
-                result[key] = try JSONContainer(jsonObject: value)
-            }
-            value = .dictionary(result)
-        } else if let array = jsonObject as? [Any] {
-            let result = try array.map { try JSONContainer(jsonObject: $0) }
-            value = .array(result)
-        } else if let string = jsonObject as? String {
-            value = .string(string)
-        } else if let number = jsonObject as? NSNumber {
-            // Special handling for boolean NSNumbers
-            if CFGetTypeID(number) == CFBooleanGetTypeID() {
-                value = .bool(number.boolValue)
-            } else {
-                value = .number(number)
-            }
-        } else if jsonObject is NSNull {
-            value = .null
-        } else {
-            throw DecodingError.dataCorrupted(DecodingError.Context(
-                codingPath: [],
-                debugDescription: "Unsupported JSON type: \(type(of: jsonObject))"
-            ))
-        }
+    public static func == (lhs: PendingDecodeData, rhs: PendingDecodeData) -> Bool {
+        return lhs.type == rhs.type
     }
 }
 
 /// Utility for decoding JSON safely without stack overflow
 public enum SafeDecoder {
-    /// Decode JSON data into a model using stack-safe methods
-    public static func decode<T: Decodable & Sendable>(_ type: T.Type, from data: Data) async throws -> T {
-        // Get current configuration
-        let config = await DecodingConfigurationManager.shared.getConfiguration()
-
-        // First try standard decoding if small/shallow data
-        if data.count < 10000 {
-            do {
-                // Use standard decoder for simple cases
-                return try JSONDecoder().decode(type, from: data)
-            } catch {
-                if config.debugMode {
-                    print("⚠️ Standard decoding failed, trying iterative approach: \(error)")
-                }
-                // Fall through to iterative approach
+    /// Decode JSON data into a model safely
+    public static func decode<T: Decodable>(_ type: T.Type, from data: Data) async throws -> T {
+        // Create decoder with the original data in userInfo
+        let decoder = JSONDecoder()
+        decoder.userInfo[.originalData] = data
+        
+        do {
+            return try decoder.decode(type, from: data)
+        } catch {
+            if await DecodingConfigurationManager.shared.getConfiguration().debugMode {
+                print("🔍 Standard decoding failed, error: \(error)")
             }
-        }
-
-        // Parse to intermediate representation (iterative)
-        let jsonObject = try JSONSerialization.jsonObject(with: data)
-        let container = try JSONContainer(jsonObject: jsonObject)
-
-        // Use iterative decoding
-        return try await iterativeDecode(type, from: container, config: config)
-    }
-
-    /// Decode with iterative approach to avoid stack overflow
-    private static func iterativeDecode<T: Decodable & Sendable>(
-        _ type: T.Type,
-        from container: JSONContainer,
-        config: DecodingConfiguration
-    ) async throws -> T {
-        if config.debugMode {
-            print("🔄 Using iterative decoding for \(T.self)")
-        }
-
-        // For simple types, decode directly
-        if let simpleValue = try decodeSimpleValue(type, from: container) {
-            return simpleValue
-        }
-
-        // For collections and objects, use a different approach based on type
-        switch T.self {
-        case is [String: Any].Type, is [String: AnyHashable].Type:
-            // Dictionary types
-            guard case let .dictionary(dict) = container.value else {
-                throw DecodingError.typeMismatch([String: Any].self, DecodingError.Context(
-                    codingPath: [],
-                    debugDescription: "Expected dictionary but found different type"
-                ))
-            }
-
-            if let result = dict as? T {
-                return result
-            }
-
-            // Convert back to JSON and use standard decoder as fallback
-            let jsonData = try encodeToData(dict)
-            return try JSONDecoder().decode(type, from: jsonData)
-
-        case is [Any].Type:
-            // Array types
-            guard case let .array(array) = container.value else {
-                throw DecodingError.typeMismatch([Any].self, DecodingError.Context(
-                    codingPath: [],
-                    debugDescription: "Expected array but found different type"
-                ))
-            }
-
-            if let result = array as? T {
-                return result
-            }
-
-            // Convert back to JSON and use standard decoder as fallback
-            let jsonData = try encodeToData(array)
-            return try JSONDecoder().decode(type, from: jsonData)
-
-        default:
-            // Custom objects - use TaskLocal for isolated decoding
+            
+            // For complex failures, try the detached task approach
             return try await withCheckedThrowingContinuation { continuation in
                 Task.detached {
                     do {
-                        // Convert container back to data
-                        let jsonData = try self.encodeToData(container)
-
-                        // Use standard decoder in isolated task
-                        let decoder = JSONDecoder()
-                        let result = try decoder.decode(type, from: jsonData)
+                        // Create a fresh decoder in a detached task
+                        let isolatedDecoder = JSONDecoder()
+                        isolatedDecoder.userInfo[.originalData] = data
+                        let result = try isolatedDecoder.decode(type, from: data)
                         continuation.resume(returning: result)
                     } catch {
                         continuation.resume(throwing: error)
@@ -194,46 +93,39 @@ public enum SafeDecoder {
             }
         }
     }
-
-    /// Try to decode simple value types directly
-    private static func decodeSimpleValue<T>(_ type: T.Type, from container: JSONContainer) throws -> T? {
-        switch container.value {
-        case let .string(string):
-            if let value = string as? T { return value }
-            if T.self == URL.self, let url = URL(string: string) as? T { return url }
-            if T.self == UUID.self, let uuid = UUID(uuidString: string) as? T { return uuid }
-
-        case let .number(number):
-            if T.self == Int.self, let value = number.intValue as? T { return value }
-            if T.self == Double.self, let value = number.doubleValue as? T { return value }
-            if T.self == Float.self, let value = number.floatValue as? T { return value }
-            if T.self == Bool.self, let value = number.boolValue as? T { return value }
-
-        case let .bool(bool):
-            if T.self == Bool.self, let value = bool as? T { return value }
-
-        case .null:
-            // For optional types, return nil
-            if let optionalType = T.self as? (any ExpressibleByNilLiteral.Type),
-               let nilValue = optionalType.init(nilLiteral: ()) as? T
-            {
-                return nilValue
+    
+    /// Extracts a portion of JSON data based on coding path
+    public static func extractNestedJSON(from data: Data, at path: [CodingKey]) throws -> Data? {
+        guard !path.isEmpty else { return data }
+        
+        // Parse the original JSON
+        let jsonObject = try JSONSerialization.jsonObject(with: data, options: [])
+        
+        // Navigate to the nested location
+        var currentObject: Any = jsonObject
+        for key in path {
+            if let keyIndex = key.intValue {
+                // Handle array indexing
+                guard let array = currentObject as? [Any], keyIndex < array.count else {
+                    return nil
+                }
+                currentObject = array[keyIndex]
+            } else {
+                // Handle dictionary key access
+                guard let dict = currentObject as? [String: Any],
+                      let value = dict[key.stringValue] else {
+                    return nil
+                }
+                currentObject = value
             }
-
-        default:
-            break
         }
-
-        return nil
+        
+        // Convert the nested object back to JSON data
+        return try JSONSerialization.data(withJSONObject: currentObject)
     }
-
-    /// Convert container back to JSON data
-    private static func encodeToData(_ container: Any) throws -> Data {
-        return try JSONSerialization.data(withJSONObject: container)
-    }
-
+    
     /// Decode with timeout protection for complex structures
-    public static func decodeWithTimeout<T: Decodable & Sendable>(
+    public static func decodeWithTimeout<T: Decodable>(
         _ type: T.Type,
         from data: Data,
         timeout: TimeInterval = 5.0
@@ -258,21 +150,5 @@ public enum SafeDecoder {
             group.cancelAll() // Cancel any remaining tasks
             return result
         }
-    }
-}
-
-/// Protocol for types that can defer loading of nested content
-public protocol PendingDataLoadable: Sendable {
-    var hasPendingData: Bool { get }
-    mutating func loadPendingData() async
-}
-
-/// Wrapper for deferred decoding of deeply nested data
-public struct PendingDecodeData: Codable, Sendable, Equatable {
-    public let rawData: Data
-    public let type: String
-
-    public static func == (lhs: PendingDecodeData, rhs: PendingDecodeData) -> Bool {
-        return lhs.type == rhs.type
     }
 }

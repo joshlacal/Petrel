@@ -72,20 +72,22 @@ public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProt
                 print("🔄 Deferring deep decode for {{ name }} at depth \(depth), type: \(typeValue)")
             }
             
-            // We need to capture the full JSON data at this point
-            // Get access to the original data
-            if let dataDecoder = decoder as? JSONDecoder,
-               let userData = dataDecoder.userInfo["originalData"] as? Data {
-                
-                // This is the raw JSON data we'll use later to decode this object
-                self = .pending(PendingDecodeData(rawData: userData, type: typeValue))
-                return
+            // Get the original JSON data if available
+            if let originalData = decoder.userInfo[.originalData] as? Data {
+                do {
+                    // Extract just the portion we need based on the coding path
+                    if let nestedData = try SafeDecoder.extractNestedJSON(from: originalData, at: decoder.codingPath) {
+                        self = .pending(PendingDecodeData(rawData: nestedData, type: typeValue))
+                        return
+                    }
+                } catch {
+                    // Fall through to minimal data approach if extraction fails
+                }
             }
             
-            // Fallback if we can't get the original data
-            // Store at least the type information
-            let rawData = try JSONEncoder().encode(["$type": typeValue])
-            self = .pending(PendingDecodeData(rawData: rawData, type: typeValue))
+            // Fallback if we can't get the nested data - store minimal information
+            let minimalData = try JSONEncoder().encode(["$type": typeValue])
+            self = .pending(PendingDecodeData(rawData: minimalData, type: typeValue))
             return
         }
         {% endif %}
@@ -161,8 +163,8 @@ public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProt
     }
     
     public func isEqual(to other: any ATProtocolValue) -> Bool {
-        guard other is {{ name }} else { return false }
-        return self == (other as! {{ name }})
+        guard let other = other as? {{ name }} else { return false }
+        return self == other
     }
     
     /// Property that indicates if this enum contains pending data that needs loading
@@ -190,7 +192,7 @@ public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProt
         {% if is_recursive %}
         case .pending(let pendingData):
             do {
-                // Properly decode the stored JSON data based on the type
+                // Attempt to decode the full object using the raw data
                 switch pendingData.type {
                 {%- for variant in variants %}
                 case "{{ variant }}":
@@ -212,13 +214,15 @@ public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProt
             }
         {% endif %}
         {%- for variant in variants %}
-        case .{{ variant | convertRefToSwift | lowerCamelCase }}(let value):
+        case .{{ variant | convertRefToSwift | lowerCamelCase }}(var value):
             // Check if this value conforms to PendingDataLoadable and has pending data
-            if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                // Create a new decoded value from scratch if possible
-                if let jsonData = try? JSONEncoder().encode(value),
-                   let decodedValue = try? await SafeDecoder.decode({{ variant | convertRefToSwift }}.self, from: jsonData) {
-                    self = .{{ variant | convertRefToSwift | lowerCamelCase }}(decodedValue)
+            if var loadable = value as? (any PendingDataLoadable) {
+                if loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated
+                    if let updatedValue = loadable as? {{ variant | convertRefToSwift }} {
+                        self = .{{ variant | convertRefToSwift | lowerCamelCase }}(updatedValue)
+                    }
                 }
             }
         {%- endfor %}
