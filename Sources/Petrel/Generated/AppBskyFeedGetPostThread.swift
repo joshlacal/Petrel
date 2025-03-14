@@ -65,29 +65,19 @@ public enum AppBskyFeedGetPostThread {
                     print("🔄 Deferring deep decode for OutputThreadUnion at depth \(depth), type: \(typeValue)")
                 }
 
-                // Capture the JSON data by re-encoding the entire payload
-                let rawData: Data
-                do {
-                    // Create a JSON snapshot of the current decoder's data
-                    let decoder = decoder as? _JSONDecoder
-                    if let jsonValue = try? decoder?.snapshot() {
-                        rawData = try JSONEncoder().encode(jsonValue)
-                    } else {
-                        // Fallback - try to capture just this container
-                        // Create a copy of all the values in the container
-                        let containerData = try JSONSerialization.data(withJSONObject: [
-                            "$type": typeValue,
-                        ])
-                        rawData = containerData
-                    }
-                } catch {
-                    if DecodingConfiguration.standard.debugMode {
-                        print("⚠️ Error creating JSON snapshot: \(error)")
-                    }
-                    // Minimal data to retry with just the type
-                    rawData = try JSONEncoder().encode(["$type": typeValue])
+                // We need to capture the full JSON data at this point
+                // Get access to the original data
+                if let dataDecoder = decoder as? JSONDecoder,
+                   let userData = dataDecoder.userInfo["originalData"] as? Data
+                {
+                    // This is the raw JSON data we'll use later to decode this object
+                    self = .pending(PendingDecodeData(rawData: userData, type: typeValue))
+                    return
                 }
 
+                // Fallback if we can't get the original data
+                // Store at least the type information
+                let rawData = try JSONEncoder().encode(["$type": typeValue])
                 self = .pending(PendingDecodeData(rawData: rawData, type: typeValue))
                 return
             }
@@ -125,7 +115,6 @@ public enum AppBskyFeedGetPostThread {
                 try container.encode(to: encoder)
             case let .pending(pendingData):
                 try container.encode(pendingData.type, forKey: .type)
-                // We don't need to encode raw content here as we'll re-decode it later
             }
         }
 
@@ -214,6 +203,7 @@ public enum AppBskyFeedGetPostThread {
             switch self {
             case let .pending(pendingData):
                 do {
+                    // Properly decode the stored JSON data based on the type
                     switch pendingData.type {
                     case "app.bsky.feed.defs#threadViewPost":
                         let value = try await SafeDecoder.decode(
