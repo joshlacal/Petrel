@@ -214,8 +214,8 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard other is ViewMediaUnion else { return false }
-            return self == (other as! ViewMediaUnion)
+            guard let other = other as? ViewMediaUnion else { return false }
+            return self == other
         }
 
         /// Property that indicates if this enum contains pending data that needs loading
@@ -244,34 +244,37 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case let .appBskyEmbedImagesView(value):
+            case var .appBskyEmbedImagesView(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(AppBskyEmbedImages.View.self, from: jsonData)
-                    {
-                        self = .appBskyEmbedImagesView(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? AppBskyEmbedImages.View {
+                            self = .appBskyEmbedImagesView(updatedValue)
+                        }
                     }
                 }
-            case let .appBskyEmbedVideoView(value):
+            case var .appBskyEmbedVideoView(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(AppBskyEmbedVideo.View.self, from: jsonData)
-                    {
-                        self = .appBskyEmbedVideoView(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? AppBskyEmbedVideo.View {
+                            self = .appBskyEmbedVideoView(updatedValue)
+                        }
                     }
                 }
-            case let .appBskyEmbedExternalView(value):
+            case var .appBskyEmbedExternalView(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(AppBskyEmbedExternal.View.self, from: jsonData)
-                    {
-                        self = .appBskyEmbedExternalView(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? AppBskyEmbedExternal.View {
+                            self = .appBskyEmbedExternalView(updatedValue)
+                        }
                     }
                 }
             case .unexpected:
@@ -371,8 +374,8 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard other is AppBskyEmbedRecordWithMediaMediaUnion else { return false }
-            return self == (other as! AppBskyEmbedRecordWithMediaMediaUnion)
+            guard let other = other as? AppBskyEmbedRecordWithMediaMediaUnion else { return false }
+            return self == other
         }
 
         /// Property that indicates if this enum contains pending data that needs loading
@@ -401,34 +404,37 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case let .appBskyEmbedImages(value):
+            case var .appBskyEmbedImages(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(AppBskyEmbedImages.self, from: jsonData)
-                    {
-                        self = .appBskyEmbedImages(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? AppBskyEmbedImages {
+                            self = .appBskyEmbedImages(updatedValue)
+                        }
                     }
                 }
-            case let .appBskyEmbedVideo(value):
+            case var .appBskyEmbedVideo(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(AppBskyEmbedVideo.self, from: jsonData)
-                    {
-                        self = .appBskyEmbedVideo(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? AppBskyEmbedVideo {
+                            self = .appBskyEmbedVideo(updatedValue)
+                        }
                     }
                 }
-            case let .appBskyEmbedExternal(value):
+            case var .appBskyEmbedExternal(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(AppBskyEmbedExternal.self, from: jsonData)
-                    {
-                        self = .appBskyEmbedExternal(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? AppBskyEmbedExternal {
+                            self = .appBskyEmbedExternal(updatedValue)
+                        }
                     }
                 }
             case .unexpected:

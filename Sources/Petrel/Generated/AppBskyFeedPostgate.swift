@@ -194,8 +194,8 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard other is AppBskyFeedPostgateEmbeddingRulesUnion else { return false }
-            return self == (other as! AppBskyFeedPostgateEmbeddingRulesUnion)
+            guard let other = other as? AppBskyFeedPostgateEmbeddingRulesUnion else { return false }
+            return self == other
         }
 
         /// Property that indicates if this enum contains pending data that needs loading
@@ -214,14 +214,15 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case let .appBskyFeedPostgateDisableRule(value):
+            case var .appBskyFeedPostgateDisableRule(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(AppBskyFeedPostgate.DisableRule.self, from: jsonData)
-                    {
-                        self = .appBskyFeedPostgateDisableRule(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? AppBskyFeedPostgate.DisableRule {
+                            self = .appBskyFeedPostgateDisableRule(updatedValue)
+                        }
                     }
                 }
             case .unexpected:

@@ -2149,8 +2149,8 @@ public enum AppBskyFeedDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard other is PostViewEmbedUnion else { return false }
-            return self == (other as! PostViewEmbedUnion)
+            guard let other = other as? PostViewEmbedUnion else { return false }
+            return self == other
         }
 
         /// Property that indicates if this enum contains pending data that needs loading
@@ -2189,54 +2189,59 @@ public enum AppBskyFeedDefs {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case let .appBskyEmbedImagesView(value):
+            case var .appBskyEmbedImagesView(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(AppBskyEmbedImages.View.self, from: jsonData)
-                    {
-                        self = .appBskyEmbedImagesView(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? AppBskyEmbedImages.View {
+                            self = .appBskyEmbedImagesView(updatedValue)
+                        }
                     }
                 }
-            case let .appBskyEmbedVideoView(value):
+            case var .appBskyEmbedVideoView(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(AppBskyEmbedVideo.View.self, from: jsonData)
-                    {
-                        self = .appBskyEmbedVideoView(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? AppBskyEmbedVideo.View {
+                            self = .appBskyEmbedVideoView(updatedValue)
+                        }
                     }
                 }
-            case let .appBskyEmbedExternalView(value):
+            case var .appBskyEmbedExternalView(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(AppBskyEmbedExternal.View.self, from: jsonData)
-                    {
-                        self = .appBskyEmbedExternalView(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? AppBskyEmbedExternal.View {
+                            self = .appBskyEmbedExternalView(updatedValue)
+                        }
                     }
                 }
-            case let .appBskyEmbedRecordView(value):
+            case var .appBskyEmbedRecordView(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(AppBskyEmbedRecord.View.self, from: jsonData)
-                    {
-                        self = .appBskyEmbedRecordView(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? AppBskyEmbedRecord.View {
+                            self = .appBskyEmbedRecordView(updatedValue)
+                        }
                     }
                 }
-            case let .appBskyEmbedRecordWithMediaView(value):
+            case var .appBskyEmbedRecordWithMediaView(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(AppBskyEmbedRecordWithMedia.View.self, from: jsonData)
-                    {
-                        self = .appBskyEmbedRecordWithMediaView(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? AppBskyEmbedRecordWithMedia.View {
+                            self = .appBskyEmbedRecordWithMediaView(updatedValue)
+                        }
                     }
                 }
             case .unexpected:
@@ -2321,8 +2326,8 @@ public enum AppBskyFeedDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard other is FeedViewPostReasonUnion else { return false }
-            return self == (other as! FeedViewPostReasonUnion)
+            guard let other = other as? FeedViewPostReasonUnion else { return false }
+            return self == other
         }
 
         /// Property that indicates if this enum contains pending data that needs loading
@@ -2346,24 +2351,26 @@ public enum AppBskyFeedDefs {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case let .appBskyFeedDefsReasonRepost(value):
+            case var .appBskyFeedDefsReasonRepost(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(AppBskyFeedDefs.ReasonRepost.self, from: jsonData)
-                    {
-                        self = .appBskyFeedDefsReasonRepost(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? AppBskyFeedDefs.ReasonRepost {
+                            self = .appBskyFeedDefsReasonRepost(updatedValue)
+                        }
                     }
                 }
-            case let .appBskyFeedDefsReasonPin(value):
+            case var .appBskyFeedDefsReasonPin(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(AppBskyFeedDefs.ReasonPin.self, from: jsonData)
-                    {
-                        self = .appBskyFeedDefsReasonPin(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? AppBskyFeedDefs.ReasonPin {
+                            self = .appBskyFeedDefsReasonPin(updatedValue)
+                        }
                     }
                 }
             case .unexpected:
@@ -2463,8 +2470,8 @@ public enum AppBskyFeedDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard other is ReplyRefRootUnion else { return false }
-            return self == (other as! ReplyRefRootUnion)
+            guard let other = other as? ReplyRefRootUnion else { return false }
+            return self == other
         }
 
         /// Property that indicates if this enum contains pending data that needs loading
@@ -2493,34 +2500,37 @@ public enum AppBskyFeedDefs {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case let .appBskyFeedDefsPostView(value):
+            case var .appBskyFeedDefsPostView(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(AppBskyFeedDefs.PostView.self, from: jsonData)
-                    {
-                        self = .appBskyFeedDefsPostView(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? AppBskyFeedDefs.PostView {
+                            self = .appBskyFeedDefsPostView(updatedValue)
+                        }
                     }
                 }
-            case let .appBskyFeedDefsNotFoundPost(value):
+            case var .appBskyFeedDefsNotFoundPost(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(AppBskyFeedDefs.NotFoundPost.self, from: jsonData)
-                    {
-                        self = .appBskyFeedDefsNotFoundPost(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? AppBskyFeedDefs.NotFoundPost {
+                            self = .appBskyFeedDefsNotFoundPost(updatedValue)
+                        }
                     }
                 }
-            case let .appBskyFeedDefsBlockedPost(value):
+            case var .appBskyFeedDefsBlockedPost(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(AppBskyFeedDefs.BlockedPost.self, from: jsonData)
-                    {
-                        self = .appBskyFeedDefsBlockedPost(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? AppBskyFeedDefs.BlockedPost {
+                            self = .appBskyFeedDefsBlockedPost(updatedValue)
+                        }
                     }
                 }
             case .unexpected:
@@ -2620,8 +2630,8 @@ public enum AppBskyFeedDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard other is ReplyRefParentUnion else { return false }
-            return self == (other as! ReplyRefParentUnion)
+            guard let other = other as? ReplyRefParentUnion else { return false }
+            return self == other
         }
 
         /// Property that indicates if this enum contains pending data that needs loading
@@ -2650,34 +2660,37 @@ public enum AppBskyFeedDefs {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case let .appBskyFeedDefsPostView(value):
+            case var .appBskyFeedDefsPostView(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(AppBskyFeedDefs.PostView.self, from: jsonData)
-                    {
-                        self = .appBskyFeedDefsPostView(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? AppBskyFeedDefs.PostView {
+                            self = .appBskyFeedDefsPostView(updatedValue)
+                        }
                     }
                 }
-            case let .appBskyFeedDefsNotFoundPost(value):
+            case var .appBskyFeedDefsNotFoundPost(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(AppBskyFeedDefs.NotFoundPost.self, from: jsonData)
-                    {
-                        self = .appBskyFeedDefsNotFoundPost(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? AppBskyFeedDefs.NotFoundPost {
+                            self = .appBskyFeedDefsNotFoundPost(updatedValue)
+                        }
                     }
                 }
-            case let .appBskyFeedDefsBlockedPost(value):
+            case var .appBskyFeedDefsBlockedPost(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(AppBskyFeedDefs.BlockedPost.self, from: jsonData)
-                    {
-                        self = .appBskyFeedDefsBlockedPost(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? AppBskyFeedDefs.BlockedPost {
+                            self = .appBskyFeedDefsBlockedPost(updatedValue)
+                        }
                     }
                 }
             case .unexpected:
@@ -2707,20 +2720,22 @@ public enum AppBskyFeedDefs {
                     print("🔄 Deferring deep decode for ThreadViewPostParentUnion at depth \(depth), type: \(typeValue)")
                 }
 
-                // We need to capture the full JSON data at this point
-                // Get access to the original data
-                if let dataDecoder = decoder as? JSONDecoder,
-                   let userData = dataDecoder.userInfo["originalData"] as? Data
-                {
-                    // This is the raw JSON data we'll use later to decode this object
-                    self = .pending(PendingDecodeData(rawData: userData, type: typeValue))
-                    return
+                // Get the original JSON data if available
+                if let originalData = decoder.userInfo[.originalData] as? Data {
+                    do {
+                        // Extract just the portion we need based on the coding path
+                        if let nestedData = try SafeDecoder.extractNestedJSON(from: originalData, at: decoder.codingPath) {
+                            self = .pending(PendingDecodeData(rawData: nestedData, type: typeValue))
+                            return
+                        }
+                    } catch {
+                        // Fall through to minimal data approach if extraction fails
+                    }
                 }
 
-                // Fallback if we can't get the original data
-                // Store at least the type information
-                let rawData = try JSONEncoder().encode(["$type": typeValue])
-                self = .pending(PendingDecodeData(rawData: rawData, type: typeValue))
+                // Fallback if we can't get the nested data - store minimal information
+                let minimalData = try JSONEncoder().encode(["$type": typeValue])
+                self = .pending(PendingDecodeData(rawData: minimalData, type: typeValue))
                 return
             }
 
@@ -2811,8 +2826,8 @@ public enum AppBskyFeedDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard other is ThreadViewPostParentUnion else { return false }
-            return self == (other as! ThreadViewPostParentUnion)
+            guard let other = other as? ThreadViewPostParentUnion else { return false }
+            return self == other
         }
 
         /// Property that indicates if this enum contains pending data that needs loading
@@ -2845,7 +2860,7 @@ public enum AppBskyFeedDefs {
             switch self {
             case let .pending(pendingData):
                 do {
-                    // Properly decode the stored JSON data based on the type
+                    // Attempt to decode the full object using the raw data
                     switch pendingData.type {
                     case "app.bsky.feed.defs#threadViewPost":
                         let value = try await SafeDecoder.decode(
@@ -2875,34 +2890,37 @@ public enum AppBskyFeedDefs {
                     }
                     self = .unexpected(ATProtocolValueContainer.string("Failed to decode: \(error)"))
                 }
-            case let .appBskyFeedDefsThreadViewPost(value):
+            case var .appBskyFeedDefsThreadViewPost(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(AppBskyFeedDefs.ThreadViewPost.self, from: jsonData)
-                    {
-                        self = .appBskyFeedDefsThreadViewPost(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? AppBskyFeedDefs.ThreadViewPost {
+                            self = .appBskyFeedDefsThreadViewPost(updatedValue)
+                        }
                     }
                 }
-            case let .appBskyFeedDefsNotFoundPost(value):
+            case var .appBskyFeedDefsNotFoundPost(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(AppBskyFeedDefs.NotFoundPost.self, from: jsonData)
-                    {
-                        self = .appBskyFeedDefsNotFoundPost(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? AppBskyFeedDefs.NotFoundPost {
+                            self = .appBskyFeedDefsNotFoundPost(updatedValue)
+                        }
                     }
                 }
-            case let .appBskyFeedDefsBlockedPost(value):
+            case var .appBskyFeedDefsBlockedPost(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(AppBskyFeedDefs.BlockedPost.self, from: jsonData)
-                    {
-                        self = .appBskyFeedDefsBlockedPost(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? AppBskyFeedDefs.BlockedPost {
+                            self = .appBskyFeedDefsBlockedPost(updatedValue)
+                        }
                     }
                 }
             case .unexpected:
@@ -2932,20 +2950,22 @@ public enum AppBskyFeedDefs {
                     print("🔄 Deferring deep decode for ThreadViewPostRepliesUnion at depth \(depth), type: \(typeValue)")
                 }
 
-                // We need to capture the full JSON data at this point
-                // Get access to the original data
-                if let dataDecoder = decoder as? JSONDecoder,
-                   let userData = dataDecoder.userInfo["originalData"] as? Data
-                {
-                    // This is the raw JSON data we'll use later to decode this object
-                    self = .pending(PendingDecodeData(rawData: userData, type: typeValue))
-                    return
+                // Get the original JSON data if available
+                if let originalData = decoder.userInfo[.originalData] as? Data {
+                    do {
+                        // Extract just the portion we need based on the coding path
+                        if let nestedData = try SafeDecoder.extractNestedJSON(from: originalData, at: decoder.codingPath) {
+                            self = .pending(PendingDecodeData(rawData: nestedData, type: typeValue))
+                            return
+                        }
+                    } catch {
+                        // Fall through to minimal data approach if extraction fails
+                    }
                 }
 
-                // Fallback if we can't get the original data
-                // Store at least the type information
-                let rawData = try JSONEncoder().encode(["$type": typeValue])
-                self = .pending(PendingDecodeData(rawData: rawData, type: typeValue))
+                // Fallback if we can't get the nested data - store minimal information
+                let minimalData = try JSONEncoder().encode(["$type": typeValue])
+                self = .pending(PendingDecodeData(rawData: minimalData, type: typeValue))
                 return
             }
 
@@ -3036,8 +3056,8 @@ public enum AppBskyFeedDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard other is ThreadViewPostRepliesUnion else { return false }
-            return self == (other as! ThreadViewPostRepliesUnion)
+            guard let other = other as? ThreadViewPostRepliesUnion else { return false }
+            return self == other
         }
 
         /// Property that indicates if this enum contains pending data that needs loading
@@ -3070,7 +3090,7 @@ public enum AppBskyFeedDefs {
             switch self {
             case let .pending(pendingData):
                 do {
-                    // Properly decode the stored JSON data based on the type
+                    // Attempt to decode the full object using the raw data
                     switch pendingData.type {
                     case "app.bsky.feed.defs#threadViewPost":
                         let value = try await SafeDecoder.decode(
@@ -3100,34 +3120,37 @@ public enum AppBskyFeedDefs {
                     }
                     self = .unexpected(ATProtocolValueContainer.string("Failed to decode: \(error)"))
                 }
-            case let .appBskyFeedDefsThreadViewPost(value):
+            case var .appBskyFeedDefsThreadViewPost(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(AppBskyFeedDefs.ThreadViewPost.self, from: jsonData)
-                    {
-                        self = .appBskyFeedDefsThreadViewPost(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? AppBskyFeedDefs.ThreadViewPost {
+                            self = .appBskyFeedDefsThreadViewPost(updatedValue)
+                        }
                     }
                 }
-            case let .appBskyFeedDefsNotFoundPost(value):
+            case var .appBskyFeedDefsNotFoundPost(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(AppBskyFeedDefs.NotFoundPost.self, from: jsonData)
-                    {
-                        self = .appBskyFeedDefsNotFoundPost(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? AppBskyFeedDefs.NotFoundPost {
+                            self = .appBskyFeedDefsNotFoundPost(updatedValue)
+                        }
                     }
                 }
-            case let .appBskyFeedDefsBlockedPost(value):
+            case var .appBskyFeedDefsBlockedPost(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(AppBskyFeedDefs.BlockedPost.self, from: jsonData)
-                    {
-                        self = .appBskyFeedDefsBlockedPost(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? AppBskyFeedDefs.BlockedPost {
+                            self = .appBskyFeedDefsBlockedPost(updatedValue)
+                        }
                     }
                 }
             case .unexpected:
@@ -3212,8 +3235,8 @@ public enum AppBskyFeedDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard other is SkeletonFeedPostReasonUnion else { return false }
-            return self == (other as! SkeletonFeedPostReasonUnion)
+            guard let other = other as? SkeletonFeedPostReasonUnion else { return false }
+            return self == other
         }
 
         /// Property that indicates if this enum contains pending data that needs loading
@@ -3237,24 +3260,26 @@ public enum AppBskyFeedDefs {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case let .appBskyFeedDefsSkeletonReasonRepost(value):
+            case var .appBskyFeedDefsSkeletonReasonRepost(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(AppBskyFeedDefs.SkeletonReasonRepost.self, from: jsonData)
-                    {
-                        self = .appBskyFeedDefsSkeletonReasonRepost(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? AppBskyFeedDefs.SkeletonReasonRepost {
+                            self = .appBskyFeedDefsSkeletonReasonRepost(updatedValue)
+                        }
                     }
                 }
-            case let .appBskyFeedDefsSkeletonReasonPin(value):
+            case var .appBskyFeedDefsSkeletonReasonPin(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(AppBskyFeedDefs.SkeletonReasonPin.self, from: jsonData)
-                    {
-                        self = .appBskyFeedDefsSkeletonReasonPin(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? AppBskyFeedDefs.SkeletonReasonPin {
+                            self = .appBskyFeedDefsSkeletonReasonPin(updatedValue)
+                        }
                     }
                 }
             case .unexpected:

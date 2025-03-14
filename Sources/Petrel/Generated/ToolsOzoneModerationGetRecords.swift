@@ -101,8 +101,8 @@ public enum ToolsOzoneModerationGetRecords {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard other is OutputRecordsUnion else { return false }
-            return self == (other as! OutputRecordsUnion)
+            guard let other = other as? OutputRecordsUnion else { return false }
+            return self == other
         }
 
         /// Property that indicates if this enum contains pending data that needs loading
@@ -126,24 +126,26 @@ public enum ToolsOzoneModerationGetRecords {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case let .toolsOzoneModerationDefsRecordViewDetail(value):
+            case var .toolsOzoneModerationDefsRecordViewDetail(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(ToolsOzoneModerationDefs.RecordViewDetail.self, from: jsonData)
-                    {
-                        self = .toolsOzoneModerationDefsRecordViewDetail(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.RecordViewDetail {
+                            self = .toolsOzoneModerationDefsRecordViewDetail(updatedValue)
+                        }
                     }
                 }
-            case let .toolsOzoneModerationDefsRecordViewNotFound(value):
+            case var .toolsOzoneModerationDefsRecordViewNotFound(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(ToolsOzoneModerationDefs.RecordViewNotFound.self, from: jsonData)
-                    {
-                        self = .toolsOzoneModerationDefsRecordViewNotFound(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.RecordViewNotFound {
+                            self = .toolsOzoneModerationDefsRecordViewNotFound(updatedValue)
+                        }
                     }
                 }
             case .unexpected:

@@ -213,8 +213,8 @@ public struct AppBskyGraphList: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard other is AppBskyGraphListLabelsUnion else { return false }
-            return self == (other as! AppBskyGraphListLabelsUnion)
+            guard let other = other as? AppBskyGraphListLabelsUnion else { return false }
+            return self == other
         }
 
         /// Property that indicates if this enum contains pending data that needs loading
@@ -233,14 +233,15 @@ public struct AppBskyGraphList: ATProtocolCodable, ATProtocolValue {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case let .comAtprotoLabelDefsSelfLabels(value):
+            case var .comAtprotoLabelDefsSelfLabels(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(ComAtprotoLabelDefs.SelfLabels.self, from: jsonData)
-                    {
-                        self = .comAtprotoLabelDefsSelfLabels(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? ComAtprotoLabelDefs.SelfLabels {
+                            self = .comAtprotoLabelDefsSelfLabels(updatedValue)
+                        }
                     }
                 }
             case .unexpected:

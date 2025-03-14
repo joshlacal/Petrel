@@ -104,8 +104,8 @@ public enum AppBskyLabelerGetServices {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard other is OutputViewsUnion else { return false }
-            return self == (other as! OutputViewsUnion)
+            guard let other = other as? OutputViewsUnion else { return false }
+            return self == other
         }
 
         /// Property that indicates if this enum contains pending data that needs loading
@@ -129,24 +129,26 @@ public enum AppBskyLabelerGetServices {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case let .appBskyLabelerDefsLabelerView(value):
+            case var .appBskyLabelerDefsLabelerView(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(AppBskyLabelerDefs.LabelerView.self, from: jsonData)
-                    {
-                        self = .appBskyLabelerDefsLabelerView(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? AppBskyLabelerDefs.LabelerView {
+                            self = .appBskyLabelerDefsLabelerView(updatedValue)
+                        }
                     }
                 }
-            case let .appBskyLabelerDefsLabelerViewDetailed(value):
+            case var .appBskyLabelerDefsLabelerViewDetailed(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(AppBskyLabelerDefs.LabelerViewDetailed.self, from: jsonData)
-                    {
-                        self = .appBskyLabelerDefsLabelerViewDetailed(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? AppBskyLabelerDefs.LabelerViewDetailed {
+                            self = .appBskyLabelerDefsLabelerViewDetailed(updatedValue)
+                        }
                     }
                 }
             case .unexpected:

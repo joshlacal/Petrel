@@ -376,8 +376,8 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard other is AppBskyRichtextFacetFeaturesUnion else { return false }
-            return self == (other as! AppBskyRichtextFacetFeaturesUnion)
+            guard let other = other as? AppBskyRichtextFacetFeaturesUnion else { return false }
+            return self == other
         }
 
         /// Property that indicates if this enum contains pending data that needs loading
@@ -406,34 +406,37 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case let .appBskyRichtextFacetMention(value):
+            case var .appBskyRichtextFacetMention(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(AppBskyRichtextFacet.Mention.self, from: jsonData)
-                    {
-                        self = .appBskyRichtextFacetMention(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? AppBskyRichtextFacet.Mention {
+                            self = .appBskyRichtextFacetMention(updatedValue)
+                        }
                     }
                 }
-            case let .appBskyRichtextFacetLink(value):
+            case var .appBskyRichtextFacetLink(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(AppBskyRichtextFacet.Link.self, from: jsonData)
-                    {
-                        self = .appBskyRichtextFacetLink(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? AppBskyRichtextFacet.Link {
+                            self = .appBskyRichtextFacetLink(updatedValue)
+                        }
                     }
                 }
-            case let .appBskyRichtextFacetTag(value):
+            case var .appBskyRichtextFacetTag(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(AppBskyRichtextFacet.Tag.self, from: jsonData)
-                    {
-                        self = .appBskyRichtextFacetTag(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? AppBskyRichtextFacet.Tag {
+                            self = .appBskyRichtextFacetTag(updatedValue)
+                        }
                     }
                 }
             case .unexpected:

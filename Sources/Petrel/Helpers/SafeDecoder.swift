@@ -51,7 +51,7 @@ public protocol PendingDataLoadable: Sendable {
 public struct PendingDecodeData: Codable, Sendable, Equatable {
     public let rawData: Data
     public let type: String
-    
+
     public init(rawData: Data, type: String) {
         self.rawData = rawData
         self.type = type
@@ -69,14 +69,14 @@ public enum SafeDecoder {
         // Create decoder with the original data in userInfo
         let decoder = JSONDecoder()
         decoder.userInfo[.originalData] = data
-        
+
         do {
             return try decoder.decode(type, from: data)
         } catch {
             if await DecodingConfigurationManager.shared.getConfiguration().debugMode {
                 print("🔍 Standard decoding failed, error: \(error)")
             }
-            
+
             // For complex failures, try the detached task approach
             return try await withCheckedThrowingContinuation { continuation in
                 Task.detached {
@@ -93,14 +93,14 @@ public enum SafeDecoder {
             }
         }
     }
-    
+
     /// Extracts a portion of JSON data based on coding path
     public static func extractNestedJSON(from data: Data, at path: [CodingKey]) throws -> Data? {
         guard !path.isEmpty else { return data }
-        
+
         // Parse the original JSON
         let jsonObject = try JSONSerialization.jsonObject(with: data, options: [])
-        
+
         // Navigate to the nested location
         var currentObject: Any = jsonObject
         for key in path {
@@ -113,17 +113,18 @@ public enum SafeDecoder {
             } else {
                 // Handle dictionary key access
                 guard let dict = currentObject as? [String: Any],
-                      let value = dict[key.stringValue] else {
+                      let value = dict[key.stringValue]
+                else {
                     return nil
                 }
                 currentObject = value
             }
         }
-        
+
         // Convert the nested object back to JSON data
         return try JSONSerialization.data(withJSONObject: currentObject)
     }
-    
+
     /// Decode with timeout protection for complex structures
     public static func decodeWithTimeout<T: Decodable>(
         _ type: T.Type,

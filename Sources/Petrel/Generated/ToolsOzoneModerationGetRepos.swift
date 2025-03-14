@@ -101,8 +101,8 @@ public enum ToolsOzoneModerationGetRepos {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard other is OutputReposUnion else { return false }
-            return self == (other as! OutputReposUnion)
+            guard let other = other as? OutputReposUnion else { return false }
+            return self == other
         }
 
         /// Property that indicates if this enum contains pending data that needs loading
@@ -126,24 +126,26 @@ public enum ToolsOzoneModerationGetRepos {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case let .toolsOzoneModerationDefsRepoViewDetail(value):
+            case var .toolsOzoneModerationDefsRepoViewDetail(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(ToolsOzoneModerationDefs.RepoViewDetail.self, from: jsonData)
-                    {
-                        self = .toolsOzoneModerationDefsRepoViewDetail(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.RepoViewDetail {
+                            self = .toolsOzoneModerationDefsRepoViewDetail(updatedValue)
+                        }
                     }
                 }
-            case let .toolsOzoneModerationDefsRepoViewNotFound(value):
+            case var .toolsOzoneModerationDefsRepoViewNotFound(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(ToolsOzoneModerationDefs.RepoViewNotFound.self, from: jsonData)
-                    {
-                        self = .toolsOzoneModerationDefsRepoViewNotFound(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.RepoViewNotFound {
+                            self = .toolsOzoneModerationDefsRepoViewNotFound(updatedValue)
+                        }
                     }
                 }
             case .unexpected:

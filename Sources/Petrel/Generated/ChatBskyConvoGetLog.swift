@@ -152,8 +152,8 @@ public enum ChatBskyConvoGetLog {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard other is OutputLogsUnion else { return false }
-            return self == (other as! OutputLogsUnion)
+            guard let other = other as? OutputLogsUnion else { return false }
+            return self == other
         }
 
         /// Property that indicates if this enum contains pending data that needs loading
@@ -192,54 +192,59 @@ public enum ChatBskyConvoGetLog {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case let .chatBskyConvoDefsLogBeginConvo(value):
+            case var .chatBskyConvoDefsLogBeginConvo(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(ChatBskyConvoDefs.LogBeginConvo.self, from: jsonData)
-                    {
-                        self = .chatBskyConvoDefsLogBeginConvo(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? ChatBskyConvoDefs.LogBeginConvo {
+                            self = .chatBskyConvoDefsLogBeginConvo(updatedValue)
+                        }
                     }
                 }
-            case let .chatBskyConvoDefsLogAcceptConvo(value):
+            case var .chatBskyConvoDefsLogAcceptConvo(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(ChatBskyConvoDefs.LogAcceptConvo.self, from: jsonData)
-                    {
-                        self = .chatBskyConvoDefsLogAcceptConvo(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? ChatBskyConvoDefs.LogAcceptConvo {
+                            self = .chatBskyConvoDefsLogAcceptConvo(updatedValue)
+                        }
                     }
                 }
-            case let .chatBskyConvoDefsLogLeaveConvo(value):
+            case var .chatBskyConvoDefsLogLeaveConvo(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(ChatBskyConvoDefs.LogLeaveConvo.self, from: jsonData)
-                    {
-                        self = .chatBskyConvoDefsLogLeaveConvo(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? ChatBskyConvoDefs.LogLeaveConvo {
+                            self = .chatBskyConvoDefsLogLeaveConvo(updatedValue)
+                        }
                     }
                 }
-            case let .chatBskyConvoDefsLogCreateMessage(value):
+            case var .chatBskyConvoDefsLogCreateMessage(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(ChatBskyConvoDefs.LogCreateMessage.self, from: jsonData)
-                    {
-                        self = .chatBskyConvoDefsLogCreateMessage(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? ChatBskyConvoDefs.LogCreateMessage {
+                            self = .chatBskyConvoDefsLogCreateMessage(updatedValue)
+                        }
                     }
                 }
-            case let .chatBskyConvoDefsLogDeleteMessage(value):
+            case var .chatBskyConvoDefsLogDeleteMessage(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(ChatBskyConvoDefs.LogDeleteMessage.self, from: jsonData)
-                    {
-                        self = .chatBskyConvoDefsLogDeleteMessage(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? ChatBskyConvoDefs.LogDeleteMessage {
+                            self = .chatBskyConvoDefsLogDeleteMessage(updatedValue)
+                        }
                     }
                 }
             case .unexpected:

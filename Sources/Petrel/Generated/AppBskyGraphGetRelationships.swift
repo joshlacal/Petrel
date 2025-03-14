@@ -117,8 +117,8 @@ public enum AppBskyGraphGetRelationships {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard other is OutputRelationshipsUnion else { return false }
-            return self == (other as! OutputRelationshipsUnion)
+            guard let other = other as? OutputRelationshipsUnion else { return false }
+            return self == other
         }
 
         /// Property that indicates if this enum contains pending data that needs loading
@@ -142,24 +142,26 @@ public enum AppBskyGraphGetRelationships {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case let .appBskyGraphDefsRelationship(value):
+            case var .appBskyGraphDefsRelationship(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(AppBskyGraphDefs.Relationship.self, from: jsonData)
-                    {
-                        self = .appBskyGraphDefsRelationship(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? AppBskyGraphDefs.Relationship {
+                            self = .appBskyGraphDefsRelationship(updatedValue)
+                        }
                     }
                 }
-            case let .appBskyGraphDefsNotFoundActor(value):
+            case var .appBskyGraphDefsNotFoundActor(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    // Create a new decoded value from scratch if possible
-                    if let jsonData = try? JSONEncoder().encode(value),
-                       let decodedValue = try? await SafeDecoder.decode(AppBskyGraphDefs.NotFoundActor.self, from: jsonData)
-                    {
-                        self = .appBskyGraphDefsNotFoundActor(decodedValue)
+                if var loadable = value as? (any PendingDataLoadable) {
+                    if loadable.hasPendingData {
+                        await loadable.loadPendingData()
+                        // Update the value if it was mutated
+                        if let updatedValue = loadable as? AppBskyGraphDefs.NotFoundActor {
+                            self = .appBskyGraphDefsNotFoundActor(updatedValue)
+                        }
                     }
                 }
             case .unexpected:
