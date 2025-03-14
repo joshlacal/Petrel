@@ -58,15 +58,6 @@ public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProt
     {% if is_recursive %}
     case pending(PendingDecodeData)
     
-    /// Structure to hold data for deferred decoding
-    public struct PendingDecodeData: Codable, Sendable, Equatable {
-        public let rawData: Data
-        public let type: String
-        
-        public static func == (lhs: PendingDecodeData, rhs: PendingDecodeData) -> Bool {
-            return lhs.type == rhs.type
-        }
-    }
     {% endif %}
 
     public init(from decoder: Decoder) throws {
@@ -167,8 +158,8 @@ public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProt
     }
     
     public func isEqual(to other: any ATProtocolValue) -> Bool {
-        guard let otherValue = other as? {{ name }} else { return false }
-        return self == otherValue
+        guard other is {{ name }} else { return false }
+        return self == (other as! {{ name }})
     }
     
     /// Property that indicates if this enum contains pending data that needs loading
@@ -216,16 +207,12 @@ public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProt
         {% endif %}
         {%- for variant in variants %}
         case .{{ variant | convertRefToSwift | lowerCamelCase }}(let value):
-            // Handle nested PendingDataLoadable values
-            if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                // Create a mutable copy we can work with
-                var mutableLoadable = loadableValue
-                await mutableLoadable.loadPendingData()
-                
-                // Only try to cast back if the original value was of the expected type
-                if let originalValue = value as? {{ variant | convertRefToSwift }},
-                   let updatedValue = mutableLoadable as? {{ variant | convertRefToSwift }} {
-                    self = .{{ variant | convertRefToSwift | lowerCamelCase }}(updatedValue)
+            // Check if this value conforms to PendingDataLoadable and has pending data
+            if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                // Create a new decoded value from scratch if possible
+                if let jsonData = try? JSONEncoder().encode(value),
+                   let decodedValue = try? await SafeDecoder.decode({{ variant | convertRefToSwift }}.self, from: jsonData) {
+                    self = .{{ variant | convertRefToSwift | lowerCamelCase }}(decodedValue)
                 }
             }
         {%- endfor %}
