@@ -455,7 +455,7 @@ public enum ComAtprotoRepoApplyWrites {
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let _ = decoder // Acknowledge parameter for empty struct
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -466,7 +466,8 @@ public enum ComAtprotoRepoApplyWrites {
         public func hash(into hasher: inout Hasher) {}
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let other = other as? Self else { return false }
+            return other is Self // For empty structs, just check the type
+
             return true
         }
 

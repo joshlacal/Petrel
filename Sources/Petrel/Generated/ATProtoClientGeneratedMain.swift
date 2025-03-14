@@ -787,18 +787,18 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
                 self.networkManager = networkManager
             }
 
-            public lazy var identity: Identity = .init(networkManager: self.networkManager)
+            public lazy var temp: Temp = .init(networkManager: self.networkManager)
 
-            public final class Identity: @unchecked Sendable {
+            public final class Temp: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
                 }
             }
 
-            public lazy var temp: Temp = .init(networkManager: self.networkManager)
+            public lazy var identity: Identity = .init(networkManager: self.networkManager)
 
-            public final class Temp: @unchecked Sendable {
+            public final class Identity: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
@@ -832,18 +832,18 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
                 }
             }
 
-            public lazy var lexicon: Lexicon = .init(networkManager: self.networkManager)
+            public lazy var sync: Sync = .init(networkManager: self.networkManager)
 
-            public final class Lexicon: @unchecked Sendable {
+            public final class Sync: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
                 }
             }
 
-            public lazy var sync: Sync = .init(networkManager: self.networkManager)
+            public lazy var lexicon: Lexicon = .init(networkManager: self.networkManager)
 
-            public final class Sync: @unchecked Sendable {
+            public final class Lexicon: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
