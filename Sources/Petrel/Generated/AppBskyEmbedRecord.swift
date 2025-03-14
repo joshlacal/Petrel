@@ -752,8 +752,8 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? ViewRecordUnion else { return false }
-            return self == otherValue
+            guard other is ViewRecordUnion else { return false }
+            return self == (other as! ViewRecordUnion)
         }
 
         /// Property that indicates if this enum contains pending data that needs loading
@@ -808,115 +808,83 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
         public mutating func loadPendingData() async {
             switch self {
             case let .appBskyEmbedRecordViewRecord(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? AppBskyEmbedRecord.ViewRecord,
-                       let updatedValue = mutableLoadable as? AppBskyEmbedRecord.ViewRecord
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(AppBskyEmbedRecord.ViewRecord.self, from: jsonData)
                     {
-                        self = .appBskyEmbedRecordViewRecord(updatedValue)
+                        self = .appBskyEmbedRecordViewRecord(decodedValue)
                     }
                 }
             case let .appBskyEmbedRecordViewNotFound(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? AppBskyEmbedRecord.ViewNotFound,
-                       let updatedValue = mutableLoadable as? AppBskyEmbedRecord.ViewNotFound
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(AppBskyEmbedRecord.ViewNotFound.self, from: jsonData)
                     {
-                        self = .appBskyEmbedRecordViewNotFound(updatedValue)
+                        self = .appBskyEmbedRecordViewNotFound(decodedValue)
                     }
                 }
             case let .appBskyEmbedRecordViewBlocked(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? AppBskyEmbedRecord.ViewBlocked,
-                       let updatedValue = mutableLoadable as? AppBskyEmbedRecord.ViewBlocked
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(AppBskyEmbedRecord.ViewBlocked.self, from: jsonData)
                     {
-                        self = .appBskyEmbedRecordViewBlocked(updatedValue)
+                        self = .appBskyEmbedRecordViewBlocked(decodedValue)
                     }
                 }
             case let .appBskyEmbedRecordViewDetached(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? AppBskyEmbedRecord.ViewDetached,
-                       let updatedValue = mutableLoadable as? AppBskyEmbedRecord.ViewDetached
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(AppBskyEmbedRecord.ViewDetached.self, from: jsonData)
                     {
-                        self = .appBskyEmbedRecordViewDetached(updatedValue)
+                        self = .appBskyEmbedRecordViewDetached(decodedValue)
                     }
                 }
             case let .appBskyFeedDefsGeneratorView(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? AppBskyFeedDefs.GeneratorView,
-                       let updatedValue = mutableLoadable as? AppBskyFeedDefs.GeneratorView
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(AppBskyFeedDefs.GeneratorView.self, from: jsonData)
                     {
-                        self = .appBskyFeedDefsGeneratorView(updatedValue)
+                        self = .appBskyFeedDefsGeneratorView(decodedValue)
                     }
                 }
             case let .appBskyGraphDefsListView(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? AppBskyGraphDefs.ListView,
-                       let updatedValue = mutableLoadable as? AppBskyGraphDefs.ListView
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(AppBskyGraphDefs.ListView.self, from: jsonData)
                     {
-                        self = .appBskyGraphDefsListView(updatedValue)
+                        self = .appBskyGraphDefsListView(decodedValue)
                     }
                 }
             case let .appBskyLabelerDefsLabelerView(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? AppBskyLabelerDefs.LabelerView,
-                       let updatedValue = mutableLoadable as? AppBskyLabelerDefs.LabelerView
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(AppBskyLabelerDefs.LabelerView.self, from: jsonData)
                     {
-                        self = .appBskyLabelerDefsLabelerView(updatedValue)
+                        self = .appBskyLabelerDefsLabelerView(decodedValue)
                     }
                 }
             case let .appBskyGraphDefsStarterPackViewBasic(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? AppBskyGraphDefs.StarterPackViewBasic,
-                       let updatedValue = mutableLoadable as? AppBskyGraphDefs.StarterPackViewBasic
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(AppBskyGraphDefs.StarterPackViewBasic.self, from: jsonData)
                     {
-                        self = .appBskyGraphDefsStarterPackViewBasic(updatedValue)
+                        self = .appBskyGraphDefsStarterPackViewBasic(decodedValue)
                     }
                 }
             case .unexpected:
@@ -1047,8 +1015,8 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? ViewRecordEmbedsUnion else { return false }
-            return self == otherValue
+            guard other is ViewRecordEmbedsUnion else { return false }
+            return self == (other as! ViewRecordEmbedsUnion)
         }
 
         /// Property that indicates if this enum contains pending data that needs loading
@@ -1088,73 +1056,53 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
         public mutating func loadPendingData() async {
             switch self {
             case let .appBskyEmbedImagesView(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? AppBskyEmbedImages.View,
-                       let updatedValue = mutableLoadable as? AppBskyEmbedImages.View
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(AppBskyEmbedImages.View.self, from: jsonData)
                     {
-                        self = .appBskyEmbedImagesView(updatedValue)
+                        self = .appBskyEmbedImagesView(decodedValue)
                     }
                 }
             case let .appBskyEmbedVideoView(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? AppBskyEmbedVideo.View,
-                       let updatedValue = mutableLoadable as? AppBskyEmbedVideo.View
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(AppBskyEmbedVideo.View.self, from: jsonData)
                     {
-                        self = .appBskyEmbedVideoView(updatedValue)
+                        self = .appBskyEmbedVideoView(decodedValue)
                     }
                 }
             case let .appBskyEmbedExternalView(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? AppBskyEmbedExternal.View,
-                       let updatedValue = mutableLoadable as? AppBskyEmbedExternal.View
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(AppBskyEmbedExternal.View.self, from: jsonData)
                     {
-                        self = .appBskyEmbedExternalView(updatedValue)
+                        self = .appBskyEmbedExternalView(decodedValue)
                     }
                 }
             case let .appBskyEmbedRecordView(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? AppBskyEmbedRecord.View,
-                       let updatedValue = mutableLoadable as? AppBskyEmbedRecord.View
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(AppBskyEmbedRecord.View.self, from: jsonData)
                     {
-                        self = .appBskyEmbedRecordView(updatedValue)
+                        self = .appBskyEmbedRecordView(decodedValue)
                     }
                 }
             case let .appBskyEmbedRecordWithMediaView(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? AppBskyEmbedRecordWithMedia.View,
-                       let updatedValue = mutableLoadable as? AppBskyEmbedRecordWithMedia.View
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(AppBskyEmbedRecordWithMedia.View.self, from: jsonData)
                     {
-                        self = .appBskyEmbedRecordWithMediaView(updatedValue)
+                        self = .appBskyEmbedRecordWithMediaView(decodedValue)
                     }
                 }
             case .unexpected:

@@ -1370,8 +1370,8 @@ public enum ChatBskyConvoDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? MessageInputEmbedUnion else { return false }
-            return self == otherValue
+            guard other is MessageInputEmbedUnion else { return false }
+            return self == (other as! MessageInputEmbedUnion)
         }
 
         /// Property that indicates if this enum contains pending data that needs loading
@@ -1391,17 +1391,13 @@ public enum ChatBskyConvoDefs {
         public mutating func loadPendingData() async {
             switch self {
             case let .appBskyEmbedRecord(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? AppBskyEmbedRecord,
-                       let updatedValue = mutableLoadable as? AppBskyEmbedRecord
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(AppBskyEmbedRecord.self, from: jsonData)
                     {
-                        self = .appBskyEmbedRecord(updatedValue)
+                        self = .appBskyEmbedRecord(decodedValue)
                     }
                 }
             case .unexpected:
@@ -1474,8 +1470,8 @@ public enum ChatBskyConvoDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? MessageViewEmbedUnion else { return false }
-            return self == otherValue
+            guard other is MessageViewEmbedUnion else { return false }
+            return self == (other as! MessageViewEmbedUnion)
         }
 
         /// Property that indicates if this enum contains pending data that needs loading
@@ -1495,17 +1491,13 @@ public enum ChatBskyConvoDefs {
         public mutating func loadPendingData() async {
             switch self {
             case let .appBskyEmbedRecordView(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? AppBskyEmbedRecord.View,
-                       let updatedValue = mutableLoadable as? AppBskyEmbedRecord.View
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(AppBskyEmbedRecord.View.self, from: jsonData)
                     {
-                        self = .appBskyEmbedRecordView(updatedValue)
+                        self = .appBskyEmbedRecordView(decodedValue)
                     }
                 }
             case .unexpected:
@@ -1591,8 +1583,8 @@ public enum ChatBskyConvoDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? ConvoViewLastMessageUnion else { return false }
-            return self == otherValue
+            guard other is ConvoViewLastMessageUnion else { return false }
+            return self == (other as! ConvoViewLastMessageUnion)
         }
 
         /// Property that indicates if this enum contains pending data that needs loading
@@ -1617,31 +1609,23 @@ public enum ChatBskyConvoDefs {
         public mutating func loadPendingData() async {
             switch self {
             case let .chatBskyConvoDefsMessageView(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? ChatBskyConvoDefs.MessageView,
-                       let updatedValue = mutableLoadable as? ChatBskyConvoDefs.MessageView
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(ChatBskyConvoDefs.MessageView.self, from: jsonData)
                     {
-                        self = .chatBskyConvoDefsMessageView(updatedValue)
+                        self = .chatBskyConvoDefsMessageView(decodedValue)
                     }
                 }
             case let .chatBskyConvoDefsDeletedMessageView(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? ChatBskyConvoDefs.DeletedMessageView,
-                       let updatedValue = mutableLoadable as? ChatBskyConvoDefs.DeletedMessageView
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(ChatBskyConvoDefs.DeletedMessageView.self, from: jsonData)
                     {
-                        self = .chatBskyConvoDefsDeletedMessageView(updatedValue)
+                        self = .chatBskyConvoDefsDeletedMessageView(decodedValue)
                     }
                 }
             case .unexpected:
@@ -1727,8 +1711,8 @@ public enum ChatBskyConvoDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? LogCreateMessageMessageUnion else { return false }
-            return self == otherValue
+            guard other is LogCreateMessageMessageUnion else { return false }
+            return self == (other as! LogCreateMessageMessageUnion)
         }
 
         /// Property that indicates if this enum contains pending data that needs loading
@@ -1753,31 +1737,23 @@ public enum ChatBskyConvoDefs {
         public mutating func loadPendingData() async {
             switch self {
             case let .chatBskyConvoDefsMessageView(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? ChatBskyConvoDefs.MessageView,
-                       let updatedValue = mutableLoadable as? ChatBskyConvoDefs.MessageView
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(ChatBskyConvoDefs.MessageView.self, from: jsonData)
                     {
-                        self = .chatBskyConvoDefsMessageView(updatedValue)
+                        self = .chatBskyConvoDefsMessageView(decodedValue)
                     }
                 }
             case let .chatBskyConvoDefsDeletedMessageView(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? ChatBskyConvoDefs.DeletedMessageView,
-                       let updatedValue = mutableLoadable as? ChatBskyConvoDefs.DeletedMessageView
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(ChatBskyConvoDefs.DeletedMessageView.self, from: jsonData)
                     {
-                        self = .chatBskyConvoDefsDeletedMessageView(updatedValue)
+                        self = .chatBskyConvoDefsDeletedMessageView(decodedValue)
                     }
                 }
             case .unexpected:
@@ -1863,8 +1839,8 @@ public enum ChatBskyConvoDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? LogDeleteMessageMessageUnion else { return false }
-            return self == otherValue
+            guard other is LogDeleteMessageMessageUnion else { return false }
+            return self == (other as! LogDeleteMessageMessageUnion)
         }
 
         /// Property that indicates if this enum contains pending data that needs loading
@@ -1889,31 +1865,23 @@ public enum ChatBskyConvoDefs {
         public mutating func loadPendingData() async {
             switch self {
             case let .chatBskyConvoDefsMessageView(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? ChatBskyConvoDefs.MessageView,
-                       let updatedValue = mutableLoadable as? ChatBskyConvoDefs.MessageView
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(ChatBskyConvoDefs.MessageView.self, from: jsonData)
                     {
-                        self = .chatBskyConvoDefsMessageView(updatedValue)
+                        self = .chatBskyConvoDefsMessageView(decodedValue)
                     }
                 }
             case let .chatBskyConvoDefsDeletedMessageView(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? ChatBskyConvoDefs.DeletedMessageView,
-                       let updatedValue = mutableLoadable as? ChatBskyConvoDefs.DeletedMessageView
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(ChatBskyConvoDefs.DeletedMessageView.self, from: jsonData)
                     {
-                        self = .chatBskyConvoDefsDeletedMessageView(updatedValue)
+                        self = .chatBskyConvoDefsDeletedMessageView(decodedValue)
                     }
                 }
             case .unexpected:
@@ -1999,8 +1967,8 @@ public enum ChatBskyConvoDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? LogReadMessageMessageUnion else { return false }
-            return self == otherValue
+            guard other is LogReadMessageMessageUnion else { return false }
+            return self == (other as! LogReadMessageMessageUnion)
         }
 
         /// Property that indicates if this enum contains pending data that needs loading
@@ -2025,31 +1993,23 @@ public enum ChatBskyConvoDefs {
         public mutating func loadPendingData() async {
             switch self {
             case let .chatBskyConvoDefsMessageView(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? ChatBskyConvoDefs.MessageView,
-                       let updatedValue = mutableLoadable as? ChatBskyConvoDefs.MessageView
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(ChatBskyConvoDefs.MessageView.self, from: jsonData)
                     {
-                        self = .chatBskyConvoDefsMessageView(updatedValue)
+                        self = .chatBskyConvoDefsMessageView(decodedValue)
                     }
                 }
             case let .chatBskyConvoDefsDeletedMessageView(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? ChatBskyConvoDefs.DeletedMessageView,
-                       let updatedValue = mutableLoadable as? ChatBskyConvoDefs.DeletedMessageView
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(ChatBskyConvoDefs.DeletedMessageView.self, from: jsonData)
                     {
-                        self = .chatBskyConvoDefsDeletedMessageView(updatedValue)
+                        self = .chatBskyConvoDefsDeletedMessageView(decodedValue)
                     }
                 }
             case .unexpected:

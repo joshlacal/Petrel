@@ -377,8 +377,8 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? AppBskyRichtextFacetFeaturesUnion else { return false }
-            return self == otherValue
+            guard other is AppBskyRichtextFacetFeaturesUnion else { return false }
+            return self == (other as! AppBskyRichtextFacetFeaturesUnion)
         }
 
         /// Property that indicates if this enum contains pending data that needs loading
@@ -408,45 +408,33 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
         public mutating func loadPendingData() async {
             switch self {
             case let .appBskyRichtextFacetMention(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? AppBskyRichtextFacet.Mention,
-                       let updatedValue = mutableLoadable as? AppBskyRichtextFacet.Mention
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(AppBskyRichtextFacet.Mention.self, from: jsonData)
                     {
-                        self = .appBskyRichtextFacetMention(updatedValue)
+                        self = .appBskyRichtextFacetMention(decodedValue)
                     }
                 }
             case let .appBskyRichtextFacetLink(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? AppBskyRichtextFacet.Link,
-                       let updatedValue = mutableLoadable as? AppBskyRichtextFacet.Link
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(AppBskyRichtextFacet.Link.self, from: jsonData)
                     {
-                        self = .appBskyRichtextFacetLink(updatedValue)
+                        self = .appBskyRichtextFacetLink(decodedValue)
                     }
                 }
             case let .appBskyRichtextFacetTag(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? AppBskyRichtextFacet.Tag,
-                       let updatedValue = mutableLoadable as? AppBskyRichtextFacet.Tag
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(AppBskyRichtextFacet.Tag.self, from: jsonData)
                     {
-                        self = .appBskyRichtextFacetTag(updatedValue)
+                        self = .appBskyRichtextFacetTag(decodedValue)
                     }
                 }
             case .unexpected:

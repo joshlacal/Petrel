@@ -118,8 +118,8 @@ public enum AppBskyGraphGetRelationships {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? OutputRelationshipsUnion else { return false }
-            return self == otherValue
+            guard other is OutputRelationshipsUnion else { return false }
+            return self == (other as! OutputRelationshipsUnion)
         }
 
         /// Property that indicates if this enum contains pending data that needs loading
@@ -144,31 +144,23 @@ public enum AppBskyGraphGetRelationships {
         public mutating func loadPendingData() async {
             switch self {
             case let .appBskyGraphDefsRelationship(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? AppBskyGraphDefs.Relationship,
-                       let updatedValue = mutableLoadable as? AppBskyGraphDefs.Relationship
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(AppBskyGraphDefs.Relationship.self, from: jsonData)
                     {
-                        self = .appBskyGraphDefsRelationship(updatedValue)
+                        self = .appBskyGraphDefsRelationship(decodedValue)
                     }
                 }
             case let .appBskyGraphDefsNotFoundActor(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? AppBskyGraphDefs.NotFoundActor,
-                       let updatedValue = mutableLoadable as? AppBskyGraphDefs.NotFoundActor
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(AppBskyGraphDefs.NotFoundActor.self, from: jsonData)
                     {
-                        self = .appBskyGraphDefsNotFoundActor(updatedValue)
+                        self = .appBskyGraphDefsNotFoundActor(decodedValue)
                     }
                 }
             case .unexpected:

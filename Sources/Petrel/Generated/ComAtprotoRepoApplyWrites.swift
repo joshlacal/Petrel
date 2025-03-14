@@ -610,8 +610,8 @@ public enum ComAtprotoRepoApplyWrites {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? InputWritesUnion else { return false }
-            return self == otherValue
+            guard other is InputWritesUnion else { return false }
+            return self == (other as! InputWritesUnion)
         }
 
         /// Property that indicates if this enum contains pending data that needs loading
@@ -641,45 +641,33 @@ public enum ComAtprotoRepoApplyWrites {
         public mutating func loadPendingData() async {
             switch self {
             case let .comAtprotoRepoApplyWritesCreate(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? ComAtprotoRepoApplyWrites.Create,
-                       let updatedValue = mutableLoadable as? ComAtprotoRepoApplyWrites.Create
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(ComAtprotoRepoApplyWrites.Create.self, from: jsonData)
                     {
-                        self = .comAtprotoRepoApplyWritesCreate(updatedValue)
+                        self = .comAtprotoRepoApplyWritesCreate(decodedValue)
                     }
                 }
             case let .comAtprotoRepoApplyWritesUpdate(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? ComAtprotoRepoApplyWrites.Update,
-                       let updatedValue = mutableLoadable as? ComAtprotoRepoApplyWrites.Update
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(ComAtprotoRepoApplyWrites.Update.self, from: jsonData)
                     {
-                        self = .comAtprotoRepoApplyWritesUpdate(updatedValue)
+                        self = .comAtprotoRepoApplyWritesUpdate(decodedValue)
                     }
                 }
             case let .comAtprotoRepoApplyWritesDelete(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? ComAtprotoRepoApplyWrites.Delete,
-                       let updatedValue = mutableLoadable as? ComAtprotoRepoApplyWrites.Delete
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(ComAtprotoRepoApplyWrites.Delete.self, from: jsonData)
                     {
-                        self = .comAtprotoRepoApplyWritesDelete(updatedValue)
+                        self = .comAtprotoRepoApplyWritesDelete(decodedValue)
                     }
                 }
             case .unexpected:
@@ -780,8 +768,8 @@ public enum ComAtprotoRepoApplyWrites {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? OutputResultsUnion else { return false }
-            return self == otherValue
+            guard other is OutputResultsUnion else { return false }
+            return self == (other as! OutputResultsUnion)
         }
 
         /// Property that indicates if this enum contains pending data that needs loading
@@ -811,45 +799,33 @@ public enum ComAtprotoRepoApplyWrites {
         public mutating func loadPendingData() async {
             switch self {
             case let .comAtprotoRepoApplyWritesCreateResult(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? ComAtprotoRepoApplyWrites.CreateResult,
-                       let updatedValue = mutableLoadable as? ComAtprotoRepoApplyWrites.CreateResult
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(ComAtprotoRepoApplyWrites.CreateResult.self, from: jsonData)
                     {
-                        self = .comAtprotoRepoApplyWritesCreateResult(updatedValue)
+                        self = .comAtprotoRepoApplyWritesCreateResult(decodedValue)
                     }
                 }
             case let .comAtprotoRepoApplyWritesUpdateResult(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? ComAtprotoRepoApplyWrites.UpdateResult,
-                       let updatedValue = mutableLoadable as? ComAtprotoRepoApplyWrites.UpdateResult
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(ComAtprotoRepoApplyWrites.UpdateResult.self, from: jsonData)
                     {
-                        self = .comAtprotoRepoApplyWritesUpdateResult(updatedValue)
+                        self = .comAtprotoRepoApplyWritesUpdateResult(decodedValue)
                     }
                 }
             case let .comAtprotoRepoApplyWritesDeleteResult(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? ComAtprotoRepoApplyWrites.DeleteResult,
-                       let updatedValue = mutableLoadable as? ComAtprotoRepoApplyWrites.DeleteResult
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(ComAtprotoRepoApplyWrites.DeleteResult.self, from: jsonData)
                     {
-                        self = .comAtprotoRepoApplyWritesDeleteResult(updatedValue)
+                        self = .comAtprotoRepoApplyWritesDeleteResult(decodedValue)
                     }
                 }
             case .unexpected:
@@ -950,8 +926,8 @@ public enum ComAtprotoRepoApplyWrites {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? ComAtprotoRepoApplyWritesWritesUnion else { return false }
-            return self == otherValue
+            guard other is ComAtprotoRepoApplyWritesWritesUnion else { return false }
+            return self == (other as! ComAtprotoRepoApplyWritesWritesUnion)
         }
 
         /// Property that indicates if this enum contains pending data that needs loading
@@ -981,45 +957,33 @@ public enum ComAtprotoRepoApplyWrites {
         public mutating func loadPendingData() async {
             switch self {
             case let .comAtprotoRepoApplyWritesCreate(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? ComAtprotoRepoApplyWrites.Create,
-                       let updatedValue = mutableLoadable as? ComAtprotoRepoApplyWrites.Create
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(ComAtprotoRepoApplyWrites.Create.self, from: jsonData)
                     {
-                        self = .comAtprotoRepoApplyWritesCreate(updatedValue)
+                        self = .comAtprotoRepoApplyWritesCreate(decodedValue)
                     }
                 }
             case let .comAtprotoRepoApplyWritesUpdate(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? ComAtprotoRepoApplyWrites.Update,
-                       let updatedValue = mutableLoadable as? ComAtprotoRepoApplyWrites.Update
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(ComAtprotoRepoApplyWrites.Update.self, from: jsonData)
                     {
-                        self = .comAtprotoRepoApplyWritesUpdate(updatedValue)
+                        self = .comAtprotoRepoApplyWritesUpdate(decodedValue)
                     }
                 }
             case let .comAtprotoRepoApplyWritesDelete(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? ComAtprotoRepoApplyWrites.Delete,
-                       let updatedValue = mutableLoadable as? ComAtprotoRepoApplyWrites.Delete
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(ComAtprotoRepoApplyWrites.Delete.self, from: jsonData)
                     {
-                        self = .comAtprotoRepoApplyWritesDelete(updatedValue)
+                        self = .comAtprotoRepoApplyWritesDelete(decodedValue)
                     }
                 }
             case .unexpected:

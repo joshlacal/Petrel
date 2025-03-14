@@ -252,8 +252,8 @@ public struct AppBskyFeedGenerator: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? AppBskyFeedGeneratorLabelsUnion else { return false }
-            return self == otherValue
+            guard other is AppBskyFeedGeneratorLabelsUnion else { return false }
+            return self == (other as! AppBskyFeedGeneratorLabelsUnion)
         }
 
         /// Property that indicates if this enum contains pending data that needs loading
@@ -273,17 +273,13 @@ public struct AppBskyFeedGenerator: ATProtocolCodable, ATProtocolValue {
         public mutating func loadPendingData() async {
             switch self {
             case let .comAtprotoLabelDefsSelfLabels(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? ComAtprotoLabelDefs.SelfLabels,
-                       let updatedValue = mutableLoadable as? ComAtprotoLabelDefs.SelfLabels
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(ComAtprotoLabelDefs.SelfLabels.self, from: jsonData)
                     {
-                        self = .comAtprotoLabelDefsSelfLabels(updatedValue)
+                        self = .comAtprotoLabelDefsSelfLabels(decodedValue)
                     }
                 }
             case .unexpected:

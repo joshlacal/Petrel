@@ -105,8 +105,8 @@ public enum AppBskyLabelerGetServices {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? OutputViewsUnion else { return false }
-            return self == otherValue
+            guard other is OutputViewsUnion else { return false }
+            return self == (other as! OutputViewsUnion)
         }
 
         /// Property that indicates if this enum contains pending data that needs loading
@@ -131,31 +131,23 @@ public enum AppBskyLabelerGetServices {
         public mutating func loadPendingData() async {
             switch self {
             case let .appBskyLabelerDefsLabelerView(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? AppBskyLabelerDefs.LabelerView,
-                       let updatedValue = mutableLoadable as? AppBskyLabelerDefs.LabelerView
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(AppBskyLabelerDefs.LabelerView.self, from: jsonData)
                     {
-                        self = .appBskyLabelerDefsLabelerView(updatedValue)
+                        self = .appBskyLabelerDefsLabelerView(decodedValue)
                     }
                 }
             case let .appBskyLabelerDefsLabelerViewDetailed(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? AppBskyLabelerDefs.LabelerViewDetailed,
-                       let updatedValue = mutableLoadable as? AppBskyLabelerDefs.LabelerViewDetailed
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(AppBskyLabelerDefs.LabelerViewDetailed.self, from: jsonData)
                     {
-                        self = .appBskyLabelerDefsLabelerViewDetailed(updatedValue)
+                        self = .appBskyLabelerDefsLabelerViewDetailed(decodedValue)
                     }
                 }
             case .unexpected:

@@ -7,7 +7,6 @@
 
 import Foundation
 
-
 /// Thread-safe configuration for controlling recursive decoding behavior
 public struct DecodingConfiguration: Sendable {
     /// Maximum recursion depth before switching to iterative parsing

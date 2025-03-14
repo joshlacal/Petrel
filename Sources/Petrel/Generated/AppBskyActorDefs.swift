@@ -3236,8 +3236,8 @@ public struct AppBskyActorDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? PostInteractionSettingsPrefThreadgateAllowRulesUnion else { return false }
-            return self == otherValue
+            guard other is PostInteractionSettingsPrefThreadgateAllowRulesUnion else { return false }
+            return self == (other as! PostInteractionSettingsPrefThreadgateAllowRulesUnion)
         }
 
         /// Property that indicates if this enum contains pending data that needs loading
@@ -3272,59 +3272,43 @@ public struct AppBskyActorDefs {
         public mutating func loadPendingData() async {
             switch self {
             case let .appBskyFeedThreadgateMentionRule(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? AppBskyFeedThreadgate.MentionRule,
-                       let updatedValue = mutableLoadable as? AppBskyFeedThreadgate.MentionRule
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(AppBskyFeedThreadgate.MentionRule.self, from: jsonData)
                     {
-                        self = .appBskyFeedThreadgateMentionRule(updatedValue)
+                        self = .appBskyFeedThreadgateMentionRule(decodedValue)
                     }
                 }
             case let .appBskyFeedThreadgateFollowerRule(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? AppBskyFeedThreadgate.FollowerRule,
-                       let updatedValue = mutableLoadable as? AppBskyFeedThreadgate.FollowerRule
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(AppBskyFeedThreadgate.FollowerRule.self, from: jsonData)
                     {
-                        self = .appBskyFeedThreadgateFollowerRule(updatedValue)
+                        self = .appBskyFeedThreadgateFollowerRule(decodedValue)
                     }
                 }
             case let .appBskyFeedThreadgateFollowingRule(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? AppBskyFeedThreadgate.FollowingRule,
-                       let updatedValue = mutableLoadable as? AppBskyFeedThreadgate.FollowingRule
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(AppBskyFeedThreadgate.FollowingRule.self, from: jsonData)
                     {
-                        self = .appBskyFeedThreadgateFollowingRule(updatedValue)
+                        self = .appBskyFeedThreadgateFollowingRule(decodedValue)
                     }
                 }
             case let .appBskyFeedThreadgateListRule(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? AppBskyFeedThreadgate.ListRule,
-                       let updatedValue = mutableLoadable as? AppBskyFeedThreadgate.ListRule
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(AppBskyFeedThreadgate.ListRule.self, from: jsonData)
                     {
-                        self = .appBskyFeedThreadgateListRule(updatedValue)
+                        self = .appBskyFeedThreadgateListRule(decodedValue)
                     }
                 }
             case .unexpected:
@@ -3397,8 +3381,8 @@ public struct AppBskyActorDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? PostInteractionSettingsPrefPostgateEmbeddingRulesUnion else { return false }
-            return self == otherValue
+            guard other is PostInteractionSettingsPrefPostgateEmbeddingRulesUnion else { return false }
+            return self == (other as! PostInteractionSettingsPrefPostgateEmbeddingRulesUnion)
         }
 
         /// Property that indicates if this enum contains pending data that needs loading
@@ -3418,17 +3402,13 @@ public struct AppBskyActorDefs {
         public mutating func loadPendingData() async {
             switch self {
             case let .appBskyFeedPostgateDisableRule(value):
-                // Handle nested PendingDataLoadable values
-                if let loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    // Create a mutable copy we can work with
-                    var mutableLoadable = loadableValue
-                    await mutableLoadable.loadPendingData()
-
-                    // Only try to cast back if the original value was of the expected type
-                    if let originalValue = value as? AppBskyFeedPostgate.DisableRule,
-                       let updatedValue = mutableLoadable as? AppBskyFeedPostgate.DisableRule
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    // Create a new decoded value from scratch if possible
+                    if let jsonData = try? JSONEncoder().encode(value),
+                       let decodedValue = try? await SafeDecoder.decode(AppBskyFeedPostgate.DisableRule.self, from: jsonData)
                     {
-                        self = .appBskyFeedPostgateDisableRule(updatedValue)
+                        self = .appBskyFeedPostgateDisableRule(decodedValue)
                     }
                 }
             case .unexpected:
