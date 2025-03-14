@@ -187,7 +187,6 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: ViewMediaUnion, rhs: ViewMediaUnion) -> Bool {
@@ -345,7 +344,6 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: AppBskyEmbedRecordWithMediaMediaUnion, rhs: AppBskyEmbedRecordWithMediaMediaUnion) -> Bool {

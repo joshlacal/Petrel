@@ -91,7 +91,6 @@ public enum ChatBskyConvoGetMessages {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: OutputMessagesUnion, rhs: OutputMessagesUnion) -> Bool {

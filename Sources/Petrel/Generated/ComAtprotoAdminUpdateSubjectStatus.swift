@@ -98,7 +98,6 @@ public enum ComAtprotoAdminUpdateSubjectStatus {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: InputSubjectUnion, rhs: InputSubjectUnion) -> Bool {
@@ -256,7 +255,6 @@ public enum ComAtprotoAdminUpdateSubjectStatus {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: OutputSubjectUnion, rhs: OutputSubjectUnion) -> Bool {
@@ -414,7 +412,6 @@ public enum ComAtprotoAdminUpdateSubjectStatus {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: ComAtprotoAdminUpdateSubjectStatusSubjectUnion, rhs: ComAtprotoAdminUpdateSubjectStatusSubjectUnion) -> Bool {

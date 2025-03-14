@@ -3203,7 +3203,6 @@ public struct AppBskyActorDefs {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: PostInteractionSettingsPrefThreadgateAllowRulesUnion, rhs: PostInteractionSettingsPrefThreadgateAllowRulesUnion) -> Bool {
@@ -3361,7 +3360,6 @@ public struct AppBskyActorDefs {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: PostInteractionSettingsPrefPostgateEmbeddingRulesUnion, rhs: PostInteractionSettingsPrefPostgateEmbeddingRulesUnion) -> Bool {

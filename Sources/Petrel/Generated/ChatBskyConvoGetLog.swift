@@ -115,7 +115,6 @@ public enum ChatBskyConvoGetLog {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: OutputLogsUnion, rhs: OutputLogsUnion) -> Bool {

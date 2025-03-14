@@ -699,7 +699,6 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: ViewRecordUnion, rhs: ViewRecordUnion) -> Bool {
@@ -977,7 +976,6 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: ViewRecordEmbedsUnion, rhs: ViewRecordEmbedsUnion) -> Bool {

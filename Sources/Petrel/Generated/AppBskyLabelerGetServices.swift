@@ -82,7 +82,6 @@ public enum AppBskyLabelerGetServices {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: OutputViewsUnion, rhs: OutputViewsUnion) -> Bool {

@@ -79,7 +79,6 @@ public enum ToolsOzoneModerationGetRecords {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: OutputRecordsUnion, rhs: OutputRecordsUnion) -> Bool {

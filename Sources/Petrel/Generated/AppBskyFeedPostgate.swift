@@ -175,7 +175,6 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: AppBskyFeedPostgateEmbeddingRulesUnion, rhs: AppBskyFeedPostgateEmbeddingRulesUnion) -> Bool {

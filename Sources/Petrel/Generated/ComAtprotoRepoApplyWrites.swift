@@ -581,7 +581,6 @@ public enum ComAtprotoRepoApplyWrites {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: InputWritesUnion, rhs: InputWritesUnion) -> Bool {
@@ -739,7 +738,6 @@ public enum ComAtprotoRepoApplyWrites {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: OutputResultsUnion, rhs: OutputResultsUnion) -> Bool {
@@ -897,7 +895,6 @@ public enum ComAtprotoRepoApplyWrites {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: ComAtprotoRepoApplyWritesWritesUnion, rhs: ComAtprotoRepoApplyWritesWritesUnion) -> Bool {

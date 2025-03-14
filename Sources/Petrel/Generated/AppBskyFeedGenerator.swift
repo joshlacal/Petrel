@@ -232,7 +232,6 @@ public struct AppBskyFeedGenerator: ATProtocolCodable, ATProtocolValue {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: AppBskyFeedGeneratorLabelsUnion, rhs: AppBskyFeedGeneratorLabelsUnion) -> Bool {

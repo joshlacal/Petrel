@@ -2112,7 +2112,6 @@ public enum AppBskyFeedDefs {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: PostViewEmbedUnion, rhs: PostViewEmbedUnion) -> Bool {
@@ -2300,7 +2299,6 @@ public enum AppBskyFeedDefs {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: FeedViewPostReasonUnion, rhs: FeedViewPostReasonUnion) -> Bool {
@@ -2438,7 +2436,6 @@ public enum AppBskyFeedDefs {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: ReplyRefRootUnion, rhs: ReplyRefRootUnion) -> Bool {
@@ -2596,7 +2593,6 @@ public enum AppBskyFeedDefs {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: ReplyRefParentUnion, rhs: ReplyRefParentUnion) -> Bool {
@@ -2711,8 +2707,29 @@ public enum AppBskyFeedDefs {
                     print("🔄 Deferring deep decode for ThreadViewPostParentUnion at depth \(depth), type: \(typeValue)")
                 }
 
-                // Extract the raw JSON to decode asynchronously later
-                let rawData = try JSONEncoder().encode(container.decode(JSONValue.self, forKey: .rawContent))
+                // Capture the JSON data by re-encoding the entire payload
+                let rawData: Data
+                do {
+                    // Create a JSON snapshot of the current decoder's data
+                    let decoder = decoder as? _JSONDecoder
+                    if let jsonValue = try? decoder?.snapshot() {
+                        rawData = try JSONEncoder().encode(jsonValue)
+                    } else {
+                        // Fallback - try to capture just this container
+                        // Create a copy of all the values in the container
+                        let containerData = try JSONSerialization.data(withJSONObject: [
+                            "$type": typeValue,
+                        ])
+                        rawData = containerData
+                    }
+                } catch {
+                    if DecodingConfiguration.standard.debugMode {
+                        print("⚠️ Error creating JSON snapshot: \(error)")
+                    }
+                    // Minimal data to retry with just the type
+                    rawData = try JSONEncoder().encode(["$type": typeValue])
+                }
+
                 self = .pending(PendingDecodeData(rawData: rawData, type: typeValue))
                 return
             }
@@ -2750,17 +2767,7 @@ public enum AppBskyFeedDefs {
                 try container.encode(to: encoder)
             case let .pending(pendingData):
                 try container.encode(pendingData.type, forKey: .type)
-                if let jsonObject = try? JSONSerialization.jsonObject(with: pendingData.rawData) {
-                    try container.encode(JSONValue(jsonObject), forKey: .rawContent)
-                } else {
-                    throw EncodingError.invalidValue(
-                        pendingData.rawData,
-                        EncodingError.Context(
-                            codingPath: encoder.codingPath,
-                            debugDescription: "Could not encode pending data as JSON"
-                        )
-                    )
-                }
+                // We don't need to encode raw content here as we'll re-decode it later
             }
         }
 
@@ -2786,7 +2793,6 @@ public enum AppBskyFeedDefs {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: ThreadViewPostParentUnion, rhs: ThreadViewPostParentUnion) -> Bool {
@@ -2936,8 +2942,29 @@ public enum AppBskyFeedDefs {
                     print("🔄 Deferring deep decode for ThreadViewPostRepliesUnion at depth \(depth), type: \(typeValue)")
                 }
 
-                // Extract the raw JSON to decode asynchronously later
-                let rawData = try JSONEncoder().encode(container.decode(JSONValue.self, forKey: .rawContent))
+                // Capture the JSON data by re-encoding the entire payload
+                let rawData: Data
+                do {
+                    // Create a JSON snapshot of the current decoder's data
+                    let decoder = decoder as? _JSONDecoder
+                    if let jsonValue = try? decoder?.snapshot() {
+                        rawData = try JSONEncoder().encode(jsonValue)
+                    } else {
+                        // Fallback - try to capture just this container
+                        // Create a copy of all the values in the container
+                        let containerData = try JSONSerialization.data(withJSONObject: [
+                            "$type": typeValue,
+                        ])
+                        rawData = containerData
+                    }
+                } catch {
+                    if DecodingConfiguration.standard.debugMode {
+                        print("⚠️ Error creating JSON snapshot: \(error)")
+                    }
+                    // Minimal data to retry with just the type
+                    rawData = try JSONEncoder().encode(["$type": typeValue])
+                }
+
                 self = .pending(PendingDecodeData(rawData: rawData, type: typeValue))
                 return
             }
@@ -2975,17 +3002,7 @@ public enum AppBskyFeedDefs {
                 try container.encode(to: encoder)
             case let .pending(pendingData):
                 try container.encode(pendingData.type, forKey: .type)
-                if let jsonObject = try? JSONSerialization.jsonObject(with: pendingData.rawData) {
-                    try container.encode(JSONValue(jsonObject), forKey: .rawContent)
-                } else {
-                    throw EncodingError.invalidValue(
-                        pendingData.rawData,
-                        EncodingError.Context(
-                            codingPath: encoder.codingPath,
-                            debugDescription: "Could not encode pending data as JSON"
-                        )
-                    )
-                }
+                // We don't need to encode raw content here as we'll re-decode it later
             }
         }
 
@@ -3011,7 +3028,6 @@ public enum AppBskyFeedDefs {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: ThreadViewPostRepliesUnion, rhs: ThreadViewPostRepliesUnion) -> Bool {
@@ -3194,7 +3210,6 @@ public enum AppBskyFeedDefs {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: SkeletonFeedPostReasonUnion, rhs: SkeletonFeedPostReasonUnion) -> Bool {

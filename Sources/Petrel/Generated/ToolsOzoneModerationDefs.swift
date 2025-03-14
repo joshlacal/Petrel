@@ -5065,7 +5065,6 @@ public enum ToolsOzoneModerationDefs {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: ModEventViewEventUnion, rhs: ModEventViewEventUnion) -> Bool {
@@ -5543,7 +5542,6 @@ public enum ToolsOzoneModerationDefs {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: ModEventViewSubjectUnion, rhs: ModEventViewSubjectUnion) -> Bool {
@@ -5861,7 +5859,6 @@ public enum ToolsOzoneModerationDefs {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: ModEventViewDetailEventUnion, rhs: ModEventViewDetailEventUnion) -> Bool {
@@ -6349,7 +6346,6 @@ public enum ToolsOzoneModerationDefs {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: ModEventViewDetailSubjectUnion, rhs: ModEventViewDetailSubjectUnion) -> Bool {
@@ -6517,7 +6513,6 @@ public enum ToolsOzoneModerationDefs {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: SubjectStatusViewSubjectUnion, rhs: SubjectStatusViewSubjectUnion) -> Bool {
@@ -6645,7 +6640,6 @@ public enum ToolsOzoneModerationDefs {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: SubjectStatusViewHostingUnion, rhs: SubjectStatusViewHostingUnion) -> Bool {
@@ -6789,7 +6783,6 @@ public enum ToolsOzoneModerationDefs {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: BlobViewDetailsUnion, rhs: BlobViewDetailsUnion) -> Bool {

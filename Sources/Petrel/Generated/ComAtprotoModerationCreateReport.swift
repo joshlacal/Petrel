@@ -112,7 +112,6 @@ public enum ComAtprotoModerationCreateReport {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: InputSubjectUnion, rhs: InputSubjectUnion) -> Bool {
@@ -240,7 +239,6 @@ public enum ComAtprotoModerationCreateReport {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: OutputSubjectUnion, rhs: OutputSubjectUnion) -> Bool {
@@ -368,7 +366,6 @@ public enum ComAtprotoModerationCreateReport {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: ComAtprotoModerationCreateReportSubjectUnion, rhs: ComAtprotoModerationCreateReportSubjectUnion) -> Bool {

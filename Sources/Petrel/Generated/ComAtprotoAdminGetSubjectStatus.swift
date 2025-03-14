@@ -107,7 +107,6 @@ public enum ComAtprotoAdminGetSubjectStatus {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: OutputSubjectUnion, rhs: OutputSubjectUnion) -> Bool {

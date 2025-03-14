@@ -79,7 +79,6 @@ public enum ToolsOzoneModerationGetRepos {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: OutputReposUnion, rhs: OutputReposUnion) -> Bool {

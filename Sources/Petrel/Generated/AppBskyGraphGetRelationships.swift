@@ -95,7 +95,6 @@ public enum AppBskyGraphGetRelationships {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: OutputRelationshipsUnion, rhs: OutputRelationshipsUnion) -> Bool {

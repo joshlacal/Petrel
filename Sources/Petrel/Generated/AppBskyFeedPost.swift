@@ -508,7 +508,6 @@ public struct AppBskyFeedPost: ATProtocolCodable, ATProtocolValue {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: AppBskyFeedPostEmbedUnion, rhs: AppBskyFeedPostEmbedUnion) -> Bool {
@@ -686,7 +685,6 @@ public struct AppBskyFeedPost: ATProtocolCodable, ATProtocolValue {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: AppBskyFeedPostLabelsUnion, rhs: AppBskyFeedPostLabelsUnion) -> Bool {

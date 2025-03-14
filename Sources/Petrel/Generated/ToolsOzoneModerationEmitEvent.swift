@@ -251,7 +251,6 @@ public enum ToolsOzoneModerationEmitEvent {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: InputEventUnion, rhs: InputEventUnion) -> Bool {
@@ -719,7 +718,6 @@ public enum ToolsOzoneModerationEmitEvent {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: InputSubjectUnion, rhs: InputSubjectUnion) -> Bool {
@@ -1017,7 +1015,6 @@ public enum ToolsOzoneModerationEmitEvent {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: ToolsOzoneModerationEmitEventEventUnion, rhs: ToolsOzoneModerationEmitEventEventUnion) -> Bool {
@@ -1485,7 +1482,6 @@ public enum ToolsOzoneModerationEmitEvent {
 
         private enum CodingKeys: String, CodingKey {
             case type = "$type"
-            case rawContent = "_rawContent"
         }
 
         public static func == (lhs: ToolsOzoneModerationEmitEventSubjectUnion, rhs: ToolsOzoneModerationEmitEventSubjectUnion) -> Bool {
