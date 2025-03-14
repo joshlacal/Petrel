@@ -121,8 +121,6 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             return other is Self // For empty structs, just check the type
-
-            return true
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {

@@ -21,6 +21,16 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
         init() {
             var decoders: [String: DecoderFunction] = [:]
 
+            decoders["tools.ozone.signature.defs#sigDetail"] = { decoder in
+                do {
+                    let decodedObject = try ToolsOzoneSignatureDefs.SigDetail(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding ToolsOzoneSignatureDefs.SigDetail: \(error)")
+                    return .decodeError("Error decoding ToolsOzoneSignatureDefs.SigDetail: \(error)")
+                }
+            }
+
             decoders["tools.ozone.server.getConfig#serviceConfig"] = { decoder in
                 do {
                     let decodedObject = try ToolsOzoneServerGetConfig.ServiceConfig(from: decoder)
@@ -41,13 +51,13 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
 
-            decoders["tools.ozone.signature.defs#sigDetail"] = { decoder in
+            decoders["tools.ozone.signature.findRelatedAccounts#relatedAccount"] = { decoder in
                 do {
-                    let decodedObject = try ToolsOzoneSignatureDefs.SigDetail(from: decoder)
+                    let decodedObject = try ToolsOzoneSignatureFindRelatedAccounts.RelatedAccount(from: decoder)
                     return .knownType(decodedObject)
                 } catch {
-                    LogManager.logError("Error decoding ToolsOzoneSignatureDefs.SigDetail: \(error)")
-                    return .decodeError("Error decoding ToolsOzoneSignatureDefs.SigDetail: \(error)")
+                    LogManager.logError("Error decoding ToolsOzoneSignatureFindRelatedAccounts.RelatedAccount: \(error)")
+                    return .decodeError("Error decoding ToolsOzoneSignatureFindRelatedAccounts.RelatedAccount: \(error)")
                 }
             }
 
@@ -88,16 +98,6 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 } catch {
                     LogManager.logError("Error decoding ToolsOzoneSetDefs.SetView: \(error)")
                     return .decodeError("Error decoding ToolsOzoneSetDefs.SetView: \(error)")
-                }
-            }
-
-            decoders["tools.ozone.signature.findRelatedAccounts#relatedAccount"] = { decoder in
-                do {
-                    let decodedObject = try ToolsOzoneSignatureFindRelatedAccounts.RelatedAccount(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logError("Error decoding ToolsOzoneSignatureFindRelatedAccounts.RelatedAccount: \(error)")
-                    return .decodeError("Error decoding ToolsOzoneSignatureFindRelatedAccounts.RelatedAccount: \(error)")
                 }
             }
 
@@ -491,46 +491,6 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
 
-            decoders["app.bsky.embed.recordWithMedia"] = { decoder in
-                do {
-                    let decodedObject = try AppBskyEmbedRecordWithMedia(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logError("Error decoding AppBskyEmbedRecordWithMedia: \(error)")
-                    return .decodeError("Error decoding AppBskyEmbedRecordWithMedia: \(error)")
-                }
-            }
-
-            decoders["app.bsky.embed.recordWithMedia#view"] = { decoder in
-                do {
-                    let decodedObject = try AppBskyEmbedRecordWithMedia.View(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logError("Error decoding AppBskyEmbedRecordWithMedia.View: \(error)")
-                    return .decodeError("Error decoding AppBskyEmbedRecordWithMedia.View: \(error)")
-                }
-            }
-
-            decoders["app.bsky.video.defs#jobStatus"] = { decoder in
-                do {
-                    let decodedObject = try AppBskyVideoDefs.JobStatus(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logError("Error decoding AppBskyVideoDefs.JobStatus: \(error)")
-                    return .decodeError("Error decoding AppBskyVideoDefs.JobStatus: \(error)")
-                }
-            }
-
-            decoders["app.bsky.embed.defs#aspectRatio"] = { decoder in
-                do {
-                    let decodedObject = try AppBskyEmbedDefs.AspectRatio(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logError("Error decoding AppBskyEmbedDefs.AspectRatio: \(error)")
-                    return .decodeError("Error decoding AppBskyEmbedDefs.AspectRatio: \(error)")
-                }
-            }
-
             decoders["app.bsky.embed.record"] = { decoder in
                 do {
                     let decodedObject = try AppBskyEmbedRecord(from: decoder)
@@ -591,6 +551,36 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
 
+            decoders["app.bsky.embed.defs#aspectRatio"] = { decoder in
+                do {
+                    let decodedObject = try AppBskyEmbedDefs.AspectRatio(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding AppBskyEmbedDefs.AspectRatio: \(error)")
+                    return .decodeError("Error decoding AppBskyEmbedDefs.AspectRatio: \(error)")
+                }
+            }
+
+            decoders["app.bsky.video.defs#jobStatus"] = { decoder in
+                do {
+                    let decodedObject = try AppBskyVideoDefs.JobStatus(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding AppBskyVideoDefs.JobStatus: \(error)")
+                    return .decodeError("Error decoding AppBskyVideoDefs.JobStatus: \(error)")
+                }
+            }
+
+            decoders["app.bsky.notification.listNotifications#notification"] = { decoder in
+                do {
+                    let decodedObject = try AppBskyNotificationListNotifications.Notification(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding AppBskyNotificationListNotifications.Notification: \(error)")
+                    return .decodeError("Error decoding AppBskyNotificationListNotifications.Notification: \(error)")
+                }
+            }
+
             decoders["app.bsky.embed.video"] = { decoder in
                 do {
                     let decodedObject = try AppBskyEmbedVideo(from: decoder)
@@ -618,96 +608,6 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 } catch {
                     LogManager.logError("Error decoding AppBskyEmbedVideo.View: \(error)")
                     return .decodeError("Error decoding AppBskyEmbedVideo.View: \(error)")
-                }
-            }
-
-            decoders["app.bsky.embed.images"] = { decoder in
-                do {
-                    let decodedObject = try AppBskyEmbedImages(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logError("Error decoding AppBskyEmbedImages: \(error)")
-                    return .decodeError("Error decoding AppBskyEmbedImages: \(error)")
-                }
-            }
-
-            decoders["app.bsky.embed.images#image"] = { decoder in
-                do {
-                    let decodedObject = try AppBskyEmbedImages.Image(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logError("Error decoding AppBskyEmbedImages.Image: \(error)")
-                    return .decodeError("Error decoding AppBskyEmbedImages.Image: \(error)")
-                }
-            }
-
-            decoders["app.bsky.embed.images#view"] = { decoder in
-                do {
-                    let decodedObject = try AppBskyEmbedImages.View(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logError("Error decoding AppBskyEmbedImages.View: \(error)")
-                    return .decodeError("Error decoding AppBskyEmbedImages.View: \(error)")
-                }
-            }
-
-            decoders["app.bsky.embed.images#viewImage"] = { decoder in
-                do {
-                    let decodedObject = try AppBskyEmbedImages.ViewImage(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logError("Error decoding AppBskyEmbedImages.ViewImage: \(error)")
-                    return .decodeError("Error decoding AppBskyEmbedImages.ViewImage: \(error)")
-                }
-            }
-
-            decoders["app.bsky.notification.listNotifications#notification"] = { decoder in
-                do {
-                    let decodedObject = try AppBskyNotificationListNotifications.Notification(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logError("Error decoding AppBskyNotificationListNotifications.Notification: \(error)")
-                    return .decodeError("Error decoding AppBskyNotificationListNotifications.Notification: \(error)")
-                }
-            }
-
-            decoders["app.bsky.embed.external"] = { decoder in
-                do {
-                    let decodedObject = try AppBskyEmbedExternal(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logError("Error decoding AppBskyEmbedExternal: \(error)")
-                    return .decodeError("Error decoding AppBskyEmbedExternal: \(error)")
-                }
-            }
-
-            decoders["app.bsky.embed.external#external"] = { decoder in
-                do {
-                    let decodedObject = try AppBskyEmbedExternal.External(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logError("Error decoding AppBskyEmbedExternal.External: \(error)")
-                    return .decodeError("Error decoding AppBskyEmbedExternal.External: \(error)")
-                }
-            }
-
-            decoders["app.bsky.embed.external#view"] = { decoder in
-                do {
-                    let decodedObject = try AppBskyEmbedExternal.View(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logError("Error decoding AppBskyEmbedExternal.View: \(error)")
-                    return .decodeError("Error decoding AppBskyEmbedExternal.View: \(error)")
-                }
-            }
-
-            decoders["app.bsky.embed.external#viewExternal"] = { decoder in
-                do {
-                    let decodedObject = try AppBskyEmbedExternal.ViewExternal(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logError("Error decoding AppBskyEmbedExternal.ViewExternal: \(error)")
-                    return .decodeError("Error decoding AppBskyEmbedExternal.ViewExternal: \(error)")
                 }
             }
 
@@ -751,43 +651,103 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
 
-            decoders["app.bsky.unspecced.getTaggedSuggestions#suggestion"] = { decoder in
+            decoders["app.bsky.embed.recordWithMedia"] = { decoder in
                 do {
-                    let decodedObject = try AppBskyUnspeccedGetTaggedSuggestions.Suggestion(from: decoder)
+                    let decodedObject = try AppBskyEmbedRecordWithMedia(from: decoder)
                     return .knownType(decodedObject)
                 } catch {
-                    LogManager.logError("Error decoding AppBskyUnspeccedGetTaggedSuggestions.Suggestion: \(error)")
-                    return .decodeError("Error decoding AppBskyUnspeccedGetTaggedSuggestions.Suggestion: \(error)")
+                    LogManager.logError("Error decoding AppBskyEmbedRecordWithMedia: \(error)")
+                    return .decodeError("Error decoding AppBskyEmbedRecordWithMedia: \(error)")
                 }
             }
 
-            decoders["app.bsky.graph.block"] = { decoder in
+            decoders["app.bsky.embed.recordWithMedia#view"] = { decoder in
                 do {
-                    let decodedObject = try AppBskyGraphBlock(from: decoder)
+                    let decodedObject = try AppBskyEmbedRecordWithMedia.View(from: decoder)
                     return .knownType(decodedObject)
                 } catch {
-                    LogManager.logError("Error decoding AppBskyGraphBlock: \(error)")
-                    return .decodeError("Error decoding AppBskyGraphBlock: \(error)")
+                    LogManager.logError("Error decoding AppBskyEmbedRecordWithMedia.View: \(error)")
+                    return .decodeError("Error decoding AppBskyEmbedRecordWithMedia.View: \(error)")
                 }
             }
 
-            decoders["app.bsky.graph.starterpack"] = { decoder in
+            decoders["app.bsky.embed.external"] = { decoder in
                 do {
-                    let decodedObject = try AppBskyGraphStarterpack(from: decoder)
+                    let decodedObject = try AppBskyEmbedExternal(from: decoder)
                     return .knownType(decodedObject)
                 } catch {
-                    LogManager.logError("Error decoding AppBskyGraphStarterpack: \(error)")
-                    return .decodeError("Error decoding AppBskyGraphStarterpack: \(error)")
+                    LogManager.logError("Error decoding AppBskyEmbedExternal: \(error)")
+                    return .decodeError("Error decoding AppBskyEmbedExternal: \(error)")
                 }
             }
 
-            decoders["app.bsky.graph.starterpack#feedItem"] = { decoder in
+            decoders["app.bsky.embed.external#external"] = { decoder in
                 do {
-                    let decodedObject = try AppBskyGraphStarterpack.FeedItem(from: decoder)
+                    let decodedObject = try AppBskyEmbedExternal.External(from: decoder)
                     return .knownType(decodedObject)
                 } catch {
-                    LogManager.logError("Error decoding AppBskyGraphStarterpack.FeedItem: \(error)")
-                    return .decodeError("Error decoding AppBskyGraphStarterpack.FeedItem: \(error)")
+                    LogManager.logError("Error decoding AppBskyEmbedExternal.External: \(error)")
+                    return .decodeError("Error decoding AppBskyEmbedExternal.External: \(error)")
+                }
+            }
+
+            decoders["app.bsky.embed.external#view"] = { decoder in
+                do {
+                    let decodedObject = try AppBskyEmbedExternal.View(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding AppBskyEmbedExternal.View: \(error)")
+                    return .decodeError("Error decoding AppBskyEmbedExternal.View: \(error)")
+                }
+            }
+
+            decoders["app.bsky.embed.external#viewExternal"] = { decoder in
+                do {
+                    let decodedObject = try AppBskyEmbedExternal.ViewExternal(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding AppBskyEmbedExternal.ViewExternal: \(error)")
+                    return .decodeError("Error decoding AppBskyEmbedExternal.ViewExternal: \(error)")
+                }
+            }
+
+            decoders["app.bsky.embed.images"] = { decoder in
+                do {
+                    let decodedObject = try AppBskyEmbedImages(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding AppBskyEmbedImages: \(error)")
+                    return .decodeError("Error decoding AppBskyEmbedImages: \(error)")
+                }
+            }
+
+            decoders["app.bsky.embed.images#image"] = { decoder in
+                do {
+                    let decodedObject = try AppBskyEmbedImages.Image(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding AppBskyEmbedImages.Image: \(error)")
+                    return .decodeError("Error decoding AppBskyEmbedImages.Image: \(error)")
+                }
+            }
+
+            decoders["app.bsky.embed.images#view"] = { decoder in
+                do {
+                    let decodedObject = try AppBskyEmbedImages.View(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding AppBskyEmbedImages.View: \(error)")
+                    return .decodeError("Error decoding AppBskyEmbedImages.View: \(error)")
+                }
+            }
+
+            decoders["app.bsky.embed.images#viewImage"] = { decoder in
+                do {
+                    let decodedObject = try AppBskyEmbedImages.ViewImage(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding AppBskyEmbedImages.ViewImage: \(error)")
+                    return .decodeError("Error decoding AppBskyEmbedImages.ViewImage: \(error)")
                 }
             }
 
@@ -871,13 +831,13 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
 
-            decoders["app.bsky.graph.listblock"] = { decoder in
+            decoders["app.bsky.unspecced.getTaggedSuggestions#suggestion"] = { decoder in
                 do {
-                    let decodedObject = try AppBskyGraphListblock(from: decoder)
+                    let decodedObject = try AppBskyUnspeccedGetTaggedSuggestions.Suggestion(from: decoder)
                     return .knownType(decodedObject)
                 } catch {
-                    LogManager.logError("Error decoding AppBskyGraphListblock: \(error)")
-                    return .decodeError("Error decoding AppBskyGraphListblock: \(error)")
+                    LogManager.logError("Error decoding AppBskyUnspeccedGetTaggedSuggestions.Suggestion: \(error)")
+                    return .decodeError("Error decoding AppBskyUnspeccedGetTaggedSuggestions.Suggestion: \(error)")
                 }
             }
 
@@ -891,23 +851,43 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
 
-            decoders["app.bsky.graph.listitem"] = { decoder in
+            decoders["app.bsky.graph.block"] = { decoder in
                 do {
-                    let decodedObject = try AppBskyGraphListitem(from: decoder)
+                    let decodedObject = try AppBskyGraphBlock(from: decoder)
                     return .knownType(decodedObject)
                 } catch {
-                    LogManager.logError("Error decoding AppBskyGraphListitem: \(error)")
-                    return .decodeError("Error decoding AppBskyGraphListitem: \(error)")
+                    LogManager.logError("Error decoding AppBskyGraphBlock: \(error)")
+                    return .decodeError("Error decoding AppBskyGraphBlock: \(error)")
                 }
             }
 
-            decoders["app.bsky.graph.list"] = { decoder in
+            decoders["app.bsky.graph.listblock"] = { decoder in
                 do {
-                    let decodedObject = try AppBskyGraphList(from: decoder)
+                    let decodedObject = try AppBskyGraphListblock(from: decoder)
                     return .knownType(decodedObject)
                 } catch {
-                    LogManager.logError("Error decoding AppBskyGraphList: \(error)")
-                    return .decodeError("Error decoding AppBskyGraphList: \(error)")
+                    LogManager.logError("Error decoding AppBskyGraphListblock: \(error)")
+                    return .decodeError("Error decoding AppBskyGraphListblock: \(error)")
+                }
+            }
+
+            decoders["app.bsky.graph.starterpack"] = { decoder in
+                do {
+                    let decodedObject = try AppBskyGraphStarterpack(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding AppBskyGraphStarterpack: \(error)")
+                    return .decodeError("Error decoding AppBskyGraphStarterpack: \(error)")
+                }
+            }
+
+            decoders["app.bsky.graph.starterpack#feedItem"] = { decoder in
+                do {
+                    let decodedObject = try AppBskyGraphStarterpack.FeedItem(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding AppBskyGraphStarterpack.FeedItem: \(error)")
+                    return .decodeError("Error decoding AppBskyGraphStarterpack.FeedItem: \(error)")
                 }
             }
 
@@ -921,13 +901,93 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
 
-            decoders["app.bsky.feed.getLikes#like"] = { decoder in
+            decoders["app.bsky.graph.list"] = { decoder in
                 do {
-                    let decodedObject = try AppBskyFeedGetLikes.Like(from: decoder)
+                    let decodedObject = try AppBskyGraphList(from: decoder)
                     return .knownType(decodedObject)
                 } catch {
-                    LogManager.logError("Error decoding AppBskyFeedGetLikes.Like: \(error)")
-                    return .decodeError("Error decoding AppBskyFeedGetLikes.Like: \(error)")
+                    LogManager.logError("Error decoding AppBskyGraphList: \(error)")
+                    return .decodeError("Error decoding AppBskyGraphList: \(error)")
+                }
+            }
+
+            decoders["app.bsky.graph.listitem"] = { decoder in
+                do {
+                    let decodedObject = try AppBskyGraphListitem(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding AppBskyGraphListitem: \(error)")
+                    return .decodeError("Error decoding AppBskyGraphListitem: \(error)")
+                }
+            }
+
+            decoders["app.bsky.feed.postgate"] = { decoder in
+                do {
+                    let decodedObject = try AppBskyFeedPostgate(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding AppBskyFeedPostgate: \(error)")
+                    return .decodeError("Error decoding AppBskyFeedPostgate: \(error)")
+                }
+            }
+
+            decoders["app.bsky.feed.postgate#disableRule"] = { decoder in
+                do {
+                    let decodedObject = try AppBskyFeedPostgate.DisableRule(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding AppBskyFeedPostgate.DisableRule: \(error)")
+                    return .decodeError("Error decoding AppBskyFeedPostgate.DisableRule: \(error)")
+                }
+            }
+
+            decoders["app.bsky.feed.threadgate"] = { decoder in
+                do {
+                    let decodedObject = try AppBskyFeedThreadgate(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding AppBskyFeedThreadgate: \(error)")
+                    return .decodeError("Error decoding AppBskyFeedThreadgate: \(error)")
+                }
+            }
+
+            decoders["app.bsky.feed.threadgate#mentionRule"] = { decoder in
+                do {
+                    let decodedObject = try AppBskyFeedThreadgate.MentionRule(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding AppBskyFeedThreadgate.MentionRule: \(error)")
+                    return .decodeError("Error decoding AppBskyFeedThreadgate.MentionRule: \(error)")
+                }
+            }
+
+            decoders["app.bsky.feed.threadgate#followerRule"] = { decoder in
+                do {
+                    let decodedObject = try AppBskyFeedThreadgate.FollowerRule(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding AppBskyFeedThreadgate.FollowerRule: \(error)")
+                    return .decodeError("Error decoding AppBskyFeedThreadgate.FollowerRule: \(error)")
+                }
+            }
+
+            decoders["app.bsky.feed.threadgate#followingRule"] = { decoder in
+                do {
+                    let decodedObject = try AppBskyFeedThreadgate.FollowingRule(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding AppBskyFeedThreadgate.FollowingRule: \(error)")
+                    return .decodeError("Error decoding AppBskyFeedThreadgate.FollowingRule: \(error)")
+                }
+            }
+
+            decoders["app.bsky.feed.threadgate#listRule"] = { decoder in
+                do {
+                    let decodedObject = try AppBskyFeedThreadgate.ListRule(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding AppBskyFeedThreadgate.ListRule: \(error)")
+                    return .decodeError("Error decoding AppBskyFeedThreadgate.ListRule: \(error)")
                 }
             }
 
@@ -1111,56 +1171,6 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
 
-            decoders["app.bsky.feed.threadgate"] = { decoder in
-                do {
-                    let decodedObject = try AppBskyFeedThreadgate(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logError("Error decoding AppBskyFeedThreadgate: \(error)")
-                    return .decodeError("Error decoding AppBskyFeedThreadgate: \(error)")
-                }
-            }
-
-            decoders["app.bsky.feed.threadgate#mentionRule"] = { decoder in
-                do {
-                    let decodedObject = try AppBskyFeedThreadgate.MentionRule(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logError("Error decoding AppBskyFeedThreadgate.MentionRule: \(error)")
-                    return .decodeError("Error decoding AppBskyFeedThreadgate.MentionRule: \(error)")
-                }
-            }
-
-            decoders["app.bsky.feed.threadgate#followerRule"] = { decoder in
-                do {
-                    let decodedObject = try AppBskyFeedThreadgate.FollowerRule(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logError("Error decoding AppBskyFeedThreadgate.FollowerRule: \(error)")
-                    return .decodeError("Error decoding AppBskyFeedThreadgate.FollowerRule: \(error)")
-                }
-            }
-
-            decoders["app.bsky.feed.threadgate#followingRule"] = { decoder in
-                do {
-                    let decodedObject = try AppBskyFeedThreadgate.FollowingRule(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logError("Error decoding AppBskyFeedThreadgate.FollowingRule: \(error)")
-                    return .decodeError("Error decoding AppBskyFeedThreadgate.FollowingRule: \(error)")
-                }
-            }
-
-            decoders["app.bsky.feed.threadgate#listRule"] = { decoder in
-                do {
-                    let decodedObject = try AppBskyFeedThreadgate.ListRule(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logError("Error decoding AppBskyFeedThreadgate.ListRule: \(error)")
-                    return .decodeError("Error decoding AppBskyFeedThreadgate.ListRule: \(error)")
-                }
-            }
-
             decoders["app.bsky.feed.describeFeedGenerator#feed"] = { decoder in
                 do {
                     let decodedObject = try AppBskyFeedDescribeFeedGenerator.Feed(from: decoder)
@@ -1181,16 +1191,6 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
 
-            decoders["app.bsky.feed.like"] = { decoder in
-                do {
-                    let decodedObject = try AppBskyFeedLike(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logError("Error decoding AppBskyFeedLike: \(error)")
-                    return .decodeError("Error decoding AppBskyFeedLike: \(error)")
-                }
-            }
-
             decoders["app.bsky.feed.repost"] = { decoder in
                 do {
                     let decodedObject = try AppBskyFeedRepost(from: decoder)
@@ -1201,23 +1201,23 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
 
-            decoders["app.bsky.feed.postgate"] = { decoder in
+            decoders["app.bsky.feed.getLikes#like"] = { decoder in
                 do {
-                    let decodedObject = try AppBskyFeedPostgate(from: decoder)
+                    let decodedObject = try AppBskyFeedGetLikes.Like(from: decoder)
                     return .knownType(decodedObject)
                 } catch {
-                    LogManager.logError("Error decoding AppBskyFeedPostgate: \(error)")
-                    return .decodeError("Error decoding AppBskyFeedPostgate: \(error)")
+                    LogManager.logError("Error decoding AppBskyFeedGetLikes.Like: \(error)")
+                    return .decodeError("Error decoding AppBskyFeedGetLikes.Like: \(error)")
                 }
             }
 
-            decoders["app.bsky.feed.postgate#disableRule"] = { decoder in
+            decoders["app.bsky.feed.like"] = { decoder in
                 do {
-                    let decodedObject = try AppBskyFeedPostgate.DisableRule(from: decoder)
+                    let decodedObject = try AppBskyFeedLike(from: decoder)
                     return .knownType(decodedObject)
                 } catch {
-                    LogManager.logError("Error decoding AppBskyFeedPostgate.DisableRule: \(error)")
-                    return .decodeError("Error decoding AppBskyFeedPostgate.DisableRule: \(error)")
+                    LogManager.logError("Error decoding AppBskyFeedLike: \(error)")
+                    return .decodeError("Error decoding AppBskyFeedLike: \(error)")
                 }
             }
 
@@ -1271,13 +1271,43 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
 
-            decoders["app.bsky.labeler.service"] = { decoder in
+            decoders["app.bsky.feed.post"] = { decoder in
                 do {
-                    let decodedObject = try AppBskyLabelerService(from: decoder)
+                    let decodedObject = try AppBskyFeedPost(from: decoder)
                     return .knownType(decodedObject)
                 } catch {
-                    LogManager.logError("Error decoding AppBskyLabelerService: \(error)")
-                    return .decodeError("Error decoding AppBskyLabelerService: \(error)")
+                    LogManager.logError("Error decoding AppBskyFeedPost: \(error)")
+                    return .decodeError("Error decoding AppBskyFeedPost: \(error)")
+                }
+            }
+
+            decoders["app.bsky.feed.post#replyRef"] = { decoder in
+                do {
+                    let decodedObject = try AppBskyFeedPost.ReplyRef(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding AppBskyFeedPost.ReplyRef: \(error)")
+                    return .decodeError("Error decoding AppBskyFeedPost.ReplyRef: \(error)")
+                }
+            }
+
+            decoders["app.bsky.feed.post#entity"] = { decoder in
+                do {
+                    let decodedObject = try AppBskyFeedPost.Entity(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding AppBskyFeedPost.Entity: \(error)")
+                    return .decodeError("Error decoding AppBskyFeedPost.Entity: \(error)")
+                }
+            }
+
+            decoders["app.bsky.feed.post#textSlice"] = { decoder in
+                do {
+                    let decodedObject = try AppBskyFeedPost.TextSlice(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding AppBskyFeedPost.TextSlice: \(error)")
+                    return .decodeError("Error decoding AppBskyFeedPost.TextSlice: \(error)")
                 }
             }
 
@@ -1541,93 +1571,13 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
 
-            decoders["app.bsky.labeler.defs#labelerView"] = { decoder in
+            decoders["app.bsky.labeler.service"] = { decoder in
                 do {
-                    let decodedObject = try AppBskyLabelerDefs.LabelerView(from: decoder)
+                    let decodedObject = try AppBskyLabelerService(from: decoder)
                     return .knownType(decodedObject)
                 } catch {
-                    LogManager.logError("Error decoding AppBskyLabelerDefs.LabelerView: \(error)")
-                    return .decodeError("Error decoding AppBskyLabelerDefs.LabelerView: \(error)")
-                }
-            }
-
-            decoders["app.bsky.labeler.defs#labelerViewDetailed"] = { decoder in
-                do {
-                    let decodedObject = try AppBskyLabelerDefs.LabelerViewDetailed(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logError("Error decoding AppBskyLabelerDefs.LabelerViewDetailed: \(error)")
-                    return .decodeError("Error decoding AppBskyLabelerDefs.LabelerViewDetailed: \(error)")
-                }
-            }
-
-            decoders["app.bsky.labeler.defs#labelerViewerState"] = { decoder in
-                do {
-                    let decodedObject = try AppBskyLabelerDefs.LabelerViewerState(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logError("Error decoding AppBskyLabelerDefs.LabelerViewerState: \(error)")
-                    return .decodeError("Error decoding AppBskyLabelerDefs.LabelerViewerState: \(error)")
-                }
-            }
-
-            decoders["app.bsky.labeler.defs#labelerPolicies"] = { decoder in
-                do {
-                    let decodedObject = try AppBskyLabelerDefs.LabelerPolicies(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logError("Error decoding AppBskyLabelerDefs.LabelerPolicies: \(error)")
-                    return .decodeError("Error decoding AppBskyLabelerDefs.LabelerPolicies: \(error)")
-                }
-            }
-
-            decoders["app.bsky.feed.post"] = { decoder in
-                do {
-                    let decodedObject = try AppBskyFeedPost(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logError("Error decoding AppBskyFeedPost: \(error)")
-                    return .decodeError("Error decoding AppBskyFeedPost: \(error)")
-                }
-            }
-
-            decoders["app.bsky.feed.post#replyRef"] = { decoder in
-                do {
-                    let decodedObject = try AppBskyFeedPost.ReplyRef(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logError("Error decoding AppBskyFeedPost.ReplyRef: \(error)")
-                    return .decodeError("Error decoding AppBskyFeedPost.ReplyRef: \(error)")
-                }
-            }
-
-            decoders["app.bsky.feed.post#entity"] = { decoder in
-                do {
-                    let decodedObject = try AppBskyFeedPost.Entity(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logError("Error decoding AppBskyFeedPost.Entity: \(error)")
-                    return .decodeError("Error decoding AppBskyFeedPost.Entity: \(error)")
-                }
-            }
-
-            decoders["app.bsky.feed.post#textSlice"] = { decoder in
-                do {
-                    let decodedObject = try AppBskyFeedPost.TextSlice(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logError("Error decoding AppBskyFeedPost.TextSlice: \(error)")
-                    return .decodeError("Error decoding AppBskyFeedPost.TextSlice: \(error)")
-                }
-            }
-
-            decoders["app.bsky.actor.profile"] = { decoder in
-                do {
-                    let decodedObject = try AppBskyActorProfile(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logError("Error decoding AppBskyActorProfile: \(error)")
-                    return .decodeError("Error decoding AppBskyActorProfile: \(error)")
+                    LogManager.logError("Error decoding AppBskyLabelerService: \(error)")
+                    return .decodeError("Error decoding AppBskyLabelerService: \(error)")
                 }
             }
 
@@ -1771,33 +1721,53 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
 
-            decoders["chat.bsky.actor.defs#profileViewBasic"] = { decoder in
+            decoders["app.bsky.labeler.defs#labelerView"] = { decoder in
                 do {
-                    let decodedObject = try ChatBskyActorDefs.ProfileViewBasic(from: decoder)
+                    let decodedObject = try AppBskyLabelerDefs.LabelerView(from: decoder)
                     return .knownType(decodedObject)
                 } catch {
-                    LogManager.logError("Error decoding ChatBskyActorDefs.ProfileViewBasic: \(error)")
-                    return .decodeError("Error decoding ChatBskyActorDefs.ProfileViewBasic: \(error)")
+                    LogManager.logError("Error decoding AppBskyLabelerDefs.LabelerView: \(error)")
+                    return .decodeError("Error decoding AppBskyLabelerDefs.LabelerView: \(error)")
                 }
             }
 
-            decoders["chat.bsky.convo.sendMessageBatch#batchItem"] = { decoder in
+            decoders["app.bsky.labeler.defs#labelerViewDetailed"] = { decoder in
                 do {
-                    let decodedObject = try ChatBskyConvoSendMessageBatch.BatchItem(from: decoder)
+                    let decodedObject = try AppBskyLabelerDefs.LabelerViewDetailed(from: decoder)
                     return .knownType(decodedObject)
                 } catch {
-                    LogManager.logError("Error decoding ChatBskyConvoSendMessageBatch.BatchItem: \(error)")
-                    return .decodeError("Error decoding ChatBskyConvoSendMessageBatch.BatchItem: \(error)")
+                    LogManager.logError("Error decoding AppBskyLabelerDefs.LabelerViewDetailed: \(error)")
+                    return .decodeError("Error decoding AppBskyLabelerDefs.LabelerViewDetailed: \(error)")
                 }
             }
 
-            decoders["chat.bsky.actor.declaration"] = { decoder in
+            decoders["app.bsky.labeler.defs#labelerViewerState"] = { decoder in
                 do {
-                    let decodedObject = try ChatBskyActorDeclaration(from: decoder)
+                    let decodedObject = try AppBskyLabelerDefs.LabelerViewerState(from: decoder)
                     return .knownType(decodedObject)
                 } catch {
-                    LogManager.logError("Error decoding ChatBskyActorDeclaration: \(error)")
-                    return .decodeError("Error decoding ChatBskyActorDeclaration: \(error)")
+                    LogManager.logError("Error decoding AppBskyLabelerDefs.LabelerViewerState: \(error)")
+                    return .decodeError("Error decoding AppBskyLabelerDefs.LabelerViewerState: \(error)")
+                }
+            }
+
+            decoders["app.bsky.labeler.defs#labelerPolicies"] = { decoder in
+                do {
+                    let decodedObject = try AppBskyLabelerDefs.LabelerPolicies(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding AppBskyLabelerDefs.LabelerPolicies: \(error)")
+                    return .decodeError("Error decoding AppBskyLabelerDefs.LabelerPolicies: \(error)")
+                }
+            }
+
+            decoders["app.bsky.actor.profile"] = { decoder in
+                do {
+                    let decodedObject = try AppBskyActorProfile(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding AppBskyActorProfile: \(error)")
+                    return .decodeError("Error decoding AppBskyActorProfile: \(error)")
                 }
             }
 
@@ -1821,123 +1791,33 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
 
-            decoders["com.atproto.admin.defs#statusAttr"] = { decoder in
+            decoders["chat.bsky.actor.declaration"] = { decoder in
                 do {
-                    let decodedObject = try ComAtprotoAdminDefs.StatusAttr(from: decoder)
+                    let decodedObject = try ChatBskyActorDeclaration(from: decoder)
                     return .knownType(decodedObject)
                 } catch {
-                    LogManager.logError("Error decoding ComAtprotoAdminDefs.StatusAttr: \(error)")
-                    return .decodeError("Error decoding ComAtprotoAdminDefs.StatusAttr: \(error)")
+                    LogManager.logError("Error decoding ChatBskyActorDeclaration: \(error)")
+                    return .decodeError("Error decoding ChatBskyActorDeclaration: \(error)")
                 }
             }
 
-            decoders["com.atproto.admin.defs#accountView"] = { decoder in
+            decoders["chat.bsky.actor.defs#profileViewBasic"] = { decoder in
                 do {
-                    let decodedObject = try ComAtprotoAdminDefs.AccountView(from: decoder)
+                    let decodedObject = try ChatBskyActorDefs.ProfileViewBasic(from: decoder)
                     return .knownType(decodedObject)
                 } catch {
-                    LogManager.logError("Error decoding ComAtprotoAdminDefs.AccountView: \(error)")
-                    return .decodeError("Error decoding ComAtprotoAdminDefs.AccountView: \(error)")
+                    LogManager.logError("Error decoding ChatBskyActorDefs.ProfileViewBasic: \(error)")
+                    return .decodeError("Error decoding ChatBskyActorDefs.ProfileViewBasic: \(error)")
                 }
             }
 
-            decoders["com.atproto.admin.defs#repoRef"] = { decoder in
+            decoders["chat.bsky.convo.sendMessageBatch#batchItem"] = { decoder in
                 do {
-                    let decodedObject = try ComAtprotoAdminDefs.RepoRef(from: decoder)
+                    let decodedObject = try ChatBskyConvoSendMessageBatch.BatchItem(from: decoder)
                     return .knownType(decodedObject)
                 } catch {
-                    LogManager.logError("Error decoding ComAtprotoAdminDefs.RepoRef: \(error)")
-                    return .decodeError("Error decoding ComAtprotoAdminDefs.RepoRef: \(error)")
-                }
-            }
-
-            decoders["com.atproto.admin.defs#repoBlobRef"] = { decoder in
-                do {
-                    let decodedObject = try ComAtprotoAdminDefs.RepoBlobRef(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logError("Error decoding ComAtprotoAdminDefs.RepoBlobRef: \(error)")
-                    return .decodeError("Error decoding ComAtprotoAdminDefs.RepoBlobRef: \(error)")
-                }
-            }
-
-            decoders["com.atproto.admin.defs#threatSignature"] = { decoder in
-                do {
-                    let decodedObject = try ComAtprotoAdminDefs.ThreatSignature(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logError("Error decoding ComAtprotoAdminDefs.ThreatSignature: \(error)")
-                    return .decodeError("Error decoding ComAtprotoAdminDefs.ThreatSignature: \(error)")
-                }
-            }
-
-            decoders["com.atproto.server.defs#inviteCode"] = { decoder in
-                do {
-                    let decodedObject = try ComAtprotoServerDefs.InviteCode(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logError("Error decoding ComAtprotoServerDefs.InviteCode: \(error)")
-                    return .decodeError("Error decoding ComAtprotoServerDefs.InviteCode: \(error)")
-                }
-            }
-
-            decoders["com.atproto.server.defs#inviteCodeUse"] = { decoder in
-                do {
-                    let decodedObject = try ComAtprotoServerDefs.InviteCodeUse(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logError("Error decoding ComAtprotoServerDefs.InviteCodeUse: \(error)")
-                    return .decodeError("Error decoding ComAtprotoServerDefs.InviteCodeUse: \(error)")
-                }
-            }
-
-            decoders["com.atproto.server.listAppPasswords#appPassword"] = { decoder in
-                do {
-                    let decodedObject = try ComAtprotoServerListAppPasswords.AppPassword(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logError("Error decoding ComAtprotoServerListAppPasswords.AppPassword: \(error)")
-                    return .decodeError("Error decoding ComAtprotoServerListAppPasswords.AppPassword: \(error)")
-                }
-            }
-
-            decoders["com.atproto.server.createAppPassword#appPassword"] = { decoder in
-                do {
-                    let decodedObject = try ComAtprotoServerCreateAppPassword.AppPassword(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logError("Error decoding ComAtprotoServerCreateAppPassword.AppPassword: \(error)")
-                    return .decodeError("Error decoding ComAtprotoServerCreateAppPassword.AppPassword: \(error)")
-                }
-            }
-
-            decoders["com.atproto.server.describeServer#links"] = { decoder in
-                do {
-                    let decodedObject = try ComAtprotoServerDescribeServer.Links(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logError("Error decoding ComAtprotoServerDescribeServer.Links: \(error)")
-                    return .decodeError("Error decoding ComAtprotoServerDescribeServer.Links: \(error)")
-                }
-            }
-
-            decoders["com.atproto.server.describeServer#contact"] = { decoder in
-                do {
-                    let decodedObject = try ComAtprotoServerDescribeServer.Contact(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logError("Error decoding ComAtprotoServerDescribeServer.Contact: \(error)")
-                    return .decodeError("Error decoding ComAtprotoServerDescribeServer.Contact: \(error)")
-                }
-            }
-
-            decoders["com.atproto.server.createInviteCodes#accountCodes"] = { decoder in
-                do {
-                    let decodedObject = try ComAtprotoServerCreateInviteCodes.AccountCodes(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logError("Error decoding ComAtprotoServerCreateInviteCodes.AccountCodes: \(error)")
-                    return .decodeError("Error decoding ComAtprotoServerCreateInviteCodes.AccountCodes: \(error)")
+                    LogManager.logError("Error decoding ChatBskyConvoSendMessageBatch.BatchItem: \(error)")
+                    return .decodeError("Error decoding ChatBskyConvoSendMessageBatch.BatchItem: \(error)")
                 }
             }
 
@@ -1991,6 +1871,126 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
 
+            decoders["com.atproto.admin.defs#statusAttr"] = { decoder in
+                do {
+                    let decodedObject = try ComAtprotoAdminDefs.StatusAttr(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding ComAtprotoAdminDefs.StatusAttr: \(error)")
+                    return .decodeError("Error decoding ComAtprotoAdminDefs.StatusAttr: \(error)")
+                }
+            }
+
+            decoders["com.atproto.admin.defs#accountView"] = { decoder in
+                do {
+                    let decodedObject = try ComAtprotoAdminDefs.AccountView(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding ComAtprotoAdminDefs.AccountView: \(error)")
+                    return .decodeError("Error decoding ComAtprotoAdminDefs.AccountView: \(error)")
+                }
+            }
+
+            decoders["com.atproto.admin.defs#repoRef"] = { decoder in
+                do {
+                    let decodedObject = try ComAtprotoAdminDefs.RepoRef(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding ComAtprotoAdminDefs.RepoRef: \(error)")
+                    return .decodeError("Error decoding ComAtprotoAdminDefs.RepoRef: \(error)")
+                }
+            }
+
+            decoders["com.atproto.admin.defs#repoBlobRef"] = { decoder in
+                do {
+                    let decodedObject = try ComAtprotoAdminDefs.RepoBlobRef(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding ComAtprotoAdminDefs.RepoBlobRef: \(error)")
+                    return .decodeError("Error decoding ComAtprotoAdminDefs.RepoBlobRef: \(error)")
+                }
+            }
+
+            decoders["com.atproto.admin.defs#threatSignature"] = { decoder in
+                do {
+                    let decodedObject = try ComAtprotoAdminDefs.ThreatSignature(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding ComAtprotoAdminDefs.ThreatSignature: \(error)")
+                    return .decodeError("Error decoding ComAtprotoAdminDefs.ThreatSignature: \(error)")
+                }
+            }
+
+            decoders["com.atproto.server.listAppPasswords#appPassword"] = { decoder in
+                do {
+                    let decodedObject = try ComAtprotoServerListAppPasswords.AppPassword(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding ComAtprotoServerListAppPasswords.AppPassword: \(error)")
+                    return .decodeError("Error decoding ComAtprotoServerListAppPasswords.AppPassword: \(error)")
+                }
+            }
+
+            decoders["com.atproto.server.defs#inviteCode"] = { decoder in
+                do {
+                    let decodedObject = try ComAtprotoServerDefs.InviteCode(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding ComAtprotoServerDefs.InviteCode: \(error)")
+                    return .decodeError("Error decoding ComAtprotoServerDefs.InviteCode: \(error)")
+                }
+            }
+
+            decoders["com.atproto.server.defs#inviteCodeUse"] = { decoder in
+                do {
+                    let decodedObject = try ComAtprotoServerDefs.InviteCodeUse(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding ComAtprotoServerDefs.InviteCodeUse: \(error)")
+                    return .decodeError("Error decoding ComAtprotoServerDefs.InviteCodeUse: \(error)")
+                }
+            }
+
+            decoders["com.atproto.server.createInviteCodes#accountCodes"] = { decoder in
+                do {
+                    let decodedObject = try ComAtprotoServerCreateInviteCodes.AccountCodes(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding ComAtprotoServerCreateInviteCodes.AccountCodes: \(error)")
+                    return .decodeError("Error decoding ComAtprotoServerCreateInviteCodes.AccountCodes: \(error)")
+                }
+            }
+
+            decoders["com.atproto.server.createAppPassword#appPassword"] = { decoder in
+                do {
+                    let decodedObject = try ComAtprotoServerCreateAppPassword.AppPassword(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding ComAtprotoServerCreateAppPassword.AppPassword: \(error)")
+                    return .decodeError("Error decoding ComAtprotoServerCreateAppPassword.AppPassword: \(error)")
+                }
+            }
+
+            decoders["com.atproto.server.describeServer#links"] = { decoder in
+                do {
+                    let decodedObject = try ComAtprotoServerDescribeServer.Links(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding ComAtprotoServerDescribeServer.Links: \(error)")
+                    return .decodeError("Error decoding ComAtprotoServerDescribeServer.Links: \(error)")
+                }
+            }
+
+            decoders["com.atproto.server.describeServer#contact"] = { decoder in
+                do {
+                    let decodedObject = try ComAtprotoServerDescribeServer.Contact(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding ComAtprotoServerDescribeServer.Contact: \(error)")
+                    return .decodeError("Error decoding ComAtprotoServerDescribeServer.Contact: \(error)")
+                }
+            }
+
             decoders["com.atproto.lexicon.schema"] = { decoder in
                 do {
                     let decodedObject = try ComAtprotoLexiconSchema(from: decoder)
@@ -2011,13 +2011,13 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
 
-            decoders["com.atproto.repo.listMissingBlobs#recordBlob"] = { decoder in
+            decoders["com.atproto.repo.strongRef"] = { decoder in
                 do {
-                    let decodedObject = try ComAtprotoRepoListMissingBlobs.RecordBlob(from: decoder)
+                    let decodedObject = try ComAtprotoRepoStrongRef(from: decoder)
                     return .knownType(decodedObject)
                 } catch {
-                    LogManager.logError("Error decoding ComAtprotoRepoListMissingBlobs.RecordBlob: \(error)")
-                    return .decodeError("Error decoding ComAtprotoRepoListMissingBlobs.RecordBlob: \(error)")
+                    LogManager.logError("Error decoding ComAtprotoRepoStrongRef: \(error)")
+                    return .decodeError("Error decoding ComAtprotoRepoStrongRef: \(error)")
                 }
             }
 
@@ -2031,13 +2031,13 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
 
-            decoders["com.atproto.repo.strongRef"] = { decoder in
+            decoders["com.atproto.repo.defs#commitMeta"] = { decoder in
                 do {
-                    let decodedObject = try ComAtprotoRepoStrongRef(from: decoder)
+                    let decodedObject = try ComAtprotoRepoDefs.CommitMeta(from: decoder)
                     return .knownType(decodedObject)
                 } catch {
-                    LogManager.logError("Error decoding ComAtprotoRepoStrongRef: \(error)")
-                    return .decodeError("Error decoding ComAtprotoRepoStrongRef: \(error)")
+                    LogManager.logError("Error decoding ComAtprotoRepoDefs.CommitMeta: \(error)")
+                    return .decodeError("Error decoding ComAtprotoRepoDefs.CommitMeta: \(error)")
                 }
             }
 
@@ -2101,13 +2101,13 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
 
-            decoders["com.atproto.repo.defs#commitMeta"] = { decoder in
+            decoders["com.atproto.repo.listMissingBlobs#recordBlob"] = { decoder in
                 do {
-                    let decodedObject = try ComAtprotoRepoDefs.CommitMeta(from: decoder)
+                    let decodedObject = try ComAtprotoRepoListMissingBlobs.RecordBlob(from: decoder)
                     return .knownType(decodedObject)
                 } catch {
-                    LogManager.logError("Error decoding ComAtprotoRepoDefs.CommitMeta: \(error)")
-                    return .decodeError("Error decoding ComAtprotoRepoDefs.CommitMeta: \(error)")
+                    LogManager.logError("Error decoding ComAtprotoRepoListMissingBlobs.RecordBlob: \(error)")
+                    return .decodeError("Error decoding ComAtprotoRepoListMissingBlobs.RecordBlob: \(error)")
                 }
             }
 
