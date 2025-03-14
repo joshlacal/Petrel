@@ -1,4 +1,4 @@
-        {%- for name, def_schema in lex_definitions.items() %}
+{%- for name, def_schema in lex_definitions.items() %}
         public struct {{ name }}{{ def_schema.conformance }} {
             public static let typeIdentifier = "{{ lexicon_id }}#{{ name|lowerCamelCase }}"
 
@@ -19,6 +19,7 @@
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
+            {% if def_schema.properties %}
             let container = try decoder.container(keyedBy: CodingKeys.self)
             {%- for prop in def_schema.properties %}
             do {
@@ -32,6 +33,9 @@
                 throw error
             }
             {%- endfor %}
+            {% else %}
+            let _ = decoder  // Acknowledge parameter for empty struct
+            {% endif %}
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -63,6 +67,7 @@
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            {% if def_schema.properties %}
             guard let other = other as? Self else { return false }
             {%- for prop in def_schema.properties %}
             {% if prop.optional %}
@@ -75,6 +80,9 @@
             }
             {% endif %}
             {%- endfor %}
+            {% else %}
+            return other is Self  // For empty structs, just check the type
+            {% endif %}
             return true
         }
 
@@ -107,8 +115,8 @@
             }
 
             // Codable initializer for sub-struct
-            {%- if sub_struct.properties %}
             public init(from decoder: Decoder) throws {
+                {% if sub_struct.properties %}
                 let container = try decoder.container(keyedBy: CodingKeys.self)
                 {%- for prop in sub_struct.properties %}
                 do {
@@ -122,8 +130,10 @@
                     throw error
                 }
                 {%- endfor %}
+                {% else %}
+                let _ = decoder  // Acknowledge parameter for empty struct
+                {% endif %}
             }
-            {%- endif %}
 
             public func encode(to encoder: Encoder) throws {
                 var container = encoder.container(keyedBy: CodingKeys.self)
@@ -155,6 +165,7 @@
             }
 
             public func isEqual(to other: any ATProtocolValue) -> Bool {
+                {% if sub_struct.properties %}
                 guard let other = other as? Self else { return false }
                 {%- for prop in sub_struct.properties %}
                 {%- if prop.optional %}
@@ -167,6 +178,9 @@
                 }
                 {%- endif %}
                 {%- endfor %}
+                {% else %}
+                return other is Self  // For empty structs, just check the type
+                {% endif %}
                 return true
             }
 
@@ -174,14 +188,12 @@
                 return lhs.isEqual(to: rhs)
             }
 
-
             private enum CodingKeys: String, CodingKey {
                 case typeIdentifier = "$type"
                 {%- for prop in sub_struct.properties %}
                 case {{ prop.name }}
                 {%- endfor %}
             }
-
         }
         {%- endfor %}
     }
