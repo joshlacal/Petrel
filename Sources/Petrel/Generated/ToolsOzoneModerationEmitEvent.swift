@@ -50,6 +50,82 @@ public enum ToolsOzoneModerationEmitEvent {
         case toolsOzoneModerationDefsModEventPriorityScore(ToolsOzoneModerationDefs.ModEventPriorityScore)
         case unexpected(ATProtocolValueContainer)
 
+        public static func toolsOzoneModerationDefsModEventTakedown(_ value: ToolsOzoneModerationDefs.ModEventTakedown) -> InputEventUnion {
+            return .toolsOzoneModerationDefsModEventTakedown(value)
+        }
+
+        public static func toolsOzoneModerationDefsModEventAcknowledge(_ value: ToolsOzoneModerationDefs.ModEventAcknowledge) -> InputEventUnion {
+            return .toolsOzoneModerationDefsModEventAcknowledge(value)
+        }
+
+        public static func toolsOzoneModerationDefsModEventEscalate(_ value: ToolsOzoneModerationDefs.ModEventEscalate) -> InputEventUnion {
+            return .toolsOzoneModerationDefsModEventEscalate(value)
+        }
+
+        public static func toolsOzoneModerationDefsModEventComment(_ value: ToolsOzoneModerationDefs.ModEventComment) -> InputEventUnion {
+            return .toolsOzoneModerationDefsModEventComment(value)
+        }
+
+        public static func toolsOzoneModerationDefsModEventLabel(_ value: ToolsOzoneModerationDefs.ModEventLabel) -> InputEventUnion {
+            return .toolsOzoneModerationDefsModEventLabel(value)
+        }
+
+        public static func toolsOzoneModerationDefsModEventReport(_ value: ToolsOzoneModerationDefs.ModEventReport) -> InputEventUnion {
+            return .toolsOzoneModerationDefsModEventReport(value)
+        }
+
+        public static func toolsOzoneModerationDefsModEventMute(_ value: ToolsOzoneModerationDefs.ModEventMute) -> InputEventUnion {
+            return .toolsOzoneModerationDefsModEventMute(value)
+        }
+
+        public static func toolsOzoneModerationDefsModEventUnmute(_ value: ToolsOzoneModerationDefs.ModEventUnmute) -> InputEventUnion {
+            return .toolsOzoneModerationDefsModEventUnmute(value)
+        }
+
+        public static func toolsOzoneModerationDefsModEventMuteReporter(_ value: ToolsOzoneModerationDefs.ModEventMuteReporter) -> InputEventUnion {
+            return .toolsOzoneModerationDefsModEventMuteReporter(value)
+        }
+
+        public static func toolsOzoneModerationDefsModEventUnmuteReporter(_ value: ToolsOzoneModerationDefs.ModEventUnmuteReporter) -> InputEventUnion {
+            return .toolsOzoneModerationDefsModEventUnmuteReporter(value)
+        }
+
+        public static func toolsOzoneModerationDefsModEventReverseTakedown(_ value: ToolsOzoneModerationDefs.ModEventReverseTakedown) -> InputEventUnion {
+            return .toolsOzoneModerationDefsModEventReverseTakedown(value)
+        }
+
+        public static func toolsOzoneModerationDefsModEventResolveAppeal(_ value: ToolsOzoneModerationDefs.ModEventResolveAppeal) -> InputEventUnion {
+            return .toolsOzoneModerationDefsModEventResolveAppeal(value)
+        }
+
+        public static func toolsOzoneModerationDefsModEventEmail(_ value: ToolsOzoneModerationDefs.ModEventEmail) -> InputEventUnion {
+            return .toolsOzoneModerationDefsModEventEmail(value)
+        }
+
+        public static func toolsOzoneModerationDefsModEventDivert(_ value: ToolsOzoneModerationDefs.ModEventDivert) -> InputEventUnion {
+            return .toolsOzoneModerationDefsModEventDivert(value)
+        }
+
+        public static func toolsOzoneModerationDefsModEventTag(_ value: ToolsOzoneModerationDefs.ModEventTag) -> InputEventUnion {
+            return .toolsOzoneModerationDefsModEventTag(value)
+        }
+
+        public static func toolsOzoneModerationDefsAccountEvent(_ value: ToolsOzoneModerationDefs.AccountEvent) -> InputEventUnion {
+            return .toolsOzoneModerationDefsAccountEvent(value)
+        }
+
+        public static func toolsOzoneModerationDefsIdentityEvent(_ value: ToolsOzoneModerationDefs.IdentityEvent) -> InputEventUnion {
+            return .toolsOzoneModerationDefsIdentityEvent(value)
+        }
+
+        public static func toolsOzoneModerationDefsRecordEvent(_ value: ToolsOzoneModerationDefs.RecordEvent) -> InputEventUnion {
+            return .toolsOzoneModerationDefsRecordEvent(value)
+        }
+
+        public static func toolsOzoneModerationDefsModEventPriorityScore(_ value: ToolsOzoneModerationDefs.ModEventPriorityScore) -> InputEventUnion {
+            return .toolsOzoneModerationDefsModEventPriorityScore(value)
+        }
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -689,6 +765,14 @@ public enum ToolsOzoneModerationEmitEvent {
         case comAtprotoRepoStrongRef(ComAtprotoRepoStrongRef)
         case unexpected(ATProtocolValueContainer)
 
+        public static func comAtprotoAdminDefsRepoRef(_ value: ComAtprotoAdminDefs.RepoRef) -> InputSubjectUnion {
+            return .comAtprotoAdminDefsRepoRef(value)
+        }
+
+        public static func comAtprotoRepoStrongRef(_ value: ComAtprotoRepoStrongRef) -> InputSubjectUnion {
+            return .comAtprotoRepoStrongRef(value)
+        }
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -834,6 +918,82 @@ public enum ToolsOzoneModerationEmitEvent {
         case toolsOzoneModerationDefsRecordEvent(ToolsOzoneModerationDefs.RecordEvent)
         case toolsOzoneModerationDefsModEventPriorityScore(ToolsOzoneModerationDefs.ModEventPriorityScore)
         case unexpected(ATProtocolValueContainer)
+
+        public static func toolsOzoneModerationDefsModEventTakedown(_ value: ToolsOzoneModerationDefs.ModEventTakedown) -> ToolsOzoneModerationEmitEventEventUnion {
+            return .toolsOzoneModerationDefsModEventTakedown(value)
+        }
+
+        public static func toolsOzoneModerationDefsModEventAcknowledge(_ value: ToolsOzoneModerationDefs.ModEventAcknowledge) -> ToolsOzoneModerationEmitEventEventUnion {
+            return .toolsOzoneModerationDefsModEventAcknowledge(value)
+        }
+
+        public static func toolsOzoneModerationDefsModEventEscalate(_ value: ToolsOzoneModerationDefs.ModEventEscalate) -> ToolsOzoneModerationEmitEventEventUnion {
+            return .toolsOzoneModerationDefsModEventEscalate(value)
+        }
+
+        public static func toolsOzoneModerationDefsModEventComment(_ value: ToolsOzoneModerationDefs.ModEventComment) -> ToolsOzoneModerationEmitEventEventUnion {
+            return .toolsOzoneModerationDefsModEventComment(value)
+        }
+
+        public static func toolsOzoneModerationDefsModEventLabel(_ value: ToolsOzoneModerationDefs.ModEventLabel) -> ToolsOzoneModerationEmitEventEventUnion {
+            return .toolsOzoneModerationDefsModEventLabel(value)
+        }
+
+        public static func toolsOzoneModerationDefsModEventReport(_ value: ToolsOzoneModerationDefs.ModEventReport) -> ToolsOzoneModerationEmitEventEventUnion {
+            return .toolsOzoneModerationDefsModEventReport(value)
+        }
+
+        public static func toolsOzoneModerationDefsModEventMute(_ value: ToolsOzoneModerationDefs.ModEventMute) -> ToolsOzoneModerationEmitEventEventUnion {
+            return .toolsOzoneModerationDefsModEventMute(value)
+        }
+
+        public static func toolsOzoneModerationDefsModEventUnmute(_ value: ToolsOzoneModerationDefs.ModEventUnmute) -> ToolsOzoneModerationEmitEventEventUnion {
+            return .toolsOzoneModerationDefsModEventUnmute(value)
+        }
+
+        public static func toolsOzoneModerationDefsModEventMuteReporter(_ value: ToolsOzoneModerationDefs.ModEventMuteReporter) -> ToolsOzoneModerationEmitEventEventUnion {
+            return .toolsOzoneModerationDefsModEventMuteReporter(value)
+        }
+
+        public static func toolsOzoneModerationDefsModEventUnmuteReporter(_ value: ToolsOzoneModerationDefs.ModEventUnmuteReporter) -> ToolsOzoneModerationEmitEventEventUnion {
+            return .toolsOzoneModerationDefsModEventUnmuteReporter(value)
+        }
+
+        public static func toolsOzoneModerationDefsModEventReverseTakedown(_ value: ToolsOzoneModerationDefs.ModEventReverseTakedown) -> ToolsOzoneModerationEmitEventEventUnion {
+            return .toolsOzoneModerationDefsModEventReverseTakedown(value)
+        }
+
+        public static func toolsOzoneModerationDefsModEventResolveAppeal(_ value: ToolsOzoneModerationDefs.ModEventResolveAppeal) -> ToolsOzoneModerationEmitEventEventUnion {
+            return .toolsOzoneModerationDefsModEventResolveAppeal(value)
+        }
+
+        public static func toolsOzoneModerationDefsModEventEmail(_ value: ToolsOzoneModerationDefs.ModEventEmail) -> ToolsOzoneModerationEmitEventEventUnion {
+            return .toolsOzoneModerationDefsModEventEmail(value)
+        }
+
+        public static func toolsOzoneModerationDefsModEventDivert(_ value: ToolsOzoneModerationDefs.ModEventDivert) -> ToolsOzoneModerationEmitEventEventUnion {
+            return .toolsOzoneModerationDefsModEventDivert(value)
+        }
+
+        public static func toolsOzoneModerationDefsModEventTag(_ value: ToolsOzoneModerationDefs.ModEventTag) -> ToolsOzoneModerationEmitEventEventUnion {
+            return .toolsOzoneModerationDefsModEventTag(value)
+        }
+
+        public static func toolsOzoneModerationDefsAccountEvent(_ value: ToolsOzoneModerationDefs.AccountEvent) -> ToolsOzoneModerationEmitEventEventUnion {
+            return .toolsOzoneModerationDefsAccountEvent(value)
+        }
+
+        public static func toolsOzoneModerationDefsIdentityEvent(_ value: ToolsOzoneModerationDefs.IdentityEvent) -> ToolsOzoneModerationEmitEventEventUnion {
+            return .toolsOzoneModerationDefsIdentityEvent(value)
+        }
+
+        public static func toolsOzoneModerationDefsRecordEvent(_ value: ToolsOzoneModerationDefs.RecordEvent) -> ToolsOzoneModerationEmitEventEventUnion {
+            return .toolsOzoneModerationDefsRecordEvent(value)
+        }
+
+        public static func toolsOzoneModerationDefsModEventPriorityScore(_ value: ToolsOzoneModerationDefs.ModEventPriorityScore) -> ToolsOzoneModerationEmitEventEventUnion {
+            return .toolsOzoneModerationDefsModEventPriorityScore(value)
+        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -1473,6 +1633,14 @@ public enum ToolsOzoneModerationEmitEvent {
         case comAtprotoAdminDefsRepoRef(ComAtprotoAdminDefs.RepoRef)
         case comAtprotoRepoStrongRef(ComAtprotoRepoStrongRef)
         case unexpected(ATProtocolValueContainer)
+
+        public static func comAtprotoAdminDefsRepoRef(_ value: ComAtprotoAdminDefs.RepoRef) -> ToolsOzoneModerationEmitEventSubjectUnion {
+            return .comAtprotoAdminDefsRepoRef(value)
+        }
+
+        public static func comAtprotoRepoStrongRef(_ value: ComAtprotoRepoStrongRef) -> ToolsOzoneModerationEmitEventSubjectUnion {
+            return .comAtprotoRepoStrongRef(value)
+        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)

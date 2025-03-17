@@ -433,6 +433,26 @@ public struct AppBskyFeedPost: ATProtocolCodable, ATProtocolValue {
         case appBskyEmbedRecordWithMedia(AppBskyEmbedRecordWithMedia)
         case unexpected(ATProtocolValueContainer)
 
+        public static func appBskyEmbedImages(_ value: AppBskyEmbedImages) -> AppBskyFeedPostEmbedUnion {
+            return .appBskyEmbedImages(value)
+        }
+
+        public static func appBskyEmbedVideo(_ value: AppBskyEmbedVideo) -> AppBskyFeedPostEmbedUnion {
+            return .appBskyEmbedVideo(value)
+        }
+
+        public static func appBskyEmbedExternal(_ value: AppBskyEmbedExternal) -> AppBskyFeedPostEmbedUnion {
+            return .appBskyEmbedExternal(value)
+        }
+
+        public static func appBskyEmbedRecord(_ value: AppBskyEmbedRecord) -> AppBskyFeedPostEmbedUnion {
+            return .appBskyEmbedRecord(value)
+        }
+
+        public static func appBskyEmbedRecordWithMedia(_ value: AppBskyEmbedRecordWithMedia) -> AppBskyFeedPostEmbedUnion {
+            return .appBskyEmbedRecordWithMedia(value)
+        }
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -650,6 +670,10 @@ public struct AppBskyFeedPost: ATProtocolCodable, ATProtocolValue {
     public enum AppBskyFeedPostLabelsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case comAtprotoLabelDefsSelfLabels(ComAtprotoLabelDefs.SelfLabels)
         case unexpected(ATProtocolValueContainer)
+
+        public static func comAtprotoLabelDefsSelfLabels(_ value: ComAtprotoLabelDefs.SelfLabels) -> AppBskyFeedPostLabelsUnion {
+            return .comAtprotoLabelDefsSelfLabels(value)
+        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)

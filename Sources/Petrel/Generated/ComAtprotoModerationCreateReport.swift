@@ -64,6 +64,14 @@ public enum ComAtprotoModerationCreateReport {
         case comAtprotoRepoStrongRef(ComAtprotoRepoStrongRef)
         case unexpected(ATProtocolValueContainer)
 
+        public static func comAtprotoAdminDefsRepoRef(_ value: ComAtprotoAdminDefs.RepoRef) -> InputSubjectUnion {
+            return .comAtprotoAdminDefsRepoRef(value)
+        }
+
+        public static func comAtprotoRepoStrongRef(_ value: ComAtprotoRepoStrongRef) -> InputSubjectUnion {
+            return .comAtprotoRepoStrongRef(value)
+        }
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -193,6 +201,14 @@ public enum ComAtprotoModerationCreateReport {
         case comAtprotoRepoStrongRef(ComAtprotoRepoStrongRef)
         case unexpected(ATProtocolValueContainer)
 
+        public static func comAtprotoAdminDefsRepoRef(_ value: ComAtprotoAdminDefs.RepoRef) -> OutputSubjectUnion {
+            return .comAtprotoAdminDefsRepoRef(value)
+        }
+
+        public static func comAtprotoRepoStrongRef(_ value: ComAtprotoRepoStrongRef) -> OutputSubjectUnion {
+            return .comAtprotoRepoStrongRef(value)
+        }
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -321,6 +337,14 @@ public enum ComAtprotoModerationCreateReport {
         case comAtprotoAdminDefsRepoRef(ComAtprotoAdminDefs.RepoRef)
         case comAtprotoRepoStrongRef(ComAtprotoRepoStrongRef)
         case unexpected(ATProtocolValueContainer)
+
+        public static func comAtprotoAdminDefsRepoRef(_ value: ComAtprotoAdminDefs.RepoRef) -> ComAtprotoModerationCreateReportSubjectUnion {
+            return .comAtprotoAdminDefsRepoRef(value)
+        }
+
+        public static func comAtprotoRepoStrongRef(_ value: ComAtprotoRepoStrongRef) -> ComAtprotoModerationCreateReportSubjectUnion {
+            return .comAtprotoRepoStrongRef(value)
+        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)

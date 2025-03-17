@@ -2848,6 +2848,10 @@ public struct AppBskyActorDefs {
     public struct Preferences: Codable, ATProtocolCodable, ATProtocolValue {
         public let items: [PreferencesForUnionArray]
 
+        public init(items: [PreferencesForUnionArray]) {
+            self.items = items
+        }
+
         public init(from decoder: Decoder) throws {
             var container = try decoder.unkeyedContainer()
             var items = [PreferencesForUnionArray]()
@@ -2891,6 +2895,57 @@ public struct AppBskyActorDefs {
         case labelersPref(LabelersPref)
         case postInteractionSettingsPref(PostInteractionSettingsPref)
         case unexpected(ATProtocolValueContainer)
+        public static func adultContentPref(_ value: AdultContentPref) -> PreferencesForUnionArray {
+            return .adultContentPref(value)
+        }
+
+        public static func contentLabelPref(_ value: ContentLabelPref) -> PreferencesForUnionArray {
+            return .contentLabelPref(value)
+        }
+
+        public static func savedFeedsPref(_ value: SavedFeedsPref) -> PreferencesForUnionArray {
+            return .savedFeedsPref(value)
+        }
+
+        public static func savedFeedsPrefV2(_ value: SavedFeedsPrefV2) -> PreferencesForUnionArray {
+            return .savedFeedsPrefV2(value)
+        }
+
+        public static func personalDetailsPref(_ value: PersonalDetailsPref) -> PreferencesForUnionArray {
+            return .personalDetailsPref(value)
+        }
+
+        public static func feedViewPref(_ value: FeedViewPref) -> PreferencesForUnionArray {
+            return .feedViewPref(value)
+        }
+
+        public static func threadViewPref(_ value: ThreadViewPref) -> PreferencesForUnionArray {
+            return .threadViewPref(value)
+        }
+
+        public static func interestsPref(_ value: InterestsPref) -> PreferencesForUnionArray {
+            return .interestsPref(value)
+        }
+
+        public static func mutedWordsPref(_ value: MutedWordsPref) -> PreferencesForUnionArray {
+            return .mutedWordsPref(value)
+        }
+
+        public static func hiddenPostsPref(_ value: HiddenPostsPref) -> PreferencesForUnionArray {
+            return .hiddenPostsPref(value)
+        }
+
+        public static func bskyAppStatePref(_ value: BskyAppStatePref) -> PreferencesForUnionArray {
+            return .bskyAppStatePref(value)
+        }
+
+        public static func labelersPref(_ value: LabelersPref) -> PreferencesForUnionArray {
+            return .labelersPref(value)
+        }
+
+        public static func postInteractionSettingsPref(_ value: PostInteractionSettingsPref) -> PreferencesForUnionArray {
+            return .postInteractionSettingsPref(value)
+        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -3137,6 +3192,22 @@ public struct AppBskyActorDefs {
         case appBskyFeedThreadgateListRule(AppBskyFeedThreadgate.ListRule)
         case unexpected(ATProtocolValueContainer)
 
+        public static func appBskyFeedThreadgateMentionRule(_ value: AppBskyFeedThreadgate.MentionRule) -> PostInteractionSettingsPrefThreadgateAllowRulesUnion {
+            return .appBskyFeedThreadgateMentionRule(value)
+        }
+
+        public static func appBskyFeedThreadgateFollowerRule(_ value: AppBskyFeedThreadgate.FollowerRule) -> PostInteractionSettingsPrefThreadgateAllowRulesUnion {
+            return .appBskyFeedThreadgateFollowerRule(value)
+        }
+
+        public static func appBskyFeedThreadgateFollowingRule(_ value: AppBskyFeedThreadgate.FollowingRule) -> PostInteractionSettingsPrefThreadgateAllowRulesUnion {
+            return .appBskyFeedThreadgateFollowingRule(value)
+        }
+
+        public static func appBskyFeedThreadgateListRule(_ value: AppBskyFeedThreadgate.ListRule) -> PostInteractionSettingsPrefThreadgateAllowRulesUnion {
+            return .appBskyFeedThreadgateListRule(value)
+        }
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -3324,6 +3395,10 @@ public struct AppBskyActorDefs {
     public enum PostInteractionSettingsPrefPostgateEmbeddingRulesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case appBskyFeedPostgateDisableRule(AppBskyFeedPostgate.DisableRule)
         case unexpected(ATProtocolValueContainer)
+
+        public static func appBskyFeedPostgateDisableRule(_ value: AppBskyFeedPostgate.DisableRule) -> PostInteractionSettingsPrefPostgateEmbeddingRulesUnion {
+            return .appBskyFeedPostgateDisableRule(value)
+        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)

@@ -597,6 +597,38 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
         case appBskyGraphDefsStarterPackViewBasic(AppBskyGraphDefs.StarterPackViewBasic)
         case unexpected(ATProtocolValueContainer)
 
+        public static func appBskyEmbedRecordViewRecord(_ value: AppBskyEmbedRecord.ViewRecord) -> ViewRecordUnion {
+            return .appBskyEmbedRecordViewRecord(value)
+        }
+
+        public static func appBskyEmbedRecordViewNotFound(_ value: AppBskyEmbedRecord.ViewNotFound) -> ViewRecordUnion {
+            return .appBskyEmbedRecordViewNotFound(value)
+        }
+
+        public static func appBskyEmbedRecordViewBlocked(_ value: AppBskyEmbedRecord.ViewBlocked) -> ViewRecordUnion {
+            return .appBskyEmbedRecordViewBlocked(value)
+        }
+
+        public static func appBskyEmbedRecordViewDetached(_ value: AppBskyEmbedRecord.ViewDetached) -> ViewRecordUnion {
+            return .appBskyEmbedRecordViewDetached(value)
+        }
+
+        public static func appBskyFeedDefsGeneratorView(_ value: AppBskyFeedDefs.GeneratorView) -> ViewRecordUnion {
+            return .appBskyFeedDefsGeneratorView(value)
+        }
+
+        public static func appBskyGraphDefsListView(_ value: AppBskyGraphDefs.ListView) -> ViewRecordUnion {
+            return .appBskyGraphDefsListView(value)
+        }
+
+        public static func appBskyLabelerDefsLabelerView(_ value: AppBskyLabelerDefs.LabelerView) -> ViewRecordUnion {
+            return .appBskyLabelerDefsLabelerView(value)
+        }
+
+        public static func appBskyGraphDefsStarterPackViewBasic(_ value: AppBskyGraphDefs.StarterPackViewBasic) -> ViewRecordUnion {
+            return .appBskyGraphDefsStarterPackViewBasic(value)
+        }
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -908,6 +940,26 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
         case appBskyEmbedRecordView(AppBskyEmbedRecord.View)
         case appBskyEmbedRecordWithMediaView(AppBskyEmbedRecordWithMedia.View)
         case unexpected(ATProtocolValueContainer)
+
+        public static func appBskyEmbedImagesView(_ value: AppBskyEmbedImages.View) -> ViewRecordEmbedsUnion {
+            return .appBskyEmbedImagesView(value)
+        }
+
+        public static func appBskyEmbedVideoView(_ value: AppBskyEmbedVideo.View) -> ViewRecordEmbedsUnion {
+            return .appBskyEmbedVideoView(value)
+        }
+
+        public static func appBskyEmbedExternalView(_ value: AppBskyEmbedExternal.View) -> ViewRecordEmbedsUnion {
+            return .appBskyEmbedExternalView(value)
+        }
+
+        public static func appBskyEmbedRecordView(_ value: AppBskyEmbedRecord.View) -> ViewRecordEmbedsUnion {
+            return .appBskyEmbedRecordView(value)
+        }
+
+        public static func appBskyEmbedRecordWithMediaView(_ value: AppBskyEmbedRecordWithMedia.View) -> ViewRecordEmbedsUnion {
+            return .appBskyEmbedRecordWithMediaView(value)
+        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)

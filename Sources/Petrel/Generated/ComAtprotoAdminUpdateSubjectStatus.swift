@@ -41,6 +41,18 @@ public enum ComAtprotoAdminUpdateSubjectStatus {
         case comAtprotoAdminDefsRepoBlobRef(ComAtprotoAdminDefs.RepoBlobRef)
         case unexpected(ATProtocolValueContainer)
 
+        public static func comAtprotoAdminDefsRepoRef(_ value: ComAtprotoAdminDefs.RepoRef) -> InputSubjectUnion {
+            return .comAtprotoAdminDefsRepoRef(value)
+        }
+
+        public static func comAtprotoRepoStrongRef(_ value: ComAtprotoRepoStrongRef) -> InputSubjectUnion {
+            return .comAtprotoRepoStrongRef(value)
+        }
+
+        public static func comAtprotoAdminDefsRepoBlobRef(_ value: ComAtprotoAdminDefs.RepoBlobRef) -> InputSubjectUnion {
+            return .comAtprotoAdminDefsRepoBlobRef(value)
+        }
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -201,6 +213,18 @@ public enum ComAtprotoAdminUpdateSubjectStatus {
         case comAtprotoAdminDefsRepoBlobRef(ComAtprotoAdminDefs.RepoBlobRef)
         case unexpected(ATProtocolValueContainer)
 
+        public static func comAtprotoAdminDefsRepoRef(_ value: ComAtprotoAdminDefs.RepoRef) -> OutputSubjectUnion {
+            return .comAtprotoAdminDefsRepoRef(value)
+        }
+
+        public static func comAtprotoRepoStrongRef(_ value: ComAtprotoRepoStrongRef) -> OutputSubjectUnion {
+            return .comAtprotoRepoStrongRef(value)
+        }
+
+        public static func comAtprotoAdminDefsRepoBlobRef(_ value: ComAtprotoAdminDefs.RepoBlobRef) -> OutputSubjectUnion {
+            return .comAtprotoAdminDefsRepoBlobRef(value)
+        }
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -360,6 +384,18 @@ public enum ComAtprotoAdminUpdateSubjectStatus {
         case comAtprotoRepoStrongRef(ComAtprotoRepoStrongRef)
         case comAtprotoAdminDefsRepoBlobRef(ComAtprotoAdminDefs.RepoBlobRef)
         case unexpected(ATProtocolValueContainer)
+
+        public static func comAtprotoAdminDefsRepoRef(_ value: ComAtprotoAdminDefs.RepoRef) -> ComAtprotoAdminUpdateSubjectStatusSubjectUnion {
+            return .comAtprotoAdminDefsRepoRef(value)
+        }
+
+        public static func comAtprotoRepoStrongRef(_ value: ComAtprotoRepoStrongRef) -> ComAtprotoAdminUpdateSubjectStatusSubjectUnion {
+            return .comAtprotoRepoStrongRef(value)
+        }
+
+        public static func comAtprotoAdminDefsRepoBlobRef(_ value: ComAtprotoAdminDefs.RepoBlobRef) -> ComAtprotoAdminUpdateSubjectStatusSubjectUnion {
+            return .comAtprotoAdminDefsRepoBlobRef(value)
+        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
