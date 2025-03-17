@@ -50,18 +50,6 @@ public enum ComAtprotoAdminGetSubjectStatus {
         case comAtprotoAdminDefsRepoBlobRef(ComAtprotoAdminDefs.RepoBlobRef)
         case unexpected(ATProtocolValueContainer)
 
-        public static func comAtprotoAdminDefsRepoRef(_ value: ComAtprotoAdminDefs.RepoRef) -> OutputSubjectUnion {
-            return .comAtprotoAdminDefsRepoRef(value)
-        }
-
-        public static func comAtprotoRepoStrongRef(_ value: ComAtprotoRepoStrongRef) -> OutputSubjectUnion {
-            return .comAtprotoRepoStrongRef(value)
-        }
-
-        public static func comAtprotoAdminDefsRepoBlobRef(_ value: ComAtprotoAdminDefs.RepoBlobRef) -> OutputSubjectUnion {
-            return .comAtprotoAdminDefsRepoBlobRef(value)
-        }
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)

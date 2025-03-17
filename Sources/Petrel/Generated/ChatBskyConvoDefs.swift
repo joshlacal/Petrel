@@ -1311,10 +1311,6 @@ public enum ChatBskyConvoDefs {
         case appBskyEmbedRecord(AppBskyEmbedRecord)
         case unexpected(ATProtocolValueContainer)
 
-        public static func appBskyEmbedRecord(_ value: AppBskyEmbedRecord) -> MessageInputEmbedUnion {
-            return .appBskyEmbedRecord(value)
-        }
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -1414,10 +1410,6 @@ public enum ChatBskyConvoDefs {
     public enum MessageViewEmbedUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case appBskyEmbedRecordView(AppBskyEmbedRecord.View)
         case unexpected(ATProtocolValueContainer)
-
-        public static func appBskyEmbedRecordView(_ value: AppBskyEmbedRecord.View) -> MessageViewEmbedUnion {
-            return .appBskyEmbedRecordView(value)
-        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -1519,14 +1511,6 @@ public enum ChatBskyConvoDefs {
         case chatBskyConvoDefsMessageView(ChatBskyConvoDefs.MessageView)
         case chatBskyConvoDefsDeletedMessageView(ChatBskyConvoDefs.DeletedMessageView)
         case unexpected(ATProtocolValueContainer)
-
-        public static func chatBskyConvoDefsMessageView(_ value: ChatBskyConvoDefs.MessageView) -> ConvoViewLastMessageUnion {
-            return .chatBskyConvoDefsMessageView(value)
-        }
-
-        public static func chatBskyConvoDefsDeletedMessageView(_ value: ChatBskyConvoDefs.DeletedMessageView) -> ConvoViewLastMessageUnion {
-            return .chatBskyConvoDefsDeletedMessageView(value)
-        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -1657,14 +1641,6 @@ public enum ChatBskyConvoDefs {
         case chatBskyConvoDefsDeletedMessageView(ChatBskyConvoDefs.DeletedMessageView)
         case unexpected(ATProtocolValueContainer)
 
-        public static func chatBskyConvoDefsMessageView(_ value: ChatBskyConvoDefs.MessageView) -> LogCreateMessageMessageUnion {
-            return .chatBskyConvoDefsMessageView(value)
-        }
-
-        public static func chatBskyConvoDefsDeletedMessageView(_ value: ChatBskyConvoDefs.DeletedMessageView) -> LogCreateMessageMessageUnion {
-            return .chatBskyConvoDefsDeletedMessageView(value)
-        }
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -1794,14 +1770,6 @@ public enum ChatBskyConvoDefs {
         case chatBskyConvoDefsDeletedMessageView(ChatBskyConvoDefs.DeletedMessageView)
         case unexpected(ATProtocolValueContainer)
 
-        public static func chatBskyConvoDefsMessageView(_ value: ChatBskyConvoDefs.MessageView) -> LogDeleteMessageMessageUnion {
-            return .chatBskyConvoDefsMessageView(value)
-        }
-
-        public static func chatBskyConvoDefsDeletedMessageView(_ value: ChatBskyConvoDefs.DeletedMessageView) -> LogDeleteMessageMessageUnion {
-            return .chatBskyConvoDefsDeletedMessageView(value)
-        }
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -1930,14 +1898,6 @@ public enum ChatBskyConvoDefs {
         case chatBskyConvoDefsMessageView(ChatBskyConvoDefs.MessageView)
         case chatBskyConvoDefsDeletedMessageView(ChatBskyConvoDefs.DeletedMessageView)
         case unexpected(ATProtocolValueContainer)
-
-        public static func chatBskyConvoDefsMessageView(_ value: ChatBskyConvoDefs.MessageView) -> LogReadMessageMessageUnion {
-            return .chatBskyConvoDefsMessageView(value)
-        }
-
-        public static func chatBskyConvoDefsDeletedMessageView(_ value: ChatBskyConvoDefs.DeletedMessageView) -> LogReadMessageMessageUnion {
-            return .chatBskyConvoDefsDeletedMessageView(value)
-        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)

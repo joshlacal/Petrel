@@ -136,10 +136,6 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
         case appBskyFeedPostgateDisableRule(AppBskyFeedPostgate.DisableRule)
         case unexpected(ATProtocolValueContainer)
 
-        public static func appBskyFeedPostgateDisableRule(_ value: AppBskyFeedPostgate.DisableRule) -> AppBskyFeedPostgateEmbeddingRulesUnion {
-            return .appBskyFeedPostgateDisableRule(value)
-        }
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)

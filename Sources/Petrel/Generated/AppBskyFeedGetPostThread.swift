@@ -53,18 +53,6 @@ public enum AppBskyFeedGetPostThread {
 
         case pending(PendingDecodeData)
 
-        public static func appBskyFeedDefsThreadViewPost(_ value: AppBskyFeedDefs.ThreadViewPost) -> OutputThreadUnion {
-            return .appBskyFeedDefsThreadViewPost(value)
-        }
-
-        public static func appBskyFeedDefsNotFoundPost(_ value: AppBskyFeedDefs.NotFoundPost) -> OutputThreadUnion {
-            return .appBskyFeedDefsNotFoundPost(value)
-        }
-
-        public static func appBskyFeedDefsBlockedPost(_ value: AppBskyFeedDefs.BlockedPost) -> OutputThreadUnion {
-            return .appBskyFeedDefsBlockedPost(value)
-        }
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)

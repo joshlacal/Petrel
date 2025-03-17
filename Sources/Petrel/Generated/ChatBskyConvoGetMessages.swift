@@ -43,14 +43,6 @@ public enum ChatBskyConvoGetMessages {
         case chatBskyConvoDefsDeletedMessageView(ChatBskyConvoDefs.DeletedMessageView)
         case unexpected(ATProtocolValueContainer)
 
-        public static func chatBskyConvoDefsMessageView(_ value: ChatBskyConvoDefs.MessageView) -> OutputMessagesUnion {
-            return .chatBskyConvoDefsMessageView(value)
-        }
-
-        public static func chatBskyConvoDefsDeletedMessageView(_ value: ChatBskyConvoDefs.DeletedMessageView) -> OutputMessagesUnion {
-            return .chatBskyConvoDefsDeletedMessageView(value)
-        }
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)

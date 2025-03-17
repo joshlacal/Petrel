@@ -292,18 +292,6 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
         case appBskyRichtextFacetTag(AppBskyRichtextFacet.Tag)
         case unexpected(ATProtocolValueContainer)
 
-        public static func appBskyRichtextFacetMention(_ value: AppBskyRichtextFacet.Mention) -> AppBskyRichtextFacetFeaturesUnion {
-            return .appBskyRichtextFacetMention(value)
-        }
-
-        public static func appBskyRichtextFacetLink(_ value: AppBskyRichtextFacet.Link) -> AppBskyRichtextFacetFeaturesUnion {
-            return .appBskyRichtextFacetLink(value)
-        }
-
-        public static func appBskyRichtextFacetTag(_ value: AppBskyRichtextFacet.Tag) -> AppBskyRichtextFacetFeaturesUnion {
-            return .appBskyRichtextFacetTag(value)
-        }
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -500,17 +488,6 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
         case link(Link)
         case tag(Tag)
         case unexpected(ATProtocolValueContainer)
-        public static func mention(_ value: Mention) -> FeaturesForUnionArray {
-            return .mention(value)
-        }
-
-        public static func link(_ value: Link) -> FeaturesForUnionArray {
-            return .link(value)
-        }
-
-        public static func tag(_ value: Tag) -> FeaturesForUnionArray {
-            return .tag(value)
-        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)

@@ -40,26 +40,6 @@ public enum ChatBskyConvoGetLog {
         case chatBskyConvoDefsLogDeleteMessage(ChatBskyConvoDefs.LogDeleteMessage)
         case unexpected(ATProtocolValueContainer)
 
-        public static func chatBskyConvoDefsLogBeginConvo(_ value: ChatBskyConvoDefs.LogBeginConvo) -> OutputLogsUnion {
-            return .chatBskyConvoDefsLogBeginConvo(value)
-        }
-
-        public static func chatBskyConvoDefsLogAcceptConvo(_ value: ChatBskyConvoDefs.LogAcceptConvo) -> OutputLogsUnion {
-            return .chatBskyConvoDefsLogAcceptConvo(value)
-        }
-
-        public static func chatBskyConvoDefsLogLeaveConvo(_ value: ChatBskyConvoDefs.LogLeaveConvo) -> OutputLogsUnion {
-            return .chatBskyConvoDefsLogLeaveConvo(value)
-        }
-
-        public static func chatBskyConvoDefsLogCreateMessage(_ value: ChatBskyConvoDefs.LogCreateMessage) -> OutputLogsUnion {
-            return .chatBskyConvoDefsLogCreateMessage(value)
-        }
-
-        public static func chatBskyConvoDefsLogDeleteMessage(_ value: ChatBskyConvoDefs.LogDeleteMessage) -> OutputLogsUnion {
-            return .chatBskyConvoDefsLogDeleteMessage(value)
-        }
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)

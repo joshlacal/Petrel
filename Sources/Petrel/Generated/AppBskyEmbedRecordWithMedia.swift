@@ -130,18 +130,6 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
         case appBskyEmbedExternalView(AppBskyEmbedExternal.View)
         case unexpected(ATProtocolValueContainer)
 
-        public static func appBskyEmbedImagesView(_ value: AppBskyEmbedImages.View) -> ViewMediaUnion {
-            return .appBskyEmbedImagesView(value)
-        }
-
-        public static func appBskyEmbedVideoView(_ value: AppBskyEmbedVideo.View) -> ViewMediaUnion {
-            return .appBskyEmbedVideoView(value)
-        }
-
-        public static func appBskyEmbedExternalView(_ value: AppBskyEmbedExternal.View) -> ViewMediaUnion {
-            return .appBskyEmbedExternalView(value)
-        }
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -301,18 +289,6 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
         case appBskyEmbedVideo(AppBskyEmbedVideo)
         case appBskyEmbedExternal(AppBskyEmbedExternal)
         case unexpected(ATProtocolValueContainer)
-
-        public static func appBskyEmbedImages(_ value: AppBskyEmbedImages) -> AppBskyEmbedRecordWithMediaMediaUnion {
-            return .appBskyEmbedImages(value)
-        }
-
-        public static func appBskyEmbedVideo(_ value: AppBskyEmbedVideo) -> AppBskyEmbedRecordWithMediaMediaUnion {
-            return .appBskyEmbedVideo(value)
-        }
-
-        public static func appBskyEmbedExternal(_ value: AppBskyEmbedExternal) -> AppBskyEmbedRecordWithMediaMediaUnion {
-            return .appBskyEmbedExternal(value)
-        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)

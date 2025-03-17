@@ -2037,26 +2037,6 @@ public enum AppBskyFeedDefs {
         case appBskyEmbedRecordWithMediaView(AppBskyEmbedRecordWithMedia.View)
         case unexpected(ATProtocolValueContainer)
 
-        public static func appBskyEmbedImagesView(_ value: AppBskyEmbedImages.View) -> PostViewEmbedUnion {
-            return .appBskyEmbedImagesView(value)
-        }
-
-        public static func appBskyEmbedVideoView(_ value: AppBskyEmbedVideo.View) -> PostViewEmbedUnion {
-            return .appBskyEmbedVideoView(value)
-        }
-
-        public static func appBskyEmbedExternalView(_ value: AppBskyEmbedExternal.View) -> PostViewEmbedUnion {
-            return .appBskyEmbedExternalView(value)
-        }
-
-        public static func appBskyEmbedRecordView(_ value: AppBskyEmbedRecord.View) -> PostViewEmbedUnion {
-            return .appBskyEmbedRecordView(value)
-        }
-
-        public static func appBskyEmbedRecordWithMediaView(_ value: AppBskyEmbedRecordWithMedia.View) -> PostViewEmbedUnion {
-            return .appBskyEmbedRecordWithMediaView(value)
-        }
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -2276,14 +2256,6 @@ public enum AppBskyFeedDefs {
         case appBskyFeedDefsReasonPin(AppBskyFeedDefs.ReasonPin)
         case unexpected(ATProtocolValueContainer)
 
-        public static func appBskyFeedDefsReasonRepost(_ value: AppBskyFeedDefs.ReasonRepost) -> FeedViewPostReasonUnion {
-            return .appBskyFeedDefsReasonRepost(value)
-        }
-
-        public static func appBskyFeedDefsReasonPin(_ value: AppBskyFeedDefs.ReasonPin) -> FeedViewPostReasonUnion {
-            return .appBskyFeedDefsReasonPin(value)
-        }
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -2413,18 +2385,6 @@ public enum AppBskyFeedDefs {
         case appBskyFeedDefsNotFoundPost(AppBskyFeedDefs.NotFoundPost)
         case appBskyFeedDefsBlockedPost(AppBskyFeedDefs.BlockedPost)
         case unexpected(ATProtocolValueContainer)
-
-        public static func appBskyFeedDefsPostView(_ value: AppBskyFeedDefs.PostView) -> ReplyRefRootUnion {
-            return .appBskyFeedDefsPostView(value)
-        }
-
-        public static func appBskyFeedDefsNotFoundPost(_ value: AppBskyFeedDefs.NotFoundPost) -> ReplyRefRootUnion {
-            return .appBskyFeedDefsNotFoundPost(value)
-        }
-
-        public static func appBskyFeedDefsBlockedPost(_ value: AppBskyFeedDefs.BlockedPost) -> ReplyRefRootUnion {
-            return .appBskyFeedDefsBlockedPost(value)
-        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -2585,18 +2545,6 @@ public enum AppBskyFeedDefs {
         case appBskyFeedDefsNotFoundPost(AppBskyFeedDefs.NotFoundPost)
         case appBskyFeedDefsBlockedPost(AppBskyFeedDefs.BlockedPost)
         case unexpected(ATProtocolValueContainer)
-
-        public static func appBskyFeedDefsPostView(_ value: AppBskyFeedDefs.PostView) -> ReplyRefParentUnion {
-            return .appBskyFeedDefsPostView(value)
-        }
-
-        public static func appBskyFeedDefsNotFoundPost(_ value: AppBskyFeedDefs.NotFoundPost) -> ReplyRefParentUnion {
-            return .appBskyFeedDefsNotFoundPost(value)
-        }
-
-        public static func appBskyFeedDefsBlockedPost(_ value: AppBskyFeedDefs.BlockedPost) -> ReplyRefParentUnion {
-            return .appBskyFeedDefsBlockedPost(value)
-        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -2759,18 +2707,6 @@ public enum AppBskyFeedDefs {
         case unexpected(ATProtocolValueContainer)
 
         case pending(PendingDecodeData)
-
-        public static func appBskyFeedDefsThreadViewPost(_ value: AppBskyFeedDefs.ThreadViewPost) -> ThreadViewPostParentUnion {
-            return .appBskyFeedDefsThreadViewPost(value)
-        }
-
-        public static func appBskyFeedDefsNotFoundPost(_ value: AppBskyFeedDefs.NotFoundPost) -> ThreadViewPostParentUnion {
-            return .appBskyFeedDefsNotFoundPost(value)
-        }
-
-        public static func appBskyFeedDefsBlockedPost(_ value: AppBskyFeedDefs.BlockedPost) -> ThreadViewPostParentUnion {
-            return .appBskyFeedDefsBlockedPost(value)
-        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -3002,18 +2938,6 @@ public enum AppBskyFeedDefs {
 
         case pending(PendingDecodeData)
 
-        public static func appBskyFeedDefsThreadViewPost(_ value: AppBskyFeedDefs.ThreadViewPost) -> ThreadViewPostRepliesUnion {
-            return .appBskyFeedDefsThreadViewPost(value)
-        }
-
-        public static func appBskyFeedDefsNotFoundPost(_ value: AppBskyFeedDefs.NotFoundPost) -> ThreadViewPostRepliesUnion {
-            return .appBskyFeedDefsNotFoundPost(value)
-        }
-
-        public static func appBskyFeedDefsBlockedPost(_ value: AppBskyFeedDefs.BlockedPost) -> ThreadViewPostRepliesUnion {
-            return .appBskyFeedDefsBlockedPost(value)
-        }
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -3240,14 +3164,6 @@ public enum AppBskyFeedDefs {
         case appBskyFeedDefsSkeletonReasonRepost(AppBskyFeedDefs.SkeletonReasonRepost)
         case appBskyFeedDefsSkeletonReasonPin(AppBskyFeedDefs.SkeletonReasonPin)
         case unexpected(ATProtocolValueContainer)
-
-        public static func appBskyFeedDefsSkeletonReasonRepost(_ value: AppBskyFeedDefs.SkeletonReasonRepost) -> SkeletonFeedPostReasonUnion {
-            return .appBskyFeedDefsSkeletonReasonRepost(value)
-        }
-
-        public static func appBskyFeedDefsSkeletonReasonPin(_ value: AppBskyFeedDefs.SkeletonReasonPin) -> SkeletonFeedPostReasonUnion {
-            return .appBskyFeedDefsSkeletonReasonPin(value)
-        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)

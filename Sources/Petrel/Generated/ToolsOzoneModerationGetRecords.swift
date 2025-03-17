@@ -31,14 +31,6 @@ public enum ToolsOzoneModerationGetRecords {
         case toolsOzoneModerationDefsRecordViewNotFound(ToolsOzoneModerationDefs.RecordViewNotFound)
         case unexpected(ATProtocolValueContainer)
 
-        public static func toolsOzoneModerationDefsRecordViewDetail(_ value: ToolsOzoneModerationDefs.RecordViewDetail) -> OutputRecordsUnion {
-            return .toolsOzoneModerationDefsRecordViewDetail(value)
-        }
-
-        public static func toolsOzoneModerationDefsRecordViewNotFound(_ value: ToolsOzoneModerationDefs.RecordViewNotFound) -> OutputRecordsUnion {
-            return .toolsOzoneModerationDefsRecordViewNotFound(value)
-        }
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)

@@ -524,18 +524,6 @@ public enum ComAtprotoRepoApplyWrites {
         case comAtprotoRepoApplyWritesDelete(ComAtprotoRepoApplyWrites.Delete)
         case unexpected(ATProtocolValueContainer)
 
-        public static func comAtprotoRepoApplyWritesCreate(_ value: ComAtprotoRepoApplyWrites.Create) -> InputWritesUnion {
-            return .comAtprotoRepoApplyWritesCreate(value)
-        }
-
-        public static func comAtprotoRepoApplyWritesUpdate(_ value: ComAtprotoRepoApplyWrites.Update) -> InputWritesUnion {
-            return .comAtprotoRepoApplyWritesUpdate(value)
-        }
-
-        public static func comAtprotoRepoApplyWritesDelete(_ value: ComAtprotoRepoApplyWrites.Delete) -> InputWritesUnion {
-            return .comAtprotoRepoApplyWritesDelete(value)
-        }
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -696,18 +684,6 @@ public enum ComAtprotoRepoApplyWrites {
         case comAtprotoRepoApplyWritesDeleteResult(ComAtprotoRepoApplyWrites.DeleteResult)
         case unexpected(ATProtocolValueContainer)
 
-        public static func comAtprotoRepoApplyWritesCreateResult(_ value: ComAtprotoRepoApplyWrites.CreateResult) -> OutputResultsUnion {
-            return .comAtprotoRepoApplyWritesCreateResult(value)
-        }
-
-        public static func comAtprotoRepoApplyWritesUpdateResult(_ value: ComAtprotoRepoApplyWrites.UpdateResult) -> OutputResultsUnion {
-            return .comAtprotoRepoApplyWritesUpdateResult(value)
-        }
-
-        public static func comAtprotoRepoApplyWritesDeleteResult(_ value: ComAtprotoRepoApplyWrites.DeleteResult) -> OutputResultsUnion {
-            return .comAtprotoRepoApplyWritesDeleteResult(value)
-        }
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -867,18 +843,6 @@ public enum ComAtprotoRepoApplyWrites {
         case comAtprotoRepoApplyWritesUpdate(ComAtprotoRepoApplyWrites.Update)
         case comAtprotoRepoApplyWritesDelete(ComAtprotoRepoApplyWrites.Delete)
         case unexpected(ATProtocolValueContainer)
-
-        public static func comAtprotoRepoApplyWritesCreate(_ value: ComAtprotoRepoApplyWrites.Create) -> ComAtprotoRepoApplyWritesWritesUnion {
-            return .comAtprotoRepoApplyWritesCreate(value)
-        }
-
-        public static func comAtprotoRepoApplyWritesUpdate(_ value: ComAtprotoRepoApplyWrites.Update) -> ComAtprotoRepoApplyWritesWritesUnion {
-            return .comAtprotoRepoApplyWritesUpdate(value)
-        }
-
-        public static func comAtprotoRepoApplyWritesDelete(_ value: ComAtprotoRepoApplyWrites.Delete) -> ComAtprotoRepoApplyWritesWritesUnion {
-            return .comAtprotoRepoApplyWritesDelete(value)
-        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)

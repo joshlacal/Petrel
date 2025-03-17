@@ -34,14 +34,6 @@ public enum AppBskyLabelerGetServices {
         case appBskyLabelerDefsLabelerViewDetailed(AppBskyLabelerDefs.LabelerViewDetailed)
         case unexpected(ATProtocolValueContainer)
 
-        public static func appBskyLabelerDefsLabelerView(_ value: AppBskyLabelerDefs.LabelerView) -> OutputViewsUnion {
-            return .appBskyLabelerDefsLabelerView(value)
-        }
-
-        public static func appBskyLabelerDefsLabelerViewDetailed(_ value: AppBskyLabelerDefs.LabelerViewDetailed) -> OutputViewsUnion {
-            return .appBskyLabelerDefsLabelerViewDetailed(value)
-        }
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)

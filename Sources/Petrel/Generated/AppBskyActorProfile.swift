@@ -192,10 +192,6 @@ public struct AppBskyActorProfile: ATProtocolCodable, ATProtocolValue {
         case comAtprotoLabelDefsSelfLabels(ComAtprotoLabelDefs.SelfLabels)
         case unexpected(ATProtocolValueContainer)
 
-        public static func comAtprotoLabelDefsSelfLabels(_ value: ComAtprotoLabelDefs.SelfLabels) -> AppBskyActorProfileLabelsUnion {
-            return .comAtprotoLabelDefsSelfLabels(value)
-        }
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)

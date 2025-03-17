@@ -4864,82 +4864,6 @@ public enum ToolsOzoneModerationDefs {
         case toolsOzoneModerationDefsModEventPriorityScore(ToolsOzoneModerationDefs.ModEventPriorityScore)
         case unexpected(ATProtocolValueContainer)
 
-        public static func toolsOzoneModerationDefsModEventTakedown(_ value: ToolsOzoneModerationDefs.ModEventTakedown) -> ModEventViewEventUnion {
-            return .toolsOzoneModerationDefsModEventTakedown(value)
-        }
-
-        public static func toolsOzoneModerationDefsModEventReverseTakedown(_ value: ToolsOzoneModerationDefs.ModEventReverseTakedown) -> ModEventViewEventUnion {
-            return .toolsOzoneModerationDefsModEventReverseTakedown(value)
-        }
-
-        public static func toolsOzoneModerationDefsModEventComment(_ value: ToolsOzoneModerationDefs.ModEventComment) -> ModEventViewEventUnion {
-            return .toolsOzoneModerationDefsModEventComment(value)
-        }
-
-        public static func toolsOzoneModerationDefsModEventReport(_ value: ToolsOzoneModerationDefs.ModEventReport) -> ModEventViewEventUnion {
-            return .toolsOzoneModerationDefsModEventReport(value)
-        }
-
-        public static func toolsOzoneModerationDefsModEventLabel(_ value: ToolsOzoneModerationDefs.ModEventLabel) -> ModEventViewEventUnion {
-            return .toolsOzoneModerationDefsModEventLabel(value)
-        }
-
-        public static func toolsOzoneModerationDefsModEventAcknowledge(_ value: ToolsOzoneModerationDefs.ModEventAcknowledge) -> ModEventViewEventUnion {
-            return .toolsOzoneModerationDefsModEventAcknowledge(value)
-        }
-
-        public static func toolsOzoneModerationDefsModEventEscalate(_ value: ToolsOzoneModerationDefs.ModEventEscalate) -> ModEventViewEventUnion {
-            return .toolsOzoneModerationDefsModEventEscalate(value)
-        }
-
-        public static func toolsOzoneModerationDefsModEventMute(_ value: ToolsOzoneModerationDefs.ModEventMute) -> ModEventViewEventUnion {
-            return .toolsOzoneModerationDefsModEventMute(value)
-        }
-
-        public static func toolsOzoneModerationDefsModEventUnmute(_ value: ToolsOzoneModerationDefs.ModEventUnmute) -> ModEventViewEventUnion {
-            return .toolsOzoneModerationDefsModEventUnmute(value)
-        }
-
-        public static func toolsOzoneModerationDefsModEventMuteReporter(_ value: ToolsOzoneModerationDefs.ModEventMuteReporter) -> ModEventViewEventUnion {
-            return .toolsOzoneModerationDefsModEventMuteReporter(value)
-        }
-
-        public static func toolsOzoneModerationDefsModEventUnmuteReporter(_ value: ToolsOzoneModerationDefs.ModEventUnmuteReporter) -> ModEventViewEventUnion {
-            return .toolsOzoneModerationDefsModEventUnmuteReporter(value)
-        }
-
-        public static func toolsOzoneModerationDefsModEventEmail(_ value: ToolsOzoneModerationDefs.ModEventEmail) -> ModEventViewEventUnion {
-            return .toolsOzoneModerationDefsModEventEmail(value)
-        }
-
-        public static func toolsOzoneModerationDefsModEventResolveAppeal(_ value: ToolsOzoneModerationDefs.ModEventResolveAppeal) -> ModEventViewEventUnion {
-            return .toolsOzoneModerationDefsModEventResolveAppeal(value)
-        }
-
-        public static func toolsOzoneModerationDefsModEventDivert(_ value: ToolsOzoneModerationDefs.ModEventDivert) -> ModEventViewEventUnion {
-            return .toolsOzoneModerationDefsModEventDivert(value)
-        }
-
-        public static func toolsOzoneModerationDefsModEventTag(_ value: ToolsOzoneModerationDefs.ModEventTag) -> ModEventViewEventUnion {
-            return .toolsOzoneModerationDefsModEventTag(value)
-        }
-
-        public static func toolsOzoneModerationDefsAccountEvent(_ value: ToolsOzoneModerationDefs.AccountEvent) -> ModEventViewEventUnion {
-            return .toolsOzoneModerationDefsAccountEvent(value)
-        }
-
-        public static func toolsOzoneModerationDefsIdentityEvent(_ value: ToolsOzoneModerationDefs.IdentityEvent) -> ModEventViewEventUnion {
-            return .toolsOzoneModerationDefsIdentityEvent(value)
-        }
-
-        public static func toolsOzoneModerationDefsRecordEvent(_ value: ToolsOzoneModerationDefs.RecordEvent) -> ModEventViewEventUnion {
-            return .toolsOzoneModerationDefsRecordEvent(value)
-        }
-
-        public static func toolsOzoneModerationDefsModEventPriorityScore(_ value: ToolsOzoneModerationDefs.ModEventPriorityScore) -> ModEventViewEventUnion {
-            return .toolsOzoneModerationDefsModEventPriorityScore(value)
-        }
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -5580,18 +5504,6 @@ public enum ToolsOzoneModerationDefs {
         case chatBskyConvoDefsMessageRef(ChatBskyConvoDefs.MessageRef)
         case unexpected(ATProtocolValueContainer)
 
-        public static func comAtprotoAdminDefsRepoRef(_ value: ComAtprotoAdminDefs.RepoRef) -> ModEventViewSubjectUnion {
-            return .comAtprotoAdminDefsRepoRef(value)
-        }
-
-        public static func comAtprotoRepoStrongRef(_ value: ComAtprotoRepoStrongRef) -> ModEventViewSubjectUnion {
-            return .comAtprotoRepoStrongRef(value)
-        }
-
-        public static func chatBskyConvoDefsMessageRef(_ value: ChatBskyConvoDefs.MessageRef) -> ModEventViewSubjectUnion {
-            return .chatBskyConvoDefsMessageRef(value)
-        }
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -5767,82 +5679,6 @@ public enum ToolsOzoneModerationDefs {
         case toolsOzoneModerationDefsRecordEvent(ToolsOzoneModerationDefs.RecordEvent)
         case toolsOzoneModerationDefsModEventPriorityScore(ToolsOzoneModerationDefs.ModEventPriorityScore)
         case unexpected(ATProtocolValueContainer)
-
-        public static func toolsOzoneModerationDefsModEventTakedown(_ value: ToolsOzoneModerationDefs.ModEventTakedown) -> ModEventViewDetailEventUnion {
-            return .toolsOzoneModerationDefsModEventTakedown(value)
-        }
-
-        public static func toolsOzoneModerationDefsModEventReverseTakedown(_ value: ToolsOzoneModerationDefs.ModEventReverseTakedown) -> ModEventViewDetailEventUnion {
-            return .toolsOzoneModerationDefsModEventReverseTakedown(value)
-        }
-
-        public static func toolsOzoneModerationDefsModEventComment(_ value: ToolsOzoneModerationDefs.ModEventComment) -> ModEventViewDetailEventUnion {
-            return .toolsOzoneModerationDefsModEventComment(value)
-        }
-
-        public static func toolsOzoneModerationDefsModEventReport(_ value: ToolsOzoneModerationDefs.ModEventReport) -> ModEventViewDetailEventUnion {
-            return .toolsOzoneModerationDefsModEventReport(value)
-        }
-
-        public static func toolsOzoneModerationDefsModEventLabel(_ value: ToolsOzoneModerationDefs.ModEventLabel) -> ModEventViewDetailEventUnion {
-            return .toolsOzoneModerationDefsModEventLabel(value)
-        }
-
-        public static func toolsOzoneModerationDefsModEventAcknowledge(_ value: ToolsOzoneModerationDefs.ModEventAcknowledge) -> ModEventViewDetailEventUnion {
-            return .toolsOzoneModerationDefsModEventAcknowledge(value)
-        }
-
-        public static func toolsOzoneModerationDefsModEventEscalate(_ value: ToolsOzoneModerationDefs.ModEventEscalate) -> ModEventViewDetailEventUnion {
-            return .toolsOzoneModerationDefsModEventEscalate(value)
-        }
-
-        public static func toolsOzoneModerationDefsModEventMute(_ value: ToolsOzoneModerationDefs.ModEventMute) -> ModEventViewDetailEventUnion {
-            return .toolsOzoneModerationDefsModEventMute(value)
-        }
-
-        public static func toolsOzoneModerationDefsModEventUnmute(_ value: ToolsOzoneModerationDefs.ModEventUnmute) -> ModEventViewDetailEventUnion {
-            return .toolsOzoneModerationDefsModEventUnmute(value)
-        }
-
-        public static func toolsOzoneModerationDefsModEventMuteReporter(_ value: ToolsOzoneModerationDefs.ModEventMuteReporter) -> ModEventViewDetailEventUnion {
-            return .toolsOzoneModerationDefsModEventMuteReporter(value)
-        }
-
-        public static func toolsOzoneModerationDefsModEventUnmuteReporter(_ value: ToolsOzoneModerationDefs.ModEventUnmuteReporter) -> ModEventViewDetailEventUnion {
-            return .toolsOzoneModerationDefsModEventUnmuteReporter(value)
-        }
-
-        public static func toolsOzoneModerationDefsModEventEmail(_ value: ToolsOzoneModerationDefs.ModEventEmail) -> ModEventViewDetailEventUnion {
-            return .toolsOzoneModerationDefsModEventEmail(value)
-        }
-
-        public static func toolsOzoneModerationDefsModEventResolveAppeal(_ value: ToolsOzoneModerationDefs.ModEventResolveAppeal) -> ModEventViewDetailEventUnion {
-            return .toolsOzoneModerationDefsModEventResolveAppeal(value)
-        }
-
-        public static func toolsOzoneModerationDefsModEventDivert(_ value: ToolsOzoneModerationDefs.ModEventDivert) -> ModEventViewDetailEventUnion {
-            return .toolsOzoneModerationDefsModEventDivert(value)
-        }
-
-        public static func toolsOzoneModerationDefsModEventTag(_ value: ToolsOzoneModerationDefs.ModEventTag) -> ModEventViewDetailEventUnion {
-            return .toolsOzoneModerationDefsModEventTag(value)
-        }
-
-        public static func toolsOzoneModerationDefsAccountEvent(_ value: ToolsOzoneModerationDefs.AccountEvent) -> ModEventViewDetailEventUnion {
-            return .toolsOzoneModerationDefsAccountEvent(value)
-        }
-
-        public static func toolsOzoneModerationDefsIdentityEvent(_ value: ToolsOzoneModerationDefs.IdentityEvent) -> ModEventViewDetailEventUnion {
-            return .toolsOzoneModerationDefsIdentityEvent(value)
-        }
-
-        public static func toolsOzoneModerationDefsRecordEvent(_ value: ToolsOzoneModerationDefs.RecordEvent) -> ModEventViewDetailEventUnion {
-            return .toolsOzoneModerationDefsRecordEvent(value)
-        }
-
-        public static func toolsOzoneModerationDefsModEventPriorityScore(_ value: ToolsOzoneModerationDefs.ModEventPriorityScore) -> ModEventViewDetailEventUnion {
-            return .toolsOzoneModerationDefsModEventPriorityScore(value)
-        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -6485,22 +6321,6 @@ public enum ToolsOzoneModerationDefs {
         case toolsOzoneModerationDefsRecordViewNotFound(ToolsOzoneModerationDefs.RecordViewNotFound)
         case unexpected(ATProtocolValueContainer)
 
-        public static func toolsOzoneModerationDefsRepoView(_ value: ToolsOzoneModerationDefs.RepoView) -> ModEventViewDetailSubjectUnion {
-            return .toolsOzoneModerationDefsRepoView(value)
-        }
-
-        public static func toolsOzoneModerationDefsRepoViewNotFound(_ value: ToolsOzoneModerationDefs.RepoViewNotFound) -> ModEventViewDetailSubjectUnion {
-            return .toolsOzoneModerationDefsRepoViewNotFound(value)
-        }
-
-        public static func toolsOzoneModerationDefsRecordView(_ value: ToolsOzoneModerationDefs.RecordView) -> ModEventViewDetailSubjectUnion {
-            return .toolsOzoneModerationDefsRecordView(value)
-        }
-
-        public static func toolsOzoneModerationDefsRecordViewNotFound(_ value: ToolsOzoneModerationDefs.RecordViewNotFound) -> ModEventViewDetailSubjectUnion {
-            return .toolsOzoneModerationDefsRecordViewNotFound(value)
-        }
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -6690,14 +6510,6 @@ public enum ToolsOzoneModerationDefs {
         case comAtprotoRepoStrongRef(ComAtprotoRepoStrongRef)
         case unexpected(ATProtocolValueContainer)
 
-        public static func comAtprotoAdminDefsRepoRef(_ value: ComAtprotoAdminDefs.RepoRef) -> SubjectStatusViewSubjectUnion {
-            return .comAtprotoAdminDefsRepoRef(value)
-        }
-
-        public static func comAtprotoRepoStrongRef(_ value: ComAtprotoRepoStrongRef) -> SubjectStatusViewSubjectUnion {
-            return .comAtprotoRepoStrongRef(value)
-        }
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -6826,14 +6638,6 @@ public enum ToolsOzoneModerationDefs {
         case toolsOzoneModerationDefsAccountHosting(ToolsOzoneModerationDefs.AccountHosting)
         case toolsOzoneModerationDefsRecordHosting(ToolsOzoneModerationDefs.RecordHosting)
         case unexpected(ATProtocolValueContainer)
-
-        public static func toolsOzoneModerationDefsAccountHosting(_ value: ToolsOzoneModerationDefs.AccountHosting) -> SubjectStatusViewHostingUnion {
-            return .toolsOzoneModerationDefsAccountHosting(value)
-        }
-
-        public static func toolsOzoneModerationDefsRecordHosting(_ value: ToolsOzoneModerationDefs.RecordHosting) -> SubjectStatusViewHostingUnion {
-            return .toolsOzoneModerationDefsRecordHosting(value)
-        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -6979,14 +6783,6 @@ public enum ToolsOzoneModerationDefs {
         case toolsOzoneModerationDefsImageDetails(ToolsOzoneModerationDefs.ImageDetails)
         case toolsOzoneModerationDefsVideoDetails(ToolsOzoneModerationDefs.VideoDetails)
         case unexpected(ATProtocolValueContainer)
-
-        public static func toolsOzoneModerationDefsImageDetails(_ value: ToolsOzoneModerationDefs.ImageDetails) -> BlobViewDetailsUnion {
-            return .toolsOzoneModerationDefsImageDetails(value)
-        }
-
-        public static func toolsOzoneModerationDefsVideoDetails(_ value: ToolsOzoneModerationDefs.VideoDetails) -> BlobViewDetailsUnion {
-            return .toolsOzoneModerationDefsVideoDetails(value)
-        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
