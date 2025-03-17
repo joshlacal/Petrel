@@ -41,12 +41,7 @@ public enum {{ union_name | convertRefToSwift }}ForUnionArray: Codable, ATProtoc
     case {{ ref.camel_case_label | lowerCamelCase }}({{ ref.swift_ref }})
     {%- endfor %}
     case unexpected(ATProtocolValueContainer)
-    
-    {%- for ref in refs %}
-    public static func {{ ref.camel_case_label | lowerCamelCase }}(_ value: {{ ref.swift_ref }}) -> {{ union_name | convertRefToSwift }}ForUnionArray {
-        return .{{ ref.camel_case_label | lowerCamelCase }}(value)
-    }
-    {%- endfor %}
+
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
