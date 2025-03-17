@@ -41,6 +41,12 @@ public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProt
     case {{ variant | convertRefToSwift | lowerCamelCase }}({{ variant | convertRefToSwift }})
     {%- endfor %}
     case unexpected(ATProtocolValueContainer)
+    
+    {%- for variant in variants %}
+    public static func {{ variant | convertRefToSwift | lowerCamelCase }}(_ value: {{ variant | convertRefToSwift }}) -> {{ name }} {
+        return .{{ variant | convertRefToSwift | lowerCamelCase }}(value)
+    }
+    {%- endfor %}
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)

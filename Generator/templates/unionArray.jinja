@@ -2,6 +2,10 @@
 
 public struct {{ union_name | convertRefToSwift }}: Codable, ATProtocolCodable, ATProtocolValue {
     public let items: [{{ union_name | convertRefToSwift }}ForUnionArray]
+    
+    public init(items: [{{ union_name | convertRefToSwift }}ForUnionArray]) {
+        self.items = items
+    }
 
     public init(from decoder: Decoder) throws {
         var container = try decoder.unkeyedContainer()
@@ -37,6 +41,12 @@ public enum {{ union_name | convertRefToSwift }}ForUnionArray: Codable, ATProtoc
     case {{ ref.camel_case_label | lowerCamelCase }}({{ ref.swift_ref }})
     {%- endfor %}
     case unexpected(ATProtocolValueContainer)
+    
+    {%- for ref in refs %}
+    public static func {{ ref.camel_case_label | lowerCamelCase }}(_ value: {{ ref.swift_ref }}) -> {{ union_name | convertRefToSwift }}ForUnionArray {
+        return .{{ ref.camel_case_label | lowerCamelCase }}(value)
+    }
+    {%- endfor %}
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
