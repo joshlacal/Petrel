@@ -2037,6 +2037,26 @@ public enum AppBskyFeedDefs {
         case appBskyEmbedRecordWithMediaView(AppBskyEmbedRecordWithMedia.View)
         case unexpected(ATProtocolValueContainer)
 
+        public init(_ value: AppBskyEmbedImages.View) {
+            self = .appBskyEmbedImagesView(value)
+        }
+
+        public init(_ value: AppBskyEmbedVideo.View) {
+            self = .appBskyEmbedVideoView(value)
+        }
+
+        public init(_ value: AppBskyEmbedExternal.View) {
+            self = .appBskyEmbedExternalView(value)
+        }
+
+        public init(_ value: AppBskyEmbedRecord.View) {
+            self = .appBskyEmbedRecordView(value)
+        }
+
+        public init(_ value: AppBskyEmbedRecordWithMedia.View) {
+            self = .appBskyEmbedRecordWithMediaView(value)
+        }
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -2256,6 +2276,14 @@ public enum AppBskyFeedDefs {
         case appBskyFeedDefsReasonPin(AppBskyFeedDefs.ReasonPin)
         case unexpected(ATProtocolValueContainer)
 
+        public init(_ value: AppBskyFeedDefs.ReasonRepost) {
+            self = .appBskyFeedDefsReasonRepost(value)
+        }
+
+        public init(_ value: AppBskyFeedDefs.ReasonPin) {
+            self = .appBskyFeedDefsReasonPin(value)
+        }
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -2385,6 +2413,18 @@ public enum AppBskyFeedDefs {
         case appBskyFeedDefsNotFoundPost(AppBskyFeedDefs.NotFoundPost)
         case appBskyFeedDefsBlockedPost(AppBskyFeedDefs.BlockedPost)
         case unexpected(ATProtocolValueContainer)
+
+        public init(_ value: AppBskyFeedDefs.PostView) {
+            self = .appBskyFeedDefsPostView(value)
+        }
+
+        public init(_ value: AppBskyFeedDefs.NotFoundPost) {
+            self = .appBskyFeedDefsNotFoundPost(value)
+        }
+
+        public init(_ value: AppBskyFeedDefs.BlockedPost) {
+            self = .appBskyFeedDefsBlockedPost(value)
+        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -2545,6 +2585,18 @@ public enum AppBskyFeedDefs {
         case appBskyFeedDefsNotFoundPost(AppBskyFeedDefs.NotFoundPost)
         case appBskyFeedDefsBlockedPost(AppBskyFeedDefs.BlockedPost)
         case unexpected(ATProtocolValueContainer)
+
+        public init(_ value: AppBskyFeedDefs.PostView) {
+            self = .appBskyFeedDefsPostView(value)
+        }
+
+        public init(_ value: AppBskyFeedDefs.NotFoundPost) {
+            self = .appBskyFeedDefsNotFoundPost(value)
+        }
+
+        public init(_ value: AppBskyFeedDefs.BlockedPost) {
+            self = .appBskyFeedDefsBlockedPost(value)
+        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -2707,6 +2759,18 @@ public enum AppBskyFeedDefs {
         case unexpected(ATProtocolValueContainer)
 
         case pending(PendingDecodeData)
+
+        public init(_ value: AppBskyFeedDefs.ThreadViewPost) {
+            self = .appBskyFeedDefsThreadViewPost(value)
+        }
+
+        public init(_ value: AppBskyFeedDefs.NotFoundPost) {
+            self = .appBskyFeedDefsNotFoundPost(value)
+        }
+
+        public init(_ value: AppBskyFeedDefs.BlockedPost) {
+            self = .appBskyFeedDefsBlockedPost(value)
+        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -2938,6 +3002,18 @@ public enum AppBskyFeedDefs {
 
         case pending(PendingDecodeData)
 
+        public init(_ value: AppBskyFeedDefs.ThreadViewPost) {
+            self = .appBskyFeedDefsThreadViewPost(value)
+        }
+
+        public init(_ value: AppBskyFeedDefs.NotFoundPost) {
+            self = .appBskyFeedDefsNotFoundPost(value)
+        }
+
+        public init(_ value: AppBskyFeedDefs.BlockedPost) {
+            self = .appBskyFeedDefsBlockedPost(value)
+        }
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -3164,6 +3240,14 @@ public enum AppBskyFeedDefs {
         case appBskyFeedDefsSkeletonReasonRepost(AppBskyFeedDefs.SkeletonReasonRepost)
         case appBskyFeedDefsSkeletonReasonPin(AppBskyFeedDefs.SkeletonReasonPin)
         case unexpected(ATProtocolValueContainer)
+
+        public init(_ value: AppBskyFeedDefs.SkeletonReasonRepost) {
+            self = .appBskyFeedDefsSkeletonReasonRepost(value)
+        }
+
+        public init(_ value: AppBskyFeedDefs.SkeletonReasonPin) {
+            self = .appBskyFeedDefsSkeletonReasonPin(value)
+        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)

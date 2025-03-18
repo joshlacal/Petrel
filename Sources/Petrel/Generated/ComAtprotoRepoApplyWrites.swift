@@ -524,6 +524,18 @@ public enum ComAtprotoRepoApplyWrites {
         case comAtprotoRepoApplyWritesDelete(ComAtprotoRepoApplyWrites.Delete)
         case unexpected(ATProtocolValueContainer)
 
+        public init(_ value: ComAtprotoRepoApplyWrites.Create) {
+            self = .comAtprotoRepoApplyWritesCreate(value)
+        }
+
+        public init(_ value: ComAtprotoRepoApplyWrites.Update) {
+            self = .comAtprotoRepoApplyWritesUpdate(value)
+        }
+
+        public init(_ value: ComAtprotoRepoApplyWrites.Delete) {
+            self = .comAtprotoRepoApplyWritesDelete(value)
+        }
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -684,6 +696,18 @@ public enum ComAtprotoRepoApplyWrites {
         case comAtprotoRepoApplyWritesDeleteResult(ComAtprotoRepoApplyWrites.DeleteResult)
         case unexpected(ATProtocolValueContainer)
 
+        public init(_ value: ComAtprotoRepoApplyWrites.CreateResult) {
+            self = .comAtprotoRepoApplyWritesCreateResult(value)
+        }
+
+        public init(_ value: ComAtprotoRepoApplyWrites.UpdateResult) {
+            self = .comAtprotoRepoApplyWritesUpdateResult(value)
+        }
+
+        public init(_ value: ComAtprotoRepoApplyWrites.DeleteResult) {
+            self = .comAtprotoRepoApplyWritesDeleteResult(value)
+        }
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -843,6 +867,18 @@ public enum ComAtprotoRepoApplyWrites {
         case comAtprotoRepoApplyWritesUpdate(ComAtprotoRepoApplyWrites.Update)
         case comAtprotoRepoApplyWritesDelete(ComAtprotoRepoApplyWrites.Delete)
         case unexpected(ATProtocolValueContainer)
+
+        public init(_ value: ComAtprotoRepoApplyWrites.Create) {
+            self = .comAtprotoRepoApplyWritesCreate(value)
+        }
+
+        public init(_ value: ComAtprotoRepoApplyWrites.Update) {
+            self = .comAtprotoRepoApplyWritesUpdate(value)
+        }
+
+        public init(_ value: ComAtprotoRepoApplyWrites.Delete) {
+            self = .comAtprotoRepoApplyWritesDelete(value)
+        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)

@@ -47,6 +47,14 @@ public enum AppBskyGraphGetRelationships {
         case appBskyGraphDefsNotFoundActor(AppBskyGraphDefs.NotFoundActor)
         case unexpected(ATProtocolValueContainer)
 
+        public init(_ value: AppBskyGraphDefs.Relationship) {
+            self = .appBskyGraphDefsRelationship(value)
+        }
+
+        public init(_ value: AppBskyGraphDefs.NotFoundActor) {
+            self = .appBskyGraphDefsNotFoundActor(value)
+        }
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)

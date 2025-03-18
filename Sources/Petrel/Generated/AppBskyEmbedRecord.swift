@@ -597,6 +597,38 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
         case appBskyGraphDefsStarterPackViewBasic(AppBskyGraphDefs.StarterPackViewBasic)
         case unexpected(ATProtocolValueContainer)
 
+        public init(_ value: AppBskyEmbedRecord.ViewRecord) {
+            self = .appBskyEmbedRecordViewRecord(value)
+        }
+
+        public init(_ value: AppBskyEmbedRecord.ViewNotFound) {
+            self = .appBskyEmbedRecordViewNotFound(value)
+        }
+
+        public init(_ value: AppBskyEmbedRecord.ViewBlocked) {
+            self = .appBskyEmbedRecordViewBlocked(value)
+        }
+
+        public init(_ value: AppBskyEmbedRecord.ViewDetached) {
+            self = .appBskyEmbedRecordViewDetached(value)
+        }
+
+        public init(_ value: AppBskyFeedDefs.GeneratorView) {
+            self = .appBskyFeedDefsGeneratorView(value)
+        }
+
+        public init(_ value: AppBskyGraphDefs.ListView) {
+            self = .appBskyGraphDefsListView(value)
+        }
+
+        public init(_ value: AppBskyLabelerDefs.LabelerView) {
+            self = .appBskyLabelerDefsLabelerView(value)
+        }
+
+        public init(_ value: AppBskyGraphDefs.StarterPackViewBasic) {
+            self = .appBskyGraphDefsStarterPackViewBasic(value)
+        }
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -908,6 +940,26 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
         case appBskyEmbedRecordView(AppBskyEmbedRecord.View)
         case appBskyEmbedRecordWithMediaView(AppBskyEmbedRecordWithMedia.View)
         case unexpected(ATProtocolValueContainer)
+
+        public init(_ value: AppBskyEmbedImages.View) {
+            self = .appBskyEmbedImagesView(value)
+        }
+
+        public init(_ value: AppBskyEmbedVideo.View) {
+            self = .appBskyEmbedVideoView(value)
+        }
+
+        public init(_ value: AppBskyEmbedExternal.View) {
+            self = .appBskyEmbedExternalView(value)
+        }
+
+        public init(_ value: AppBskyEmbedRecord.View) {
+            self = .appBskyEmbedRecordView(value)
+        }
+
+        public init(_ value: AppBskyEmbedRecordWithMedia.View) {
+            self = .appBskyEmbedRecordWithMediaView(value)
+        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)

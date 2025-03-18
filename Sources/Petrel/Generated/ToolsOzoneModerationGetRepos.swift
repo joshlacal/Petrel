@@ -31,6 +31,14 @@ public enum ToolsOzoneModerationGetRepos {
         case toolsOzoneModerationDefsRepoViewNotFound(ToolsOzoneModerationDefs.RepoViewNotFound)
         case unexpected(ATProtocolValueContainer)
 
+        public init(_ value: ToolsOzoneModerationDefs.RepoViewDetail) {
+            self = .toolsOzoneModerationDefsRepoViewDetail(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.RepoViewNotFound) {
+            self = .toolsOzoneModerationDefsRepoViewNotFound(value)
+        }
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)

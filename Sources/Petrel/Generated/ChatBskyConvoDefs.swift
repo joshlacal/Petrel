@@ -1311,6 +1311,10 @@ public enum ChatBskyConvoDefs {
         case appBskyEmbedRecord(AppBskyEmbedRecord)
         case unexpected(ATProtocolValueContainer)
 
+        public init(_ value: AppBskyEmbedRecord) {
+            self = .appBskyEmbedRecord(value)
+        }
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -1410,6 +1414,10 @@ public enum ChatBskyConvoDefs {
     public enum MessageViewEmbedUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case appBskyEmbedRecordView(AppBskyEmbedRecord.View)
         case unexpected(ATProtocolValueContainer)
+
+        public init(_ value: AppBskyEmbedRecord.View) {
+            self = .appBskyEmbedRecordView(value)
+        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -1511,6 +1519,14 @@ public enum ChatBskyConvoDefs {
         case chatBskyConvoDefsMessageView(ChatBskyConvoDefs.MessageView)
         case chatBskyConvoDefsDeletedMessageView(ChatBskyConvoDefs.DeletedMessageView)
         case unexpected(ATProtocolValueContainer)
+
+        public init(_ value: ChatBskyConvoDefs.MessageView) {
+            self = .chatBskyConvoDefsMessageView(value)
+        }
+
+        public init(_ value: ChatBskyConvoDefs.DeletedMessageView) {
+            self = .chatBskyConvoDefsDeletedMessageView(value)
+        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -1641,6 +1657,14 @@ public enum ChatBskyConvoDefs {
         case chatBskyConvoDefsDeletedMessageView(ChatBskyConvoDefs.DeletedMessageView)
         case unexpected(ATProtocolValueContainer)
 
+        public init(_ value: ChatBskyConvoDefs.MessageView) {
+            self = .chatBskyConvoDefsMessageView(value)
+        }
+
+        public init(_ value: ChatBskyConvoDefs.DeletedMessageView) {
+            self = .chatBskyConvoDefsDeletedMessageView(value)
+        }
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -1770,6 +1794,14 @@ public enum ChatBskyConvoDefs {
         case chatBskyConvoDefsDeletedMessageView(ChatBskyConvoDefs.DeletedMessageView)
         case unexpected(ATProtocolValueContainer)
 
+        public init(_ value: ChatBskyConvoDefs.MessageView) {
+            self = .chatBskyConvoDefsMessageView(value)
+        }
+
+        public init(_ value: ChatBskyConvoDefs.DeletedMessageView) {
+            self = .chatBskyConvoDefsDeletedMessageView(value)
+        }
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -1898,6 +1930,14 @@ public enum ChatBskyConvoDefs {
         case chatBskyConvoDefsMessageView(ChatBskyConvoDefs.MessageView)
         case chatBskyConvoDefsDeletedMessageView(ChatBskyConvoDefs.DeletedMessageView)
         case unexpected(ATProtocolValueContainer)
+
+        public init(_ value: ChatBskyConvoDefs.MessageView) {
+            self = .chatBskyConvoDefsMessageView(value)
+        }
+
+        public init(_ value: ChatBskyConvoDefs.DeletedMessageView) {
+            self = .chatBskyConvoDefsDeletedMessageView(value)
+        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)

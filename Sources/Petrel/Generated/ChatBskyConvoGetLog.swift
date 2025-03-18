@@ -40,6 +40,26 @@ public enum ChatBskyConvoGetLog {
         case chatBskyConvoDefsLogDeleteMessage(ChatBskyConvoDefs.LogDeleteMessage)
         case unexpected(ATProtocolValueContainer)
 
+        public init(_ value: ChatBskyConvoDefs.LogBeginConvo) {
+            self = .chatBskyConvoDefsLogBeginConvo(value)
+        }
+
+        public init(_ value: ChatBskyConvoDefs.LogAcceptConvo) {
+            self = .chatBskyConvoDefsLogAcceptConvo(value)
+        }
+
+        public init(_ value: ChatBskyConvoDefs.LogLeaveConvo) {
+            self = .chatBskyConvoDefsLogLeaveConvo(value)
+        }
+
+        public init(_ value: ChatBskyConvoDefs.LogCreateMessage) {
+            self = .chatBskyConvoDefsLogCreateMessage(value)
+        }
+
+        public init(_ value: ChatBskyConvoDefs.LogDeleteMessage) {
+            self = .chatBskyConvoDefsLogDeleteMessage(value)
+        }
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)

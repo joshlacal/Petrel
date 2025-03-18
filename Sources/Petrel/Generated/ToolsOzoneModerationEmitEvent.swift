@@ -50,6 +50,82 @@ public enum ToolsOzoneModerationEmitEvent {
         case toolsOzoneModerationDefsModEventPriorityScore(ToolsOzoneModerationDefs.ModEventPriorityScore)
         case unexpected(ATProtocolValueContainer)
 
+        public init(_ value: ToolsOzoneModerationDefs.ModEventTakedown) {
+            self = .toolsOzoneModerationDefsModEventTakedown(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventAcknowledge) {
+            self = .toolsOzoneModerationDefsModEventAcknowledge(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventEscalate) {
+            self = .toolsOzoneModerationDefsModEventEscalate(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventComment) {
+            self = .toolsOzoneModerationDefsModEventComment(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventLabel) {
+            self = .toolsOzoneModerationDefsModEventLabel(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventReport) {
+            self = .toolsOzoneModerationDefsModEventReport(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventMute) {
+            self = .toolsOzoneModerationDefsModEventMute(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventUnmute) {
+            self = .toolsOzoneModerationDefsModEventUnmute(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventMuteReporter) {
+            self = .toolsOzoneModerationDefsModEventMuteReporter(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventUnmuteReporter) {
+            self = .toolsOzoneModerationDefsModEventUnmuteReporter(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventReverseTakedown) {
+            self = .toolsOzoneModerationDefsModEventReverseTakedown(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventResolveAppeal) {
+            self = .toolsOzoneModerationDefsModEventResolveAppeal(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventEmail) {
+            self = .toolsOzoneModerationDefsModEventEmail(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventDivert) {
+            self = .toolsOzoneModerationDefsModEventDivert(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventTag) {
+            self = .toolsOzoneModerationDefsModEventTag(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.AccountEvent) {
+            self = .toolsOzoneModerationDefsAccountEvent(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.IdentityEvent) {
+            self = .toolsOzoneModerationDefsIdentityEvent(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.RecordEvent) {
+            self = .toolsOzoneModerationDefsRecordEvent(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventPriorityScore) {
+            self = .toolsOzoneModerationDefsModEventPriorityScore(value)
+        }
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -689,6 +765,14 @@ public enum ToolsOzoneModerationEmitEvent {
         case comAtprotoRepoStrongRef(ComAtprotoRepoStrongRef)
         case unexpected(ATProtocolValueContainer)
 
+        public init(_ value: ComAtprotoAdminDefs.RepoRef) {
+            self = .comAtprotoAdminDefsRepoRef(value)
+        }
+
+        public init(_ value: ComAtprotoRepoStrongRef) {
+            self = .comAtprotoRepoStrongRef(value)
+        }
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -834,6 +918,82 @@ public enum ToolsOzoneModerationEmitEvent {
         case toolsOzoneModerationDefsRecordEvent(ToolsOzoneModerationDefs.RecordEvent)
         case toolsOzoneModerationDefsModEventPriorityScore(ToolsOzoneModerationDefs.ModEventPriorityScore)
         case unexpected(ATProtocolValueContainer)
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventTakedown) {
+            self = .toolsOzoneModerationDefsModEventTakedown(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventAcknowledge) {
+            self = .toolsOzoneModerationDefsModEventAcknowledge(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventEscalate) {
+            self = .toolsOzoneModerationDefsModEventEscalate(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventComment) {
+            self = .toolsOzoneModerationDefsModEventComment(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventLabel) {
+            self = .toolsOzoneModerationDefsModEventLabel(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventReport) {
+            self = .toolsOzoneModerationDefsModEventReport(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventMute) {
+            self = .toolsOzoneModerationDefsModEventMute(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventUnmute) {
+            self = .toolsOzoneModerationDefsModEventUnmute(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventMuteReporter) {
+            self = .toolsOzoneModerationDefsModEventMuteReporter(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventUnmuteReporter) {
+            self = .toolsOzoneModerationDefsModEventUnmuteReporter(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventReverseTakedown) {
+            self = .toolsOzoneModerationDefsModEventReverseTakedown(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventResolveAppeal) {
+            self = .toolsOzoneModerationDefsModEventResolveAppeal(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventEmail) {
+            self = .toolsOzoneModerationDefsModEventEmail(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventDivert) {
+            self = .toolsOzoneModerationDefsModEventDivert(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventTag) {
+            self = .toolsOzoneModerationDefsModEventTag(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.AccountEvent) {
+            self = .toolsOzoneModerationDefsAccountEvent(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.IdentityEvent) {
+            self = .toolsOzoneModerationDefsIdentityEvent(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.RecordEvent) {
+            self = .toolsOzoneModerationDefsRecordEvent(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventPriorityScore) {
+            self = .toolsOzoneModerationDefsModEventPriorityScore(value)
+        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -1473,6 +1633,14 @@ public enum ToolsOzoneModerationEmitEvent {
         case comAtprotoAdminDefsRepoRef(ComAtprotoAdminDefs.RepoRef)
         case comAtprotoRepoStrongRef(ComAtprotoRepoStrongRef)
         case unexpected(ATProtocolValueContainer)
+
+        public init(_ value: ComAtprotoAdminDefs.RepoRef) {
+            self = .comAtprotoAdminDefsRepoRef(value)
+        }
+
+        public init(_ value: ComAtprotoRepoStrongRef) {
+            self = .comAtprotoRepoStrongRef(value)
+        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)

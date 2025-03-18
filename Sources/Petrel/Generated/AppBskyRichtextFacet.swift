@@ -292,6 +292,18 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
         case appBskyRichtextFacetTag(AppBskyRichtextFacet.Tag)
         case unexpected(ATProtocolValueContainer)
 
+        public init(_ value: AppBskyRichtextFacet.Mention) {
+            self = .appBskyRichtextFacetMention(value)
+        }
+
+        public init(_ value: AppBskyRichtextFacet.Link) {
+            self = .appBskyRichtextFacetLink(value)
+        }
+
+        public init(_ value: AppBskyRichtextFacet.Tag) {
+            self = .appBskyRichtextFacetTag(value)
+        }
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -488,6 +500,17 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
         case link(Link)
         case tag(Tag)
         case unexpected(ATProtocolValueContainer)
+        public init(_ value: Mention) {
+            self = .mention(value)
+        }
+
+        public init(_ value: Link) {
+            self = .link(value)
+        }
+
+        public init(_ value: Tag) {
+            self = .tag(value)
+        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)

@@ -2895,6 +2895,57 @@ public struct AppBskyActorDefs {
         case labelersPref(LabelersPref)
         case postInteractionSettingsPref(PostInteractionSettingsPref)
         case unexpected(ATProtocolValueContainer)
+        public init(_ value: AdultContentPref) {
+            self = .adultContentPref(value)
+        }
+
+        public init(_ value: ContentLabelPref) {
+            self = .contentLabelPref(value)
+        }
+
+        public init(_ value: SavedFeedsPref) {
+            self = .savedFeedsPref(value)
+        }
+
+        public init(_ value: SavedFeedsPrefV2) {
+            self = .savedFeedsPrefV2(value)
+        }
+
+        public init(_ value: PersonalDetailsPref) {
+            self = .personalDetailsPref(value)
+        }
+
+        public init(_ value: FeedViewPref) {
+            self = .feedViewPref(value)
+        }
+
+        public init(_ value: ThreadViewPref) {
+            self = .threadViewPref(value)
+        }
+
+        public init(_ value: InterestsPref) {
+            self = .interestsPref(value)
+        }
+
+        public init(_ value: MutedWordsPref) {
+            self = .mutedWordsPref(value)
+        }
+
+        public init(_ value: HiddenPostsPref) {
+            self = .hiddenPostsPref(value)
+        }
+
+        public init(_ value: BskyAppStatePref) {
+            self = .bskyAppStatePref(value)
+        }
+
+        public init(_ value: LabelersPref) {
+            self = .labelersPref(value)
+        }
+
+        public init(_ value: PostInteractionSettingsPref) {
+            self = .postInteractionSettingsPref(value)
+        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -3141,6 +3192,22 @@ public struct AppBskyActorDefs {
         case appBskyFeedThreadgateListRule(AppBskyFeedThreadgate.ListRule)
         case unexpected(ATProtocolValueContainer)
 
+        public init(_ value: AppBskyFeedThreadgate.MentionRule) {
+            self = .appBskyFeedThreadgateMentionRule(value)
+        }
+
+        public init(_ value: AppBskyFeedThreadgate.FollowerRule) {
+            self = .appBskyFeedThreadgateFollowerRule(value)
+        }
+
+        public init(_ value: AppBskyFeedThreadgate.FollowingRule) {
+            self = .appBskyFeedThreadgateFollowingRule(value)
+        }
+
+        public init(_ value: AppBskyFeedThreadgate.ListRule) {
+            self = .appBskyFeedThreadgateListRule(value)
+        }
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -3328,6 +3395,10 @@ public struct AppBskyActorDefs {
     public enum PostInteractionSettingsPrefPostgateEmbeddingRulesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case appBskyFeedPostgateDisableRule(AppBskyFeedPostgate.DisableRule)
         case unexpected(ATProtocolValueContainer)
+
+        public init(_ value: AppBskyFeedPostgate.DisableRule) {
+            self = .appBskyFeedPostgateDisableRule(value)
+        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)

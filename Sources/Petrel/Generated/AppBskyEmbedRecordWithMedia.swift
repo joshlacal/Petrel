@@ -130,6 +130,18 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
         case appBskyEmbedExternalView(AppBskyEmbedExternal.View)
         case unexpected(ATProtocolValueContainer)
 
+        public init(_ value: AppBskyEmbedImages.View) {
+            self = .appBskyEmbedImagesView(value)
+        }
+
+        public init(_ value: AppBskyEmbedVideo.View) {
+            self = .appBskyEmbedVideoView(value)
+        }
+
+        public init(_ value: AppBskyEmbedExternal.View) {
+            self = .appBskyEmbedExternalView(value)
+        }
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -289,6 +301,18 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
         case appBskyEmbedVideo(AppBskyEmbedVideo)
         case appBskyEmbedExternal(AppBskyEmbedExternal)
         case unexpected(ATProtocolValueContainer)
+
+        public init(_ value: AppBskyEmbedImages) {
+            self = .appBskyEmbedImages(value)
+        }
+
+        public init(_ value: AppBskyEmbedVideo) {
+            self = .appBskyEmbedVideo(value)
+        }
+
+        public init(_ value: AppBskyEmbedExternal) {
+            self = .appBskyEmbedExternal(value)
+        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)

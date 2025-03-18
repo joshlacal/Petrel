@@ -4864,6 +4864,82 @@ public enum ToolsOzoneModerationDefs {
         case toolsOzoneModerationDefsModEventPriorityScore(ToolsOzoneModerationDefs.ModEventPriorityScore)
         case unexpected(ATProtocolValueContainer)
 
+        public init(_ value: ToolsOzoneModerationDefs.ModEventTakedown) {
+            self = .toolsOzoneModerationDefsModEventTakedown(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventReverseTakedown) {
+            self = .toolsOzoneModerationDefsModEventReverseTakedown(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventComment) {
+            self = .toolsOzoneModerationDefsModEventComment(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventReport) {
+            self = .toolsOzoneModerationDefsModEventReport(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventLabel) {
+            self = .toolsOzoneModerationDefsModEventLabel(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventAcknowledge) {
+            self = .toolsOzoneModerationDefsModEventAcknowledge(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventEscalate) {
+            self = .toolsOzoneModerationDefsModEventEscalate(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventMute) {
+            self = .toolsOzoneModerationDefsModEventMute(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventUnmute) {
+            self = .toolsOzoneModerationDefsModEventUnmute(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventMuteReporter) {
+            self = .toolsOzoneModerationDefsModEventMuteReporter(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventUnmuteReporter) {
+            self = .toolsOzoneModerationDefsModEventUnmuteReporter(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventEmail) {
+            self = .toolsOzoneModerationDefsModEventEmail(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventResolveAppeal) {
+            self = .toolsOzoneModerationDefsModEventResolveAppeal(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventDivert) {
+            self = .toolsOzoneModerationDefsModEventDivert(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventTag) {
+            self = .toolsOzoneModerationDefsModEventTag(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.AccountEvent) {
+            self = .toolsOzoneModerationDefsAccountEvent(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.IdentityEvent) {
+            self = .toolsOzoneModerationDefsIdentityEvent(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.RecordEvent) {
+            self = .toolsOzoneModerationDefsRecordEvent(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventPriorityScore) {
+            self = .toolsOzoneModerationDefsModEventPriorityScore(value)
+        }
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -5504,6 +5580,18 @@ public enum ToolsOzoneModerationDefs {
         case chatBskyConvoDefsMessageRef(ChatBskyConvoDefs.MessageRef)
         case unexpected(ATProtocolValueContainer)
 
+        public init(_ value: ComAtprotoAdminDefs.RepoRef) {
+            self = .comAtprotoAdminDefsRepoRef(value)
+        }
+
+        public init(_ value: ComAtprotoRepoStrongRef) {
+            self = .comAtprotoRepoStrongRef(value)
+        }
+
+        public init(_ value: ChatBskyConvoDefs.MessageRef) {
+            self = .chatBskyConvoDefsMessageRef(value)
+        }
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -5679,6 +5767,82 @@ public enum ToolsOzoneModerationDefs {
         case toolsOzoneModerationDefsRecordEvent(ToolsOzoneModerationDefs.RecordEvent)
         case toolsOzoneModerationDefsModEventPriorityScore(ToolsOzoneModerationDefs.ModEventPriorityScore)
         case unexpected(ATProtocolValueContainer)
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventTakedown) {
+            self = .toolsOzoneModerationDefsModEventTakedown(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventReverseTakedown) {
+            self = .toolsOzoneModerationDefsModEventReverseTakedown(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventComment) {
+            self = .toolsOzoneModerationDefsModEventComment(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventReport) {
+            self = .toolsOzoneModerationDefsModEventReport(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventLabel) {
+            self = .toolsOzoneModerationDefsModEventLabel(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventAcknowledge) {
+            self = .toolsOzoneModerationDefsModEventAcknowledge(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventEscalate) {
+            self = .toolsOzoneModerationDefsModEventEscalate(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventMute) {
+            self = .toolsOzoneModerationDefsModEventMute(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventUnmute) {
+            self = .toolsOzoneModerationDefsModEventUnmute(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventMuteReporter) {
+            self = .toolsOzoneModerationDefsModEventMuteReporter(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventUnmuteReporter) {
+            self = .toolsOzoneModerationDefsModEventUnmuteReporter(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventEmail) {
+            self = .toolsOzoneModerationDefsModEventEmail(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventResolveAppeal) {
+            self = .toolsOzoneModerationDefsModEventResolveAppeal(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventDivert) {
+            self = .toolsOzoneModerationDefsModEventDivert(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventTag) {
+            self = .toolsOzoneModerationDefsModEventTag(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.AccountEvent) {
+            self = .toolsOzoneModerationDefsAccountEvent(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.IdentityEvent) {
+            self = .toolsOzoneModerationDefsIdentityEvent(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.RecordEvent) {
+            self = .toolsOzoneModerationDefsRecordEvent(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.ModEventPriorityScore) {
+            self = .toolsOzoneModerationDefsModEventPriorityScore(value)
+        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -6321,6 +6485,22 @@ public enum ToolsOzoneModerationDefs {
         case toolsOzoneModerationDefsRecordViewNotFound(ToolsOzoneModerationDefs.RecordViewNotFound)
         case unexpected(ATProtocolValueContainer)
 
+        public init(_ value: ToolsOzoneModerationDefs.RepoView) {
+            self = .toolsOzoneModerationDefsRepoView(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.RepoViewNotFound) {
+            self = .toolsOzoneModerationDefsRepoViewNotFound(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.RecordView) {
+            self = .toolsOzoneModerationDefsRecordView(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.RecordViewNotFound) {
+            self = .toolsOzoneModerationDefsRecordViewNotFound(value)
+        }
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -6510,6 +6690,14 @@ public enum ToolsOzoneModerationDefs {
         case comAtprotoRepoStrongRef(ComAtprotoRepoStrongRef)
         case unexpected(ATProtocolValueContainer)
 
+        public init(_ value: ComAtprotoAdminDefs.RepoRef) {
+            self = .comAtprotoAdminDefsRepoRef(value)
+        }
+
+        public init(_ value: ComAtprotoRepoStrongRef) {
+            self = .comAtprotoRepoStrongRef(value)
+        }
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
@@ -6638,6 +6826,14 @@ public enum ToolsOzoneModerationDefs {
         case toolsOzoneModerationDefsAccountHosting(ToolsOzoneModerationDefs.AccountHosting)
         case toolsOzoneModerationDefsRecordHosting(ToolsOzoneModerationDefs.RecordHosting)
         case unexpected(ATProtocolValueContainer)
+
+        public init(_ value: ToolsOzoneModerationDefs.AccountHosting) {
+            self = .toolsOzoneModerationDefsAccountHosting(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.RecordHosting) {
+            self = .toolsOzoneModerationDefsRecordHosting(value)
+        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -6783,6 +6979,14 @@ public enum ToolsOzoneModerationDefs {
         case toolsOzoneModerationDefsImageDetails(ToolsOzoneModerationDefs.ImageDetails)
         case toolsOzoneModerationDefsVideoDetails(ToolsOzoneModerationDefs.VideoDetails)
         case unexpected(ATProtocolValueContainer)
+
+        public init(_ value: ToolsOzoneModerationDefs.ImageDetails) {
+            self = .toolsOzoneModerationDefsImageDetails(value)
+        }
+
+        public init(_ value: ToolsOzoneModerationDefs.VideoDetails) {
+            self = .toolsOzoneModerationDefsVideoDetails(value)
+        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)

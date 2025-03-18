@@ -50,6 +50,18 @@ public enum ComAtprotoAdminGetSubjectStatus {
         case comAtprotoAdminDefsRepoBlobRef(ComAtprotoAdminDefs.RepoBlobRef)
         case unexpected(ATProtocolValueContainer)
 
+        public init(_ value: ComAtprotoAdminDefs.RepoRef) {
+            self = .comAtprotoAdminDefsRepoRef(value)
+        }
+
+        public init(_ value: ComAtprotoRepoStrongRef) {
+            self = .comAtprotoRepoStrongRef(value)
+        }
+
+        public init(_ value: ComAtprotoAdminDefs.RepoBlobRef) {
+            self = .comAtprotoAdminDefsRepoBlobRef(value)
+        }
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)

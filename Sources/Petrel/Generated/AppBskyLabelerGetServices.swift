@@ -34,6 +34,14 @@ public enum AppBskyLabelerGetServices {
         case appBskyLabelerDefsLabelerViewDetailed(AppBskyLabelerDefs.LabelerViewDetailed)
         case unexpected(ATProtocolValueContainer)
 
+        public init(_ value: AppBskyLabelerDefs.LabelerView) {
+            self = .appBskyLabelerDefsLabelerView(value)
+        }
+
+        public init(_ value: AppBskyLabelerDefs.LabelerViewDetailed) {
+            self = .appBskyLabelerDefsLabelerViewDetailed(value)
+        }
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)

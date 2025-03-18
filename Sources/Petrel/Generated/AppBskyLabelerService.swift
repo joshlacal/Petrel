@@ -142,6 +142,10 @@ public struct AppBskyLabelerService: ATProtocolCodable, ATProtocolValue {
         case comAtprotoLabelDefsSelfLabels(ComAtprotoLabelDefs.SelfLabels)
         case unexpected(ATProtocolValueContainer)
 
+        public init(_ value: ComAtprotoLabelDefs.SelfLabels) {
+            self = .comAtprotoLabelDefsSelfLabels(value)
+        }
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)

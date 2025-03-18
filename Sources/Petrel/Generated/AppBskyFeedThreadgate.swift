@@ -257,6 +257,22 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
         case appBskyFeedThreadgateListRule(AppBskyFeedThreadgate.ListRule)
         case unexpected(ATProtocolValueContainer)
 
+        public init(_ value: AppBskyFeedThreadgate.MentionRule) {
+            self = .appBskyFeedThreadgateMentionRule(value)
+        }
+
+        public init(_ value: AppBskyFeedThreadgate.FollowerRule) {
+            self = .appBskyFeedThreadgateFollowerRule(value)
+        }
+
+        public init(_ value: AppBskyFeedThreadgate.FollowingRule) {
+            self = .appBskyFeedThreadgateFollowingRule(value)
+        }
+
+        public init(_ value: AppBskyFeedThreadgate.ListRule) {
+            self = .appBskyFeedThreadgateListRule(value)
+        }
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let typeValue = try container.decode(String.self, forKey: .type)
