@@ -15,7 +15,7 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(url: "https://github.com/beatt83/jose-swift.git", .upToNextMajor(from: "4.0.0")),
+        .package(url: "https://github.com/beatt83/jose-swift.git", .upToNextMajor(from: "5.0.0")),
     ],
     targets: [
         .target(
