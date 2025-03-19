@@ -467,27 +467,28 @@ actor OAuthManager {
         regenerateDPoPKeyPair()
     }
 
-func deleteDPoPKey() {
-    do {
-        // Delete the DPoP key
-        try KeychainManager.deleteDPoPKey(namespace: namespace)
-        
-        // Also delete the DPoP key bindings
-        try KeychainManager.deleteDPoPKeyBindings(namespace: namespace)
-        
-        // Clear in-memory state
-        dpopKeyPair = nil
-        dpopNonces = [:]
-        
-        LogManager.logInfo("Deleted DPoP key pair, bindings, and cleared nonces")
-        // Optionally publish an event
-        Task {
-            await EventBus.shared.publish(.customEvent(name: "DPoPKeyDeleted", data: "DPoP key pair and bindings deleted and nonces cleared"))
+    func deleteDPoPKey() {
+        do {
+            // Delete the DPoP key
+            try KeychainManager.deleteDPoPKey(namespace: namespace)
+
+            // Also delete the DPoP key bindings
+            try KeychainManager.deleteDPoPKeyBindings(namespace: namespace)
+
+            // Clear in-memory state
+            dpopKeyPair = nil
+            dpopNonces = [:]
+
+            LogManager.logInfo("Deleted DPoP key pair, bindings, and cleared nonces")
+            // Optionally publish an event
+            Task {
+                await EventBus.shared.publish(.customEvent(name: "DPoPKeyDeleted", data: "DPoP key pair and bindings deleted and nonces cleared"))
+            }
+        } catch {
+            LogManager.logError("Failed to delete DPoP key or bindings: \(error)")
         }
-    } catch {
-        LogManager.logError("Failed to delete DPoP key or bindings: \(error)")
     }
-}
+
     func handleCallback(url: URL) async throws -> (accessToken: String, refreshToken: String) {
         await EventBus.shared.publish(.oauthFlowStarted(url))
         guard let code = extractAuthorizationCode(from: url),
