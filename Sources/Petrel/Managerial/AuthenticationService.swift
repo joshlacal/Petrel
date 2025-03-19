@@ -234,7 +234,7 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
             await oauthManager?.updateDPoPNonce(for: requestURL, from: ["DPoP-Nonce": newNonce])
 
             // Prepare the request again with the updated nonce
-            var retryRequest = try await prepareAuthenticatedRequest(request)
+            let retryRequest = try await prepareAuthenticatedRequest(request)
             LogManager.logRequest(retryRequest)
 
             // Perform the retry
@@ -258,7 +258,7 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
             LogManager.logError("Received invalid_token error")
             if try await refreshTokenIfNeeded() == true {
                 // Retry the request with the new token
-                var retryRequest = try await prepareAuthenticatedRequest(request)
+                let retryRequest = try await prepareAuthenticatedRequest(request)
                 return try await networkManager.performRequest(retryRequest)
             } else {
                 LogManager.logError("NetworkManager - Token refresh failed")
@@ -401,7 +401,7 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
         }
 
         // Atomic check-and-set for refresh state
-        guard await startRefreshIfNotInProgress() else {
+        guard startRefreshIfNotInProgress() else {
             LogManager.logInfo("AuthenticationService - Refresh already in progress")
             return false
         }

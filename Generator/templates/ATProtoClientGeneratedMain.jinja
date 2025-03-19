@@ -330,7 +330,6 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
 
     // MARK: - Logout Method
 
-    /// Logs out the user by clearing tokens and session data.
     public func logout() async throws {
         // Clear session and tokens first
         try await middlewareService.clearSession()
@@ -338,10 +337,12 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
 
         // Clear DPoP state
         await authenticationService.deleteDPoPKey()
-
-//        // Clear session last
-//        try await sessionManager.clearSession()
-
+        
+        // Clear any other OAuth-related state
+        try KeychainManager.delete(key: "codeVerifier", namespace: namespace)
+        try KeychainManager.delete(key: "state", namespace: namespace)
+        try KeychainManager.delete(key: "isAuthenticated", namespace: namespace)
+        
         // Notify delegate that authentication is required
         await authDelegate?.authenticationRequired(client: self)
     }

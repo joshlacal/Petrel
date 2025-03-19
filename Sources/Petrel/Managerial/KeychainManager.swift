@@ -209,4 +209,21 @@ enum KeychainManager {
         }
         LogManager.logDebug("KeychainManager - Successfully deleted DPoP key for tag \(tagString).")
     }
+
+    /// Deletes DPoP key bindings from the keychain for a specified namespace.
+static func deleteDPoPKeyBindings(namespace: String) throws {
+    let bindingsKey = "\(namespace).dpopKeyBindings"
+    
+    let query: [String: Any] = [
+        kSecClass as String: kSecClassGenericPassword,
+        kSecAttrAccount as String: bindingsKey,
+    ]
+    
+    let status = SecItemDelete(query as CFDictionary)
+    if status != errSecSuccess, status != errSecItemNotFound {
+        LogManager.logError("KeychainManager - Failed to delete DPoP key bindings for namespace \(namespace). Status: \(status)")
+        throw KeychainError.itemStoreError(status: status)
+    }
+    LogManager.logDebug("KeychainManager - Successfully deleted DPoP key bindings for namespace \(namespace).")
+}
 }
