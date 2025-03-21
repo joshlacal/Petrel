@@ -10,19 +10,19 @@ public enum ComAtprotoModerationDefs {
 
         // Predefined constants
         //
-        public static let comAtprotoModerationDefsReasonSpam = ReasonType(rawValue: "com.atproto.moderation.defs#reasonSpam")
+        public static let comatprotomoderationdefsreasonspam = ReasonType(rawValue: "com.atproto.moderation.defs#reasonSpam")
         //
-        public static let comAtprotoModerationDefsReasonViolation = ReasonType(rawValue: "com.atproto.moderation.defs#reasonViolation")
+        public static let comatprotomoderationdefsreasonviolation = ReasonType(rawValue: "com.atproto.moderation.defs#reasonViolation")
         //
-        public static let comAtprotoModerationDefsReasonMisleading = ReasonType(rawValue: "com.atproto.moderation.defs#reasonMisleading")
+        public static let comatprotomoderationdefsreasonmisleading = ReasonType(rawValue: "com.atproto.moderation.defs#reasonMisleading")
         //
-        public static let comAtprotoModerationDefsReasonSexual = ReasonType(rawValue: "com.atproto.moderation.defs#reasonSexual")
+        public static let comatprotomoderationdefsreasonsexual = ReasonType(rawValue: "com.atproto.moderation.defs#reasonSexual")
         //
-        public static let comAtprotoModerationDefsReasonRude = ReasonType(rawValue: "com.atproto.moderation.defs#reasonRude")
+        public static let comatprotomoderationdefsreasonrude = ReasonType(rawValue: "com.atproto.moderation.defs#reasonRude")
         //
-        public static let comAtprotoModerationDefsReasonOther = ReasonType(rawValue: "com.atproto.moderation.defs#reasonOther")
+        public static let comatprotomoderationdefsreasonother = ReasonType(rawValue: "com.atproto.moderation.defs#reasonOther")
         //
-        public static let comAtprotoModerationDefsReasonAppeal = ReasonType(rawValue: "com.atproto.moderation.defs#reasonAppeal")
+        public static let comatprotomoderationdefsreasonappeal = ReasonType(rawValue: "com.atproto.moderation.defs#reasonAppeal")
 
         public init(rawValue: String) {
             self.rawValue = rawValue

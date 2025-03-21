@@ -577,15 +577,15 @@ public enum ComAtprotoLabelDefs {
 
         // Predefined constants
         //
-        public static let !hide = LabelValue(rawValue: "!hide")
+        public static let exclamationhide = LabelValue(rawValue: "!hide")
         //
-        public static let !no - promote = LabelValue(rawValue: "!no-promote")
+        public static let exclamationnodashpromote = LabelValue(rawValue: "!no-promote")
         //
-        public static let !warn = LabelValue(rawValue: "!warn")
+        public static let exclamationwarn = LabelValue(rawValue: "!warn")
         //
-        public static let !no - unauthenticated = LabelValue(rawValue: "!no-unauthenticated")
+        public static let exclamationnodashunauthenticated = LabelValue(rawValue: "!no-unauthenticated")
         //
-        public static let dmca - violation = LabelValue(rawValue: "dmca-violation")
+        public static let dmcadashviolation = LabelValue(rawValue: "dmca-violation")
         //
         public static let doxxing = LabelValue(rawValue: "doxxing")
         //

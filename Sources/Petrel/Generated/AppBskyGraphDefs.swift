@@ -1306,11 +1306,11 @@ public enum AppBskyGraphDefs {
 
         // Predefined constants
         //
-        public static let appBskyGraphDefsModlist = ListPurpose(rawValue: "app.bsky.graph.defs#modlist")
+        public static let appbskygraphdefsmodlist = ListPurpose(rawValue: "app.bsky.graph.defs#modlist")
         //
-        public static let appBskyGraphDefsCuratelist = ListPurpose(rawValue: "app.bsky.graph.defs#curatelist")
+        public static let appbskygraphdefscuratelist = ListPurpose(rawValue: "app.bsky.graph.defs#curatelist")
         //
-        public static let appBskyGraphDefsReferencelist = ListPurpose(rawValue: "app.bsky.graph.defs#referencelist")
+        public static let appbskygraphdefsreferencelist = ListPurpose(rawValue: "app.bsky.graph.defs#referencelist")
 
         public init(rawValue: String) {
             self.rawValue = rawValue

@@ -6964,13 +6964,13 @@ public enum ToolsOzoneModerationDefs {
 
         // Predefined constants
         //
-        public static let reviewOpen = SubjectReviewState(rawValue: "#reviewOpen")
+        public static let reviewopen = SubjectReviewState(rawValue: "#reviewOpen")
         //
-        public static let reviewEscalated = SubjectReviewState(rawValue: "#reviewEscalated")
+        public static let reviewescalated = SubjectReviewState(rawValue: "#reviewEscalated")
         //
-        public static let reviewClosed = SubjectReviewState(rawValue: "#reviewClosed")
+        public static let reviewclosed = SubjectReviewState(rawValue: "#reviewClosed")
         //
-        public static let reviewNone = SubjectReviewState(rawValue: "#reviewNone")
+        public static let reviewnone = SubjectReviewState(rawValue: "#reviewNone")
 
         public init(rawValue: String) {
             self.rawValue = rawValue
