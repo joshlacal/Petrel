@@ -517,7 +517,7 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
     /// Removes a custom header
     /// - Parameter name: Header name to remove
     public func removeHeader(name: String) async {
-        await networkManager.removeHeader(name)
+        await networkManager.removeHeader(name: name)
     }
 
     /// Clears all custom headers
