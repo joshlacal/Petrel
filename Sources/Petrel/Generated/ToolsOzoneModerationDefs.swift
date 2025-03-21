@@ -6959,7 +6959,7 @@ public enum ToolsOzoneModerationDefs {
         }
     }
 
-    public enum SubjectReviewState: String, Codable, ATProtocolCodable, ATProtocolValue, CaseIterable {
+    public enum SubjectReviewState: Codable, ATProtocolCodable, ATProtocolValue {
         //
         case reviewopen = "#reviewOpen"
         //
@@ -6968,10 +6968,60 @@ public enum ToolsOzoneModerationDefs {
         case reviewclosed = "#reviewClosed"
         //
         case reviewnone = "#reviewNone"
+        // Case for handling custom/unknown values
+        case custom(String)
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            let rawValue = try container.decode(String.self)
+
+            switch rawValue {
+            case "#reviewOpen": self = .reviewopen
+            case "#reviewEscalated": self = .reviewescalated
+            case "#reviewClosed": self = .reviewclosed
+            case "#reviewNone": self = .reviewnone
+            default: self = .custom(rawValue)
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.singleValueContainer()
+            switch self {
+            case .reviewopen:
+                try container.encode("#reviewOpen")
+            case .reviewescalated:
+                try container.encode("#reviewEscalated")
+            case .reviewclosed:
+                try container.encode("#reviewClosed")
+            case .reviewnone:
+                try container.encode("#reviewNone")
+            case let .custom(value):
+                try container.encode(value)
+            }
+        }
+
+        public var stringValue: String {
+            switch self {
+            case .reviewopen: return "#reviewOpen"
+            case .reviewescalated: return "#reviewEscalated"
+            case .reviewclosed: return "#reviewClosed"
+            case .reviewnone: return "#reviewNone"
+            case let .custom(value): return value
+            }
+        }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let otherEnum = other as? SubjectReviewState else { return false }
-            return rawValue == otherEnum.rawValue
+            return stringValue == otherEnum.stringValue
+        }
+
+        public static var definedCases: [SubjectReviewState] {
+            return [
+                .reviewopen,
+                .reviewescalated,
+                .reviewclosed,
+                .reviewnone,
+            ]
         }
     }
 

@@ -572,7 +572,7 @@ public enum ComAtprotoLabelDefs {
         }
     }
 
-    public enum LabelValue: String, Codable, ATProtocolCodable, ATProtocolValue, CaseIterable {
+    public enum LabelValue: Codable, ATProtocolCodable, ATProtocolValue {
         //
         case exclamationhide = "!hide"
         //
@@ -584,21 +584,106 @@ public enum ComAtprotoLabelDefs {
         //
         case dmcadashviolation = "dmca-violation"
         //
-        case doxxing
+        case doxxing = "doxxing"
         //
-        case porn
+        case porn = "porn"
         //
-        case sexual
+        case sexual = "sexual"
         //
-        case nudity
+        case nudity = "nudity"
         //
-        case nsfl
+        case nsfl = "nsfl"
         //
-        case gore
+        case gore = "gore"
+        // Case for handling custom/unknown values
+        case custom(String)
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            let rawValue = try container.decode(String.self)
+
+            switch rawValue {
+            case "!hide": self = .exclamationhide
+            case "!no-promote": self = .exclamationnodashpromote
+            case "!warn": self = .exclamationwarn
+            case "!no-unauthenticated": self = .exclamationnodashunauthenticated
+            case "dmca-violation": self = .dmcadashviolation
+            case "doxxing": self = .doxxing
+            case "porn": self = .porn
+            case "sexual": self = .sexual
+            case "nudity": self = .nudity
+            case "nsfl": self = .nsfl
+            case "gore": self = .gore
+            default: self = .custom(rawValue)
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.singleValueContainer()
+            switch self {
+            case .exclamationhide:
+                try container.encode("!hide")
+            case .exclamationnodashpromote:
+                try container.encode("!no-promote")
+            case .exclamationwarn:
+                try container.encode("!warn")
+            case .exclamationnodashunauthenticated:
+                try container.encode("!no-unauthenticated")
+            case .dmcadashviolation:
+                try container.encode("dmca-violation")
+            case .doxxing:
+                try container.encode("doxxing")
+            case .porn:
+                try container.encode("porn")
+            case .sexual:
+                try container.encode("sexual")
+            case .nudity:
+                try container.encode("nudity")
+            case .nsfl:
+                try container.encode("nsfl")
+            case .gore:
+                try container.encode("gore")
+            case let .custom(value):
+                try container.encode(value)
+            }
+        }
+
+        public var stringValue: String {
+            switch self {
+            case .exclamationhide: return "!hide"
+            case .exclamationnodashpromote: return "!no-promote"
+            case .exclamationwarn: return "!warn"
+            case .exclamationnodashunauthenticated: return "!no-unauthenticated"
+            case .dmcadashviolation: return "dmca-violation"
+            case .doxxing: return "doxxing"
+            case .porn: return "porn"
+            case .sexual: return "sexual"
+            case .nudity: return "nudity"
+            case .nsfl: return "nsfl"
+            case .gore: return "gore"
+            case let .custom(value): return value
+            }
+        }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let otherEnum = other as? LabelValue else { return false }
-            return rawValue == otherEnum.rawValue
+            return stringValue == otherEnum.stringValue
+        }
+
+        public static var definedCases: [LabelValue] {
+            return [
+                .exclamationhide,
+                .exclamationnodashpromote,
+                .exclamationwarn,
+                .exclamationnodashunauthenticated,
+                .dmcadashviolation,
+                .doxxing,
+                .porn,
+                .sexual,
+                .nudity,
+                .nsfl,
+                .gore,
+            ]
         }
     }
 }

@@ -3173,15 +3173,55 @@ public struct AppBskyActorDefs {
         }
     }
 
-    public enum MutedWordTarget: String, Codable, ATProtocolCodable, ATProtocolValue, CaseIterable {
+    public enum MutedWordTarget: Codable, ATProtocolCodable, ATProtocolValue {
         //
-        case content
+        case content = "content"
         //
-        case tag
+        case tag = "tag"
+        // Case for handling custom/unknown values
+        case custom(String)
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            let rawValue = try container.decode(String.self)
+
+            switch rawValue {
+            case "content": self = .content
+            case "tag": self = .tag
+            default: self = .custom(rawValue)
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.singleValueContainer()
+            switch self {
+            case .content:
+                try container.encode("content")
+            case .tag:
+                try container.encode("tag")
+            case let .custom(value):
+                try container.encode(value)
+            }
+        }
+
+        public var stringValue: String {
+            switch self {
+            case .content: return "content"
+            case .tag: return "tag"
+            case let .custom(value): return value
+            }
+        }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let otherEnum = other as? MutedWordTarget else { return false }
-            return rawValue == otherEnum.rawValue
+            return stringValue == otherEnum.stringValue
+        }
+
+        public static var definedCases: [MutedWordTarget] {
+            return [
+                .content,
+                .tag,
+            ]
         }
     }
 

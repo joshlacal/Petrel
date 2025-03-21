@@ -640,15 +640,6 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
                 }
             }
 
-            public lazy var server: Server = .init(networkManager: self.networkManager)
-
-            public final class Server: @unchecked Sendable {
-                let networkManager: NetworkManaging
-                init(networkManager: NetworkManaging) {
-                    self.networkManager = networkManager
-                }
-            }
-
             public lazy var team: Team = .init(networkManager: self.networkManager)
 
             public final class Team: @unchecked Sendable {
@@ -658,9 +649,9 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
                 }
             }
 
-            public lazy var communication: Communication = .init(networkManager: self.networkManager)
+            public lazy var server: Server = .init(networkManager: self.networkManager)
 
-            public final class Communication: @unchecked Sendable {
+            public final class Server: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
@@ -670,6 +661,15 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
             public lazy var set: Set = .init(networkManager: self.networkManager)
 
             public final class Set: @unchecked Sendable {
+                let networkManager: NetworkManaging
+                init(networkManager: NetworkManaging) {
+                    self.networkManager = networkManager
+                }
+            }
+
+            public lazy var communication: Communication = .init(networkManager: self.networkManager)
+
+            public final class Communication: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
@@ -856,18 +856,18 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
                 self.networkManager = networkManager
             }
 
-            public lazy var temp: Temp = .init(networkManager: self.networkManager)
+            public lazy var identity: Identity = .init(networkManager: self.networkManager)
 
-            public final class Temp: @unchecked Sendable {
+            public final class Identity: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
                 }
             }
 
-            public lazy var identity: Identity = .init(networkManager: self.networkManager)
+            public lazy var temp: Temp = .init(networkManager: self.networkManager)
 
-            public final class Identity: @unchecked Sendable {
+            public final class Temp: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
@@ -910,18 +910,18 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
                 }
             }
 
-            public lazy var repo: Repo = .init(networkManager: self.networkManager)
+            public lazy var lexicon: Lexicon = .init(networkManager: self.networkManager)
 
-            public final class Repo: @unchecked Sendable {
+            public final class Lexicon: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
                 }
             }
 
-            public lazy var lexicon: Lexicon = .init(networkManager: self.networkManager)
+            public lazy var repo: Repo = .init(networkManager: self.networkManager)
 
-            public final class Lexicon: @unchecked Sendable {
+            public final class Repo: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager

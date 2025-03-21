@@ -1301,17 +1301,62 @@ public enum AppBskyGraphDefs {
         }
     }
 
-    public enum ListPurpose: String, Codable, ATProtocolCodable, ATProtocolValue, CaseIterable {
+    public enum ListPurpose: Codable, ATProtocolCodable, ATProtocolValue {
         //
         case appbskygraphdefsmodlist = "app.bsky.graph.defs#modlist"
         //
         case appbskygraphdefscuratelist = "app.bsky.graph.defs#curatelist"
         //
         case appbskygraphdefsreferencelist = "app.bsky.graph.defs#referencelist"
+        // Case for handling custom/unknown values
+        case custom(String)
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            let rawValue = try container.decode(String.self)
+
+            switch rawValue {
+            case "app.bsky.graph.defs#modlist": self = .appbskygraphdefsmodlist
+            case "app.bsky.graph.defs#curatelist": self = .appbskygraphdefscuratelist
+            case "app.bsky.graph.defs#referencelist": self = .appbskygraphdefsreferencelist
+            default: self = .custom(rawValue)
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.singleValueContainer()
+            switch self {
+            case .appbskygraphdefsmodlist:
+                try container.encode("app.bsky.graph.defs#modlist")
+            case .appbskygraphdefscuratelist:
+                try container.encode("app.bsky.graph.defs#curatelist")
+            case .appbskygraphdefsreferencelist:
+                try container.encode("app.bsky.graph.defs#referencelist")
+            case let .custom(value):
+                try container.encode(value)
+            }
+        }
+
+        public var stringValue: String {
+            switch self {
+            case .appbskygraphdefsmodlist: return "app.bsky.graph.defs#modlist"
+            case .appbskygraphdefscuratelist: return "app.bsky.graph.defs#curatelist"
+            case .appbskygraphdefsreferencelist: return "app.bsky.graph.defs#referencelist"
+            case let .custom(value): return value
+            }
+        }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let otherEnum = other as? ListPurpose else { return false }
-            return rawValue == otherEnum.rawValue
+            return stringValue == otherEnum.stringValue
+        }
+
+        public static var definedCases: [ListPurpose] {
+            return [
+                .appbskygraphdefsmodlist,
+                .appbskygraphdefscuratelist,
+                .appbskygraphdefsreferencelist,
+            ]
         }
     }
 }
