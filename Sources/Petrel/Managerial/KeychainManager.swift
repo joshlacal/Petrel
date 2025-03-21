@@ -129,7 +129,7 @@ enum KeychainManager {
             kSecAttrKeySizeInBits as String: 256,
             kSecAttrApplicationTag as String: tagData,
             kSecValueData as String: key.x963Representation,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
         ]
 
         // Delete any existing key with the same tag

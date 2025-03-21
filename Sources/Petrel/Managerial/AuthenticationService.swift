@@ -240,11 +240,7 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
             // Perform the retry
             let (retryData, retryResponse) = try await networkManager.performRequest(retryRequest)
 
-            guard let retryHTTPResponse = retryResponse as? HTTPURLResponse else {
-                throw NetworkError.requestFailed
-            }
-
-            if retryHTTPResponse.statusCode == 401 {
+            if retryResponse.statusCode == 401 {
                 // If the retry also fails, propagate the error
                 LogManager.logError("Retry with updated DPoP nonce failed")
                 throw NetworkError.authenticationRequired

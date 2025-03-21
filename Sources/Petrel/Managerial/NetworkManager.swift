@@ -50,6 +50,19 @@ protocol NetworkManaging: Actor {
     /// - Returns: A boolean indicating whether the token refresh was successful.
     /// - Throws: Throws an error if the token refresh fails.
     func refreshLegacySessionToken(refreshToken: String, tokenManager: TokenManaging) async throws -> Bool
+    
+    
+    func setHeader(name: String, value: String)
+    func getHeader(name: String) -> String?
+    func removeHeader(name: String)
+    func clearHeaders()
+    
+    // ATProto-specific header methods
+    func setUserAgent(_ userAgent: String)
+    func setProxyHeader(did: String, service: String)
+    func setAcceptLabelers(_ labelers: [(did: String, redact: Bool)])
+    func extractContentLabelers(from response: HTTPURLResponse) -> [(did: String, redact: Bool)]
+
 }
 
 // MARK: - NetworkManager Actor
@@ -67,7 +80,8 @@ actor NetworkManager: NetworkManaging {
 
     private var middlewares: [NetworkMiddleware] = []
     private var isMiddlewareConfigured = false
-//    private var authenticationService: AuthenticationService?
+    private var customHeaders: [String: String] = [:]
+    private var userAgent: String?
     private var tokenManager: TokenManaging
 
     // Custom URLSession with hardened configuration
@@ -211,6 +225,103 @@ actor NetworkManager: NetworkManaging {
         LogManager.logInfo("NetworkManager - Base URL updated to: \(newBaseURL)")
         // Optionally, you can reset or reconfigure session/middleware here
     }
+    
+    // MARK: - Header Management
+    
+    /// Sets a custom header to be included in all requests
+    /// - Parameters:
+    ///   - name: Header name
+    ///   - value: Header value
+    func setHeader(name: String, value: String) {
+        LogManager.logDebug("NetworkManager - Setting header: \(name) = \(value)")
+        customHeaders[name] = value
+    }
+    
+    /// Gets the value of a custom header
+    /// - Parameter name: Header name
+    /// - Returns: Header value if it exists
+    func getHeader(name: String) -> String? {
+        return customHeaders[name]
+    }
+    
+    /// Removes a custom header
+    /// - Parameter name: Header name to remove
+    func removeHeader(name: String) {
+        LogManager.logDebug("NetworkManager - Removing header: \(name)")
+        customHeaders.removeValue(forKey: name)
+    }
+    
+    /// Clears all custom headers
+    func clearHeaders() {
+        LogManager.logDebug("NetworkManager - Clearing all custom headers")
+        customHeaders.removeAll()
+    }
+    
+    // MARK: - ATProto-Specific Headers
+    
+    /// Sets the User-Agent header
+    /// - Parameter userAgent: The user agent string
+    func setUserAgent(_ userAgent: String) {
+        self.userAgent = userAgent
+        setHeader(name: "User-Agent", value: userAgent)
+    }
+    
+    /// Sets the atproto-proxy header for directing requests to specific services
+    /// - Parameters:
+    ///   - did: The DID of the target service
+    ///   - service: The service identifier
+    func setProxyHeader(did: String, service: String) {
+        setHeader(name: "atproto-proxy", value: "\(did):\(service)")
+    }
+    
+    /// Sets the atproto-accept-labelers header with proper formatting
+    /// - Parameter labelers: Array of tuples containing labeler DIDs and redaction flags
+    func setAcceptLabelers(_ labelers: [(did: String, redact: Bool)]) {
+        // Format according to RFC-8941 structured syntax
+        let headerValue = labelers.map { labeler -> String in
+            if labeler.redact {
+                return "\(labeler.did);redact"
+            } else {
+                return labeler.did
+            }
+        }.joined(separator: ", ")
+        
+        if !headerValue.isEmpty {
+            setHeader(name: "atproto-accept-labelers", value: headerValue)
+        } else {
+            // If empty, remove the header
+            removeHeader(name: "atproto-accept-labelers")
+        }
+    }
+    
+    /// Extracts the content labelers from a response header
+    /// - Parameter response: The HTTP response
+    /// - Returns: Array of tuples containing labeler DIDs and redaction flags
+    func extractContentLabelers(from response: HTTPURLResponse) -> [(did: String, redact: Bool)] {
+        guard let contentLabelers = response.allHeaderFields["atproto-content-labelers"] as? String else {
+            return []
+        }
+        
+        return parseLabelerHeader(contentLabelers)
+    }
+    
+    /// Helper to parse a labeler header value according to RFC-8941
+    /// - Parameter header: The header value to parse
+    /// - Returns: Array of tuples containing labeler DIDs and redaction flags
+    private func parseLabelerHeader(_ header: String) -> [(did: String, redact: Bool)] {
+        let components = header.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+        
+        return components.compactMap { component in
+            let parts = component.split(separator: ";").map { $0.trimmingCharacters(in: .whitespaces) }
+            guard let did = parts.first, !did.isEmpty else { return nil }
+            
+            // Check if redact parameter is present
+            let redact = parts.count > 1 && parts.contains("redact")
+            
+            return (did: String(did), redact: redact)
+        }
+    }
+
 
     // MARK: - Perform Request
 
@@ -364,15 +475,27 @@ actor NetworkManager: NetworkManaging {
 
         var request = URLRequest(url: url)
         request.httpMethod = method
-
+        
+        // Apply custom headers first
+        for (key, value) in customHeaders {
+            request.setValue(value, forHTTPHeaderField: key)
+        }
+        
+        // Then apply request-specific headers (which may override custom headers)
         for (key, value) in headers {
             request.setValue(value, forHTTPHeaderField: key)
         }
-
+        
+        // Set User-Agent if we have one and it wasn't specified in headers
+        if let userAgent = userAgent, request.value(forHTTPHeaderField: "User-Agent") == nil {
+            request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+        }
+        
         request.httpBody = body
-
+        
         return request
     }
+
 
     // MARK: - Refresh Session Token
 
