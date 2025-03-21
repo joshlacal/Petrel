@@ -101,12 +101,16 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
     ///   - oauthConfig: Configuration for OAuth authentication.
     ///   - baseURL: The base URL for the AT Protocol service.
     ///   - environment: The client environment (production or testing).
+    ///   - namespace: The namespace for the client.
+    ///   - userAgent: Optional user agent string.
+
     public init(
         authMethod: AuthMethod,
         oauthConfig: OAuthConfiguration,
         baseURL: URL = URL(string: "https://bsky.social")!,
         namespace: String,
-        environment: ClientEnvironment
+        environment: ClientEnvironment,
+        userAgent: String? = nil
     ) async {
         LogManager.logDebug(
             "ATProtoClient - Initializing with baseURL: \(baseURL), namespace: \(namespace)")
@@ -134,6 +138,11 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
             oauthConfig: oauthConfig, didResolver: didResolutionService,
             namespace: namespace
         )
+
+        // Set user agent if provided
+        if let userAgent = userAgent {
+            await networkManager.setUserAgent(userAgent)
+        }
 
         do {
             // Initialize TokenManager first
@@ -489,6 +498,65 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
         }
     }
 
+    // MARK: - Header Management
+
+    /// Sets the user agent for all requests from this client
+    /// - Parameter userAgent: The user agent string
+    public func setUserAgent(_ userAgent: String) async {
+        await networkManager.setUserAgent(userAgent)
+    }
+
+    /// Sets a custom header for all requests from this client
+    /// - Parameters:
+    ///   - name: Header name
+    ///   - value: Header value
+    public func setHeader(name: String, value: String) async {
+        await networkManager.setHeader(name: name, value: value)
+    }
+
+    /// Removes a custom header
+    /// - Parameter name: Header name to remove
+    public func removeHeader(name: String) async {
+        await networkManager.removeHeader(name)
+    }
+
+    /// Clears all custom headers
+    public func clearHeaders() async {
+        await networkManager.clearHeaders()
+    }
+
+    // MARK: - ATProto-Specific Headers
+
+    /// Sets the labeler service to receive moderation reports
+    /// - Parameter did: The DID of the labeler service
+    public func setReportLabeler(did: String) async {
+        await networkManager.setProxyHeader(did: did, service: "atproto_labeler")
+    }
+
+    /// Clears any previously set report labeler
+    public func clearReportLabeler() async {
+        await networkManager.removeHeader(name: "atproto-proxy")
+    }
+
+    /// Sets which labelers to subscribe to for content labels
+    /// - Parameter labelers: Array of tuples containing labeler DIDs and redaction flags
+    public func setAcceptLabelers(_ labelers: [(did: String, redact: Bool)]) async {
+        await networkManager.setAcceptLabelers(labelers)
+    }
+
+    /// Sets the chat service for proxying
+    /// - Parameter did: The DID of the chat service
+    public func setChatService(did: String) async {
+        await networkManager.setProxyHeader(did: did, service: "bsky_chat")
+    }
+
+    /// Extracts content labelers from a response
+    /// - Parameter response: The HTTP response
+    /// - Returns: Array of tuples containing labeler DIDs and redaction flags
+    public func getContentLabelers(from response: HTTPURLResponse) async -> [(did: String, redact: Bool)] {
+        return await networkManager.extractContentLabelers(from: response)
+    }
+
     // MARK: - SessionDelegate Protocol Methods
 
     /// Notifies that the session requires reauthentication.
@@ -572,18 +640,18 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
                 }
             }
 
-            public lazy var team: Team = .init(networkManager: self.networkManager)
+            public lazy var server: Server = .init(networkManager: self.networkManager)
 
-            public final class Team: @unchecked Sendable {
+            public final class Server: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
                 }
             }
 
-            public lazy var server: Server = .init(networkManager: self.networkManager)
+            public lazy var team: Team = .init(networkManager: self.networkManager)
 
-            public final class Server: @unchecked Sendable {
+            public final class Team: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
@@ -662,18 +730,18 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
                 }
             }
 
-            public lazy var notification: Notification = .init(networkManager: self.networkManager)
+            public lazy var unspecced: Unspecced = .init(networkManager: self.networkManager)
 
-            public final class Notification: @unchecked Sendable {
+            public final class Unspecced: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
                 }
             }
 
-            public lazy var unspecced: Unspecced = .init(networkManager: self.networkManager)
+            public lazy var notification: Notification = .init(networkManager: self.networkManager)
 
-            public final class Unspecced: @unchecked Sendable {
+            public final class Notification: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
@@ -698,18 +766,18 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
                 }
             }
 
-            public lazy var richtext: Richtext = .init(networkManager: self.networkManager)
+            public lazy var actor: Actor = .init(networkManager: self.networkManager)
 
-            public final class Richtext: @unchecked Sendable {
+            public final class Actor: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
                 }
             }
 
-            public lazy var actor: Actor = .init(networkManager: self.networkManager)
+            public lazy var richtext: Richtext = .init(networkManager: self.networkManager)
 
-            public final class Actor: @unchecked Sendable {
+            public final class Richtext: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
@@ -833,18 +901,18 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
                 }
             }
 
-            public lazy var sync: Sync = .init(networkManager: self.networkManager)
+            public lazy var lexicon: Lexicon = .init(networkManager: self.networkManager)
 
-            public final class Sync: @unchecked Sendable {
+            public final class Lexicon: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
                 }
             }
 
-            public lazy var lexicon: Lexicon = .init(networkManager: self.networkManager)
+            public lazy var sync: Sync = .init(networkManager: self.networkManager)
 
-            public final class Lexicon: @unchecked Sendable {
+            public final class Sync: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
