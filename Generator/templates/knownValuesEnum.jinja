@@ -4,7 +4,7 @@
             // Predefined constants
             {%- for value, description in values %}
             // {{ description }}
-            public static let {{ value | convertRefToSwift | lowerCamelCase }} = {{ enum_name }}(rawValue: "{{ value }}")
+            public static let {{ value | convertRefToSwift | lowerCamelCase | enum_case }} = {{ enum_name }}(rawValue: "{{ value }}")
             {%- endfor %}
             
             public init(rawValue: String) {
