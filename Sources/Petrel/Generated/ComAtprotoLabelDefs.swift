@@ -572,111 +572,60 @@ public enum ComAtprotoLabelDefs {
         }
     }
 
-    public enum LabelValue: Codable, ATProtocolCodable, ATProtocolValue {
+    public struct LabelValue: Codable, ATProtocolCodable, ATProtocolValue {
+        public let rawValue: String
+
+        // Predefined constants
         //
-        case exclamationhide = "!hide"
+        public static let !hide = LabelValue(rawValue: "!hide")
         //
-        case exclamationnodashpromote = "!no-promote"
+        public static let !no - promote = LabelValue(rawValue: "!no-promote")
         //
-        case exclamationwarn = "!warn"
+        public static let !warn = LabelValue(rawValue: "!warn")
         //
-        case exclamationnodashunauthenticated = "!no-unauthenticated"
+        public static let !no - unauthenticated = LabelValue(rawValue: "!no-unauthenticated")
         //
-        case dmcadashviolation = "dmca-violation"
+        public static let dmca - violation = LabelValue(rawValue: "dmca-violation")
         //
-        case doxxing = "doxxing"
+        public static let doxxing = LabelValue(rawValue: "doxxing")
         //
-        case porn = "porn"
+        public static let porn = LabelValue(rawValue: "porn")
         //
-        case sexual = "sexual"
+        public static let sexual = LabelValue(rawValue: "sexual")
         //
-        case nudity = "nudity"
+        public static let nudity = LabelValue(rawValue: "nudity")
         //
-        case nsfl = "nsfl"
+        public static let nsfl = LabelValue(rawValue: "nsfl")
         //
-        case gore = "gore"
-        // Case for handling custom/unknown values
-        case custom(String)
+        public static let gore = LabelValue(rawValue: "gore")
+
+        public init(rawValue: String) {
+            self.rawValue = rawValue
+        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.singleValueContainer()
-            let rawValue = try container.decode(String.self)
-
-            switch rawValue {
-            case "!hide": self = .exclamationhide
-            case "!no-promote": self = .exclamationnodashpromote
-            case "!warn": self = .exclamationwarn
-            case "!no-unauthenticated": self = .exclamationnodashunauthenticated
-            case "dmca-violation": self = .dmcadashviolation
-            case "doxxing": self = .doxxing
-            case "porn": self = .porn
-            case "sexual": self = .sexual
-            case "nudity": self = .nudity
-            case "nsfl": self = .nsfl
-            case "gore": self = .gore
-            default: self = .custom(rawValue)
-            }
+            rawValue = try container.decode(String.self)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.singleValueContainer()
-            switch self {
-            case .exclamationhide:
-                try container.encode("!hide")
-            case .exclamationnodashpromote:
-                try container.encode("!no-promote")
-            case .exclamationwarn:
-                try container.encode("!warn")
-            case .exclamationnodashunauthenticated:
-                try container.encode("!no-unauthenticated")
-            case .dmcadashviolation:
-                try container.encode("dmca-violation")
-            case .doxxing:
-                try container.encode("doxxing")
-            case .porn:
-                try container.encode("porn")
-            case .sexual:
-                try container.encode("sexual")
-            case .nudity:
-                try container.encode("nudity")
-            case .nsfl:
-                try container.encode("nsfl")
-            case .gore:
-                try container.encode("gore")
-            case let .custom(value):
-                try container.encode(value)
-            }
-        }
-
-        public var stringValue: String {
-            switch self {
-            case .exclamationhide: return "!hide"
-            case .exclamationnodashpromote: return "!no-promote"
-            case .exclamationwarn: return "!warn"
-            case .exclamationnodashunauthenticated: return "!no-unauthenticated"
-            case .dmcadashviolation: return "dmca-violation"
-            case .doxxing: return "doxxing"
-            case .porn: return "porn"
-            case .sexual: return "sexual"
-            case .nudity: return "nudity"
-            case .nsfl: return "nsfl"
-            case .gore: return "gore"
-            case let .custom(value): return value
-            }
+            try container.encode(rawValue)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherEnum = other as? LabelValue else { return false }
-            return stringValue == otherEnum.stringValue
+            guard let otherValue = other as? LabelValue else { return false }
+            return rawValue == otherValue.rawValue
         }
 
-        public static var definedCases: [LabelValue] {
+        // Provide allCases-like functionality
+        public static var predefinedValues: [LabelValue] {
             return [
-                .exclamationhide,
-                .exclamationnodashpromote,
-                .exclamationwarn,
-                .exclamationnodashunauthenticated,
-                .dmcadashviolation,
+                .!hide,
+                .!no - promote,
+                .!warn,
+                .!no - unauthenticated,
+                .dmca - violation,
                 .doxxing,
                 .porn,
                 .sexual,

@@ -3173,51 +3173,36 @@ public struct AppBskyActorDefs {
         }
     }
 
-    public enum MutedWordTarget: Codable, ATProtocolCodable, ATProtocolValue {
+    public struct MutedWordTarget: Codable, ATProtocolCodable, ATProtocolValue {
+        public let rawValue: String
+
+        // Predefined constants
         //
-        case content = "content"
+        public static let content = MutedWordTarget(rawValue: "content")
         //
-        case tag = "tag"
-        // Case for handling custom/unknown values
-        case custom(String)
+        public static let tag = MutedWordTarget(rawValue: "tag")
+
+        public init(rawValue: String) {
+            self.rawValue = rawValue
+        }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.singleValueContainer()
-            let rawValue = try container.decode(String.self)
-
-            switch rawValue {
-            case "content": self = .content
-            case "tag": self = .tag
-            default: self = .custom(rawValue)
-            }
+            rawValue = try container.decode(String.self)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.singleValueContainer()
-            switch self {
-            case .content:
-                try container.encode("content")
-            case .tag:
-                try container.encode("tag")
-            case let .custom(value):
-                try container.encode(value)
-            }
-        }
-
-        public var stringValue: String {
-            switch self {
-            case .content: return "content"
-            case .tag: return "tag"
-            case let .custom(value): return value
-            }
+            try container.encode(rawValue)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherEnum = other as? MutedWordTarget else { return false }
-            return stringValue == otherEnum.stringValue
+            guard let otherValue = other as? MutedWordTarget else { return false }
+            return rawValue == otherValue.rawValue
         }
 
-        public static var definedCases: [MutedWordTarget] {
+        // Provide allCases-like functionality
+        public static var predefinedValues: [MutedWordTarget] {
             return [
                 .content,
                 .tag,
