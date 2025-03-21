@@ -30,7 +30,7 @@
             public static var predefinedValues: [{{ enum_name }}] {
                 return [
                     {%- for value, description in values %}
-                    .{{ value | convertRefToSwift | lowerCamelCase }},
+                    .{{ value | convertRefToSwift | lowerCamelCase | enum_case }},
                     {%- endfor %}
                 ]
             }
