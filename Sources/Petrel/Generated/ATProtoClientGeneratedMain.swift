@@ -730,18 +730,18 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
                 }
             }
 
-            public lazy var unspecced: Unspecced = .init(networkManager: self.networkManager)
+            public lazy var notification: Notification = .init(networkManager: self.networkManager)
 
-            public final class Unspecced: @unchecked Sendable {
+            public final class Notification: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
                 }
             }
 
-            public lazy var notification: Notification = .init(networkManager: self.networkManager)
+            public lazy var unspecced: Unspecced = .init(networkManager: self.networkManager)
 
-            public final class Notification: @unchecked Sendable {
+            public final class Unspecced: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
@@ -766,18 +766,18 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
                 }
             }
 
-            public lazy var actor: Actor = .init(networkManager: self.networkManager)
+            public lazy var richtext: Richtext = .init(networkManager: self.networkManager)
 
-            public final class Actor: @unchecked Sendable {
+            public final class Richtext: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
                 }
             }
 
-            public lazy var richtext: Richtext = .init(networkManager: self.networkManager)
+            public lazy var actor: Actor = .init(networkManager: self.networkManager)
 
-            public final class Richtext: @unchecked Sendable {
+            public final class Actor: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
@@ -901,15 +901,6 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
                 }
             }
 
-            public lazy var lexicon: Lexicon = .init(networkManager: self.networkManager)
-
-            public final class Lexicon: @unchecked Sendable {
-                let networkManager: NetworkManaging
-                init(networkManager: NetworkManaging) {
-                    self.networkManager = networkManager
-                }
-            }
-
             public lazy var sync: Sync = .init(networkManager: self.networkManager)
 
             public final class Sync: @unchecked Sendable {
@@ -922,6 +913,15 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
             public lazy var repo: Repo = .init(networkManager: self.networkManager)
 
             public final class Repo: @unchecked Sendable {
+                let networkManager: NetworkManaging
+                init(networkManager: NetworkManaging) {
+                    self.networkManager = networkManager
+                }
+            }
+
+            public lazy var lexicon: Lexicon = .init(networkManager: self.networkManager)
+
+            public final class Lexicon: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
