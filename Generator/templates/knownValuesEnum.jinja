@@ -1,11 +1,54 @@
-        public enum {{ enum_name }}: String, Codable, ATProtocolCodable, ATProtocolValue, CaseIterable {
+        public enum {{ enum_name }}: Codable, ATProtocolCodable, ATProtocolValue {
             {%- for value, description in values %}
             // {{ description }}
             case {{ value | convertRefToSwift | lowerCamelCase | enum_case }} = "{{ value }}"
             {%- endfor %}
-
+            // Case for handling custom/unknown values
+            case custom(String)
+            
+            public init(from decoder: Decoder) throws {
+                let container = try decoder.singleValueContainer()
+                let rawValue = try container.decode(String.self)
+                
+                switch rawValue {
+                {%- for value, description in values %}
+                case "{{ value }}": self = .{{ value | convertRefToSwift | lowerCamelCase | enum_case }}
+                {%- endfor %}
+                default: self = .custom(rawValue)
+                }
+            }
+            
+            public func encode(to encoder: Encoder) throws {
+                var container = encoder.singleValueContainer()
+                switch self {
+                {%- for value, description in values %}
+                case .{{ value | convertRefToSwift | lowerCamelCase | enum_case }}:
+                    try container.encode("{{ value }}")
+                {%- endfor %}
+                case .custom(let value):
+                    try container.encode(value)
+                }
+            }
+            
+            public var stringValue: String {
+                switch self {
+                {%- for value, description in values %}
+                case .{{ value | convertRefToSwift | lowerCamelCase | enum_case }}: return "{{ value }}"
+                {%- endfor %}
+                case .custom(let value): return value
+                }
+            }
+            
             public func isEqual(to other: any ATProtocolValue) -> Bool {
                 guard let otherEnum = other as? {{ enum_name }} else { return false }
-                return self.rawValue == otherEnum.rawValue
+                return self.stringValue == otherEnum.stringValue
+            }
+            
+            public static var definedCases: [{{ enum_name }}] {
+                return [
+                    {%- for value, description in values %}
+                    .{{ value | convertRefToSwift | lowerCamelCase | enum_case }},
+                    {%- endfor %}
+                ]
             }
         }
