@@ -621,11 +621,11 @@ public enum ComAtprotoLabelDefs {
         // Provide allCases-like functionality
         public static var predefinedValues: [LabelValue] {
             return [
-                .!hide,
-                .!no - promote,
-                .!warn,
-                .!no - unauthenticated,
-                .dmca - violation,
+                .exclamationhide,
+                .exclamationnodashpromote,
+                .exclamationwarn,
+                .exclamationnodashunauthenticated,
+                .dmcadashviolation,
                 .doxxing,
                 .porn,
                 .sexual,

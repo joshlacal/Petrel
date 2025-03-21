@@ -1334,9 +1334,9 @@ public enum AppBskyGraphDefs {
         // Provide allCases-like functionality
         public static var predefinedValues: [ListPurpose] {
             return [
-                .appBskyGraphDefsModlist,
-                .appBskyGraphDefsCuratelist,
-                .appBskyGraphDefsReferencelist,
+                .appbskygraphdefsmodlist,
+                .appbskygraphdefscuratelist,
+                .appbskygraphdefsreferencelist,
             ]
         }
     }

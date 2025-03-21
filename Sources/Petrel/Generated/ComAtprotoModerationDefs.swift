@@ -46,13 +46,13 @@ public enum ComAtprotoModerationDefs {
         // Provide allCases-like functionality
         public static var predefinedValues: [ReasonType] {
             return [
-                .comAtprotoModerationDefsReasonSpam,
-                .comAtprotoModerationDefsReasonViolation,
-                .comAtprotoModerationDefsReasonMisleading,
-                .comAtprotoModerationDefsReasonSexual,
-                .comAtprotoModerationDefsReasonRude,
-                .comAtprotoModerationDefsReasonOther,
-                .comAtprotoModerationDefsReasonAppeal,
+                .comatprotomoderationdefsreasonspam,
+                .comatprotomoderationdefsreasonviolation,
+                .comatprotomoderationdefsreasonmisleading,
+                .comatprotomoderationdefsreasonsexual,
+                .comatprotomoderationdefsreasonrude,
+                .comatprotomoderationdefsreasonother,
+                .comatprotomoderationdefsreasonappeal,
             ]
         }
     }

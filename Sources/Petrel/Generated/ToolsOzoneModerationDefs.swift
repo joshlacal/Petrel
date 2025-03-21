@@ -6994,10 +6994,10 @@ public enum ToolsOzoneModerationDefs {
         // Provide allCases-like functionality
         public static var predefinedValues: [SubjectReviewState] {
             return [
-                .reviewOpen,
-                .reviewEscalated,
-                .reviewClosed,
-                .reviewNone,
+                .reviewopen,
+                .reviewescalated,
+                .reviewclosed,
+                .reviewnone,
             ]
         }
     }
