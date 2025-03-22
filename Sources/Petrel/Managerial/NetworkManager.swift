@@ -269,7 +269,7 @@ actor NetworkManager: NetworkManaging {
     ///   - did: The DID of the target service
     ///   - service: The service identifier
     func setProxyHeader(did: String, service: String) {
-        setHeader(name: "atproto-proxy", value: "\(did):\(service)")
+        setHeader(name: "atproto-proxy", value: "\(did)#\(service)")
     }
 
     /// Sets the atproto-accept-labelers header with proper formatting
