@@ -7,7 +7,7 @@
 
 import Foundation
 
-public protocol ATProtocolCodable: Codable, Sendable {}
+public protocol ATProtocolCodable: Codable, DAGCBORCodable, Sendable {}
 
 public protocol ATProtocolValue: ATProtocolCodable, Equatable, Hashable {
     func isEqual(to other: any ATProtocolValue) -> Bool
