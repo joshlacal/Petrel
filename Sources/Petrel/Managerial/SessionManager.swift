@@ -60,7 +60,7 @@ actor SessionManager: SessionManaging {
         Task {
             for await event in eventStream {
                 switch event {
-                case .activeAccountChanged(let did):
+                case let .activeAccountChanged(did):
                     // When account changes, reset internal state but rely on subsequent checks
                     // or explicit calls to set the correct state. Don't load from keychain here
                     // as it might be stale right after a switch before new state is saved.
@@ -86,10 +86,10 @@ actor SessionManager: SessionManaging {
                         // Check token validity without side effects first
                         let stillValid = await self?.tokenManager.hasValidTokens() ?? false
                         if !stillValid {
-                             LogManager.logInfo("SessionManager - Periodic check found invalid tokens. Setting state to false.")
-                             await self?.setAuthenticatedState(false)
-                             // Optionally publish authenticationRequired here if needed
-                             // await EventBus.shared.publish(.authenticationRequired)
+                            LogManager.logInfo("SessionManager - Periodic check found invalid tokens. Setting state to false.")
+                            await self?.setAuthenticatedState(false)
+                            // Optionally publish authenticationRequired here if needed
+                            // await EventBus.shared.publish(.authenticationRequired)
                         } else {
                             // If tokens seem valid, check if refresh is needed
                             let shouldRefresh = await self?.tokenManager.shouldRefreshTokens() ?? false
@@ -128,26 +128,25 @@ actor SessionManager: SessionManaging {
         if !hasValidTokens {
             // If the internal state thought it was authenticated, log the discrepancy and update internal state.
             if isAuthenticated {
-                 LogManager.logInfo("SessionManager - hasValidSession check found invalid tokens, but internal state was true. Updating internal state.") // Changed logWarning to logInfo
-                 isAuthenticated = false
-                 // Consider if saving 'false' to keychain is needed here or rely on periodic check/logout
+                LogManager.logInfo("SessionManager - hasValidSession check found invalid tokens, but internal state was true. Updating internal state.") // Changed logWarning to logInfo
+                isAuthenticated = false
+                // Consider if saving 'false' to keychain is needed here or rely on periodic check/logout
             }
             return false
         } else {
             // Tokens are valid according to TokenManager.
             // Ensure internal state reflects this, but don't necessarily save to Keychain here.
             if !isAuthenticated {
-                 LogManager.logInfo("SessionManager - hasValidSession check found valid tokens, updating internal state to true.")
-                 isAuthenticated = true
-                 // We *could* save true here, but explicit calls from Auth Service are preferred.
-                 // await setAuthenticatedState(true)
+                LogManager.logInfo("SessionManager - hasValidSession check found valid tokens, updating internal state to true.")
+                isAuthenticated = true
+                // We *could* save true here, but explicit calls from Auth Service are preferred.
+                // await setAuthenticatedState(true)
             }
             return true
         }
         // Note: Removed the explicit setAuthenticatedState calls that overwrite Keychain state.
         // Internal isAuthenticated is updated based on token check for immediate consistency.
     }
-
 
     func isUserLoggedIn() async -> Bool {
         // Simply return the current internal state, which is updated by checks/events
@@ -162,7 +161,7 @@ actor SessionManager: SessionManaging {
 
         do {
             // Use hasValidSession which performs a fresh check if needed
-            let isValid = await self.hasValidSession()
+            let isValid = await hasValidSession()
             if isValid {
                 await EventBus.shared.publish(.sessionInitialized)
                 return
@@ -172,7 +171,7 @@ actor SessionManager: SessionManaging {
             try await middlewareService.validateAndRefreshSession()
 
             // Re-check validity after potential refresh attempt
-            let refreshedSession = await self.hasValidSession()
+            let refreshedSession = await hasValidSession()
             if refreshedSession {
                 await EventBus.shared.publish(.sessionInitialized)
             } else {
@@ -222,10 +221,9 @@ actor SessionManager: SessionManaging {
                 LogManager.logError("SessionManager - Failed to store authentication state in Keychain: \(error)")
             }
         } else {
-             LogManager.logDebug("SessionManager - Authentication state already \(authenticated), no Keychain update needed.")
+            LogManager.logDebug("SessionManager - Authentication state already \(authenticated), no Keychain update needed.")
         }
     }
-
 
     private func loadAuthenticatedState() async -> Bool? {
         do {
@@ -239,7 +237,7 @@ actor SessionManager: SessionManaging {
             LogManager.logDebug("SessionManager - Found empty authentication state in Keychain for namespace \(namespace).")
             return nil // Treat empty data as not found
         } catch KeychainError.itemRetrievalError {
-             LogManager.logDebug("SessionManager - No authentication state found in Keychain for namespace \(await getNamespace()).")
+            LogManager.logDebug("SessionManager - No authentication state found in Keychain for namespace \(await getNamespace()).")
             return nil // Explicitly return nil if not found
         } catch {
             LogManager.logError("SessionManager - Error loading authentication state from Keychain: \(error)")

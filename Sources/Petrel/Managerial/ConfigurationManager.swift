@@ -57,9 +57,9 @@ actor ConfigurationManager: ConfigurationManaging {
 
     /// Starts the background task to listen for events. Call this after initialization.
     func startEventSubscription() async {
-         LogManager.logDebug("ConfigurationManager - Starting event subscription")
-         await subscribeToEvents()
-     }
+        LogManager.logDebug("ConfigurationManager - Starting event subscription")
+        await subscribeToEvents()
+    }
 
     // MARK: - Event Subscription
 
@@ -76,8 +76,8 @@ actor ConfigurationManager: ConfigurationManaging {
                 // as long as the actor itself manages the task lifecycle (e.g., cancellation on deinit).
                 // However, direct await calls on self are fine within the actor's context.
                 switch event {
-            case .activeAccountChanged:
-                // Reload settings when active account changes
+                case .activeAccountChanged:
+                    // Reload settings when active account changes
                     await self.loadSettings()
                 default:
                     break

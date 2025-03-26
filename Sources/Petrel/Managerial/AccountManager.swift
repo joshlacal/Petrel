@@ -75,7 +75,7 @@ actor AccountManager: AccountManaging {
     private let accountDataKeychainPrefix = "accountData." // Prefix for storing individual account data
 
     // MARK: - Initialization
-    
+
     init() async {
         LogManager.logDebug(">>> AccountManager.init STARTING")
         await loadAccounts()
@@ -83,7 +83,7 @@ actor AccountManager: AccountManaging {
     }
 
     // MARK: - Private Methods
-    
+
     private func loadAccounts() async {
         LogManager.logDebug(">>> AccountManager.loadAccounts STARTING")
         do {
