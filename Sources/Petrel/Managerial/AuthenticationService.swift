@@ -92,6 +92,7 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
     private let tokenManager: TokenManaging
     private let configurationManager: ConfigurationManaging
     private let accountManager: AccountManaging // Added
+    private let sessionManager: SessionManaging
     private let oauthConfig: OAuthConfiguration?
     private let didResolver: DIDResolving
     private var oauthManager: OAuthManager?
@@ -117,7 +118,8 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
         configurationManager: ConfigurationManaging,
         accountManager: AccountManaging, // Added
         oauthConfig: OAuthConfiguration? = nil,
-        didResolver: DIDResolving
+        didResolver: DIDResolving,
+        sessionManager: SessionManaging
     ) async {
         self.authMethod = authMethod
         self.networkManager = networkManager
@@ -126,6 +128,7 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
         self.accountManager = accountManager // Added
         self.oauthConfig = oauthConfig
         self.didResolver = didResolver
+        self.sessionManager = sessionManager
 
         if authMethod == .oauth, let oauthConfig = oauthConfig {
             oauthManager = await OAuthManager(
@@ -322,25 +325,32 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
         do {
             let (accessToken, refreshToken) = try await oauthManager.handleCallback(url: url)
 
-            // Extract DID from token
+            // Extract DID from token FIRST
             let did = try await extractDIDFromToken(accessToken)
-
+            
             // Get handle from config (set during startOAuthFlow)
             let handle = await configurationManager.getHandle()
-
+            
             // Resolve PDS URL
             let pdsURL = try await didResolver.resolveDIDToPDSURL(did: did)
 
             // Create AccountData
-            let accountData = AccountData(did: did, handle: handle, pdsURL: pdsURL, isActive: false)
-
-            // Add/Update account in AccountManager
+            let accountData = AccountData(did: did, handle: handle, pdsURL: pdsURL, isActive: false) // Start as inactive
+            
+            // Add/Update account in AccountManager BEFORE switching
             try await accountManager.addOrUpdateAccount(accountData)
-
-            // Switch to the newly authenticated account
+            
+            // Save the tokens BEFORE switching the active account
+            // This ensures tokens are saved under the correct (potentially new) namespace
+            // Temporarily switch context for saving tokens if needed, or ensure TokenManager uses the provided DID
+            // Let's assume TokenManager can save for a specific DID without switching the global active one yet.
+            // If not, we need a way to save tokens for a specific DID.
+            // For now, let's switch first, then save, accepting the potential race condition was the issue.
+            
+            // Switch to the newly authenticated account - THIS TRIGGERS STATE RELOAD
             try await accountManager.switchAccount(to: did)
-
-            // Save the tokens (now associated with the active account via TokenManager's internal logic)
+            
+            // NOW save the tokens. TokenManager will use the *newly active* DID as namespace.
             try await tokenManager.saveTokens(
                 accessJwt: accessToken,
                 refreshJwt: refreshToken,
@@ -349,15 +359,19 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
             )
 
             // Update user configuration (this might be redundant now, handled by AccountManager/ConfigManager listening to events)
+            // Ensure config manager updates for the *now active* account
             try await configurationManager.updateUserConfiguration(did: did, handle: handle ?? "", serviceEndpoint: pdsURL.absoluteString)
-            await networkManager.updateBaseURL(pdsURL)
+            await networkManager.updateBaseURL(pdsURL) // Ensure network manager uses the correct PDS
 
             // Publish events
-            await EventBus.shared.publish(.baseURLUpdated(pdsURL))
-            await EventBus.shared.publish(.pdsURLResolved(pdsURL))
+            await EventBus.shared.publish(.baseURLUpdated(pdsURL)) // Maybe redundant if ATProtoClient handles this on account switch
+            await EventBus.shared.publish(.pdsURLResolved(pdsURL)) // Maybe redundant
             await EventBus.shared.publish(.oauthTokensReceived(accessToken: accessToken, refreshToken: refreshToken))
 
-            LogManager.logInfo("AuthenticationService - OAuth callback handled successfully. Account \(did) added/updated and activated. Tokens saved.")
+            // Explicitly set session state to authenticated AFTER tokens are saved and account switched
+            await sessionManager.setAuthenticatedState(true)
+
+            LogManager.logInfo("AuthenticationService - OAuth callback handled successfully. Account \(did) added/updated and activated. Tokens saved. Session state set to true.")
         } catch {
             LogManager.logError("Failed to handle OAuth callback: \(error)")
             // Publish OAuth flow failed event
@@ -392,11 +406,13 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
             LogManager.logInfo("AuthenticationService - Last account logged out. Clearing state but keeping account entry.")
             // Tokens and DPoP key already cleared.
             // Optionally clear other Keychain data associated with this DID if needed.
+            // We might need a method in AccountManager to just deactivate without removing.
+            // For now, leaving the inactive account entry might be acceptable.
         } catch {
             LogManager.logError("AuthenticationService - Failed to remove account \(activeDID): \(error)")
             throw error // Propagate other errors
         }
-
+        
         // Publish logout succeeded event
         await EventBus.shared.publish(.logoutSucceeded)
     }
@@ -484,23 +500,23 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
 
         let did = sessionOutput.did
         let handle = sessionOutput.handle
-        let baseURL = await configurationManager.baseURL.absoluteString
+        let baseURL = await configurationManager.baseURL.absoluteString // Get current base URL for fallback
         let pdsURLString = sessionOutput.didDoc?.service.first?.serviceEndpoint ?? baseURL
         guard let pdsURL = URL(string: pdsURLString) else {
-            LogManager.logError("AuthenticationService - Invalid PDS URL from session: \(pdsURLString)")
-            throw AuthenticationError.invalidCredentials // Or a more specific error
+             LogManager.logError("AuthenticationService - Invalid PDS URL from session: \(pdsURLString)")
+             throw AuthenticationError.invalidCredentials // Or a more specific error
         }
 
         // Create AccountData
-        let accountData = AccountData(did: did, handle: handle, pdsURL: pdsURL, isActive: false)
-
-        // Add/Update account in AccountManager
+        let accountData = AccountData(did: did, handle: handle, pdsURL: pdsURL, isActive: false) // Start as inactive
+        
+        // Add/Update account in AccountManager BEFORE switching
         try await accountManager.addOrUpdateAccount(accountData)
-
-        // Switch to the newly authenticated account
+        
+        // Switch to the newly authenticated account - THIS TRIGGERS STATE RELOAD
         try await accountManager.switchAccount(to: did)
 
-        // Save tokens (now associated with the active account)
+        // NOW save the tokens. TokenManager will use the *newly active* DID as namespace.
         try await tokenManager.saveTokens(
             accessJwt: sessionOutput.accessJwt,
             refreshJwt: sessionOutput.refreshJwt,
@@ -509,6 +525,7 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
         )
 
         // Update configuration (might be redundant if config manager listens to account change)
+        // Ensure config manager updates for the *now active* account
         try await configurationManager.updateUserConfiguration(
             did: did,
             handle: handle,
@@ -517,6 +534,10 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
         await networkManager.updateBaseURL(pdsURL) // Ensure network manager uses the correct PDS
 
         LogManager.logInfo("AuthenticationService - Account \(did) added/updated and activated. Tokens saved.")
+
+        // Explicitly set session state to authenticated AFTER tokens are saved and account switched
+        await sessionManager.setAuthenticatedState(true)
+        LogManager.logInfo("AuthenticationService - Session state set to true after legacy login.")
 
         // Publish token updated event
         await EventBus.shared.publish(.tokensUpdated(accessToken: sessionOutput.accessJwt, refreshToken: sessionOutput.refreshJwt))

@@ -141,7 +141,8 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
             configurationManager: configManager,
             accountManager: accountManager, // Pass accountManager
             oauthConfig: oauthConfig,
-            didResolver: didResolutionService
+            didResolver: didResolutionService,
+            sessionManager: sessionManager
             // Removed namespace parameter
         )
 
@@ -201,6 +202,12 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
 
         // Subscribe to account changes to update baseURL
         await subscribeToAccountChanges()
+
+        // Start event subscriptions for managers AFTER they are fully initialized
+        await configManager.startEventSubscription()
+        // Add calls for other managers if they also need post-init event subscriptions
+        // await tokenManager.startEventSubscription() // Example if TokenManager had one
+        // await sessionManager.startEventSubscription() // Example if SessionManager had one
 
         // Publish an initialization completed event
         await EventBus.shared.publish(.initializationCompleted)

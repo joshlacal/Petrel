@@ -25,6 +25,7 @@ protocol ConfigurationManaging: Actor {
     func setCurrentAuthorizationServer(_ url: URL) async
     func getCurrentAuthorizationServer() async -> URL?
     func updateHandle(_ handle: String) async
+    func startEventSubscription() async
 }
 
 // MARK: - ConfigurationManager Actor
@@ -45,25 +46,44 @@ actor ConfigurationManager: ConfigurationManaging {
     // MARK: - Initialization
 
     init(baseURL: URL, accountManager: AccountManaging) async {
+        LogManager.logDebug(">>> ConfigurationManager.init STARTING")
         self.accountManager = accountManager
         self.baseURL = baseURL
         LogManager.logDebug("ConfigurationManager initialized with baseURL: \(baseURL)")
         await loadSettings()
-        await subscribeToEvents()
+        // await subscribeToEvents() // Removed from init
+        LogManager.logDebug("<<< ConfigurationManager.init FINISHED")
     }
+
+    /// Starts the background task to listen for events. Call this after initialization.
+    func startEventSubscription() async {
+         LogManager.logDebug("ConfigurationManager - Starting event subscription")
+         await subscribeToEvents()
+     }
 
     // MARK: - Event Subscription
 
     private func subscribeToEvents() async {
+        LogManager.logDebug("ConfigurationManager - Subscribing to EventBus")
         let eventStream = await EventBus.shared.subscribe()
-        for await event in eventStream {
-            switch event {
+        LogManager.logDebug("ConfigurationManager - EventBus stream obtained")
+        // Run the event loop in a detached task so it doesn't block the caller
+        Task.detached {
+            LogManager.logDebug("ConfigurationManager - Event loop task started")
+            for await event in eventStream {
+                LogManager.logDebug("ConfigurationManager - Received event: \(event)")
+                // Use a weak self reference inside the task if needed, although for actors it might be less critical
+                // as long as the actor itself manages the task lifecycle (e.g., cancellation on deinit).
+                // However, direct await calls on self are fine within the actor's context.
+                switch event {
             case .activeAccountChanged:
                 // Reload settings when active account changes
-                await loadSettings()
-            default:
-                break
+                    await self.loadSettings()
+                default:
+                    break
+                }
             }
+            LogManager.logDebug("ConfigurationManager - Event loop task finished")
         }
     }
 
@@ -79,10 +99,12 @@ actor ConfigurationManager: ConfigurationManaging {
     }
 
     private func loadSettings() async {
+        LogManager.logDebug(">>> ConfigurationManager.loadSettings STARTING")
         LogManager.logDebug("ConfigurationManager - Loading settings from Keychain")
 
         // Get the namespace key
-        let namespace = await key("")
+        let namespace = await key("") // This itself is an async call
+        LogManager.logDebug("ConfigurationManager - Determined namespace for loadSettings: \(namespace)")
 
         // Try to load protected resource metadata first
         if let metadata = await getProtectedResourceMetadata() {
@@ -125,10 +147,13 @@ actor ConfigurationManager: ConfigurationManaging {
 
         // Load metadata objects
         await loadMetadata()
+        LogManager.logDebug("<<< ConfigurationManager.loadSettings FINISHED")
     }
 
     private func loadMetadata() async {
+        LogManager.logDebug(">>> ConfigurationManager.loadMetadata STARTING")
         let namespace = await key("")
+        LogManager.logDebug("ConfigurationManager - Determined namespace for loadMetadata: \(namespace)")
         // Load protected resource metadata
         do {
             let data = try KeychainManager.retrieve(key: await key("protectedResourceMetadata"), namespace: namespace)
@@ -146,6 +171,7 @@ actor ConfigurationManager: ConfigurationManaging {
         } catch {
             LogManager.logDebug("ConfigurationManager - No AuthorizationServerMetadata found in Keychain: \(error)")
         }
+        LogManager.logDebug("<<< ConfigurationManager.loadMetadata FINISHED")
     }
 
     // MARK: - Configuration Methods
