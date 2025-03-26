@@ -79,25 +79,23 @@ actor AccountManager: AccountManaging {
   private let activeAccountKeychainKey = "activeAccountDID"  // Key for storing the active DID
   private let accountDataKeychainPrefix = "accountData."  // Prefix for storing individual account data
 
-  // MARK: - Initialization
+    // MARK: - Initialization
+    
+    init() async {
+        LogManager.logDebug(">>> AccountManager.init STARTING")
+        await loadAccounts()
+        LogManager.logDebug("<<< AccountManager.init FINISHED")
+    }
 
-  init() async {
-    LogManager.logDebug(">>> AccountManager.init STARTING")
-    await loadAccounts()
-    LogManager.logDebug("<<< AccountManager.init FINISHED")
-  }
-
-  // MARK: - Private Methods
-
-  private func loadAccounts() async {
-    LogManager.logDebug(">>> AccountManager.loadAccounts STARTING")
-    do {
-      // Load the list of managed accounts
-      LogManager.logDebug("AccountManager - Attempting to load managed accounts list...")
-      if let accountsData = try? KeychainManager.retrieve(
-        key: accountsKeychainKey, namespace: "accounts")
-      {
-        let dids = try JSONDecoder().decode([String].self, from: accountsData)
+    // MARK: - Private Methods
+    
+    private func loadAccounts() async {
+        LogManager.logDebug(">>> AccountManager.loadAccounts STARTING")
+        do {
+            // Load the list of managed accounts
+            LogManager.logDebug("AccountManager - Attempting to load managed accounts list...")
+            if let accountsData = try? KeychainManager.retrieve(key: accountsKeychainKey, namespace: "accounts") {
+                let dids = try JSONDecoder().decode([String].self, from: accountsData)
 
         // Load each account's data
         for did in dids {
@@ -119,12 +117,12 @@ actor AccountManager: AccountManaging {
         activeAccountDID = activeDid
       }
 
-      LogManager.logInfo("AccountManager - Loaded \(accounts.count) accounts")
-    } catch {
-      LogManager.logError("AccountManager - Failed to load accounts: \(error)")
+            LogManager.logInfo("AccountManager - Loaded \(accounts.count) accounts")
+        } catch {
+            LogManager.logError("AccountManager - Failed to load accounts: \(error)")
+        }
+        LogManager.logDebug("<<< AccountManager.loadAccounts FINISHED")
     }
-    LogManager.logDebug("<<< AccountManager.loadAccounts FINISHED")
-  }
 
   private func saveManagedAccountList() async throws {
     let dids = Array(accounts.keys)

@@ -417,14 +417,26 @@ public actor TokenManager: TokenManaging {
                 LogManager.logDebug("TokenManager - Fetched refreshJwt from Keychain: \(savedRefreshToken.prefix(30))...")
                 return savedRefreshToken
             } else {
-                LogManager.logError("TokenManager - Failed to decode refreshJwt from Keychain data.")
-                return nil
+                LogManager.logDebug("TokenManager - Failed to fetch refreshJwt from Keychain")
             }
-        } catch KeychainError.itemRetrievalError {
-            LogManager.logDebug("TokenManager - No refreshJwt found in Keychain for namespace \(namespace).")
+        case .none:
             return nil
+        }
+        LogManager.logDebug("TokenManager - Fetched refreshJwt: \(token?.prefix(30) ?? "nil")")
+        return token
+    }
+
+    public func decodeJWT(token: String) async -> OAuthClaims? {
+        do {
+            let jwt = try JWT(jwtString: token)
+            let claims = try JSONDecoder().decode(OAuthClaims.self, from: jwt.payload)
+            LogManager.logDebug("TokenManager - Decoded JWT claims: \(claims)")
+            LogManager.logDebug(
+                "TokenManager - Token expiration: \(claims.exp?.description ?? "nil"), Current time: \(Date().description)"
+            )
+            return claims
         } catch {
-            LogManager.logError("TokenManager - Error retrieving refreshJwt from Keychain: \(error)")
+            LogManager.logError("TokenManager - Failed to decode JWT: \(error)")
             return nil
         }
     }
