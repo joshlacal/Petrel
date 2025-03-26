@@ -222,6 +222,12 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
             for await event in eventStream {
                 if case let .activeAccountChanged(did) = event {
                     LogManager.logInfo("ATProtoClient - Active account changed to \(did)")
+                    
+                    guard let did = did else {
+                        LogManager.logError("ATProtoClient - Active account changed to nil DID.")
+                        return
+                    }
+                    
                     if let account = await accountManager.getAccount(did: did),
                        let newPDSURL = account.pdsURL
                     {

@@ -350,7 +350,13 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
             // Switch to the newly authenticated account - THIS TRIGGERS STATE RELOAD
             try await accountManager.switchAccount(to: did)
 
-            // NOW save the tokens. TokenManager will use the *newly active* DID as namespace.
+            // --- Synchronization Point Needed ---
+            // Ideally, we'd await confirmation that TokenManager processed the account change.
+            // For now, we proceed, hoping the event propagation is fast enough.
+            // If issues persist, consider adding an explicit delay or modifying TokenManager.
+            // try await Task.sleep(nanoseconds: 100_000_000) // Example: 0.1s delay (use cautiously)
+
+            // NOW save the tokens. TokenManager should use the *newly active* DID as namespace.
             try await tokenManager.saveTokens(
                 accessJwt: accessToken,
                 refreshJwt: refreshToken,
@@ -403,13 +409,12 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
             LogManager.logInfo("AuthenticationService - Account \(activeDID) removed.")
         } catch AccountManagerError.cannotRemoveLastAccount {
             // If it's the last account, don't remove it, just clear its state
-            LogManager.logInfo("AuthenticationService - Last account logged out. Clearing state but keeping account entry.")
-            // Tokens and DPoP key already cleared.
-            // Optionally clear other Keychain data associated with this DID if needed.
-            // We might need a method in AccountManager to just deactivate without removing.
-            // For now, leaving the inactive account entry might be acceptable.
+            LogManager.logInfo("AuthenticationService - Last account logged out. Deactivating account state.")
+            // Tokens and DPoP key already cleared above.
+            // Explicitly deactivate the account in AccountManager to clear the active DID state.
+            try await accountManager.deactivateAccount(did: activeDID)
         } catch {
-            LogManager.logError("AuthenticationService - Failed to remove account \(activeDID): \(error)")
+            LogManager.logError("AuthenticationService - Failed during logout for account \(activeDID): \(error)")
             throw error // Propagate other errors
         }
 
