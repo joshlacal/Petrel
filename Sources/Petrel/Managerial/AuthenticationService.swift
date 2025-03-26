@@ -71,12 +71,12 @@ protocol AuthenticationServicing: Actor, TokenRefreshing, AuthenticationProvider
     /// This is typically used during logout or when the DPoP key needs to be regenerated.
     func deleteDPoPKey() async
 
-    /// Checks whether authentication tokens exist.
+    /// Checks whether authentication tokens exist for the active account.
     ///
     /// - Returns: `true` if both access and refresh tokens exist; otherwise, `false`.
     func tokensExist() async -> Bool
 
-    /// Refreshes the authentication token if needed.
+    /// Refreshes the authentication token if needed for the active account.
     ///
     /// - Returns: `true` if the token was refreshed successfully; otherwise, `false`.
     /// - Throws: `AuthenticationError` if the token refresh process fails.
@@ -91,6 +91,7 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
     private let networkManager: NetworkManaging
     private let tokenManager: TokenManaging
     private let configurationManager: ConfigurationManaging
+    private let accountManager: AccountManaging // Added
     private let oauthConfig: OAuthConfiguration?
     private let didResolver: DIDResolving
     private var oauthManager: OAuthManager?
@@ -106,22 +107,23 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
     ///   - networkManager: The network manager for performing requests.
     ///   - tokenManager: The token manager for handling token storage and retrieval.
     ///   - configurationManager: The configuration manager for user settings.
+    ///   - accountManager: The account manager for handling multiple accounts.
     ///   - oauthConfig: The OAuth configuration (required for OAuth authentication).
     ///   - didResolver: The DID resolver for resolving decentralized identifiers.
-    ///   - namespace: The namespace used for token storage and other services.
     init(
         authMethod: AuthMethod,
         networkManager: NetworkManaging,
         tokenManager: TokenManaging,
         configurationManager: ConfigurationManaging,
+        accountManager: AccountManaging, // Added
         oauthConfig: OAuthConfiguration? = nil,
-        didResolver: DIDResolving,
-        namespace: String
+        didResolver: DIDResolving
     ) async {
         self.authMethod = authMethod
         self.networkManager = networkManager
         self.tokenManager = tokenManager
         self.configurationManager = configurationManager
+        self.accountManager = accountManager // Added
         self.oauthConfig = oauthConfig
         self.didResolver = didResolver
 
@@ -132,7 +134,7 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
                 configurationManager: configurationManager,
                 tokenManager: tokenManager,
                 didResolver: didResolver,
-                namespace: namespace
+                accountManager: accountManager // Pass AccountManager
             )
         }
 
@@ -162,12 +164,6 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
                         await EventBus.shared.publish(.authenticationRequired)
                     }
                 }
-//
-//            case .authenticationRequired:
-//                // Handle authentication required event if needed
-//                LogManager.logInfo("AuthenticationService - Received authenticationRequired event.")
-//                // Possibly initiate re-authentication or notify UI
-//
             default:
                 break
             }
@@ -326,34 +322,42 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
         do {
             let (accessToken, refreshToken) = try await oauthManager.handleCallback(url: url)
 
-            // Save the tokens
+            // Extract DID from token
+            let did = try await extractDIDFromToken(accessToken)
+            
+            // Get handle from config (set during startOAuthFlow)
+            let handle = await configurationManager.getHandle()
+            
+            // Resolve PDS URL
+            let pdsURL = try await didResolver.resolveDIDToPDSURL(did: did)
+
+            // Create AccountData
+            let accountData = AccountData(did: did, handle: handle, pdsURL: pdsURL, isActive: false)
+            
+            // Add/Update account in AccountManager
+            try await accountManager.addOrUpdateAccount(accountData)
+            
+            // Switch to the newly authenticated account
+            try await accountManager.switchAccount(to: did)
+            
+            // Save the tokens (now associated with the active account via TokenManager's internal logic)
             try await tokenManager.saveTokens(
                 accessJwt: accessToken,
                 refreshJwt: refreshToken,
                 type: .dpop,
-                domain: configurationManager.baseURL.host // Get domain from current base URL
+                domain: pdsURL.host // Use PDS URL host as domain
             )
 
-            // Update user configuration
-            if let did = try? await extractDIDFromToken(accessToken), let handle = await configurationManager.getHandle() {
-                let pdsURL = try await didResolver.resolveDIDToPDSURL(did: did)
-                try await configurationManager.updateUserConfiguration(did: did, handle: handle, serviceEndpoint: pdsURL.absoluteString)
+            // Update user configuration (this might be redundant now, handled by AccountManager/ConfigManager listening to events)
+            try await configurationManager.updateUserConfiguration(did: did, handle: handle ?? "", serviceEndpoint: pdsURL.absoluteString)
+            await networkManager.updateBaseURL(pdsURL)
 
-                // Store the PDS URL in the ConfigurationManager
-                await configurationManager.updatePDSURL(pdsURL)
-                await networkManager.updateBaseURL(pdsURL)
-
-                // Update the NetworkManager's base URL to the PDS URL
-                await EventBus.shared.publish(.baseURLUpdated(pdsURL))
-
-                // Publish PDS URL resolved event
-                await EventBus.shared.publish(.pdsURLResolved(pdsURL))
-            }
-
-            // Publish OAuth tokens received event
+            // Publish events
+            await EventBus.shared.publish(.baseURLUpdated(pdsURL))
+            await EventBus.shared.publish(.pdsURLResolved(pdsURL))
             await EventBus.shared.publish(.oauthTokensReceived(accessToken: accessToken, refreshToken: refreshToken))
 
-            LogManager.logInfo("AuthenticationService - OAuth callback handled successfully. Tokens saved and user configuration updated.")
+            LogManager.logInfo("AuthenticationService - OAuth callback handled successfully. Account \(did) added/updated and activated. Tokens saved.")
         } catch {
             LogManager.logError("Failed to handle OAuth callback: \(error)")
             // Publish OAuth flow failed event
@@ -363,25 +367,43 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
     }
 
     public func logout() async throws {
-        switch authMethod {
-        case .legacy:
-            try await tokenManager.deleteTokens()
-            // Additional logout steps if necessary
-            // Publish logout succeeded event
-            await EventBus.shared.publish(.logoutSucceeded)
-        case .oauth:
-            try await tokenManager.deleteTokens()
-            // Additional OAuth-specific logout steps if necessary
-            // Publish logout succeeded event
-            await EventBus.shared.publish(.logoutSucceeded)
+        guard let activeDID = await accountManager.getActiveAccountDID() else {
+            LogManager.logInfo("AuthenticationService - Logout called but no active account.")
+            return // No active account to log out
         }
+
+        LogManager.logInfo("AuthenticationService - Logging out account: \(activeDID)")
+
+        // Clear tokens for the active account
+        try await tokenManager.deleteTokens()
+
+        // Delete DPoP key if OAuth
+        if authMethod == .oauth {
+            await oauthManager?.deleteDPoPKey()
+        }
+
+        // Remove the account from the manager
+        // This will also trigger a switch to another account if available
+        do {
+            try await accountManager.removeAccount(did: activeDID)
+            LogManager.logInfo("AuthenticationService - Account \(activeDID) removed.")
+        } catch AccountManagerError.cannotRemoveLastAccount {
+            // If it's the last account, don't remove it, just clear its state
+            LogManager.logInfo("AuthenticationService - Last account logged out. Clearing state but keeping account entry.")
+            // Tokens and DPoP key already cleared.
+            // Optionally clear other Keychain data associated with this DID if needed.
+        } catch {
+            LogManager.logError("AuthenticationService - Failed to remove account \(activeDID): \(error)")
+            throw error // Propagate other errors
+        }
+        
+        // Publish logout succeeded event
+        await EventBus.shared.publish(.logoutSucceeded)
     }
 
     func tokensExist() async -> Bool {
-        let accessToken = await tokenManager.fetchAccessToken()
-        let refreshToken = await tokenManager.fetchRefreshToken()
-
-        return accessToken != nil && refreshToken != nil
+        // Relies on TokenManager which is now account-aware
+        return await tokenManager.hasAnyTokens()
     }
 
     func initializeOAuthState() async throws {
@@ -391,7 +413,7 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
     }
 
     func refreshTokens() async throws -> Bool {
-        // If tokens don't exist, return false (no refresh needed/possible)
+        // If tokens don't exist for the active account, return false
         guard await tokensExist() else {
             return false
         }
@@ -426,7 +448,7 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
     ///   - identifier: The user's identifier (e.g., handle).
     ///   - password: The user's password.
     private func createSession(identifier: String, password: String) async throws {
-        LogManager.logInfo("AuthenticationService - Starting session creation for identifier: \(identifier)")
+        LogManager.logInfo("AuthenticationService - Starting legacy session creation for identifier: \(identifier)")
 
         let endpoint = "/com.atproto.server.createSession"
         let body = try JSONEncoder().encode(
@@ -434,6 +456,8 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
         )
         let headers = ["Content-Type": "application/json"]
 
+        // Use a temporary base URL for the initial login request if needed
+        // Or ensure NetworkManager uses the correct one before this call
         let request = try await networkManager.createURLRequest(
             endpoint: endpoint,
             method: "POST",
@@ -458,23 +482,40 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
         )
         LogManager.logInfo("AuthenticationService - Session created successfully. Tokens received.")
 
-        // Save tokens with TokenType as `.bearer`
+        let did = sessionOutput.did
+        let handle = sessionOutput.handle
+        let pdsURLString = sessionOutput.didDoc?.service.first?.serviceEndpoint ?? await configurationManager.baseURL.absoluteString
+        guard let pdsURL = URL(string: pdsURLString) else {
+             LogManager.logError("AuthenticationService - Invalid PDS URL from session: \(pdsURLString)")
+             throw AuthenticationError.invalidCredentials // Or a more specific error
+        }
+
+        // Create AccountData
+        let accountData = AccountData(did: did, handle: handle, pdsURL: pdsURL, isActive: false)
+        
+        // Add/Update account in AccountManager
+        try await accountManager.addOrUpdateAccount(accountData)
+        
+        // Switch to the newly authenticated account
+        try await accountManager.switchAccount(to: did)
+
+        // Save tokens (now associated with the active account)
         try await tokenManager.saveTokens(
             accessJwt: sessionOutput.accessJwt,
             refreshJwt: sessionOutput.refreshJwt,
             type: .bearer,
-            domain: configurationManager.baseURL.host
+            domain: pdsURL.host // Use PDS URL host as domain
         )
 
-        let baseURL = await configurationManager.baseURL.absoluteString
-        // Update user configuration
+        // Update configuration (might be redundant if config manager listens to account change)
         try await configurationManager.updateUserConfiguration(
-            did: sessionOutput.did,
-            handle: sessionOutput.handle,
-            serviceEndpoint: sessionOutput.didDoc?.service.first?.serviceEndpoint ?? baseURL
+            did: did,
+            handle: handle,
+            serviceEndpoint: pdsURL.absoluteString
         )
+        await networkManager.updateBaseURL(pdsURL) // Ensure network manager uses the correct PDS
 
-        LogManager.logInfo("AuthenticationService - Tokens saved and user configuration updated successfully.")
+        LogManager.logInfo("AuthenticationService - Account \(did) added/updated and activated. Tokens saved.")
 
         // Publish token updated event
         await EventBus.shared.publish(.tokensUpdated(accessToken: sessionOutput.accessJwt, refreshToken: sessionOutput.refreshJwt))
@@ -485,9 +526,9 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
     /// - Returns: A boolean indicating whether the token was refreshed.
     /// - Throws: `AuthenticationError` if token refresh fails.
     private func refreshTokenIfNeededLegacy() async throws -> Bool {
-        LogManager.logInfo("AuthenticationService - Checking if token refresh is needed.")
+        LogManager.logInfo("AuthenticationService - Checking if legacy token refresh is needed.")
 
-        // Fetch tokens from token manager
+        // Fetch tokens for the active account
         guard let refreshToken = await tokenManager.fetchRefreshToken() else {
             LogManager.logError("AuthenticationService - Refresh token is missing.")
             throw AuthenticationError.tokenMissingOrCorrupted
@@ -539,18 +580,18 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
     /// - Returns: A boolean indicating whether the token refresh was successful.
     /// - Throws: An error if the token refresh fails.
     private func attemptLegacyTokenRefresh(refreshToken: String) async throws -> Bool {
-        LogManager.logInfo("AuthenticationService - Attempting to refresh tokens.")
+        LogManager.logInfo("AuthenticationService - Attempting to refresh legacy tokens.")
 
         // Perform token refresh via NetworkManager
         let success = try await networkManager.refreshLegacySessionToken(
             refreshToken: refreshToken,
-            tokenManager: tokenManager
+            tokenManager: tokenManager // TokenManager will save tokens for the active account
         )
 
         if success {
-            LogManager.logInfo("AuthenticationService - Tokens refreshed successfully.")
+            LogManager.logInfo("AuthenticationService - Legacy tokens refreshed successfully.")
 
-            // Fetch updated tokens
+            // Fetch updated tokens (for the active account)
             if let newAccessToken = await tokenManager.fetchAccessToken(),
                let newRefreshToken = await tokenManager.fetchRefreshToken()
             {
@@ -560,7 +601,7 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
 
             return true
         } else {
-            LogManager.logError("AuthenticationService - Token refresh failed.")
+            LogManager.logError("AuthenticationService - Legacy token refresh failed.")
             throw AuthenticationError.tokenRefreshFailed
         }
     }
@@ -569,7 +610,7 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
 
     private func refreshOAuthTokens() async throws -> Bool {
         guard let oauthManager = oauthManager,
-              let refreshToken = await tokenManager.fetchRefreshToken()
+              let refreshToken = await tokenManager.fetchRefreshToken() // Fetches for active account
         else {
             LogManager.logError("AuthenticationService - Unable to refresh OAuth tokens: missing OAuth manager or refresh token")
             throw AuthenticationError.tokenMissingOrCorrupted
@@ -579,10 +620,10 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
             LogManager.logInfo("AuthenticationService - Attempting to refresh OAuth tokens")
             let (newAccessToken, newRefreshToken) = try await oauthManager.refreshToken(refreshToken: refreshToken)
 
-            // Get the domain from the current base URL
+            // Get the domain from the current base URL (should be PDS URL for the active account)
             let domain = await configurationManager.baseURL.host
 
-            // Pass the domain when saving tokens
+            // Save tokens (for the active account)
             try await tokenManager.saveTokens(
                 accessJwt: newAccessToken,
                 refreshJwt: newRefreshToken,

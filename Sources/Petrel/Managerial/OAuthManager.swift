@@ -183,14 +183,14 @@ actor OAuthManager {
     private let configurationManager: ConfigurationManaging
     private let tokenManager: TokenManaging
     private let didResolver: DIDResolving
+    private let accountManager: AccountManaging
     private var authorizationServerMetadata: AuthorizationServerMetadata?
     private var protectedResourceMetadata: ProtectedResourceMetadata?
     private var dpopKeyPair: P256.Signing.PrivateKey?
     private let oauthConfig: OAuthConfiguration
     private var lastKeyRegenerationTime: Date
     private var dpopNonces: [String: String] = [:] // Dictionary to store nonces for different domains
-    private let namespace: String
-    private let dpopKeyTag: String
+    private let dpopKeyTag = "dpopkeypair"
 
     public init(
         oauthConfig: OAuthConfiguration,
@@ -198,15 +198,14 @@ actor OAuthManager {
         configurationManager: ConfigurationManaging,
         tokenManager: TokenManaging,
         didResolver: DIDResolving,
-        namespace: String
+        accountManager: AccountManaging
     ) async {
         self.oauthConfig = oauthConfig
         self.networkManager = networkManager
         self.configurationManager = configurationManager
         self.tokenManager = tokenManager
         self.didResolver = didResolver
-        self.namespace = namespace
-        dpopKeyTag = "\(namespace).dpopkeypair"
+        self.accountManager = accountManager
 
         // Initialize stored properties
         lastKeyRegenerationTime = Date()
@@ -215,20 +214,49 @@ actor OAuthManager {
         authorizationServerMetadata = await configurationManager.getAuthorizationServerMetadata()
         protectedResourceMetadata = await configurationManager.getProtectedResourceMetadata()
 
+        await subscribeToEvents()
+        await loadInitialDPoPKey()
+    }
+
+    private func getNamespace() async -> String {
+        if let did = await accountManager.getActiveAccountDID() {
+            return did
+        }
+        return "global"
+    }
+
+    private func subscribeToEvents() async {
+        let eventStream = await EventBus.shared.subscribe()
+        Task {
+            for await event in eventStream {
+                switch event {
+                case .activeAccountChanged:
+                    // Reload DPoP key and clear nonces when active account changes
+                    await loadInitialDPoPKey()
+                    dpopNonces.removeAll()
+                default:
+                    break
+                }
+            }
+        }
+    }
+
+    private func loadInitialDPoPKey() async {
         // Attempt to load existing DPoP key pair
         do {
+            let namespace = await getNamespace()
             dpopKeyPair = try KeychainManager.retrieveDPoPKey(namespace: namespace)
-            LogManager.logInfo("Loaded existing DPoP key pair from keychain.")
+            LogManager.logInfo("Loaded existing DPoP key pair from keychain for namespace: \(namespace)")
         } catch {
             // Generate new DPoP key pair if not found
             dpopKeyPair = P256.Signing.PrivateKey()
             lastKeyRegenerationTime = Date()
             do {
+                let namespace = await getNamespace()
                 try KeychainManager.storeDPoPKey(dpopKeyPair!, namespace: namespace)
-                LogManager.logInfo("Generated new DPoP key pair and stored in keychain.")
+                LogManager.logInfo("Generated new DPoP key pair and stored in keychain for namespace: \(namespace)")
             } catch {
                 LogManager.logError("Failed to store DPoP key pair: \(error)")
-                // Handle error as appropriate
             }
         }
 
@@ -288,10 +316,10 @@ actor OAuthManager {
     // MARK: - OAuth Flow Methods
 
     func startOAuthFlow(identifier: String) async throws -> URL {
-        resetOAuthFlow()
+        await resetOAuthFlow()
 
         // Step 1: Generate or retrieve DPoP key pair
-        let privateKey = try getOrCreateDPoPKeyPair()
+        let privateKey = try await getOrCreateDPoPKeyPair()
 
         // Step 2: Resolve the handle to DID
         let did = try await didResolver.resolveHandleToDID(handle: identifier)
@@ -424,7 +452,9 @@ actor OAuthManager {
                         case "invalid_dpop_proof":
                             // Clear stale state and retry
                             LogManager.logInfo("Invalid DPoP proof, regenerating state")
-                            regenerateDPoPKeyPair()
+                            await regenerateDPoPKeyPair()
+                            // After regenerating key pair, also re-initialize DPoP state
+                            try await initializeDPoPState()
                             dpopNonces.removeAll()
                             attempt += 1
                             continue
@@ -451,10 +481,10 @@ actor OAuthManager {
         throw OAuthError.maxRetriesReached
     }
 
-    func regenerateDPoPKeyPair() {
+    func regenerateDPoPKeyPair() async {
         do {
             let newKeyPair = P256.Signing.PrivateKey()
-            try KeychainManager.storeDPoPKey(newKeyPair, namespace: namespace)
+            try KeychainManager.storeDPoPKey(newKeyPair, namespace: await getNamespace())
             dpopKeyPair = newKeyPair
             dpopNonces = [:] // Clear all nonces when generating a new key pair
             LogManager.logInfo("Regenerated DPoP key pair and cleared all nonces")
@@ -463,12 +493,13 @@ actor OAuthManager {
         }
     }
 
-    private func resetOAuthFlow() {
-        regenerateDPoPKeyPair()
+    private func resetOAuthFlow() async {
+        await regenerateDPoPKeyPair()
     }
 
-    func deleteDPoPKey() {
+    func deleteDPoPKey() async {
         do {
+            let namespace = await getNamespace()
             // Delete the DPoP key
             try KeychainManager.deleteDPoPKey(namespace: namespace)
 
@@ -480,10 +511,7 @@ actor OAuthManager {
             dpopNonces = [:]
 
             LogManager.logInfo("Deleted DPoP key pair, bindings, and cleared nonces")
-            // Optionally publish an event
-            Task {
-                await EventBus.shared.publish(.customEvent(name: "DPoPKeyDeleted", data: "DPoP key pair and bindings deleted and nonces cleared"))
-            }
+            await EventBus.shared.publish(.customEvent(name: "DPoPKeyDeleted", data: "DPoP key pair and bindings deleted and nonces cleared"))
         } catch {
             LogManager.logError("Failed to delete DPoP key or bindings: \(error)")
         }
@@ -876,7 +904,7 @@ actor OAuthManager {
 
     func regenerateDPoPProof() async throws {
         // Regenerate the DPoP key pair
-        regenerateDPoPKeyPair()
+        await regenerateDPoPKeyPair()
 
         // Initialize the DPoP state
         try await initializeDPoPState()
@@ -884,20 +912,20 @@ actor OAuthManager {
         LogManager.logInfo("OAuthManager - DPoP proof regenerated successfully")
     }
 
-    private func getOrCreateDPoPKeyPair() throws -> P256.Signing.PrivateKey {
+    private func getOrCreateDPoPKeyPair() async throws -> P256.Signing.PrivateKey {
         if let existingKeyPair = dpopKeyPair {
             return existingKeyPair
         }
 
         do {
             // Try to retrieve from keychain
-            let storedKey = try KeychainManager.retrieveDPoPKey(namespace: namespace)
+            let storedKey = try KeychainManager.retrieveDPoPKey(namespace: await getNamespace())
             dpopKeyPair = storedKey
             return storedKey
         } catch KeychainError.itemRetrievalError {
             // Generate new key pair if not found
             let newKeyPair = P256.Signing.PrivateKey()
-            try KeychainManager.storeDPoPKey(newKeyPair, namespace: namespace)
+            try KeychainManager.storeDPoPKey(newKeyPair, namespace: await getNamespace())
             dpopKeyPair = newKeyPair
             return newKeyPair
         }

@@ -22,6 +22,10 @@ enum Event: Sendable {
 
     // MARK: - Authentication Events
 
+    /// Indicates that the active account has been changed.
+    /// - Parameter did: The DID of the newly active account.
+    case activeAccountChanged(did: String)
+
     /// Indicates that an authentication process (login) has started.
     case authenticationStarted
 

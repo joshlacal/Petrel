@@ -66,7 +66,8 @@ public enum ClientEnvironment: Sendable {
 public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
     // MARK: - Properties
 
-    private let namespace: String
+    // Removed namespace property
+    // private let namespace: String
 
     public var baseURL: URL
     private var pdsURL: URL?
@@ -77,14 +78,14 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
     private let middlewareService: MiddlewareService
     private let oauthConfig: OAuthConfiguration
     private var authenticationService: AuthenticationService
+    private let accountManager: AccountManaging // Added
 
     private(set) var initState: InitializationState = .uninitialized
-    //    public weak var authDelegate: AuthenticationDelegate?
     private var _authDelegate: AuthenticationDelegate?
 
-    // User-related properties
-    private var did: String?
-    private var handle: String?
+    // User-related properties (now primarily managed by AccountManager/ConfigManager)
+    // private var did: String? // Can get from accountManager or configManager
+    // private var handle: String? // Can get from accountManager or configManager
 
     private var authorizationServerURL: URL
 
@@ -99,35 +100,38 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
     /// - Parameters:
     ///   - authMethod: The authentication method to use (`.legacy` or `.oauth`).
     ///   - oauthConfig: Configuration for OAuth authentication.
-    ///   - baseURL: The base URL for the AT Protocol service.
+    ///   - baseURL: The initial base URL (will be updated based on active account).
     ///   - environment: The client environment (production or testing).
-    ///   - namespace: The namespace for the client.
     ///   - userAgent: Optional user agent string.
-
     public init(
         authMethod: AuthMethod,
         oauthConfig: OAuthConfiguration,
         baseURL: URL = URL(string: "https://bsky.social")!,
-        namespace: String,
+        // Removed namespace parameter
+        // namespace: String,
         environment: ClientEnvironment,
         userAgent: String? = nil
     ) async {
         LogManager.logDebug(
-            "ATProtoClient - Initializing with baseURL: \(baseURL), namespace: \(namespace)")
+            "ATProtoClient - Initializing with baseURL: \(baseURL)")
         self.oauthConfig = oauthConfig
-        self.namespace = namespace
+        // self.namespace = namespace // Removed
         self.baseURL = baseURL
         authorizationServerURL = baseURL
         selectedAuthMethod = authMethod
 
-        configManager = await ConfigurationManager(baseURL: baseURL, namespace: namespace)
-        tokenManager = await TokenManager(namespace: namespace)
+        // Instantiate AccountManager first
+        accountManager = await AccountManager()
+
+        // Pass accountManager to other managers
+        configManager = await ConfigurationManager(baseURL: baseURL, accountManager: accountManager)
+        tokenManager = await TokenManager(accountManager: accountManager)
         networkManager = await NetworkManager(
             baseURL: baseURL, configurationManager: configManager, tokenManager: tokenManager
         )
         middlewareService = await MiddlewareService(tokenManager: tokenManager)
         sessionManager = await SessionManager(
-            tokenManager: tokenManager, middlewareService: middlewareService, namespace: namespace
+            tokenManager: tokenManager, middlewareService: middlewareService, accountManager: accountManager
         )
         let didResolutionService = await DIDResolutionService(networkManager: networkManager)
         authenticationService = await AuthenticationService(
@@ -135,8 +139,10 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
             networkManager: networkManager,
             tokenManager: tokenManager,
             configurationManager: configManager,
-            oauthConfig: oauthConfig, didResolver: didResolutionService,
-            namespace: namespace
+            accountManager: accountManager, // Pass accountManager
+            oauthConfig: oauthConfig,
+            didResolver: didResolutionService
+            // Removed namespace parameter
         )
 
         // Set user agent if provided
@@ -145,50 +151,83 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
         }
 
         do {
-            // Initialize TokenManager first
-            LogManager.logDebug("ATProtoClient - TokenManager initialized.")
+            LogManager.logDebug("ATProtoClient - Managers initialized.")
 
             await networkManager.setAuthenticationProvider(authenticationService)
             await middlewareService.setSessionManager(sessionManager)
-            //            await configManager.waitForInitialization()
 
-            if let savedPDSURL = await configManager.getPDSURL() {
-                LogManager.logInfo("ATProtoClient - Using saved PDS URL: \(savedPDSURL)")
+            // Load initial state based on potentially active account
+            if let activeDID = await accountManager.getActiveAccountDID(),
+               let activeAccount = await accountManager.getAccount(did: activeDID),
+               let savedPDSURL = activeAccount.pdsURL {
+                LogManager.logInfo("ATProtoClient - Using saved PDS URL for active account \(activeDID): \(savedPDSURL)")
                 self.baseURL = savedPDSURL
                 await updateAllComponentsWithNewURL(savedPDSURL)
             } else {
                 LogManager.logDebug(
-                    "ATProtoClient - No saved PDS URL found, using default: \(baseURL)")
+                    "ATProtoClient - No active account or PDS URL found, using default: \(baseURL)")
             }
 
-            //            _ = try await getSession()
-            //            // Then initialize the OAuth state
+            // Initialize OAuth state if needed
             try await authenticationService.initializeOAuthState()
 
-            // First, try to refresh the token if needed
-            if try await authenticationService.refreshTokenIfNeeded() {
-                LogManager.logInfo("Token refreshed successfully")
+            // Attempt initial token refresh if tokens exist
+            if await tokenManager.hasAnyTokens() {
+                 if try await authenticationService.refreshTokenIfNeeded() {
+                     LogManager.logInfo("Token refreshed successfully during initialization.")
+                 }
             }
 
             // Attempt to make a simple authenticated request to verify everything is working
-            do {
-                let _ = try await com.atproto.server.describeServer()
-                LogManager.logInfo("Client state initialized successfully")
-            } catch {
-                LogManager.logError("Failed to initialize client state: \(error)")
-                throw error
+            // Only if there's an active session
+            if await sessionManager.hasValidSession() {
+                do {
+                    let _ = try await com.atproto.server.describeServer()
+                    LogManager.logInfo("Client state verified successfully with describeServer call.")
+                } catch {
+                    LogManager.logError("Failed to verify client state with describeServer: \(error)")
+                    // Don't throw here, allow initialization to complete but log the issue
+                }
+            } else {
+                 LogManager.logInfo("No active session found during initialization.")
             }
 
         } catch {
-            LogManager.logError("ATProtoClient - Failed to fetch session: \(error)")
-            await EventBus.shared.publish(.authenticationFailed(error))
+            LogManager.logError("ATProtoClient - Error during initialization: \(error)")
+            await EventBus.shared.publish(.initializationFailed(error))
+            // Consider how to handle initialization failure - maybe set a failed state
         }
+
+        // Subscribe to account changes to update baseURL
+        await subscribeToAccountChanges()
 
         // Publish an initialization completed event
         await EventBus.shared.publish(.initializationCompleted)
+        LogManager.logInfo("ATProtoClient - Initialization complete.")
     }
 
     // MARK: - Initialization Helper Methods
+
+    private func subscribeToAccountChanges() async {
+         let eventStream = await EventBus.shared.subscribe()
+         Task {
+             for await event in eventStream {
+                 if case let .activeAccountChanged(did) = event {
+                     LogManager.logInfo("ATProtoClient - Active account changed to \(did)")
+                     if let account = await accountManager.getAccount(did: did),
+                        let newPDSURL = account.pdsURL {
+                         await updateAllComponentsWithNewURL(newPDSURL)
+                     } else {
+                         // Handle case where new active account has no PDS URL?
+                         // Maybe revert to default or log an error.
+                         LogManager.logError("ATProtoClient - Switched to account \(did) with no PDS URL.")
+                         // Consider reverting to default baseURL or handling appropriately
+                         // await updateAllComponentsWithNewURL(URL(string: "https://bsky.social")!)
+                     }
+                 }
+             }
+         }
+     }
 
     private func publishInitializationStarted() async {
         await EventBus.shared.publish(.initializationStarted)
@@ -198,55 +237,45 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
         LogManager.logInfo("ATProtoClient - Updating all components with new URL: \(newURL)")
 
         baseURL = newURL
-        pdsURL = newURL
-        await configManager.updatePDSURL(newURL)
+        pdsURL = newURL // Keep pdsURL updated as well
+        await configManager.updatePDSURL(newURL) // ConfigManager now manages its own PDS/base URL state per account
         await networkManager.updateBaseURL(newURL)
 
         LogManager.logInfo("ATProtoClient - Base URL updated to: \(newURL)")
     }
 
-    // Modify other methods that might change the PDS URL to use updatePDSURL
+    // getSession is less relevant now as state is managed per account
+    // Keep it for potential direct use, but ensure it uses the active account context
     private func getSession() async throws -> ComAtprotoServerGetSession.Output {
-        let sessionResponse = try await com.atproto.server.getSession()
+         LogManager.logDebug("ATProtoClient - getSession called. Fetching for active account.")
+         // This call implicitly uses the active account's tokens via NetworkManager/AuthProvider
+         let sessionResponse = try await com.atproto.server.getSession()
 
-        guard let sessionInfo = sessionResponse.data,
-              let endpoint = sessionInfo.didDoc?.service.first?.serviceEndpoint,
-              let serviceURL = URL(string: endpoint)
-        else {
-            throw APIError.authorizationFailed
-        }
+         guard let sessionInfo = sessionResponse.data else {
+             LogManager.logError("ATProtoClient - Failed to get session info from response.")
+             throw APIError.invalidResponse // Or a more specific error
+         }
 
-        // Update PDS URL
-        await updateAllComponentsWithNewURL(serviceURL)
+         // Update the current account's data if needed (handle might change)
+         if let currentDID = await accountManager.getActiveAccountDID() {
+             if var account = await accountManager.getAccount(did: currentDID) {
+                 account.handle = sessionInfo.handle
+                 // Update PDS URL if it changed (though unlikely via getSession)
+                 if let serviceEndpoint = sessionInfo.didDoc?.service.first?.serviceEndpoint,
+                    let serviceURL = URL(string: serviceEndpoint),
+                    account.pdsURL != serviceURL {
+                     account.pdsURL = serviceURL
+                     await updateAllComponentsWithNewURL(serviceURL) // Update client state if PDS changed
+                 }
+                 try await accountManager.addOrUpdateAccount(account)
+             }
+         } else {
+             LogManager.logWarning("ATProtoClient - getSession called without an active account.")
+             // This case should ideally not happen if getSession requires authentication
+         }
 
-        try await configManager.updateUserConfiguration(
-            did: sessionInfo.did,
-            handle: sessionInfo.handle,
-            serviceEndpoint: endpoint
-        )
-
-        did = sessionInfo.did
-        handle = sessionInfo.handle
-
-        return sessionInfo
-    }
-
-    //    private func completeInitialization(authMethod: AuthMethod, oauthConfig: OAuthConfiguration) async {
-    //        // Publish an initialization completed event
-    //    }
-    //
-    //    private func setupPostInit() async {
-    //        await middlewareService.setSessionManager(sessionManager)
-    //        // Publish configuration updated event if needed
-    //    }
-
-    //    private func getAuthenticationService() throws -> AuthenticationService {
-    //        guard let authService = authenticationService else {
-    //            LogManager.logError("AuthenticationService not initialized")
-    //            throw APIError.serviceNotInitialized
-    //        }
-    //        return authService
-    //    }
+         return sessionInfo
+     }
 
     // MARK: - Authentication Delegate Protocol Methods
 
@@ -286,6 +315,34 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
         }
     }
 
+    // MARK: - Account Management Methods (New)
+
+    /// Switches the active account.
+    /// - Parameter did: The DID of the account to switch to.
+    public func switchAccount(to did: String) async throws {
+        LogManager.logInfo("ATProtoClient - Attempting to switch account to: \(did)")
+        try await accountManager.switchAccount(to: did)
+        // Event .activeAccountChanged will trigger state reloading in managers and ATProtoClient
+    }
+
+    /// Lists the DIDs of all managed accounts.
+    /// - Returns: An array of DID strings.
+    public func listAccounts() async -> [String] {
+        return await accountManager.listAccountDIDs()
+    }
+
+    /// Gets the DID of the currently active account.
+    /// - Returns: The active account's DID, or nil if none is active.
+    public func getActiveAccountDID() async -> String? {
+        return await accountManager.getActiveAccountDID()
+    }
+
+    /// Removes an account from the manager.
+    /// - Parameter did: The DID of the account to remove.
+    public func removeAccount(did: String) async throws {
+        try await accountManager.removeAccount(did: did)
+    }
+
     // MARK: - OAuth Flow Methods
 
     /// Starts the OAuth flow by obtaining the authorization URL.
@@ -304,13 +361,7 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
     /// - Parameter url: The callback URL containing authorization data.
     public func handleOAuthCallback(url: URL) async throws {
         try await authenticationService.handleOAuthCallback(url: url)
-        // Publish OAuth callback received event
-
-        // After successful OAuth, save the PDS URL
-        if let pdsURL = await configManager.getPDSURL() {
-            await configManager.updatePDSURL(pdsURL)
-        }
-
+        // Account switching and state updates are handled within AuthenticationService now
         await EventBus.shared.publish(.oauthCallbackReceived(url))
     }
 
@@ -323,37 +374,20 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
     ///   - password: The user's password.
     public func login(identifier: String, password: String) async throws {
         try await authenticationService.login(identifier: identifier, password: password)
-
-        // After login, set DID and handle
-        did = try await resolveHandleToDID(handle: identifier)
-        handle = identifier
-
-        // Publish token updated event
-        if let accessToken = await tokenManager.fetchAccessToken(),
-           let refreshToken = await tokenManager.fetchRefreshToken()
-        {
-            await EventBus.shared.publish(
-                .tokensUpdated(accessToken: accessToken, refreshToken: refreshToken))
-        }
+        // Account switching and state updates are handled within AuthenticationService now
+        // Publish token updated event (already done in AuthenticationService)
     }
 
     // MARK: - Logout Method
 
     public func logout() async throws {
-        // Clear session and tokens first
-        try await middlewareService.clearSession()
-        try await tokenManager.deleteTokens()
-
-        // Clear DPoP state
-        await authenticationService.deleteDPoPKey()
-
-        // Clear any other OAuth-related state
-        try KeychainManager.delete(key: "codeVerifier", namespace: namespace)
-        try KeychainManager.delete(key: "state", namespace: namespace)
-        try KeychainManager.delete(key: "isAuthenticated", namespace: namespace)
-
-        // Notify delegate that authentication is required
-        await authDelegate?.authenticationRequired(client: self)
+        // Delegate logout logic entirely to AuthenticationService
+        try await authenticationService.logout()
+        // AuthenticationService handles clearing tokens, DPoP keys, and removing/switching accounts.
+        // It also publishes .logoutSucceeded
+        
+        // Optionally, notify delegate if needed, though logout might imply this
+        // await authDelegate?.authenticationRequired(client: self) // Or a specific logout notification
     }
 
     // MARK: - Utility Functions
@@ -363,12 +397,9 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
     /// - Parameter handle: The user's handle.
     /// - Returns: The resolved DID.
     public func resolveHandleToDID(handle: String) async throws -> String {
-        let input = ComAtprotoIdentityResolveHandle.Parameters(handle: handle)
-        let (responseCode, data) = try await com.atproto.identity.resolveHandle(input: input)
-        guard responseCode == 200, let did = data?.did else {
-            throw APIError.invalidPDSURL
-        }
-        return did
+        // This is a general utility, doesn't need account context directly
+        let didResolutionService = await DIDResolutionService(networkManager: networkManager)
+        return try await didResolutionService.resolveHandleToDID(handle: handle)
     }
 
     /// Resolves a DID to the user's PDS URL by fetching their DID document.
@@ -376,123 +407,93 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
     /// - Parameter did: The user's DID.
     /// - Returns: The PDS URL.
     public func resolveDIDToPDSURL(did: String) async throws -> URL {
-        let didDocURL = "https://plc.directory/\(did)"
-        let request = try await networkManager.createURLRequest(
-            endpoint: didDocURL,
-            method: "GET",
-            headers: [:],
-            body: nil,
-            queryItems: nil
-        )
-        let (data, _) = try await networkManager.performRequest(request)
-        let didDocument = try JSONDecoder().decode(DIDDocument.self, from: data)
+         // This is a general utility, doesn't need account context directly
+         let didResolutionService = await DIDResolutionService(networkManager: networkManager)
+         let serviceURL = try await didResolutionService.resolveDIDToPDSURL(did: did)
 
-        guard
-            let serviceURLString = didDocument.service.first(where: {
-                $0.type == "AtprotoPersonalDataServer"
-            })?.serviceEndpoint,
-            let serviceURL = URL(string: serviceURLString)
-        else {
-            throw APIError.invalidPDSURL
-        }
+         // Update internal pdsURL if resolving for the active user? Or rely on configManager?
+         // Let's rely on configManager updating based on account switching.
+         // If this DID matches the active DID, we could potentially update baseURL here too,
+         // but the event-driven update in subscribeToAccountChanges is likely better.
+         // if did == await accountManager.getActiveAccountDID() {
+         //     await updateAllComponentsWithNewURL(serviceURL)
+         // }
 
-        pdsURL = serviceURL
-        // Publish PDS URL updated event
-        await EventBus.shared.publish(.baseURLUpdated(serviceURL))
-        return serviceURL
-    }
+         // Publish PDS URL updated event (maybe redundant if configManager does it)
+         // await EventBus.shared.publish(.baseURLUpdated(serviceURL))
+         return serviceURL
+     }
 
     private func updateNetworkManagerBaseURL() async {
-        if let pdsURL = pdsURL {
-            await EventBus.shared.publish(.baseURLUpdated(pdsURL))
+        // This might be less relevant now, baseURL is updated on account switch
+        if let activeDID = await accountManager.getActiveAccountDID(),
+           let account = await accountManager.getAccount(did: activeDID),
+           let pdsURL = account.pdsURL {
+            await networkManager.updateBaseURL(pdsURL)
+        } else {
+            // Fallback or handle error if no active account/PDS URL
+            LogManager.logWarning("ATProtoClient - updateNetworkManagerBaseURL called without active PDS URL.")
         }
     }
 
-    /// Retrieves the current user's handle.
+    /// Retrieves the current active user's handle.
     ///
     /// - Returns: The user's handle, if available.
-    public func getHandle() async throws -> String {
-        guard let handle = await configManager.getHandle() else {
-            return try await getSession().handle
+    public func getHandle() async -> String? {
+        // Get handle associated with the active account
+        guard let activeDID = await accountManager.getActiveAccountDID(),
+              let account = await accountManager.getAccount(did: activeDID) else {
+            return nil
         }
-        return handle
+        return account.handle
     }
 
-    /// Retrieves the current user's DID.
+    /// Retrieves the current active user's DID.
     ///
     /// - Returns: The user's DID, if available.
-    public func getDid() async throws -> String {
-        guard let did = await configManager.getDID() else {
-            return try await getSession().did
-        }
-
-        return did
+    public func getDid() async -> String? {
+        // Simply return the active DID from accountManager
+        return await accountManager.getActiveAccountDID()
     }
 
-    /// Refreshes the access token if necessary.
+    /// Refreshes the access token if necessary for the active account.
     ///
     /// - Returns: A boolean indicating whether the refresh was successful.
     public func refreshToken() async throws -> Bool {
-        let refreshed = try await authenticationService.refreshTokenIfNeeded()
-        if refreshed {
-            if let accessToken = await tokenManager.fetchAccessToken(),
-               let refreshToken = await tokenManager.fetchRefreshToken()
-            {
-                await EventBus.shared.publish(
-                    .tokensUpdated(accessToken: accessToken, refreshToken: refreshToken))
-            }
-        }
-        return refreshed
+        // AuthenticationService handles refresh for the active account
+        return try await authenticationService.refreshTokenIfNeeded()
     }
 
-    /// Checks if the current session is valid, attempting a token refresh if not.
+    /// Checks if the current session is valid for the active account.
     ///
     /// - Returns: A boolean indicating whether the session is valid.
     public func hasValidSession() async -> Bool {
-        do {
-            let hasValidTokens = await tokenManager.hasValidTokens()
-            if !hasValidTokens {
-                await refreshOrRequireAuth()
-                return false
-            }
-            return true
-        } catch {
-            await refreshOrRequireAuth()
-            return false
-        }
+        // SessionManager is now account-aware
+        return await sessionManager.hasValidSession()
     }
 
-    /// Initializes the session by fetching metadata and validating tokens.
+    /// Initializes the session by fetching metadata and validating tokens for the active account.
     public func initializeSession() async throws {
         LogManager.logDebug("ATProtoClient - Initializing session.")
         do {
-            await baseURL = configManager.getPDSURL() ?? baseURL
-            try await tokenManager.fetchAuthServerMetadataAndJWKS(baseURL: baseURL)
-            LogManager.logDebug("ATProtoClient - Authorization Server Metadata and JWKS fetched.")
+            // Base URL should be set based on active account during init or switch
+            // Fetching metadata might need context or be generic? Assuming generic for now.
+            // try await tokenManager.fetchAuthServerMetadataAndJWKS(baseURL: baseURL)
+            // LogManager.logDebug("ATProtoClient - Authorization Server Metadata and JWKS fetched.")
 
-            try await sessionManager.initializeIfNeeded()
+            try await sessionManager.initializeIfNeeded() // SessionManager is account-aware
             LogManager.logDebug("ATProtoClient - SessionManager initialized.")
 
             let isValid = await hasValidSession()
             if isValid {
-                did = await configManager.getDID()
-                handle = await configManager.getHandle()
-                pdsURL = await configManager.getPDSURL()
-                if let pdsURL = pdsURL {
-                    await EventBus.shared.publish(.baseURLUpdated(pdsURL))
-                    LogManager.logInfo(
-                        "ATProtoClient - Updated NetworkManager base URL to PDS URL: \(pdsURL)")
-                }
-                // Publish session initialized event
+                LogManager.logInfo("ATProtoClient - Session is valid after initialization.")
                 await EventBus.shared.publish(.sessionInitialized)
             } else {
                 LogManager.logError("ATProtoClient - Session is invalid after initialization.")
-                // Publish session expired event
                 await EventBus.shared.publish(.sessionExpired)
             }
         } catch {
             LogManager.logError("ATProtoClient - Failed to initialize session: \(error)")
-            // Publish network error event
             await EventBus.shared.publish(.networkError(error))
             throw error
         }
@@ -557,61 +558,11 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
         return await networkManager.extractContentLabelers(from: response)
     }
 
-    // MARK: - SessionDelegate Protocol Methods
+    // MARK: - SessionDelegate Protocol Methods (Now handled internally or via events)
 
-    /// Notifies that the session requires reauthentication.
-    ///
-    /// - Parameter sessionManager: The session manager requiring reauthentication.
-    func sessionRequiresReauthentication(sessionManager: SessionManager) async throws {
-        // Publish an authentication required event
-        await EventBus.shared.publish(.authenticationRequired)
-    }
-
-    // MARK: - Event Subscription
-
-    private func subscribeToEvents() async {
-        let eventStream = await EventBus.shared.subscribe()
-        for await event in eventStream {
-            switch event {
-            //            case .tokensUpdated(accessToken: let accessToken, refreshToken: let refreshToken):
-            //                // Handle token refreshed event
-            //                LogManager.logDebug("ATProtoClient - Received tokenRefreshed event.")
-            //                // Update internal state if necessary
-            ////                self.baseURL = await configManager.getPDSURL() ?? self.baseURL
-            //            case .sessionExpired:
-            //                // Handle session expired event
-            //                LogManager.logInfo("ATProtoClient - Session expired. Requiring authentication.")
-            //                await authDelegate?.authenticationRequired(client: self)
-            //            case .networkError(let error):
-            //                // Handle network errors
-            //                LogManager.logError("ATProtoClient - Network error occurred: \(error)")
-            //            case .baseURLUpdated(let newURL):
-            //                if self.baseURL != newURL {
-            //                    LogManager.logInfo("ATProtoClient - Configuration updated with new URL: \(newURL)")
-            //                    self.baseURL = newURL
-            //                }
-            //            case .authenticationRequired:
-            //                LogManager.logInfo("ATProtoClient - Authentication required event received.")
-            //                await handleAuthenticationError()
-            //            case .oauthFlowStarted(let url):
-            //                // Handle OAuth flow started
-            //                LogManager.logInfo("ATProtoClient - OAuth flow started with URL: \(url)")
-            //            case .oauthCallbackReceived(let url):
-            //                // Handle OAuth callback received
-            //                LogManager.logInfo("ATProtoClient - OAuth callback received with URL: \(url)")
-            //            case .tokensUpdated(let accessToken, let refreshToken):
-            //                // Handle token updated event
-            //                LogManager.logInfo("ATProtoClient - Tokens updated.")
-            //                // Update internal state or notify other components if necessary
-            //            case .requestCompleted(let request, let data, let response):
-            //                // Handle request completed event
-            //                LogManager.logDebug("ATProtoClient - Request completed: \(request.url?.absoluteString ?? "") with status: \(response.statusCode)")
-            //            // Add cases for additional events as needed
-            default:
-                break
-            }
-        }
-    }
+    // func sessionRequiresReauthentication(sessionManager: SessionManager) async throws {
+    //     await EventBus.shared.publish(.authenticationRequired)
+    // }
 
     // MARK: - Generated Classes
 
@@ -938,4 +889,14 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
             }
         }
     }
+}
+
+// Helper struct for DID Document resolution
+struct DIDDocument: Codable {
+    struct Service: Codable {
+        let id: String
+        let type: String
+        let serviceEndpoint: String
+    }
+    let service: [Service]
 }

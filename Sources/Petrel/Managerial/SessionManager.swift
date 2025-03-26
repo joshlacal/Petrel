@@ -22,7 +22,7 @@ actor SessionManager: SessionManaging {
 
     private let tokenManager: TokenManaging
     private let middlewareService: MiddlewareServicing
-    private let namespace: String
+    private let accountManager: AccountManaging
     private var lastSessionCheckTime: Date = .distantPast
     private let sessionCheckInterval: TimeInterval = 5 // 5 seconds
     private(set) var isAuthenticated: Bool = false
@@ -31,10 +31,10 @@ actor SessionManager: SessionManaging {
 
     // MARK: - Initialization
 
-    init(tokenManager: TokenManaging, middlewareService: MiddlewareServicing, namespace: String) async {
+    init(tokenManager: TokenManaging, middlewareService: MiddlewareServicing, accountManager: AccountManaging) async {
         self.tokenManager = tokenManager
         self.middlewareService = middlewareService
-        self.namespace = namespace
+        self.accountManager = accountManager
 
         // Load authentication state from Keychain
         isAuthenticated = await loadAuthenticatedState() ?? false
@@ -46,11 +46,27 @@ actor SessionManager: SessionManaging {
             await setAuthenticatedState(isAuthenticated)
         }
 
+        await subscribeToEvents()
         startPeriodicTokenCheck()
     }
 
     deinit {
         tokenCheckTask?.cancel()
+    }
+
+    private func subscribeToEvents() async {
+        let eventStream = await EventBus.shared.subscribe()
+        Task {
+            for await event in eventStream {
+                switch event {
+                case .activeAccountChanged:
+                    // Reload authentication state when active account changes
+                    isAuthenticated = await loadAuthenticatedState() ?? false
+                default:
+                    break
+                }
+            }
+        }
     }
 
     private func startPeriodicTokenCheck() {
@@ -129,6 +145,13 @@ actor SessionManager: SessionManaging {
 
     // MARK: - Helper Methods
 
+    private func getNamespace() async -> String {
+        if let did = await accountManager.getActiveAccountDID() {
+            return did
+        }
+        return "global"
+    }
+
     private func setAuthenticatedState(_ authenticated: Bool) async {
         isAuthenticated = authenticated
 
@@ -138,7 +161,7 @@ actor SessionManager: SessionManaging {
             try KeychainManager.store(
                 key: "isAuthenticated",
                 value: data,
-                namespace: namespace,
+                namespace: await getNamespace(),
                 accessibility: kSecAttrAccessibleAfterFirstUnlock
             )
             LogManager.logDebug("SessionManager - Saved authentication state to Keychain: \(authenticated)")
@@ -149,7 +172,7 @@ actor SessionManager: SessionManaging {
 
     private func loadAuthenticatedState() async -> Bool? {
         do {
-            let data = try KeychainManager.retrieve(key: "isAuthenticated", namespace: namespace)
+            let data = try KeychainManager.retrieve(key: "isAuthenticated", namespace: await getNamespace())
             if data.count > 0 {
                 let authenticated = data[0] == 1
                 LogManager.logDebug("SessionManager - Loaded authentication state from Keychain: \(authenticated)")
