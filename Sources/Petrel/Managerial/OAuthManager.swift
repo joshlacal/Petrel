@@ -268,50 +268,50 @@ actor OAuthManager {
 
     // MARK: - Event Subscription
 
-    private func subscribeToEvents() async {
-        let eventStream = await EventBus.shared.subscribe()
-        for await event in eventStream {
-            switch event {
-//            case .tokensUpdated(_, _):
-//                LogManager.logDebug("OAuthManager - Token updated event received.")
-//                // Handle token updates, e.g., initiate token refresh if needed
-//
-//            case .tokensCleared:
-//                LogManager.logDebug("OAuthManager - Tokens cleared event received. Resetting OAuth flow.")
-//                await resetOAuthFlow()
-//
-//            case .sessionExpired:
-//                LogManager.logInfo("OAuthManager - Session expired event received. Initiating re-authentication.")
-//                // Optionally initiate OAuth flow again or notify the user
-//
-//            case .authenticationRequired:
-//                LogManager.logInfo("OAuthManager - Authentication required event received.")
-//                // Optionally trigger OAuth authentication flow
-//
-//            case .oauthFlowFailed(let error):
-//                LogManager.logError("OAuthManager - OAuth flow failed with error: \(error.localizedDescription)")
-//                await EventBus.shared.publish(.oauthFlowFailed(error))
-//
-//            case .oauthTokensReceived(let accessToken, let refreshToken):
-//                LogManager.logInfo("OAuthManager - OAuth tokens received.")
-//                // Handle received tokens if additional processing is needed
-//
-//            case .oauthFlowStarted(let url):
-//                LogManager.logInfo("OAuthManager - OAuth flow started with URL: \(url.absoluteString)")
-//                // Handle OAuth flow initiation if needed
-//
-//            case .oauthFlowCompleted:
-//                LogManager.logInfo("OAuthManager - OAuth flow completed successfully.")
-//
-//            case .customEvent(let name, let data):
-//                // Handle custom events if necessary
-//                LogManager.logDebug("OAuthManager - Received custom event: \(name) with data: \(data)")
-//
-            default:
-                break
-            }
-        }
-    }
+//    private func subscribeToEvents() async {
+//        let eventStream = await EventBus.shared.subscribe()
+//        for await event in eventStream {
+//            switch event {
+////            case .tokensUpdated(_, _):
+////                LogManager.logDebug("OAuthManager - Token updated event received.")
+////                // Handle token updates, e.g., initiate token refresh if needed
+////
+////            case .tokensCleared:
+////                LogManager.logDebug("OAuthManager - Tokens cleared event received. Resetting OAuth flow.")
+////                await resetOAuthFlow()
+////
+////            case .sessionExpired:
+////                LogManager.logInfo("OAuthManager - Session expired event received. Initiating re-authentication.")
+////                // Optionally initiate OAuth flow again or notify the user
+////
+////            case .authenticationRequired:
+////                LogManager.logInfo("OAuthManager - Authentication required event received.")
+////                // Optionally trigger OAuth authentication flow
+////
+////            case .oauthFlowFailed(let error):
+////                LogManager.logError("OAuthManager - OAuth flow failed with error: \(error.localizedDescription)")
+////                await EventBus.shared.publish(.oauthFlowFailed(error))
+////
+////            case .oauthTokensReceived(let accessToken, let refreshToken):
+////                LogManager.logInfo("OAuthManager - OAuth tokens received.")
+////                // Handle received tokens if additional processing is needed
+////
+////            case .oauthFlowStarted(let url):
+////                LogManager.logInfo("OAuthManager - OAuth flow started with URL: \(url.absoluteString)")
+////                // Handle OAuth flow initiation if needed
+////
+////            case .oauthFlowCompleted:
+////                LogManager.logInfo("OAuthManager - OAuth flow completed successfully.")
+////
+////            case .customEvent(let name, let data):
+////                // Handle custom events if necessary
+////                LogManager.logDebug("OAuthManager - Received custom event: \(name) with data: \(data)")
+////
+//            default:
+//                break
+//            }
+//        }
+//    }
 
     // MARK: - OAuth Flow Methods
 

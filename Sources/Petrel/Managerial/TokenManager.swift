@@ -175,7 +175,7 @@ public actor TokenManager: TokenManaging {
 
     public func hasValidTokens() async -> Bool {
         guard let accessToken = await fetchAccessToken(),
-              let refreshToken = fetchRefreshToken()
+              let refreshToken = await fetchRefreshToken()
         else {
             return false
         }

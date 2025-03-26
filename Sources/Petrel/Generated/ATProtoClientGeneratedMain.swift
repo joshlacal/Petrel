@@ -273,7 +273,7 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
                 try await accountManager.addOrUpdateAccount(account)
             }
         } else {
-            LogManager.logWarning("ATProtoClient - getSession called without an active account.")
+            LogManager.logDebug("ATProtoClient - getSession called without an active account.")
             // This case should ideally not happen if getSession requires authentication
         }
 
@@ -436,7 +436,7 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
             await networkManager.updateBaseURL(pdsURL)
         } else {
             // Fallback or handle error if no active account/PDS URL
-            LogManager.logWarning("ATProtoClient - updateNetworkManagerBaseURL called without active PDS URL.")
+            LogManager.logDebug("ATProtoClient - updateNetworkManagerBaseURL called without active PDS URL.")
         }
     }
 

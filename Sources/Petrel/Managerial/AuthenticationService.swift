@@ -484,7 +484,8 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
 
         let did = sessionOutput.did
         let handle = sessionOutput.handle
-        let pdsURLString = sessionOutput.didDoc?.service.first?.serviceEndpoint ?? await configurationManager.baseURL.absoluteString
+        let baseURL = await configurationManager.baseURL.absoluteString
+        let pdsURLString = sessionOutput.didDoc?.service.first?.serviceEndpoint ?? baseURL
         guard let pdsURL = URL(string: pdsURLString) else {
             LogManager.logError("AuthenticationService - Invalid PDS URL from session: \(pdsURLString)")
             throw AuthenticationError.invalidCredentials // Or a more specific error

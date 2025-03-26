@@ -157,7 +157,7 @@ actor AccountManager: AccountManaging {
         try await saveActiveAccountDID(did)
 
         // Save account data to persist isActive flag changes
-        if let previousAccount = accounts[previousDID ?? ""] {
+        if let previousAccount = accounts[previousActiveDID ?? ""] {
             try await saveAccountData(previousAccount)
         }
         if let newActiveAccount = accounts[did] {
