@@ -159,7 +159,8 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
             // Load initial state based on potentially active account
             if let activeDID = await accountManager.getActiveAccountDID(),
                let activeAccount = await accountManager.getAccount(did: activeDID),
-               let savedPDSURL = activeAccount.pdsURL {
+               let savedPDSURL = activeAccount.pdsURL
+            {
                 LogManager.logInfo("ATProtoClient - Using saved PDS URL for active account \(activeDID): \(savedPDSURL)")
                 self.baseURL = savedPDSURL
                 await updateAllComponentsWithNewURL(savedPDSURL)
@@ -173,9 +174,9 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
 
             // Attempt initial token refresh if tokens exist
             if await tokenManager.hasAnyTokens() {
-                 if try await authenticationService.refreshTokenIfNeeded() {
-                     LogManager.logInfo("Token refreshed successfully during initialization.")
-                 }
+                if try await authenticationService.refreshTokenIfNeeded() {
+                    LogManager.logInfo("Token refreshed successfully during initialization.")
+                }
             }
 
             // Attempt to make a simple authenticated request to verify everything is working
@@ -189,7 +190,7 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
                     // Don't throw here, allow initialization to complete but log the issue
                 }
             } else {
-                 LogManager.logInfo("No active session found during initialization.")
+                LogManager.logInfo("No active session found during initialization.")
             }
 
         } catch {
@@ -209,25 +210,26 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
     // MARK: - Initialization Helper Methods
 
     private func subscribeToAccountChanges() async {
-         let eventStream = await EventBus.shared.subscribe()
-         Task {
-             for await event in eventStream {
-                 if case let .activeAccountChanged(did) = event {
-                     LogManager.logInfo("ATProtoClient - Active account changed to \(did)")
-                     if let account = await accountManager.getAccount(did: did),
-                        let newPDSURL = account.pdsURL {
-                         await updateAllComponentsWithNewURL(newPDSURL)
-                     } else {
-                         // Handle case where new active account has no PDS URL?
-                         // Maybe revert to default or log an error.
-                         LogManager.logError("ATProtoClient - Switched to account \(did) with no PDS URL.")
-                         // Consider reverting to default baseURL or handling appropriately
-                         // await updateAllComponentsWithNewURL(URL(string: "https://bsky.social")!)
-                     }
-                 }
-             }
-         }
-     }
+        let eventStream = await EventBus.shared.subscribe()
+        Task {
+            for await event in eventStream {
+                if case let .activeAccountChanged(did) = event {
+                    LogManager.logInfo("ATProtoClient - Active account changed to \(did)")
+                    if let account = await accountManager.getAccount(did: did),
+                       let newPDSURL = account.pdsURL
+                    {
+                        await updateAllComponentsWithNewURL(newPDSURL)
+                    } else {
+                        // Handle case where new active account has no PDS URL?
+                        // Maybe revert to default or log an error.
+                        LogManager.logError("ATProtoClient - Switched to account \(did) with no PDS URL.")
+                        // Consider reverting to default baseURL or handling appropriately
+                        // await updateAllComponentsWithNewURL(URL(string: "https://bsky.social")!)
+                    }
+                }
+            }
+        }
+    }
 
     private func publishInitializationStarted() async {
         await EventBus.shared.publish(.initializationStarted)
@@ -247,35 +249,36 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
     // getSession is less relevant now as state is managed per account
     // Keep it for potential direct use, but ensure it uses the active account context
     private func getSession() async throws -> ComAtprotoServerGetSession.Output {
-         LogManager.logDebug("ATProtoClient - getSession called. Fetching for active account.")
-         // This call implicitly uses the active account's tokens via NetworkManager/AuthProvider
-         let sessionResponse = try await com.atproto.server.getSession()
+        LogManager.logDebug("ATProtoClient - getSession called. Fetching for active account.")
+        // This call implicitly uses the active account's tokens via NetworkManager/AuthProvider
+        let sessionResponse = try await com.atproto.server.getSession()
 
-         guard let sessionInfo = sessionResponse.data else {
-             LogManager.logError("ATProtoClient - Failed to get session info from response.")
-             throw APIError.invalidResponse // Or a more specific error
-         }
+        guard let sessionInfo = sessionResponse.data else {
+            LogManager.logError("ATProtoClient - Failed to get session info from response.")
+            throw APIError.invalidResponse // Or a more specific error
+        }
 
-         // Update the current account's data if needed (handle might change)
-         if let currentDID = await accountManager.getActiveAccountDID() {
-             if var account = await accountManager.getAccount(did: currentDID) {
-                 account.handle = sessionInfo.handle
-                 // Update PDS URL if it changed (though unlikely via getSession)
-                 if let serviceEndpoint = sessionInfo.didDoc?.service.first?.serviceEndpoint,
-                    let serviceURL = URL(string: serviceEndpoint),
-                    account.pdsURL != serviceURL {
-                     account.pdsURL = serviceURL
-                     await updateAllComponentsWithNewURL(serviceURL) // Update client state if PDS changed
-                 }
-                 try await accountManager.addOrUpdateAccount(account)
-             }
-         } else {
-             LogManager.logWarning("ATProtoClient - getSession called without an active account.")
-             // This case should ideally not happen if getSession requires authentication
-         }
+        // Update the current account's data if needed (handle might change)
+        if let currentDID = await accountManager.getActiveAccountDID() {
+            if var account = await accountManager.getAccount(did: currentDID) {
+                account.handle = sessionInfo.handle
+                // Update PDS URL if it changed (though unlikely via getSession)
+                if let serviceEndpoint = sessionInfo.didDoc?.service.first?.serviceEndpoint,
+                   let serviceURL = URL(string: serviceEndpoint),
+                   account.pdsURL != serviceURL
+                {
+                    account.pdsURL = serviceURL
+                    await updateAllComponentsWithNewURL(serviceURL) // Update client state if PDS changed
+                }
+                try await accountManager.addOrUpdateAccount(account)
+            }
+        } else {
+            LogManager.logWarning("ATProtoClient - getSession called without an active account.")
+            // This case should ideally not happen if getSession requires authentication
+        }
 
-         return sessionInfo
-     }
+        return sessionInfo
+    }
 
     // MARK: - Authentication Delegate Protocol Methods
 
@@ -385,7 +388,7 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
         try await authenticationService.logout()
         // AuthenticationService handles clearing tokens, DPoP keys, and removing/switching accounts.
         // It also publishes .logoutSucceeded
-        
+
         // Optionally, notify delegate if needed, though logout might imply this
         // await authDelegate?.authenticationRequired(client: self) // Or a specific logout notification
     }
@@ -407,28 +410,29 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
     /// - Parameter did: The user's DID.
     /// - Returns: The PDS URL.
     public func resolveDIDToPDSURL(did: String) async throws -> URL {
-         // This is a general utility, doesn't need account context directly
-         let didResolutionService = await DIDResolutionService(networkManager: networkManager)
-         let serviceURL = try await didResolutionService.resolveDIDToPDSURL(did: did)
+        // This is a general utility, doesn't need account context directly
+        let didResolutionService = await DIDResolutionService(networkManager: networkManager)
+        let serviceURL = try await didResolutionService.resolveDIDToPDSURL(did: did)
 
-         // Update internal pdsURL if resolving for the active user? Or rely on configManager?
-         // Let's rely on configManager updating based on account switching.
-         // If this DID matches the active DID, we could potentially update baseURL here too,
-         // but the event-driven update in subscribeToAccountChanges is likely better.
-         // if did == await accountManager.getActiveAccountDID() {
-         //     await updateAllComponentsWithNewURL(serviceURL)
-         // }
+        // Update internal pdsURL if resolving for the active user? Or rely on configManager?
+        // Let's rely on configManager updating based on account switching.
+        // If this DID matches the active DID, we could potentially update baseURL here too,
+        // but the event-driven update in subscribeToAccountChanges is likely better.
+        // if did == await accountManager.getActiveAccountDID() {
+        //     await updateAllComponentsWithNewURL(serviceURL)
+        // }
 
-         // Publish PDS URL updated event (maybe redundant if configManager does it)
-         // await EventBus.shared.publish(.baseURLUpdated(serviceURL))
-         return serviceURL
-     }
+        // Publish PDS URL updated event (maybe redundant if configManager does it)
+        // await EventBus.shared.publish(.baseURLUpdated(serviceURL))
+        return serviceURL
+    }
 
     private func updateNetworkManagerBaseURL() async {
         // This might be less relevant now, baseURL is updated on account switch
         if let activeDID = await accountManager.getActiveAccountDID(),
            let account = await accountManager.getAccount(did: activeDID),
-           let pdsURL = account.pdsURL {
+           let pdsURL = account.pdsURL
+        {
             await networkManager.updateBaseURL(pdsURL)
         } else {
             // Fallback or handle error if no active account/PDS URL
@@ -442,7 +446,8 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
     public func getHandle() async -> String? {
         // Get handle associated with the active account
         guard let activeDID = await accountManager.getActiveAccountDID(),
-              let account = await accountManager.getAccount(did: activeDID) else {
+              let account = await accountManager.getAccount(did: activeDID)
+        else {
             return nil
         }
         return account.handle
@@ -582,15 +587,6 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
                 self.networkManager = networkManager
             }
 
-            public lazy var server: Server = .init(networkManager: self.networkManager)
-
-            public final class Server: @unchecked Sendable {
-                let networkManager: NetworkManaging
-                init(networkManager: NetworkManaging) {
-                    self.networkManager = networkManager
-                }
-            }
-
             public lazy var signature: Signature = .init(networkManager: self.networkManager)
 
             public final class Signature: @unchecked Sendable {
@@ -609,15 +605,6 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
                 }
             }
 
-            public lazy var set: Set = .init(networkManager: self.networkManager)
-
-            public final class Set: @unchecked Sendable {
-                let networkManager: NetworkManaging
-                init(networkManager: NetworkManaging) {
-                    self.networkManager = networkManager
-                }
-            }
-
             public lazy var communication: Communication = .init(networkManager: self.networkManager)
 
             public final class Communication: @unchecked Sendable {
@@ -627,9 +614,18 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
                 }
             }
 
-            public lazy var setting: Setting = .init(networkManager: self.networkManager)
+            public lazy var server: Server = .init(networkManager: self.networkManager)
 
-            public final class Setting: @unchecked Sendable {
+            public final class Server: @unchecked Sendable {
+                let networkManager: NetworkManaging
+                init(networkManager: NetworkManaging) {
+                    self.networkManager = networkManager
+                }
+            }
+
+            public lazy var set: Set = .init(networkManager: self.networkManager)
+
+            public final class Set: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
@@ -639,6 +635,15 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
             public lazy var moderation: Moderation = .init(networkManager: self.networkManager)
 
             public final class Moderation: @unchecked Sendable {
+                let networkManager: NetworkManaging
+                init(networkManager: NetworkManaging) {
+                    self.networkManager = networkManager
+                }
+            }
+
+            public lazy var setting: Setting = .init(networkManager: self.networkManager)
+
+            public final class Setting: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
@@ -663,18 +668,18 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
                 self.networkManager = networkManager
             }
 
-            public lazy var video: Video = .init(networkManager: self.networkManager)
+            public lazy var embed: Embed = .init(networkManager: self.networkManager)
 
-            public final class Video: @unchecked Sendable {
+            public final class Embed: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
                 }
             }
 
-            public lazy var embed: Embed = .init(networkManager: self.networkManager)
+            public lazy var video: Video = .init(networkManager: self.networkManager)
 
-            public final class Embed: @unchecked Sendable {
+            public final class Video: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
@@ -717,18 +722,18 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
                 }
             }
 
-            public lazy var richtext: Richtext = .init(networkManager: self.networkManager)
+            public lazy var actor: Actor = .init(networkManager: self.networkManager)
 
-            public final class Richtext: @unchecked Sendable {
+            public final class Actor: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
                 }
             }
 
-            public lazy var actor: Actor = .init(networkManager: self.networkManager)
+            public lazy var richtext: Richtext = .init(networkManager: self.networkManager)
 
-            public final class Actor: @unchecked Sendable {
+            public final class Richtext: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
@@ -834,15 +839,6 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
                 }
             }
 
-            public lazy var label: Label = .init(networkManager: self.networkManager)
-
-            public final class Label: @unchecked Sendable {
-                let networkManager: NetworkManaging
-                init(networkManager: NetworkManaging) {
-                    self.networkManager = networkManager
-                }
-            }
-
             public lazy var server: Server = .init(networkManager: self.networkManager)
 
             public final class Server: @unchecked Sendable {
@@ -852,9 +848,9 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
                 }
             }
 
-            public lazy var lexicon: Lexicon = .init(networkManager: self.networkManager)
+            public lazy var label: Label = .init(networkManager: self.networkManager)
 
-            public final class Lexicon: @unchecked Sendable {
+            public final class Label: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
@@ -864,6 +860,15 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
             public lazy var sync: Sync = .init(networkManager: self.networkManager)
 
             public final class Sync: @unchecked Sendable {
+                let networkManager: NetworkManaging
+                init(networkManager: NetworkManaging) {
+                    self.networkManager = networkManager
+                }
+            }
+
+            public lazy var lexicon: Lexicon = .init(networkManager: self.networkManager)
+
+            public final class Lexicon: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
@@ -889,14 +894,4 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
             }
         }
     }
-}
-
-// Helper struct for DID Document resolution
-struct DIDDocument: Codable {
-    struct Service: Codable {
-        let id: String
-        let type: String
-        let serviceEndpoint: String
-    }
-    let service: [Service]
 }

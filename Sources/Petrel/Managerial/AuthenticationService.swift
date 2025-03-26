@@ -324,22 +324,22 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
 
             // Extract DID from token
             let did = try await extractDIDFromToken(accessToken)
-            
+
             // Get handle from config (set during startOAuthFlow)
             let handle = await configurationManager.getHandle()
-            
+
             // Resolve PDS URL
             let pdsURL = try await didResolver.resolveDIDToPDSURL(did: did)
 
             // Create AccountData
             let accountData = AccountData(did: did, handle: handle, pdsURL: pdsURL, isActive: false)
-            
+
             // Add/Update account in AccountManager
             try await accountManager.addOrUpdateAccount(accountData)
-            
+
             // Switch to the newly authenticated account
             try await accountManager.switchAccount(to: did)
-            
+
             // Save the tokens (now associated with the active account via TokenManager's internal logic)
             try await tokenManager.saveTokens(
                 accessJwt: accessToken,
@@ -396,7 +396,7 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
             LogManager.logError("AuthenticationService - Failed to remove account \(activeDID): \(error)")
             throw error // Propagate other errors
         }
-        
+
         // Publish logout succeeded event
         await EventBus.shared.publish(.logoutSucceeded)
     }
@@ -486,16 +486,16 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
         let handle = sessionOutput.handle
         let pdsURLString = sessionOutput.didDoc?.service.first?.serviceEndpoint ?? await configurationManager.baseURL.absoluteString
         guard let pdsURL = URL(string: pdsURLString) else {
-             LogManager.logError("AuthenticationService - Invalid PDS URL from session: \(pdsURLString)")
-             throw AuthenticationError.invalidCredentials // Or a more specific error
+            LogManager.logError("AuthenticationService - Invalid PDS URL from session: \(pdsURLString)")
+            throw AuthenticationError.invalidCredentials // Or a more specific error
         }
 
         // Create AccountData
         let accountData = AccountData(did: did, handle: handle, pdsURL: pdsURL, isActive: false)
-        
+
         // Add/Update account in AccountManager
         try await accountManager.addOrUpdateAccount(accountData)
-        
+
         // Switch to the newly authenticated account
         try await accountManager.switchAccount(to: did)
 

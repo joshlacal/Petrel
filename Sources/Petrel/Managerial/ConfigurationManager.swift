@@ -94,7 +94,8 @@ actor ConfigurationManager: ConfigurationManaging {
             do {
                 let pdsURLData = try KeychainManager.retrieve(key: await key("pdsURL"), namespace: namespace)
                 if let pdsURLString = String(data: pdsURLData, encoding: .utf8),
-                   let url = URL(string: pdsURLString) {
+                   let url = URL(string: pdsURLString)
+                {
                     pdsURL = url
                     baseURL = url
                     LogManager.logInfo("ConfigurationManager - Loaded PDS URL from Keychain: \(url)")
@@ -292,7 +293,8 @@ actor ConfigurationManager: ConfigurationManaging {
         do {
             let pdsURLData = try KeychainManager.retrieve(key: await key("pdsURL"), namespace: await key(""))
             if let pdsURLString = String(data: pdsURLData, encoding: .utf8),
-               let url = URL(string: pdsURLString) {
+               let url = URL(string: pdsURLString)
+            {
                 pdsURL = url
                 LogManager.logDebug("ConfigurationManager - Loaded PDS URL from Keychain: \(url)")
                 return url
@@ -382,7 +384,8 @@ actor ConfigurationManager: ConfigurationManaging {
         do {
             let serverData = try KeychainManager.retrieve(key: await key("currentAuthorizationServer"), namespace: await key(""))
             if let serverString = String(data: serverData, encoding: .utf8),
-               let serverURL = URL(string: serverString) {
+               let serverURL = URL(string: serverString)
+            {
                 currentAuthorizationServer = serverURL
                 return serverURL
             }

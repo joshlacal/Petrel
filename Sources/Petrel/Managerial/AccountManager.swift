@@ -66,28 +66,28 @@ protocol AccountManaging: Actor {
 /// Actor responsible for managing multiple user accounts, their data, and the active session.
 actor AccountManager: AccountManaging {
     // MARK: - Properties
-    
+
     private var accounts: [String: AccountData] = [:] // Keyed by DID
     private var activeAccountDID: String?
 
     private let accountsKeychainKey = "managedAccounts" // Key for storing the list of account DIDs
     private let activeAccountKeychainKey = "activeAccountDID" // Key for storing the active DID
     private let accountDataKeychainPrefix = "accountData." // Prefix for storing individual account data
-    
+
     // MARK: - Initialization
-    
+
     init() async {
         await loadAccounts()
     }
 
     // MARK: - Private Methods
-    
+
     private func loadAccounts() async {
         do {
             // Load the list of managed accounts
             if let accountsData = try? KeychainManager.retrieve(key: accountsKeychainKey, namespace: "accounts") {
                 let dids = try JSONDecoder().decode([String].self, from: accountsData)
-                
+
                 // Load each account's data
                 for did in dids {
                     if let accountData = try? KeychainManager.retrieve(key: "\(accountDataKeychainPrefix)\(did)", namespace: "accounts") {
@@ -97,32 +97,33 @@ actor AccountManager: AccountManaging {
                     }
                 }
             }
-            
+
             // Load active account DID
             if let activeDidData = try? KeychainManager.retrieve(key: activeAccountKeychainKey, namespace: "accounts"),
-               let activeDid = String(data: activeDidData, encoding: .utf8) {
+               let activeDid = String(data: activeDidData, encoding: .utf8)
+            {
                 activeAccountDID = activeDid
             }
-            
+
             LogManager.logInfo("AccountManager - Loaded \(accounts.count) accounts")
         } catch {
             LogManager.logError("AccountManager - Failed to load accounts: \(error)")
         }
     }
-    
+
     private func saveManagedAccountList() async throws {
         let dids = Array(accounts.keys)
         let data = try JSONEncoder().encode(dids)
         try KeychainManager.store(key: accountsKeychainKey, value: data, namespace: "accounts")
         LogManager.logInfo("AccountManager - Saved managed accounts list with \(dids.count) accounts")
     }
-    
+
     private func saveAccountData(_ accountData: AccountData) async throws {
         let data = try JSONEncoder().encode(accountData)
         try KeychainManager.store(key: "\(accountDataKeychainPrefix)\(accountData.did)", value: data, namespace: "accounts")
         LogManager.logInfo("AccountManager - Saved data for account: \(accountData.did)")
     }
-    
+
     private func saveActiveAccountDID(_ did: String) async throws {
         guard let data = did.data(using: .utf8) else {
             throw AccountManagerError.invalidAccountData
@@ -154,7 +155,7 @@ actor AccountManager: AccountManaging {
 
         // Persist the new active DID
         try await saveActiveAccountDID(did)
-        
+
         // Save account data to persist isActive flag changes
         if let previousAccount = accounts[previousDID ?? ""] {
             try await saveAccountData(previousAccount)
@@ -200,7 +201,7 @@ actor AccountManager: AccountManaging {
         }
 
         accounts.removeValue(forKey: did)
-        
+
         // Remove account data from keychain
         try KeychainManager.delete(key: "\(accountDataKeychainPrefix)\(did)", namespace: "accounts")
         try await saveManagedAccountList()
@@ -225,11 +226,11 @@ actor AccountManager: AccountManaging {
         for did in accounts.keys {
             try KeychainManager.delete(key: "\(accountDataKeychainPrefix)\(did)", namespace: "accounts")
         }
-        
+
         // Clear managed accounts list and active account
         try KeychainManager.delete(key: accountsKeychainKey, namespace: "accounts")
         try KeychainManager.delete(key: activeAccountKeychainKey, namespace: "accounts")
-        
+
         accounts.removeAll()
         activeAccountDID = nil
 
