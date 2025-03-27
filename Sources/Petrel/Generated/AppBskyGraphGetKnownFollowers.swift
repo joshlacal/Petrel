@@ -42,6 +42,34 @@ public enum AppBskyGraphGetKnownFollowers {
 
             self.followers = followers
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            subject = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: .subject)
+
+            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+
+            followers = try container.decode([AppBskyActorDefs.ProfileView].self, forKey: .followers)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(subject, forKey: .subject)
+
+            if let value = cursor {
+                try container.encode(value, forKey: .cursor)
+            }
+
+            try container.encode(followers, forKey: .followers)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case subject
+            case cursor
+            case followers
+        }
     }
 }
 

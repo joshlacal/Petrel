@@ -11,6 +11,22 @@ public enum AppBskyFeedSendInteractions {
         public init(interactions: [AppBskyFeedDefs.Interaction]) {
             self.interactions = interactions
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            interactions = try container.decode([AppBskyFeedDefs.Interaction].self, forKey: .interactions)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(interactions, forKey: .interactions)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case interactions
+        }
     }
 
     public struct Output: ATProtocolCodable {
@@ -22,6 +38,23 @@ public enum AppBskyFeedSendInteractions {
 
         ) {
             self.data = data
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            let data = try container.decode(Data.self, forKey: .data)
+            self.data = data
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(data, forKey: .data)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case data
         }
     }
 }

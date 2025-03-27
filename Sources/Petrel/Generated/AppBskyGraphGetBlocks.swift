@@ -33,6 +33,29 @@ public enum AppBskyGraphGetBlocks {
 
             self.blocks = blocks
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+
+            blocks = try container.decode([AppBskyActorDefs.ProfileView].self, forKey: .blocks)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            if let value = cursor {
+                try container.encode(value, forKey: .cursor)
+            }
+
+            try container.encode(blocks, forKey: .blocks)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case cursor
+            case blocks
+        }
     }
 }
 

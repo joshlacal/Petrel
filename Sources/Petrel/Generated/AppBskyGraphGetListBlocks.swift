@@ -33,6 +33,29 @@ public enum AppBskyGraphGetListBlocks {
 
             self.lists = lists
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+
+            lists = try container.decode([AppBskyGraphDefs.ListView].self, forKey: .lists)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            if let value = cursor {
+                try container.encode(value, forKey: .cursor)
+            }
+
+            try container.encode(lists, forKey: .lists)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case cursor
+            case lists
+        }
     }
 }
 

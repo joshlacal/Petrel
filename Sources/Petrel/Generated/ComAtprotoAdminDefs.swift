@@ -217,7 +217,9 @@ public enum ComAtprotoAdminDefs {
             }
 
             if let value = relatedRecords {
-                try container.encode(value, forKey: .relatedRecords)
+                if !value.isEmpty {
+                    try container.encode(value, forKey: .relatedRecords)
+                }
             }
 
             try container.encode(indexedAt, forKey: .indexedAt)
@@ -227,7 +229,9 @@ public enum ComAtprotoAdminDefs {
             }
 
             if let value = invites {
-                try container.encode(value, forKey: .invites)
+                if !value.isEmpty {
+                    try container.encode(value, forKey: .invites)
+                }
             }
 
             if let value = invitesDisabled {
@@ -247,7 +251,9 @@ public enum ComAtprotoAdminDefs {
             }
 
             if let value = threatSignatures {
-                try container.encode(value, forKey: .threatSignatures)
+                if !value.isEmpty {
+                    try container.encode(value, forKey: .threatSignatures)
+                }
             }
         }
 

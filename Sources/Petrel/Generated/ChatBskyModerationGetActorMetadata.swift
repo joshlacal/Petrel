@@ -142,6 +142,32 @@ public enum ChatBskyModerationGetActorMetadata {
 
             self.all = all
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            day = try container.decode(Metadata.self, forKey: .day)
+
+            month = try container.decode(Metadata.self, forKey: .month)
+
+            all = try container.decode(Metadata.self, forKey: .all)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(day, forKey: .day)
+
+            try container.encode(month, forKey: .month)
+
+            try container.encode(all, forKey: .all)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case day
+            case month
+            case all
+        }
     }
 }
 

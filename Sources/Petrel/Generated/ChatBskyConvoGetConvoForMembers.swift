@@ -24,6 +24,22 @@ public enum ChatBskyConvoGetConvoForMembers {
         ) {
             self.convo = convo
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            convo = try container.decode(ChatBskyConvoDefs.ConvoView.self, forKey: .convo)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(convo, forKey: .convo)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case convo
+        }
     }
 }
 

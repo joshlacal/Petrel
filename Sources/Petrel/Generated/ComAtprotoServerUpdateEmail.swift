@@ -15,6 +15,36 @@ public enum ComAtprotoServerUpdateEmail {
             self.emailAuthFactor = emailAuthFactor
             self.token = token
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            email = try container.decode(String.self, forKey: .email)
+
+            emailAuthFactor = try container.decodeIfPresent(Bool.self, forKey: .emailAuthFactor)
+
+            token = try container.decodeIfPresent(String.self, forKey: .token)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(email, forKey: .email)
+
+            if let value = emailAuthFactor {
+                try container.encode(value, forKey: .emailAuthFactor)
+            }
+
+            if let value = token {
+                try container.encode(value, forKey: .token)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case email
+            case emailAuthFactor
+            case token
+        }
     }
 
     public enum Error: String, Swift.Error, CustomStringConvertible {

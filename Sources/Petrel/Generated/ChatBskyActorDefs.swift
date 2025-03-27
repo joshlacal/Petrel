@@ -116,7 +116,9 @@ public enum ChatBskyActorDefs {
             }
 
             if let value = labels {
-                try container.encode(value, forKey: .labels)
+                if !value.isEmpty {
+                    try container.encode(value, forKey: .labels)
+                }
             }
 
             if let value = chatDisabled {

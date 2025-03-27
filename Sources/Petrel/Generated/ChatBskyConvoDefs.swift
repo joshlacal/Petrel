@@ -141,7 +141,9 @@ public enum ChatBskyConvoDefs {
             try container.encode(text, forKey: .text)
 
             if let value = facets {
-                try container.encode(value, forKey: .facets)
+                if !value.isEmpty {
+                    try container.encode(value, forKey: .facets)
+                }
             }
 
             if let value = embed {
@@ -200,18 +202,20 @@ public enum ChatBskyConvoDefs {
         public let text: String
         public let facets: [AppBskyRichtextFacet]?
         public let embed: MessageViewEmbedUnion?
+        public let reactions: [ReactionView]?
         public let sender: MessageViewSender
         public let sentAt: ATProtocolDate
 
         // Standard initializer
         public init(
-            id: String, rev: String, text: String, facets: [AppBskyRichtextFacet]?, embed: MessageViewEmbedUnion?, sender: MessageViewSender, sentAt: ATProtocolDate
+            id: String, rev: String, text: String, facets: [AppBskyRichtextFacet]?, embed: MessageViewEmbedUnion?, reactions: [ReactionView]?, sender: MessageViewSender, sentAt: ATProtocolDate
         ) {
             self.id = id
             self.rev = rev
             self.text = text
             self.facets = facets
             self.embed = embed
+            self.reactions = reactions
             self.sender = sender
             self.sentAt = sentAt
         }
@@ -255,6 +259,13 @@ public enum ChatBskyConvoDefs {
                 throw error
             }
             do {
+                reactions = try container.decodeIfPresent([ReactionView].self, forKey: .reactions)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'reactions': \(error)")
+                throw error
+            }
+            do {
                 sender = try container.decode(MessageViewSender.self, forKey: .sender)
 
             } catch {
@@ -281,11 +292,19 @@ public enum ChatBskyConvoDefs {
             try container.encode(text, forKey: .text)
 
             if let value = facets {
-                try container.encode(value, forKey: .facets)
+                if !value.isEmpty {
+                    try container.encode(value, forKey: .facets)
+                }
             }
 
             if let value = embed {
                 try container.encode(value, forKey: .embed)
+            }
+
+            if let value = reactions {
+                if !value.isEmpty {
+                    try container.encode(value, forKey: .reactions)
+                }
             }
 
             try container.encode(sender, forKey: .sender)
@@ -303,6 +322,11 @@ public enum ChatBskyConvoDefs {
                 hasher.combine(nil as Int?)
             }
             if let value = embed {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = reactions {
                 hasher.combine(value)
             } else {
                 hasher.combine(nil as Int?)
@@ -334,6 +358,10 @@ public enum ChatBskyConvoDefs {
                 return false
             }
 
+            if reactions != other.reactions {
+                return false
+            }
+
             if sender != other.sender {
                 return false
             }
@@ -356,6 +384,7 @@ public enum ChatBskyConvoDefs {
             case text
             case facets
             case embed
+            case reactions
             case sender
             case sentAt
         }
@@ -517,6 +546,202 @@ public enum ChatBskyConvoDefs {
         private enum CodingKeys: String, CodingKey {
             case typeIdentifier = "$type"
             case did
+        }
+    }
+
+    public struct ReactionView: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "chat.bsky.convo.defs#reactionView"
+        public let value: String
+        public let sender: ReactionViewSender
+
+        // Standard initializer
+        public init(
+            value: String, sender: ReactionViewSender
+        ) {
+            self.value = value
+            self.sender = sender
+        }
+
+        // Codable initializer
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                value = try container.decode(String.self, forKey: .value)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'value': \(error)")
+                throw error
+            }
+            do {
+                sender = try container.decode(ReactionViewSender.self, forKey: .sender)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'sender': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+
+            try container.encode(value, forKey: .value)
+
+            try container.encode(sender, forKey: .sender)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(value)
+            hasher.combine(sender)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+
+            if value != other.value {
+                return false
+            }
+
+            if sender != other.sender {
+                return false
+            }
+
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case value
+            case sender
+        }
+    }
+
+    public struct ReactionViewSender: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "chat.bsky.convo.defs#reactionViewSender"
+        public let did: String
+
+        // Standard initializer
+        public init(
+            did: String
+        ) {
+            self.did = did
+        }
+
+        // Codable initializer
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                did = try container.decode(String.self, forKey: .did)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'did': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+
+            try container.encode(did, forKey: .did)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(did)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+
+            if did != other.did {
+                return false
+            }
+
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case did
+        }
+    }
+
+    public struct MessageAndReactionView: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "chat.bsky.convo.defs#messageAndReactionView"
+        public let message: MessageView
+        public let reaction: ReactionView
+
+        // Standard initializer
+        public init(
+            message: MessageView, reaction: ReactionView
+        ) {
+            self.message = message
+            self.reaction = reaction
+        }
+
+        // Codable initializer
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                message = try container.decode(MessageView.self, forKey: .message)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'message': \(error)")
+                throw error
+            }
+            do {
+                reaction = try container.decode(ReactionView.self, forKey: .reaction)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'reaction': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+
+            try container.encode(message, forKey: .message)
+
+            try container.encode(reaction, forKey: .reaction)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(message)
+            hasher.combine(reaction)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+
+            if message != other.message {
+                return false
+            }
+
+            if reaction != other.reaction {
+                return false
+            }
+
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case message
+            case reaction
         }
     }
 
@@ -1307,6 +1532,216 @@ public enum ChatBskyConvoDefs {
         }
     }
 
+    public struct LogAddReaction: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "chat.bsky.convo.defs#logAddReaction"
+        public let rev: String
+        public let convoId: String
+        public let message: LogAddReactionMessageUnion
+        public let reaction: ReactionView
+
+        // Standard initializer
+        public init(
+            rev: String, convoId: String, message: LogAddReactionMessageUnion, reaction: ReactionView
+        ) {
+            self.rev = rev
+            self.convoId = convoId
+            self.message = message
+            self.reaction = reaction
+        }
+
+        // Codable initializer
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                rev = try container.decode(String.self, forKey: .rev)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'rev': \(error)")
+                throw error
+            }
+            do {
+                convoId = try container.decode(String.self, forKey: .convoId)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'convoId': \(error)")
+                throw error
+            }
+            do {
+                message = try container.decode(LogAddReactionMessageUnion.self, forKey: .message)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'message': \(error)")
+                throw error
+            }
+            do {
+                reaction = try container.decode(ReactionView.self, forKey: .reaction)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'reaction': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+
+            try container.encode(rev, forKey: .rev)
+
+            try container.encode(convoId, forKey: .convoId)
+
+            try container.encode(message, forKey: .message)
+
+            try container.encode(reaction, forKey: .reaction)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(rev)
+            hasher.combine(convoId)
+            hasher.combine(message)
+            hasher.combine(reaction)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+
+            if rev != other.rev {
+                return false
+            }
+
+            if convoId != other.convoId {
+                return false
+            }
+
+            if message != other.message {
+                return false
+            }
+
+            if reaction != other.reaction {
+                return false
+            }
+
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case rev
+            case convoId
+            case message
+            case reaction
+        }
+    }
+
+    public struct LogRemoveReaction: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "chat.bsky.convo.defs#logRemoveReaction"
+        public let rev: String
+        public let convoId: String
+        public let message: LogRemoveReactionMessageUnion
+        public let reaction: ReactionView
+
+        // Standard initializer
+        public init(
+            rev: String, convoId: String, message: LogRemoveReactionMessageUnion, reaction: ReactionView
+        ) {
+            self.rev = rev
+            self.convoId = convoId
+            self.message = message
+            self.reaction = reaction
+        }
+
+        // Codable initializer
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                rev = try container.decode(String.self, forKey: .rev)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'rev': \(error)")
+                throw error
+            }
+            do {
+                convoId = try container.decode(String.self, forKey: .convoId)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'convoId': \(error)")
+                throw error
+            }
+            do {
+                message = try container.decode(LogRemoveReactionMessageUnion.self, forKey: .message)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'message': \(error)")
+                throw error
+            }
+            do {
+                reaction = try container.decode(ReactionView.self, forKey: .reaction)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'reaction': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+
+            try container.encode(rev, forKey: .rev)
+
+            try container.encode(convoId, forKey: .convoId)
+
+            try container.encode(message, forKey: .message)
+
+            try container.encode(reaction, forKey: .reaction)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(rev)
+            hasher.combine(convoId)
+            hasher.combine(message)
+            hasher.combine(reaction)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+
+            if rev != other.rev {
+                return false
+            }
+
+            if convoId != other.convoId {
+                return false
+            }
+
+            if message != other.message {
+                return false
+            }
+
+            if reaction != other.reaction {
+                return false
+            }
+
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case rev
+            case convoId
+            case message
+            case reaction
+        }
+    }
+
     public enum MessageInputEmbedUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case appBskyEmbedRecord(AppBskyEmbedRecord)
         case unexpected(ATProtocolValueContainer)
@@ -1393,15 +1828,13 @@ public enum ChatBskyConvoDefs {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .appBskyEmbedRecord(value):
+            case let .appBskyEmbedRecord(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? AppBskyEmbedRecord {
-                            self = .appBskyEmbedRecord(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? AppBskyEmbedRecord {
+                        self = .appBskyEmbedRecord(updatedValue)
                     }
                 }
             case .unexpected:
@@ -1497,15 +1930,13 @@ public enum ChatBskyConvoDefs {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .appBskyEmbedRecordView(value):
+            case let .appBskyEmbedRecordView(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? AppBskyEmbedRecord.View {
-                            self = .appBskyEmbedRecordView(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? AppBskyEmbedRecord.View {
+                        self = .appBskyEmbedRecordView(updatedValue)
                     }
                 }
             case .unexpected:
@@ -1518,6 +1949,7 @@ public enum ChatBskyConvoDefs {
     public enum ConvoViewLastMessageUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case chatBskyConvoDefsMessageView(ChatBskyConvoDefs.MessageView)
         case chatBskyConvoDefsDeletedMessageView(ChatBskyConvoDefs.DeletedMessageView)
+        case chatBskyConvoDefsMessageAndReactionView(ChatBskyConvoDefs.MessageAndReactionView)
         case unexpected(ATProtocolValueContainer)
 
         public init(_ value: ChatBskyConvoDefs.MessageView) {
@@ -1526,6 +1958,10 @@ public enum ChatBskyConvoDefs {
 
         public init(_ value: ChatBskyConvoDefs.DeletedMessageView) {
             self = .chatBskyConvoDefsDeletedMessageView(value)
+        }
+
+        public init(_ value: ChatBskyConvoDefs.MessageAndReactionView) {
+            self = .chatBskyConvoDefsMessageAndReactionView(value)
         }
 
         public init(from decoder: Decoder) throws {
@@ -1539,6 +1975,9 @@ public enum ChatBskyConvoDefs {
             case "chat.bsky.convo.defs#deletedMessageView":
                 let value = try ChatBskyConvoDefs.DeletedMessageView(from: decoder)
                 self = .chatBskyConvoDefsDeletedMessageView(value)
+            case "chat.bsky.convo.defs#messageAndReactionView":
+                let value = try ChatBskyConvoDefs.MessageAndReactionView(from: decoder)
+                self = .chatBskyConvoDefsMessageAndReactionView(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
                 self = .unexpected(unknownValue)
@@ -1555,6 +1994,9 @@ public enum ChatBskyConvoDefs {
             case let .chatBskyConvoDefsDeletedMessageView(value):
                 try container.encode("chat.bsky.convo.defs#deletedMessageView", forKey: .type)
                 try value.encode(to: encoder)
+            case let .chatBskyConvoDefsMessageAndReactionView(value):
+                try container.encode("chat.bsky.convo.defs#messageAndReactionView", forKey: .type)
+                try value.encode(to: encoder)
             case let .unexpected(container):
                 try container.encode(to: encoder)
             }
@@ -1567,6 +2009,9 @@ public enum ChatBskyConvoDefs {
                 hasher.combine(value)
             case let .chatBskyConvoDefsDeletedMessageView(value):
                 hasher.combine("chat.bsky.convo.defs#deletedMessageView")
+                hasher.combine(value)
+            case let .chatBskyConvoDefsMessageAndReactionView(value):
+                hasher.combine("chat.bsky.convo.defs#messageAndReactionView")
                 hasher.combine(value)
             case let .unexpected(container):
                 hasher.combine("unexpected")
@@ -1588,6 +2033,11 @@ public enum ChatBskyConvoDefs {
             case let (
                 .chatBskyConvoDefsDeletedMessageView(lhsValue),
                 .chatBskyConvoDefsDeletedMessageView(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .chatBskyConvoDefsMessageAndReactionView(lhsValue),
+                .chatBskyConvoDefsMessageAndReactionView(rhsValue)
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
@@ -1615,6 +2065,11 @@ public enum ChatBskyConvoDefs {
                     return loadable.hasPendingData
                 }
                 return false
+            case let .chatBskyConvoDefsMessageAndReactionView(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
             case .unexpected:
                 return false
             }
@@ -1623,26 +2078,31 @@ public enum ChatBskyConvoDefs {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .chatBskyConvoDefsMessageView(value):
+            case let .chatBskyConvoDefsMessageView(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ChatBskyConvoDefs.MessageView {
-                            self = .chatBskyConvoDefsMessageView(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ChatBskyConvoDefs.MessageView {
+                        self = .chatBskyConvoDefsMessageView(updatedValue)
                     }
                 }
-            case var .chatBskyConvoDefsDeletedMessageView(value):
+            case let .chatBskyConvoDefsDeletedMessageView(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ChatBskyConvoDefs.DeletedMessageView {
-                            self = .chatBskyConvoDefsDeletedMessageView(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ChatBskyConvoDefs.DeletedMessageView {
+                        self = .chatBskyConvoDefsDeletedMessageView(updatedValue)
+                    }
+                }
+            case let .chatBskyConvoDefsMessageAndReactionView(value):
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ChatBskyConvoDefs.MessageAndReactionView {
+                        self = .chatBskyConvoDefsMessageAndReactionView(updatedValue)
                     }
                 }
             case .unexpected:
@@ -1760,26 +2220,22 @@ public enum ChatBskyConvoDefs {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .chatBskyConvoDefsMessageView(value):
+            case let .chatBskyConvoDefsMessageView(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ChatBskyConvoDefs.MessageView {
-                            self = .chatBskyConvoDefsMessageView(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ChatBskyConvoDefs.MessageView {
+                        self = .chatBskyConvoDefsMessageView(updatedValue)
                     }
                 }
-            case var .chatBskyConvoDefsDeletedMessageView(value):
+            case let .chatBskyConvoDefsDeletedMessageView(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ChatBskyConvoDefs.DeletedMessageView {
-                            self = .chatBskyConvoDefsDeletedMessageView(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ChatBskyConvoDefs.DeletedMessageView {
+                        self = .chatBskyConvoDefsDeletedMessageView(updatedValue)
                     }
                 }
             case .unexpected:
@@ -1897,26 +2353,22 @@ public enum ChatBskyConvoDefs {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .chatBskyConvoDefsMessageView(value):
+            case let .chatBskyConvoDefsMessageView(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ChatBskyConvoDefs.MessageView {
-                            self = .chatBskyConvoDefsMessageView(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ChatBskyConvoDefs.MessageView {
+                        self = .chatBskyConvoDefsMessageView(updatedValue)
                     }
                 }
-            case var .chatBskyConvoDefsDeletedMessageView(value):
+            case let .chatBskyConvoDefsDeletedMessageView(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ChatBskyConvoDefs.DeletedMessageView {
-                            self = .chatBskyConvoDefsDeletedMessageView(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ChatBskyConvoDefs.DeletedMessageView {
+                        self = .chatBskyConvoDefsDeletedMessageView(updatedValue)
                     }
                 }
             case .unexpected:
@@ -2034,26 +2486,288 @@ public enum ChatBskyConvoDefs {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .chatBskyConvoDefsMessageView(value):
+            case let .chatBskyConvoDefsMessageView(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ChatBskyConvoDefs.MessageView {
-                            self = .chatBskyConvoDefsMessageView(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ChatBskyConvoDefs.MessageView {
+                        self = .chatBskyConvoDefsMessageView(updatedValue)
                     }
                 }
-            case var .chatBskyConvoDefsDeletedMessageView(value):
+            case let .chatBskyConvoDefsDeletedMessageView(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ChatBskyConvoDefs.DeletedMessageView {
-                            self = .chatBskyConvoDefsDeletedMessageView(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ChatBskyConvoDefs.DeletedMessageView {
+                        self = .chatBskyConvoDefsDeletedMessageView(updatedValue)
+                    }
+                }
+            case .unexpected:
+                // Nothing to load for unexpected values
+                break
+            }
+        }
+    }
+
+    public enum LogAddReactionMessageUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
+        case chatBskyConvoDefsMessageView(ChatBskyConvoDefs.MessageView)
+        case chatBskyConvoDefsDeletedMessageView(ChatBskyConvoDefs.DeletedMessageView)
+        case unexpected(ATProtocolValueContainer)
+
+        public init(_ value: ChatBskyConvoDefs.MessageView) {
+            self = .chatBskyConvoDefsMessageView(value)
+        }
+
+        public init(_ value: ChatBskyConvoDefs.DeletedMessageView) {
+            self = .chatBskyConvoDefsDeletedMessageView(value)
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let typeValue = try container.decode(String.self, forKey: .type)
+
+            switch typeValue {
+            case "chat.bsky.convo.defs#messageView":
+                let value = try ChatBskyConvoDefs.MessageView(from: decoder)
+                self = .chatBskyConvoDefsMessageView(value)
+            case "chat.bsky.convo.defs#deletedMessageView":
+                let value = try ChatBskyConvoDefs.DeletedMessageView(from: decoder)
+                self = .chatBskyConvoDefsDeletedMessageView(value)
+            default:
+                let unknownValue = try ATProtocolValueContainer(from: decoder)
+                self = .unexpected(unknownValue)
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            switch self {
+            case let .chatBskyConvoDefsMessageView(value):
+                try container.encode("chat.bsky.convo.defs#messageView", forKey: .type)
+                try value.encode(to: encoder)
+            case let .chatBskyConvoDefsDeletedMessageView(value):
+                try container.encode("chat.bsky.convo.defs#deletedMessageView", forKey: .type)
+                try value.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
+            }
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            switch self {
+            case let .chatBskyConvoDefsMessageView(value):
+                hasher.combine("chat.bsky.convo.defs#messageView")
+                hasher.combine(value)
+            case let .chatBskyConvoDefsDeletedMessageView(value):
+                hasher.combine("chat.bsky.convo.defs#deletedMessageView")
+                hasher.combine(value)
+            case let .unexpected(container):
+                hasher.combine("unexpected")
+                hasher.combine(container)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case type = "$type"
+        }
+
+        public static func == (lhs: LogAddReactionMessageUnion, rhs: LogAddReactionMessageUnion) -> Bool {
+            switch (lhs, rhs) {
+            case let (
+                .chatBskyConvoDefsMessageView(lhsValue),
+                .chatBskyConvoDefsMessageView(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .chatBskyConvoDefsDeletedMessageView(lhsValue),
+                .chatBskyConvoDefsDeletedMessageView(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
+            default:
+                return false
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? LogAddReactionMessageUnion else { return false }
+            return self == other
+        }
+
+        /// Property that indicates if this enum contains pending data that needs loading
+        public var hasPendingData: Bool {
+            switch self {
+            case let .chatBskyConvoDefsMessageView(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .chatBskyConvoDefsDeletedMessageView(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case .unexpected:
+                return false
+            }
+        }
+
+        /// Attempts to load any pending data in this enum or its children
+        public mutating func loadPendingData() async {
+            switch self {
+            case let .chatBskyConvoDefsMessageView(value):
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ChatBskyConvoDefs.MessageView {
+                        self = .chatBskyConvoDefsMessageView(updatedValue)
+                    }
+                }
+            case let .chatBskyConvoDefsDeletedMessageView(value):
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ChatBskyConvoDefs.DeletedMessageView {
+                        self = .chatBskyConvoDefsDeletedMessageView(updatedValue)
+                    }
+                }
+            case .unexpected:
+                // Nothing to load for unexpected values
+                break
+            }
+        }
+    }
+
+    public enum LogRemoveReactionMessageUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
+        case chatBskyConvoDefsMessageView(ChatBskyConvoDefs.MessageView)
+        case chatBskyConvoDefsDeletedMessageView(ChatBskyConvoDefs.DeletedMessageView)
+        case unexpected(ATProtocolValueContainer)
+
+        public init(_ value: ChatBskyConvoDefs.MessageView) {
+            self = .chatBskyConvoDefsMessageView(value)
+        }
+
+        public init(_ value: ChatBskyConvoDefs.DeletedMessageView) {
+            self = .chatBskyConvoDefsDeletedMessageView(value)
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let typeValue = try container.decode(String.self, forKey: .type)
+
+            switch typeValue {
+            case "chat.bsky.convo.defs#messageView":
+                let value = try ChatBskyConvoDefs.MessageView(from: decoder)
+                self = .chatBskyConvoDefsMessageView(value)
+            case "chat.bsky.convo.defs#deletedMessageView":
+                let value = try ChatBskyConvoDefs.DeletedMessageView(from: decoder)
+                self = .chatBskyConvoDefsDeletedMessageView(value)
+            default:
+                let unknownValue = try ATProtocolValueContainer(from: decoder)
+                self = .unexpected(unknownValue)
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            switch self {
+            case let .chatBskyConvoDefsMessageView(value):
+                try container.encode("chat.bsky.convo.defs#messageView", forKey: .type)
+                try value.encode(to: encoder)
+            case let .chatBskyConvoDefsDeletedMessageView(value):
+                try container.encode("chat.bsky.convo.defs#deletedMessageView", forKey: .type)
+                try value.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
+            }
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            switch self {
+            case let .chatBskyConvoDefsMessageView(value):
+                hasher.combine("chat.bsky.convo.defs#messageView")
+                hasher.combine(value)
+            case let .chatBskyConvoDefsDeletedMessageView(value):
+                hasher.combine("chat.bsky.convo.defs#deletedMessageView")
+                hasher.combine(value)
+            case let .unexpected(container):
+                hasher.combine("unexpected")
+                hasher.combine(container)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case type = "$type"
+        }
+
+        public static func == (lhs: LogRemoveReactionMessageUnion, rhs: LogRemoveReactionMessageUnion) -> Bool {
+            switch (lhs, rhs) {
+            case let (
+                .chatBskyConvoDefsMessageView(lhsValue),
+                .chatBskyConvoDefsMessageView(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .chatBskyConvoDefsDeletedMessageView(lhsValue),
+                .chatBskyConvoDefsDeletedMessageView(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
+            default:
+                return false
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? LogRemoveReactionMessageUnion else { return false }
+            return self == other
+        }
+
+        /// Property that indicates if this enum contains pending data that needs loading
+        public var hasPendingData: Bool {
+            switch self {
+            case let .chatBskyConvoDefsMessageView(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case let .chatBskyConvoDefsDeletedMessageView(value):
+                if let loadable = value as? PendingDataLoadable {
+                    return loadable.hasPendingData
+                }
+                return false
+            case .unexpected:
+                return false
+            }
+        }
+
+        /// Attempts to load any pending data in this enum or its children
+        public mutating func loadPendingData() async {
+            switch self {
+            case let .chatBskyConvoDefsMessageView(value):
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ChatBskyConvoDefs.MessageView {
+                        self = .chatBskyConvoDefsMessageView(updatedValue)
+                    }
+                }
+            case let .chatBskyConvoDefsDeletedMessageView(value):
+                // Check if this value conforms to PendingDataLoadable and has pending data
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ChatBskyConvoDefs.DeletedMessageView {
+                        self = .chatBskyConvoDefsDeletedMessageView(updatedValue)
                     }
                 }
             case .unexpected:

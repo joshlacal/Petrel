@@ -24,6 +24,22 @@ public enum AppBskyFeedGetPosts {
         ) {
             self.posts = posts
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            posts = try container.decode([AppBskyFeedDefs.PostView].self, forKey: .posts)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(posts, forKey: .posts)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case posts
+        }
     }
 }
 

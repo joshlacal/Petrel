@@ -55,13 +55,17 @@ public struct AppBskyGraphStarterpack: ATProtocolCodable, ATProtocolValue {
         }
 
         if let value = descriptionFacets {
-            try container.encode(value, forKey: .descriptionFacets)
+            if !value.isEmpty {
+                try container.encode(value, forKey: .descriptionFacets)
+            }
         }
 
         try container.encode(list, forKey: .list)
 
         if let value = feeds {
-            try container.encode(value, forKey: .feeds)
+            if !value.isEmpty {
+                try container.encode(value, forKey: .feeds)
+            }
         }
 
         try container.encode(createdAt, forKey: .createdAt)

@@ -109,6 +109,22 @@ public enum ComAtprotoServerListAppPasswords {
         ) {
             self.passwords = passwords
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            passwords = try container.decode([AppPassword].self, forKey: .passwords)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(passwords, forKey: .passwords)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case passwords
+        }
     }
 
     public enum Error: String, Swift.Error, CustomStringConvertible {

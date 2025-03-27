@@ -63,6 +63,62 @@ public enum ComAtprotoServerCheckAccountStatus {
 
             self.importedBlobs = importedBlobs
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            activated = try container.decode(Bool.self, forKey: .activated)
+
+            validDid = try container.decode(Bool.self, forKey: .validDid)
+
+            repoCommit = try container.decode(String.self, forKey: .repoCommit)
+
+            repoRev = try container.decode(String.self, forKey: .repoRev)
+
+            repoBlocks = try container.decode(Int.self, forKey: .repoBlocks)
+
+            indexedRecords = try container.decode(Int.self, forKey: .indexedRecords)
+
+            privateStateValues = try container.decode(Int.self, forKey: .privateStateValues)
+
+            expectedBlobs = try container.decode(Int.self, forKey: .expectedBlobs)
+
+            importedBlobs = try container.decode(Int.self, forKey: .importedBlobs)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(activated, forKey: .activated)
+
+            try container.encode(validDid, forKey: .validDid)
+
+            try container.encode(repoCommit, forKey: .repoCommit)
+
+            try container.encode(repoRev, forKey: .repoRev)
+
+            try container.encode(repoBlocks, forKey: .repoBlocks)
+
+            try container.encode(indexedRecords, forKey: .indexedRecords)
+
+            try container.encode(privateStateValues, forKey: .privateStateValues)
+
+            try container.encode(expectedBlobs, forKey: .expectedBlobs)
+
+            try container.encode(importedBlobs, forKey: .importedBlobs)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case activated
+            case validDid
+            case repoCommit
+            case repoRev
+            case repoBlocks
+            case indexedRecords
+            case privateStateValues
+            case expectedBlobs
+            case importedBlobs
+        }
     }
 }
 

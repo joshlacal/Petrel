@@ -418,37 +418,31 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .appBskyRichtextFacetMention(value):
+            case let .appBskyRichtextFacetMention(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? AppBskyRichtextFacet.Mention {
-                            self = .appBskyRichtextFacetMention(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? AppBskyRichtextFacet.Mention {
+                        self = .appBskyRichtextFacetMention(updatedValue)
                     }
                 }
-            case var .appBskyRichtextFacetLink(value):
+            case let .appBskyRichtextFacetLink(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? AppBskyRichtextFacet.Link {
-                            self = .appBskyRichtextFacetLink(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? AppBskyRichtextFacet.Link {
+                        self = .appBskyRichtextFacetLink(updatedValue)
                     }
                 }
-            case var .appBskyRichtextFacetTag(value):
+            case let .appBskyRichtextFacetTag(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? AppBskyRichtextFacet.Tag {
-                            self = .appBskyRichtextFacetTag(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? AppBskyRichtextFacet.Tag {
+                        self = .appBskyRichtextFacetTag(updatedValue)
                     }
                 }
             case .unexpected:

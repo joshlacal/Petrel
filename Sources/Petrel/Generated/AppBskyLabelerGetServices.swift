@@ -27,6 +27,22 @@ public enum AppBskyLabelerGetServices {
         ) {
             self.views = views
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            views = try container.decode([OutputViewsUnion].self, forKey: .views)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(views, forKey: .views)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case views
+        }
     }
 
     public enum OutputViewsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
@@ -137,26 +153,22 @@ public enum AppBskyLabelerGetServices {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .appBskyLabelerDefsLabelerView(value):
+            case let .appBskyLabelerDefsLabelerView(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? AppBskyLabelerDefs.LabelerView {
-                            self = .appBskyLabelerDefsLabelerView(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? AppBskyLabelerDefs.LabelerView {
+                        self = .appBskyLabelerDefsLabelerView(updatedValue)
                     }
                 }
-            case var .appBskyLabelerDefsLabelerViewDetailed(value):
+            case let .appBskyLabelerDefsLabelerViewDetailed(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? AppBskyLabelerDefs.LabelerViewDetailed {
-                            self = .appBskyLabelerDefsLabelerViewDetailed(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? AppBskyLabelerDefs.LabelerViewDetailed {
+                        self = .appBskyLabelerDefsLabelerViewDetailed(updatedValue)
                     }
                 }
             case .unexpected:

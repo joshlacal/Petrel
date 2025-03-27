@@ -45,6 +45,34 @@ public enum ComAtprotoRepoGetRecord {
 
             self.value = value
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+
+            cid = try container.decodeIfPresent(String.self, forKey: .cid)
+
+            value = try container.decode(ATProtocolValueContainer.self, forKey: .value)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(uri, forKey: .uri)
+
+            if let value = cid {
+                try container.encode(value, forKey: .cid)
+            }
+
+            try container.encode(value, forKey: .value)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case uri
+            case cid
+            case value
+        }
     }
 
     public enum Error: String, Swift.Error, CustomStringConvertible {

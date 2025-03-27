@@ -84,6 +84,29 @@ public enum ToolsOzoneModerationQueryEvents {
 
             self.events = events
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+
+            events = try container.decode([ToolsOzoneModerationDefs.ModEventView].self, forKey: .events)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            if let value = cursor {
+                try container.encode(value, forKey: .cursor)
+            }
+
+            try container.encode(events, forKey: .events)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case cursor
+            case events
+        }
     }
 }
 

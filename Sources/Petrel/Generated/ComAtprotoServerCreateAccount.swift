@@ -27,6 +27,78 @@ public enum ComAtprotoServerCreateAccount {
             self.recoveryKey = recoveryKey
             self.plcOp = plcOp
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            email = try container.decodeIfPresent(String.self, forKey: .email)
+
+            handle = try container.decode(String.self, forKey: .handle)
+
+            did = try container.decodeIfPresent(String.self, forKey: .did)
+
+            inviteCode = try container.decodeIfPresent(String.self, forKey: .inviteCode)
+
+            verificationCode = try container.decodeIfPresent(String.self, forKey: .verificationCode)
+
+            verificationPhone = try container.decodeIfPresent(String.self, forKey: .verificationPhone)
+
+            password = try container.decodeIfPresent(String.self, forKey: .password)
+
+            recoveryKey = try container.decodeIfPresent(String.self, forKey: .recoveryKey)
+
+            plcOp = try container.decodeIfPresent(ATProtocolValueContainer.self, forKey: .plcOp)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            if let value = email {
+                try container.encode(value, forKey: .email)
+            }
+
+            try container.encode(handle, forKey: .handle)
+
+            if let value = did {
+                try container.encode(value, forKey: .did)
+            }
+
+            if let value = inviteCode {
+                try container.encode(value, forKey: .inviteCode)
+            }
+
+            if let value = verificationCode {
+                try container.encode(value, forKey: .verificationCode)
+            }
+
+            if let value = verificationPhone {
+                try container.encode(value, forKey: .verificationPhone)
+            }
+
+            if let value = password {
+                try container.encode(value, forKey: .password)
+            }
+
+            if let value = recoveryKey {
+                try container.encode(value, forKey: .recoveryKey)
+            }
+
+            if let value = plcOp {
+                try container.encode(value, forKey: .plcOp)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case email
+            case handle
+            case did
+            case inviteCode
+            case verificationCode
+            case verificationPhone
+            case password
+            case recoveryKey
+            case plcOp
+        }
     }
 
     public struct Output: ATProtocolCodable {
@@ -62,6 +134,44 @@ public enum ComAtprotoServerCreateAccount {
             self.did = did
 
             self.didDoc = didDoc
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            accessJwt = try container.decode(String.self, forKey: .accessJwt)
+
+            refreshJwt = try container.decode(String.self, forKey: .refreshJwt)
+
+            handle = try container.decode(String.self, forKey: .handle)
+
+            did = try container.decode(String.self, forKey: .did)
+
+            didDoc = try container.decodeIfPresent(DIDDocument.self, forKey: .didDoc)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(accessJwt, forKey: .accessJwt)
+
+            try container.encode(refreshJwt, forKey: .refreshJwt)
+
+            try container.encode(handle, forKey: .handle)
+
+            try container.encode(did, forKey: .did)
+
+            if let value = didDoc {
+                try container.encode(value, forKey: .didDoc)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case accessJwt
+            case refreshJwt
+            case handle
+            case did
+            case didDoc
         }
     }
 

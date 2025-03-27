@@ -164,6 +164,34 @@ public enum AppBskyFeedDescribeFeedGenerator {
 
             self.links = links
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            did = try container.decode(String.self, forKey: .did)
+
+            feeds = try container.decode([Feed].self, forKey: .feeds)
+
+            links = try container.decodeIfPresent(Links.self, forKey: .links)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(did, forKey: .did)
+
+            try container.encode(feeds, forKey: .feeds)
+
+            if let value = links {
+                try container.encode(value, forKey: .links)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case did
+            case feeds
+            case links
+        }
     }
 }
 

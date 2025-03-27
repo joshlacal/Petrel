@@ -123,7 +123,9 @@ public enum AppBskyNotificationListNotifications {
             try container.encode(indexedAt, forKey: .indexedAt)
 
             if let value = labels {
-                try container.encode(value, forKey: .labels)
+                if !value.isEmpty {
+                    try container.encode(value, forKey: .labels)
+                }
             }
         }
 
@@ -256,6 +258,43 @@ public enum AppBskyNotificationListNotifications {
             self.priority = priority
 
             self.seenAt = seenAt
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+
+            notifications = try container.decode([Notification].self, forKey: .notifications)
+
+            priority = try container.decodeIfPresent(Bool.self, forKey: .priority)
+
+            seenAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .seenAt)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            if let value = cursor {
+                try container.encode(value, forKey: .cursor)
+            }
+
+            try container.encode(notifications, forKey: .notifications)
+
+            if let value = priority {
+                try container.encode(value, forKey: .priority)
+            }
+
+            if let value = seenAt {
+                try container.encode(value, forKey: .seenAt)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case cursor
+            case notifications
+            case priority
+            case seenAt
         }
     }
 }

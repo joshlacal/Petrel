@@ -24,6 +24,22 @@ public enum ToolsOzoneModerationGetRecords {
         ) {
             self.records = records
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            records = try container.decode([OutputRecordsUnion].self, forKey: .records)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(records, forKey: .records)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case records
+        }
     }
 
     public enum OutputRecordsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
@@ -134,26 +150,22 @@ public enum ToolsOzoneModerationGetRecords {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .toolsOzoneModerationDefsRecordViewDetail(value):
+            case let .toolsOzoneModerationDefsRecordViewDetail(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.RecordViewDetail {
-                            self = .toolsOzoneModerationDefsRecordViewDetail(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.RecordViewDetail {
+                        self = .toolsOzoneModerationDefsRecordViewDetail(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsRecordViewNotFound(value):
+            case let .toolsOzoneModerationDefsRecordViewNotFound(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.RecordViewNotFound {
-                            self = .toolsOzoneModerationDefsRecordViewNotFound(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.RecordViewNotFound {
+                        self = .toolsOzoneModerationDefsRecordViewNotFound(updatedValue)
                     }
                 }
             case .unexpected:

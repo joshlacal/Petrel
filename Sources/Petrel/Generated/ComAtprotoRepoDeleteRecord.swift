@@ -19,6 +19,46 @@ public enum ComAtprotoRepoDeleteRecord {
             self.swapRecord = swapRecord
             self.swapCommit = swapCommit
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            repo = try container.decode(String.self, forKey: .repo)
+
+            collection = try container.decode(String.self, forKey: .collection)
+
+            rkey = try container.decode(String.self, forKey: .rkey)
+
+            swapRecord = try container.decodeIfPresent(String.self, forKey: .swapRecord)
+
+            swapCommit = try container.decodeIfPresent(String.self, forKey: .swapCommit)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(repo, forKey: .repo)
+
+            try container.encode(collection, forKey: .collection)
+
+            try container.encode(rkey, forKey: .rkey)
+
+            if let value = swapRecord {
+                try container.encode(value, forKey: .swapRecord)
+            }
+
+            if let value = swapCommit {
+                try container.encode(value, forKey: .swapCommit)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case repo
+            case collection
+            case rkey
+            case swapRecord
+            case swapCommit
+        }
     }
 
     public struct Output: ATProtocolCodable {
@@ -30,6 +70,24 @@ public enum ComAtprotoRepoDeleteRecord {
 
         ) {
             self.commit = commit
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            commit = try container.decodeIfPresent(ComAtprotoRepoDefs.CommitMeta.self, forKey: .commit)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            if let value = commit {
+                try container.encode(value, forKey: .commit)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case commit
         }
     }
 

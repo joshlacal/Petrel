@@ -24,6 +24,22 @@ public enum AppBskyGraphGetStarterPacks {
         ) {
             self.starterPacks = starterPacks
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            starterPacks = try container.decode([AppBskyGraphDefs.StarterPackViewBasic].self, forKey: .starterPacks)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(starterPacks, forKey: .starterPacks)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case starterPacks
+        }
     }
 }
 

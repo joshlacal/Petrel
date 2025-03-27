@@ -121,7 +121,9 @@ public enum AppBskyGraphDefs {
             }
 
             if let value = labels {
-                try container.encode(value, forKey: .labels)
+                if !value.isEmpty {
+                    try container.encode(value, forKey: .labels)
+                }
             }
 
             if let value = viewer {
@@ -366,7 +368,9 @@ public enum AppBskyGraphDefs {
             }
 
             if let value = descriptionFacets {
-                try container.encode(value, forKey: .descriptionFacets)
+                if !value.isEmpty {
+                    try container.encode(value, forKey: .descriptionFacets)
+                }
             }
 
             if let value = avatar {
@@ -378,7 +382,9 @@ public enum AppBskyGraphDefs {
             }
 
             if let value = labels {
-                try container.encode(value, forKey: .labels)
+                if !value.isEmpty {
+                    try container.encode(value, forKey: .labels)
+                }
             }
 
             if let value = viewer {
@@ -703,11 +709,15 @@ public enum AppBskyGraphDefs {
             }
 
             if let value = listItemsSample {
-                try container.encode(value, forKey: .listItemsSample)
+                if !value.isEmpty {
+                    try container.encode(value, forKey: .listItemsSample)
+                }
             }
 
             if let value = feeds {
-                try container.encode(value, forKey: .feeds)
+                if !value.isEmpty {
+                    try container.encode(value, forKey: .feeds)
+                }
             }
 
             if let value = joinedWeekCount {
@@ -719,7 +729,9 @@ public enum AppBskyGraphDefs {
             }
 
             if let value = labels {
-                try container.encode(value, forKey: .labels)
+                if !value.isEmpty {
+                    try container.encode(value, forKey: .labels)
+                }
             }
 
             try container.encode(indexedAt, forKey: .indexedAt)
@@ -953,7 +965,9 @@ public enum AppBskyGraphDefs {
             }
 
             if let value = labels {
-                try container.encode(value, forKey: .labels)
+                if !value.isEmpty {
+                    try container.encode(value, forKey: .labels)
+                }
             }
 
             try container.encode(indexedAt, forKey: .indexedAt)

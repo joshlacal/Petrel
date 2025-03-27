@@ -30,6 +30,22 @@ public enum ComAtprotoServerGetServiceAuth {
         ) {
             self.token = token
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            token = try container.decode(String.self, forKey: .token)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(token, forKey: .token)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case token
+        }
     }
 
     public enum Error: String, Swift.Error, CustomStringConvertible {

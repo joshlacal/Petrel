@@ -15,6 +15,22 @@ public enum ToolsOzoneCommunicationListTemplates {
         ) {
             self.communicationTemplates = communicationTemplates
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            communicationTemplates = try container.decode([ToolsOzoneCommunicationDefs.TemplateView].self, forKey: .communicationTemplates)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(communicationTemplates, forKey: .communicationTemplates)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case communicationTemplates
+        }
     }
 }
 

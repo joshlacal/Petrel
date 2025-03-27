@@ -42,6 +42,36 @@ public enum ComAtprotoAdminGetSubjectStatus {
 
             self.deactivated = deactivated
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            subject = try container.decode(OutputSubjectUnion.self, forKey: .subject)
+
+            takedown = try container.decodeIfPresent(ComAtprotoAdminDefs.StatusAttr.self, forKey: .takedown)
+
+            deactivated = try container.decodeIfPresent(ComAtprotoAdminDefs.StatusAttr.self, forKey: .deactivated)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(subject, forKey: .subject)
+
+            if let value = takedown {
+                try container.encode(value, forKey: .takedown)
+            }
+
+            if let value = deactivated {
+                try container.encode(value, forKey: .deactivated)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case subject
+            case takedown
+            case deactivated
+        }
     }
 
     public enum OutputSubjectUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
@@ -176,37 +206,31 @@ public enum ComAtprotoAdminGetSubjectStatus {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .comAtprotoAdminDefsRepoRef(value):
+            case let .comAtprotoAdminDefsRepoRef(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ComAtprotoAdminDefs.RepoRef {
-                            self = .comAtprotoAdminDefsRepoRef(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ComAtprotoAdminDefs.RepoRef {
+                        self = .comAtprotoAdminDefsRepoRef(updatedValue)
                     }
                 }
-            case var .comAtprotoRepoStrongRef(value):
+            case let .comAtprotoRepoStrongRef(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ComAtprotoRepoStrongRef {
-                            self = .comAtprotoRepoStrongRef(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ComAtprotoRepoStrongRef {
+                        self = .comAtprotoRepoStrongRef(updatedValue)
                     }
                 }
-            case var .comAtprotoAdminDefsRepoBlobRef(value):
+            case let .comAtprotoAdminDefsRepoBlobRef(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ComAtprotoAdminDefs.RepoBlobRef {
-                            self = .comAtprotoAdminDefsRepoBlobRef(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ComAtprotoAdminDefs.RepoBlobRef {
+                        self = .comAtprotoAdminDefsRepoBlobRef(updatedValue)
                     }
                 }
             case .unexpected:

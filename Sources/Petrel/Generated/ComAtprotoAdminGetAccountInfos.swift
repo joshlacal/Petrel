@@ -24,6 +24,22 @@ public enum ComAtprotoAdminGetAccountInfos {
         ) {
             self.infos = infos
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            infos = try container.decode([ComAtprotoAdminDefs.AccountView].self, forKey: .infos)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(infos, forKey: .infos)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case infos
+        }
     }
 }
 

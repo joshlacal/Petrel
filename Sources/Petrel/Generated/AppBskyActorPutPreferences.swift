@@ -11,6 +11,22 @@ public enum AppBskyActorPutPreferences {
         public init(preferences: AppBskyActorDefs.Preferences) {
             self.preferences = preferences
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            preferences = try container.decode(AppBskyActorDefs.Preferences.self, forKey: .preferences)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(preferences, forKey: .preferences)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case preferences
+        }
     }
 }
 

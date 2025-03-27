@@ -15,6 +15,36 @@ public enum ToolsOzoneTeamUpdateMember {
             self.disabled = disabled
             self.role = role
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            did = try container.decode(String.self, forKey: .did)
+
+            disabled = try container.decodeIfPresent(Bool.self, forKey: .disabled)
+
+            role = try container.decodeIfPresent(String.self, forKey: .role)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(did, forKey: .did)
+
+            if let value = disabled {
+                try container.encode(value, forKey: .disabled)
+            }
+
+            if let value = role {
+                try container.encode(value, forKey: .role)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case did
+            case disabled
+            case role
+        }
     }
 
     public typealias Output = ToolsOzoneTeamDefs.Member

@@ -27,6 +27,22 @@ public enum ComAtprotoTempFetchLabels {
         ) {
             self.labels = labels
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            labels = try container.decode([ComAtprotoLabelDefs.Label].self, forKey: .labels)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(labels, forKey: .labels)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case labels
+        }
     }
 }
 

@@ -103,7 +103,9 @@ public enum AppBskyLabelerDefs {
             try container.encode(indexedAt, forKey: .indexedAt)
 
             if let value = labels {
-                try container.encode(value, forKey: .labels)
+                if !value.isEmpty {
+                    try container.encode(value, forKey: .labels)
+                }
             }
         }
 
@@ -315,19 +317,27 @@ public enum AppBskyLabelerDefs {
             try container.encode(indexedAt, forKey: .indexedAt)
 
             if let value = labels {
-                try container.encode(value, forKey: .labels)
+                if !value.isEmpty {
+                    try container.encode(value, forKey: .labels)
+                }
             }
 
             if let value = reasonTypes {
-                try container.encode(value, forKey: .reasonTypes)
+                if !value.isEmpty {
+                    try container.encode(value, forKey: .reasonTypes)
+                }
             }
 
             if let value = subjectTypes {
-                try container.encode(value, forKey: .subjectTypes)
+                if !value.isEmpty {
+                    try container.encode(value, forKey: .subjectTypes)
+                }
             }
 
             if let value = subjectCollections {
-                try container.encode(value, forKey: .subjectCollections)
+                if !value.isEmpty {
+                    try container.encode(value, forKey: .subjectCollections)
+                }
             }
         }
 
@@ -538,7 +548,9 @@ public enum AppBskyLabelerDefs {
             try container.encode(labelValues, forKey: .labelValues)
 
             if let value = labelValueDefinitions {
-                try container.encode(value, forKey: .labelValueDefinitions)
+                if !value.isEmpty {
+                    try container.encode(value, forKey: .labelValueDefinitions)
+                }
             }
         }
 

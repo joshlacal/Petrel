@@ -36,6 +36,29 @@ public enum ToolsOzoneSignatureSearchAccounts {
 
             self.accounts = accounts
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+
+            accounts = try container.decode([ComAtprotoAdminDefs.AccountView].self, forKey: .accounts)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            if let value = cursor {
+                try container.encode(value, forKey: .cursor)
+            }
+
+            try container.encode(accounts, forKey: .accounts)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case cursor
+            case accounts
+        }
     }
 }
 

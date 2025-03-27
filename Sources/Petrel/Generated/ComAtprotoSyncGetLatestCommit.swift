@@ -30,6 +30,27 @@ public enum ComAtprotoSyncGetLatestCommit {
 
             self.rev = rev
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            cid = try container.decode(String.self, forKey: .cid)
+
+            rev = try container.decode(String.self, forKey: .rev)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(cid, forKey: .cid)
+
+            try container.encode(rev, forKey: .rev)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case cid
+            case rev
+        }
     }
 
     public enum Error: String, Swift.Error, CustomStringConvertible {

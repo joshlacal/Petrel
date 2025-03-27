@@ -51,6 +51,41 @@ public enum AppBskyFeedGetRepostedBy {
 
             self.repostedBy = repostedBy
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+
+            cid = try container.decodeIfPresent(String.self, forKey: .cid)
+
+            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+
+            repostedBy = try container.decode([AppBskyActorDefs.ProfileView].self, forKey: .repostedBy)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(uri, forKey: .uri)
+
+            if let value = cid {
+                try container.encode(value, forKey: .cid)
+            }
+
+            if let value = cursor {
+                try container.encode(value, forKey: .cursor)
+            }
+
+            try container.encode(repostedBy, forKey: .repostedBy)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case uri
+            case cid
+            case cursor
+            case repostedBy
+        }
     }
 }
 

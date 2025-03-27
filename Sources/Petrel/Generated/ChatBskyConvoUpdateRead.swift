@@ -13,6 +13,29 @@ public enum ChatBskyConvoUpdateRead {
             self.convoId = convoId
             self.messageId = messageId
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            convoId = try container.decode(String.self, forKey: .convoId)
+
+            messageId = try container.decodeIfPresent(String.self, forKey: .messageId)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(convoId, forKey: .convoId)
+
+            if let value = messageId {
+                try container.encode(value, forKey: .messageId)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case convoId
+            case messageId
+        }
     }
 
     public struct Output: ATProtocolCodable {
@@ -24,6 +47,22 @@ public enum ChatBskyConvoUpdateRead {
 
         ) {
             self.convo = convo
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            convo = try container.decode(ChatBskyConvoDefs.ConvoView.self, forKey: .convo)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(convo, forKey: .convo)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case convo
         }
     }
 }

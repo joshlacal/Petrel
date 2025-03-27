@@ -45,6 +45,36 @@ public enum AppBskyUnspeccedSearchStarterPacksSkeleton {
 
             self.starterPacks = starterPacks
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+
+            hitsTotal = try container.decodeIfPresent(Int.self, forKey: .hitsTotal)
+
+            starterPacks = try container.decode([AppBskyUnspeccedDefs.SkeletonSearchStarterPack].self, forKey: .starterPacks)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            if let value = cursor {
+                try container.encode(value, forKey: .cursor)
+            }
+
+            if let value = hitsTotal {
+                try container.encode(value, forKey: .hitsTotal)
+            }
+
+            try container.encode(starterPacks, forKey: .starterPacks)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case cursor
+            case hitsTotal
+            case starterPacks
+        }
     }
 
     public enum Error: String, Swift.Error, CustomStringConvertible {

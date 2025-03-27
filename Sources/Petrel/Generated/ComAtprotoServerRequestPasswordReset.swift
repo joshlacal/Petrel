@@ -11,6 +11,22 @@ public enum ComAtprotoServerRequestPasswordReset {
         public init(email: String) {
             self.email = email
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            email = try container.decode(String.self, forKey: .email)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(email, forKey: .email)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case email
+        }
     }
 }
 

@@ -21,6 +21,22 @@ public enum ComAtprotoRepoUploadBlob {
         ) {
             self.blob = blob
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            blob = try container.decode(Blob.self, forKey: .blob)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(blob, forKey: .blob)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case blob
+        }
     }
 }
 

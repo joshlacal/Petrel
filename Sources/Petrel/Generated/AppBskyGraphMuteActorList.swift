@@ -11,6 +11,22 @@ public enum AppBskyGraphMuteActorList {
         public init(list: ATProtocolURI) {
             self.list = list
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            list = try container.decode(ATProtocolURI.self, forKey: .list)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(list, forKey: .list)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case list
+        }
     }
 }
 

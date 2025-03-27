@@ -11,6 +11,22 @@ public enum ToolsOzoneTeamDeleteMember {
         public init(did: String) {
             self.did = did
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            did = try container.decode(String.self, forKey: .did)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(did, forKey: .did)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case did
+        }
     }
 
     public enum Error: String, Swift.Error, CustomStringConvertible {

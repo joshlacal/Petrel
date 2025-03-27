@@ -159,6 +159,52 @@ public enum ToolsOzoneServerGetConfig {
 
             self.viewer = viewer
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            appview = try container.decodeIfPresent(ServiceConfig.self, forKey: .appview)
+
+            pds = try container.decodeIfPresent(ServiceConfig.self, forKey: .pds)
+
+            blobDivert = try container.decodeIfPresent(ServiceConfig.self, forKey: .blobDivert)
+
+            chat = try container.decodeIfPresent(ServiceConfig.self, forKey: .chat)
+
+            viewer = try container.decodeIfPresent(ViewerConfig.self, forKey: .viewer)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            if let value = appview {
+                try container.encode(value, forKey: .appview)
+            }
+
+            if let value = pds {
+                try container.encode(value, forKey: .pds)
+            }
+
+            if let value = blobDivert {
+                try container.encode(value, forKey: .blobDivert)
+            }
+
+            if let value = chat {
+                try container.encode(value, forKey: .chat)
+            }
+
+            if let value = viewer {
+                try container.encode(value, forKey: .viewer)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case appview
+            case pds
+            case blobDivert
+            case chat
+            case viewer
+        }
     }
 }
 

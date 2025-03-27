@@ -24,6 +24,22 @@ public enum ToolsOzoneModerationGetRepos {
         ) {
             self.repos = repos
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            repos = try container.decode([OutputReposUnion].self, forKey: .repos)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(repos, forKey: .repos)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case repos
+        }
     }
 
     public enum OutputReposUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
@@ -134,26 +150,22 @@ public enum ToolsOzoneModerationGetRepos {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .toolsOzoneModerationDefsRepoViewDetail(value):
+            case let .toolsOzoneModerationDefsRepoViewDetail(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.RepoViewDetail {
-                            self = .toolsOzoneModerationDefsRepoViewDetail(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.RepoViewDetail {
+                        self = .toolsOzoneModerationDefsRepoViewDetail(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsRepoViewNotFound(value):
+            case let .toolsOzoneModerationDefsRepoViewNotFound(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.RepoViewNotFound {
-                            self = .toolsOzoneModerationDefsRepoViewNotFound(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.RepoViewNotFound {
+                        self = .toolsOzoneModerationDefsRepoViewNotFound(updatedValue)
                     }
                 }
             case .unexpected:

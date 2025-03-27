@@ -39,6 +39,29 @@ public enum ChatBskyConvoListConvos {
 
             self.convos = convos
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+
+            convos = try container.decode([ChatBskyConvoDefs.ConvoView].self, forKey: .convos)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            if let value = cursor {
+                try container.encode(value, forKey: .cursor)
+            }
+
+            try container.encode(convos, forKey: .convos)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case cursor
+            case convos
+        }
     }
 }
 

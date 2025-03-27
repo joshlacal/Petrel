@@ -48,6 +48,42 @@ public enum ComAtprotoRepoDescribeRepo {
 
             self.handleIsCorrect = handleIsCorrect
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            handle = try container.decode(String.self, forKey: .handle)
+
+            did = try container.decode(String.self, forKey: .did)
+
+            didDoc = try container.decode(DIDDocument.self, forKey: .didDoc)
+
+            collections = try container.decode([String].self, forKey: .collections)
+
+            handleIsCorrect = try container.decode(Bool.self, forKey: .handleIsCorrect)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(handle, forKey: .handle)
+
+            try container.encode(did, forKey: .did)
+
+            try container.encode(didDoc, forKey: .didDoc)
+
+            try container.encode(collections, forKey: .collections)
+
+            try container.encode(handleIsCorrect, forKey: .handleIsCorrect)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case handle
+            case did
+            case didDoc
+            case collections
+            case handleIsCorrect
+        }
     }
 }
 

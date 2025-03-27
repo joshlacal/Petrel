@@ -13,6 +13,27 @@ public enum ChatBskyConvoSendMessage {
             self.convoId = convoId
             self.message = message
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            convoId = try container.decode(String.self, forKey: .convoId)
+
+            message = try container.decode(ChatBskyConvoDefs.MessageInput.self, forKey: .message)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(convoId, forKey: .convoId)
+
+            try container.encode(message, forKey: .message)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case convoId
+            case message
+        }
     }
 
     public typealias Output = ChatBskyConvoDefs.MessageView

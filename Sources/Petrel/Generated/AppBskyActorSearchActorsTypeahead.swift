@@ -30,6 +30,22 @@ public enum AppBskyActorSearchActorsTypeahead {
         ) {
             self.actors = actors
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            actors = try container.decode([AppBskyActorDefs.ProfileViewBasic].self, forKey: .actors)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(actors, forKey: .actors)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case actors
+        }
     }
 }
 

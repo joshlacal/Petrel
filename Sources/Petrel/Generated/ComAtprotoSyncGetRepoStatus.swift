@@ -42,6 +42,41 @@ public enum ComAtprotoSyncGetRepoStatus {
 
             self.rev = rev
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            did = try container.decode(String.self, forKey: .did)
+
+            active = try container.decode(Bool.self, forKey: .active)
+
+            status = try container.decodeIfPresent(String.self, forKey: .status)
+
+            rev = try container.decodeIfPresent(String.self, forKey: .rev)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(did, forKey: .did)
+
+            try container.encode(active, forKey: .active)
+
+            if let value = status {
+                try container.encode(value, forKey: .status)
+            }
+
+            if let value = rev {
+                try container.encode(value, forKey: .rev)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case did
+            case active
+            case status
+            case rev
+        }
     }
 
     public enum Error: String, Swift.Error, CustomStringConvertible {

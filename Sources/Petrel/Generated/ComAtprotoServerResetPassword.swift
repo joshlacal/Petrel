@@ -13,6 +13,27 @@ public enum ComAtprotoServerResetPassword {
             self.token = token
             self.password = password
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            token = try container.decode(String.self, forKey: .token)
+
+            password = try container.decode(String.self, forKey: .password)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(token, forKey: .token)
+
+            try container.encode(password, forKey: .password)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case token
+            case password
+        }
     }
 
     public enum Error: String, Swift.Error, CustomStringConvertible {

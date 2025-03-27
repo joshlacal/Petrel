@@ -87,6 +87,36 @@ public enum ComAtprotoServerCreateInviteCodes {
             self.useCount = useCount
             self.forAccounts = forAccounts
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            codeCount = try container.decode(Int.self, forKey: .codeCount)
+
+            useCount = try container.decode(Int.self, forKey: .useCount)
+
+            forAccounts = try container.decodeIfPresent([String].self, forKey: .forAccounts)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(codeCount, forKey: .codeCount)
+
+            try container.encode(useCount, forKey: .useCount)
+
+            if let value = forAccounts {
+                if !value.isEmpty {
+                    try container.encode(value, forKey: .forAccounts)
+                }
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case codeCount
+            case useCount
+            case forAccounts
+        }
     }
 
     public struct Output: ATProtocolCodable {
@@ -98,6 +128,22 @@ public enum ComAtprotoServerCreateInviteCodes {
 
         ) {
             self.codes = codes
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            codes = try container.decode([AccountCodes].self, forKey: .codes)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(codes, forKey: .codes)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case codes
         }
     }
 }

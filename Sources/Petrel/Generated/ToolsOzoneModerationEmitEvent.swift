@@ -17,6 +17,41 @@ public enum ToolsOzoneModerationEmitEvent {
             self.subjectBlobCids = subjectBlobCids
             self.createdBy = createdBy
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            event = try container.decode(InputEventUnion.self, forKey: .event)
+
+            subject = try container.decode(InputSubjectUnion.self, forKey: .subject)
+
+            subjectBlobCids = try container.decodeIfPresent([String].self, forKey: .subjectBlobCids)
+
+            createdBy = try container.decode(String.self, forKey: .createdBy)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(event, forKey: .event)
+
+            try container.encode(subject, forKey: .subject)
+
+            if let value = subjectBlobCids {
+                if !value.isEmpty {
+                    try container.encode(value, forKey: .subjectBlobCids)
+                }
+            }
+
+            try container.encode(createdBy, forKey: .createdBy)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case event
+            case subject
+            case subjectBlobCids
+            case createdBy
+        }
     }
 
     public typealias Output = ToolsOzoneModerationDefs.ModEventView
@@ -544,213 +579,175 @@ public enum ToolsOzoneModerationEmitEvent {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .toolsOzoneModerationDefsModEventTakedown(value):
+            case let .toolsOzoneModerationDefsModEventTakedown(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventTakedown {
-                            self = .toolsOzoneModerationDefsModEventTakedown(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventTakedown {
+                        self = .toolsOzoneModerationDefsModEventTakedown(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventAcknowledge(value):
+            case let .toolsOzoneModerationDefsModEventAcknowledge(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventAcknowledge {
-                            self = .toolsOzoneModerationDefsModEventAcknowledge(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventAcknowledge {
+                        self = .toolsOzoneModerationDefsModEventAcknowledge(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventEscalate(value):
+            case let .toolsOzoneModerationDefsModEventEscalate(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventEscalate {
-                            self = .toolsOzoneModerationDefsModEventEscalate(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventEscalate {
+                        self = .toolsOzoneModerationDefsModEventEscalate(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventComment(value):
+            case let .toolsOzoneModerationDefsModEventComment(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventComment {
-                            self = .toolsOzoneModerationDefsModEventComment(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventComment {
+                        self = .toolsOzoneModerationDefsModEventComment(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventLabel(value):
+            case let .toolsOzoneModerationDefsModEventLabel(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventLabel {
-                            self = .toolsOzoneModerationDefsModEventLabel(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventLabel {
+                        self = .toolsOzoneModerationDefsModEventLabel(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventReport(value):
+            case let .toolsOzoneModerationDefsModEventReport(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventReport {
-                            self = .toolsOzoneModerationDefsModEventReport(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventReport {
+                        self = .toolsOzoneModerationDefsModEventReport(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventMute(value):
+            case let .toolsOzoneModerationDefsModEventMute(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventMute {
-                            self = .toolsOzoneModerationDefsModEventMute(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventMute {
+                        self = .toolsOzoneModerationDefsModEventMute(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventUnmute(value):
+            case let .toolsOzoneModerationDefsModEventUnmute(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventUnmute {
-                            self = .toolsOzoneModerationDefsModEventUnmute(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventUnmute {
+                        self = .toolsOzoneModerationDefsModEventUnmute(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventMuteReporter(value):
+            case let .toolsOzoneModerationDefsModEventMuteReporter(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventMuteReporter {
-                            self = .toolsOzoneModerationDefsModEventMuteReporter(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventMuteReporter {
+                        self = .toolsOzoneModerationDefsModEventMuteReporter(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventUnmuteReporter(value):
+            case let .toolsOzoneModerationDefsModEventUnmuteReporter(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventUnmuteReporter {
-                            self = .toolsOzoneModerationDefsModEventUnmuteReporter(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventUnmuteReporter {
+                        self = .toolsOzoneModerationDefsModEventUnmuteReporter(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventReverseTakedown(value):
+            case let .toolsOzoneModerationDefsModEventReverseTakedown(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventReverseTakedown {
-                            self = .toolsOzoneModerationDefsModEventReverseTakedown(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventReverseTakedown {
+                        self = .toolsOzoneModerationDefsModEventReverseTakedown(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventResolveAppeal(value):
+            case let .toolsOzoneModerationDefsModEventResolveAppeal(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventResolveAppeal {
-                            self = .toolsOzoneModerationDefsModEventResolveAppeal(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventResolveAppeal {
+                        self = .toolsOzoneModerationDefsModEventResolveAppeal(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventEmail(value):
+            case let .toolsOzoneModerationDefsModEventEmail(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventEmail {
-                            self = .toolsOzoneModerationDefsModEventEmail(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventEmail {
+                        self = .toolsOzoneModerationDefsModEventEmail(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventDivert(value):
+            case let .toolsOzoneModerationDefsModEventDivert(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventDivert {
-                            self = .toolsOzoneModerationDefsModEventDivert(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventDivert {
+                        self = .toolsOzoneModerationDefsModEventDivert(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventTag(value):
+            case let .toolsOzoneModerationDefsModEventTag(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventTag {
-                            self = .toolsOzoneModerationDefsModEventTag(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventTag {
+                        self = .toolsOzoneModerationDefsModEventTag(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsAccountEvent(value):
+            case let .toolsOzoneModerationDefsAccountEvent(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.AccountEvent {
-                            self = .toolsOzoneModerationDefsAccountEvent(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.AccountEvent {
+                        self = .toolsOzoneModerationDefsAccountEvent(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsIdentityEvent(value):
+            case let .toolsOzoneModerationDefsIdentityEvent(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.IdentityEvent {
-                            self = .toolsOzoneModerationDefsIdentityEvent(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.IdentityEvent {
+                        self = .toolsOzoneModerationDefsIdentityEvent(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsRecordEvent(value):
+            case let .toolsOzoneModerationDefsRecordEvent(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.RecordEvent {
-                            self = .toolsOzoneModerationDefsRecordEvent(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.RecordEvent {
+                        self = .toolsOzoneModerationDefsRecordEvent(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventPriorityScore(value):
+            case let .toolsOzoneModerationDefsModEventPriorityScore(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventPriorityScore {
-                            self = .toolsOzoneModerationDefsModEventPriorityScore(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventPriorityScore {
+                        self = .toolsOzoneModerationDefsModEventPriorityScore(updatedValue)
                     }
                 }
             case .unexpected:
@@ -868,26 +865,22 @@ public enum ToolsOzoneModerationEmitEvent {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .comAtprotoAdminDefsRepoRef(value):
+            case let .comAtprotoAdminDefsRepoRef(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ComAtprotoAdminDefs.RepoRef {
-                            self = .comAtprotoAdminDefsRepoRef(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ComAtprotoAdminDefs.RepoRef {
+                        self = .comAtprotoAdminDefsRepoRef(updatedValue)
                     }
                 }
-            case var .comAtprotoRepoStrongRef(value):
+            case let .comAtprotoRepoStrongRef(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ComAtprotoRepoStrongRef {
-                            self = .comAtprotoRepoStrongRef(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ComAtprotoRepoStrongRef {
+                        self = .comAtprotoRepoStrongRef(updatedValue)
                     }
                 }
             case .unexpected:
@@ -1413,213 +1406,175 @@ public enum ToolsOzoneModerationEmitEvent {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .toolsOzoneModerationDefsModEventTakedown(value):
+            case let .toolsOzoneModerationDefsModEventTakedown(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventTakedown {
-                            self = .toolsOzoneModerationDefsModEventTakedown(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventTakedown {
+                        self = .toolsOzoneModerationDefsModEventTakedown(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventAcknowledge(value):
+            case let .toolsOzoneModerationDefsModEventAcknowledge(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventAcknowledge {
-                            self = .toolsOzoneModerationDefsModEventAcknowledge(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventAcknowledge {
+                        self = .toolsOzoneModerationDefsModEventAcknowledge(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventEscalate(value):
+            case let .toolsOzoneModerationDefsModEventEscalate(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventEscalate {
-                            self = .toolsOzoneModerationDefsModEventEscalate(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventEscalate {
+                        self = .toolsOzoneModerationDefsModEventEscalate(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventComment(value):
+            case let .toolsOzoneModerationDefsModEventComment(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventComment {
-                            self = .toolsOzoneModerationDefsModEventComment(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventComment {
+                        self = .toolsOzoneModerationDefsModEventComment(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventLabel(value):
+            case let .toolsOzoneModerationDefsModEventLabel(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventLabel {
-                            self = .toolsOzoneModerationDefsModEventLabel(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventLabel {
+                        self = .toolsOzoneModerationDefsModEventLabel(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventReport(value):
+            case let .toolsOzoneModerationDefsModEventReport(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventReport {
-                            self = .toolsOzoneModerationDefsModEventReport(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventReport {
+                        self = .toolsOzoneModerationDefsModEventReport(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventMute(value):
+            case let .toolsOzoneModerationDefsModEventMute(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventMute {
-                            self = .toolsOzoneModerationDefsModEventMute(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventMute {
+                        self = .toolsOzoneModerationDefsModEventMute(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventUnmute(value):
+            case let .toolsOzoneModerationDefsModEventUnmute(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventUnmute {
-                            self = .toolsOzoneModerationDefsModEventUnmute(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventUnmute {
+                        self = .toolsOzoneModerationDefsModEventUnmute(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventMuteReporter(value):
+            case let .toolsOzoneModerationDefsModEventMuteReporter(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventMuteReporter {
-                            self = .toolsOzoneModerationDefsModEventMuteReporter(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventMuteReporter {
+                        self = .toolsOzoneModerationDefsModEventMuteReporter(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventUnmuteReporter(value):
+            case let .toolsOzoneModerationDefsModEventUnmuteReporter(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventUnmuteReporter {
-                            self = .toolsOzoneModerationDefsModEventUnmuteReporter(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventUnmuteReporter {
+                        self = .toolsOzoneModerationDefsModEventUnmuteReporter(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventReverseTakedown(value):
+            case let .toolsOzoneModerationDefsModEventReverseTakedown(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventReverseTakedown {
-                            self = .toolsOzoneModerationDefsModEventReverseTakedown(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventReverseTakedown {
+                        self = .toolsOzoneModerationDefsModEventReverseTakedown(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventResolveAppeal(value):
+            case let .toolsOzoneModerationDefsModEventResolveAppeal(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventResolveAppeal {
-                            self = .toolsOzoneModerationDefsModEventResolveAppeal(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventResolveAppeal {
+                        self = .toolsOzoneModerationDefsModEventResolveAppeal(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventEmail(value):
+            case let .toolsOzoneModerationDefsModEventEmail(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventEmail {
-                            self = .toolsOzoneModerationDefsModEventEmail(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventEmail {
+                        self = .toolsOzoneModerationDefsModEventEmail(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventDivert(value):
+            case let .toolsOzoneModerationDefsModEventDivert(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventDivert {
-                            self = .toolsOzoneModerationDefsModEventDivert(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventDivert {
+                        self = .toolsOzoneModerationDefsModEventDivert(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventTag(value):
+            case let .toolsOzoneModerationDefsModEventTag(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventTag {
-                            self = .toolsOzoneModerationDefsModEventTag(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventTag {
+                        self = .toolsOzoneModerationDefsModEventTag(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsAccountEvent(value):
+            case let .toolsOzoneModerationDefsAccountEvent(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.AccountEvent {
-                            self = .toolsOzoneModerationDefsAccountEvent(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.AccountEvent {
+                        self = .toolsOzoneModerationDefsAccountEvent(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsIdentityEvent(value):
+            case let .toolsOzoneModerationDefsIdentityEvent(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.IdentityEvent {
-                            self = .toolsOzoneModerationDefsIdentityEvent(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.IdentityEvent {
+                        self = .toolsOzoneModerationDefsIdentityEvent(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsRecordEvent(value):
+            case let .toolsOzoneModerationDefsRecordEvent(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.RecordEvent {
-                            self = .toolsOzoneModerationDefsRecordEvent(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.RecordEvent {
+                        self = .toolsOzoneModerationDefsRecordEvent(updatedValue)
                     }
                 }
-            case var .toolsOzoneModerationDefsModEventPriorityScore(value):
+            case let .toolsOzoneModerationDefsModEventPriorityScore(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventPriorityScore {
-                            self = .toolsOzoneModerationDefsModEventPriorityScore(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ToolsOzoneModerationDefs.ModEventPriorityScore {
+                        self = .toolsOzoneModerationDefsModEventPriorityScore(updatedValue)
                     }
                 }
             case .unexpected:
@@ -1737,26 +1692,22 @@ public enum ToolsOzoneModerationEmitEvent {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .comAtprotoAdminDefsRepoRef(value):
+            case let .comAtprotoAdminDefsRepoRef(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ComAtprotoAdminDefs.RepoRef {
-                            self = .comAtprotoAdminDefsRepoRef(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ComAtprotoAdminDefs.RepoRef {
+                        self = .comAtprotoAdminDefsRepoRef(updatedValue)
                     }
                 }
-            case var .comAtprotoRepoStrongRef(value):
+            case let .comAtprotoRepoStrongRef(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ComAtprotoRepoStrongRef {
-                            self = .comAtprotoRepoStrongRef(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ComAtprotoRepoStrongRef {
+                        self = .comAtprotoRepoStrongRef(updatedValue)
                     }
                 }
             case .unexpected:

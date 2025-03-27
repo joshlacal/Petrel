@@ -19,6 +19,46 @@ public enum ToolsOzoneSettingUpsertOption {
             self.description = description
             self.managerRole = managerRole
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            key = try container.decode(String.self, forKey: .key)
+
+            scope = try container.decode(String.self, forKey: .scope)
+
+            value = try container.decode(ATProtocolValueContainer.self, forKey: .value)
+
+            description = try container.decodeIfPresent(String.self, forKey: .description)
+
+            managerRole = try container.decodeIfPresent(String.self, forKey: .managerRole)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(key, forKey: .key)
+
+            try container.encode(scope, forKey: .scope)
+
+            try container.encode(value, forKey: .value)
+
+            if let value = description {
+                try container.encode(value, forKey: .description)
+            }
+
+            if let value = managerRole {
+                try container.encode(value, forKey: .managerRole)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case key
+            case scope
+            case value
+            case description
+            case managerRole
+        }
     }
 
     public struct Output: ATProtocolCodable {
@@ -30,6 +70,22 @@ public enum ToolsOzoneSettingUpsertOption {
 
         ) {
             self.option = option
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            option = try container.decode(ToolsOzoneSettingDefs.Option.self, forKey: .option)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(option, forKey: .option)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case option
         }
     }
 }

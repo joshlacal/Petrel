@@ -21,6 +21,53 @@ public enum ComAtprotoRepoCreateRecord {
             self.record = record
             self.swapCommit = swapCommit
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            repo = try container.decode(String.self, forKey: .repo)
+
+            collection = try container.decode(String.self, forKey: .collection)
+
+            rkey = try container.decodeIfPresent(String.self, forKey: .rkey)
+
+            validate = try container.decodeIfPresent(Bool.self, forKey: .validate)
+
+            record = try container.decode(ATProtocolValueContainer.self, forKey: .record)
+
+            swapCommit = try container.decodeIfPresent(String.self, forKey: .swapCommit)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(repo, forKey: .repo)
+
+            try container.encode(collection, forKey: .collection)
+
+            if let value = rkey {
+                try container.encode(value, forKey: .rkey)
+            }
+
+            if let value = validate {
+                try container.encode(value, forKey: .validate)
+            }
+
+            try container.encode(record, forKey: .record)
+
+            if let value = swapCommit {
+                try container.encode(value, forKey: .swapCommit)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case repo
+            case collection
+            case rkey
+            case validate
+            case record
+            case swapCommit
+        }
     }
 
     public struct Output: ATProtocolCodable {
@@ -50,6 +97,41 @@ public enum ComAtprotoRepoCreateRecord {
             self.commit = commit
 
             self.validationStatus = validationStatus
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+
+            cid = try container.decode(String.self, forKey: .cid)
+
+            commit = try container.decodeIfPresent(ComAtprotoRepoDefs.CommitMeta.self, forKey: .commit)
+
+            validationStatus = try container.decodeIfPresent(String.self, forKey: .validationStatus)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(uri, forKey: .uri)
+
+            try container.encode(cid, forKey: .cid)
+
+            if let value = commit {
+                try container.encode(value, forKey: .commit)
+            }
+
+            if let value = validationStatus {
+                try container.encode(value, forKey: .validationStatus)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case uri
+            case cid
+            case commit
+            case validationStatus
         }
     }
 

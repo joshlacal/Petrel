@@ -222,7 +222,9 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
             try container.encode(value, forKey: .value)
 
             if let value = labels {
-                try container.encode(value, forKey: .labels)
+                if !value.isEmpty {
+                    try container.encode(value, forKey: .labels)
+                }
             }
 
             if let value = replyCount {
@@ -242,7 +244,9 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
             }
 
             if let value = embeds {
-                try container.encode(value, forKey: .embeds)
+                if !value.isEmpty {
+                    try container.encode(value, forKey: .embeds)
+                }
             }
 
             try container.encode(indexedAt, forKey: .indexedAt)
@@ -838,92 +842,76 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .appBskyEmbedRecordViewRecord(value):
+            case let .appBskyEmbedRecordViewRecord(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? AppBskyEmbedRecord.ViewRecord {
-                            self = .appBskyEmbedRecordViewRecord(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? AppBskyEmbedRecord.ViewRecord {
+                        self = .appBskyEmbedRecordViewRecord(updatedValue)
                     }
                 }
-            case var .appBskyEmbedRecordViewNotFound(value):
+            case let .appBskyEmbedRecordViewNotFound(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? AppBskyEmbedRecord.ViewNotFound {
-                            self = .appBskyEmbedRecordViewNotFound(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? AppBskyEmbedRecord.ViewNotFound {
+                        self = .appBskyEmbedRecordViewNotFound(updatedValue)
                     }
                 }
-            case var .appBskyEmbedRecordViewBlocked(value):
+            case let .appBskyEmbedRecordViewBlocked(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? AppBskyEmbedRecord.ViewBlocked {
-                            self = .appBskyEmbedRecordViewBlocked(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? AppBskyEmbedRecord.ViewBlocked {
+                        self = .appBskyEmbedRecordViewBlocked(updatedValue)
                     }
                 }
-            case var .appBskyEmbedRecordViewDetached(value):
+            case let .appBskyEmbedRecordViewDetached(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? AppBskyEmbedRecord.ViewDetached {
-                            self = .appBskyEmbedRecordViewDetached(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? AppBskyEmbedRecord.ViewDetached {
+                        self = .appBskyEmbedRecordViewDetached(updatedValue)
                     }
                 }
-            case var .appBskyFeedDefsGeneratorView(value):
+            case let .appBskyFeedDefsGeneratorView(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? AppBskyFeedDefs.GeneratorView {
-                            self = .appBskyFeedDefsGeneratorView(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? AppBskyFeedDefs.GeneratorView {
+                        self = .appBskyFeedDefsGeneratorView(updatedValue)
                     }
                 }
-            case var .appBskyGraphDefsListView(value):
+            case let .appBskyGraphDefsListView(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? AppBskyGraphDefs.ListView {
-                            self = .appBskyGraphDefsListView(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? AppBskyGraphDefs.ListView {
+                        self = .appBskyGraphDefsListView(updatedValue)
                     }
                 }
-            case var .appBskyLabelerDefsLabelerView(value):
+            case let .appBskyLabelerDefsLabelerView(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? AppBskyLabelerDefs.LabelerView {
-                            self = .appBskyLabelerDefsLabelerView(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? AppBskyLabelerDefs.LabelerView {
+                        self = .appBskyLabelerDefsLabelerView(updatedValue)
                     }
                 }
-            case var .appBskyGraphDefsStarterPackViewBasic(value):
+            case let .appBskyGraphDefsStarterPackViewBasic(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? AppBskyGraphDefs.StarterPackViewBasic {
-                            self = .appBskyGraphDefsStarterPackViewBasic(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? AppBskyGraphDefs.StarterPackViewBasic {
+                        self = .appBskyGraphDefsStarterPackViewBasic(updatedValue)
                     }
                 }
             case .unexpected:
@@ -1113,59 +1101,49 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .appBskyEmbedImagesView(value):
+            case let .appBskyEmbedImagesView(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? AppBskyEmbedImages.View {
-                            self = .appBskyEmbedImagesView(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? AppBskyEmbedImages.View {
+                        self = .appBskyEmbedImagesView(updatedValue)
                     }
                 }
-            case var .appBskyEmbedVideoView(value):
+            case let .appBskyEmbedVideoView(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? AppBskyEmbedVideo.View {
-                            self = .appBskyEmbedVideoView(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? AppBskyEmbedVideo.View {
+                        self = .appBskyEmbedVideoView(updatedValue)
                     }
                 }
-            case var .appBskyEmbedExternalView(value):
+            case let .appBskyEmbedExternalView(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? AppBskyEmbedExternal.View {
-                            self = .appBskyEmbedExternalView(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? AppBskyEmbedExternal.View {
+                        self = .appBskyEmbedExternalView(updatedValue)
                     }
                 }
-            case var .appBskyEmbedRecordView(value):
+            case let .appBskyEmbedRecordView(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? AppBskyEmbedRecord.View {
-                            self = .appBskyEmbedRecordView(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? AppBskyEmbedRecord.View {
+                        self = .appBskyEmbedRecordView(updatedValue)
                     }
                 }
-            case var .appBskyEmbedRecordWithMediaView(value):
+            case let .appBskyEmbedRecordWithMediaView(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? AppBskyEmbedRecordWithMedia.View {
-                            self = .appBskyEmbedRecordWithMediaView(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? AppBskyEmbedRecordWithMedia.View {
+                        self = .appBskyEmbedRecordWithMediaView(updatedValue)
                     }
                 }
             case .unexpected:

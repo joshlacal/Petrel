@@ -13,6 +13,27 @@ public enum ComAtprotoAdminUpdateAccountHandle {
             self.did = did
             self.handle = handle
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            did = try container.decode(String.self, forKey: .did)
+
+            handle = try container.decode(String.self, forKey: .handle)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(did, forKey: .did)
+
+            try container.encode(handle, forKey: .handle)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case did
+            case handle
+        }
     }
 }
 

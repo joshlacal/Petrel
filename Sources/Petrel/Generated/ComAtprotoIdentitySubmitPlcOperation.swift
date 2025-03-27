@@ -11,6 +11,22 @@ public enum ComAtprotoIdentitySubmitPlcOperation {
         public init(operation: ATProtocolValueContainer) {
             self.operation = operation
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            operation = try container.decode(ATProtocolValueContainer.self, forKey: .operation)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(operation, forKey: .operation)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case operation
+        }
     }
 }
 

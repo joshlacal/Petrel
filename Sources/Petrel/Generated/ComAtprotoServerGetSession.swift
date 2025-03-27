@@ -57,6 +57,69 @@ public enum ComAtprotoServerGetSession {
 
             self.status = status
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            handle = try container.decode(String.self, forKey: .handle)
+
+            did = try container.decode(String.self, forKey: .did)
+
+            email = try container.decodeIfPresent(String.self, forKey: .email)
+
+            emailConfirmed = try container.decodeIfPresent(Bool.self, forKey: .emailConfirmed)
+
+            emailAuthFactor = try container.decodeIfPresent(Bool.self, forKey: .emailAuthFactor)
+
+            didDoc = try container.decodeIfPresent(DIDDocument.self, forKey: .didDoc)
+
+            active = try container.decodeIfPresent(Bool.self, forKey: .active)
+
+            status = try container.decodeIfPresent(String.self, forKey: .status)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(handle, forKey: .handle)
+
+            try container.encode(did, forKey: .did)
+
+            if let value = email {
+                try container.encode(value, forKey: .email)
+            }
+
+            if let value = emailConfirmed {
+                try container.encode(value, forKey: .emailConfirmed)
+            }
+
+            if let value = emailAuthFactor {
+                try container.encode(value, forKey: .emailAuthFactor)
+            }
+
+            if let value = didDoc {
+                try container.encode(value, forKey: .didDoc)
+            }
+
+            if let value = active {
+                try container.encode(value, forKey: .active)
+            }
+
+            if let value = status {
+                try container.encode(value, forKey: .status)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case handle
+            case did
+            case email
+            case emailConfirmed
+            case emailAuthFactor
+            case didDoc
+            case active
+            case status
+        }
     }
 }
 

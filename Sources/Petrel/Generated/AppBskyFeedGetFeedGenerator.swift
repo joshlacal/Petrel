@@ -36,6 +36,32 @@ public enum AppBskyFeedGetFeedGenerator {
 
             self.isValid = isValid
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            view = try container.decode(AppBskyFeedDefs.GeneratorView.self, forKey: .view)
+
+            isOnline = try container.decode(Bool.self, forKey: .isOnline)
+
+            isValid = try container.decode(Bool.self, forKey: .isValid)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(view, forKey: .view)
+
+            try container.encode(isOnline, forKey: .isOnline)
+
+            try container.encode(isValid, forKey: .isValid)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case view
+            case isOnline
+            case isValid
+        }
     }
 }
 

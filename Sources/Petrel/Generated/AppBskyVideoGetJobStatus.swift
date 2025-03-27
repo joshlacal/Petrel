@@ -24,6 +24,22 @@ public enum AppBskyVideoGetJobStatus {
         ) {
             self.jobStatus = jobStatus
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            jobStatus = try container.decode(AppBskyVideoDefs.JobStatus.self, forKey: .jobStatus)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(jobStatus, forKey: .jobStatus)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case jobStatus
+        }
     }
 }
 

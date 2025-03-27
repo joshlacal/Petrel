@@ -36,6 +36,29 @@ public enum AppBskyFeedGetPostThread {
 
             self.threadgate = threadgate
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            thread = try container.decode(OutputThreadUnion.self, forKey: .thread)
+
+            threadgate = try container.decodeIfPresent(AppBskyFeedDefs.ThreadgateView.self, forKey: .threadgate)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(thread, forKey: .thread)
+
+            if let value = threadgate {
+                try container.encode(value, forKey: .threadgate)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case thread
+            case threadgate
+        }
     }
 
     public enum Error: String, Swift.Error, CustomStringConvertible {
@@ -247,37 +270,31 @@ public enum AppBskyFeedGetPostThread {
                     }
                     self = .unexpected(ATProtocolValueContainer.string("Failed to decode: \(error)"))
                 }
-            case var .appBskyFeedDefsThreadViewPost(value):
+            case let .appBskyFeedDefsThreadViewPost(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? AppBskyFeedDefs.ThreadViewPost {
-                            self = .appBskyFeedDefsThreadViewPost(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? AppBskyFeedDefs.ThreadViewPost {
+                        self = .appBskyFeedDefsThreadViewPost(updatedValue)
                     }
                 }
-            case var .appBskyFeedDefsNotFoundPost(value):
+            case let .appBskyFeedDefsNotFoundPost(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? AppBskyFeedDefs.NotFoundPost {
-                            self = .appBskyFeedDefsNotFoundPost(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? AppBskyFeedDefs.NotFoundPost {
+                        self = .appBskyFeedDefsNotFoundPost(updatedValue)
                     }
                 }
-            case var .appBskyFeedDefsBlockedPost(value):
+            case let .appBskyFeedDefsBlockedPost(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? AppBskyFeedDefs.BlockedPost {
-                            self = .appBskyFeedDefsBlockedPost(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? AppBskyFeedDefs.BlockedPost {
+                        self = .appBskyFeedDefsBlockedPost(updatedValue)
                     }
                 }
             case .unexpected:

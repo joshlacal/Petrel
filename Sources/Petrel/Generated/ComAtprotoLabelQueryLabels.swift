@@ -39,6 +39,29 @@ public enum ComAtprotoLabelQueryLabels {
 
             self.labels = labels
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+
+            labels = try container.decode([ComAtprotoLabelDefs.Label].self, forKey: .labels)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            if let value = cursor {
+                try container.encode(value, forKey: .cursor)
+            }
+
+            try container.encode(labels, forKey: .labels)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case cursor
+            case labels
+        }
     }
 }
 

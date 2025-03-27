@@ -13,6 +13,35 @@ public enum ComAtprotoAdminDisableInviteCodes {
             self.codes = codes
             self.accounts = accounts
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            codes = try container.decodeIfPresent([String].self, forKey: .codes)
+
+            accounts = try container.decodeIfPresent([String].self, forKey: .accounts)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            if let value = codes {
+                if !value.isEmpty {
+                    try container.encode(value, forKey: .codes)
+                }
+            }
+
+            if let value = accounts {
+                if !value.isEmpty {
+                    try container.encode(value, forKey: .accounts)
+                }
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case codes
+            case accounts
+        }
     }
 }
 

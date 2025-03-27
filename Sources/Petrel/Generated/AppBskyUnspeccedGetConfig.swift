@@ -15,6 +15,24 @@ public enum AppBskyUnspeccedGetConfig {
         ) {
             self.checkEmailConfirmed = checkEmailConfirmed
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            checkEmailConfirmed = try container.decodeIfPresent(Bool.self, forKey: .checkEmailConfirmed)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            if let value = checkEmailConfirmed {
+                try container.encode(value, forKey: .checkEmailConfirmed)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case checkEmailConfirmed
+        }
     }
 }
 

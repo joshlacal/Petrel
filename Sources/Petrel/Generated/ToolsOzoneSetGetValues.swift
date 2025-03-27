@@ -42,6 +42,34 @@ public enum ToolsOzoneSetGetValues {
 
             self.cursor = cursor
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            set = try container.decode(ToolsOzoneSetDefs.SetView.self, forKey: .set)
+
+            values = try container.decode([String].self, forKey: .values)
+
+            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(set, forKey: .set)
+
+            try container.encode(values, forKey: .values)
+
+            if let value = cursor {
+                try container.encode(value, forKey: .cursor)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case set
+            case values
+            case cursor
+        }
     }
 
     public enum Error: String, Swift.Error, CustomStringConvertible {

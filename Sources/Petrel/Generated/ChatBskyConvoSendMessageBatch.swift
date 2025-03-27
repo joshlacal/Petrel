@@ -83,6 +83,22 @@ public enum ChatBskyConvoSendMessageBatch {
         public init(items: [BatchItem]) {
             self.items = items
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            items = try container.decode([BatchItem].self, forKey: .items)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(items, forKey: .items)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case items
+        }
     }
 
     public struct Output: ATProtocolCodable {
@@ -94,6 +110,22 @@ public enum ChatBskyConvoSendMessageBatch {
 
         ) {
             self.items = items
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            items = try container.decode([ChatBskyConvoDefs.MessageView].self, forKey: .items)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(items, forKey: .items)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case items
         }
     }
 }

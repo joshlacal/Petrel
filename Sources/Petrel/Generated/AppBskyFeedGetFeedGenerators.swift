@@ -24,6 +24,22 @@ public enum AppBskyFeedGetFeedGenerators {
         ) {
             self.feeds = feeds
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            feeds = try container.decode([AppBskyFeedDefs.GeneratorView].self, forKey: .feeds)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(feeds, forKey: .feeds)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case feeds
+        }
     }
 }
 

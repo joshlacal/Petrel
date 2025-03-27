@@ -36,6 +36,36 @@ public enum AppBskyGraphGetSuggestedFollowsByActor {
 
             self.recId = recId
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            suggestions = try container.decode([AppBskyActorDefs.ProfileView].self, forKey: .suggestions)
+
+            isFallback = try container.decodeIfPresent(Bool.self, forKey: .isFallback)
+
+            recId = try container.decodeIfPresent(Int.self, forKey: .recId)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(suggestions, forKey: .suggestions)
+
+            if let value = isFallback {
+                try container.encode(value, forKey: .isFallback)
+            }
+
+            if let value = recId {
+                try container.encode(value, forKey: .recId)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case suggestions
+            case isFallback
+            case recId
+        }
     }
 }
 

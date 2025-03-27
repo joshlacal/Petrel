@@ -33,6 +33,27 @@ public enum AppBskyUnspeccedGetTrendingTopics {
 
             self.suggested = suggested
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            topics = try container.decode([AppBskyUnspeccedDefs.TrendingTopic].self, forKey: .topics)
+
+            suggested = try container.decode([AppBskyUnspeccedDefs.TrendingTopic].self, forKey: .suggested)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(topics, forKey: .topics)
+
+            try container.encode(suggested, forKey: .suggested)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case topics
+            case suggested
+        }
     }
 }
 

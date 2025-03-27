@@ -27,6 +27,22 @@ public enum ComAtprotoServerGetAccountInviteCodes {
         ) {
             self.codes = codes
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            codes = try container.decode([ComAtprotoServerDefs.InviteCode].self, forKey: .codes)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(codes, forKey: .codes)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case codes
+        }
     }
 
     public enum Error: String, Swift.Error, CustomStringConvertible {

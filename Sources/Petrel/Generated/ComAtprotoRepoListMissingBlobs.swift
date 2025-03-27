@@ -105,6 +105,29 @@ public enum ComAtprotoRepoListMissingBlobs {
 
             self.blobs = blobs
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+
+            blobs = try container.decode([RecordBlob].self, forKey: .blobs)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            if let value = cursor {
+                try container.encode(value, forKey: .cursor)
+            }
+
+            try container.encode(blobs, forKey: .blobs)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case cursor
+            case blobs
+        }
     }
 }
 

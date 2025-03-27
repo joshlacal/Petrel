@@ -11,6 +11,22 @@ public enum ComAtprotoIdentityRefreshIdentity {
         public init(identifier: String) {
             self.identifier = identifier
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            identifier = try container.decode(String.self, forKey: .identifier)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(identifier, forKey: .identifier)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case identifier
+        }
     }
 
     public typealias Output = ComAtprotoIdentityDefs.IdentityInfo

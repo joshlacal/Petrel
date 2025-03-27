@@ -34,7 +34,9 @@ public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue {
         try container.encode(video, forKey: .video)
 
         if let value = captions {
-            try container.encode(value, forKey: .captions)
+            if !value.isEmpty {
+                try container.encode(value, forKey: .captions)
+            }
         }
 
         if let value = alt {

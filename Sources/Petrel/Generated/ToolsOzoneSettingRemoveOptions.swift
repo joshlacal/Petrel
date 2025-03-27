@@ -13,6 +13,27 @@ public enum ToolsOzoneSettingRemoveOptions {
             self.keys = keys
             self.scope = scope
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            keys = try container.decode([String].self, forKey: .keys)
+
+            scope = try container.decode(String.self, forKey: .scope)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(keys, forKey: .keys)
+
+            try container.encode(scope, forKey: .scope)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case keys
+            case scope
+        }
     }
 
     public struct Output: ATProtocolCodable {
@@ -24,6 +45,23 @@ public enum ToolsOzoneSettingRemoveOptions {
 
         ) {
             self.data = data
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            let data = try container.decode(Data.self, forKey: .data)
+            self.data = data
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(data, forKey: .data)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case data
         }
     }
 }

@@ -30,6 +30,29 @@ public enum ChatBskyConvoGetConvoAvailability {
 
             self.convo = convo
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            canChat = try container.decode(Bool.self, forKey: .canChat)
+
+            convo = try container.decodeIfPresent(ChatBskyConvoDefs.ConvoView.self, forKey: .convo)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(canChat, forKey: .canChat)
+
+            if let value = convo {
+                try container.encode(value, forKey: .convo)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case canChat
+            case convo
+        }
     }
 }
 

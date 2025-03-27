@@ -24,6 +24,22 @@ public enum ComAtprotoIdentityResolveDid {
         ) {
             self.didDoc = didDoc
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            didDoc = try container.decode(DIDDocument.self, forKey: .didDoc)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(didDoc, forKey: .didDoc)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case didDoc
+        }
     }
 
     public enum Error: String, Swift.Error, CustomStringConvertible {

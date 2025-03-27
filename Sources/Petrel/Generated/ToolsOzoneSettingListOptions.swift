@@ -42,6 +42,29 @@ public enum ToolsOzoneSettingListOptions {
 
             self.options = options
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+
+            options = try container.decode([ToolsOzoneSettingDefs.Option].self, forKey: .options)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            if let value = cursor {
+                try container.encode(value, forKey: .cursor)
+            }
+
+            try container.encode(options, forKey: .options)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case cursor
+            case options
+        }
     }
 }
 

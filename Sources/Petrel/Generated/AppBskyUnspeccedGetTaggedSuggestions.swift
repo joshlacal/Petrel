@@ -108,6 +108,22 @@ public enum AppBskyUnspeccedGetTaggedSuggestions {
         ) {
             self.suggestions = suggestions
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            suggestions = try container.decode([Suggestion].self, forKey: .suggestions)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(suggestions, forKey: .suggestions)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case suggestions
+        }
     }
 }
 

@@ -15,6 +15,32 @@ public enum ComAtprotoServerDeleteAccount {
             self.password = password
             self.token = token
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            did = try container.decode(String.self, forKey: .did)
+
+            password = try container.decode(String.self, forKey: .password)
+
+            token = try container.decode(String.self, forKey: .token)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(did, forKey: .did)
+
+            try container.encode(password, forKey: .password)
+
+            try container.encode(token, forKey: .token)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case did
+            case password
+            case token
+        }
     }
 
     public enum Error: String, Swift.Error, CustomStringConvertible {

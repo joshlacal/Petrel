@@ -11,6 +11,24 @@ public enum ComAtprotoServerDeactivateAccount {
         public init(deleteAfter: ATProtocolDate? = nil) {
             self.deleteAfter = deleteAfter
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            deleteAfter = try container.decodeIfPresent(ATProtocolDate.self, forKey: .deleteAfter)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            if let value = deleteAfter {
+                try container.encode(value, forKey: .deleteAfter)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case deleteAfter
+        }
     }
 }
 

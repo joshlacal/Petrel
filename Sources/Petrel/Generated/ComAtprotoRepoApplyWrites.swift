@@ -491,6 +491,41 @@ public enum ComAtprotoRepoApplyWrites {
             self.writes = writes
             self.swapCommit = swapCommit
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            repo = try container.decode(String.self, forKey: .repo)
+
+            validate = try container.decodeIfPresent(Bool.self, forKey: .validate)
+
+            writes = try container.decode([InputWritesUnion].self, forKey: .writes)
+
+            swapCommit = try container.decodeIfPresent(String.self, forKey: .swapCommit)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(repo, forKey: .repo)
+
+            if let value = validate {
+                try container.encode(value, forKey: .validate)
+            }
+
+            try container.encode(writes, forKey: .writes)
+
+            if let value = swapCommit {
+                try container.encode(value, forKey: .swapCommit)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case repo
+            case validate
+            case writes
+            case swapCommit
+        }
     }
 
     public struct Output: ATProtocolCodable {
@@ -508,6 +543,33 @@ public enum ComAtprotoRepoApplyWrites {
             self.commit = commit
 
             self.results = results
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            commit = try container.decodeIfPresent(ComAtprotoRepoDefs.CommitMeta.self, forKey: .commit)
+
+            results = try container.decodeIfPresent([OutputResultsUnion].self, forKey: .results)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            if let value = commit {
+                try container.encode(value, forKey: .commit)
+            }
+
+            if let value = results {
+                if !value.isEmpty {
+                    try container.encode(value, forKey: .results)
+                }
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case commit
+            case results
         }
     }
 
@@ -650,37 +712,31 @@ public enum ComAtprotoRepoApplyWrites {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .comAtprotoRepoApplyWritesCreate(value):
+            case let .comAtprotoRepoApplyWritesCreate(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.Create {
-                            self = .comAtprotoRepoApplyWritesCreate(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.Create {
+                        self = .comAtprotoRepoApplyWritesCreate(updatedValue)
                     }
                 }
-            case var .comAtprotoRepoApplyWritesUpdate(value):
+            case let .comAtprotoRepoApplyWritesUpdate(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.Update {
-                            self = .comAtprotoRepoApplyWritesUpdate(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.Update {
+                        self = .comAtprotoRepoApplyWritesUpdate(updatedValue)
                     }
                 }
-            case var .comAtprotoRepoApplyWritesDelete(value):
+            case let .comAtprotoRepoApplyWritesDelete(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.Delete {
-                            self = .comAtprotoRepoApplyWritesDelete(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.Delete {
+                        self = .comAtprotoRepoApplyWritesDelete(updatedValue)
                     }
                 }
             case .unexpected:
@@ -822,37 +878,31 @@ public enum ComAtprotoRepoApplyWrites {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .comAtprotoRepoApplyWritesCreateResult(value):
+            case let .comAtprotoRepoApplyWritesCreateResult(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.CreateResult {
-                            self = .comAtprotoRepoApplyWritesCreateResult(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.CreateResult {
+                        self = .comAtprotoRepoApplyWritesCreateResult(updatedValue)
                     }
                 }
-            case var .comAtprotoRepoApplyWritesUpdateResult(value):
+            case let .comAtprotoRepoApplyWritesUpdateResult(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.UpdateResult {
-                            self = .comAtprotoRepoApplyWritesUpdateResult(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.UpdateResult {
+                        self = .comAtprotoRepoApplyWritesUpdateResult(updatedValue)
                     }
                 }
-            case var .comAtprotoRepoApplyWritesDeleteResult(value):
+            case let .comAtprotoRepoApplyWritesDeleteResult(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.DeleteResult {
-                            self = .comAtprotoRepoApplyWritesDeleteResult(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.DeleteResult {
+                        self = .comAtprotoRepoApplyWritesDeleteResult(updatedValue)
                     }
                 }
             case .unexpected:
@@ -994,37 +1044,31 @@ public enum ComAtprotoRepoApplyWrites {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .comAtprotoRepoApplyWritesCreate(value):
+            case let .comAtprotoRepoApplyWritesCreate(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.Create {
-                            self = .comAtprotoRepoApplyWritesCreate(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.Create {
+                        self = .comAtprotoRepoApplyWritesCreate(updatedValue)
                     }
                 }
-            case var .comAtprotoRepoApplyWritesUpdate(value):
+            case let .comAtprotoRepoApplyWritesUpdate(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.Update {
-                            self = .comAtprotoRepoApplyWritesUpdate(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.Update {
+                        self = .comAtprotoRepoApplyWritesUpdate(updatedValue)
                     }
                 }
-            case var .comAtprotoRepoApplyWritesDelete(value):
+            case let .comAtprotoRepoApplyWritesDelete(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.Delete {
-                            self = .comAtprotoRepoApplyWritesDelete(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.Delete {
+                        self = .comAtprotoRepoApplyWritesDelete(updatedValue)
                     }
                 }
             case .unexpected:

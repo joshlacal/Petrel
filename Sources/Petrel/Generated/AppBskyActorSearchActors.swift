@@ -39,6 +39,29 @@ public enum AppBskyActorSearchActors {
 
             self.actors = actors
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+
+            actors = try container.decode([AppBskyActorDefs.ProfileView].self, forKey: .actors)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            if let value = cursor {
+                try container.encode(value, forKey: .cursor)
+            }
+
+            try container.encode(actors, forKey: .actors)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case cursor
+            case actors
+        }
     }
 }
 

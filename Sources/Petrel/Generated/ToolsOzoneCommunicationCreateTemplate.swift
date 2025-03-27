@@ -19,6 +19,46 @@ public enum ToolsOzoneCommunicationCreateTemplate {
             self.lang = lang
             self.createdBy = createdBy
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            name = try container.decode(String.self, forKey: .name)
+
+            contentMarkdown = try container.decode(String.self, forKey: .contentMarkdown)
+
+            subject = try container.decode(String.self, forKey: .subject)
+
+            lang = try container.decodeIfPresent(LanguageCodeContainer.self, forKey: .lang)
+
+            createdBy = try container.decodeIfPresent(String.self, forKey: .createdBy)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(name, forKey: .name)
+
+            try container.encode(contentMarkdown, forKey: .contentMarkdown)
+
+            try container.encode(subject, forKey: .subject)
+
+            if let value = lang {
+                try container.encode(value, forKey: .lang)
+            }
+
+            if let value = createdBy {
+                try container.encode(value, forKey: .createdBy)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case name
+            case contentMarkdown
+            case subject
+            case lang
+            case createdBy
+        }
     }
 
     public typealias Output = ToolsOzoneCommunicationDefs.TemplateView

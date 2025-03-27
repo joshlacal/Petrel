@@ -13,6 +13,29 @@ public enum ComAtprotoAdminEnableAccountInvites {
             self.account = account
             self.note = note
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            account = try container.decode(String.self, forKey: .account)
+
+            note = try container.decodeIfPresent(String.self, forKey: .note)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(account, forKey: .account)
+
+            if let value = note {
+                try container.encode(value, forKey: .note)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case account
+            case note
+        }
     }
 }
 

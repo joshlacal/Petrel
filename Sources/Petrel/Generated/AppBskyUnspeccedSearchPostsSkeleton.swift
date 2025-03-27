@@ -72,6 +72,36 @@ public enum AppBskyUnspeccedSearchPostsSkeleton {
 
             self.posts = posts
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+
+            hitsTotal = try container.decodeIfPresent(Int.self, forKey: .hitsTotal)
+
+            posts = try container.decode([AppBskyUnspeccedDefs.SkeletonSearchPost].self, forKey: .posts)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            if let value = cursor {
+                try container.encode(value, forKey: .cursor)
+            }
+
+            if let value = hitsTotal {
+                try container.encode(value, forKey: .hitsTotal)
+            }
+
+            try container.encode(posts, forKey: .posts)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case cursor
+            case hitsTotal
+            case posts
+        }
     }
 
     public enum Error: String, Swift.Error, CustomStringConvertible {

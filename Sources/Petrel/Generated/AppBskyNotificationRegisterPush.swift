@@ -17,6 +17,37 @@ public enum AppBskyNotificationRegisterPush {
             self.platform = platform
             self.appId = appId
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            serviceDid = try container.decode(String.self, forKey: .serviceDid)
+
+            token = try container.decode(String.self, forKey: .token)
+
+            platform = try container.decode(String.self, forKey: .platform)
+
+            appId = try container.decode(String.self, forKey: .appId)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(serviceDid, forKey: .serviceDid)
+
+            try container.encode(token, forKey: .token)
+
+            try container.encode(platform, forKey: .platform)
+
+            try container.encode(appId, forKey: .appId)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case serviceDid
+            case token
+            case platform
+            case appId
+        }
     }
 }
 

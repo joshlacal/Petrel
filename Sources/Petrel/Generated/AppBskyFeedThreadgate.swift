@@ -41,13 +41,17 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
         try container.encode(post, forKey: .post)
 
         if let value = allow {
-            try container.encode(value, forKey: .allow)
+            if !value.isEmpty {
+                try container.encode(value, forKey: .allow)
+            }
         }
 
         try container.encode(createdAt, forKey: .createdAt)
 
         if let value = hiddenReplies {
-            try container.encode(value, forKey: .hiddenReplies)
+            if !value.isEmpty {
+                try container.encode(value, forKey: .hiddenReplies)
+            }
         }
     }
 
@@ -406,48 +410,40 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .appBskyFeedThreadgateMentionRule(value):
+            case let .appBskyFeedThreadgateMentionRule(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? AppBskyFeedThreadgate.MentionRule {
-                            self = .appBskyFeedThreadgateMentionRule(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? AppBskyFeedThreadgate.MentionRule {
+                        self = .appBskyFeedThreadgateMentionRule(updatedValue)
                     }
                 }
-            case var .appBskyFeedThreadgateFollowerRule(value):
+            case let .appBskyFeedThreadgateFollowerRule(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? AppBskyFeedThreadgate.FollowerRule {
-                            self = .appBskyFeedThreadgateFollowerRule(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? AppBskyFeedThreadgate.FollowerRule {
+                        self = .appBskyFeedThreadgateFollowerRule(updatedValue)
                     }
                 }
-            case var .appBskyFeedThreadgateFollowingRule(value):
+            case let .appBskyFeedThreadgateFollowingRule(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? AppBskyFeedThreadgate.FollowingRule {
-                            self = .appBskyFeedThreadgateFollowingRule(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? AppBskyFeedThreadgate.FollowingRule {
+                        self = .appBskyFeedThreadgateFollowingRule(updatedValue)
                     }
                 }
-            case var .appBskyFeedThreadgateListRule(value):
+            case let .appBskyFeedThreadgateListRule(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? AppBskyFeedThreadgate.ListRule {
-                            self = .appBskyFeedThreadgateListRule(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? AppBskyFeedThreadgate.ListRule {
+                        self = .appBskyFeedThreadgateListRule(updatedValue)
                     }
                 }
             case .unexpected:

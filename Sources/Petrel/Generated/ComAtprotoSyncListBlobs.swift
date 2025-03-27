@@ -39,6 +39,29 @@ public enum ComAtprotoSyncListBlobs {
 
             self.cids = cids
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+
+            cids = try container.decode([String].self, forKey: .cids)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            if let value = cursor {
+                try container.encode(value, forKey: .cursor)
+            }
+
+            try container.encode(cids, forKey: .cids)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case cursor
+            case cids
+        }
     }
 
     public enum Error: String, Swift.Error, CustomStringConvertible {

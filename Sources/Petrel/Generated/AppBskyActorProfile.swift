@@ -274,15 +274,13 @@ public struct AppBskyActorProfile: ATProtocolCodable, ATProtocolValue {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .comAtprotoLabelDefsSelfLabels(value):
+            case let .comAtprotoLabelDefsSelfLabels(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ComAtprotoLabelDefs.SelfLabels {
-                            self = .comAtprotoLabelDefsSelfLabels(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ComAtprotoLabelDefs.SelfLabels {
+                        self = .comAtprotoLabelDefsSelfLabels(updatedValue)
                     }
                 }
             case .unexpected:

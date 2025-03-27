@@ -42,6 +42,34 @@ public enum AppBskyGraphGetList {
 
             self.items = items
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+
+            list = try container.decode(AppBskyGraphDefs.ListView.self, forKey: .list)
+
+            items = try container.decode([AppBskyGraphDefs.ListItemView].self, forKey: .items)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            if let value = cursor {
+                try container.encode(value, forKey: .cursor)
+            }
+
+            try container.encode(list, forKey: .list)
+
+            try container.encode(items, forKey: .items)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case cursor
+            case list
+            case items
+        }
     }
 }
 

@@ -168,6 +168,29 @@ public enum ComAtprotoSyncListRepos {
 
             self.repos = repos
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+
+            repos = try container.decode([Repo].self, forKey: .repos)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            if let value = cursor {
+                try container.encode(value, forKey: .cursor)
+            }
+
+            try container.encode(repos, forKey: .repos)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case cursor
+            case repos
+        }
     }
 }
 

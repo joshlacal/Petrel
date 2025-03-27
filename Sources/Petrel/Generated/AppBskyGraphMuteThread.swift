@@ -11,6 +11,22 @@ public enum AppBskyGraphMuteThread {
         public init(root: ATProtocolURI) {
             self.root = root
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            root = try container.decode(ATProtocolURI.self, forKey: .root)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(root, forKey: .root)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case root
+        }
     }
 }
 

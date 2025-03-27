@@ -129,6 +129,29 @@ public enum ToolsOzoneModerationQueryStatuses {
 
             self.subjectStatuses = subjectStatuses
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+
+            subjectStatuses = try container.decode([ToolsOzoneModerationDefs.SubjectStatusView].self, forKey: .subjectStatuses)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            if let value = cursor {
+                try container.encode(value, forKey: .cursor)
+            }
+
+            try container.encode(subjectStatuses, forKey: .subjectStatuses)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case cursor
+            case subjectStatuses
+        }
     }
 }
 

@@ -19,6 +19,56 @@ public enum ComAtprotoIdentitySignPlcOperation {
             self.verificationMethods = verificationMethods
             self.services = services
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            token = try container.decodeIfPresent(String.self, forKey: .token)
+
+            rotationKeys = try container.decodeIfPresent([String].self, forKey: .rotationKeys)
+
+            alsoKnownAs = try container.decodeIfPresent([String].self, forKey: .alsoKnownAs)
+
+            verificationMethods = try container.decodeIfPresent(ATProtocolValueContainer.self, forKey: .verificationMethods)
+
+            services = try container.decodeIfPresent(ATProtocolValueContainer.self, forKey: .services)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            if let value = token {
+                try container.encode(value, forKey: .token)
+            }
+
+            if let value = rotationKeys {
+                if !value.isEmpty {
+                    try container.encode(value, forKey: .rotationKeys)
+                }
+            }
+
+            if let value = alsoKnownAs {
+                if !value.isEmpty {
+                    try container.encode(value, forKey: .alsoKnownAs)
+                }
+            }
+
+            if let value = verificationMethods {
+                try container.encode(value, forKey: .verificationMethods)
+            }
+
+            if let value = services {
+                try container.encode(value, forKey: .services)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case token
+            case rotationKeys
+            case alsoKnownAs
+            case verificationMethods
+            case services
+        }
     }
 
     public struct Output: ATProtocolCodable {
@@ -30,6 +80,22 @@ public enum ComAtprotoIdentitySignPlcOperation {
 
         ) {
             self.operation = operation
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            operation = try container.decode(ATProtocolValueContainer.self, forKey: .operation)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(operation, forKey: .operation)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case operation
         }
     }
 }

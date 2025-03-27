@@ -44,7 +44,9 @@ public enum ToolsOzoneSignatureFindRelatedAccounts {
             try container.encode(account, forKey: .account)
 
             if let value = similarities {
-                try container.encode(value, forKey: .similarities)
+                if !value.isEmpty {
+                    try container.encode(value, forKey: .similarities)
+                }
             }
         }
 
@@ -113,6 +115,29 @@ public enum ToolsOzoneSignatureFindRelatedAccounts {
             self.cursor = cursor
 
             self.accounts = accounts
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+
+            accounts = try container.decode([RelatedAccount].self, forKey: .accounts)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            if let value = cursor {
+                try container.encode(value, forKey: .cursor)
+            }
+
+            try container.encode(accounts, forKey: .accounts)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case cursor
+            case accounts
         }
     }
 }

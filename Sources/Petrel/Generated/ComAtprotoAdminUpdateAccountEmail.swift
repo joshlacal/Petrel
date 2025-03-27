@@ -13,6 +13,27 @@ public enum ComAtprotoAdminUpdateAccountEmail {
             self.account = account
             self.email = email
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            account = try container.decode(String.self, forKey: .account)
+
+            email = try container.decode(String.self, forKey: .email)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(account, forKey: .account)
+
+            try container.encode(email, forKey: .email)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case account
+            case email
+        }
     }
 }
 

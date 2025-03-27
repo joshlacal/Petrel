@@ -19,6 +19,46 @@ public enum ComAtprotoAdminSendEmail {
             self.senderDid = senderDid
             self.comment = comment
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            recipientDid = try container.decode(String.self, forKey: .recipientDid)
+
+            content = try container.decode(String.self, forKey: .content)
+
+            subject = try container.decodeIfPresent(String.self, forKey: .subject)
+
+            senderDid = try container.decode(String.self, forKey: .senderDid)
+
+            comment = try container.decodeIfPresent(String.self, forKey: .comment)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(recipientDid, forKey: .recipientDid)
+
+            try container.encode(content, forKey: .content)
+
+            if let value = subject {
+                try container.encode(value, forKey: .subject)
+            }
+
+            try container.encode(senderDid, forKey: .senderDid)
+
+            if let value = comment {
+                try container.encode(value, forKey: .comment)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case recipientDid
+            case content
+            case subject
+            case senderDid
+            case comment
+        }
     }
 
     public struct Output: ATProtocolCodable {
@@ -30,6 +70,22 @@ public enum ComAtprotoAdminSendEmail {
 
         ) {
             self.sent = sent
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            sent = try container.decode(Bool.self, forKey: .sent)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(sent, forKey: .sent)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case sent
         }
     }
 }

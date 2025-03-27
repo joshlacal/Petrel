@@ -24,6 +24,22 @@ public enum ToolsOzoneSignatureFindCorrelation {
         ) {
             self.details = details
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            details = try container.decode([ToolsOzoneSignatureDefs.SigDetail].self, forKey: .details)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(details, forKey: .details)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case details
+        }
     }
 }
 

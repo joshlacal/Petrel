@@ -66,11 +66,15 @@ public struct AppBskyFeedPost: ATProtocolCodable, ATProtocolValue {
         try container.encode(text, forKey: .text)
 
         if let value = entities {
-            try container.encode(value, forKey: .entities)
+            if !value.isEmpty {
+                try container.encode(value, forKey: .entities)
+            }
         }
 
         if let value = facets {
-            try container.encode(value, forKey: .facets)
+            if !value.isEmpty {
+                try container.encode(value, forKey: .facets)
+            }
         }
 
         if let value = reply {
@@ -82,7 +86,9 @@ public struct AppBskyFeedPost: ATProtocolCodable, ATProtocolValue {
         }
 
         if let value = langs {
-            try container.encode(value, forKey: .langs)
+            if !value.isEmpty {
+                try container.encode(value, forKey: .langs)
+            }
         }
 
         if let value = labels {
@@ -90,7 +96,9 @@ public struct AppBskyFeedPost: ATProtocolCodable, ATProtocolValue {
         }
 
         if let value = tags {
-            try container.encode(value, forKey: .tags)
+            if !value.isEmpty {
+                try container.encode(value, forKey: .tags)
+            }
         }
 
         try container.encode(createdAt, forKey: .createdAt)
@@ -605,59 +613,49 @@ public struct AppBskyFeedPost: ATProtocolCodable, ATProtocolValue {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .appBskyEmbedImages(value):
+            case let .appBskyEmbedImages(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? AppBskyEmbedImages {
-                            self = .appBskyEmbedImages(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? AppBskyEmbedImages {
+                        self = .appBskyEmbedImages(updatedValue)
                     }
                 }
-            case var .appBskyEmbedVideo(value):
+            case let .appBskyEmbedVideo(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? AppBskyEmbedVideo {
-                            self = .appBskyEmbedVideo(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? AppBskyEmbedVideo {
+                        self = .appBskyEmbedVideo(updatedValue)
                     }
                 }
-            case var .appBskyEmbedExternal(value):
+            case let .appBskyEmbedExternal(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? AppBskyEmbedExternal {
-                            self = .appBskyEmbedExternal(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? AppBskyEmbedExternal {
+                        self = .appBskyEmbedExternal(updatedValue)
                     }
                 }
-            case var .appBskyEmbedRecord(value):
+            case let .appBskyEmbedRecord(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? AppBskyEmbedRecord {
-                            self = .appBskyEmbedRecord(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? AppBskyEmbedRecord {
+                        self = .appBskyEmbedRecord(updatedValue)
                     }
                 }
-            case var .appBskyEmbedRecordWithMedia(value):
+            case let .appBskyEmbedRecordWithMedia(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? AppBskyEmbedRecordWithMedia {
-                            self = .appBskyEmbedRecordWithMedia(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? AppBskyEmbedRecordWithMedia {
+                        self = .appBskyEmbedRecordWithMedia(updatedValue)
                     }
                 }
             case .unexpected:
@@ -753,15 +751,13 @@ public struct AppBskyFeedPost: ATProtocolCodable, ATProtocolValue {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .comAtprotoLabelDefsSelfLabels(value):
+            case let .comAtprotoLabelDefsSelfLabels(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? ComAtprotoLabelDefs.SelfLabels {
-                            self = .comAtprotoLabelDefsSelfLabels(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? ComAtprotoLabelDefs.SelfLabels {
+                        self = .comAtprotoLabelDefsSelfLabels(updatedValue)
                     }
                 }
             case .unexpected:

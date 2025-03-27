@@ -11,6 +11,22 @@ public enum AppBskyGraphUnmuteActor {
         public init(actor: String) {
             self.actor = actor
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            actor = try container.decode(String.self, forKey: .actor)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(actor, forKey: .actor)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case actor
+        }
     }
 }
 

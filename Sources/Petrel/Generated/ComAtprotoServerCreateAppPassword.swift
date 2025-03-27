@@ -125,6 +125,29 @@ public enum ComAtprotoServerCreateAppPassword {
             self.name = name
             self.privileged = privileged
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            name = try container.decode(String.self, forKey: .name)
+
+            privileged = try container.decodeIfPresent(Bool.self, forKey: .privileged)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(name, forKey: .name)
+
+            if let value = privileged {
+                try container.encode(value, forKey: .privileged)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case name
+            case privileged
+        }
     }
 
     public typealias Output = AppPassword

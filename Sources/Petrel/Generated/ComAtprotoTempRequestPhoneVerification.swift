@@ -11,6 +11,22 @@ public enum ComAtprotoTempRequestPhoneVerification {
         public init(phoneNumber: String) {
             self.phoneNumber = phoneNumber
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            phoneNumber = try container.decode(String.self, forKey: .phoneNumber)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(phoneNumber, forKey: .phoneNumber)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case phoneNumber
+        }
     }
 }
 

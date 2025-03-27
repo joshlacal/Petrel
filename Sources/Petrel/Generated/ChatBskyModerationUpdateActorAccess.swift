@@ -15,6 +15,34 @@ public enum ChatBskyModerationUpdateActorAccess {
             self.allowAccess = allowAccess
             self.ref = ref
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            actor = try container.decode(String.self, forKey: .actor)
+
+            allowAccess = try container.decode(Bool.self, forKey: .allowAccess)
+
+            ref = try container.decodeIfPresent(String.self, forKey: .ref)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(actor, forKey: .actor)
+
+            try container.encode(allowAccess, forKey: .allowAccess)
+
+            if let value = ref {
+                try container.encode(value, forKey: .ref)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case actor
+            case allowAccess
+            case ref
+        }
     }
 }
 

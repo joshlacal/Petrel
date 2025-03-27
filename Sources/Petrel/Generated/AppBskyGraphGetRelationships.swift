@@ -33,6 +33,29 @@ public enum AppBskyGraphGetRelationships {
 
             self.relationships = relationships
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            actor = try container.decodeIfPresent(String.self, forKey: .actor)
+
+            relationships = try container.decode([OutputRelationshipsUnion].self, forKey: .relationships)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            if let value = actor {
+                try container.encode(value, forKey: .actor)
+            }
+
+            try container.encode(relationships, forKey: .relationships)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case actor
+            case relationships
+        }
     }
 
     public enum Error: String, Swift.Error, CustomStringConvertible {
@@ -150,26 +173,22 @@ public enum AppBskyGraphGetRelationships {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .appBskyGraphDefsRelationship(value):
+            case let .appBskyGraphDefsRelationship(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? AppBskyGraphDefs.Relationship {
-                            self = .appBskyGraphDefsRelationship(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? AppBskyGraphDefs.Relationship {
+                        self = .appBskyGraphDefsRelationship(updatedValue)
                     }
                 }
-            case var .appBskyGraphDefsNotFoundActor(value):
+            case let .appBskyGraphDefsNotFoundActor(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? AppBskyGraphDefs.NotFoundActor {
-                            self = .appBskyGraphDefsNotFoundActor(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? AppBskyGraphDefs.NotFoundActor {
+                        self = .appBskyGraphDefsNotFoundActor(updatedValue)
                     }
                 }
             case .unexpected:

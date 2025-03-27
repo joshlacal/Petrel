@@ -43,11 +43,15 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
         try container.encode(post, forKey: .post)
 
         if let value = detachedEmbeddingUris {
-            try container.encode(value, forKey: .detachedEmbeddingUris)
+            if !value.isEmpty {
+                try container.encode(value, forKey: .detachedEmbeddingUris)
+            }
         }
 
         if let value = embeddingRules {
-            try container.encode(value, forKey: .embeddingRules)
+            if !value.isEmpty {
+                try container.encode(value, forKey: .embeddingRules)
+            }
         }
     }
 
@@ -218,15 +222,13 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
         /// Attempts to load any pending data in this enum or its children
         public mutating func loadPendingData() async {
             switch self {
-            case var .appBskyFeedPostgateDisableRule(value):
+            case let .appBskyFeedPostgateDisableRule(value):
                 // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? (any PendingDataLoadable) {
-                    if loadable.hasPendingData {
-                        await loadable.loadPendingData()
-                        // Update the value if it was mutated
-                        if let updatedValue = loadable as? AppBskyFeedPostgate.DisableRule {
-                            self = .appBskyFeedPostgateDisableRule(updatedValue)
-                        }
+                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                    await loadable.loadPendingData()
+                    // Update the value if it was mutated (only if it's actually the expected type)
+                    if let updatedValue = loadable as? AppBskyFeedPostgate.DisableRule {
+                        self = .appBskyFeedPostgateDisableRule(updatedValue)
                     }
                 }
             case .unexpected:

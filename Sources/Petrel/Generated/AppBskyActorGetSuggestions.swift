@@ -39,6 +39,36 @@ public enum AppBskyActorGetSuggestions {
 
             self.recId = recId
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+
+            actors = try container.decode([AppBskyActorDefs.ProfileView].self, forKey: .actors)
+
+            recId = try container.decodeIfPresent(Int.self, forKey: .recId)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            if let value = cursor {
+                try container.encode(value, forKey: .cursor)
+            }
+
+            try container.encode(actors, forKey: .actors)
+
+            if let value = recId {
+                try container.encode(value, forKey: .recId)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case cursor
+            case actors
+            case recId
+        }
     }
 }
 

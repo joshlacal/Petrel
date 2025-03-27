@@ -188,6 +188,55 @@ public enum ComAtprotoServerDescribeServer {
 
             self.did = did
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            inviteCodeRequired = try container.decodeIfPresent(Bool.self, forKey: .inviteCodeRequired)
+
+            phoneVerificationRequired = try container.decodeIfPresent(Bool.self, forKey: .phoneVerificationRequired)
+
+            availableUserDomains = try container.decode([String].self, forKey: .availableUserDomains)
+
+            links = try container.decodeIfPresent(Links.self, forKey: .links)
+
+            contact = try container.decodeIfPresent(Contact.self, forKey: .contact)
+
+            did = try container.decode(String.self, forKey: .did)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            if let value = inviteCodeRequired {
+                try container.encode(value, forKey: .inviteCodeRequired)
+            }
+
+            if let value = phoneVerificationRequired {
+                try container.encode(value, forKey: .phoneVerificationRequired)
+            }
+
+            try container.encode(availableUserDomains, forKey: .availableUserDomains)
+
+            if let value = links {
+                try container.encode(value, forKey: .links)
+            }
+
+            if let value = contact {
+                try container.encode(value, forKey: .contact)
+            }
+
+            try container.encode(did, forKey: .did)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case inviteCodeRequired
+            case phoneVerificationRequired
+            case availableUserDomains
+            case links
+            case contact
+            case did
+        }
     }
 }
 

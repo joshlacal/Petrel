@@ -23,6 +23,64 @@ public enum ToolsOzoneCommunicationUpdateTemplate {
             self.updatedBy = updatedBy
             self.disabled = disabled
         }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            id = try container.decode(String.self, forKey: .id)
+
+            name = try container.decodeIfPresent(String.self, forKey: .name)
+
+            lang = try container.decodeIfPresent(LanguageCodeContainer.self, forKey: .lang)
+
+            contentMarkdown = try container.decodeIfPresent(String.self, forKey: .contentMarkdown)
+
+            subject = try container.decodeIfPresent(String.self, forKey: .subject)
+
+            updatedBy = try container.decodeIfPresent(String.self, forKey: .updatedBy)
+
+            disabled = try container.decodeIfPresent(Bool.self, forKey: .disabled)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(id, forKey: .id)
+
+            if let value = name {
+                try container.encode(value, forKey: .name)
+            }
+
+            if let value = lang {
+                try container.encode(value, forKey: .lang)
+            }
+
+            if let value = contentMarkdown {
+                try container.encode(value, forKey: .contentMarkdown)
+            }
+
+            if let value = subject {
+                try container.encode(value, forKey: .subject)
+            }
+
+            if let value = updatedBy {
+                try container.encode(value, forKey: .updatedBy)
+            }
+
+            if let value = disabled {
+                try container.encode(value, forKey: .disabled)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case id
+            case name
+            case lang
+            case contentMarkdown
+            case subject
+            case updatedBy
+            case disabled
+        }
     }
 
     public typealias Output = ToolsOzoneCommunicationDefs.TemplateView
