@@ -1,29 +1,24 @@
 import Foundation
 
-
-
 // lexicon: 1, id: app.bsky.labeler.defs
 
-
-public struct AppBskyLabelerDefs { 
-
+public enum AppBskyLabelerDefs {
     public static let typeIdentifier = "app.bsky.labeler.defs"
-        
-public struct LabelerView: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.labeler.defs#labelerView"
-            public let uri: ATProtocolURI
-            public let cid: String
-            public let creator: AppBskyActorDefs.ProfileView
-            public let likeCount: Int?
-            public let viewer: LabelerViewerState?
-            public let indexedAt: ATProtocolDate
-            public let labels: [ComAtprotoLabelDefs.Label]?
+
+    public struct LabelerView: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.labeler.defs#labelerView"
+        public let uri: ATProtocolURI
+        public let cid: String
+        public let creator: AppBskyActorDefs.ProfileView
+        public let likeCount: Int?
+        public let viewer: LabelerViewerState?
+        public let indexedAt: ATProtocolDate
+        public let labels: [ComAtprotoLabelDefs.Label]?
 
         // Standard initializer
         public init(
             uri: ATProtocolURI, cid: String, creator: AppBskyActorDefs.ProfileView, likeCount: Int?, viewer: LabelerViewerState?, indexedAt: ATProtocolDate, labels: [ComAtprotoLabelDefs.Label]?
         ) {
-            
             self.uri = uri
             self.cid = cid
             self.creator = creator
@@ -35,105 +30,83 @@ public struct LabelerView: ATProtocolCodable, ATProtocolValue {
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
-            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                
-                self.uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-                
+                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+
             } catch {
                 LogManager.logError("Decoding error for property 'uri': \(error)")
                 throw error
             }
             do {
-                
-                self.cid = try container.decode(String.self, forKey: .cid)
-                
+                cid = try container.decode(String.self, forKey: .cid)
+
             } catch {
                 LogManager.logError("Decoding error for property 'cid': \(error)")
                 throw error
             }
             do {
-                
-                self.creator = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: .creator)
-                
+                creator = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: .creator)
+
             } catch {
                 LogManager.logError("Decoding error for property 'creator': \(error)")
                 throw error
             }
             do {
-                
-                self.likeCount = try container.decodeIfPresent(Int.self, forKey: .likeCount)
-                
+                likeCount = try container.decodeIfPresent(Int.self, forKey: .likeCount)
+
             } catch {
                 LogManager.logError("Decoding error for property 'likeCount': \(error)")
                 throw error
             }
             do {
-                
-                self.viewer = try container.decodeIfPresent(LabelerViewerState.self, forKey: .viewer)
-                
+                viewer = try container.decodeIfPresent(LabelerViewerState.self, forKey: .viewer)
+
             } catch {
                 LogManager.logError("Decoding error for property 'viewer': \(error)")
                 throw error
             }
             do {
-                
-                self.indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
-                
+                indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
+
             } catch {
                 LogManager.logError("Decoding error for property 'indexedAt': \(error)")
                 throw error
             }
             do {
-                
-                self.labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
-                
+                labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
+
             } catch {
                 LogManager.logError("Decoding error for property 'labels': \(error)")
                 throw error
             }
-            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            
+
             try container.encode(uri, forKey: .uri)
-            
-            
+
             try container.encode(cid, forKey: .cid)
-            
-            
+
             try container.encode(creator, forKey: .creator)
-            
-            
+
             if let value = likeCount {
-                
                 try container.encode(value, forKey: .likeCount)
-                
             }
-            
-            
+
             if let value = viewer {
-                
                 try container.encode(value, forKey: .viewer)
-                
             }
-            
-            
+
             try container.encode(indexedAt, forKey: .indexedAt)
-            
-            
+
             if let value = labels {
-                
                 if !value.isEmpty {
                     try container.encode(value, forKey: .labels)
                 }
-                
             }
-            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -159,45 +132,37 @@ public struct LabelerView: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            
             guard let other = other as? Self else { return false }
-            
-            if self.uri != other.uri {
+
+            if uri != other.uri {
                 return false
             }
-            
-            
-            if self.cid != other.cid {
+
+            if cid != other.cid {
                 return false
             }
-            
-            
-            if self.creator != other.creator {
+
+            if creator != other.creator {
                 return false
             }
-            
-            
+
             if likeCount != other.likeCount {
                 return false
             }
-            
-            
+
             if viewer != other.viewer {
                 return false
             }
-            
-            
-            if self.indexedAt != other.indexedAt {
+
+            if indexedAt != other.indexedAt {
                 return false
             }
-            
-            
+
             if labels != other.labels {
                 return false
             }
-            
+
             return true
-            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -215,26 +180,25 @@ public struct LabelerView: ATProtocolCodable, ATProtocolValue {
             case labels
         }
     }
-        
-public struct LabelerViewDetailed: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.labeler.defs#labelerViewDetailed"
-            public let uri: ATProtocolURI
-            public let cid: String
-            public let creator: AppBskyActorDefs.ProfileView
-            public let policies: AppBskyLabelerDefs.LabelerPolicies
-            public let likeCount: Int?
-            public let viewer: LabelerViewerState?
-            public let indexedAt: ATProtocolDate
-            public let labels: [ComAtprotoLabelDefs.Label]?
-            public let reasonTypes: [ComAtprotoModerationDefs.ReasonType]?
-            public let subjectTypes: [ComAtprotoModerationDefs.SubjectType]?
-            public let subjectCollections: [String]?
+
+    public struct LabelerViewDetailed: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.labeler.defs#labelerViewDetailed"
+        public let uri: ATProtocolURI
+        public let cid: String
+        public let creator: AppBskyActorDefs.ProfileView
+        public let policies: AppBskyLabelerDefs.LabelerPolicies
+        public let likeCount: Int?
+        public let viewer: LabelerViewerState?
+        public let indexedAt: ATProtocolDate
+        public let labels: [ComAtprotoLabelDefs.Label]?
+        public let reasonTypes: [ComAtprotoModerationDefs.ReasonType]?
+        public let subjectTypes: [ComAtprotoModerationDefs.SubjectType]?
+        public let subjectCollections: [String]?
 
         // Standard initializer
         public init(
             uri: ATProtocolURI, cid: String, creator: AppBskyActorDefs.ProfileView, policies: AppBskyLabelerDefs.LabelerPolicies, likeCount: Int?, viewer: LabelerViewerState?, indexedAt: ATProtocolDate, labels: [ComAtprotoLabelDefs.Label]?, reasonTypes: [ComAtprotoModerationDefs.ReasonType]?, subjectTypes: [ComAtprotoModerationDefs.SubjectType]?, subjectCollections: [String]?
         ) {
-            
             self.uri = uri
             self.cid = cid
             self.creator = creator
@@ -250,167 +214,131 @@ public struct LabelerViewDetailed: ATProtocolCodable, ATProtocolValue {
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
-            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                
-                self.uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-                
+                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+
             } catch {
                 LogManager.logError("Decoding error for property 'uri': \(error)")
                 throw error
             }
             do {
-                
-                self.cid = try container.decode(String.self, forKey: .cid)
-                
+                cid = try container.decode(String.self, forKey: .cid)
+
             } catch {
                 LogManager.logError("Decoding error for property 'cid': \(error)")
                 throw error
             }
             do {
-                
-                self.creator = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: .creator)
-                
+                creator = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: .creator)
+
             } catch {
                 LogManager.logError("Decoding error for property 'creator': \(error)")
                 throw error
             }
             do {
-                
-                self.policies = try container.decode(AppBskyLabelerDefs.LabelerPolicies.self, forKey: .policies)
-                
+                policies = try container.decode(AppBskyLabelerDefs.LabelerPolicies.self, forKey: .policies)
+
             } catch {
                 LogManager.logError("Decoding error for property 'policies': \(error)")
                 throw error
             }
             do {
-                
-                self.likeCount = try container.decodeIfPresent(Int.self, forKey: .likeCount)
-                
+                likeCount = try container.decodeIfPresent(Int.self, forKey: .likeCount)
+
             } catch {
                 LogManager.logError("Decoding error for property 'likeCount': \(error)")
                 throw error
             }
             do {
-                
-                self.viewer = try container.decodeIfPresent(LabelerViewerState.self, forKey: .viewer)
-                
+                viewer = try container.decodeIfPresent(LabelerViewerState.self, forKey: .viewer)
+
             } catch {
                 LogManager.logError("Decoding error for property 'viewer': \(error)")
                 throw error
             }
             do {
-                
-                self.indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
-                
+                indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
+
             } catch {
                 LogManager.logError("Decoding error for property 'indexedAt': \(error)")
                 throw error
             }
             do {
-                
-                self.labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
-                
+                labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
+
             } catch {
                 LogManager.logError("Decoding error for property 'labels': \(error)")
                 throw error
             }
             do {
-                
-                self.reasonTypes = try container.decodeIfPresent([ComAtprotoModerationDefs.ReasonType].self, forKey: .reasonTypes)
-                
+                reasonTypes = try container.decodeIfPresent([ComAtprotoModerationDefs.ReasonType].self, forKey: .reasonTypes)
+
             } catch {
                 LogManager.logError("Decoding error for property 'reasonTypes': \(error)")
                 throw error
             }
             do {
-                
-                self.subjectTypes = try container.decodeIfPresent([ComAtprotoModerationDefs.SubjectType].self, forKey: .subjectTypes)
-                
+                subjectTypes = try container.decodeIfPresent([ComAtprotoModerationDefs.SubjectType].self, forKey: .subjectTypes)
+
             } catch {
                 LogManager.logError("Decoding error for property 'subjectTypes': \(error)")
                 throw error
             }
             do {
-                
-                self.subjectCollections = try container.decodeIfPresent([String].self, forKey: .subjectCollections)
-                
+                subjectCollections = try container.decodeIfPresent([String].self, forKey: .subjectCollections)
+
             } catch {
                 LogManager.logError("Decoding error for property 'subjectCollections': \(error)")
                 throw error
             }
-            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            
+
             try container.encode(uri, forKey: .uri)
-            
-            
+
             try container.encode(cid, forKey: .cid)
-            
-            
+
             try container.encode(creator, forKey: .creator)
-            
-            
+
             try container.encode(policies, forKey: .policies)
-            
-            
+
             if let value = likeCount {
-                
                 try container.encode(value, forKey: .likeCount)
-                
             }
-            
-            
+
             if let value = viewer {
-                
                 try container.encode(value, forKey: .viewer)
-                
             }
-            
-            
+
             try container.encode(indexedAt, forKey: .indexedAt)
-            
-            
+
             if let value = labels {
-                
                 if !value.isEmpty {
                     try container.encode(value, forKey: .labels)
                 }
-                
             }
-            
-            
+
             if let value = reasonTypes {
-                
                 if !value.isEmpty {
                     try container.encode(value, forKey: .reasonTypes)
                 }
-                
             }
-            
-            
+
             if let value = subjectTypes {
-                
                 if !value.isEmpty {
                     try container.encode(value, forKey: .subjectTypes)
                 }
-                
             }
-            
-            
+
             if let value = subjectCollections {
-                
                 if !value.isEmpty {
                     try container.encode(value, forKey: .subjectCollections)
                 }
-                
             }
-            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -452,65 +380,53 @@ public struct LabelerViewDetailed: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            
             guard let other = other as? Self else { return false }
-            
-            if self.uri != other.uri {
+
+            if uri != other.uri {
                 return false
             }
-            
-            
-            if self.cid != other.cid {
+
+            if cid != other.cid {
                 return false
             }
-            
-            
-            if self.creator != other.creator {
+
+            if creator != other.creator {
                 return false
             }
-            
-            
-            if self.policies != other.policies {
+
+            if policies != other.policies {
                 return false
             }
-            
-            
+
             if likeCount != other.likeCount {
                 return false
             }
-            
-            
+
             if viewer != other.viewer {
                 return false
             }
-            
-            
-            if self.indexedAt != other.indexedAt {
+
+            if indexedAt != other.indexedAt {
                 return false
             }
-            
-            
+
             if labels != other.labels {
                 return false
             }
-            
-            
+
             if reasonTypes != other.reasonTypes {
                 return false
             }
-            
-            
+
             if subjectTypes != other.subjectTypes {
                 return false
             }
-            
-            
+
             if subjectCollections != other.subjectCollections {
                 return false
             }
-            
+
             return true
-            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -532,44 +448,37 @@ public struct LabelerViewDetailed: ATProtocolCodable, ATProtocolValue {
             case subjectCollections
         }
     }
-        
-public struct LabelerViewerState: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.labeler.defs#labelerViewerState"
-            public let like: ATProtocolURI?
+
+    public struct LabelerViewerState: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.labeler.defs#labelerViewerState"
+        public let like: ATProtocolURI?
 
         // Standard initializer
         public init(
             like: ATProtocolURI?
         ) {
-            
             self.like = like
         }
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
-            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                
-                self.like = try container.decodeIfPresent(ATProtocolURI.self, forKey: .like)
-                
+                like = try container.decodeIfPresent(ATProtocolURI.self, forKey: .like)
+
             } catch {
                 LogManager.logError("Decoding error for property 'like': \(error)")
                 throw error
             }
-            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            
+
             if let value = like {
-                
                 try container.encode(value, forKey: .like)
-                
             }
-            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -581,15 +490,13 @@ public struct LabelerViewerState: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            
             guard let other = other as? Self else { return false }
-            
+
             if like != other.like {
                 return false
             }
-            
+
             return true
-            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -601,59 +508,50 @@ public struct LabelerViewerState: ATProtocolCodable, ATProtocolValue {
             case like
         }
     }
-        
-public struct LabelerPolicies: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.labeler.defs#labelerPolicies"
-            public let labelValues: [ComAtprotoLabelDefs.LabelValue]
-            public let labelValueDefinitions: [ComAtprotoLabelDefs.LabelValueDefinition]?
+
+    public struct LabelerPolicies: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.labeler.defs#labelerPolicies"
+        public let labelValues: [ComAtprotoLabelDefs.LabelValue]
+        public let labelValueDefinitions: [ComAtprotoLabelDefs.LabelValueDefinition]?
 
         // Standard initializer
         public init(
             labelValues: [ComAtprotoLabelDefs.LabelValue], labelValueDefinitions: [ComAtprotoLabelDefs.LabelValueDefinition]?
         ) {
-            
             self.labelValues = labelValues
             self.labelValueDefinitions = labelValueDefinitions
         }
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
-            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                
-                self.labelValues = try container.decode([ComAtprotoLabelDefs.LabelValue].self, forKey: .labelValues)
-                
+                labelValues = try container.decode([ComAtprotoLabelDefs.LabelValue].self, forKey: .labelValues)
+
             } catch {
                 LogManager.logError("Decoding error for property 'labelValues': \(error)")
                 throw error
             }
             do {
-                
-                self.labelValueDefinitions = try container.decodeIfPresent([ComAtprotoLabelDefs.LabelValueDefinition].self, forKey: .labelValueDefinitions)
-                
+                labelValueDefinitions = try container.decodeIfPresent([ComAtprotoLabelDefs.LabelValueDefinition].self, forKey: .labelValueDefinitions)
+
             } catch {
                 LogManager.logError("Decoding error for property 'labelValueDefinitions': \(error)")
                 throw error
             }
-            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            
+
             try container.encode(labelValues, forKey: .labelValues)
-            
-            
+
             if let value = labelValueDefinitions {
-                
                 if !value.isEmpty {
                     try container.encode(value, forKey: .labelValueDefinitions)
                 }
-                
             }
-            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -666,20 +564,17 @@ public struct LabelerPolicies: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            
             guard let other = other as? Self else { return false }
-            
-            if self.labelValues != other.labelValues {
+
+            if labelValues != other.labelValues {
                 return false
             }
-            
-            
+
             if labelValueDefinitions != other.labelValueDefinitions {
                 return false
             }
-            
+
             return true
-            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -692,10 +587,4 @@ public struct LabelerPolicies: ATProtocolCodable, ATProtocolValue {
             case labelValueDefinitions
         }
     }
-
-
-
 }
-
-
-                           

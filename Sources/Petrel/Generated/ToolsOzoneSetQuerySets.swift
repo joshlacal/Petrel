@@ -1,112 +1,80 @@
 import Foundation
 
-
-
 // lexicon: 1, id: tools.ozone.set.querySets
 
-
-public struct ToolsOzoneSetQuerySets { 
-
-    public static let typeIdentifier = "tools.ozone.set.querySets"    
-public struct Parameters: Parametrizable {
+public enum ToolsOzoneSetQuerySets {
+    public static let typeIdentifier = "tools.ozone.set.querySets"
+    public struct Parameters: Parametrizable {
         public let limit: Int?
         public let cursor: String?
         public let namePrefix: String?
         public let sortBy: String?
         public let sortDirection: String?
-        
+
         public init(
-            limit: Int? = nil, 
-            cursor: String? = nil, 
-            namePrefix: String? = nil, 
-            sortBy: String? = nil, 
+            limit: Int? = nil,
+            cursor: String? = nil,
+            namePrefix: String? = nil,
+            sortBy: String? = nil,
             sortDirection: String? = nil
-            ) {
+        ) {
             self.limit = limit
             self.cursor = cursor
             self.namePrefix = namePrefix
             self.sortBy = sortBy
             self.sortDirection = sortDirection
-            
         }
     }
-    
-public struct Output: ATProtocolCodable {
-        
-        
+
+    public struct Output: ATProtocolCodable {
         public let sets: [ToolsOzoneSetDefs.SetView]
-        
+
         public let cursor: String?
-        
-        
-        
+
         // Standard public initializer
         public init(
-            
             sets: [ToolsOzoneSetDefs.SetView],
-            
+
             cursor: String? = nil
-            
-            
+
         ) {
-            
             self.sets = sets
-            
+
             self.cursor = cursor
-            
-            
         }
-        
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
-            
-            self.sets = try container.decode([ToolsOzoneSetDefs.SetView].self, forKey: .sets)
-            
-            
-            self.cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
-            
-            
+
+            sets = try container.decode([ToolsOzoneSetDefs.SetView].self, forKey: .sets)
+
+            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
         }
-        
+
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
-            
+
             try container.encode(sets, forKey: .sets)
-            
-            
+
             if let value = cursor {
-                
                 try container.encode(value, forKey: .cursor)
-                
             }
-            
-            
         }
-        
+
         private enum CodingKeys: String, CodingKey {
-            
             case sets
             case cursor
-            
         }
     }
-
-
-
-
 }
 
-
-extension ATProtoClient.Tools.Ozone.Set {
+public extension ATProtoClient.Tools.Ozone.Set {
     /// Query available sets
-    public func querySets(input: ToolsOzoneSetQuerySets.Parameters) async throws -> (responseCode: Int, data: ToolsOzoneSetQuerySets.Output?) {
+    func querySets(input: ToolsOzoneSetQuerySets.Parameters) async throws -> (responseCode: Int, data: ToolsOzoneSetQuerySets.Output?) {
         let endpoint = "tools.ozone.set.querySets"
-        
-        
+
         let queryItems = input.asQueryItems()
-        
+
         let urlRequest = try await networkManager.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -114,7 +82,7 @@ extension ATProtoClient.Tools.Ozone.Set {
             body: nil,
             queryItems: queryItems
         )
-        
+
         let (responseData, response) = try await networkManager.performRequest(urlRequest)
         let responseCode = response.statusCode
 
@@ -122,17 +90,16 @@ extension ATProtoClient.Tools.Ozone.Set {
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
-        
+
         if !contentType.lowercased().contains("application/json") {
             throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
         }
 
         // Data decoding and validation
-        
+
         let decoder = JSONDecoder()
         let decodedData = try? decoder.decode(ToolsOzoneSetQuerySets.Output.self, from: responseData)
-        
-        
+
         return (responseCode, decodedData)
     }
-}                           
+}

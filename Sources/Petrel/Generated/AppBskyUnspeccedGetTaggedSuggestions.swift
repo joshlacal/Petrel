@@ -1,25 +1,20 @@
 import Foundation
 
-
-
 // lexicon: 1, id: app.bsky.unspecced.getTaggedSuggestions
 
-
-public struct AppBskyUnspeccedGetTaggedSuggestions { 
-
+public enum AppBskyUnspeccedGetTaggedSuggestions {
     public static let typeIdentifier = "app.bsky.unspecced.getTaggedSuggestions"
-        
-public struct Suggestion: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.unspecced.getTaggedSuggestions#suggestion"
-            public let tag: String
-            public let subjectType: String
-            public let subject: URI
+
+    public struct Suggestion: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.unspecced.getTaggedSuggestions#suggestion"
+        public let tag: String
+        public let subjectType: String
+        public let subject: URI
 
         // Standard initializer
         public init(
             tag: String, subjectType: String, subject: URI
         ) {
-            
             self.tag = tag
             self.subjectType = subjectType
             self.subject = subject
@@ -27,47 +22,39 @@ public struct Suggestion: ATProtocolCodable, ATProtocolValue {
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
-            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                
-                self.tag = try container.decode(String.self, forKey: .tag)
-                
+                tag = try container.decode(String.self, forKey: .tag)
+
             } catch {
                 LogManager.logError("Decoding error for property 'tag': \(error)")
                 throw error
             }
             do {
-                
-                self.subjectType = try container.decode(String.self, forKey: .subjectType)
-                
+                subjectType = try container.decode(String.self, forKey: .subjectType)
+
             } catch {
                 LogManager.logError("Decoding error for property 'subjectType': \(error)")
                 throw error
             }
             do {
-                
-                self.subject = try container.decode(URI.self, forKey: .subject)
-                
+                subject = try container.decode(URI.self, forKey: .subject)
+
             } catch {
                 LogManager.logError("Decoding error for property 'subject': \(error)")
                 throw error
             }
-            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            
+
             try container.encode(tag, forKey: .tag)
-            
-            
+
             try container.encode(subjectType, forKey: .subjectType)
-            
-            
+
             try container.encode(subject, forKey: .subject)
-            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -77,25 +64,21 @@ public struct Suggestion: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            
             guard let other = other as? Self else { return false }
-            
-            if self.tag != other.tag {
+
+            if tag != other.tag {
                 return false
             }
-            
-            
-            if self.subjectType != other.subjectType {
+
+            if subjectType != other.subjectType {
                 return false
             }
-            
-            
-            if self.subject != other.subject {
+
+            if subject != other.subject {
                 return false
             }
-            
+
             return true
-            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -108,74 +91,49 @@ public struct Suggestion: ATProtocolCodable, ATProtocolValue {
             case subjectType
             case subject
         }
-    }    
-public struct Parameters: Parametrizable {
-        
-        public init(
-            ) {
-            
-        }
     }
-    
-public struct Output: ATProtocolCodable {
-        
-        
+
+    public struct Parameters: Parametrizable {
+        public init(
+        ) {}
+    }
+
+    public struct Output: ATProtocolCodable {
         public let suggestions: [Suggestion]
-        
-        
-        
+
         // Standard public initializer
         public init(
-            
             suggestions: [Suggestion]
-            
-            
+
         ) {
-            
             self.suggestions = suggestions
-            
-            
         }
-        
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
-            
-            self.suggestions = try container.decode([Suggestion].self, forKey: .suggestions)
-            
-            
+
+            suggestions = try container.decode([Suggestion].self, forKey: .suggestions)
         }
-        
+
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
-            
+
             try container.encode(suggestions, forKey: .suggestions)
-            
-            
         }
-        
+
         private enum CodingKeys: String, CodingKey {
-            
             case suggestions
-            
         }
     }
-
-
-
-
 }
 
-
-extension ATProtoClient.App.Bsky.Unspecced {
+public extension ATProtoClient.App.Bsky.Unspecced {
     /// Get a list of suggestions (feeds and users) tagged with categories
-    public func getTaggedSuggestions(input: AppBskyUnspeccedGetTaggedSuggestions.Parameters) async throws -> (responseCode: Int, data: AppBskyUnspeccedGetTaggedSuggestions.Output?) {
+    func getTaggedSuggestions(input: AppBskyUnspeccedGetTaggedSuggestions.Parameters) async throws -> (responseCode: Int, data: AppBskyUnspeccedGetTaggedSuggestions.Output?) {
         let endpoint = "app.bsky.unspecced.getTaggedSuggestions"
-        
-        
+
         let queryItems = input.asQueryItems()
-        
+
         let urlRequest = try await networkManager.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -183,7 +141,7 @@ extension ATProtoClient.App.Bsky.Unspecced {
             body: nil,
             queryItems: queryItems
         )
-        
+
         let (responseData, response) = try await networkManager.performRequest(urlRequest)
         let responseCode = response.statusCode
 
@@ -191,17 +149,16 @@ extension ATProtoClient.App.Bsky.Unspecced {
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
-        
+
         if !contentType.lowercased().contains("application/json") {
             throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
         }
 
         // Data decoding and validation
-        
+
         let decoder = JSONDecoder()
         let decodedData = try? decoder.decode(AppBskyUnspeccedGetTaggedSuggestions.Output.self, from: responseData)
-        
-        
+
         return (responseCode, decodedData)
     }
-}                           
+}

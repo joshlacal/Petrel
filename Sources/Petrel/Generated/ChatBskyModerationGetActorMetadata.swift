@@ -1,26 +1,21 @@
 import Foundation
 
-
-
 // lexicon: 1, id: chat.bsky.moderation.getActorMetadata
 
-
-public struct ChatBskyModerationGetActorMetadata { 
-
+public enum ChatBskyModerationGetActorMetadata {
     public static let typeIdentifier = "chat.bsky.moderation.getActorMetadata"
-        
-public struct Metadata: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "chat.bsky.moderation.getActorMetadata#metadata"
-            public let messagesSent: Int
-            public let messagesReceived: Int
-            public let convos: Int
-            public let convosStarted: Int
+
+    public struct Metadata: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "chat.bsky.moderation.getActorMetadata#metadata"
+        public let messagesSent: Int
+        public let messagesReceived: Int
+        public let convos: Int
+        public let convosStarted: Int
 
         // Standard initializer
         public init(
             messagesSent: Int, messagesReceived: Int, convos: Int, convosStarted: Int
         ) {
-            
             self.messagesSent = messagesSent
             self.messagesReceived = messagesReceived
             self.convos = convos
@@ -29,58 +24,48 @@ public struct Metadata: ATProtocolCodable, ATProtocolValue {
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
-            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                
-                self.messagesSent = try container.decode(Int.self, forKey: .messagesSent)
-                
+                messagesSent = try container.decode(Int.self, forKey: .messagesSent)
+
             } catch {
                 LogManager.logError("Decoding error for property 'messagesSent': \(error)")
                 throw error
             }
             do {
-                
-                self.messagesReceived = try container.decode(Int.self, forKey: .messagesReceived)
-                
+                messagesReceived = try container.decode(Int.self, forKey: .messagesReceived)
+
             } catch {
                 LogManager.logError("Decoding error for property 'messagesReceived': \(error)")
                 throw error
             }
             do {
-                
-                self.convos = try container.decode(Int.self, forKey: .convos)
-                
+                convos = try container.decode(Int.self, forKey: .convos)
+
             } catch {
                 LogManager.logError("Decoding error for property 'convos': \(error)")
                 throw error
             }
             do {
-                
-                self.convosStarted = try container.decode(Int.self, forKey: .convosStarted)
-                
+                convosStarted = try container.decode(Int.self, forKey: .convosStarted)
+
             } catch {
                 LogManager.logError("Decoding error for property 'convosStarted': \(error)")
                 throw error
             }
-            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            
+
             try container.encode(messagesSent, forKey: .messagesSent)
-            
-            
+
             try container.encode(messagesReceived, forKey: .messagesReceived)
-            
-            
+
             try container.encode(convos, forKey: .convos)
-            
-            
+
             try container.encode(convosStarted, forKey: .convosStarted)
-            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -91,30 +76,25 @@ public struct Metadata: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            
             guard let other = other as? Self else { return false }
-            
-            if self.messagesSent != other.messagesSent {
+
+            if messagesSent != other.messagesSent {
                 return false
             }
-            
-            
-            if self.messagesReceived != other.messagesReceived {
+
+            if messagesReceived != other.messagesReceived {
                 return false
             }
-            
-            
-            if self.convos != other.convos {
+
+            if convos != other.convos {
                 return false
             }
-            
-            
-            if self.convosStarted != other.convosStarted {
+
+            if convosStarted != other.convosStarted {
                 return false
             }
-            
+
             return true
-            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -128,103 +108,76 @@ public struct Metadata: ATProtocolCodable, ATProtocolValue {
             case convos
             case convosStarted
         }
-    }    
-public struct Parameters: Parametrizable {
+    }
+
+    public struct Parameters: Parametrizable {
         public let actor: String
-        
+
         public init(
             actor: String
-            ) {
+        ) {
             self.actor = actor
-            
         }
     }
-    
-public struct Output: ATProtocolCodable {
-        
-        
+
+    public struct Output: ATProtocolCodable {
         public let day: Metadata
-        
+
         public let month: Metadata
-        
+
         public let all: Metadata
-        
-        
-        
+
         // Standard public initializer
         public init(
-            
             day: Metadata,
-            
+
             month: Metadata,
-            
+
             all: Metadata
-            
-            
+
         ) {
-            
             self.day = day
-            
+
             self.month = month
-            
+
             self.all = all
-            
-            
         }
-        
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
-            
-            self.day = try container.decode(Metadata.self, forKey: .day)
-            
-            
-            self.month = try container.decode(Metadata.self, forKey: .month)
-            
-            
-            self.all = try container.decode(Metadata.self, forKey: .all)
-            
-            
+
+            day = try container.decode(Metadata.self, forKey: .day)
+
+            month = try container.decode(Metadata.self, forKey: .month)
+
+            all = try container.decode(Metadata.self, forKey: .all)
         }
-        
+
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
-            
+
             try container.encode(day, forKey: .day)
-            
-            
+
             try container.encode(month, forKey: .month)
-            
-            
+
             try container.encode(all, forKey: .all)
-            
-            
         }
-        
+
         private enum CodingKeys: String, CodingKey {
-            
             case day
             case month
             case all
-            
         }
     }
-
-
-
-
 }
 
-
-extension ATProtoClient.Chat.Bsky.Moderation {
-    /// 
-    public func getActorMetadata(input: ChatBskyModerationGetActorMetadata.Parameters) async throws -> (responseCode: Int, data: ChatBskyModerationGetActorMetadata.Output?) {
+public extension ATProtoClient.Chat.Bsky.Moderation {
+    ///
+    func getActorMetadata(input: ChatBskyModerationGetActorMetadata.Parameters) async throws -> (responseCode: Int, data: ChatBskyModerationGetActorMetadata.Output?) {
         let endpoint = "chat.bsky.moderation.getActorMetadata"
-        
-        
+
         let queryItems = input.asQueryItems()
-        
+
         let urlRequest = try await networkManager.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -232,7 +185,7 @@ extension ATProtoClient.Chat.Bsky.Moderation {
             body: nil,
             queryItems: queryItems
         )
-        
+
         let (responseData, response) = try await networkManager.performRequest(urlRequest)
         let responseCode = response.statusCode
 
@@ -240,17 +193,16 @@ extension ATProtoClient.Chat.Bsky.Moderation {
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
-        
+
         if !contentType.lowercased().contains("application/json") {
             throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
         }
 
         // Data decoding and validation
-        
+
         let decoder = JSONDecoder()
         let decodedData = try? decoder.decode(ChatBskyModerationGetActorMetadata.Output.self, from: responseData)
-        
-        
+
         return (responseCode, decodedData)
     }
-}                           
+}

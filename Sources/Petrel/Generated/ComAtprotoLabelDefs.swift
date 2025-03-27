@@ -1,31 +1,26 @@
 import Foundation
 
-
-
 // lexicon: 1, id: com.atproto.label.defs
 
-
-public struct ComAtprotoLabelDefs { 
-
+public enum ComAtprotoLabelDefs {
     public static let typeIdentifier = "com.atproto.label.defs"
-        
-public struct Label: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "com.atproto.label.defs#label"
-            public let ver: Int?
-            public let src: String
-            public let uri: URI
-            public let cid: String?
-            public let val: String
-            public let neg: Bool?
-            public let cts: ATProtocolDate
-            public let exp: ATProtocolDate?
-            public let sig: Bytes?
+
+    public struct Label: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "com.atproto.label.defs#label"
+        public let ver: Int?
+        public let src: String
+        public let uri: URI
+        public let cid: String?
+        public let val: String
+        public let neg: Bool?
+        public let cts: ATProtocolDate
+        public let exp: ATProtocolDate?
+        public let sig: Bytes?
 
         // Standard initializer
         public init(
             ver: Int?, src: String, uri: URI, cid: String?, val: String, neg: Bool?, cts: ATProtocolDate, exp: ATProtocolDate?, sig: Bytes?
         ) {
-            
             self.ver = ver
             self.src = src
             self.uri = uri
@@ -39,133 +34,103 @@ public struct Label: ATProtocolCodable, ATProtocolValue {
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
-            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                
-                self.ver = try container.decodeIfPresent(Int.self, forKey: .ver)
-                
+                ver = try container.decodeIfPresent(Int.self, forKey: .ver)
+
             } catch {
                 LogManager.logError("Decoding error for property 'ver': \(error)")
                 throw error
             }
             do {
-                
-                self.src = try container.decode(String.self, forKey: .src)
-                
+                src = try container.decode(String.self, forKey: .src)
+
             } catch {
                 LogManager.logError("Decoding error for property 'src': \(error)")
                 throw error
             }
             do {
-                
-                self.uri = try container.decode(URI.self, forKey: .uri)
-                
+                uri = try container.decode(URI.self, forKey: .uri)
+
             } catch {
                 LogManager.logError("Decoding error for property 'uri': \(error)")
                 throw error
             }
             do {
-                
-                self.cid = try container.decodeIfPresent(String.self, forKey: .cid)
-                
+                cid = try container.decodeIfPresent(String.self, forKey: .cid)
+
             } catch {
                 LogManager.logError("Decoding error for property 'cid': \(error)")
                 throw error
             }
             do {
-                
-                self.val = try container.decode(String.self, forKey: .val)
-                
+                val = try container.decode(String.self, forKey: .val)
+
             } catch {
                 LogManager.logError("Decoding error for property 'val': \(error)")
                 throw error
             }
             do {
-                
-                self.neg = try container.decodeIfPresent(Bool.self, forKey: .neg)
-                
+                neg = try container.decodeIfPresent(Bool.self, forKey: .neg)
+
             } catch {
                 LogManager.logError("Decoding error for property 'neg': \(error)")
                 throw error
             }
             do {
-                
-                self.cts = try container.decode(ATProtocolDate.self, forKey: .cts)
-                
+                cts = try container.decode(ATProtocolDate.self, forKey: .cts)
+
             } catch {
                 LogManager.logError("Decoding error for property 'cts': \(error)")
                 throw error
             }
             do {
-                
-                self.exp = try container.decodeIfPresent(ATProtocolDate.self, forKey: .exp)
-                
+                exp = try container.decodeIfPresent(ATProtocolDate.self, forKey: .exp)
+
             } catch {
                 LogManager.logError("Decoding error for property 'exp': \(error)")
                 throw error
             }
             do {
-                
-                self.sig = try container.decodeIfPresent(Bytes.self, forKey: .sig)
-                
+                sig = try container.decodeIfPresent(Bytes.self, forKey: .sig)
+
             } catch {
                 LogManager.logError("Decoding error for property 'sig': \(error)")
                 throw error
             }
-            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            
+
             if let value = ver {
-                
                 try container.encode(value, forKey: .ver)
-                
             }
-            
-            
+
             try container.encode(src, forKey: .src)
-            
-            
+
             try container.encode(uri, forKey: .uri)
-            
-            
+
             if let value = cid {
-                
                 try container.encode(value, forKey: .cid)
-                
             }
-            
-            
+
             try container.encode(val, forKey: .val)
-            
-            
+
             if let value = neg {
-                
                 try container.encode(value, forKey: .neg)
-                
             }
-            
-            
+
             try container.encode(cts, forKey: .cts)
-            
-            
+
             if let value = exp {
-                
                 try container.encode(value, forKey: .exp)
-                
             }
-            
-            
+
             if let value = sig {
-                
                 try container.encode(value, forKey: .sig)
-                
             }
-            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -201,55 +166,45 @@ public struct Label: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            
             guard let other = other as? Self else { return false }
-            
+
             if ver != other.ver {
                 return false
             }
-            
-            
-            if self.src != other.src {
+
+            if src != other.src {
                 return false
             }
-            
-            
-            if self.uri != other.uri {
+
+            if uri != other.uri {
                 return false
             }
-            
-            
+
             if cid != other.cid {
                 return false
             }
-            
-            
-            if self.val != other.val {
+
+            if val != other.val {
                 return false
             }
-            
-            
+
             if neg != other.neg {
                 return false
             }
-            
-            
-            if self.cts != other.cts {
+
+            if cts != other.cts {
                 return false
             }
-            
-            
+
             if exp != other.exp {
                 return false
             }
-            
-            
+
             if sig != other.sig {
                 return false
             }
-            
+
             return true
-            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -269,40 +224,35 @@ public struct Label: ATProtocolCodable, ATProtocolValue {
             case sig
         }
     }
-        
-public struct SelfLabels: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "com.atproto.label.defs#selfLabels"
-            public let values: [SelfLabel]
+
+    public struct SelfLabels: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "com.atproto.label.defs#selfLabels"
+        public let values: [SelfLabel]
 
         // Standard initializer
         public init(
             values: [SelfLabel]
         ) {
-            
             self.values = values
         }
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
-            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                
-                self.values = try container.decode([SelfLabel].self, forKey: .values)
-                
+                values = try container.decode([SelfLabel].self, forKey: .values)
+
             } catch {
                 LogManager.logError("Decoding error for property 'values': \(error)")
                 throw error
             }
-            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            
+
             try container.encode(values, forKey: .values)
-            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -310,15 +260,13 @@ public struct SelfLabels: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            
             guard let other = other as? Self else { return false }
-            
-            if self.values != other.values {
+
+            if values != other.values {
                 return false
             }
-            
+
             return true
-            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -330,40 +278,35 @@ public struct SelfLabels: ATProtocolCodable, ATProtocolValue {
             case values
         }
     }
-        
-public struct SelfLabel: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "com.atproto.label.defs#selfLabel"
-            public let val: String
+
+    public struct SelfLabel: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "com.atproto.label.defs#selfLabel"
+        public let val: String
 
         // Standard initializer
         public init(
             val: String
         ) {
-            
             self.val = val
         }
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
-            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                
-                self.val = try container.decode(String.self, forKey: .val)
-                
+                val = try container.decode(String.self, forKey: .val)
+
             } catch {
                 LogManager.logError("Decoding error for property 'val': \(error)")
                 throw error
             }
-            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            
+
             try container.encode(val, forKey: .val)
-            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -371,15 +314,13 @@ public struct SelfLabel: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            
             guard let other = other as? Self else { return false }
-            
-            if self.val != other.val {
+
+            if val != other.val {
                 return false
             }
-            
+
             return true
-            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -391,21 +332,20 @@ public struct SelfLabel: ATProtocolCodable, ATProtocolValue {
             case val
         }
     }
-        
-public struct LabelValueDefinition: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "com.atproto.label.defs#labelValueDefinition"
-            public let identifier: String
-            public let severity: String
-            public let blurs: String
-            public let defaultSetting: String?
-            public let adultOnly: Bool?
-            public let locales: [LabelValueDefinitionStrings]
+
+    public struct LabelValueDefinition: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "com.atproto.label.defs#labelValueDefinition"
+        public let identifier: String
+        public let severity: String
+        public let blurs: String
+        public let defaultSetting: String?
+        public let adultOnly: Bool?
+        public let locales: [LabelValueDefinitionStrings]
 
         // Standard initializer
         public init(
             identifier: String, severity: String, blurs: String, defaultSetting: String?, adultOnly: Bool?, locales: [LabelValueDefinitionStrings]
         ) {
-            
             self.identifier = identifier
             self.severity = severity
             self.blurs = blurs
@@ -416,88 +356,70 @@ public struct LabelValueDefinition: ATProtocolCodable, ATProtocolValue {
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
-            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                
-                self.identifier = try container.decode(String.self, forKey: .identifier)
-                
+                identifier = try container.decode(String.self, forKey: .identifier)
+
             } catch {
                 LogManager.logError("Decoding error for property 'identifier': \(error)")
                 throw error
             }
             do {
-                
-                self.severity = try container.decode(String.self, forKey: .severity)
-                
+                severity = try container.decode(String.self, forKey: .severity)
+
             } catch {
                 LogManager.logError("Decoding error for property 'severity': \(error)")
                 throw error
             }
             do {
-                
-                self.blurs = try container.decode(String.self, forKey: .blurs)
-                
+                blurs = try container.decode(String.self, forKey: .blurs)
+
             } catch {
                 LogManager.logError("Decoding error for property 'blurs': \(error)")
                 throw error
             }
             do {
-                
-                self.defaultSetting = try container.decodeIfPresent(String.self, forKey: .defaultSetting)
-                
+                defaultSetting = try container.decodeIfPresent(String.self, forKey: .defaultSetting)
+
             } catch {
                 LogManager.logError("Decoding error for property 'defaultSetting': \(error)")
                 throw error
             }
             do {
-                
-                self.adultOnly = try container.decodeIfPresent(Bool.self, forKey: .adultOnly)
-                
+                adultOnly = try container.decodeIfPresent(Bool.self, forKey: .adultOnly)
+
             } catch {
                 LogManager.logError("Decoding error for property 'adultOnly': \(error)")
                 throw error
             }
             do {
-                
-                self.locales = try container.decode([LabelValueDefinitionStrings].self, forKey: .locales)
-                
+                locales = try container.decode([LabelValueDefinitionStrings].self, forKey: .locales)
+
             } catch {
                 LogManager.logError("Decoding error for property 'locales': \(error)")
                 throw error
             }
-            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            
+
             try container.encode(identifier, forKey: .identifier)
-            
-            
+
             try container.encode(severity, forKey: .severity)
-            
-            
+
             try container.encode(blurs, forKey: .blurs)
-            
-            
+
             if let value = defaultSetting {
-                
                 try container.encode(value, forKey: .defaultSetting)
-                
             }
-            
-            
+
             if let value = adultOnly {
-                
                 try container.encode(value, forKey: .adultOnly)
-                
             }
-            
-            
+
             try container.encode(locales, forKey: .locales)
-            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -518,40 +440,33 @@ public struct LabelValueDefinition: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            
             guard let other = other as? Self else { return false }
-            
-            if self.identifier != other.identifier {
+
+            if identifier != other.identifier {
                 return false
             }
-            
-            
-            if self.severity != other.severity {
+
+            if severity != other.severity {
                 return false
             }
-            
-            
-            if self.blurs != other.blurs {
+
+            if blurs != other.blurs {
                 return false
             }
-            
-            
+
             if defaultSetting != other.defaultSetting {
                 return false
             }
-            
-            
+
             if adultOnly != other.adultOnly {
                 return false
             }
-            
-            
-            if self.locales != other.locales {
+
+            if locales != other.locales {
                 return false
             }
-            
+
             return true
-            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -568,18 +483,17 @@ public struct LabelValueDefinition: ATProtocolCodable, ATProtocolValue {
             case locales
         }
     }
-        
-public struct LabelValueDefinitionStrings: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "com.atproto.label.defs#labelValueDefinitionStrings"
-            public let lang: LanguageCodeContainer
-            public let name: String
-            public let description: String
+
+    public struct LabelValueDefinitionStrings: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "com.atproto.label.defs#labelValueDefinitionStrings"
+        public let lang: LanguageCodeContainer
+        public let name: String
+        public let description: String
 
         // Standard initializer
         public init(
             lang: LanguageCodeContainer, name: String, description: String
         ) {
-            
             self.lang = lang
             self.name = name
             self.description = description
@@ -587,47 +501,39 @@ public struct LabelValueDefinitionStrings: ATProtocolCodable, ATProtocolValue {
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
-            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                
-                self.lang = try container.decode(LanguageCodeContainer.self, forKey: .lang)
-                
+                lang = try container.decode(LanguageCodeContainer.self, forKey: .lang)
+
             } catch {
                 LogManager.logError("Decoding error for property 'lang': \(error)")
                 throw error
             }
             do {
-                
-                self.name = try container.decode(String.self, forKey: .name)
-                
+                name = try container.decode(String.self, forKey: .name)
+
             } catch {
                 LogManager.logError("Decoding error for property 'name': \(error)")
                 throw error
             }
             do {
-                
-                self.description = try container.decode(String.self, forKey: .description)
-                
+                description = try container.decode(String.self, forKey: .description)
+
             } catch {
                 LogManager.logError("Decoding error for property 'description': \(error)")
                 throw error
             }
-            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            
+
             try container.encode(lang, forKey: .lang)
-            
-            
+
             try container.encode(name, forKey: .name)
-            
-            
+
             try container.encode(description, forKey: .description)
-            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -637,25 +543,21 @@ public struct LabelValueDefinitionStrings: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            
             guard let other = other as? Self else { return false }
-            
-            if self.lang != other.lang {
+
+            if lang != other.lang {
                 return false
             }
-            
-            
-            if self.name != other.name {
+
+            if name != other.name {
                 return false
             }
-            
-            
-            if self.description != other.description {
+
+            if description != other.description {
                 return false
             }
-            
+
             return true
-            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -670,74 +572,67 @@ public struct LabelValueDefinitionStrings: ATProtocolCodable, ATProtocolValue {
         }
     }
 
+    public struct LabelValue: Codable, ATProtocolCodable, ATProtocolValue {
+        public let rawValue: String
 
-        
-public struct LabelValue: Codable, ATProtocolCodable, ATProtocolValue {
-            public let rawValue: String
-            
-            // Predefined constants
-            // 
-            public static let exclamationhide = LabelValue(rawValue: "!hide")
-            // 
-            public static let exclamationnodashpromote = LabelValue(rawValue: "!no-promote")
-            // 
-            public static let exclamationwarn = LabelValue(rawValue: "!warn")
-            // 
-            public static let exclamationnodashunauthenticated = LabelValue(rawValue: "!no-unauthenticated")
-            // 
-            public static let dmcadashviolation = LabelValue(rawValue: "dmca-violation")
-            // 
-            public static let doxxing = LabelValue(rawValue: "doxxing")
-            // 
-            public static let porn = LabelValue(rawValue: "porn")
-            // 
-            public static let sexual = LabelValue(rawValue: "sexual")
-            // 
-            public static let nudity = LabelValue(rawValue: "nudity")
-            // 
-            public static let nsfl = LabelValue(rawValue: "nsfl")
-            // 
-            public static let gore = LabelValue(rawValue: "gore")
-            
-            public init(rawValue: String) {
-                self.rawValue = rawValue
-            }
-            
-            public init(from decoder: Decoder) throws {
-                let container = try decoder.singleValueContainer()
-                rawValue = try container.decode(String.self)
-            }
-            
-            public func encode(to encoder: Encoder) throws {
-                var container = encoder.singleValueContainer()
-                try container.encode(rawValue)
-            }
-            
-            public func isEqual(to other: any ATProtocolValue) -> Bool {
-                guard let otherValue = other as? LabelValue else { return false }
-                return self.rawValue == otherValue.rawValue
-            }
-            
-            // Provide allCases-like functionality
-            public static var predefinedValues: [LabelValue] {
-                return [
-                    .exclamationhide,
-                    .exclamationnodashpromote,
-                    .exclamationwarn,
-                    .exclamationnodashunauthenticated,
-                    .dmcadashviolation,
-                    .doxxing,
-                    .porn,
-                    .sexual,
-                    .nudity,
-                    .nsfl,
-                    .gore,
-                ]
-            }
+        // Predefined constants
+        //
+        public static let exclamationhide = LabelValue(rawValue: "!hide")
+        //
+        public static let exclamationnodashpromote = LabelValue(rawValue: "!no-promote")
+        //
+        public static let exclamationwarn = LabelValue(rawValue: "!warn")
+        //
+        public static let exclamationnodashunauthenticated = LabelValue(rawValue: "!no-unauthenticated")
+        //
+        public static let dmcadashviolation = LabelValue(rawValue: "dmca-violation")
+        //
+        public static let doxxing = LabelValue(rawValue: "doxxing")
+        //
+        public static let porn = LabelValue(rawValue: "porn")
+        //
+        public static let sexual = LabelValue(rawValue: "sexual")
+        //
+        public static let nudity = LabelValue(rawValue: "nudity")
+        //
+        public static let nsfl = LabelValue(rawValue: "nsfl")
+        //
+        public static let gore = LabelValue(rawValue: "gore")
+
+        public init(rawValue: String) {
+            self.rawValue = rawValue
         }
 
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            rawValue = try container.decode(String.self)
+        }
 
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.singleValueContainer()
+            try container.encode(rawValue)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? LabelValue else { return false }
+            return rawValue == otherValue.rawValue
+        }
+
+        // Provide allCases-like functionality
+        public static var predefinedValues: [LabelValue] {
+            return [
+                .exclamationhide,
+                .exclamationnodashpromote,
+                .exclamationwarn,
+                .exclamationnodashunauthenticated,
+                .dmcadashviolation,
+                .doxxing,
+                .porn,
+                .sexual,
+                .nudity,
+                .nsfl,
+                .gore,
+            ]
+        }
+    }
 }
-
-
-                           
