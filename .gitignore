@@ -11,3 +11,9 @@ Generator/__pycache__/
 __pycache__/
 *.py[cod]
 *$py.class
+Generator/__pycache__/enum_generator.cpython-312.pyc
+Generator/__pycache__/main.cpython-312.pyc
+Generator/__pycache__/swift_code_generator.cpython-312.pyc
+Generator/__pycache__/templates.cpython-312.pyc
+Generator/__pycache__/type_converter.cpython-312.pyc
+Generator/__pycache__/utils.cpython-312.pyc
