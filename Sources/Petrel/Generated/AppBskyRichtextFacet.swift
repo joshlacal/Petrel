@@ -454,9 +454,12 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
         }
 
         public func encode(to encoder: Encoder) throws {
-            var container = encoder.unkeyedContainer()
-            for item in items {
-                try container.encode(item)
+            // Only encode if the items array is not empty
+            if !items.isEmpty {
+                var container = encoder.unkeyedContainer()
+                for item in items {
+                    try container.encode(item)
+                }
             }
         }
 

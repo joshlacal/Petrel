@@ -1027,15 +1027,6 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
                 }
             }
 
-            public lazy var team: Team = .init(networkManager: self.networkManager)
-
-            public final class Team: @unchecked Sendable {
-                let networkManager: NetworkManaging
-                init(networkManager: NetworkManaging) {
-                    self.networkManager = networkManager
-                }
-            }
-
             public lazy var server: Server = .init(networkManager: self.networkManager)
 
             public final class Server: @unchecked Sendable {
@@ -1048,6 +1039,15 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
             public lazy var communication: Communication = .init(networkManager: self.networkManager)
 
             public final class Communication: @unchecked Sendable {
+                let networkManager: NetworkManaging
+                init(networkManager: NetworkManaging) {
+                    self.networkManager = networkManager
+                }
+            }
+
+            public lazy var team: Team = .init(networkManager: self.networkManager)
+
+            public final class Team: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
