@@ -1,4 +1,4 @@
-        {%- for prop in properties %}
+{%- for prop in properties %}
         public let {{ prop.name }}: {{ prop.type }}{% if prop.optional %}?{% endif %}
         {%- endfor %}
 
@@ -30,7 +30,13 @@
             {%- for prop in properties %}
             {% if prop.optional %}
             if let value = {{ prop.name }} {
+                {% if '[' in prop.type and ']' in prop.type %}
+                if !value.isEmpty {
+                    try container.encode(value, forKey: .{{ prop.name }})
+                }
+                {% else %}
                 try container.encode(value, forKey: .{{ prop.name }})
+                {% endif %}
             }
             {% else %}
             try container.encode({{ prop.name }}, forKey: .{{ prop.name }})

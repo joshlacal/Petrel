@@ -1,4 +1,4 @@
-        public struct Input: ATProtocolCodable {
+public struct Input: ATProtocolCodable {
         {%- for prop in properties %}
             public let {{ prop.name }}: {{ prop.type }}{% if prop.optional %}?{% endif %}
         {%- endfor %}
@@ -10,5 +10,41 @@
                 {% for prop in properties -%}
                 self.{{ prop.name }} = {{ prop.name }}
                 {% endfor %}
+            }
+            
+            public init(from decoder: Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                {%- for prop in properties %}
+                {% if prop.optional %}
+                self.{{ prop.name }} = try container.decodeIfPresent({{ prop.type }}.self, forKey: .{{ prop.name }})
+                {% else %}
+                self.{{ prop.name }} = try container.decode({{ prop.type }}.self, forKey: .{{ prop.name }})
+                {% endif %}
+                {%- endfor %}
+            }
+            
+            public func encode(to encoder: Encoder) throws {
+                var container = encoder.container(keyedBy: CodingKeys.self)
+                {%- for prop in properties %}
+                {% if prop.optional %}
+                if let value = {{ prop.name }} {
+                    {% if '[' in prop.type and ']' in prop.type %}
+                    if !value.isEmpty {
+                        try container.encode(value, forKey: .{{ prop.name }})
+                    }
+                    {% else %}
+                    try container.encode(value, forKey: .{{ prop.name }})
+                    {% endif %}
+                }
+                {% else %}
+                try container.encode({{ prop.name }}, forKey: .{{ prop.name }})
+                {% endif %}
+                {%- endfor %}
+            }
+            
+            private enum CodingKeys: String, CodingKey {
+                {%- for prop in properties %}
+                case {{ prop.name }}
+                {%- endfor %}
             }
         }

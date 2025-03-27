@@ -446,11 +446,7 @@ public func base32Encode(_ data: Data) -> String {
     result.append(base32Alphabet[base32Alphabet.index(base32Alphabet.startIndex, offsetBy: index)])
   }
 
-  // Add padding if needed to make length a multiple of 8
-  while result.count % 8 != 0 {
-    result.append("=")
-  }
-
+  // Remove the padding step - don't add "=" characters
   return result
 }
 

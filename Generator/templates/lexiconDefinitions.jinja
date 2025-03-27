@@ -44,7 +44,13 @@
             {%- for prop in def_schema.properties %}
             {% if prop.optional %}
             if let value = {{ prop.name }} {
+                {% if '[' in prop.type and ']' in prop.type %}
+                if !value.isEmpty {
+                    try container.encode(value, forKey: .{{ prop.name }})
+                }
+                {% else %}
                 try container.encode(value, forKey: .{{ prop.name }})
+                {% endif %}
             }
             {% else %}
             try container.encode({{ prop.name }}, forKey: .{{ prop.name }})
@@ -142,7 +148,13 @@
                 {%- for prop in sub_struct.properties %}
                 {% if prop.optional %}
                 if let value = {{ prop.name }} {
+                    {% if '[' in prop.type and ']' in prop.type %}
+                    if !value.isEmpty {
+                        try container.encode(value, forKey: .{{ prop.name }})
+                    }
+                    {% else %}
                     try container.encode(value, forKey: .{{ prop.name }})
+                    {% endif %}
                 }
                 {% else %}
                 try container.encode({{ prop.name }}, forKey: .{{ prop.name }})
@@ -165,9 +177,9 @@
             }
 
             public func isEqual(to other: any ATProtocolValue) -> Bool {
-                {% if def_schema.properties %}
+                {% if sub_struct.properties %}
                 guard let other = other as? Self else { return false }
-                {%- for prop in def_schema.properties %}
+                {%- for prop in sub_struct.properties %}
                 {% if prop.optional %}
                 if {{ prop.name }} != other.{{ prop.name }} {
                     return false

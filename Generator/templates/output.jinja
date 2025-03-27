@@ -1,4 +1,4 @@
-    {% if is_type_alias %}
+{% if is_type_alias %}
     public typealias Output = {{ type_alias_target }}
     {% else %}
     public struct Output: ATProtocolCodable {
@@ -24,6 +24,55 @@
             {% endfor %}
             {% if not properties %}
             self.data = data
+            {% endif %}
+        }
+        
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            {% if properties %}
+            {%- for prop in properties %}
+            {% if prop.optional %}
+            self.{{ prop.name }} = try container.decodeIfPresent({{ prop.type }}.self, forKey: .{{ prop.name }})
+            {% else %}
+            self.{{ prop.name }} = try container.decode({{ prop.type }}.self, forKey: .{{ prop.name }})
+            {% endif %}
+            {%- endfor %}
+            {% else %}
+            let data = try container.decode(Data.self, forKey: .data)
+            self.data = data
+            {% endif %}
+        }
+        
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            {% if properties %}
+            {%- for prop in properties %}
+            {% if prop.optional %}
+            if let value = {{ prop.name }} {
+                {% if '[' in prop.type and ']' in prop.type %}
+                if !value.isEmpty {
+                    try container.encode(value, forKey: .{{ prop.name }})
+                }
+                {% else %}
+                try container.encode(value, forKey: .{{ prop.name }})
+                {% endif %}
+            }
+            {% else %}
+            try container.encode({{ prop.name }}, forKey: .{{ prop.name }})
+            {% endif %}
+            {%- endfor %}
+            {% else %}
+            try container.encode(data, forKey: .data)
+            {% endif %}
+        }
+        
+        private enum CodingKeys: String, CodingKey {
+            {% if properties %}
+            {%- for prop in properties %}
+            case {{ prop.name }}
+            {%- endfor %}
+            {% else %}
+            case data
             {% endif %}
         }
     }
