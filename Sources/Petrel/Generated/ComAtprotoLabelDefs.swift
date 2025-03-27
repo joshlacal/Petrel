@@ -223,6 +223,130 @@ public enum ComAtprotoLabelDefs {
             case exp
             case sig
         }
+
+        // MARK: - PendingDataLoadable
+
+        /// Check if any properties contain pending data that needs loading
+        public var hasPendingData: Bool {
+            var hasPending = false
+
+            if !hasPending, let value = ver, let loadable = value as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let loadable = src as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let loadable = uri as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let value = cid, let loadable = value as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let loadable = val as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let value = neg, let loadable = value as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let loadable = cts as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let value = exp, let loadable = value as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let value = sig, let loadable = value as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            return hasPending
+        }
+
+        /// Load any pending data in properties
+        public mutating func loadPendingData() async {
+            if let value = ver, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                await loadableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = loadableValue as? Int {
+                    ver = updatedValue
+                }
+            }
+
+            if let loadable = src as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? String {
+                    src = updatedValue
+                }
+            }
+
+            if let loadable = uri as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? URI {
+                    uri = updatedValue
+                }
+            }
+
+            if let value = cid, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                await loadableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = loadableValue as? String {
+                    cid = updatedValue
+                }
+            }
+
+            if let loadable = val as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? String {
+                    val = updatedValue
+                }
+            }
+
+            if let value = neg, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                await loadableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = loadableValue as? Bool {
+                    neg = updatedValue
+                }
+            }
+
+            if let loadable = cts as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? ATProtocolDate {
+                    cts = updatedValue
+                }
+            }
+
+            if let value = exp, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                await loadableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = loadableValue as? ATProtocolDate {
+                    exp = updatedValue
+                }
+            }
+
+            if let value = sig, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                await loadableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = loadableValue as? Bytes {
+                    sig = updatedValue
+                }
+            }
+        }
     }
 
     public struct SelfLabels: ATProtocolCodable, ATProtocolValue {
@@ -277,6 +401,31 @@ public enum ComAtprotoLabelDefs {
             case typeIdentifier = "$type"
             case values
         }
+
+        // MARK: - PendingDataLoadable
+
+        /// Check if any properties contain pending data that needs loading
+        public var hasPendingData: Bool {
+            var hasPending = false
+
+            if !hasPending, let loadable = values as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            return hasPending
+        }
+
+        /// Load any pending data in properties
+        public mutating func loadPendingData() async {
+            if let loadable = values as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? [SelfLabel] {
+                    values = updatedValue
+                }
+            }
+        }
     }
 
     public struct SelfLabel: ATProtocolCodable, ATProtocolValue {
@@ -330,6 +479,31 @@ public enum ComAtprotoLabelDefs {
         private enum CodingKeys: String, CodingKey {
             case typeIdentifier = "$type"
             case val
+        }
+
+        // MARK: - PendingDataLoadable
+
+        /// Check if any properties contain pending data that needs loading
+        public var hasPendingData: Bool {
+            var hasPending = false
+
+            if !hasPending, let loadable = val as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            return hasPending
+        }
+
+        /// Load any pending data in properties
+        public mutating func loadPendingData() async {
+            if let loadable = val as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? String {
+                    val = updatedValue
+                }
+            }
         }
     }
 
@@ -482,6 +656,94 @@ public enum ComAtprotoLabelDefs {
             case adultOnly
             case locales
         }
+
+        // MARK: - PendingDataLoadable
+
+        /// Check if any properties contain pending data that needs loading
+        public var hasPendingData: Bool {
+            var hasPending = false
+
+            if !hasPending, let loadable = identifier as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let loadable = severity as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let loadable = blurs as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let value = defaultSetting, let loadable = value as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let value = adultOnly, let loadable = value as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let loadable = locales as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            return hasPending
+        }
+
+        /// Load any pending data in properties
+        public mutating func loadPendingData() async {
+            if let loadable = identifier as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? String {
+                    identifier = updatedValue
+                }
+            }
+
+            if let loadable = severity as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? String {
+                    severity = updatedValue
+                }
+            }
+
+            if let loadable = blurs as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? String {
+                    blurs = updatedValue
+                }
+            }
+
+            if let value = defaultSetting, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                await loadableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = loadableValue as? String {
+                    defaultSetting = updatedValue
+                }
+            }
+
+            if let value = adultOnly, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                await loadableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = loadableValue as? Bool {
+                    adultOnly = updatedValue
+                }
+            }
+
+            if let loadable = locales as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? [LabelValueDefinitionStrings] {
+                    locales = updatedValue
+                }
+            }
+        }
     }
 
     public struct LabelValueDefinitionStrings: ATProtocolCodable, ATProtocolValue {
@@ -569,6 +831,57 @@ public enum ComAtprotoLabelDefs {
             case lang
             case name
             case description
+        }
+
+        // MARK: - PendingDataLoadable
+
+        /// Check if any properties contain pending data that needs loading
+        public var hasPendingData: Bool {
+            var hasPending = false
+
+            if !hasPending, let loadable = lang as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let loadable = name as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let loadable = description as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            return hasPending
+        }
+
+        /// Load any pending data in properties
+        public mutating func loadPendingData() async {
+            if let loadable = lang as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? LanguageCodeContainer {
+                    lang = updatedValue
+                }
+            }
+
+            if let loadable = name as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? String {
+                    name = updatedValue
+                }
+            }
+
+            if let loadable = description as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? String {
+                    description = updatedValue
+                }
+            }
         }
     }
 

@@ -80,6 +80,43 @@ public enum ToolsOzoneSetDefs {
             case name
             case description
         }
+
+        // MARK: - PendingDataLoadable
+
+        /// Check if any properties contain pending data that needs loading
+        public var hasPendingData: Bool {
+            var hasPending = false
+
+            if !hasPending, let loadable = name as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let value = description, let loadable = value as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            return hasPending
+        }
+
+        /// Load any pending data in properties
+        public mutating func loadPendingData() async {
+            if let loadable = name as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? String {
+                    name = updatedValue
+                }
+            }
+
+            if let value = description, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                await loadableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = loadableValue as? String {
+                    description = updatedValue
+                }
+            }
+        }
     }
 
     public struct SetView: ATProtocolCodable, ATProtocolValue {
@@ -207,6 +244,82 @@ public enum ToolsOzoneSetDefs {
             case setSize
             case createdAt
             case updatedAt
+        }
+
+        // MARK: - PendingDataLoadable
+
+        /// Check if any properties contain pending data that needs loading
+        public var hasPendingData: Bool {
+            var hasPending = false
+
+            if !hasPending, let loadable = name as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let value = description, let loadable = value as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let loadable = setSize as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let loadable = createdAt as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let loadable = updatedAt as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            return hasPending
+        }
+
+        /// Load any pending data in properties
+        public mutating func loadPendingData() async {
+            if let loadable = name as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? String {
+                    name = updatedValue
+                }
+            }
+
+            if let value = description, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                await loadableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = loadableValue as? String {
+                    description = updatedValue
+                }
+            }
+
+            if let loadable = setSize as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? Int {
+                    setSize = updatedValue
+                }
+            }
+
+            if let loadable = createdAt as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? ATProtocolDate {
+                    createdAt = updatedValue
+                }
+            }
+
+            if let loadable = updatedAt as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? ATProtocolDate {
+                    updatedAt = updatedValue
+                }
+            }
         }
     }
 }

@@ -179,6 +179,106 @@ public enum AppBskyLabelerDefs {
             case indexedAt
             case labels
         }
+
+        // MARK: - PendingDataLoadable
+
+        /// Check if any properties contain pending data that needs loading
+        public var hasPendingData: Bool {
+            var hasPending = false
+
+            if !hasPending, let loadable = uri as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let loadable = cid as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let loadable = creator as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let value = likeCount, let loadable = value as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let value = viewer, let loadable = value as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let loadable = indexedAt as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let value = labels, let loadable = value as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            return hasPending
+        }
+
+        /// Load any pending data in properties
+        public mutating func loadPendingData() async {
+            if let loadable = uri as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? ATProtocolURI {
+                    uri = updatedValue
+                }
+            }
+
+            if let loadable = cid as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? String {
+                    cid = updatedValue
+                }
+            }
+
+            if let loadable = creator as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? AppBskyActorDefs.ProfileView {
+                    creator = updatedValue
+                }
+            }
+
+            if let value = likeCount, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                await loadableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = loadableValue as? Int {
+                    likeCount = updatedValue
+                }
+            }
+
+            if let value = viewer, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                await loadableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = loadableValue as? LabelerViewerState {
+                    viewer = updatedValue
+                }
+            }
+
+            if let loadable = indexedAt as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? ATProtocolDate {
+                    indexedAt = updatedValue
+                }
+            }
+
+            if let value = labels, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                await loadableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = loadableValue as? [ComAtprotoLabelDefs.Label] {
+                    labels = updatedValue
+                }
+            }
+        }
     }
 
     public struct LabelerViewDetailed: ATProtocolCodable, ATProtocolValue {
@@ -447,6 +547,155 @@ public enum AppBskyLabelerDefs {
             case subjectTypes
             case subjectCollections
         }
+
+        // MARK: - PendingDataLoadable
+
+        /// Check if any properties contain pending data that needs loading
+        public var hasPendingData: Bool {
+            var hasPending = false
+
+            if !hasPending, let loadable = uri as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let loadable = cid as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let loadable = creator as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let loadable = policies as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let value = likeCount, let loadable = value as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let value = viewer, let loadable = value as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let loadable = indexedAt as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let value = labels, let loadable = value as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let value = reasonTypes, let loadable = value as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let value = subjectTypes, let loadable = value as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let value = subjectCollections, let loadable = value as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            return hasPending
+        }
+
+        /// Load any pending data in properties
+        public mutating func loadPendingData() async {
+            if let loadable = uri as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? ATProtocolURI {
+                    uri = updatedValue
+                }
+            }
+
+            if let loadable = cid as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? String {
+                    cid = updatedValue
+                }
+            }
+
+            if let loadable = creator as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? AppBskyActorDefs.ProfileView {
+                    creator = updatedValue
+                }
+            }
+
+            if let loadable = policies as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? AppBskyLabelerDefs.LabelerPolicies {
+                    policies = updatedValue
+                }
+            }
+
+            if let value = likeCount, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                await loadableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = loadableValue as? Int {
+                    likeCount = updatedValue
+                }
+            }
+
+            if let value = viewer, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                await loadableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = loadableValue as? LabelerViewerState {
+                    viewer = updatedValue
+                }
+            }
+
+            if let loadable = indexedAt as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? ATProtocolDate {
+                    indexedAt = updatedValue
+                }
+            }
+
+            if let value = labels, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                await loadableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = loadableValue as? [ComAtprotoLabelDefs.Label] {
+                    labels = updatedValue
+                }
+            }
+
+            if let value = reasonTypes, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                await loadableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = loadableValue as? [ComAtprotoModerationDefs.ReasonType] {
+                    reasonTypes = updatedValue
+                }
+            }
+
+            if let value = subjectTypes, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                await loadableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = loadableValue as? [ComAtprotoModerationDefs.SubjectType] {
+                    subjectTypes = updatedValue
+                }
+            }
+
+            if let value = subjectCollections, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                await loadableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = loadableValue as? [String] {
+                    subjectCollections = updatedValue
+                }
+            }
+        }
     }
 
     public struct LabelerViewerState: ATProtocolCodable, ATProtocolValue {
@@ -506,6 +755,30 @@ public enum AppBskyLabelerDefs {
         private enum CodingKeys: String, CodingKey {
             case typeIdentifier = "$type"
             case like
+        }
+
+        // MARK: - PendingDataLoadable
+
+        /// Check if any properties contain pending data that needs loading
+        public var hasPendingData: Bool {
+            var hasPending = false
+
+            if !hasPending, let value = like, let loadable = value as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            return hasPending
+        }
+
+        /// Load any pending data in properties
+        public mutating func loadPendingData() async {
+            if let value = like, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                await loadableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = loadableValue as? ATProtocolURI {
+                    like = updatedValue
+                }
+            }
         }
     }
 
@@ -585,6 +858,43 @@ public enum AppBskyLabelerDefs {
             case typeIdentifier = "$type"
             case labelValues
             case labelValueDefinitions
+        }
+
+        // MARK: - PendingDataLoadable
+
+        /// Check if any properties contain pending data that needs loading
+        public var hasPendingData: Bool {
+            var hasPending = false
+
+            if !hasPending, let loadable = labelValues as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let value = labelValueDefinitions, let loadable = value as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            return hasPending
+        }
+
+        /// Load any pending data in properties
+        public mutating func loadPendingData() async {
+            if let loadable = labelValues as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? [ComAtprotoLabelDefs.LabelValue] {
+                    labelValues = updatedValue
+                }
+            }
+
+            if let value = labelValueDefinitions, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                await loadableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = loadableValue as? [ComAtprotoLabelDefs.LabelValueDefinition] {
+                    labelValueDefinitions = updatedValue
+                }
+            }
         }
     }
 }

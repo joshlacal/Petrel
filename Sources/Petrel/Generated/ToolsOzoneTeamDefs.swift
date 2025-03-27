@@ -189,5 +189,103 @@ public enum ToolsOzoneTeamDefs {
             case lastUpdatedBy
             case role
         }
+
+        // MARK: - PendingDataLoadable
+
+        /// Check if any properties contain pending data that needs loading
+        public var hasPendingData: Bool {
+            var hasPending = false
+
+            if !hasPending, let loadable = did as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let value = disabled, let loadable = value as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let value = profile, let loadable = value as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let value = createdAt, let loadable = value as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let value = updatedAt, let loadable = value as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let value = lastUpdatedBy, let loadable = value as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let loadable = role as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            return hasPending
+        }
+
+        /// Load any pending data in properties
+        public mutating func loadPendingData() async {
+            if let loadable = did as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? String {
+                    did = updatedValue
+                }
+            }
+
+            if let value = disabled, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                await loadableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = loadableValue as? Bool {
+                    disabled = updatedValue
+                }
+            }
+
+            if let value = profile, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                await loadableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = loadableValue as? AppBskyActorDefs.ProfileViewDetailed {
+                    profile = updatedValue
+                }
+            }
+
+            if let value = createdAt, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                await loadableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = loadableValue as? ATProtocolDate {
+                    createdAt = updatedValue
+                }
+            }
+
+            if let value = updatedAt, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                await loadableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = loadableValue as? ATProtocolDate {
+                    updatedAt = updatedValue
+                }
+            }
+
+            if let value = lastUpdatedBy, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                await loadableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = loadableValue as? String {
+                    lastUpdatedBy = updatedValue
+                }
+            }
+
+            if let loadable = role as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? String {
+                    role = updatedValue
+                }
+            }
+        }
     }
 }

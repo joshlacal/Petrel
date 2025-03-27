@@ -234,5 +234,143 @@ public enum ToolsOzoneSettingDefs {
             case createdBy
             case lastUpdatedBy
         }
+
+        // MARK: - PendingDataLoadable
+
+        /// Check if any properties contain pending data that needs loading
+        public var hasPendingData: Bool {
+            var hasPending = false
+
+            if !hasPending, let loadable = key as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let loadable = did as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let loadable = value as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let value = description, let loadable = value as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let value = createdAt, let loadable = value as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let value = updatedAt, let loadable = value as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let value = managerRole, let loadable = value as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let loadable = scope as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let loadable = createdBy as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let loadable = lastUpdatedBy as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            return hasPending
+        }
+
+        /// Load any pending data in properties
+        public mutating func loadPendingData() async {
+            if let loadable = key as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? String {
+                    key = updatedValue
+                }
+            }
+
+            if let loadable = did as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? String {
+                    did = updatedValue
+                }
+            }
+
+            if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? ATProtocolValueContainer {
+                    value = updatedValue
+                }
+            }
+
+            if let value = description, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                await loadableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = loadableValue as? String {
+                    description = updatedValue
+                }
+            }
+
+            if let value = createdAt, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                await loadableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = loadableValue as? ATProtocolDate {
+                    createdAt = updatedValue
+                }
+            }
+
+            if let value = updatedAt, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                await loadableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = loadableValue as? ATProtocolDate {
+                    updatedAt = updatedValue
+                }
+            }
+
+            if let value = managerRole, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
+                await loadableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = loadableValue as? String {
+                    managerRole = updatedValue
+                }
+            }
+
+            if let loadable = scope as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? String {
+                    scope = updatedValue
+                }
+            }
+
+            if let loadable = createdBy as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? String {
+                    createdBy = updatedValue
+                }
+            }
+
+            if let loadable = lastUpdatedBy as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? String {
+                    lastUpdatedBy = updatedValue
+                }
+            }
+        }
     }
 }

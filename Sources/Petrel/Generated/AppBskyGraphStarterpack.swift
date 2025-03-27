@@ -136,6 +136,84 @@ public struct AppBskyGraphStarterpack: ATProtocolCodable, ATProtocolValue {
         case createdAt
     }
 
+    // MARK: - PendingDataLoadable
+
+    /// Check if any properties contain pending data that needs loading
+    public var hasPendingData: Bool {
+        var hasPending = false
+
+        if !hasPending, let loadable = name as? PendingDataLoadable {
+            hasPending = loadable.hasPendingData
+        }
+
+        if !hasPending, let value = description, let loadable = value as? PendingDataLoadable {
+            hasPending = loadable.hasPendingData
+        }
+
+        if !hasPending, let value = descriptionFacets, let loadable = value as? PendingDataLoadable {
+            hasPending = loadable.hasPendingData
+        }
+
+        if !hasPending, let loadable = list as? PendingDataLoadable {
+            hasPending = loadable.hasPendingData
+        }
+
+        if !hasPending, let value = feeds, let loadable = value as? PendingDataLoadable {
+            hasPending = loadable.hasPendingData
+        }
+
+        if !hasPending, let loadable = createdAt as? PendingDataLoadable {
+            hasPending = loadable.hasPendingData
+        }
+
+        return hasPending
+    }
+
+    /// Load any pending data in properties
+    public mutating func loadPendingData() async {
+        if let loadable = name as? PendingDataLoadable, loadable.hasPendingData {
+            var mutableValue = loadable
+            await mutableValue.loadPendingData()
+            // Only update if we can safely cast back to the expected type
+            if let updatedValue = mutableValue as? String {
+                name = updatedValue
+            }
+        }
+
+        if var value = description as? (String & PendingDataLoadable), value.hasPendingData {
+            await value.loadPendingData()
+            description = value
+        }
+
+        if var value = descriptionFacets as? ([AppBskyRichtextFacet] & PendingDataLoadable), value.hasPendingData {
+            await value.loadPendingData()
+            descriptionFacets = value
+        }
+
+        if let loadable = list as? PendingDataLoadable, loadable.hasPendingData {
+            var mutableValue = loadable
+            await mutableValue.loadPendingData()
+            // Only update if we can safely cast back to the expected type
+            if let updatedValue = mutableValue as? ATProtocolURI {
+                list = updatedValue
+            }
+        }
+
+        if var value = feeds as? ([FeedItem] & PendingDataLoadable), value.hasPendingData {
+            await value.loadPendingData()
+            feeds = value
+        }
+
+        if let loadable = createdAt as? PendingDataLoadable, loadable.hasPendingData {
+            var mutableValue = loadable
+            await mutableValue.loadPendingData()
+            // Only update if we can safely cast back to the expected type
+            if let updatedValue = mutableValue as? ATProtocolDate {
+                createdAt = updatedValue
+            }
+        }
+    }
+
     public struct FeedItem: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.graph.starterpack#feedItem"
         public let uri: ATProtocolURI
@@ -187,6 +265,31 @@ public struct AppBskyGraphStarterpack: ATProtocolCodable, ATProtocolValue {
         private enum CodingKeys: String, CodingKey {
             case typeIdentifier = "$type"
             case uri
+        }
+
+        // MARK: - PendingDataLoadable
+
+        /// Check if any properties contain pending data that needs loading
+        public var hasPendingData: Bool {
+            var hasPending = false
+
+            if !hasPending, let loadable = uri as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            return hasPending
+        }
+
+        /// Load any pending data in properties
+        public mutating func loadPendingData() async {
+            if let loadable = uri as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? ATProtocolURI {
+                    uri = updatedValue
+                }
+            }
         }
     }
 }

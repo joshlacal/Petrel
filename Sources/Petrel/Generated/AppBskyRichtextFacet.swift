@@ -105,6 +105,31 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
             case typeIdentifier = "$type"
             case did
         }
+
+        // MARK: - PendingDataLoadable
+
+        /// Check if any properties contain pending data that needs loading
+        public var hasPendingData: Bool {
+            var hasPending = false
+
+            if !hasPending, let loadable = did as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            return hasPending
+        }
+
+        /// Load any pending data in properties
+        public mutating func loadPendingData() async {
+            if let loadable = did as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? String {
+                    did = updatedValue
+                }
+            }
+        }
     }
 
     public struct Link: ATProtocolCodable, ATProtocolValue {
@@ -159,6 +184,31 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
             case typeIdentifier = "$type"
             case uri
         }
+
+        // MARK: - PendingDataLoadable
+
+        /// Check if any properties contain pending data that needs loading
+        public var hasPendingData: Bool {
+            var hasPending = false
+
+            if !hasPending, let loadable = uri as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            return hasPending
+        }
+
+        /// Load any pending data in properties
+        public mutating func loadPendingData() async {
+            if let loadable = uri as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? URI {
+                    uri = updatedValue
+                }
+            }
+        }
     }
 
     public struct Tag: ATProtocolCodable, ATProtocolValue {
@@ -212,6 +262,31 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
         private enum CodingKeys: String, CodingKey {
             case typeIdentifier = "$type"
             case tag
+        }
+
+        // MARK: - PendingDataLoadable
+
+        /// Check if any properties contain pending data that needs loading
+        public var hasPendingData: Bool {
+            var hasPending = false
+
+            if !hasPending, let loadable = tag as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            return hasPending
+        }
+
+        /// Load any pending data in properties
+        public mutating func loadPendingData() async {
+            if let loadable = tag as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? String {
+                    tag = updatedValue
+                }
+            }
         }
     }
 
@@ -283,6 +358,44 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
             case typeIdentifier = "$type"
             case byteStart
             case byteEnd
+        }
+
+        // MARK: - PendingDataLoadable
+
+        /// Check if any properties contain pending data that needs loading
+        public var hasPendingData: Bool {
+            var hasPending = false
+
+            if !hasPending, let loadable = byteStart as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            if !hasPending, let loadable = byteEnd as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            return hasPending
+        }
+
+        /// Load any pending data in properties
+        public mutating func loadPendingData() async {
+            if let loadable = byteStart as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? Int {
+                    byteStart = updatedValue
+                }
+            }
+
+            if let loadable = byteEnd as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? Int {
+                    byteEnd = updatedValue
+                }
+            }
         }
     }
 

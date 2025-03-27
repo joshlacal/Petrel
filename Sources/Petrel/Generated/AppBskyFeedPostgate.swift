@@ -104,6 +104,62 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
         case embeddingRules
     }
 
+    // MARK: - PendingDataLoadable
+
+    /// Check if any properties contain pending data that needs loading
+    public var hasPendingData: Bool {
+        var hasPending = false
+
+        if !hasPending, let loadable = createdAt as? PendingDataLoadable {
+            hasPending = loadable.hasPendingData
+        }
+
+        if !hasPending, let loadable = post as? PendingDataLoadable {
+            hasPending = loadable.hasPendingData
+        }
+
+        if !hasPending, let value = detachedEmbeddingUris, let loadable = value as? PendingDataLoadable {
+            hasPending = loadable.hasPendingData
+        }
+
+        if !hasPending, let value = embeddingRules, let loadable = value as? PendingDataLoadable {
+            hasPending = loadable.hasPendingData
+        }
+
+        return hasPending
+    }
+
+    /// Load any pending data in properties
+    public mutating func loadPendingData() async {
+        if let loadable = createdAt as? PendingDataLoadable, loadable.hasPendingData {
+            var mutableValue = loadable
+            await mutableValue.loadPendingData()
+            // Only update if we can safely cast back to the expected type
+            if let updatedValue = mutableValue as? ATProtocolDate {
+                createdAt = updatedValue
+            }
+        }
+
+        if let loadable = post as? PendingDataLoadable, loadable.hasPendingData {
+            var mutableValue = loadable
+            await mutableValue.loadPendingData()
+            // Only update if we can safely cast back to the expected type
+            if let updatedValue = mutableValue as? ATProtocolURI {
+                post = updatedValue
+            }
+        }
+
+        if var value = detachedEmbeddingUris as? ([ATProtocolURI] & PendingDataLoadable), value.hasPendingData {
+            await value.loadPendingData()
+            detachedEmbeddingUris = value
+        }
+
+        if var value = embeddingRules as? ([AppBskyFeedPostgateEmbeddingRulesUnion] & PendingDataLoadable), value.hasPendingData {
+            await value.loadPendingData()
+            embeddingRules = value
+        }
+    }
+
     public struct DisableRule: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.feed.postgate#disableRule"
 
@@ -134,6 +190,18 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
         private enum CodingKeys: String, CodingKey {
             case typeIdentifier = "$type"
         }
+
+        // MARK: - PendingDataLoadable
+
+        /// Check if any properties contain pending data that needs loading
+        public var hasPendingData: Bool {
+            var hasPending = false
+
+            return hasPending
+        }
+
+        /// Load any pending data in properties
+        public mutating func loadPendingData() async {}
     }
 
     public enum AppBskyFeedPostgateEmbeddingRulesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {

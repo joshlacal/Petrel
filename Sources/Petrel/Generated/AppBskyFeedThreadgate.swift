@@ -104,6 +104,62 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
         case hiddenReplies
     }
 
+    // MARK: - PendingDataLoadable
+
+    /// Check if any properties contain pending data that needs loading
+    public var hasPendingData: Bool {
+        var hasPending = false
+
+        if !hasPending, let loadable = post as? PendingDataLoadable {
+            hasPending = loadable.hasPendingData
+        }
+
+        if !hasPending, let value = allow, let loadable = value as? PendingDataLoadable {
+            hasPending = loadable.hasPendingData
+        }
+
+        if !hasPending, let loadable = createdAt as? PendingDataLoadable {
+            hasPending = loadable.hasPendingData
+        }
+
+        if !hasPending, let value = hiddenReplies, let loadable = value as? PendingDataLoadable {
+            hasPending = loadable.hasPendingData
+        }
+
+        return hasPending
+    }
+
+    /// Load any pending data in properties
+    public mutating func loadPendingData() async {
+        if let loadable = post as? PendingDataLoadable, loadable.hasPendingData {
+            var mutableValue = loadable
+            await mutableValue.loadPendingData()
+            // Only update if we can safely cast back to the expected type
+            if let updatedValue = mutableValue as? ATProtocolURI {
+                post = updatedValue
+            }
+        }
+
+        if var value = allow as? ([AppBskyFeedThreadgateAllowUnion] & PendingDataLoadable), value.hasPendingData {
+            await value.loadPendingData()
+            allow = value
+        }
+
+        if let loadable = createdAt as? PendingDataLoadable, loadable.hasPendingData {
+            var mutableValue = loadable
+            await mutableValue.loadPendingData()
+            // Only update if we can safely cast back to the expected type
+            if let updatedValue = mutableValue as? ATProtocolDate {
+                createdAt = updatedValue
+            }
+        }
+
+        if var value = hiddenReplies as? ([ATProtocolURI] & PendingDataLoadable), value.hasPendingData {
+            await value.loadPendingData()
+            hiddenReplies = value
+        }
+    }
+
     public struct MentionRule: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.feed.threadgate#mentionRule"
 
@@ -134,6 +190,18 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
         private enum CodingKeys: String, CodingKey {
             case typeIdentifier = "$type"
         }
+
+        // MARK: - PendingDataLoadable
+
+        /// Check if any properties contain pending data that needs loading
+        public var hasPendingData: Bool {
+            var hasPending = false
+
+            return hasPending
+        }
+
+        /// Load any pending data in properties
+        public mutating func loadPendingData() async {}
     }
 
     public struct FollowerRule: ATProtocolCodable, ATProtocolValue {
@@ -166,6 +234,18 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
         private enum CodingKeys: String, CodingKey {
             case typeIdentifier = "$type"
         }
+
+        // MARK: - PendingDataLoadable
+
+        /// Check if any properties contain pending data that needs loading
+        public var hasPendingData: Bool {
+            var hasPending = false
+
+            return hasPending
+        }
+
+        /// Load any pending data in properties
+        public mutating func loadPendingData() async {}
     }
 
     public struct FollowingRule: ATProtocolCodable, ATProtocolValue {
@@ -198,6 +278,18 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
         private enum CodingKeys: String, CodingKey {
             case typeIdentifier = "$type"
         }
+
+        // MARK: - PendingDataLoadable
+
+        /// Check if any properties contain pending data that needs loading
+        public var hasPendingData: Bool {
+            var hasPending = false
+
+            return hasPending
+        }
+
+        /// Load any pending data in properties
+        public mutating func loadPendingData() async {}
     }
 
     public struct ListRule: ATProtocolCodable, ATProtocolValue {
@@ -251,6 +343,31 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
         private enum CodingKeys: String, CodingKey {
             case typeIdentifier = "$type"
             case list
+        }
+
+        // MARK: - PendingDataLoadable
+
+        /// Check if any properties contain pending data that needs loading
+        public var hasPendingData: Bool {
+            var hasPending = false
+
+            if !hasPending, let loadable = list as? PendingDataLoadable {
+                hasPending = loadable.hasPendingData
+            }
+
+            return hasPending
+        }
+
+        /// Load any pending data in properties
+        public mutating func loadPendingData() async {
+            if let loadable = list as? PendingDataLoadable, loadable.hasPendingData {
+                var mutableValue = loadable
+                await mutableValue.loadPendingData()
+                // Only update if we can safely cast back to the expected type
+                if let updatedValue = mutableValue as? ATProtocolURI {
+                    list = updatedValue
+                }
+            }
         }
     }
 

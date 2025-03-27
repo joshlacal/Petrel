@@ -188,6 +188,90 @@ public struct AppBskyActorProfile: ATProtocolCodable, ATProtocolValue {
         case createdAt
     }
 
+    // MARK: - PendingDataLoadable
+
+    /// Check if any properties contain pending data that needs loading
+    public var hasPendingData: Bool {
+        var hasPending = false
+
+        if !hasPending, let value = displayName, let loadable = value as? PendingDataLoadable {
+            hasPending = loadable.hasPendingData
+        }
+
+        if !hasPending, let value = description, let loadable = value as? PendingDataLoadable {
+            hasPending = loadable.hasPendingData
+        }
+
+        if !hasPending, let value = avatar, let loadable = value as? PendingDataLoadable {
+            hasPending = loadable.hasPendingData
+        }
+
+        if !hasPending, let value = banner, let loadable = value as? PendingDataLoadable {
+            hasPending = loadable.hasPendingData
+        }
+
+        if !hasPending, let value = labels, let loadable = value as? PendingDataLoadable {
+            hasPending = loadable.hasPendingData
+        }
+
+        if !hasPending, let value = joinedViaStarterPack, let loadable = value as? PendingDataLoadable {
+            hasPending = loadable.hasPendingData
+        }
+
+        if !hasPending, let value = pinnedPost, let loadable = value as? PendingDataLoadable {
+            hasPending = loadable.hasPendingData
+        }
+
+        if !hasPending, let value = createdAt, let loadable = value as? PendingDataLoadable {
+            hasPending = loadable.hasPendingData
+        }
+
+        return hasPending
+    }
+
+    /// Load any pending data in properties
+    public mutating func loadPendingData() async {
+        if var value = displayName as? (String & PendingDataLoadable), value.hasPendingData {
+            await value.loadPendingData()
+            displayName = value
+        }
+
+        if var value = description as? (String & PendingDataLoadable), value.hasPendingData {
+            await value.loadPendingData()
+            description = value
+        }
+
+        if var value = avatar as? (Blob & PendingDataLoadable), value.hasPendingData {
+            await value.loadPendingData()
+            avatar = value
+        }
+
+        if var value = banner as? (Blob & PendingDataLoadable), value.hasPendingData {
+            await value.loadPendingData()
+            banner = value
+        }
+
+        if var value = labels as? (AppBskyActorProfileLabelsUnion & PendingDataLoadable), value.hasPendingData {
+            await value.loadPendingData()
+            labels = value
+        }
+
+        if var value = joinedViaStarterPack as? (ComAtprotoRepoStrongRef & PendingDataLoadable), value.hasPendingData {
+            await value.loadPendingData()
+            joinedViaStarterPack = value
+        }
+
+        if var value = pinnedPost as? (ComAtprotoRepoStrongRef & PendingDataLoadable), value.hasPendingData {
+            await value.loadPendingData()
+            pinnedPost = value
+        }
+
+        if var value = createdAt as? (ATProtocolDate & PendingDataLoadable), value.hasPendingData {
+            await value.loadPendingData()
+            createdAt = value
+        }
+    }
+
     public enum AppBskyActorProfileLabelsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case comAtprotoLabelDefsSelfLabels(ComAtprotoLabelDefs.SelfLabels)
         case unexpected(ATProtocolValueContainer)

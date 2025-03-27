@@ -191,6 +191,111 @@ public struct AppBskyFeedGenerator: ATProtocolCodable, ATProtocolValue {
         case createdAt
     }
 
+    // MARK: - PendingDataLoadable
+
+    /// Check if any properties contain pending data that needs loading
+    public var hasPendingData: Bool {
+        var hasPending = false
+
+        if !hasPending, let loadable = did as? PendingDataLoadable {
+            hasPending = loadable.hasPendingData
+        }
+
+        if !hasPending, let loadable = displayName as? PendingDataLoadable {
+            hasPending = loadable.hasPendingData
+        }
+
+        if !hasPending, let value = description, let loadable = value as? PendingDataLoadable {
+            hasPending = loadable.hasPendingData
+        }
+
+        if !hasPending, let value = descriptionFacets, let loadable = value as? PendingDataLoadable {
+            hasPending = loadable.hasPendingData
+        }
+
+        if !hasPending, let value = avatar, let loadable = value as? PendingDataLoadable {
+            hasPending = loadable.hasPendingData
+        }
+
+        if !hasPending, let value = acceptsInteractions, let loadable = value as? PendingDataLoadable {
+            hasPending = loadable.hasPendingData
+        }
+
+        if !hasPending, let value = labels, let loadable = value as? PendingDataLoadable {
+            hasPending = loadable.hasPendingData
+        }
+
+        if !hasPending, let value = contentMode, let loadable = value as? PendingDataLoadable {
+            hasPending = loadable.hasPendingData
+        }
+
+        if !hasPending, let loadable = createdAt as? PendingDataLoadable {
+            hasPending = loadable.hasPendingData
+        }
+
+        return hasPending
+    }
+
+    /// Load any pending data in properties
+    public mutating func loadPendingData() async {
+        if let loadable = did as? PendingDataLoadable, loadable.hasPendingData {
+            var mutableValue = loadable
+            await mutableValue.loadPendingData()
+            // Only update if we can safely cast back to the expected type
+            if let updatedValue = mutableValue as? String {
+                did = updatedValue
+            }
+        }
+
+        if let loadable = displayName as? PendingDataLoadable, loadable.hasPendingData {
+            var mutableValue = loadable
+            await mutableValue.loadPendingData()
+            // Only update if we can safely cast back to the expected type
+            if let updatedValue = mutableValue as? String {
+                displayName = updatedValue
+            }
+        }
+
+        if var value = description as? (String & PendingDataLoadable), value.hasPendingData {
+            await value.loadPendingData()
+            description = value
+        }
+
+        if var value = descriptionFacets as? ([AppBskyRichtextFacet] & PendingDataLoadable), value.hasPendingData {
+            await value.loadPendingData()
+            descriptionFacets = value
+        }
+
+        if var value = avatar as? (Blob & PendingDataLoadable), value.hasPendingData {
+            await value.loadPendingData()
+            avatar = value
+        }
+
+        if var value = acceptsInteractions as? (Bool & PendingDataLoadable), value.hasPendingData {
+            await value.loadPendingData()
+            acceptsInteractions = value
+        }
+
+        if var value = labels as? (AppBskyFeedGeneratorLabelsUnion & PendingDataLoadable), value.hasPendingData {
+            await value.loadPendingData()
+            labels = value
+        }
+
+        if var value = contentMode as? (String & PendingDataLoadable), value.hasPendingData {
+            await value.loadPendingData()
+            contentMode = value
+        }
+
+        if let loadable = createdAt as? PendingDataLoadable, loadable.hasPendingData {
+            var mutableValue = loadable
+            await mutableValue.loadPendingData()
+            // Only update if we can safely cast back to the expected type
+            if let updatedValue = mutableValue as? ATProtocolDate {
+                createdAt = updatedValue
+            }
+        }
+    }
+
     public enum AppBskyFeedGeneratorLabelsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case comAtprotoLabelDefsSelfLabels(ComAtprotoLabelDefs.SelfLabels)
         case unexpected(ATProtocolValueContainer)

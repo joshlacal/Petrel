@@ -144,6 +144,80 @@ public struct AppBskyLabelerService: ATProtocolCodable, ATProtocolValue {
         case subjectCollections
     }
 
+    // MARK: - PendingDataLoadable
+
+    /// Check if any properties contain pending data that needs loading
+    public var hasPendingData: Bool {
+        var hasPending = false
+
+        if !hasPending, let loadable = policies as? PendingDataLoadable {
+            hasPending = loadable.hasPendingData
+        }
+
+        if !hasPending, let value = labels, let loadable = value as? PendingDataLoadable {
+            hasPending = loadable.hasPendingData
+        }
+
+        if !hasPending, let loadable = createdAt as? PendingDataLoadable {
+            hasPending = loadable.hasPendingData
+        }
+
+        if !hasPending, let value = reasonTypes, let loadable = value as? PendingDataLoadable {
+            hasPending = loadable.hasPendingData
+        }
+
+        if !hasPending, let value = subjectTypes, let loadable = value as? PendingDataLoadable {
+            hasPending = loadable.hasPendingData
+        }
+
+        if !hasPending, let value = subjectCollections, let loadable = value as? PendingDataLoadable {
+            hasPending = loadable.hasPendingData
+        }
+
+        return hasPending
+    }
+
+    /// Load any pending data in properties
+    public mutating func loadPendingData() async {
+        if let loadable = policies as? PendingDataLoadable, loadable.hasPendingData {
+            var mutableValue = loadable
+            await mutableValue.loadPendingData()
+            // Only update if we can safely cast back to the expected type
+            if let updatedValue = mutableValue as? AppBskyLabelerDefs.LabelerPolicies {
+                policies = updatedValue
+            }
+        }
+
+        if var value = labels as? (AppBskyLabelerServiceLabelsUnion & PendingDataLoadable), value.hasPendingData {
+            await value.loadPendingData()
+            labels = value
+        }
+
+        if let loadable = createdAt as? PendingDataLoadable, loadable.hasPendingData {
+            var mutableValue = loadable
+            await mutableValue.loadPendingData()
+            // Only update if we can safely cast back to the expected type
+            if let updatedValue = mutableValue as? ATProtocolDate {
+                createdAt = updatedValue
+            }
+        }
+
+        if var value = reasonTypes as? ([ComAtprotoModerationDefs.ReasonType] & PendingDataLoadable), value.hasPendingData {
+            await value.loadPendingData()
+            reasonTypes = value
+        }
+
+        if var value = subjectTypes as? ([ComAtprotoModerationDefs.SubjectType] & PendingDataLoadable), value.hasPendingData {
+            await value.loadPendingData()
+            subjectTypes = value
+        }
+
+        if var value = subjectCollections as? ([String] & PendingDataLoadable), value.hasPendingData {
+            await value.loadPendingData()
+            subjectCollections = value
+        }
+    }
+
     public enum AppBskyLabelerServiceLabelsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
         case comAtprotoLabelDefsSelfLabels(ComAtprotoLabelDefs.SelfLabels)
         case unexpected(ATProtocolValueContainer)
