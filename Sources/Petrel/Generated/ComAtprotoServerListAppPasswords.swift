@@ -1,20 +1,25 @@
 import Foundation
 
+
+
 // lexicon: 1, id: com.atproto.server.listAppPasswords
 
-public enum ComAtprotoServerListAppPasswords {
-    public static let typeIdentifier = "com.atproto.server.listAppPasswords"
 
-    public struct AppPassword: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "com.atproto.server.listAppPasswords#appPassword"
-        public let name: String
-        public let createdAt: ATProtocolDate
-        public let privileged: Bool?
+public struct ComAtprotoServerListAppPasswords { 
+
+    public static let typeIdentifier = "com.atproto.server.listAppPasswords"
+        
+public struct AppPassword: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "com.atproto.server.listAppPasswords#appPassword"
+            public let name: String
+            public let createdAt: ATProtocolDate
+            public let privileged: Bool?
 
         // Standard initializer
         public init(
             name: String, createdAt: ATProtocolDate, privileged: Bool?
         ) {
+            
             self.name = name
             self.createdAt = createdAt
             self.privileged = privileged
@@ -22,41 +27,51 @@ public enum ComAtprotoServerListAppPasswords {
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                name = try container.decode(String.self, forKey: .name)
-
+                
+                self.name = try container.decode(String.self, forKey: .name)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'name': \(error)")
                 throw error
             }
             do {
-                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
-
+                
+                self.createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'createdAt': \(error)")
                 throw error
             }
             do {
-                privileged = try container.decodeIfPresent(Bool.self, forKey: .privileged)
-
+                
+                self.privileged = try container.decodeIfPresent(Bool.self, forKey: .privileged)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'privileged': \(error)")
                 throw error
             }
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
             try container.encode(name, forKey: .name)
-
+            
+            
             try container.encode(createdAt, forKey: .createdAt)
-
+            
+            
             if let value = privileged {
+                
                 try container.encode(value, forKey: .privileged)
+                
             }
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -70,21 +85,25 @@ public enum ComAtprotoServerListAppPasswords {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
             guard let other = other as? Self else { return false }
-
-            if name != other.name {
+            
+            if self.name != other.name {
                 return false
             }
-
-            if createdAt != other.createdAt {
+            
+            
+            if self.createdAt != other.createdAt {
                 return false
             }
-
+            
+            
             if privileged != other.privileged {
                 return false
             }
-
+            
             return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -97,101 +116,73 @@ public enum ComAtprotoServerListAppPasswords {
             case createdAt
             case privileged
         }
-
-        // MARK: - PendingDataLoadable
-
-        /// Check if any properties contain pending data that needs loading
-        public var hasPendingData: Bool {
-            var hasPending = false
-
-            if !hasPending, let loadable = name as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            if !hasPending, let loadable = createdAt as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            if !hasPending, let value = privileged, let loadable = value as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            return hasPending
-        }
-
-        /// Load any pending data in properties
-        public mutating func loadPendingData() async {
-            if let loadable = name as? PendingDataLoadable, loadable.hasPendingData {
-                var mutableValue = loadable
-                await mutableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = mutableValue as? String {
-                    name = updatedValue
-                }
-            }
-
-            if let loadable = createdAt as? PendingDataLoadable, loadable.hasPendingData {
-                var mutableValue = loadable
-                await mutableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = mutableValue as? ATProtocolDate {
-                    createdAt = updatedValue
-                }
-            }
-
-            if let value = privileged, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                await loadableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = loadableValue as? Bool {
-                    privileged = updatedValue
-                }
-            }
-        }
     }
-
-    public struct Output: ATProtocolCodable {
+    
+public struct Output: ATProtocolCodable {
+        
+        
         public let passwords: [AppPassword]
-
+        
+        
+        
         // Standard public initializer
         public init(
+            
             passwords: [AppPassword]
-
+            
+            
         ) {
+            
             self.passwords = passwords
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
-            passwords = try container.decode([AppPassword].self, forKey: .passwords)
+            
+            
+            self.passwords = try container.decode([AppPassword].self, forKey: .passwords)
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
+            
             try container.encode(passwords, forKey: .passwords)
+            
+            
         }
-
+        
         private enum CodingKeys: String, CodingKey {
+            
             case passwords
+            
         }
     }
+        
+public enum Error: String, Swift.Error, CustomStringConvertible {
+                case accountTakedown = "AccountTakedown."
+            public var description: String {
+                return self.rawValue
+            }
+        }
 
-    public enum Error: String, Swift.Error, CustomStringConvertible {
-        case accountTakedown = "AccountTakedown."
-        public var description: String {
-            return rawValue
-        }
-    }
+
+
 }
 
-public extension ATProtoClient.Com.Atproto.Server {
+
+extension ATProtoClient.Com.Atproto.Server {
     /// List all App Passwords.
-    func listAppPasswords() async throws -> (responseCode: Int, data: ComAtprotoServerListAppPasswords.Output?) {
+    public func listAppPasswords() async throws -> (responseCode: Int, data: ComAtprotoServerListAppPasswords.Output?) {
         let endpoint = "com.atproto.server.listAppPasswords"
-
+        
+        
         let queryItems: [URLQueryItem]? = nil
-
+        
         let urlRequest = try await networkManager.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -199,7 +190,7 @@ public extension ATProtoClient.Com.Atproto.Server {
             body: nil,
             queryItems: queryItems
         )
-
+        
         let (responseData, response) = try await networkManager.performRequest(urlRequest)
         let responseCode = response.statusCode
 
@@ -207,16 +198,17 @@ public extension ATProtoClient.Com.Atproto.Server {
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
-
+        
         if !contentType.lowercased().contains("application/json") {
             throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
         }
 
         // Data decoding and validation
-
+        
         let decoder = JSONDecoder()
         let decodedData = try? decoder.decode(ComAtprotoServerListAppPasswords.Output.self, from: responseData)
-
+        
+        
         return (responseCode, decodedData)
     }
-}
+}                           

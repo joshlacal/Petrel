@@ -1,20 +1,25 @@
 import Foundation
 
+
+
 // lexicon: 1, id: com.atproto.repo.applyWrites
 
-public enum ComAtprotoRepoApplyWrites {
-    public static let typeIdentifier = "com.atproto.repo.applyWrites"
 
-    public struct Create: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "com.atproto.repo.applyWrites#create"
-        public let collection: String
-        public let rkey: String?
-        public let value: ATProtocolValueContainer
+public struct ComAtprotoRepoApplyWrites { 
+
+    public static let typeIdentifier = "com.atproto.repo.applyWrites"
+        
+public struct Create: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "com.atproto.repo.applyWrites#create"
+            public let collection: String
+            public let rkey: String?
+            public let value: ATProtocolValueContainer
 
         // Standard initializer
         public init(
             collection: String, rkey: String?, value: ATProtocolValueContainer
         ) {
+            
             self.collection = collection
             self.rkey = rkey
             self.value = value
@@ -22,41 +27,51 @@ public enum ComAtprotoRepoApplyWrites {
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                collection = try container.decode(String.self, forKey: .collection)
-
+                
+                self.collection = try container.decode(String.self, forKey: .collection)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'collection': \(error)")
                 throw error
             }
             do {
-                rkey = try container.decodeIfPresent(String.self, forKey: .rkey)
-
+                
+                self.rkey = try container.decodeIfPresent(String.self, forKey: .rkey)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'rkey': \(error)")
                 throw error
             }
             do {
-                value = try container.decode(ATProtocolValueContainer.self, forKey: .value)
-
+                
+                self.value = try container.decode(ATProtocolValueContainer.self, forKey: .value)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'value': \(error)")
                 throw error
             }
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
             try container.encode(collection, forKey: .collection)
-
+            
+            
             if let value = rkey {
+                
                 try container.encode(value, forKey: .rkey)
+                
             }
-
+            
+            
             try container.encode(value, forKey: .value)
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -70,21 +85,25 @@ public enum ComAtprotoRepoApplyWrites {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
             guard let other = other as? Self else { return false }
-
-            if collection != other.collection {
+            
+            if self.collection != other.collection {
                 return false
             }
-
+            
+            
             if rkey != other.rkey {
                 return false
             }
-
-            if value != other.value {
+            
+            
+            if self.value != other.value {
                 return false
             }
-
+            
             return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -97,68 +116,19 @@ public enum ComAtprotoRepoApplyWrites {
             case rkey
             case value
         }
-
-        // MARK: - PendingDataLoadable
-
-        /// Check if any properties contain pending data that needs loading
-        public var hasPendingData: Bool {
-            var hasPending = false
-
-            if !hasPending, let loadable = collection as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            if !hasPending, let value = rkey, let loadable = value as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            if !hasPending, let loadable = value as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            return hasPending
-        }
-
-        /// Load any pending data in properties
-        public mutating func loadPendingData() async {
-            if let loadable = collection as? PendingDataLoadable, loadable.hasPendingData {
-                var mutableValue = loadable
-                await mutableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = mutableValue as? String {
-                    collection = updatedValue
-                }
-            }
-
-            if let value = rkey, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                await loadableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = loadableValue as? String {
-                    rkey = updatedValue
-                }
-            }
-
-            if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                var mutableValue = loadable
-                await mutableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = mutableValue as? ATProtocolValueContainer {
-                    value = updatedValue
-                }
-            }
-        }
     }
-
-    public struct Update: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "com.atproto.repo.applyWrites#update"
-        public let collection: String
-        public let rkey: String
-        public let value: ATProtocolValueContainer
+        
+public struct Update: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "com.atproto.repo.applyWrites#update"
+            public let collection: String
+            public let rkey: String
+            public let value: ATProtocolValueContainer
 
         // Standard initializer
         public init(
             collection: String, rkey: String, value: ATProtocolValueContainer
         ) {
+            
             self.collection = collection
             self.rkey = rkey
             self.value = value
@@ -166,39 +136,47 @@ public enum ComAtprotoRepoApplyWrites {
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                collection = try container.decode(String.self, forKey: .collection)
-
+                
+                self.collection = try container.decode(String.self, forKey: .collection)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'collection': \(error)")
                 throw error
             }
             do {
-                rkey = try container.decode(String.self, forKey: .rkey)
-
+                
+                self.rkey = try container.decode(String.self, forKey: .rkey)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'rkey': \(error)")
                 throw error
             }
             do {
-                value = try container.decode(ATProtocolValueContainer.self, forKey: .value)
-
+                
+                self.value = try container.decode(ATProtocolValueContainer.self, forKey: .value)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'value': \(error)")
                 throw error
             }
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
             try container.encode(collection, forKey: .collection)
-
+            
+            
             try container.encode(rkey, forKey: .rkey)
-
+            
+            
             try container.encode(value, forKey: .value)
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -208,21 +186,25 @@ public enum ComAtprotoRepoApplyWrites {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
             guard let other = other as? Self else { return false }
-
-            if collection != other.collection {
+            
+            if self.collection != other.collection {
                 return false
             }
-
-            if rkey != other.rkey {
+            
+            
+            if self.rkey != other.rkey {
                 return false
             }
-
-            if value != other.value {
+            
+            
+            if self.value != other.value {
                 return false
             }
-
+            
             return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -235,98 +217,54 @@ public enum ComAtprotoRepoApplyWrites {
             case rkey
             case value
         }
-
-        // MARK: - PendingDataLoadable
-
-        /// Check if any properties contain pending data that needs loading
-        public var hasPendingData: Bool {
-            var hasPending = false
-
-            if !hasPending, let loadable = collection as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            if !hasPending, let loadable = rkey as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            if !hasPending, let loadable = value as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            return hasPending
-        }
-
-        /// Load any pending data in properties
-        public mutating func loadPendingData() async {
-            if let loadable = collection as? PendingDataLoadable, loadable.hasPendingData {
-                var mutableValue = loadable
-                await mutableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = mutableValue as? String {
-                    collection = updatedValue
-                }
-            }
-
-            if let loadable = rkey as? PendingDataLoadable, loadable.hasPendingData {
-                var mutableValue = loadable
-                await mutableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = mutableValue as? String {
-                    rkey = updatedValue
-                }
-            }
-
-            if let loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                var mutableValue = loadable
-                await mutableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = mutableValue as? ATProtocolValueContainer {
-                    value = updatedValue
-                }
-            }
-        }
     }
-
-    public struct Delete: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "com.atproto.repo.applyWrites#delete"
-        public let collection: String
-        public let rkey: String
+        
+public struct Delete: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "com.atproto.repo.applyWrites#delete"
+            public let collection: String
+            public let rkey: String
 
         // Standard initializer
         public init(
             collection: String, rkey: String
         ) {
+            
             self.collection = collection
             self.rkey = rkey
         }
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                collection = try container.decode(String.self, forKey: .collection)
-
+                
+                self.collection = try container.decode(String.self, forKey: .collection)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'collection': \(error)")
                 throw error
             }
             do {
-                rkey = try container.decode(String.self, forKey: .rkey)
-
+                
+                self.rkey = try container.decode(String.self, forKey: .rkey)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'rkey': \(error)")
                 throw error
             }
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
             try container.encode(collection, forKey: .collection)
-
+            
+            
             try container.encode(rkey, forKey: .rkey)
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -335,17 +273,20 @@ public enum ComAtprotoRepoApplyWrites {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
             guard let other = other as? Self else { return false }
-
-            if collection != other.collection {
+            
+            if self.collection != other.collection {
                 return false
             }
-
-            if rkey != other.rkey {
+            
+            
+            if self.rkey != other.rkey {
                 return false
             }
-
+            
             return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -357,56 +298,19 @@ public enum ComAtprotoRepoApplyWrites {
             case collection
             case rkey
         }
-
-        // MARK: - PendingDataLoadable
-
-        /// Check if any properties contain pending data that needs loading
-        public var hasPendingData: Bool {
-            var hasPending = false
-
-            if !hasPending, let loadable = collection as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            if !hasPending, let loadable = rkey as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            return hasPending
-        }
-
-        /// Load any pending data in properties
-        public mutating func loadPendingData() async {
-            if let loadable = collection as? PendingDataLoadable, loadable.hasPendingData {
-                var mutableValue = loadable
-                await mutableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = mutableValue as? String {
-                    collection = updatedValue
-                }
-            }
-
-            if let loadable = rkey as? PendingDataLoadable, loadable.hasPendingData {
-                var mutableValue = loadable
-                await mutableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = mutableValue as? String {
-                    rkey = updatedValue
-                }
-            }
-        }
     }
-
-    public struct CreateResult: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "com.atproto.repo.applyWrites#createResult"
-        public let uri: ATProtocolURI
-        public let cid: String
-        public let validationStatus: String?
+        
+public struct CreateResult: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "com.atproto.repo.applyWrites#createResult"
+            public let uri: ATProtocolURI
+            public let cid: String
+            public let validationStatus: String?
 
         // Standard initializer
         public init(
             uri: ATProtocolURI, cid: String, validationStatus: String?
         ) {
+            
             self.uri = uri
             self.cid = cid
             self.validationStatus = validationStatus
@@ -414,41 +318,51 @@ public enum ComAtprotoRepoApplyWrites {
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-
+                
+                self.uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'uri': \(error)")
                 throw error
             }
             do {
-                cid = try container.decode(String.self, forKey: .cid)
-
+                
+                self.cid = try container.decode(String.self, forKey: .cid)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'cid': \(error)")
                 throw error
             }
             do {
-                validationStatus = try container.decodeIfPresent(String.self, forKey: .validationStatus)
-
+                
+                self.validationStatus = try container.decodeIfPresent(String.self, forKey: .validationStatus)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'validationStatus': \(error)")
                 throw error
             }
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
             try container.encode(uri, forKey: .uri)
-
+            
+            
             try container.encode(cid, forKey: .cid)
-
+            
+            
             if let value = validationStatus {
+                
                 try container.encode(value, forKey: .validationStatus)
+                
             }
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -462,21 +376,25 @@ public enum ComAtprotoRepoApplyWrites {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
             guard let other = other as? Self else { return false }
-
-            if uri != other.uri {
+            
+            if self.uri != other.uri {
                 return false
             }
-
-            if cid != other.cid {
+            
+            
+            if self.cid != other.cid {
                 return false
             }
-
+            
+            
             if validationStatus != other.validationStatus {
                 return false
             }
-
+            
             return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -489,68 +407,19 @@ public enum ComAtprotoRepoApplyWrites {
             case cid
             case validationStatus
         }
-
-        // MARK: - PendingDataLoadable
-
-        /// Check if any properties contain pending data that needs loading
-        public var hasPendingData: Bool {
-            var hasPending = false
-
-            if !hasPending, let loadable = uri as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            if !hasPending, let loadable = cid as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            if !hasPending, let value = validationStatus, let loadable = value as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            return hasPending
-        }
-
-        /// Load any pending data in properties
-        public mutating func loadPendingData() async {
-            if let loadable = uri as? PendingDataLoadable, loadable.hasPendingData {
-                var mutableValue = loadable
-                await mutableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = mutableValue as? ATProtocolURI {
-                    uri = updatedValue
-                }
-            }
-
-            if let loadable = cid as? PendingDataLoadable, loadable.hasPendingData {
-                var mutableValue = loadable
-                await mutableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = mutableValue as? String {
-                    cid = updatedValue
-                }
-            }
-
-            if let value = validationStatus, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                await loadableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = loadableValue as? String {
-                    validationStatus = updatedValue
-                }
-            }
-        }
     }
-
-    public struct UpdateResult: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "com.atproto.repo.applyWrites#updateResult"
-        public let uri: ATProtocolURI
-        public let cid: String
-        public let validationStatus: String?
+        
+public struct UpdateResult: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "com.atproto.repo.applyWrites#updateResult"
+            public let uri: ATProtocolURI
+            public let cid: String
+            public let validationStatus: String?
 
         // Standard initializer
         public init(
             uri: ATProtocolURI, cid: String, validationStatus: String?
         ) {
+            
             self.uri = uri
             self.cid = cid
             self.validationStatus = validationStatus
@@ -558,41 +427,51 @@ public enum ComAtprotoRepoApplyWrites {
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-
+                
+                self.uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'uri': \(error)")
                 throw error
             }
             do {
-                cid = try container.decode(String.self, forKey: .cid)
-
+                
+                self.cid = try container.decode(String.self, forKey: .cid)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'cid': \(error)")
                 throw error
             }
             do {
-                validationStatus = try container.decodeIfPresent(String.self, forKey: .validationStatus)
-
+                
+                self.validationStatus = try container.decodeIfPresent(String.self, forKey: .validationStatus)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'validationStatus': \(error)")
                 throw error
             }
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
             try container.encode(uri, forKey: .uri)
-
+            
+            
             try container.encode(cid, forKey: .cid)
-
+            
+            
             if let value = validationStatus {
+                
                 try container.encode(value, forKey: .validationStatus)
+                
             }
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -606,21 +485,25 @@ public enum ComAtprotoRepoApplyWrites {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
             guard let other = other as? Self else { return false }
-
-            if uri != other.uri {
+            
+            if self.uri != other.uri {
                 return false
             }
-
-            if cid != other.cid {
+            
+            
+            if self.cid != other.cid {
                 return false
             }
-
+            
+            
             if validationStatus != other.validationStatus {
                 return false
             }
-
+            
             return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -633,68 +516,23 @@ public enum ComAtprotoRepoApplyWrites {
             case cid
             case validationStatus
         }
-
-        // MARK: - PendingDataLoadable
-
-        /// Check if any properties contain pending data that needs loading
-        public var hasPendingData: Bool {
-            var hasPending = false
-
-            if !hasPending, let loadable = uri as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            if !hasPending, let loadable = cid as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            if !hasPending, let value = validationStatus, let loadable = value as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            return hasPending
-        }
-
-        /// Load any pending data in properties
-        public mutating func loadPendingData() async {
-            if let loadable = uri as? PendingDataLoadable, loadable.hasPendingData {
-                var mutableValue = loadable
-                await mutableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = mutableValue as? ATProtocolURI {
-                    uri = updatedValue
-                }
-            }
-
-            if let loadable = cid as? PendingDataLoadable, loadable.hasPendingData {
-                var mutableValue = loadable
-                await mutableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = mutableValue as? String {
-                    cid = updatedValue
-                }
-            }
-
-            if let value = validationStatus, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                await loadableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = loadableValue as? String {
-                    validationStatus = updatedValue
-                }
-            }
-        }
     }
-
-    public struct DeleteResult: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "com.atproto.repo.applyWrites#deleteResult"
+        
+public struct DeleteResult: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "com.atproto.repo.applyWrites#deleteResult"
 
         // Standard initializer
         public init(
-        ) {}
+            
+        ) {
+            
+        }
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
-            let _ = decoder // Acknowledge parameter for empty struct
+            
+            let _ = decoder  // Acknowledge parameter for empty struct
+            
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -702,10 +540,13 @@ public enum ComAtprotoRepoApplyWrites {
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
         }
 
-        public func hash(into hasher: inout Hasher) {}
+        public func hash(into hasher: inout Hasher) {
+        }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            return other is Self // For empty structs, just check the type
+            
+            return other is Self  // For empty structs, just check the type
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -715,644 +556,624 @@ public enum ComAtprotoRepoApplyWrites {
         private enum CodingKeys: String, CodingKey {
             case typeIdentifier = "$type"
         }
-
-        // MARK: - PendingDataLoadable
-
-        /// Check if any properties contain pending data that needs loading
-        public var hasPendingData: Bool {
-            var hasPending = false
-
-            return hasPending
-        }
-
-        /// Load any pending data in properties
-        public mutating func loadPendingData() async {}
     }
+public struct Input: ATProtocolCodable {
+            public let repo: String
+            public let validate: Bool?
+            public let writes: [InputWritesUnion]
+            public let swapCommit: String?
 
-    public struct Input: ATProtocolCodable {
-        public let repo: String
-        public let validate: Bool?
-        public let writes: [InputWritesUnion]
-        public let swapCommit: String?
-
-        // Standard public initializer
-        public init(repo: String, validate: Bool? = nil, writes: [InputWritesUnion], swapCommit: String? = nil) {
-            self.repo = repo
-            self.validate = validate
-            self.writes = writes
-            self.swapCommit = swapCommit
-        }
-
-        public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-
-            repo = try container.decode(String.self, forKey: .repo)
-
-            validate = try container.decodeIfPresent(Bool.self, forKey: .validate)
-
-            writes = try container.decode([InputWritesUnion].self, forKey: .writes)
-
-            swapCommit = try container.decodeIfPresent(String.self, forKey: .swapCommit)
-        }
-
-        public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-
-            try container.encode(repo, forKey: .repo)
-
-            if let value = validate {
-                try container.encode(value, forKey: .validate)
+            // Standard public initializer
+            public init(repo: String, validate: Bool? = nil, writes: [InputWritesUnion], swapCommit: String? = nil) {
+                self.repo = repo
+                self.validate = validate
+                self.writes = writes
+                self.swapCommit = swapCommit
+                
             }
-
-            try container.encode(writes, forKey: .writes)
-
-            if let value = swapCommit {
-                try container.encode(value, forKey: .swapCommit)
+            
+            public init(from decoder: Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                
+                self.repo = try container.decode(String.self, forKey: .repo)
+                
+                
+                self.validate = try container.decodeIfPresent(Bool.self, forKey: .validate)
+                
+                
+                self.writes = try container.decode([InputWritesUnion].self, forKey: .writes)
+                
+                
+                self.swapCommit = try container.decodeIfPresent(String.self, forKey: .swapCommit)
+                
+            }
+            
+            public func encode(to encoder: Encoder) throws {
+                var container = encoder.container(keyedBy: CodingKeys.self)
+                
+                try container.encode(repo, forKey: .repo)
+                
+                
+                if let value = validate {
+                    
+                    try container.encode(value, forKey: .validate)
+                    
+                }
+                
+                
+                try container.encode(writes, forKey: .writes)
+                
+                
+                if let value = swapCommit {
+                    
+                    try container.encode(value, forKey: .swapCommit)
+                    
+                }
+                
+            }
+            
+            private enum CodingKeys: String, CodingKey {
+                case repo
+                case validate
+                case writes
+                case swapCommit
             }
         }
-
-        private enum CodingKeys: String, CodingKey {
-            case repo
-            case validate
-            case writes
-            case swapCommit
-        }
-    }
-
-    public struct Output: ATProtocolCodable {
+    
+public struct Output: ATProtocolCodable {
+        
+        
         public let commit: ComAtprotoRepoDefs.CommitMeta?
-
+        
         public let results: [OutputResultsUnion]?
-
+        
+        
+        
         // Standard public initializer
         public init(
+            
             commit: ComAtprotoRepoDefs.CommitMeta? = nil,
-
+            
             results: [OutputResultsUnion]? = nil
-
+            
+            
         ) {
+            
             self.commit = commit
-
+            
             self.results = results
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
-            commit = try container.decodeIfPresent(ComAtprotoRepoDefs.CommitMeta.self, forKey: .commit)
-
-            results = try container.decodeIfPresent([OutputResultsUnion].self, forKey: .results)
+            
+            
+            self.commit = try container.decodeIfPresent(ComAtprotoRepoDefs.CommitMeta.self, forKey: .commit)
+            
+            
+            self.results = try container.decodeIfPresent([OutputResultsUnion].self, forKey: .results)
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
+            
             if let value = commit {
+                
                 try container.encode(value, forKey: .commit)
+                
             }
-
+            
+            
             if let value = results {
+                
                 if !value.isEmpty {
                     try container.encode(value, forKey: .results)
                 }
+                
             }
+            
+            
         }
-
+        
         private enum CodingKeys: String, CodingKey {
+            
             case commit
             case results
+            
         }
     }
-
-    public enum Error: String, Swift.Error, CustomStringConvertible {
-        case invalidSwap = "InvalidSwap.Indicates that the 'swapCommit' parameter did not match current commit."
-        public var description: String {
-            return rawValue
+        
+public enum Error: String, Swift.Error, CustomStringConvertible {
+                case invalidSwap = "InvalidSwap.Indicates that the 'swapCommit' parameter did not match current commit."
+            public var description: String {
+                return self.rawValue
+            }
         }
+
+
+
+
+
+public enum InputWritesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
+    case comAtprotoRepoApplyWritesCreate(ComAtprotoRepoApplyWrites.Create)
+    case comAtprotoRepoApplyWritesUpdate(ComAtprotoRepoApplyWrites.Update)
+    case comAtprotoRepoApplyWritesDelete(ComAtprotoRepoApplyWrites.Delete)
+    case unexpected(ATProtocolValueContainer)
+    
+    public init(_ value: ComAtprotoRepoApplyWrites.Create) {
+        self = .comAtprotoRepoApplyWritesCreate(value)
+    }
+    public init(_ value: ComAtprotoRepoApplyWrites.Update) {
+        self = .comAtprotoRepoApplyWritesUpdate(value)
+    }
+    public init(_ value: ComAtprotoRepoApplyWrites.Delete) {
+        self = .comAtprotoRepoApplyWritesDelete(value)
     }
 
-    public enum InputWritesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
-        case comAtprotoRepoApplyWritesCreate(ComAtprotoRepoApplyWrites.Create)
-        case comAtprotoRepoApplyWritesUpdate(ComAtprotoRepoApplyWrites.Update)
-        case comAtprotoRepoApplyWritesDelete(ComAtprotoRepoApplyWrites.Delete)
-        case unexpected(ATProtocolValueContainer)
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let typeValue = try container.decode(String.self, forKey: .type)
+        
 
-        public init(_ value: ComAtprotoRepoApplyWrites.Create) {
+        switch typeValue {
+        case "com.atproto.repo.applyWrites#create":
+            let value = try ComAtprotoRepoApplyWrites.Create(from: decoder)
             self = .comAtprotoRepoApplyWritesCreate(value)
-        }
-
-        public init(_ value: ComAtprotoRepoApplyWrites.Update) {
+        case "com.atproto.repo.applyWrites#update":
+            let value = try ComAtprotoRepoApplyWrites.Update(from: decoder)
             self = .comAtprotoRepoApplyWritesUpdate(value)
-        }
-
-        public init(_ value: ComAtprotoRepoApplyWrites.Delete) {
+        case "com.atproto.repo.applyWrites#delete":
+            let value = try ComAtprotoRepoApplyWrites.Delete(from: decoder)
             self = .comAtprotoRepoApplyWritesDelete(value)
-        }
-
-        public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
-
-            switch typeValue {
-            case "com.atproto.repo.applyWrites#create":
-                let value = try ComAtprotoRepoApplyWrites.Create(from: decoder)
-                self = .comAtprotoRepoApplyWritesCreate(value)
-            case "com.atproto.repo.applyWrites#update":
-                let value = try ComAtprotoRepoApplyWrites.Update(from: decoder)
-                self = .comAtprotoRepoApplyWritesUpdate(value)
-            case "com.atproto.repo.applyWrites#delete":
-                let value = try ComAtprotoRepoApplyWrites.Delete(from: decoder)
-                self = .comAtprotoRepoApplyWritesDelete(value)
-            default:
-                let unknownValue = try ATProtocolValueContainer(from: decoder)
-                self = .unexpected(unknownValue)
-            }
-        }
-
-        public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-
-            switch self {
-            case let .comAtprotoRepoApplyWritesCreate(value):
-                try container.encode("com.atproto.repo.applyWrites#create", forKey: .type)
-                try value.encode(to: encoder)
-            case let .comAtprotoRepoApplyWritesUpdate(value):
-                try container.encode("com.atproto.repo.applyWrites#update", forKey: .type)
-                try value.encode(to: encoder)
-            case let .comAtprotoRepoApplyWritesDelete(value):
-                try container.encode("com.atproto.repo.applyWrites#delete", forKey: .type)
-                try value.encode(to: encoder)
-            case let .unexpected(container):
-                try container.encode(to: encoder)
-            }
-        }
-
-        public func hash(into hasher: inout Hasher) {
-            switch self {
-            case let .comAtprotoRepoApplyWritesCreate(value):
-                hasher.combine("com.atproto.repo.applyWrites#create")
-                hasher.combine(value)
-            case let .comAtprotoRepoApplyWritesUpdate(value):
-                hasher.combine("com.atproto.repo.applyWrites#update")
-                hasher.combine(value)
-            case let .comAtprotoRepoApplyWritesDelete(value):
-                hasher.combine("com.atproto.repo.applyWrites#delete")
-                hasher.combine(value)
-            case let .unexpected(container):
-                hasher.combine("unexpected")
-                hasher.combine(container)
-            }
-        }
-
-        private enum CodingKeys: String, CodingKey {
-            case type = "$type"
-        }
-
-        public static func == (lhs: InputWritesUnion, rhs: InputWritesUnion) -> Bool {
-            switch (lhs, rhs) {
-            case let (
-                .comAtprotoRepoApplyWritesCreate(lhsValue),
-                .comAtprotoRepoApplyWritesCreate(rhsValue)
-            ):
-                return lhsValue == rhsValue
-            case let (
-                .comAtprotoRepoApplyWritesUpdate(lhsValue),
-                .comAtprotoRepoApplyWritesUpdate(rhsValue)
-            ):
-                return lhsValue == rhsValue
-            case let (
-                .comAtprotoRepoApplyWritesDelete(lhsValue),
-                .comAtprotoRepoApplyWritesDelete(rhsValue)
-            ):
-                return lhsValue == rhsValue
-            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
-            default:
-                return false
-            }
-        }
-
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let other = other as? InputWritesUnion else { return false }
-            return self == other
-        }
-
-        /// Property that indicates if this enum contains pending data that needs loading
-        public var hasPendingData: Bool {
-            switch self {
-            case let .comAtprotoRepoApplyWritesCreate(value):
-                if let loadable = value as? PendingDataLoadable {
-                    return loadable.hasPendingData
-                }
-                return false
-            case let .comAtprotoRepoApplyWritesUpdate(value):
-                if let loadable = value as? PendingDataLoadable {
-                    return loadable.hasPendingData
-                }
-                return false
-            case let .comAtprotoRepoApplyWritesDelete(value):
-                if let loadable = value as? PendingDataLoadable {
-                    return loadable.hasPendingData
-                }
-                return false
-            case .unexpected:
-                return false
-            }
-        }
-
-        /// Attempts to load any pending data in this enum or its children
-        public mutating func loadPendingData() async {
-            switch self {
-            case let .comAtprotoRepoApplyWritesCreate(value):
-                // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update the value if it was mutated (only if it's actually the expected type)
-                    if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.Create {
-                        self = .comAtprotoRepoApplyWritesCreate(updatedValue)
-                    }
-                }
-            case let .comAtprotoRepoApplyWritesUpdate(value):
-                // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update the value if it was mutated (only if it's actually the expected type)
-                    if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.Update {
-                        self = .comAtprotoRepoApplyWritesUpdate(updatedValue)
-                    }
-                }
-            case let .comAtprotoRepoApplyWritesDelete(value):
-                // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update the value if it was mutated (only if it's actually the expected type)
-                    if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.Delete {
-                        self = .comAtprotoRepoApplyWritesDelete(updatedValue)
-                    }
-                }
-            case .unexpected:
-                // Nothing to load for unexpected values
-                break
-            }
+        default:
+            let unknownValue = try ATProtocolValueContainer(from: decoder)
+            self = .unexpected(unknownValue)
         }
     }
 
-    public enum OutputResultsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
-        case comAtprotoRepoApplyWritesCreateResult(ComAtprotoRepoApplyWrites.CreateResult)
-        case comAtprotoRepoApplyWritesUpdateResult(ComAtprotoRepoApplyWrites.UpdateResult)
-        case comAtprotoRepoApplyWritesDeleteResult(ComAtprotoRepoApplyWrites.DeleteResult)
-        case unexpected(ATProtocolValueContainer)
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
 
-        public init(_ value: ComAtprotoRepoApplyWrites.CreateResult) {
-            self = .comAtprotoRepoApplyWritesCreateResult(value)
-        }
-
-        public init(_ value: ComAtprotoRepoApplyWrites.UpdateResult) {
-            self = .comAtprotoRepoApplyWritesUpdateResult(value)
-        }
-
-        public init(_ value: ComAtprotoRepoApplyWrites.DeleteResult) {
-            self = .comAtprotoRepoApplyWritesDeleteResult(value)
-        }
-
-        public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
-
-            switch typeValue {
-            case "com.atproto.repo.applyWrites#createResult":
-                let value = try ComAtprotoRepoApplyWrites.CreateResult(from: decoder)
-                self = .comAtprotoRepoApplyWritesCreateResult(value)
-            case "com.atproto.repo.applyWrites#updateResult":
-                let value = try ComAtprotoRepoApplyWrites.UpdateResult(from: decoder)
-                self = .comAtprotoRepoApplyWritesUpdateResult(value)
-            case "com.atproto.repo.applyWrites#deleteResult":
-                let value = try ComAtprotoRepoApplyWrites.DeleteResult(from: decoder)
-                self = .comAtprotoRepoApplyWritesDeleteResult(value)
-            default:
-                let unknownValue = try ATProtocolValueContainer(from: decoder)
-                self = .unexpected(unknownValue)
-            }
-        }
-
-        public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-
-            switch self {
-            case let .comAtprotoRepoApplyWritesCreateResult(value):
-                try container.encode("com.atproto.repo.applyWrites#createResult", forKey: .type)
-                try value.encode(to: encoder)
-            case let .comAtprotoRepoApplyWritesUpdateResult(value):
-                try container.encode("com.atproto.repo.applyWrites#updateResult", forKey: .type)
-                try value.encode(to: encoder)
-            case let .comAtprotoRepoApplyWritesDeleteResult(value):
-                try container.encode("com.atproto.repo.applyWrites#deleteResult", forKey: .type)
-                try value.encode(to: encoder)
-            case let .unexpected(container):
-                try container.encode(to: encoder)
-            }
-        }
-
-        public func hash(into hasher: inout Hasher) {
-            switch self {
-            case let .comAtprotoRepoApplyWritesCreateResult(value):
-                hasher.combine("com.atproto.repo.applyWrites#createResult")
-                hasher.combine(value)
-            case let .comAtprotoRepoApplyWritesUpdateResult(value):
-                hasher.combine("com.atproto.repo.applyWrites#updateResult")
-                hasher.combine(value)
-            case let .comAtprotoRepoApplyWritesDeleteResult(value):
-                hasher.combine("com.atproto.repo.applyWrites#deleteResult")
-                hasher.combine(value)
-            case let .unexpected(container):
-                hasher.combine("unexpected")
-                hasher.combine(container)
-            }
-        }
-
-        private enum CodingKeys: String, CodingKey {
-            case type = "$type"
-        }
-
-        public static func == (lhs: OutputResultsUnion, rhs: OutputResultsUnion) -> Bool {
-            switch (lhs, rhs) {
-            case let (
-                .comAtprotoRepoApplyWritesCreateResult(lhsValue),
-                .comAtprotoRepoApplyWritesCreateResult(rhsValue)
-            ):
-                return lhsValue == rhsValue
-            case let (
-                .comAtprotoRepoApplyWritesUpdateResult(lhsValue),
-                .comAtprotoRepoApplyWritesUpdateResult(rhsValue)
-            ):
-                return lhsValue == rhsValue
-            case let (
-                .comAtprotoRepoApplyWritesDeleteResult(lhsValue),
-                .comAtprotoRepoApplyWritesDeleteResult(rhsValue)
-            ):
-                return lhsValue == rhsValue
-            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
-            default:
-                return false
-            }
-        }
-
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let other = other as? OutputResultsUnion else { return false }
-            return self == other
-        }
-
-        /// Property that indicates if this enum contains pending data that needs loading
-        public var hasPendingData: Bool {
-            switch self {
-            case let .comAtprotoRepoApplyWritesCreateResult(value):
-                if let loadable = value as? PendingDataLoadable {
-                    return loadable.hasPendingData
-                }
-                return false
-            case let .comAtprotoRepoApplyWritesUpdateResult(value):
-                if let loadable = value as? PendingDataLoadable {
-                    return loadable.hasPendingData
-                }
-                return false
-            case let .comAtprotoRepoApplyWritesDeleteResult(value):
-                if let loadable = value as? PendingDataLoadable {
-                    return loadable.hasPendingData
-                }
-                return false
-            case .unexpected:
-                return false
-            }
-        }
-
-        /// Attempts to load any pending data in this enum or its children
-        public mutating func loadPendingData() async {
-            switch self {
-            case let .comAtprotoRepoApplyWritesCreateResult(value):
-                // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update the value if it was mutated (only if it's actually the expected type)
-                    if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.CreateResult {
-                        self = .comAtprotoRepoApplyWritesCreateResult(updatedValue)
-                    }
-                }
-            case let .comAtprotoRepoApplyWritesUpdateResult(value):
-                // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update the value if it was mutated (only if it's actually the expected type)
-                    if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.UpdateResult {
-                        self = .comAtprotoRepoApplyWritesUpdateResult(updatedValue)
-                    }
-                }
-            case let .comAtprotoRepoApplyWritesDeleteResult(value):
-                // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update the value if it was mutated (only if it's actually the expected type)
-                    if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.DeleteResult {
-                        self = .comAtprotoRepoApplyWritesDeleteResult(updatedValue)
-                    }
-                }
-            case .unexpected:
-                // Nothing to load for unexpected values
-                break
-            }
+        switch self {
+        case .comAtprotoRepoApplyWritesCreate(let value):
+            try container.encode("com.atproto.repo.applyWrites#create", forKey: .type)
+            try value.encode(to: encoder)
+        case .comAtprotoRepoApplyWritesUpdate(let value):
+            try container.encode("com.atproto.repo.applyWrites#update", forKey: .type)
+            try value.encode(to: encoder)
+        case .comAtprotoRepoApplyWritesDelete(let value):
+            try container.encode("com.atproto.repo.applyWrites#delete", forKey: .type)
+            try value.encode(to: encoder)
+        case .unexpected(let container):
+            try container.encode(to: encoder)
+        
         }
     }
 
-    public enum ComAtprotoRepoApplyWritesWritesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
-        case comAtprotoRepoApplyWritesCreate(ComAtprotoRepoApplyWrites.Create)
-        case comAtprotoRepoApplyWritesUpdate(ComAtprotoRepoApplyWrites.Update)
-        case comAtprotoRepoApplyWritesDelete(ComAtprotoRepoApplyWrites.Delete)
-        case unexpected(ATProtocolValueContainer)
+    public func hash(into hasher: inout Hasher) {
+        switch self {
+        case .comAtprotoRepoApplyWritesCreate(let value):
+            hasher.combine("com.atproto.repo.applyWrites#create")
+            hasher.combine(value)
+        case .comAtprotoRepoApplyWritesUpdate(let value):
+            hasher.combine("com.atproto.repo.applyWrites#update")
+            hasher.combine(value)
+        case .comAtprotoRepoApplyWritesDelete(let value):
+            hasher.combine("com.atproto.repo.applyWrites#delete")
+            hasher.combine(value)
+        case .unexpected(let container):
+            hasher.combine("unexpected")
+            hasher.combine(container)
+        
+        }
+    }
 
-        public init(_ value: ComAtprotoRepoApplyWrites.Create) {
+    private enum CodingKeys: String, CodingKey {
+        case type = "$type"
+    }
+    
+    public static func == (lhs: InputWritesUnion, rhs: InputWritesUnion) -> Bool {
+        switch (lhs, rhs) {
+        case (.comAtprotoRepoApplyWritesCreate(let lhsValue),
+              .comAtprotoRepoApplyWritesCreate(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.comAtprotoRepoApplyWritesUpdate(let lhsValue),
+              .comAtprotoRepoApplyWritesUpdate(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.comAtprotoRepoApplyWritesDelete(let lhsValue),
+              .comAtprotoRepoApplyWritesDelete(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.unexpected(let lhsValue), .unexpected(let rhsValue)):
+            return lhsValue.isEqual(to: rhsValue)
+        
+        default:
+            return false
+        }
+    }
+    
+    public func isEqual(to other: any ATProtocolValue) -> Bool {
+        guard let other = other as? InputWritesUnion else { return false }
+        return self == other
+    }
+    
+    /// Property that indicates if this enum contains pending data that needs loading
+    public var hasPendingData: Bool {
+        switch self {
+        
+        case .comAtprotoRepoApplyWritesCreate(let value):
+            return value.hasPendingData
+        case .comAtprotoRepoApplyWritesUpdate(let value):
+            return value.hasPendingData
+        case .comAtprotoRepoApplyWritesDelete(let value):
+            return value.hasPendingData
+        case .unexpected:
+            return false
+        }
+    }
+    
+    /// Attempts to load any pending data in this enum or its children
+    public mutating func loadPendingData() async {
+        switch self {
+        
+        case .comAtprotoRepoApplyWritesCreate(var value):
+            // Since ATProtocolValue already includes PendingDataLoadable,
+            // we can directly call loadPendingData without conditional casting
+            await value.loadPendingData()
+            // Update the enum case with the potentially updated value
             self = .comAtprotoRepoApplyWritesCreate(value)
-        }
-
-        public init(_ value: ComAtprotoRepoApplyWrites.Update) {
+        case .comAtprotoRepoApplyWritesUpdate(var value):
+            // Since ATProtocolValue already includes PendingDataLoadable,
+            // we can directly call loadPendingData without conditional casting
+            await value.loadPendingData()
+            // Update the enum case with the potentially updated value
             self = .comAtprotoRepoApplyWritesUpdate(value)
-        }
-
-        public init(_ value: ComAtprotoRepoApplyWrites.Delete) {
+        case .comAtprotoRepoApplyWritesDelete(var value):
+            // Since ATProtocolValue already includes PendingDataLoadable,
+            // we can directly call loadPendingData without conditional casting
+            await value.loadPendingData()
+            // Update the enum case with the potentially updated value
             self = .comAtprotoRepoApplyWritesDelete(value)
-        }
-
-        public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
-
-            switch typeValue {
-            case "com.atproto.repo.applyWrites#create":
-                let value = try ComAtprotoRepoApplyWrites.Create(from: decoder)
-                self = .comAtprotoRepoApplyWritesCreate(value)
-            case "com.atproto.repo.applyWrites#update":
-                let value = try ComAtprotoRepoApplyWrites.Update(from: decoder)
-                self = .comAtprotoRepoApplyWritesUpdate(value)
-            case "com.atproto.repo.applyWrites#delete":
-                let value = try ComAtprotoRepoApplyWrites.Delete(from: decoder)
-                self = .comAtprotoRepoApplyWritesDelete(value)
-            default:
-                let unknownValue = try ATProtocolValueContainer(from: decoder)
-                self = .unexpected(unknownValue)
-            }
-        }
-
-        public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-
-            switch self {
-            case let .comAtprotoRepoApplyWritesCreate(value):
-                try container.encode("com.atproto.repo.applyWrites#create", forKey: .type)
-                try value.encode(to: encoder)
-            case let .comAtprotoRepoApplyWritesUpdate(value):
-                try container.encode("com.atproto.repo.applyWrites#update", forKey: .type)
-                try value.encode(to: encoder)
-            case let .comAtprotoRepoApplyWritesDelete(value):
-                try container.encode("com.atproto.repo.applyWrites#delete", forKey: .type)
-                try value.encode(to: encoder)
-            case let .unexpected(container):
-                try container.encode(to: encoder)
-            }
-        }
-
-        public func hash(into hasher: inout Hasher) {
-            switch self {
-            case let .comAtprotoRepoApplyWritesCreate(value):
-                hasher.combine("com.atproto.repo.applyWrites#create")
-                hasher.combine(value)
-            case let .comAtprotoRepoApplyWritesUpdate(value):
-                hasher.combine("com.atproto.repo.applyWrites#update")
-                hasher.combine(value)
-            case let .comAtprotoRepoApplyWritesDelete(value):
-                hasher.combine("com.atproto.repo.applyWrites#delete")
-                hasher.combine(value)
-            case let .unexpected(container):
-                hasher.combine("unexpected")
-                hasher.combine(container)
-            }
-        }
-
-        private enum CodingKeys: String, CodingKey {
-            case type = "$type"
-        }
-
-        public static func == (lhs: ComAtprotoRepoApplyWritesWritesUnion, rhs: ComAtprotoRepoApplyWritesWritesUnion) -> Bool {
-            switch (lhs, rhs) {
-            case let (
-                .comAtprotoRepoApplyWritesCreate(lhsValue),
-                .comAtprotoRepoApplyWritesCreate(rhsValue)
-            ):
-                return lhsValue == rhsValue
-            case let (
-                .comAtprotoRepoApplyWritesUpdate(lhsValue),
-                .comAtprotoRepoApplyWritesUpdate(rhsValue)
-            ):
-                return lhsValue == rhsValue
-            case let (
-                .comAtprotoRepoApplyWritesDelete(lhsValue),
-                .comAtprotoRepoApplyWritesDelete(rhsValue)
-            ):
-                return lhsValue == rhsValue
-            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
-            default:
-                return false
-            }
-        }
-
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let other = other as? ComAtprotoRepoApplyWritesWritesUnion else { return false }
-            return self == other
-        }
-
-        /// Property that indicates if this enum contains pending data that needs loading
-        public var hasPendingData: Bool {
-            switch self {
-            case let .comAtprotoRepoApplyWritesCreate(value):
-                if let loadable = value as? PendingDataLoadable {
-                    return loadable.hasPendingData
-                }
-                return false
-            case let .comAtprotoRepoApplyWritesUpdate(value):
-                if let loadable = value as? PendingDataLoadable {
-                    return loadable.hasPendingData
-                }
-                return false
-            case let .comAtprotoRepoApplyWritesDelete(value):
-                if let loadable = value as? PendingDataLoadable {
-                    return loadable.hasPendingData
-                }
-                return false
-            case .unexpected:
-                return false
-            }
-        }
-
-        /// Attempts to load any pending data in this enum or its children
-        public mutating func loadPendingData() async {
-            switch self {
-            case let .comAtprotoRepoApplyWritesCreate(value):
-                // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update the value if it was mutated (only if it's actually the expected type)
-                    if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.Create {
-                        self = .comAtprotoRepoApplyWritesCreate(updatedValue)
-                    }
-                }
-            case let .comAtprotoRepoApplyWritesUpdate(value):
-                // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update the value if it was mutated (only if it's actually the expected type)
-                    if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.Update {
-                        self = .comAtprotoRepoApplyWritesUpdate(updatedValue)
-                    }
-                }
-            case let .comAtprotoRepoApplyWritesDelete(value):
-                // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update the value if it was mutated (only if it's actually the expected type)
-                    if let updatedValue = loadable as? ComAtprotoRepoApplyWrites.Delete {
-                        self = .comAtprotoRepoApplyWritesDelete(updatedValue)
-                    }
-                }
-            case .unexpected:
-                // Nothing to load for unexpected values
-                break
-            }
+        case .unexpected:
+            // Nothing to load for unexpected values
+            break
         }
     }
 }
 
-public extension ATProtoClient.Com.Atproto.Repo {
-    /// Apply a batch transaction of repository creates, updates, and deletes. Requires auth, implemented by PDS.
-    func applyWrites(
-        input: ComAtprotoRepoApplyWrites.Input
 
+
+
+public enum OutputResultsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
+    case comAtprotoRepoApplyWritesCreateResult(ComAtprotoRepoApplyWrites.CreateResult)
+    case comAtprotoRepoApplyWritesUpdateResult(ComAtprotoRepoApplyWrites.UpdateResult)
+    case comAtprotoRepoApplyWritesDeleteResult(ComAtprotoRepoApplyWrites.DeleteResult)
+    case unexpected(ATProtocolValueContainer)
+    
+    public init(_ value: ComAtprotoRepoApplyWrites.CreateResult) {
+        self = .comAtprotoRepoApplyWritesCreateResult(value)
+    }
+    public init(_ value: ComAtprotoRepoApplyWrites.UpdateResult) {
+        self = .comAtprotoRepoApplyWritesUpdateResult(value)
+    }
+    public init(_ value: ComAtprotoRepoApplyWrites.DeleteResult) {
+        self = .comAtprotoRepoApplyWritesDeleteResult(value)
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let typeValue = try container.decode(String.self, forKey: .type)
+        
+
+        switch typeValue {
+        case "com.atproto.repo.applyWrites#createResult":
+            let value = try ComAtprotoRepoApplyWrites.CreateResult(from: decoder)
+            self = .comAtprotoRepoApplyWritesCreateResult(value)
+        case "com.atproto.repo.applyWrites#updateResult":
+            let value = try ComAtprotoRepoApplyWrites.UpdateResult(from: decoder)
+            self = .comAtprotoRepoApplyWritesUpdateResult(value)
+        case "com.atproto.repo.applyWrites#deleteResult":
+            let value = try ComAtprotoRepoApplyWrites.DeleteResult(from: decoder)
+            self = .comAtprotoRepoApplyWritesDeleteResult(value)
+        default:
+            let unknownValue = try ATProtocolValueContainer(from: decoder)
+            self = .unexpected(unknownValue)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+
+        switch self {
+        case .comAtprotoRepoApplyWritesCreateResult(let value):
+            try container.encode("com.atproto.repo.applyWrites#createResult", forKey: .type)
+            try value.encode(to: encoder)
+        case .comAtprotoRepoApplyWritesUpdateResult(let value):
+            try container.encode("com.atproto.repo.applyWrites#updateResult", forKey: .type)
+            try value.encode(to: encoder)
+        case .comAtprotoRepoApplyWritesDeleteResult(let value):
+            try container.encode("com.atproto.repo.applyWrites#deleteResult", forKey: .type)
+            try value.encode(to: encoder)
+        case .unexpected(let container):
+            try container.encode(to: encoder)
+        
+        }
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        switch self {
+        case .comAtprotoRepoApplyWritesCreateResult(let value):
+            hasher.combine("com.atproto.repo.applyWrites#createResult")
+            hasher.combine(value)
+        case .comAtprotoRepoApplyWritesUpdateResult(let value):
+            hasher.combine("com.atproto.repo.applyWrites#updateResult")
+            hasher.combine(value)
+        case .comAtprotoRepoApplyWritesDeleteResult(let value):
+            hasher.combine("com.atproto.repo.applyWrites#deleteResult")
+            hasher.combine(value)
+        case .unexpected(let container):
+            hasher.combine("unexpected")
+            hasher.combine(container)
+        
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case type = "$type"
+    }
+    
+    public static func == (lhs: OutputResultsUnion, rhs: OutputResultsUnion) -> Bool {
+        switch (lhs, rhs) {
+        case (.comAtprotoRepoApplyWritesCreateResult(let lhsValue),
+              .comAtprotoRepoApplyWritesCreateResult(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.comAtprotoRepoApplyWritesUpdateResult(let lhsValue),
+              .comAtprotoRepoApplyWritesUpdateResult(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.comAtprotoRepoApplyWritesDeleteResult(let lhsValue),
+              .comAtprotoRepoApplyWritesDeleteResult(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.unexpected(let lhsValue), .unexpected(let rhsValue)):
+            return lhsValue.isEqual(to: rhsValue)
+        
+        default:
+            return false
+        }
+    }
+    
+    public func isEqual(to other: any ATProtocolValue) -> Bool {
+        guard let other = other as? OutputResultsUnion else { return false }
+        return self == other
+    }
+    
+    /// Property that indicates if this enum contains pending data that needs loading
+    public var hasPendingData: Bool {
+        switch self {
+        
+        case .comAtprotoRepoApplyWritesCreateResult(let value):
+            return value.hasPendingData
+        case .comAtprotoRepoApplyWritesUpdateResult(let value):
+            return value.hasPendingData
+        case .comAtprotoRepoApplyWritesDeleteResult(let value):
+            return value.hasPendingData
+        case .unexpected:
+            return false
+        }
+    }
+    
+    /// Attempts to load any pending data in this enum or its children
+    public mutating func loadPendingData() async {
+        switch self {
+        
+        case .comAtprotoRepoApplyWritesCreateResult(var value):
+            // Since ATProtocolValue already includes PendingDataLoadable,
+            // we can directly call loadPendingData without conditional casting
+            await value.loadPendingData()
+            // Update the enum case with the potentially updated value
+            self = .comAtprotoRepoApplyWritesCreateResult(value)
+        case .comAtprotoRepoApplyWritesUpdateResult(var value):
+            // Since ATProtocolValue already includes PendingDataLoadable,
+            // we can directly call loadPendingData without conditional casting
+            await value.loadPendingData()
+            // Update the enum case with the potentially updated value
+            self = .comAtprotoRepoApplyWritesUpdateResult(value)
+        case .comAtprotoRepoApplyWritesDeleteResult(var value):
+            // Since ATProtocolValue already includes PendingDataLoadable,
+            // we can directly call loadPendingData without conditional casting
+            await value.loadPendingData()
+            // Update the enum case with the potentially updated value
+            self = .comAtprotoRepoApplyWritesDeleteResult(value)
+        case .unexpected:
+            // Nothing to load for unexpected values
+            break
+        }
+    }
+}
+
+
+
+
+public enum ComAtprotoRepoApplyWritesWritesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
+    case comAtprotoRepoApplyWritesCreate(ComAtprotoRepoApplyWrites.Create)
+    case comAtprotoRepoApplyWritesUpdate(ComAtprotoRepoApplyWrites.Update)
+    case comAtprotoRepoApplyWritesDelete(ComAtprotoRepoApplyWrites.Delete)
+    case unexpected(ATProtocolValueContainer)
+    
+    public init(_ value: ComAtprotoRepoApplyWrites.Create) {
+        self = .comAtprotoRepoApplyWritesCreate(value)
+    }
+    public init(_ value: ComAtprotoRepoApplyWrites.Update) {
+        self = .comAtprotoRepoApplyWritesUpdate(value)
+    }
+    public init(_ value: ComAtprotoRepoApplyWrites.Delete) {
+        self = .comAtprotoRepoApplyWritesDelete(value)
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let typeValue = try container.decode(String.self, forKey: .type)
+        
+
+        switch typeValue {
+        case "com.atproto.repo.applyWrites#create":
+            let value = try ComAtprotoRepoApplyWrites.Create(from: decoder)
+            self = .comAtprotoRepoApplyWritesCreate(value)
+        case "com.atproto.repo.applyWrites#update":
+            let value = try ComAtprotoRepoApplyWrites.Update(from: decoder)
+            self = .comAtprotoRepoApplyWritesUpdate(value)
+        case "com.atproto.repo.applyWrites#delete":
+            let value = try ComAtprotoRepoApplyWrites.Delete(from: decoder)
+            self = .comAtprotoRepoApplyWritesDelete(value)
+        default:
+            let unknownValue = try ATProtocolValueContainer(from: decoder)
+            self = .unexpected(unknownValue)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+
+        switch self {
+        case .comAtprotoRepoApplyWritesCreate(let value):
+            try container.encode("com.atproto.repo.applyWrites#create", forKey: .type)
+            try value.encode(to: encoder)
+        case .comAtprotoRepoApplyWritesUpdate(let value):
+            try container.encode("com.atproto.repo.applyWrites#update", forKey: .type)
+            try value.encode(to: encoder)
+        case .comAtprotoRepoApplyWritesDelete(let value):
+            try container.encode("com.atproto.repo.applyWrites#delete", forKey: .type)
+            try value.encode(to: encoder)
+        case .unexpected(let container):
+            try container.encode(to: encoder)
+        
+        }
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        switch self {
+        case .comAtprotoRepoApplyWritesCreate(let value):
+            hasher.combine("com.atproto.repo.applyWrites#create")
+            hasher.combine(value)
+        case .comAtprotoRepoApplyWritesUpdate(let value):
+            hasher.combine("com.atproto.repo.applyWrites#update")
+            hasher.combine(value)
+        case .comAtprotoRepoApplyWritesDelete(let value):
+            hasher.combine("com.atproto.repo.applyWrites#delete")
+            hasher.combine(value)
+        case .unexpected(let container):
+            hasher.combine("unexpected")
+            hasher.combine(container)
+        
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case type = "$type"
+    }
+    
+    public static func == (lhs: ComAtprotoRepoApplyWritesWritesUnion, rhs: ComAtprotoRepoApplyWritesWritesUnion) -> Bool {
+        switch (lhs, rhs) {
+        case (.comAtprotoRepoApplyWritesCreate(let lhsValue),
+              .comAtprotoRepoApplyWritesCreate(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.comAtprotoRepoApplyWritesUpdate(let lhsValue),
+              .comAtprotoRepoApplyWritesUpdate(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.comAtprotoRepoApplyWritesDelete(let lhsValue),
+              .comAtprotoRepoApplyWritesDelete(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.unexpected(let lhsValue), .unexpected(let rhsValue)):
+            return lhsValue.isEqual(to: rhsValue)
+        
+        default:
+            return false
+        }
+    }
+    
+    public func isEqual(to other: any ATProtocolValue) -> Bool {
+        guard let other = other as? ComAtprotoRepoApplyWritesWritesUnion else { return false }
+        return self == other
+    }
+    
+    /// Property that indicates if this enum contains pending data that needs loading
+    public var hasPendingData: Bool {
+        switch self {
+        
+        case .comAtprotoRepoApplyWritesCreate(let value):
+            return value.hasPendingData
+        case .comAtprotoRepoApplyWritesUpdate(let value):
+            return value.hasPendingData
+        case .comAtprotoRepoApplyWritesDelete(let value):
+            return value.hasPendingData
+        case .unexpected:
+            return false
+        }
+    }
+    
+    /// Attempts to load any pending data in this enum or its children
+    public mutating func loadPendingData() async {
+        switch self {
+        
+        case .comAtprotoRepoApplyWritesCreate(var value):
+            // Since ATProtocolValue already includes PendingDataLoadable,
+            // we can directly call loadPendingData without conditional casting
+            await value.loadPendingData()
+            // Update the enum case with the potentially updated value
+            self = .comAtprotoRepoApplyWritesCreate(value)
+        case .comAtprotoRepoApplyWritesUpdate(var value):
+            // Since ATProtocolValue already includes PendingDataLoadable,
+            // we can directly call loadPendingData without conditional casting
+            await value.loadPendingData()
+            // Update the enum case with the potentially updated value
+            self = .comAtprotoRepoApplyWritesUpdate(value)
+        case .comAtprotoRepoApplyWritesDelete(var value):
+            // Since ATProtocolValue already includes PendingDataLoadable,
+            // we can directly call loadPendingData without conditional casting
+            await value.loadPendingData()
+            // Update the enum case with the potentially updated value
+            self = .comAtprotoRepoApplyWritesDelete(value)
+        case .unexpected:
+            // Nothing to load for unexpected values
+            break
+        }
+    }
+}
+
+
+}
+
+extension ATProtoClient.Com.Atproto.Repo {
+    /// Apply a batch transaction of repository creates, updates, and deletes. Requires auth, implemented by PDS.
+    public func applyWrites(
+        
+        input: ComAtprotoRepoApplyWrites.Input
+        
     ) async throws -> (responseCode: Int, data: ComAtprotoRepoApplyWrites.Output?) {
         let endpoint = "com.atproto.repo.applyWrites"
-
+        
         var headers: [String: String] = [:]
-
+        
         headers["Content-Type"] = "application/json"
-
+        
+        
+        
         headers["Accept"] = "application/json"
-
+        
+        
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkManager.createURLRequest(
             endpoint: endpoint,
             method: "POST",
-            headers: headers,
+            headers: headers, 
             body: requestData,
             queryItems: nil
         )
-
+        
+        
         let (responseData, response) = try await networkManager.performRequest(urlRequest)
         let responseCode = response.statusCode
 
@@ -1360,16 +1181,20 @@ public extension ATProtoClient.Com.Atproto.Repo {
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
-
+        
         if !contentType.lowercased().contains("application/json") {
             throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
         }
 
         // Data decoding and validation
-
+        
         let decoder = JSONDecoder()
         let decodedData = try? decoder.decode(ComAtprotoRepoApplyWrites.Output.self, from: responseData)
-
+        
+        
         return (responseCode, decodedData)
+        
     }
+    
 }
+                           

@@ -1,29 +1,39 @@
 import Foundation
 
+
+
 // lexicon: 1, id: app.bsky.actor.getProfile
 
-public enum AppBskyActorGetProfile {
-    public static let typeIdentifier = "app.bsky.actor.getProfile"
-    public struct Parameters: Parametrizable {
-        public let actor: String
 
+public struct AppBskyActorGetProfile { 
+
+    public static let typeIdentifier = "app.bsky.actor.getProfile"    
+public struct Parameters: Parametrizable {
+        public let actor: String
+        
         public init(
             actor: String
-        ) {
+            ) {
             self.actor = actor
+            
         }
     }
-
     public typealias Output = AppBskyActorDefs.ProfileViewDetailed
+    
+
+
+
 }
 
-public extension ATProtoClient.App.Bsky.Actor {
+
+extension ATProtoClient.App.Bsky.Actor {
     /// Get detailed profile view of an actor. Does not require auth, but contains relevant metadata with auth.
-    func getProfile(input: AppBskyActorGetProfile.Parameters) async throws -> (responseCode: Int, data: AppBskyActorGetProfile.Output?) {
+    public func getProfile(input: AppBskyActorGetProfile.Parameters) async throws -> (responseCode: Int, data: AppBskyActorGetProfile.Output?) {
         let endpoint = "app.bsky.actor.getProfile"
-
+        
+        
         let queryItems = input.asQueryItems()
-
+        
         let urlRequest = try await networkManager.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -31,7 +41,7 @@ public extension ATProtoClient.App.Bsky.Actor {
             body: nil,
             queryItems: queryItems
         )
-
+        
         let (responseData, response) = try await networkManager.performRequest(urlRequest)
         let responseCode = response.statusCode
 
@@ -39,16 +49,17 @@ public extension ATProtoClient.App.Bsky.Actor {
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
-
+        
         if !contentType.lowercased().contains("application/json") {
             throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
         }
 
         // Data decoding and validation
-
+        
         let decoder = JSONDecoder()
         let decodedData = try? decoder.decode(AppBskyActorGetProfile.Output.self, from: responseData)
-
+        
+        
         return (responseCode, decodedData)
     }
-}
+}                           

@@ -1,97 +1,40 @@
 import Foundation
 
+
+
 // lexicon: 1, id: app.bsky.embed.recordWithMedia
 
-public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
+
+public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue { 
+
     public static let typeIdentifier = "app.bsky.embed.recordWithMedia"
-    public let record: AppBskyEmbedRecord
-    public let media: AppBskyEmbedRecordWithMediaMediaUnion
+        public let record: AppBskyEmbedRecord
+        public let media: AppBskyEmbedRecordWithMediaMediaUnion
 
-    public init(record: AppBskyEmbedRecord, media: AppBskyEmbedRecordWithMediaMediaUnion) {
-        self.record = record
-        self.media = media
-    }
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-
-        record = try container.decode(AppBskyEmbedRecord.self, forKey: .record)
-
-        media = try container.decode(AppBskyEmbedRecordWithMediaMediaUnion.self, forKey: .media)
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-
-        try container.encode(record, forKey: .record)
-
-        try container.encode(media, forKey: .media)
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(record)
-        hasher.combine(media)
-    }
-
-    public func isEqual(to other: any ATProtocolValue) -> Bool {
-        guard let other = other as? Self else { return false }
-        if record != other.record {
-            return false
-        }
-        if media != other.media {
-            return false
-        }
-        return true
-    }
-
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case record
-        case media
-    }
-
-    public struct View: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.embed.recordWithMedia#view"
-        public let record: AppBskyEmbedRecord.View
-        public let media: ViewMediaUnion
-
-        // Standard initializer
-        public init(
-            record: AppBskyEmbedRecord.View, media: ViewMediaUnion
-        ) {
+        public init(record: AppBskyEmbedRecord, media: AppBskyEmbedRecordWithMediaMediaUnion) {
             self.record = record
             self.media = media
+            
         }
 
-        // Codable initializer
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                record = try container.decode(AppBskyEmbedRecord.View.self, forKey: .record)
-
-            } catch {
-                LogManager.logError("Decoding error for property 'record': \(error)")
-                throw error
-            }
-            do {
-                media = try container.decode(ViewMediaUnion.self, forKey: .media)
-
-            } catch {
-                LogManager.logError("Decoding error for property 'media': \(error)")
-                throw error
-            }
+            
+            self.record = try container.decode(AppBskyEmbedRecord.self, forKey: .record)
+            
+            
+            self.media = try container.decode(AppBskyEmbedRecordWithMediaMediaUnion.self, forKey: .media)
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
             try container.encode(record, forKey: .record)
-
+            
+            
             try container.encode(media, forKey: .media)
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -101,16 +44,94 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-
-            if record != other.record {
+            if self.record != other.record {
                 return false
             }
-
-            if media != other.media {
+            if self.media != other.media {
                 return false
             }
-
             return true
+        }
+ 
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+
+
+        private enum CodingKeys: String, CodingKey {
+            case record
+            case media
+        }
+        
+public struct View: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.embed.recordWithMedia#view"
+            public let record: AppBskyEmbedRecord.View
+            public let media: ViewMediaUnion
+
+        // Standard initializer
+        public init(
+            record: AppBskyEmbedRecord.View, media: ViewMediaUnion
+        ) {
+            
+            self.record = record
+            self.media = media
+        }
+
+        // Codable initializer
+        public init(from decoder: Decoder) throws {
+            
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                
+                self.record = try container.decode(AppBskyEmbedRecord.View.self, forKey: .record)
+                
+            } catch {
+                LogManager.logError("Decoding error for property 'record': \(error)")
+                throw error
+            }
+            do {
+                
+                self.media = try container.decode(ViewMediaUnion.self, forKey: .media)
+                
+            } catch {
+                LogManager.logError("Decoding error for property 'media': \(error)")
+                throw error
+            }
+            
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            
+            try container.encode(record, forKey: .record)
+            
+            
+            try container.encode(media, forKey: .media)
+            
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(record)
+            hasher.combine(media)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
+            guard let other = other as? Self else { return false }
+            
+            if self.record != other.record {
+                return false
+            }
+            
+            
+            if self.media != other.media {
+                return false
+            }
+            
+            return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -122,375 +143,309 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
             case record
             case media
         }
-
-        // MARK: - PendingDataLoadable
-
-        /// Check if any properties contain pending data that needs loading
-        public var hasPendingData: Bool {
-            var hasPending = false
-
-            if !hasPending, let loadable = record as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            if !hasPending, let loadable = media as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            return hasPending
-        }
-
-        /// Load any pending data in properties
-        public mutating func loadPendingData() async {
-            if let loadable = record as? PendingDataLoadable, loadable.hasPendingData {
-                var mutableValue = loadable
-                await mutableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = mutableValue as? AppBskyEmbedRecord.View {
-                    record = updatedValue
-                }
-            }
-
-            if let loadable = media as? PendingDataLoadable, loadable.hasPendingData {
-                var mutableValue = loadable
-                await mutableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = mutableValue as? ViewMediaUnion {
-                    media = updatedValue
-                }
-            }
-        }
     }
 
-    public enum ViewMediaUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
-        case appBskyEmbedImagesView(AppBskyEmbedImages.View)
-        case appBskyEmbedVideoView(AppBskyEmbedVideo.View)
-        case appBskyEmbedExternalView(AppBskyEmbedExternal.View)
-        case unexpected(ATProtocolValueContainer)
 
-        public init(_ value: AppBskyEmbedImages.View) {
+
+
+
+public enum ViewMediaUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
+    case appBskyEmbedImagesView(AppBskyEmbedImages.View)
+    case appBskyEmbedVideoView(AppBskyEmbedVideo.View)
+    case appBskyEmbedExternalView(AppBskyEmbedExternal.View)
+    case unexpected(ATProtocolValueContainer)
+    
+    public init(_ value: AppBskyEmbedImages.View) {
+        self = .appBskyEmbedImagesView(value)
+    }
+    public init(_ value: AppBskyEmbedVideo.View) {
+        self = .appBskyEmbedVideoView(value)
+    }
+    public init(_ value: AppBskyEmbedExternal.View) {
+        self = .appBskyEmbedExternalView(value)
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let typeValue = try container.decode(String.self, forKey: .type)
+        
+
+        switch typeValue {
+        case "app.bsky.embed.images#view":
+            let value = try AppBskyEmbedImages.View(from: decoder)
             self = .appBskyEmbedImagesView(value)
-        }
-
-        public init(_ value: AppBskyEmbedVideo.View) {
+        case "app.bsky.embed.video#view":
+            let value = try AppBskyEmbedVideo.View(from: decoder)
             self = .appBskyEmbedVideoView(value)
-        }
-
-        public init(_ value: AppBskyEmbedExternal.View) {
+        case "app.bsky.embed.external#view":
+            let value = try AppBskyEmbedExternal.View(from: decoder)
             self = .appBskyEmbedExternalView(value)
-        }
-
-        public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
-
-            switch typeValue {
-            case "app.bsky.embed.images#view":
-                let value = try AppBskyEmbedImages.View(from: decoder)
-                self = .appBskyEmbedImagesView(value)
-            case "app.bsky.embed.video#view":
-                let value = try AppBskyEmbedVideo.View(from: decoder)
-                self = .appBskyEmbedVideoView(value)
-            case "app.bsky.embed.external#view":
-                let value = try AppBskyEmbedExternal.View(from: decoder)
-                self = .appBskyEmbedExternalView(value)
-            default:
-                let unknownValue = try ATProtocolValueContainer(from: decoder)
-                self = .unexpected(unknownValue)
-            }
-        }
-
-        public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-
-            switch self {
-            case let .appBskyEmbedImagesView(value):
-                try container.encode("app.bsky.embed.images#view", forKey: .type)
-                try value.encode(to: encoder)
-            case let .appBskyEmbedVideoView(value):
-                try container.encode("app.bsky.embed.video#view", forKey: .type)
-                try value.encode(to: encoder)
-            case let .appBskyEmbedExternalView(value):
-                try container.encode("app.bsky.embed.external#view", forKey: .type)
-                try value.encode(to: encoder)
-            case let .unexpected(container):
-                try container.encode(to: encoder)
-            }
-        }
-
-        public func hash(into hasher: inout Hasher) {
-            switch self {
-            case let .appBskyEmbedImagesView(value):
-                hasher.combine("app.bsky.embed.images#view")
-                hasher.combine(value)
-            case let .appBskyEmbedVideoView(value):
-                hasher.combine("app.bsky.embed.video#view")
-                hasher.combine(value)
-            case let .appBskyEmbedExternalView(value):
-                hasher.combine("app.bsky.embed.external#view")
-                hasher.combine(value)
-            case let .unexpected(container):
-                hasher.combine("unexpected")
-                hasher.combine(container)
-            }
-        }
-
-        private enum CodingKeys: String, CodingKey {
-            case type = "$type"
-        }
-
-        public static func == (lhs: ViewMediaUnion, rhs: ViewMediaUnion) -> Bool {
-            switch (lhs, rhs) {
-            case let (
-                .appBskyEmbedImagesView(lhsValue),
-                .appBskyEmbedImagesView(rhsValue)
-            ):
-                return lhsValue == rhsValue
-            case let (
-                .appBskyEmbedVideoView(lhsValue),
-                .appBskyEmbedVideoView(rhsValue)
-            ):
-                return lhsValue == rhsValue
-            case let (
-                .appBskyEmbedExternalView(lhsValue),
-                .appBskyEmbedExternalView(rhsValue)
-            ):
-                return lhsValue == rhsValue
-            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
-            default:
-                return false
-            }
-        }
-
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let other = other as? ViewMediaUnion else { return false }
-            return self == other
-        }
-
-        /// Property that indicates if this enum contains pending data that needs loading
-        public var hasPendingData: Bool {
-            switch self {
-            case let .appBskyEmbedImagesView(value):
-                if let loadable = value as? PendingDataLoadable {
-                    return loadable.hasPendingData
-                }
-                return false
-            case let .appBskyEmbedVideoView(value):
-                if let loadable = value as? PendingDataLoadable {
-                    return loadable.hasPendingData
-                }
-                return false
-            case let .appBskyEmbedExternalView(value):
-                if let loadable = value as? PendingDataLoadable {
-                    return loadable.hasPendingData
-                }
-                return false
-            case .unexpected:
-                return false
-            }
-        }
-
-        /// Attempts to load any pending data in this enum or its children
-        public mutating func loadPendingData() async {
-            switch self {
-            case let .appBskyEmbedImagesView(value):
-                // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update the value if it was mutated (only if it's actually the expected type)
-                    if let updatedValue = loadable as? AppBskyEmbedImages.View {
-                        self = .appBskyEmbedImagesView(updatedValue)
-                    }
-                }
-            case let .appBskyEmbedVideoView(value):
-                // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update the value if it was mutated (only if it's actually the expected type)
-                    if let updatedValue = loadable as? AppBskyEmbedVideo.View {
-                        self = .appBskyEmbedVideoView(updatedValue)
-                    }
-                }
-            case let .appBskyEmbedExternalView(value):
-                // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update the value if it was mutated (only if it's actually the expected type)
-                    if let updatedValue = loadable as? AppBskyEmbedExternal.View {
-                        self = .appBskyEmbedExternalView(updatedValue)
-                    }
-                }
-            case .unexpected:
-                // Nothing to load for unexpected values
-                break
-            }
+        default:
+            let unknownValue = try ATProtocolValueContainer(from: decoder)
+            self = .unexpected(unknownValue)
         }
     }
 
-    public enum AppBskyEmbedRecordWithMediaMediaUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
-        case appBskyEmbedImages(AppBskyEmbedImages)
-        case appBskyEmbedVideo(AppBskyEmbedVideo)
-        case appBskyEmbedExternal(AppBskyEmbedExternal)
-        case unexpected(ATProtocolValueContainer)
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
 
-        public init(_ value: AppBskyEmbedImages) {
-            self = .appBskyEmbedImages(value)
+        switch self {
+        case .appBskyEmbedImagesView(let value):
+            try container.encode("app.bsky.embed.images#view", forKey: .type)
+            try value.encode(to: encoder)
+        case .appBskyEmbedVideoView(let value):
+            try container.encode("app.bsky.embed.video#view", forKey: .type)
+            try value.encode(to: encoder)
+        case .appBskyEmbedExternalView(let value):
+            try container.encode("app.bsky.embed.external#view", forKey: .type)
+            try value.encode(to: encoder)
+        case .unexpected(let container):
+            try container.encode(to: encoder)
+        
         }
+    }
 
-        public init(_ value: AppBskyEmbedVideo) {
-            self = .appBskyEmbedVideo(value)
+    public func hash(into hasher: inout Hasher) {
+        switch self {
+        case .appBskyEmbedImagesView(let value):
+            hasher.combine("app.bsky.embed.images#view")
+            hasher.combine(value)
+        case .appBskyEmbedVideoView(let value):
+            hasher.combine("app.bsky.embed.video#view")
+            hasher.combine(value)
+        case .appBskyEmbedExternalView(let value):
+            hasher.combine("app.bsky.embed.external#view")
+            hasher.combine(value)
+        case .unexpected(let container):
+            hasher.combine("unexpected")
+            hasher.combine(container)
+        
         }
+    }
 
-        public init(_ value: AppBskyEmbedExternal) {
-            self = .appBskyEmbedExternal(value)
+    private enum CodingKeys: String, CodingKey {
+        case type = "$type"
+    }
+    
+    public static func == (lhs: ViewMediaUnion, rhs: ViewMediaUnion) -> Bool {
+        switch (lhs, rhs) {
+        case (.appBskyEmbedImagesView(let lhsValue),
+              .appBskyEmbedImagesView(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.appBskyEmbedVideoView(let lhsValue),
+              .appBskyEmbedVideoView(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.appBskyEmbedExternalView(let lhsValue),
+              .appBskyEmbedExternalView(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.unexpected(let lhsValue), .unexpected(let rhsValue)):
+            return lhsValue.isEqual(to: rhsValue)
+        
+        default:
+            return false
         }
-
-        public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
-
-            switch typeValue {
-            case "app.bsky.embed.images":
-                let value = try AppBskyEmbedImages(from: decoder)
-                self = .appBskyEmbedImages(value)
-            case "app.bsky.embed.video":
-                let value = try AppBskyEmbedVideo(from: decoder)
-                self = .appBskyEmbedVideo(value)
-            case "app.bsky.embed.external":
-                let value = try AppBskyEmbedExternal(from: decoder)
-                self = .appBskyEmbedExternal(value)
-            default:
-                let unknownValue = try ATProtocolValueContainer(from: decoder)
-                self = .unexpected(unknownValue)
-            }
+    }
+    
+    public func isEqual(to other: any ATProtocolValue) -> Bool {
+        guard let other = other as? ViewMediaUnion else { return false }
+        return self == other
+    }
+    
+    /// Property that indicates if this enum contains pending data that needs loading
+    public var hasPendingData: Bool {
+        switch self {
+        
+        case .appBskyEmbedImagesView(let value):
+            return value.hasPendingData
+        case .appBskyEmbedVideoView(let value):
+            return value.hasPendingData
+        case .appBskyEmbedExternalView(let value):
+            return value.hasPendingData
+        case .unexpected:
+            return false
         }
-
-        public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-
-            switch self {
-            case let .appBskyEmbedImages(value):
-                try container.encode("app.bsky.embed.images", forKey: .type)
-                try value.encode(to: encoder)
-            case let .appBskyEmbedVideo(value):
-                try container.encode("app.bsky.embed.video", forKey: .type)
-                try value.encode(to: encoder)
-            case let .appBskyEmbedExternal(value):
-                try container.encode("app.bsky.embed.external", forKey: .type)
-                try value.encode(to: encoder)
-            case let .unexpected(container):
-                try container.encode(to: encoder)
-            }
-        }
-
-        public func hash(into hasher: inout Hasher) {
-            switch self {
-            case let .appBskyEmbedImages(value):
-                hasher.combine("app.bsky.embed.images")
-                hasher.combine(value)
-            case let .appBskyEmbedVideo(value):
-                hasher.combine("app.bsky.embed.video")
-                hasher.combine(value)
-            case let .appBskyEmbedExternal(value):
-                hasher.combine("app.bsky.embed.external")
-                hasher.combine(value)
-            case let .unexpected(container):
-                hasher.combine("unexpected")
-                hasher.combine(container)
-            }
-        }
-
-        private enum CodingKeys: String, CodingKey {
-            case type = "$type"
-        }
-
-        public static func == (lhs: AppBskyEmbedRecordWithMediaMediaUnion, rhs: AppBskyEmbedRecordWithMediaMediaUnion) -> Bool {
-            switch (lhs, rhs) {
-            case let (
-                .appBskyEmbedImages(lhsValue),
-                .appBskyEmbedImages(rhsValue)
-            ):
-                return lhsValue == rhsValue
-            case let (
-                .appBskyEmbedVideo(lhsValue),
-                .appBskyEmbedVideo(rhsValue)
-            ):
-                return lhsValue == rhsValue
-            case let (
-                .appBskyEmbedExternal(lhsValue),
-                .appBskyEmbedExternal(rhsValue)
-            ):
-                return lhsValue == rhsValue
-            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
-            default:
-                return false
-            }
-        }
-
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let other = other as? AppBskyEmbedRecordWithMediaMediaUnion else { return false }
-            return self == other
-        }
-
-        /// Property that indicates if this enum contains pending data that needs loading
-        public var hasPendingData: Bool {
-            switch self {
-            case let .appBskyEmbedImages(value):
-                if let loadable = value as? PendingDataLoadable {
-                    return loadable.hasPendingData
-                }
-                return false
-            case let .appBskyEmbedVideo(value):
-                if let loadable = value as? PendingDataLoadable {
-                    return loadable.hasPendingData
-                }
-                return false
-            case let .appBskyEmbedExternal(value):
-                if let loadable = value as? PendingDataLoadable {
-                    return loadable.hasPendingData
-                }
-                return false
-            case .unexpected:
-                return false
-            }
-        }
-
-        /// Attempts to load any pending data in this enum or its children
-        public mutating func loadPendingData() async {
-            switch self {
-            case let .appBskyEmbedImages(value):
-                // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update the value if it was mutated (only if it's actually the expected type)
-                    if let updatedValue = loadable as? AppBskyEmbedImages {
-                        self = .appBskyEmbedImages(updatedValue)
-                    }
-                }
-            case let .appBskyEmbedVideo(value):
-                // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update the value if it was mutated (only if it's actually the expected type)
-                    if let updatedValue = loadable as? AppBskyEmbedVideo {
-                        self = .appBskyEmbedVideo(updatedValue)
-                    }
-                }
-            case let .appBskyEmbedExternal(value):
-                // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update the value if it was mutated (only if it's actually the expected type)
-                    if let updatedValue = loadable as? AppBskyEmbedExternal {
-                        self = .appBskyEmbedExternal(updatedValue)
-                    }
-                }
-            case .unexpected:
-                // Nothing to load for unexpected values
-                break
-            }
+    }
+    
+    /// Attempts to load any pending data in this enum or its children
+    public mutating func loadPendingData() async {
+        switch self {
+        
+        case .appBskyEmbedImagesView(var value):
+            // Since ATProtocolValue already includes PendingDataLoadable,
+            // we can directly call loadPendingData without conditional casting
+            await value.loadPendingData()
+            // Update the enum case with the potentially updated value
+            self = .appBskyEmbedImagesView(value)
+        case .appBskyEmbedVideoView(var value):
+            // Since ATProtocolValue already includes PendingDataLoadable,
+            // we can directly call loadPendingData without conditional casting
+            await value.loadPendingData()
+            // Update the enum case with the potentially updated value
+            self = .appBskyEmbedVideoView(value)
+        case .appBskyEmbedExternalView(var value):
+            // Since ATProtocolValue already includes PendingDataLoadable,
+            // we can directly call loadPendingData without conditional casting
+            await value.loadPendingData()
+            // Update the enum case with the potentially updated value
+            self = .appBskyEmbedExternalView(value)
+        case .unexpected:
+            // Nothing to load for unexpected values
+            break
         }
     }
 }
+
+
+
+
+public enum AppBskyEmbedRecordWithMediaMediaUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
+    case appBskyEmbedImages(AppBskyEmbedImages)
+    case appBskyEmbedVideo(AppBskyEmbedVideo)
+    case appBskyEmbedExternal(AppBskyEmbedExternal)
+    case unexpected(ATProtocolValueContainer)
+    
+    public init(_ value: AppBskyEmbedImages) {
+        self = .appBskyEmbedImages(value)
+    }
+    public init(_ value: AppBskyEmbedVideo) {
+        self = .appBskyEmbedVideo(value)
+    }
+    public init(_ value: AppBskyEmbedExternal) {
+        self = .appBskyEmbedExternal(value)
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let typeValue = try container.decode(String.self, forKey: .type)
+        
+
+        switch typeValue {
+        case "app.bsky.embed.images":
+            let value = try AppBskyEmbedImages(from: decoder)
+            self = .appBskyEmbedImages(value)
+        case "app.bsky.embed.video":
+            let value = try AppBskyEmbedVideo(from: decoder)
+            self = .appBskyEmbedVideo(value)
+        case "app.bsky.embed.external":
+            let value = try AppBskyEmbedExternal(from: decoder)
+            self = .appBskyEmbedExternal(value)
+        default:
+            let unknownValue = try ATProtocolValueContainer(from: decoder)
+            self = .unexpected(unknownValue)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+
+        switch self {
+        case .appBskyEmbedImages(let value):
+            try container.encode("app.bsky.embed.images", forKey: .type)
+            try value.encode(to: encoder)
+        case .appBskyEmbedVideo(let value):
+            try container.encode("app.bsky.embed.video", forKey: .type)
+            try value.encode(to: encoder)
+        case .appBskyEmbedExternal(let value):
+            try container.encode("app.bsky.embed.external", forKey: .type)
+            try value.encode(to: encoder)
+        case .unexpected(let container):
+            try container.encode(to: encoder)
+        
+        }
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        switch self {
+        case .appBskyEmbedImages(let value):
+            hasher.combine("app.bsky.embed.images")
+            hasher.combine(value)
+        case .appBskyEmbedVideo(let value):
+            hasher.combine("app.bsky.embed.video")
+            hasher.combine(value)
+        case .appBskyEmbedExternal(let value):
+            hasher.combine("app.bsky.embed.external")
+            hasher.combine(value)
+        case .unexpected(let container):
+            hasher.combine("unexpected")
+            hasher.combine(container)
+        
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case type = "$type"
+    }
+    
+    public static func == (lhs: AppBskyEmbedRecordWithMediaMediaUnion, rhs: AppBskyEmbedRecordWithMediaMediaUnion) -> Bool {
+        switch (lhs, rhs) {
+        case (.appBskyEmbedImages(let lhsValue),
+              .appBskyEmbedImages(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.appBskyEmbedVideo(let lhsValue),
+              .appBskyEmbedVideo(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.appBskyEmbedExternal(let lhsValue),
+              .appBskyEmbedExternal(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.unexpected(let lhsValue), .unexpected(let rhsValue)):
+            return lhsValue.isEqual(to: rhsValue)
+        
+        default:
+            return false
+        }
+    }
+    
+    public func isEqual(to other: any ATProtocolValue) -> Bool {
+        guard let other = other as? AppBskyEmbedRecordWithMediaMediaUnion else { return false }
+        return self == other
+    }
+    
+    /// Property that indicates if this enum contains pending data that needs loading
+    public var hasPendingData: Bool {
+        switch self {
+        
+        case .appBskyEmbedImages(let value):
+            return value.hasPendingData
+        case .appBskyEmbedVideo(let value):
+            return value.hasPendingData
+        case .appBskyEmbedExternal(let value):
+            return value.hasPendingData
+        case .unexpected:
+            return false
+        }
+    }
+    
+    /// Attempts to load any pending data in this enum or its children
+    public mutating func loadPendingData() async {
+        switch self {
+        
+        case .appBskyEmbedImages(var value):
+            // Since ATProtocolValue already includes PendingDataLoadable,
+            // we can directly call loadPendingData without conditional casting
+            await value.loadPendingData()
+            // Update the enum case with the potentially updated value
+            self = .appBskyEmbedImages(value)
+        case .appBskyEmbedVideo(var value):
+            // Since ATProtocolValue already includes PendingDataLoadable,
+            // we can directly call loadPendingData without conditional casting
+            await value.loadPendingData()
+            // Update the enum case with the potentially updated value
+            self = .appBskyEmbedVideo(value)
+        case .appBskyEmbedExternal(var value):
+            // Since ATProtocolValue already includes PendingDataLoadable,
+            // we can directly call loadPendingData without conditional casting
+            await value.loadPendingData()
+            // Update the enum case with the potentially updated value
+            self = .appBskyEmbedExternal(value)
+        case .unexpected:
+            // Nothing to load for unexpected values
+            break
+        }
+    }
+}
+
+
+}
+
+
+                           

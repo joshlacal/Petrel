@@ -1,49 +1,60 @@
 import Foundation
 
+
+
 // lexicon: 1, id: app.bsky.embed.defs
 
-public enum AppBskyEmbedDefs {
-    public static let typeIdentifier = "app.bsky.embed.defs"
 
-    public struct AspectRatio: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.embed.defs#aspectRatio"
-        public let width: Int
-        public let height: Int
+public struct AppBskyEmbedDefs { 
+
+    public static let typeIdentifier = "app.bsky.embed.defs"
+        
+public struct AspectRatio: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.embed.defs#aspectRatio"
+            public let width: Int
+            public let height: Int
 
         // Standard initializer
         public init(
             width: Int, height: Int
         ) {
+            
             self.width = width
             self.height = height
         }
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                width = try container.decode(Int.self, forKey: .width)
-
+                
+                self.width = try container.decode(Int.self, forKey: .width)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'width': \(error)")
                 throw error
             }
             do {
-                height = try container.decode(Int.self, forKey: .height)
-
+                
+                self.height = try container.decode(Int.self, forKey: .height)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'height': \(error)")
                 throw error
             }
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
             try container.encode(width, forKey: .width)
-
+            
+            
             try container.encode(height, forKey: .height)
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -52,17 +63,20 @@ public enum AppBskyEmbedDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
             guard let other = other as? Self else { return false }
-
-            if width != other.width {
+            
+            if self.width != other.width {
                 return false
             }
-
-            if height != other.height {
+            
+            
+            if self.height != other.height {
                 return false
             }
-
+            
             return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -74,43 +88,11 @@ public enum AppBskyEmbedDefs {
             case width
             case height
         }
-
-        // MARK: - PendingDataLoadable
-
-        /// Check if any properties contain pending data that needs loading
-        public var hasPendingData: Bool {
-            var hasPending = false
-
-            if !hasPending, let loadable = width as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            if !hasPending, let loadable = height as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            return hasPending
-        }
-
-        /// Load any pending data in properties
-        public mutating func loadPendingData() async {
-            if let loadable = width as? PendingDataLoadable, loadable.hasPendingData {
-                var mutableValue = loadable
-                await mutableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = mutableValue as? Int {
-                    width = updatedValue
-                }
-            }
-
-            if let loadable = height as? PendingDataLoadable, loadable.hasPendingData {
-                var mutableValue = loadable
-                await mutableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = mutableValue as? Int {
-                    height = updatedValue
-                }
-            }
-        }
     }
+
+
+
 }
+
+
+                           

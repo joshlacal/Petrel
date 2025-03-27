@@ -43,10 +43,10 @@ public actor DecodingConfigurationManager {
 }
 
 /// Protocol for types that can defer loading of nested content
-public protocol PendingDataLoadable: Sendable {
-    var hasPendingData: Bool { get }
-    mutating func loadPendingData() async
-}
+//public protocol PendingDataLoadable: Sendable {
+//    var hasPendingData: Bool { get }
+//    mutating func loadPendingData() async
+//}
 
 /// Wrapper for deferred decoding of deeply nested data
 public struct PendingDecodeData: Codable, Sendable, Equatable {

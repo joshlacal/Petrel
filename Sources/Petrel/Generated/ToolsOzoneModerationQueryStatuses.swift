@@ -1,10 +1,14 @@
 import Foundation
 
+
+
 // lexicon: 1, id: tools.ozone.moderation.queryStatuses
 
-public enum ToolsOzoneModerationQueryStatuses {
-    public static let typeIdentifier = "tools.ozone.moderation.queryStatuses"
-    public struct Parameters: Parametrizable {
+
+public struct ToolsOzoneModerationQueryStatuses { 
+
+    public static let typeIdentifier = "tools.ozone.moderation.queryStatuses"    
+public struct Parameters: Parametrizable {
         public let queueCount: Int?
         public let queueIndex: Int?
         public let queueSeed: String?
@@ -39,43 +43,43 @@ public enum ToolsOzoneModerationQueryStatuses {
         public let minReportedRecordsCount: Int?
         public let minTakendownRecordsCount: Int?
         public let minPriorityScore: Int?
-
+        
         public init(
-            queueCount: Int? = nil,
-            queueIndex: Int? = nil,
-            queueSeed: String? = nil,
-            includeAllUserRecords: Bool? = nil,
-            subject: URI? = nil,
-            comment: String? = nil,
-            reportedAfter: ATProtocolDate? = nil,
-            reportedBefore: ATProtocolDate? = nil,
-            reviewedAfter: ATProtocolDate? = nil,
-            hostingDeletedAfter: ATProtocolDate? = nil,
-            hostingDeletedBefore: ATProtocolDate? = nil,
-            hostingUpdatedAfter: ATProtocolDate? = nil,
-            hostingUpdatedBefore: ATProtocolDate? = nil,
-            hostingStatuses: [String]? = nil,
-            reviewedBefore: ATProtocolDate? = nil,
-            includeMuted: Bool? = nil,
-            onlyMuted: Bool? = nil,
-            reviewState: String? = nil,
-            ignoreSubjects: [URI]? = nil,
-            lastReviewedBy: String? = nil,
-            sortField: String? = nil,
-            sortDirection: String? = nil,
-            takendown: Bool? = nil,
-            appealed: Bool? = nil,
-            limit: Int? = nil,
-            tags: [String]? = nil,
-            excludeTags: [String]? = nil,
-            cursor: String? = nil,
-            collections: [String]? = nil,
-            subjectType: String? = nil,
-            minAccountSuspendCount: Int? = nil,
-            minReportedRecordsCount: Int? = nil,
-            minTakendownRecordsCount: Int? = nil,
+            queueCount: Int? = nil, 
+            queueIndex: Int? = nil, 
+            queueSeed: String? = nil, 
+            includeAllUserRecords: Bool? = nil, 
+            subject: URI? = nil, 
+            comment: String? = nil, 
+            reportedAfter: ATProtocolDate? = nil, 
+            reportedBefore: ATProtocolDate? = nil, 
+            reviewedAfter: ATProtocolDate? = nil, 
+            hostingDeletedAfter: ATProtocolDate? = nil, 
+            hostingDeletedBefore: ATProtocolDate? = nil, 
+            hostingUpdatedAfter: ATProtocolDate? = nil, 
+            hostingUpdatedBefore: ATProtocolDate? = nil, 
+            hostingStatuses: [String]? = nil, 
+            reviewedBefore: ATProtocolDate? = nil, 
+            includeMuted: Bool? = nil, 
+            onlyMuted: Bool? = nil, 
+            reviewState: String? = nil, 
+            ignoreSubjects: [URI]? = nil, 
+            lastReviewedBy: String? = nil, 
+            sortField: String? = nil, 
+            sortDirection: String? = nil, 
+            takendown: Bool? = nil, 
+            appealed: Bool? = nil, 
+            limit: Int? = nil, 
+            tags: [String]? = nil, 
+            excludeTags: [String]? = nil, 
+            cursor: String? = nil, 
+            collections: [String]? = nil, 
+            subjectType: String? = nil, 
+            minAccountSuspendCount: Int? = nil, 
+            minReportedRecordsCount: Int? = nil, 
+            minTakendownRecordsCount: Int? = nil, 
             minPriorityScore: Int? = nil
-        ) {
+            ) {
             self.queueCount = queueCount
             self.queueIndex = queueIndex
             self.queueSeed = queueSeed
@@ -110,58 +114,86 @@ public enum ToolsOzoneModerationQueryStatuses {
             self.minReportedRecordsCount = minReportedRecordsCount
             self.minTakendownRecordsCount = minTakendownRecordsCount
             self.minPriorityScore = minPriorityScore
+            
         }
     }
-
-    public struct Output: ATProtocolCodable {
+    
+public struct Output: ATProtocolCodable {
+        
+        
         public let cursor: String?
-
+        
         public let subjectStatuses: [ToolsOzoneModerationDefs.SubjectStatusView]
-
+        
+        
+        
         // Standard public initializer
         public init(
+            
             cursor: String? = nil,
-
+            
             subjectStatuses: [ToolsOzoneModerationDefs.SubjectStatusView]
-
+            
+            
         ) {
+            
             self.cursor = cursor
-
+            
             self.subjectStatuses = subjectStatuses
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
-            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
-
-            subjectStatuses = try container.decode([ToolsOzoneModerationDefs.SubjectStatusView].self, forKey: .subjectStatuses)
+            
+            
+            self.cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+            
+            
+            self.subjectStatuses = try container.decode([ToolsOzoneModerationDefs.SubjectStatusView].self, forKey: .subjectStatuses)
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
+            
             if let value = cursor {
+                
                 try container.encode(value, forKey: .cursor)
+                
             }
-
+            
+            
             try container.encode(subjectStatuses, forKey: .subjectStatuses)
+            
+            
         }
-
+        
         private enum CodingKeys: String, CodingKey {
+            
             case cursor
             case subjectStatuses
+            
         }
     }
+
+
+
+
 }
 
-public extension ATProtoClient.Tools.Ozone.Moderation {
+
+extension ATProtoClient.Tools.Ozone.Moderation {
     /// View moderation statuses of subjects (record or repo).
-    func queryStatuses(input: ToolsOzoneModerationQueryStatuses.Parameters) async throws -> (responseCode: Int, data: ToolsOzoneModerationQueryStatuses.Output?) {
+    public func queryStatuses(input: ToolsOzoneModerationQueryStatuses.Parameters) async throws -> (responseCode: Int, data: ToolsOzoneModerationQueryStatuses.Output?) {
         let endpoint = "tools.ozone.moderation.queryStatuses"
-
+        
+        
         let queryItems = input.asQueryItems()
-
+        
         let urlRequest = try await networkManager.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -169,7 +201,7 @@ public extension ATProtoClient.Tools.Ozone.Moderation {
             body: nil,
             queryItems: queryItems
         )
-
+        
         let (responseData, response) = try await networkManager.performRequest(urlRequest)
         let responseCode = response.statusCode
 
@@ -177,16 +209,17 @@ public extension ATProtoClient.Tools.Ozone.Moderation {
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
-
+        
         if !contentType.lowercased().contains("application/json") {
             throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
         }
 
         // Data decoding and validation
-
+        
         let decoder = JSONDecoder()
         let decodedData = try? decoder.decode(ToolsOzoneModerationQueryStatuses.Output.self, from: responseData)
-
+        
+        
         return (responseCode, decodedData)
     }
-}
+}                           

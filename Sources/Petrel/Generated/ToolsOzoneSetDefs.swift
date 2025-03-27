@@ -1,51 +1,64 @@
 import Foundation
 
+
+
 // lexicon: 1, id: tools.ozone.set.defs
 
-public enum ToolsOzoneSetDefs {
-    public static let typeIdentifier = "tools.ozone.set.defs"
 
-    public struct Set: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "tools.ozone.set.defs#set"
-        public let name: String
-        public let description: String?
+public struct ToolsOzoneSetDefs { 
+
+    public static let typeIdentifier = "tools.ozone.set.defs"
+        
+public struct Set: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "tools.ozone.set.defs#set"
+            public let name: String
+            public let description: String?
 
         // Standard initializer
         public init(
             name: String, description: String?
         ) {
+            
             self.name = name
             self.description = description
         }
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                name = try container.decode(String.self, forKey: .name)
-
+                
+                self.name = try container.decode(String.self, forKey: .name)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'name': \(error)")
                 throw error
             }
             do {
-                description = try container.decodeIfPresent(String.self, forKey: .description)
-
+                
+                self.description = try container.decodeIfPresent(String.self, forKey: .description)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'description': \(error)")
                 throw error
             }
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
             try container.encode(name, forKey: .name)
-
+            
+            
             if let value = description {
+                
                 try container.encode(value, forKey: .description)
+                
             }
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -58,17 +71,20 @@ public enum ToolsOzoneSetDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
             guard let other = other as? Self else { return false }
-
-            if name != other.name {
+            
+            if self.name != other.name {
                 return false
             }
-
+            
+            
             if description != other.description {
                 return false
             }
-
+            
             return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -80,57 +96,21 @@ public enum ToolsOzoneSetDefs {
             case name
             case description
         }
-
-        // MARK: - PendingDataLoadable
-
-        /// Check if any properties contain pending data that needs loading
-        public var hasPendingData: Bool {
-            var hasPending = false
-
-            if !hasPending, let loadable = name as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            if !hasPending, let value = description, let loadable = value as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            return hasPending
-        }
-
-        /// Load any pending data in properties
-        public mutating func loadPendingData() async {
-            if let loadable = name as? PendingDataLoadable, loadable.hasPendingData {
-                var mutableValue = loadable
-                await mutableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = mutableValue as? String {
-                    name = updatedValue
-                }
-            }
-
-            if let value = description, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                await loadableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = loadableValue as? String {
-                    description = updatedValue
-                }
-            }
-        }
     }
-
-    public struct SetView: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "tools.ozone.set.defs#setView"
-        public let name: String
-        public let description: String?
-        public let setSize: Int
-        public let createdAt: ATProtocolDate
-        public let updatedAt: ATProtocolDate
+        
+public struct SetView: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "tools.ozone.set.defs#setView"
+            public let name: String
+            public let description: String?
+            public let setSize: Int
+            public let createdAt: ATProtocolDate
+            public let updatedAt: ATProtocolDate
 
         // Standard initializer
         public init(
             name: String, description: String?, setSize: Int, createdAt: ATProtocolDate, updatedAt: ATProtocolDate
         ) {
+            
             self.name = name
             self.description = description
             self.setSize = setSize
@@ -140,59 +120,73 @@ public enum ToolsOzoneSetDefs {
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                name = try container.decode(String.self, forKey: .name)
-
+                
+                self.name = try container.decode(String.self, forKey: .name)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'name': \(error)")
                 throw error
             }
             do {
-                description = try container.decodeIfPresent(String.self, forKey: .description)
-
+                
+                self.description = try container.decodeIfPresent(String.self, forKey: .description)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'description': \(error)")
                 throw error
             }
             do {
-                setSize = try container.decode(Int.self, forKey: .setSize)
-
+                
+                self.setSize = try container.decode(Int.self, forKey: .setSize)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'setSize': \(error)")
                 throw error
             }
             do {
-                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
-
+                
+                self.createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'createdAt': \(error)")
                 throw error
             }
             do {
-                updatedAt = try container.decode(ATProtocolDate.self, forKey: .updatedAt)
-
+                
+                self.updatedAt = try container.decode(ATProtocolDate.self, forKey: .updatedAt)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'updatedAt': \(error)")
                 throw error
             }
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
             try container.encode(name, forKey: .name)
-
+            
+            
             if let value = description {
+                
                 try container.encode(value, forKey: .description)
+                
             }
-
+            
+            
             try container.encode(setSize, forKey: .setSize)
-
+            
+            
             try container.encode(createdAt, forKey: .createdAt)
-
+            
+            
             try container.encode(updatedAt, forKey: .updatedAt)
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -208,29 +202,35 @@ public enum ToolsOzoneSetDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
             guard let other = other as? Self else { return false }
-
-            if name != other.name {
+            
+            if self.name != other.name {
                 return false
             }
-
+            
+            
             if description != other.description {
                 return false
             }
-
-            if setSize != other.setSize {
+            
+            
+            if self.setSize != other.setSize {
                 return false
             }
-
-            if createdAt != other.createdAt {
+            
+            
+            if self.createdAt != other.createdAt {
                 return false
             }
-
-            if updatedAt != other.updatedAt {
+            
+            
+            if self.updatedAt != other.updatedAt {
                 return false
             }
-
+            
             return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -245,81 +245,11 @@ public enum ToolsOzoneSetDefs {
             case createdAt
             case updatedAt
         }
-
-        // MARK: - PendingDataLoadable
-
-        /// Check if any properties contain pending data that needs loading
-        public var hasPendingData: Bool {
-            var hasPending = false
-
-            if !hasPending, let loadable = name as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            if !hasPending, let value = description, let loadable = value as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            if !hasPending, let loadable = setSize as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            if !hasPending, let loadable = createdAt as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            if !hasPending, let loadable = updatedAt as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            return hasPending
-        }
-
-        /// Load any pending data in properties
-        public mutating func loadPendingData() async {
-            if let loadable = name as? PendingDataLoadable, loadable.hasPendingData {
-                var mutableValue = loadable
-                await mutableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = mutableValue as? String {
-                    name = updatedValue
-                }
-            }
-
-            if let value = description, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                await loadableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = loadableValue as? String {
-                    description = updatedValue
-                }
-            }
-
-            if let loadable = setSize as? PendingDataLoadable, loadable.hasPendingData {
-                var mutableValue = loadable
-                await mutableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = mutableValue as? Int {
-                    setSize = updatedValue
-                }
-            }
-
-            if let loadable = createdAt as? PendingDataLoadable, loadable.hasPendingData {
-                var mutableValue = loadable
-                await mutableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = mutableValue as? ATProtocolDate {
-                    createdAt = updatedValue
-                }
-            }
-
-            if let loadable = updatedAt as? PendingDataLoadable, loadable.hasPendingData {
-                var mutableValue = loadable
-                await mutableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = mutableValue as? ATProtocolDate {
-                    updatedAt = updatedValue
-                }
-            }
-        }
     }
+
+
+
 }
+
+
+                           

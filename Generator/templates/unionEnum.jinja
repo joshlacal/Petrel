@@ -50,7 +50,7 @@ public struct {{ enum_struct_name }}: Codable, ATProtocolCodable, ATProtocolValu
 }
 {%- endif %}
 
-public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
+public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
     {%- for variant in variants %}
     case {{ variant | convertRefToSwift | lowerCamelCase }}({{ variant | convertRefToSwift }})
     {%- endfor %}
@@ -182,10 +182,7 @@ public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProt
         {% endif %}
         {%- for variant in variants %}
         case .{{ variant | convertRefToSwift | lowerCamelCase }}(let value):
-            if let loadable = value as? PendingDataLoadable {
-                return loadable.hasPendingData
-            }
-            return false
+            return value.hasPendingData
         {%- endfor %}
         case .unexpected:
             return false
@@ -220,15 +217,12 @@ public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProt
             }
         {% endif %}
         {%- for variant in variants %}
-        case .{{ variant | convertRefToSwift | lowerCamelCase }}(let value):
-            // Check if this value conforms to PendingDataLoadable and has pending data
-            if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                await loadable.loadPendingData()
-                // Update the value if it was mutated (only if it's actually the expected type)
-                if let updatedValue = loadable as? {{ variant | convertRefToSwift }} {
-                    self = .{{ variant | convertRefToSwift | lowerCamelCase }}(updatedValue)
-                }
-            }
+        case .{{ variant | convertRefToSwift | lowerCamelCase }}(var value):
+            // Since ATProtocolValue already includes PendingDataLoadable,
+            // we can directly call loadPendingData without conditional casting
+            await value.loadPendingData()
+            // Update the enum case with the potentially updated value
+            self = .{{ variant | convertRefToSwift | lowerCamelCase }}(value)
         {%- endfor %}
         case .unexpected:
             // Nothing to load for unexpected values

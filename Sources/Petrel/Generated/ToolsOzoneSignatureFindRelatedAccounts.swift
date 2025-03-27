@@ -1,53 +1,66 @@
 import Foundation
 
+
+
 // lexicon: 1, id: tools.ozone.signature.findRelatedAccounts
 
-public enum ToolsOzoneSignatureFindRelatedAccounts {
-    public static let typeIdentifier = "tools.ozone.signature.findRelatedAccounts"
 
-    public struct RelatedAccount: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "tools.ozone.signature.findRelatedAccounts#relatedAccount"
-        public let account: ComAtprotoAdminDefs.AccountView
-        public let similarities: [ToolsOzoneSignatureDefs.SigDetail]?
+public struct ToolsOzoneSignatureFindRelatedAccounts { 
+
+    public static let typeIdentifier = "tools.ozone.signature.findRelatedAccounts"
+        
+public struct RelatedAccount: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "tools.ozone.signature.findRelatedAccounts#relatedAccount"
+            public let account: ComAtprotoAdminDefs.AccountView
+            public let similarities: [ToolsOzoneSignatureDefs.SigDetail]?
 
         // Standard initializer
         public init(
             account: ComAtprotoAdminDefs.AccountView, similarities: [ToolsOzoneSignatureDefs.SigDetail]?
         ) {
+            
             self.account = account
             self.similarities = similarities
         }
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                account = try container.decode(ComAtprotoAdminDefs.AccountView.self, forKey: .account)
-
+                
+                self.account = try container.decode(ComAtprotoAdminDefs.AccountView.self, forKey: .account)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'account': \(error)")
                 throw error
             }
             do {
-                similarities = try container.decodeIfPresent([ToolsOzoneSignatureDefs.SigDetail].self, forKey: .similarities)
-
+                
+                self.similarities = try container.decodeIfPresent([ToolsOzoneSignatureDefs.SigDetail].self, forKey: .similarities)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'similarities': \(error)")
                 throw error
             }
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
             try container.encode(account, forKey: .account)
-
+            
+            
             if let value = similarities {
+                
                 if !value.isEmpty {
                     try container.encode(value, forKey: .similarities)
                 }
+                
             }
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -60,17 +73,20 @@ public enum ToolsOzoneSignatureFindRelatedAccounts {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
             guard let other = other as? Self else { return false }
-
-            if account != other.account {
+            
+            if self.account != other.account {
                 return false
             }
-
+            
+            
             if similarities != other.similarities {
                 return false
             }
-
+            
             return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -82,110 +98,100 @@ public enum ToolsOzoneSignatureFindRelatedAccounts {
             case account
             case similarities
         }
-
-        // MARK: - PendingDataLoadable
-
-        /// Check if any properties contain pending data that needs loading
-        public var hasPendingData: Bool {
-            var hasPending = false
-
-            if !hasPending, let loadable = account as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            if !hasPending, let value = similarities, let loadable = value as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            return hasPending
-        }
-
-        /// Load any pending data in properties
-        public mutating func loadPendingData() async {
-            if let loadable = account as? PendingDataLoadable, loadable.hasPendingData {
-                var mutableValue = loadable
-                await mutableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = mutableValue as? ComAtprotoAdminDefs.AccountView {
-                    account = updatedValue
-                }
-            }
-
-            if let value = similarities, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                await loadableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = loadableValue as? [ToolsOzoneSignatureDefs.SigDetail] {
-                    similarities = updatedValue
-                }
-            }
-        }
-    }
-
-    public struct Parameters: Parametrizable {
+    }    
+public struct Parameters: Parametrizable {
         public let did: String
         public let cursor: String?
         public let limit: Int?
-
+        
         public init(
-            did: String,
-            cursor: String? = nil,
+            did: String, 
+            cursor: String? = nil, 
             limit: Int? = nil
-        ) {
+            ) {
             self.did = did
             self.cursor = cursor
             self.limit = limit
+            
         }
     }
-
-    public struct Output: ATProtocolCodable {
+    
+public struct Output: ATProtocolCodable {
+        
+        
         public let cursor: String?
-
+        
         public let accounts: [RelatedAccount]
-
+        
+        
+        
         // Standard public initializer
         public init(
+            
             cursor: String? = nil,
-
+            
             accounts: [RelatedAccount]
-
+            
+            
         ) {
+            
             self.cursor = cursor
-
+            
             self.accounts = accounts
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
-            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
-
-            accounts = try container.decode([RelatedAccount].self, forKey: .accounts)
+            
+            
+            self.cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+            
+            
+            self.accounts = try container.decode([RelatedAccount].self, forKey: .accounts)
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
+            
             if let value = cursor {
+                
                 try container.encode(value, forKey: .cursor)
+                
             }
-
+            
+            
             try container.encode(accounts, forKey: .accounts)
+            
+            
         }
-
+        
         private enum CodingKeys: String, CodingKey {
+            
             case cursor
             case accounts
+            
         }
     }
+
+
+
+
 }
 
-public extension ATProtoClient.Tools.Ozone.Signature {
+
+extension ATProtoClient.Tools.Ozone.Signature {
     /// Get accounts that share some matching threat signatures with the root account.
-    func findRelatedAccounts(input: ToolsOzoneSignatureFindRelatedAccounts.Parameters) async throws -> (responseCode: Int, data: ToolsOzoneSignatureFindRelatedAccounts.Output?) {
+    public func findRelatedAccounts(input: ToolsOzoneSignatureFindRelatedAccounts.Parameters) async throws -> (responseCode: Int, data: ToolsOzoneSignatureFindRelatedAccounts.Output?) {
         let endpoint = "tools.ozone.signature.findRelatedAccounts"
-
+        
+        
         let queryItems = input.asQueryItems()
-
+        
         let urlRequest = try await networkManager.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -193,7 +199,7 @@ public extension ATProtoClient.Tools.Ozone.Signature {
             body: nil,
             queryItems: queryItems
         )
-
+        
         let (responseData, response) = try await networkManager.performRequest(urlRequest)
         let responseCode = response.statusCode
 
@@ -201,16 +207,17 @@ public extension ATProtoClient.Tools.Ozone.Signature {
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
-
+        
         if !contentType.lowercased().contains("application/json") {
             throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
         }
 
         // Data decoding and validation
-
+        
         let decoder = JSONDecoder()
         let decodedData = try? decoder.decode(ToolsOzoneSignatureFindRelatedAccounts.Output.self, from: responseData)
-
+        
+        
         return (responseCode, decodedData)
     }
-}
+}                           

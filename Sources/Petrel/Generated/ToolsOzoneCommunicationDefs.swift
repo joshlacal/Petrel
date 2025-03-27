@@ -1,26 +1,31 @@
 import Foundation
 
+
+
 // lexicon: 1, id: tools.ozone.communication.defs
 
-public enum ToolsOzoneCommunicationDefs {
-    public static let typeIdentifier = "tools.ozone.communication.defs"
 
-    public struct TemplateView: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "tools.ozone.communication.defs#templateView"
-        public let id: String
-        public let name: String
-        public let subject: String?
-        public let contentMarkdown: String
-        public let disabled: Bool
-        public let lang: LanguageCodeContainer?
-        public let lastUpdatedBy: String
-        public let createdAt: ATProtocolDate
-        public let updatedAt: ATProtocolDate
+public struct ToolsOzoneCommunicationDefs { 
+
+    public static let typeIdentifier = "tools.ozone.communication.defs"
+        
+public struct TemplateView: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "tools.ozone.communication.defs#templateView"
+            public let id: String
+            public let name: String
+            public let subject: String?
+            public let contentMarkdown: String
+            public let disabled: Bool
+            public let lang: LanguageCodeContainer?
+            public let lastUpdatedBy: String
+            public let createdAt: ATProtocolDate
+            public let updatedAt: ATProtocolDate
 
         // Standard initializer
         public init(
             id: String, name: String, subject: String?, contentMarkdown: String, disabled: Bool, lang: LanguageCodeContainer?, lastUpdatedBy: String, createdAt: ATProtocolDate, updatedAt: ATProtocolDate
         ) {
+            
             self.id = id
             self.name = name
             self.subject = subject
@@ -34,97 +39,121 @@ public enum ToolsOzoneCommunicationDefs {
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                id = try container.decode(String.self, forKey: .id)
-
+                
+                self.id = try container.decode(String.self, forKey: .id)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'id': \(error)")
                 throw error
             }
             do {
-                name = try container.decode(String.self, forKey: .name)
-
+                
+                self.name = try container.decode(String.self, forKey: .name)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'name': \(error)")
                 throw error
             }
             do {
-                subject = try container.decodeIfPresent(String.self, forKey: .subject)
-
+                
+                self.subject = try container.decodeIfPresent(String.self, forKey: .subject)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'subject': \(error)")
                 throw error
             }
             do {
-                contentMarkdown = try container.decode(String.self, forKey: .contentMarkdown)
-
+                
+                self.contentMarkdown = try container.decode(String.self, forKey: .contentMarkdown)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'contentMarkdown': \(error)")
                 throw error
             }
             do {
-                disabled = try container.decode(Bool.self, forKey: .disabled)
-
+                
+                self.disabled = try container.decode(Bool.self, forKey: .disabled)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'disabled': \(error)")
                 throw error
             }
             do {
-                lang = try container.decodeIfPresent(LanguageCodeContainer.self, forKey: .lang)
-
+                
+                self.lang = try container.decodeIfPresent(LanguageCodeContainer.self, forKey: .lang)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'lang': \(error)")
                 throw error
             }
             do {
-                lastUpdatedBy = try container.decode(String.self, forKey: .lastUpdatedBy)
-
+                
+                self.lastUpdatedBy = try container.decode(String.self, forKey: .lastUpdatedBy)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'lastUpdatedBy': \(error)")
                 throw error
             }
             do {
-                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
-
+                
+                self.createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'createdAt': \(error)")
                 throw error
             }
             do {
-                updatedAt = try container.decode(ATProtocolDate.self, forKey: .updatedAt)
-
+                
+                self.updatedAt = try container.decode(ATProtocolDate.self, forKey: .updatedAt)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'updatedAt': \(error)")
                 throw error
             }
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
             try container.encode(id, forKey: .id)
-
+            
+            
             try container.encode(name, forKey: .name)
-
+            
+            
             if let value = subject {
+                
                 try container.encode(value, forKey: .subject)
+                
             }
-
+            
+            
             try container.encode(contentMarkdown, forKey: .contentMarkdown)
-
+            
+            
             try container.encode(disabled, forKey: .disabled)
-
+            
+            
             if let value = lang {
+                
                 try container.encode(value, forKey: .lang)
+                
             }
-
+            
+            
             try container.encode(lastUpdatedBy, forKey: .lastUpdatedBy)
-
+            
+            
             try container.encode(createdAt, forKey: .createdAt)
-
+            
+            
             try container.encode(updatedAt, forKey: .updatedAt)
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -148,45 +177,55 @@ public enum ToolsOzoneCommunicationDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
             guard let other = other as? Self else { return false }
-
-            if id != other.id {
+            
+            if self.id != other.id {
                 return false
             }
-
-            if name != other.name {
+            
+            
+            if self.name != other.name {
                 return false
             }
-
+            
+            
             if subject != other.subject {
                 return false
             }
-
-            if contentMarkdown != other.contentMarkdown {
+            
+            
+            if self.contentMarkdown != other.contentMarkdown {
                 return false
             }
-
-            if disabled != other.disabled {
+            
+            
+            if self.disabled != other.disabled {
                 return false
             }
-
+            
+            
             if lang != other.lang {
                 return false
             }
-
-            if lastUpdatedBy != other.lastUpdatedBy {
+            
+            
+            if self.lastUpdatedBy != other.lastUpdatedBy {
                 return false
             }
-
-            if createdAt != other.createdAt {
+            
+            
+            if self.createdAt != other.createdAt {
                 return false
             }
-
-            if updatedAt != other.updatedAt {
+            
+            
+            if self.updatedAt != other.updatedAt {
                 return false
             }
-
+            
             return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -205,132 +244,11 @@ public enum ToolsOzoneCommunicationDefs {
             case createdAt
             case updatedAt
         }
-
-        // MARK: - PendingDataLoadable
-
-        /// Check if any properties contain pending data that needs loading
-        public var hasPendingData: Bool {
-            var hasPending = false
-
-            if !hasPending, let loadable = id as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            if !hasPending, let loadable = name as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            if !hasPending, let value = subject, let loadable = value as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            if !hasPending, let loadable = contentMarkdown as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            if !hasPending, let loadable = disabled as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            if !hasPending, let value = lang, let loadable = value as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            if !hasPending, let loadable = lastUpdatedBy as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            if !hasPending, let loadable = createdAt as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            if !hasPending, let loadable = updatedAt as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            return hasPending
-        }
-
-        /// Load any pending data in properties
-        public mutating func loadPendingData() async {
-            if let loadable = id as? PendingDataLoadable, loadable.hasPendingData {
-                var mutableValue = loadable
-                await mutableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = mutableValue as? String {
-                    id = updatedValue
-                }
-            }
-
-            if let loadable = name as? PendingDataLoadable, loadable.hasPendingData {
-                var mutableValue = loadable
-                await mutableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = mutableValue as? String {
-                    name = updatedValue
-                }
-            }
-
-            if let value = subject, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                await loadableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = loadableValue as? String {
-                    subject = updatedValue
-                }
-            }
-
-            if let loadable = contentMarkdown as? PendingDataLoadable, loadable.hasPendingData {
-                var mutableValue = loadable
-                await mutableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = mutableValue as? String {
-                    contentMarkdown = updatedValue
-                }
-            }
-
-            if let loadable = disabled as? PendingDataLoadable, loadable.hasPendingData {
-                var mutableValue = loadable
-                await mutableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = mutableValue as? Bool {
-                    disabled = updatedValue
-                }
-            }
-
-            if let value = lang, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                await loadableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = loadableValue as? LanguageCodeContainer {
-                    lang = updatedValue
-                }
-            }
-
-            if let loadable = lastUpdatedBy as? PendingDataLoadable, loadable.hasPendingData {
-                var mutableValue = loadable
-                await mutableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = mutableValue as? String {
-                    lastUpdatedBy = updatedValue
-                }
-            }
-
-            if let loadable = createdAt as? PendingDataLoadable, loadable.hasPendingData {
-                var mutableValue = loadable
-                await mutableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = mutableValue as? ATProtocolDate {
-                    createdAt = updatedValue
-                }
-            }
-
-            if let loadable = updatedAt as? PendingDataLoadable, loadable.hasPendingData {
-                var mutableValue = loadable
-                await mutableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = mutableValue as? ATProtocolDate {
-                    updatedAt = updatedValue
-                }
-            }
-        }
     }
+
+
+
 }
+
+
+                           

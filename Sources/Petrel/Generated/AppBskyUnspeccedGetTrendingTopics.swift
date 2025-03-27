@@ -1,69 +1,99 @@
 import Foundation
 
+
+
 // lexicon: 1, id: app.bsky.unspecced.getTrendingTopics
 
-public enum AppBskyUnspeccedGetTrendingTopics {
-    public static let typeIdentifier = "app.bsky.unspecced.getTrendingTopics"
-    public struct Parameters: Parametrizable {
+
+public struct AppBskyUnspeccedGetTrendingTopics { 
+
+    public static let typeIdentifier = "app.bsky.unspecced.getTrendingTopics"    
+public struct Parameters: Parametrizable {
         public let viewer: String?
         public let limit: Int?
-
+        
         public init(
-            viewer: String? = nil,
+            viewer: String? = nil, 
             limit: Int? = nil
-        ) {
+            ) {
             self.viewer = viewer
             self.limit = limit
+            
         }
     }
-
-    public struct Output: ATProtocolCodable {
+    
+public struct Output: ATProtocolCodable {
+        
+        
         public let topics: [AppBskyUnspeccedDefs.TrendingTopic]
-
+        
         public let suggested: [AppBskyUnspeccedDefs.TrendingTopic]
-
+        
+        
+        
         // Standard public initializer
         public init(
+            
             topics: [AppBskyUnspeccedDefs.TrendingTopic],
-
+            
             suggested: [AppBskyUnspeccedDefs.TrendingTopic]
-
+            
+            
         ) {
+            
             self.topics = topics
-
+            
             self.suggested = suggested
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
-            topics = try container.decode([AppBskyUnspeccedDefs.TrendingTopic].self, forKey: .topics)
-
-            suggested = try container.decode([AppBskyUnspeccedDefs.TrendingTopic].self, forKey: .suggested)
+            
+            
+            self.topics = try container.decode([AppBskyUnspeccedDefs.TrendingTopic].self, forKey: .topics)
+            
+            
+            self.suggested = try container.decode([AppBskyUnspeccedDefs.TrendingTopic].self, forKey: .suggested)
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
+            
             try container.encode(topics, forKey: .topics)
-
+            
+            
             try container.encode(suggested, forKey: .suggested)
+            
+            
         }
-
+        
         private enum CodingKeys: String, CodingKey {
+            
             case topics
             case suggested
+            
         }
     }
+
+
+
+
 }
 
-public extension ATProtoClient.App.Bsky.Unspecced {
+
+extension ATProtoClient.App.Bsky.Unspecced {
     /// Get a list of trending topics
-    func getTrendingTopics(input: AppBskyUnspeccedGetTrendingTopics.Parameters) async throws -> (responseCode: Int, data: AppBskyUnspeccedGetTrendingTopics.Output?) {
+    public func getTrendingTopics(input: AppBskyUnspeccedGetTrendingTopics.Parameters) async throws -> (responseCode: Int, data: AppBskyUnspeccedGetTrendingTopics.Output?) {
         let endpoint = "app.bsky.unspecced.getTrendingTopics"
-
+        
+        
         let queryItems = input.asQueryItems()
-
+        
         let urlRequest = try await networkManager.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -71,7 +101,7 @@ public extension ATProtoClient.App.Bsky.Unspecced {
             body: nil,
             queryItems: queryItems
         )
-
+        
         let (responseData, response) = try await networkManager.performRequest(urlRequest)
         let responseCode = response.statusCode
 
@@ -79,16 +109,17 @@ public extension ATProtoClient.App.Bsky.Unspecced {
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
-
+        
         if !contentType.lowercased().contains("application/json") {
             throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
         }
 
         // Data decoding and validation
-
+        
         let decoder = JSONDecoder()
         let decodedData = try? decoder.decode(AppBskyUnspeccedGetTrendingTopics.Output.self, from: responseData)
-
+        
+        
         return (responseCode, decodedData)
     }
-}
+}                           

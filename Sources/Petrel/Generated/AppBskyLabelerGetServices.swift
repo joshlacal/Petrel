@@ -1,191 +1,211 @@
 import Foundation
 
+
+
 // lexicon: 1, id: app.bsky.labeler.getServices
 
-public enum AppBskyLabelerGetServices {
-    public static let typeIdentifier = "app.bsky.labeler.getServices"
-    public struct Parameters: Parametrizable {
+
+public struct AppBskyLabelerGetServices { 
+
+    public static let typeIdentifier = "app.bsky.labeler.getServices"    
+public struct Parameters: Parametrizable {
         public let dids: [String]
         public let detailed: Bool?
-
+        
         public init(
-            dids: [String],
+            dids: [String], 
             detailed: Bool? = nil
-        ) {
+            ) {
             self.dids = dids
             self.detailed = detailed
+            
         }
     }
-
-    public struct Output: ATProtocolCodable {
+    
+public struct Output: ATProtocolCodable {
+        
+        
         public let views: [OutputViewsUnion]
-
+        
+        
+        
         // Standard public initializer
         public init(
+            
             views: [OutputViewsUnion]
-
+            
+            
         ) {
+            
             self.views = views
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
-            views = try container.decode([OutputViewsUnion].self, forKey: .views)
+            
+            
+            self.views = try container.decode([OutputViewsUnion].self, forKey: .views)
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
+            
             try container.encode(views, forKey: .views)
+            
+            
         }
-
+        
         private enum CodingKeys: String, CodingKey {
+            
             case views
+            
         }
     }
 
-    public enum OutputViewsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, PendingDataLoadable, Equatable {
-        case appBskyLabelerDefsLabelerView(AppBskyLabelerDefs.LabelerView)
-        case appBskyLabelerDefsLabelerViewDetailed(AppBskyLabelerDefs.LabelerViewDetailed)
-        case unexpected(ATProtocolValueContainer)
 
-        public init(_ value: AppBskyLabelerDefs.LabelerView) {
+
+
+
+
+public enum OutputViewsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
+    case appBskyLabelerDefsLabelerView(AppBskyLabelerDefs.LabelerView)
+    case appBskyLabelerDefsLabelerViewDetailed(AppBskyLabelerDefs.LabelerViewDetailed)
+    case unexpected(ATProtocolValueContainer)
+    
+    public init(_ value: AppBskyLabelerDefs.LabelerView) {
+        self = .appBskyLabelerDefsLabelerView(value)
+    }
+    public init(_ value: AppBskyLabelerDefs.LabelerViewDetailed) {
+        self = .appBskyLabelerDefsLabelerViewDetailed(value)
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let typeValue = try container.decode(String.self, forKey: .type)
+        
+
+        switch typeValue {
+        case "app.bsky.labeler.defs#labelerView":
+            let value = try AppBskyLabelerDefs.LabelerView(from: decoder)
             self = .appBskyLabelerDefsLabelerView(value)
-        }
-
-        public init(_ value: AppBskyLabelerDefs.LabelerViewDetailed) {
+        case "app.bsky.labeler.defs#labelerViewDetailed":
+            let value = try AppBskyLabelerDefs.LabelerViewDetailed(from: decoder)
             self = .appBskyLabelerDefsLabelerViewDetailed(value)
+        default:
+            let unknownValue = try ATProtocolValueContainer(from: decoder)
+            self = .unexpected(unknownValue)
         }
+    }
 
-        public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
 
-            switch typeValue {
-            case "app.bsky.labeler.defs#labelerView":
-                let value = try AppBskyLabelerDefs.LabelerView(from: decoder)
-                self = .appBskyLabelerDefsLabelerView(value)
-            case "app.bsky.labeler.defs#labelerViewDetailed":
-                let value = try AppBskyLabelerDefs.LabelerViewDetailed(from: decoder)
-                self = .appBskyLabelerDefsLabelerViewDetailed(value)
-            default:
-                let unknownValue = try ATProtocolValueContainer(from: decoder)
-                self = .unexpected(unknownValue)
-            }
+        switch self {
+        case .appBskyLabelerDefsLabelerView(let value):
+            try container.encode("app.bsky.labeler.defs#labelerView", forKey: .type)
+            try value.encode(to: encoder)
+        case .appBskyLabelerDefsLabelerViewDetailed(let value):
+            try container.encode("app.bsky.labeler.defs#labelerViewDetailed", forKey: .type)
+            try value.encode(to: encoder)
+        case .unexpected(let container):
+            try container.encode(to: encoder)
+        
         }
+    }
 
-        public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-
-            switch self {
-            case let .appBskyLabelerDefsLabelerView(value):
-                try container.encode("app.bsky.labeler.defs#labelerView", forKey: .type)
-                try value.encode(to: encoder)
-            case let .appBskyLabelerDefsLabelerViewDetailed(value):
-                try container.encode("app.bsky.labeler.defs#labelerViewDetailed", forKey: .type)
-                try value.encode(to: encoder)
-            case let .unexpected(container):
-                try container.encode(to: encoder)
-            }
+    public func hash(into hasher: inout Hasher) {
+        switch self {
+        case .appBskyLabelerDefsLabelerView(let value):
+            hasher.combine("app.bsky.labeler.defs#labelerView")
+            hasher.combine(value)
+        case .appBskyLabelerDefsLabelerViewDetailed(let value):
+            hasher.combine("app.bsky.labeler.defs#labelerViewDetailed")
+            hasher.combine(value)
+        case .unexpected(let container):
+            hasher.combine("unexpected")
+            hasher.combine(container)
+        
         }
+    }
 
-        public func hash(into hasher: inout Hasher) {
-            switch self {
-            case let .appBskyLabelerDefsLabelerView(value):
-                hasher.combine("app.bsky.labeler.defs#labelerView")
-                hasher.combine(value)
-            case let .appBskyLabelerDefsLabelerViewDetailed(value):
-                hasher.combine("app.bsky.labeler.defs#labelerViewDetailed")
-                hasher.combine(value)
-            case let .unexpected(container):
-                hasher.combine("unexpected")
-                hasher.combine(container)
-            }
+    private enum CodingKeys: String, CodingKey {
+        case type = "$type"
+    }
+    
+    public static func == (lhs: OutputViewsUnion, rhs: OutputViewsUnion) -> Bool {
+        switch (lhs, rhs) {
+        case (.appBskyLabelerDefsLabelerView(let lhsValue),
+              .appBskyLabelerDefsLabelerView(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.appBskyLabelerDefsLabelerViewDetailed(let lhsValue),
+              .appBskyLabelerDefsLabelerViewDetailed(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.unexpected(let lhsValue), .unexpected(let rhsValue)):
+            return lhsValue.isEqual(to: rhsValue)
+        
+        default:
+            return false
         }
-
-        private enum CodingKeys: String, CodingKey {
-            case type = "$type"
+    }
+    
+    public func isEqual(to other: any ATProtocolValue) -> Bool {
+        guard let other = other as? OutputViewsUnion else { return false }
+        return self == other
+    }
+    
+    /// Property that indicates if this enum contains pending data that needs loading
+    public var hasPendingData: Bool {
+        switch self {
+        
+        case .appBskyLabelerDefsLabelerView(let value):
+            return value.hasPendingData
+        case .appBskyLabelerDefsLabelerViewDetailed(let value):
+            return value.hasPendingData
+        case .unexpected:
+            return false
         }
-
-        public static func == (lhs: OutputViewsUnion, rhs: OutputViewsUnion) -> Bool {
-            switch (lhs, rhs) {
-            case let (
-                .appBskyLabelerDefsLabelerView(lhsValue),
-                .appBskyLabelerDefsLabelerView(rhsValue)
-            ):
-                return lhsValue == rhsValue
-            case let (
-                .appBskyLabelerDefsLabelerViewDetailed(lhsValue),
-                .appBskyLabelerDefsLabelerViewDetailed(rhsValue)
-            ):
-                return lhsValue == rhsValue
-            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
-            default:
-                return false
-            }
-        }
-
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let other = other as? OutputViewsUnion else { return false }
-            return self == other
-        }
-
-        /// Property that indicates if this enum contains pending data that needs loading
-        public var hasPendingData: Bool {
-            switch self {
-            case let .appBskyLabelerDefsLabelerView(value):
-                if let loadable = value as? PendingDataLoadable {
-                    return loadable.hasPendingData
-                }
-                return false
-            case let .appBskyLabelerDefsLabelerViewDetailed(value):
-                if let loadable = value as? PendingDataLoadable {
-                    return loadable.hasPendingData
-                }
-                return false
-            case .unexpected:
-                return false
-            }
-        }
-
-        /// Attempts to load any pending data in this enum or its children
-        public mutating func loadPendingData() async {
-            switch self {
-            case let .appBskyLabelerDefsLabelerView(value):
-                // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update the value if it was mutated (only if it's actually the expected type)
-                    if let updatedValue = loadable as? AppBskyLabelerDefs.LabelerView {
-                        self = .appBskyLabelerDefsLabelerView(updatedValue)
-                    }
-                }
-            case let .appBskyLabelerDefsLabelerViewDetailed(value):
-                // Check if this value conforms to PendingDataLoadable and has pending data
-                if var loadable = value as? PendingDataLoadable, loadable.hasPendingData {
-                    await loadable.loadPendingData()
-                    // Update the value if it was mutated (only if it's actually the expected type)
-                    if let updatedValue = loadable as? AppBskyLabelerDefs.LabelerViewDetailed {
-                        self = .appBskyLabelerDefsLabelerViewDetailed(updatedValue)
-                    }
-                }
-            case .unexpected:
-                // Nothing to load for unexpected values
-                break
-            }
+    }
+    
+    /// Attempts to load any pending data in this enum or its children
+    public mutating func loadPendingData() async {
+        switch self {
+        
+        case .appBskyLabelerDefsLabelerView(var value):
+            // Since ATProtocolValue already includes PendingDataLoadable,
+            // we can directly call loadPendingData without conditional casting
+            await value.loadPendingData()
+            // Update the enum case with the potentially updated value
+            self = .appBskyLabelerDefsLabelerView(value)
+        case .appBskyLabelerDefsLabelerViewDetailed(var value):
+            // Since ATProtocolValue already includes PendingDataLoadable,
+            // we can directly call loadPendingData without conditional casting
+            await value.loadPendingData()
+            // Update the enum case with the potentially updated value
+            self = .appBskyLabelerDefsLabelerViewDetailed(value)
+        case .unexpected:
+            // Nothing to load for unexpected values
+            break
         }
     }
 }
 
-public extension ATProtoClient.App.Bsky.Labeler {
+
+}
+
+
+extension ATProtoClient.App.Bsky.Labeler {
     /// Get information about a list of labeler services.
-    func getServices(input: AppBskyLabelerGetServices.Parameters) async throws -> (responseCode: Int, data: AppBskyLabelerGetServices.Output?) {
+    public func getServices(input: AppBskyLabelerGetServices.Parameters) async throws -> (responseCode: Int, data: AppBskyLabelerGetServices.Output?) {
         let endpoint = "app.bsky.labeler.getServices"
-
+        
+        
         let queryItems = input.asQueryItems()
-
+        
         let urlRequest = try await networkManager.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -193,7 +213,7 @@ public extension ATProtoClient.App.Bsky.Labeler {
             body: nil,
             queryItems: queryItems
         )
-
+        
         let (responseData, response) = try await networkManager.performRequest(urlRequest)
         let responseCode = response.statusCode
 
@@ -201,16 +221,17 @@ public extension ATProtoClient.App.Bsky.Labeler {
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
-
+        
         if !contentType.lowercased().contains("application/json") {
             throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
         }
 
         // Data decoding and validation
-
+        
         let decoder = JSONDecoder()
         let decodedData = try? decoder.decode(AppBskyLabelerGetServices.Output.self, from: responseData)
-
+        
+        
         return (responseCode, decodedData)
     }
-}
+}                           

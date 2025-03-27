@@ -1,36 +1,45 @@
 import Foundation
 
+
+
 // lexicon: 1, id: tools.ozone.moderation.getRepo
 
-public enum ToolsOzoneModerationGetRepo {
-    public static let typeIdentifier = "tools.ozone.moderation.getRepo"
-    public struct Parameters: Parametrizable {
-        public let did: String
 
+public struct ToolsOzoneModerationGetRepo { 
+
+    public static let typeIdentifier = "tools.ozone.moderation.getRepo"    
+public struct Parameters: Parametrizable {
+        public let did: String
+        
         public init(
             did: String
-        ) {
+            ) {
             self.did = did
+            
         }
     }
-
     public typealias Output = ToolsOzoneModerationDefs.RepoViewDetail
-
-    public enum Error: String, Swift.Error, CustomStringConvertible {
-        case repoNotFound = "RepoNotFound."
-        public var description: String {
-            return rawValue
+            
+public enum Error: String, Swift.Error, CustomStringConvertible {
+                case repoNotFound = "RepoNotFound."
+            public var description: String {
+                return self.rawValue
+            }
         }
-    }
+
+
+
 }
 
-public extension ATProtoClient.Tools.Ozone.Moderation {
+
+extension ATProtoClient.Tools.Ozone.Moderation {
     /// Get details about a repository.
-    func getRepo(input: ToolsOzoneModerationGetRepo.Parameters) async throws -> (responseCode: Int, data: ToolsOzoneModerationGetRepo.Output?) {
+    public func getRepo(input: ToolsOzoneModerationGetRepo.Parameters) async throws -> (responseCode: Int, data: ToolsOzoneModerationGetRepo.Output?) {
         let endpoint = "tools.ozone.moderation.getRepo"
-
+        
+        
         let queryItems = input.asQueryItems()
-
+        
         let urlRequest = try await networkManager.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -38,7 +47,7 @@ public extension ATProtoClient.Tools.Ozone.Moderation {
             body: nil,
             queryItems: queryItems
         )
-
+        
         let (responseData, response) = try await networkManager.performRequest(urlRequest)
         let responseCode = response.statusCode
 
@@ -46,16 +55,17 @@ public extension ATProtoClient.Tools.Ozone.Moderation {
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
-
+        
         if !contentType.lowercased().contains("application/json") {
             throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
         }
 
         // Data decoding and validation
-
+        
         let decoder = JSONDecoder()
         let decodedData = try? decoder.decode(ToolsOzoneModerationGetRepo.Output.self, from: responseData)
-
+        
+        
         return (responseCode, decodedData)
     }
-}
+}                           

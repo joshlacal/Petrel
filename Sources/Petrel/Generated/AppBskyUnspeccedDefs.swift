@@ -1,38 +1,47 @@
 import Foundation
 
+
+
 // lexicon: 1, id: app.bsky.unspecced.defs
 
-public enum AppBskyUnspeccedDefs {
-    public static let typeIdentifier = "app.bsky.unspecced.defs"
 
-    public struct SkeletonSearchPost: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.unspecced.defs#skeletonSearchPost"
-        public let uri: ATProtocolURI
+public struct AppBskyUnspeccedDefs { 
+
+    public static let typeIdentifier = "app.bsky.unspecced.defs"
+        
+public struct SkeletonSearchPost: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.unspecced.defs#skeletonSearchPost"
+            public let uri: ATProtocolURI
 
         // Standard initializer
         public init(
             uri: ATProtocolURI
         ) {
+            
             self.uri = uri
         }
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-
+                
+                self.uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'uri': \(error)")
                 throw error
             }
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
             try container.encode(uri, forKey: .uri)
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -40,13 +49,15 @@ public enum AppBskyUnspeccedDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
             guard let other = other as? Self else { return false }
-
-            if uri != other.uri {
+            
+            if self.uri != other.uri {
                 return false
             }
-
+            
             return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -57,61 +68,41 @@ public enum AppBskyUnspeccedDefs {
             case typeIdentifier = "$type"
             case uri
         }
-
-        // MARK: - PendingDataLoadable
-
-        /// Check if any properties contain pending data that needs loading
-        public var hasPendingData: Bool {
-            var hasPending = false
-
-            if !hasPending, let loadable = uri as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            return hasPending
-        }
-
-        /// Load any pending data in properties
-        public mutating func loadPendingData() async {
-            if let loadable = uri as? PendingDataLoadable, loadable.hasPendingData {
-                var mutableValue = loadable
-                await mutableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = mutableValue as? ATProtocolURI {
-                    uri = updatedValue
-                }
-            }
-        }
     }
-
-    public struct SkeletonSearchActor: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.unspecced.defs#skeletonSearchActor"
-        public let did: String
+        
+public struct SkeletonSearchActor: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.unspecced.defs#skeletonSearchActor"
+            public let did: String
 
         // Standard initializer
         public init(
             did: String
         ) {
+            
             self.did = did
         }
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                did = try container.decode(String.self, forKey: .did)
-
+                
+                self.did = try container.decode(String.self, forKey: .did)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'did': \(error)")
                 throw error
             }
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
             try container.encode(did, forKey: .did)
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -119,13 +110,15 @@ public enum AppBskyUnspeccedDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
             guard let other = other as? Self else { return false }
-
-            if did != other.did {
+            
+            if self.did != other.did {
                 return false
             }
-
+            
             return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -136,61 +129,41 @@ public enum AppBskyUnspeccedDefs {
             case typeIdentifier = "$type"
             case did
         }
-
-        // MARK: - PendingDataLoadable
-
-        /// Check if any properties contain pending data that needs loading
-        public var hasPendingData: Bool {
-            var hasPending = false
-
-            if !hasPending, let loadable = did as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            return hasPending
-        }
-
-        /// Load any pending data in properties
-        public mutating func loadPendingData() async {
-            if let loadable = did as? PendingDataLoadable, loadable.hasPendingData {
-                var mutableValue = loadable
-                await mutableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = mutableValue as? String {
-                    did = updatedValue
-                }
-            }
-        }
     }
-
-    public struct SkeletonSearchStarterPack: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.unspecced.defs#skeletonSearchStarterPack"
-        public let uri: ATProtocolURI
+        
+public struct SkeletonSearchStarterPack: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.unspecced.defs#skeletonSearchStarterPack"
+            public let uri: ATProtocolURI
 
         // Standard initializer
         public init(
             uri: ATProtocolURI
         ) {
+            
             self.uri = uri
         }
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-
+                
+                self.uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'uri': \(error)")
                 throw error
             }
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
             try container.encode(uri, forKey: .uri)
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -198,13 +171,15 @@ public enum AppBskyUnspeccedDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
             guard let other = other as? Self else { return false }
-
-            if uri != other.uri {
+            
+            if self.uri != other.uri {
                 return false
             }
-
+            
             return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -215,44 +190,20 @@ public enum AppBskyUnspeccedDefs {
             case typeIdentifier = "$type"
             case uri
         }
-
-        // MARK: - PendingDataLoadable
-
-        /// Check if any properties contain pending data that needs loading
-        public var hasPendingData: Bool {
-            var hasPending = false
-
-            if !hasPending, let loadable = uri as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            return hasPending
-        }
-
-        /// Load any pending data in properties
-        public mutating func loadPendingData() async {
-            if let loadable = uri as? PendingDataLoadable, loadable.hasPendingData {
-                var mutableValue = loadable
-                await mutableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = mutableValue as? ATProtocolURI {
-                    uri = updatedValue
-                }
-            }
-        }
     }
-
-    public struct TrendingTopic: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.unspecced.defs#trendingTopic"
-        public let topic: String
-        public let displayName: String?
-        public let description: String?
-        public let link: String
+        
+public struct TrendingTopic: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.unspecced.defs#trendingTopic"
+            public let topic: String
+            public let displayName: String?
+            public let description: String?
+            public let link: String
 
         // Standard initializer
         public init(
             topic: String, displayName: String?, description: String?, link: String
         ) {
+            
             self.topic = topic
             self.displayName = displayName
             self.description = description
@@ -261,52 +212,66 @@ public enum AppBskyUnspeccedDefs {
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                topic = try container.decode(String.self, forKey: .topic)
-
+                
+                self.topic = try container.decode(String.self, forKey: .topic)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'topic': \(error)")
                 throw error
             }
             do {
-                displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
-
+                
+                self.displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'displayName': \(error)")
                 throw error
             }
             do {
-                description = try container.decodeIfPresent(String.self, forKey: .description)
-
+                
+                self.description = try container.decodeIfPresent(String.self, forKey: .description)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'description': \(error)")
                 throw error
             }
             do {
-                link = try container.decode(String.self, forKey: .link)
-
+                
+                self.link = try container.decode(String.self, forKey: .link)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'link': \(error)")
                 throw error
             }
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
             try container.encode(topic, forKey: .topic)
-
+            
+            
             if let value = displayName {
+                
                 try container.encode(value, forKey: .displayName)
+                
             }
-
+            
+            
             if let value = description {
+                
                 try container.encode(value, forKey: .description)
+                
             }
-
+            
+            
             try container.encode(link, forKey: .link)
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -325,25 +290,30 @@ public enum AppBskyUnspeccedDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
             guard let other = other as? Self else { return false }
-
-            if topic != other.topic {
+            
+            if self.topic != other.topic {
                 return false
             }
-
+            
+            
             if displayName != other.displayName {
                 return false
             }
-
+            
+            
             if description != other.description {
                 return false
             }
-
-            if link != other.link {
+            
+            
+            if self.link != other.link {
                 return false
             }
-
+            
             return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -357,67 +327,11 @@ public enum AppBskyUnspeccedDefs {
             case description
             case link
         }
-
-        // MARK: - PendingDataLoadable
-
-        /// Check if any properties contain pending data that needs loading
-        public var hasPendingData: Bool {
-            var hasPending = false
-
-            if !hasPending, let loadable = topic as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            if !hasPending, let value = displayName, let loadable = value as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            if !hasPending, let value = description, let loadable = value as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            if !hasPending, let loadable = link as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-
-            return hasPending
-        }
-
-        /// Load any pending data in properties
-        public mutating func loadPendingData() async {
-            if let loadable = topic as? PendingDataLoadable, loadable.hasPendingData {
-                var mutableValue = loadable
-                await mutableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = mutableValue as? String {
-                    topic = updatedValue
-                }
-            }
-
-            if let value = displayName, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                await loadableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = loadableValue as? String {
-                    displayName = updatedValue
-                }
-            }
-
-            if let value = description, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                await loadableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = loadableValue as? String {
-                    description = updatedValue
-                }
-            }
-
-            if let loadable = link as? PendingDataLoadable, loadable.hasPendingData {
-                var mutableValue = loadable
-                await mutableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = mutableValue as? String {
-                    link = updatedValue
-                }
-            }
-        }
     }
+
+
+
 }
+
+
+                           

@@ -1,65 +1,92 @@
 import Foundation
 
+
+
 // lexicon: 1, id: com.atproto.server.getAccountInviteCodes
 
-public enum ComAtprotoServerGetAccountInviteCodes {
-    public static let typeIdentifier = "com.atproto.server.getAccountInviteCodes"
-    public struct Parameters: Parametrizable {
+
+public struct ComAtprotoServerGetAccountInviteCodes { 
+
+    public static let typeIdentifier = "com.atproto.server.getAccountInviteCodes"    
+public struct Parameters: Parametrizable {
         public let includeUsed: Bool?
         public let createAvailable: Bool?
-
+        
         public init(
-            includeUsed: Bool? = nil,
+            includeUsed: Bool? = nil, 
             createAvailable: Bool? = nil
-        ) {
+            ) {
             self.includeUsed = includeUsed
             self.createAvailable = createAvailable
+            
         }
     }
-
-    public struct Output: ATProtocolCodable {
+    
+public struct Output: ATProtocolCodable {
+        
+        
         public let codes: [ComAtprotoServerDefs.InviteCode]
-
+        
+        
+        
         // Standard public initializer
         public init(
+            
             codes: [ComAtprotoServerDefs.InviteCode]
-
+            
+            
         ) {
+            
             self.codes = codes
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
-            codes = try container.decode([ComAtprotoServerDefs.InviteCode].self, forKey: .codes)
+            
+            
+            self.codes = try container.decode([ComAtprotoServerDefs.InviteCode].self, forKey: .codes)
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
+            
             try container.encode(codes, forKey: .codes)
+            
+            
         }
-
+        
         private enum CodingKeys: String, CodingKey {
+            
             case codes
+            
         }
     }
+        
+public enum Error: String, Swift.Error, CustomStringConvertible {
+                case duplicateCreate = "DuplicateCreate."
+            public var description: String {
+                return self.rawValue
+            }
+        }
 
-    public enum Error: String, Swift.Error, CustomStringConvertible {
-        case duplicateCreate = "DuplicateCreate."
-        public var description: String {
-            return rawValue
-        }
-    }
+
+
 }
 
-public extension ATProtoClient.Com.Atproto.Server {
+
+extension ATProtoClient.Com.Atproto.Server {
     /// Get all invite codes for the current account. Requires auth.
-    func getAccountInviteCodes(input: ComAtprotoServerGetAccountInviteCodes.Parameters) async throws -> (responseCode: Int, data: ComAtprotoServerGetAccountInviteCodes.Output?) {
+    public func getAccountInviteCodes(input: ComAtprotoServerGetAccountInviteCodes.Parameters) async throws -> (responseCode: Int, data: ComAtprotoServerGetAccountInviteCodes.Output?) {
         let endpoint = "com.atproto.server.getAccountInviteCodes"
-
+        
+        
         let queryItems = input.asQueryItems()
-
+        
         let urlRequest = try await networkManager.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -67,7 +94,7 @@ public extension ATProtoClient.Com.Atproto.Server {
             body: nil,
             queryItems: queryItems
         )
-
+        
         let (responseData, response) = try await networkManager.performRequest(urlRequest)
         let responseCode = response.statusCode
 
@@ -75,16 +102,17 @@ public extension ATProtoClient.Com.Atproto.Server {
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
-
+        
         if !contentType.lowercased().contains("application/json") {
             throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
         }
 
         // Data decoding and validation
-
+        
         let decoder = JSONDecoder()
         let decodedData = try? decoder.decode(ComAtprotoServerGetAccountInviteCodes.Output.self, from: responseData)
-
+        
+        
         return (responseCode, decodedData)
     }
-}
+}                           

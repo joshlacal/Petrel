@@ -102,49 +102,6 @@
             case {{ prop.name }}
             {%- endfor %}
         }
-        
-        // MARK: - PendingDataLoadable
-        
-        /// Check if any properties contain pending data that needs loading
-        public var hasPendingData: Bool {
-            var hasPending = false
-            {% for prop in def_schema.properties %}
-            {% if not prop.optional %}
-            if !hasPending, let loadable = {{ prop.name }} as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-            {% else %}
-            if !hasPending, let value = {{ prop.name }}, let loadable = value as? PendingDataLoadable {
-                hasPending = loadable.hasPendingData
-            }
-            {% endif %}
-            {% endfor %}
-            return hasPending
-        }
-        
-        /// Load any pending data in properties
-        public mutating func loadPendingData() async {
-            {% for prop in def_schema.properties %}
-            {% if not prop.optional %}
-            if let loadable = {{ prop.name }} as? PendingDataLoadable, loadable.hasPendingData {
-                var mutableValue = loadable
-                await mutableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = mutableValue as? {{ prop.type }} {
-                    self.{{ prop.name }} = updatedValue
-                }
-            }
-            {% else %}
-            if let value = {{ prop.name }}, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                await loadableValue.loadPendingData()
-                // Only update if we can safely cast back to the expected type
-                if let updatedValue = loadableValue as? {{ prop.type }} {
-                    self.{{ prop.name }} = updatedValue
-                }
-            }
-            {% endif %}
-            {% endfor %}
-        }
 
         {%- for sub_struct_name, sub_struct in def_schema.sub_structs.items() %}
         public struct {{ sub_struct_name }}{{ sub_struct.conformance }} {
@@ -248,49 +205,6 @@
                 {%- for prop in sub_struct.properties %}
                 case {{ prop.name }}
                 {%- endfor %}
-            }
-            
-            // MARK: - Sub-struct PendingDataLoadable
-            
-            /// Check if any properties contain pending data that needs loading
-            public var hasPendingData: Bool {
-                var hasPending = false
-                {% for prop in sub_struct.properties %}
-                {% if not prop.optional %}
-                if !hasPending, let loadable = {{ prop.name }} as? PendingDataLoadable {
-                    hasPending = loadable.hasPendingData
-                }
-                {% else %}
-                if !hasPending, let value = {{ prop.name }}, let loadable = value as? PendingDataLoadable {
-                    hasPending = loadable.hasPendingData
-                }
-                {% endif %}
-                {% endfor %}
-                return hasPending
-            }
-            
-            /// Load any pending data in properties
-            public mutating func loadPendingData() async {
-                {% for prop in sub_struct.properties %}
-                {% if not prop.optional %}
-                if let loadable = {{ prop.name }} as? PendingDataLoadable, loadable.hasPendingData {
-                    var mutableValue = loadable
-                    await mutableValue.loadPendingData()
-                    // Only update if we can safely cast back to the expected type
-                    if let updatedValue = mutableValue as? {{ prop.type }} {
-                        self.{{ prop.name }} = updatedValue
-                    }
-                }
-                {% else %}
-                if let value = {{ prop.name }}, var loadableValue = value as? PendingDataLoadable, loadableValue.hasPendingData {
-                    await loadableValue.loadPendingData()
-                    // Only update if we can safely cast back to the expected type
-                    if let updatedValue = loadableValue as? {{ prop.type }} {
-                        self.{{ prop.name }} = updatedValue
-                    }
-                }
-                {% endif %}
-                {% endfor %}
             }
         }
         {%- endfor %}

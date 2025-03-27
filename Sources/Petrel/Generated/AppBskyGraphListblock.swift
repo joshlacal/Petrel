@@ -1,102 +1,81 @@
 import Foundation
 
+
+
 // lexicon: 1, id: app.bsky.graph.listblock
 
-public struct AppBskyGraphListblock: ATProtocolCodable, ATProtocolValue {
+
+public struct AppBskyGraphListblock: ATProtocolCodable, ATProtocolValue { 
+
     public static let typeIdentifier = "app.bsky.graph.listblock"
-    public let subject: ATProtocolURI
-    public let createdAt: ATProtocolDate
+        public let subject: ATProtocolURI
+        public let createdAt: ATProtocolDate
 
-    // Standard initializer
-    public init(subject: ATProtocolURI, createdAt: ATProtocolDate) {
-        self.subject = subject
-
-        self.createdAt = createdAt
-    }
-
-    // Codable initializer
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-
-        subject = try container.decode(ATProtocolURI.self, forKey: .subject)
-
-        createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        // Encode the $type field
-        try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
-        try container.encode(subject, forKey: .subject)
-
-        try container.encode(createdAt, forKey: .createdAt)
-    }
-
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
-    }
-
-    public func isEqual(to other: any ATProtocolValue) -> Bool {
-        guard let other = other as? Self else { return false }
-
-        if subject != other.subject {
-            return false
+        // Standard initializer
+        public init(subject: ATProtocolURI, createdAt: ATProtocolDate) {
+            
+            self.subject = subject
+            
+            self.createdAt = createdAt
+            
         }
 
-        if createdAt != other.createdAt {
-            return false
+        // Codable initializer
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            
+            self.subject = try container.decode(ATProtocolURI.self, forKey: .subject)
+            
+            
+            self.createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+            
         }
 
-        return true
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(subject)
-        hasher.combine(createdAt)
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case typeIdentifier = "$type"
-        case subject
-        case createdAt
-    }
-
-    // MARK: - PendingDataLoadable
-
-    /// Check if any properties contain pending data that needs loading
-    public var hasPendingData: Bool {
-        var hasPending = false
-
-        if !hasPending, let loadable = subject as? PendingDataLoadable {
-            hasPending = loadable.hasPendingData
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            // Encode the $type field
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            
+            try container.encode(subject, forKey: .subject)
+            
+            
+            try container.encode(createdAt, forKey: .createdAt)
+            
+        }
+                                            
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
         }
 
-        if !hasPending, let loadable = createdAt as? PendingDataLoadable {
-            hasPending = loadable.hasPendingData
-        }
-
-        return hasPending
-    }
-
-    /// Load any pending data in properties
-    public mutating func loadPendingData() async {
-        if let loadable = subject as? PendingDataLoadable, loadable.hasPendingData {
-            var mutableValue = loadable
-            await mutableValue.loadPendingData()
-            // Only update if we can safely cast back to the expected type
-            if let updatedValue = mutableValue as? ATProtocolURI {
-                subject = updatedValue
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+            
+            if self.subject != other.subject {
+                return false
             }
+            
+            
+            if self.createdAt != other.createdAt {
+                return false
+            }
+            
+            return true
+        }
+        
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(subject)
+            hasher.combine(createdAt)
         }
 
-        if let loadable = createdAt as? PendingDataLoadable, loadable.hasPendingData {
-            var mutableValue = loadable
-            await mutableValue.loadPendingData()
-            // Only update if we can safely cast back to the expected type
-            if let updatedValue = mutableValue as? ATProtocolDate {
-                createdAt = updatedValue
-            }
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case subject
+            case createdAt
         }
-    }
+
+
+
 }
+
+
+                           
