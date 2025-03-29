@@ -25,13 +25,26 @@ public struct {{ union_name | convertRefToSwift }}: Codable, ATProtocolCodable, 
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
-        guard let other = other as? Self else { return false }
+        guard let other = other as? {{ union_name | convertRefToSwift }} else { return false }
         
         if self.items != other.items {
             return false
         }
 
         return true
+    }
+    
+    // DAGCBOR encoding with field ordering
+    public func toCBORValue() throws -> Any {
+        // For union arrays, we need to encode each item while preserving its order
+        var itemsArray = [Any]()
+        
+        for item in items {
+            let itemValue = try item.toCBORValue()
+            itemsArray.append(itemValue)
+        }
+        
+        return itemsArray
     }
 
 }
@@ -109,5 +122,38 @@ public enum {{ union_name | convertRefToSwift }}ForUnionArray: Codable, ATProtoc
 
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
+    }
+    
+    // DAGCBOR encoding with field ordering
+    public func toCBORValue() throws -> Any {
+        var map = OrderedCBORMap()
+        
+        switch self {
+        {%- for ref in refs %}
+        case .{{ ref.camel_case_label | lowerCamelCase }}(let value):
+            // Always add $type first
+            map = map.adding(key: "$type", value: "{{ ref.ref }}")
+            
+            // Add the value's fields while preserving their order
+            if let encodableValue = value as? DAGCBOREncodable {
+                let valueDict = try encodableValue.toCBORValue()
+                
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+            }
+            return map
+        {%- endfor %}
+        case .unexpected(let container):
+            return try container.toCBORValue()
+        }
     }
 }

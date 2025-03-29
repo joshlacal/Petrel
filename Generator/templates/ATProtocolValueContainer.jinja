@@ -132,6 +132,51 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
             throw EncodingError.invalidValue(errorMessage, EncodingError.Context(codingPath: encoder.codingPath, debugDescription: "Cannot encode a decoding error."))
         }
     }
+    
+    // DAG-CBOR encoding with field ordering
+    public func toCBORValue() throws -> Any {
+        switch self {
+        case .knownType(let value):
+            return try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+        case .string(let string):
+            return string
+        case .number(let number):
+            return number
+        case .bigNumber(let string):
+            return string
+        case .object(let dict):
+            var map = OrderedCBORMap()
+            // Sort keys to maintain consistent ordering
+            let sortedKeys = dict.keys.sorted { a, b in
+                if a.utf8.count != b.utf8.count {
+                    return a.utf8.count < b.utf8.count
+                }
+                return a < b
+            }
+            
+            for key in sortedKeys {
+                if let value = dict[key] {
+                    let cborValue = try value.toCBORValue()
+                    map = map.adding(key: key, value: cborValue)
+                }
+            }
+            return map
+        case .array(let array):
+            return try array.map { try $0.toCBORValue() }
+        case .bool(let bool):
+            return bool
+        case .null:
+            return nil as Any?
+        case .link(let link):
+            return link
+        case .bytes(let bytes):
+            return bytes
+        case .unknownType(_, let container):
+            return try container.toCBORValue()
+        case .decodeError(let error):
+            throw DAGCBORError.encodingFailed("Cannot encode error: \(error)")
+        }
+    }
 
     struct DynamicCodingKeys: CodingKey {
         var stringValue: String

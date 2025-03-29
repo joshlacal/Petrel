@@ -14,6 +14,10 @@ public extension Locale.Language {
 }
 
 public struct LanguageCodeContainer: Codable, ATProtocolCodable, Hashable, Sendable {
+    public func toCBORValue() throws -> Any {
+        return lang.languageCode?.identifier ?? lang.minimalIdentifier
+    }
+    
     public var lang: Locale.Language
 
     // Standard initializer

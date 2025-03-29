@@ -1,6 +1,18 @@
 import Foundation
 
-public struct ATProtocolDate: Codable, Hashable, Equatable, Sendable {
+public struct ATProtocolDate: Codable, Hashable, Equatable, Sendable, ATProtocolValue {
+    public func isEqual(to other: any ATProtocolValue) -> Bool {
+        guard let otherDate = other as? ATProtocolDate else {
+            return false
+        }
+        return date == otherDate.date
+    }
+    
+    public func toCBORValue() throws -> Any {
+        // Convert to a string representation for CBOR
+        return iso8601String
+    }
+    
     public let date: Date
 
     public var toDate: Date { date }

@@ -224,13 +224,13 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
     await updateAllComponentsWithNewURL(serviceURL)
 
     try await configManager.updateUserConfiguration(
-      did: sessionInfo.did,
-      handle: sessionInfo.handle,
+        did: sessionInfo.did.didString(),
+        handle: sessionInfo.handle.description,
       serviceEndpoint: endpoint
     )
 
-    did = sessionInfo.did
-    handle = sessionInfo.handle
+      did = sessionInfo.did.didString()
+      handle = sessionInfo.handle.description
 
     return sessionInfo
   }
@@ -470,12 +470,12 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
   /// - Parameter handle: The user's handle.
   /// - Returns: The resolved DID.
   public func resolveHandleToDID(handle: String) async throws -> String {
-    let input = ComAtprotoIdentityResolveHandle.Parameters(handle: handle)
+      let input = ComAtprotoIdentityResolveHandle.Parameters(handle: try Handle(handleString: handle))
     let (responseCode, data) = try await com.atproto.identity.resolveHandle(input: input)
     guard responseCode == 200, let did = data?.did else {
       throw APIError.invalidPDSURL
     }
-    return did
+      return did.didString()
   }
 
   /// Resolves a DID to the user's PDS URL by fetching their DID document.
@@ -521,7 +521,7 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
   public func getHandle() async throws -> String {
     guard let handle = await configManager.getHandle() else {
       if selectedAuthMethod == .legacy {
-        return try await getSession().handle
+          return try await getSession().handle.description
       } else {
         // For OAuth, we should throw an error instead of calling getSession
         throw APIError.authorizationFailed
@@ -533,7 +533,7 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
   public func getDid() async throws -> String {
     guard let did = await configManager.getDID() else {
       if selectedAuthMethod == .legacy {
-        return try await getSession().did
+          return try await getSession().did.didString()
       } else {
         // For OAuth, we should throw an error instead of calling getSession
         throw APIError.authorizationFailed

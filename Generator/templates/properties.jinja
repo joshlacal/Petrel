@@ -74,6 +74,36 @@
             return lhs.isEqual(to: rhs)
         }
 
+        // DAGCBOR encoding with field ordering
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            
+            // Add fields in lexicon-defined order to ensure proper CID generation
+            {% for prop in properties %}
+            {% if prop.optional %}
+            if let value = {{ prop.name }} {
+                {% if '[' in prop.type and ']' in prop.type %}
+                if !value.isEmpty {
+                    {% set var_name = prop.name + 'Value' %}
+                    let {{ var_name }} = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                    map = map.adding(key: "{{ prop.name }}", value: {{ var_name }})
+                }
+                {% else %}
+                {% set var_name = prop.name + 'Value' %}
+                let {{ var_name }} = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "{{ prop.name }}", value: {{ var_name }})
+                {% endif %}
+            }
+            {% else %}
+            {% set var_name = prop.name + 'Value' %}
+            let {{ var_name }} = try ({{ prop.name }} as? DAGCBOREncodable)?.toCBORValue() ?? {{ prop.name }}
+            map = map.adding(key: "{{ prop.name }}", value: {{ var_name }})
+            {% endif %}
+            {% endfor %}
+            
+            return map
+        }
+
 
 
         private enum CodingKeys: String, CodingKey {

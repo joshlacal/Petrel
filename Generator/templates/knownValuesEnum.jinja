@@ -1,4 +1,4 @@
-        public struct {{ enum_name }}: Codable, ATProtocolCodable, ATProtocolValue {
+public struct {{ enum_name }}: Codable, ATProtocolCodable, ATProtocolValue {
             public let rawValue: String
             
             // Predefined constants
@@ -24,6 +24,12 @@
             public func isEqual(to other: any ATProtocolValue) -> Bool {
                 guard let otherValue = other as? {{ enum_name }} else { return false }
                 return self.rawValue == otherValue.rawValue
+            }
+            
+            // DAGCBOR encoding with field ordering
+            public func toCBORValue() throws -> Any {
+                // For string-based enum types, we return the raw string value directly
+                return rawValue
             }
             
             // Provide allCases-like functionality

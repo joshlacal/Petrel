@@ -37,7 +37,7 @@ actor DIDResolutionService: DIDResolving {
     }
 
     public func resolveHandleToDID(handle: String) async throws -> String {
-        let input = ComAtprotoIdentityResolveHandle.Parameters(handle: handle)
+        let input = ComAtprotoIdentityResolveHandle.Parameters(handle: try Handle(handleString: handle))
         let endpoint = "com.atproto.identity.resolveHandle"
 
         let queryItems = input.asQueryItems()
@@ -70,7 +70,7 @@ actor DIDResolutionService: DIDResolving {
         guard responseCode == 200, let did = decodedData?.did else {
             throw APIError.invalidPDSURL
         }
-        return did
+        return did.didString()
     }
 
     public func resolveDIDToPDSURL(did: String) async throws -> URL {

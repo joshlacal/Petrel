@@ -533,8 +533,8 @@ actor NetworkManager: NetworkManaging {
 
             // Update user configuration with the new DID and service endpoint
             try await configurationManager.updateUserConfiguration(
-                did: tokenResponse.did,
-                handle: tokenResponse.handle,
+                did: tokenResponse.did.didString(),
+                handle: tokenResponse.handle.description,
                 serviceEndpoint: tokenResponse.didDoc?.service.first?.serviceEndpoint ?? baseURL.absoluteString
             )
 

@@ -1,26 +1,31 @@
 import Foundation
 
+
+
 // lexicon: 1, id: app.bsky.graph.defs
 
-public enum AppBskyGraphDefs {
-    public static let typeIdentifier = "app.bsky.graph.defs"
 
-    public struct ListViewBasic: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.graph.defs#listViewBasic"
-        public let uri: ATProtocolURI
-        public let cid: String
-        public let name: String
-        public let purpose: ListPurpose
-        public let avatar: URI?
-        public let listItemCount: Int?
-        public let labels: [ComAtprotoLabelDefs.Label]?
-        public let viewer: ListViewerState?
-        public let indexedAt: ATProtocolDate?
+public struct AppBskyGraphDefs { 
+
+    public static let typeIdentifier = "app.bsky.graph.defs"
+        
+public struct ListViewBasic: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.graph.defs#listViewBasic"
+            public let uri: ATProtocolURI
+            public let cid: CID
+            public let name: String
+            public let purpose: ListPurpose
+            public let avatar: URI?
+            public let listItemCount: Int?
+            public let labels: [ComAtprotoLabelDefs.Label]?
+            public let viewer: ListViewerState?
+            public let indexedAt: ATProtocolDate?
 
         // Standard initializer
         public init(
-            uri: ATProtocolURI, cid: String, name: String, purpose: ListPurpose, avatar: URI?, listItemCount: Int?, labels: [ComAtprotoLabelDefs.Label]?, viewer: ListViewerState?, indexedAt: ATProtocolDate?
+            uri: ATProtocolURI, cid: CID, name: String, purpose: ListPurpose, avatar: URI?, listItemCount: Int?, labels: [ComAtprotoLabelDefs.Label]?, viewer: ListViewerState?, indexedAt: ATProtocolDate?
         ) {
+            
             self.uri = uri
             self.cid = cid
             self.name = name
@@ -34,105 +39,135 @@ public enum AppBskyGraphDefs {
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-
+                
+                self.uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'uri': \(error)")
                 throw error
             }
             do {
-                cid = try container.decode(String.self, forKey: .cid)
-
+                
+                self.cid = try container.decode(CID.self, forKey: .cid)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'cid': \(error)")
                 throw error
             }
             do {
-                name = try container.decode(String.self, forKey: .name)
-
+                
+                self.name = try container.decode(String.self, forKey: .name)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'name': \(error)")
                 throw error
             }
             do {
-                purpose = try container.decode(ListPurpose.self, forKey: .purpose)
-
+                
+                self.purpose = try container.decode(ListPurpose.self, forKey: .purpose)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'purpose': \(error)")
                 throw error
             }
             do {
-                avatar = try container.decodeIfPresent(URI.self, forKey: .avatar)
-
+                
+                self.avatar = try container.decodeIfPresent(URI.self, forKey: .avatar)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'avatar': \(error)")
                 throw error
             }
             do {
-                listItemCount = try container.decodeIfPresent(Int.self, forKey: .listItemCount)
-
+                
+                self.listItemCount = try container.decodeIfPresent(Int.self, forKey: .listItemCount)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'listItemCount': \(error)")
                 throw error
             }
             do {
-                labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
-
+                
+                self.labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'labels': \(error)")
                 throw error
             }
             do {
-                viewer = try container.decodeIfPresent(ListViewerState.self, forKey: .viewer)
-
+                
+                self.viewer = try container.decodeIfPresent(ListViewerState.self, forKey: .viewer)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'viewer': \(error)")
                 throw error
             }
             do {
-                indexedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .indexedAt)
-
+                
+                self.indexedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .indexedAt)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'indexedAt': \(error)")
                 throw error
             }
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
             try container.encode(uri, forKey: .uri)
-
+            
+            
             try container.encode(cid, forKey: .cid)
-
+            
+            
             try container.encode(name, forKey: .name)
-
+            
+            
             try container.encode(purpose, forKey: .purpose)
-
+            
+            
             if let value = avatar {
+                
                 try container.encode(value, forKey: .avatar)
+                
             }
-
+            
+            
             if let value = listItemCount {
+                
                 try container.encode(value, forKey: .listItemCount)
+                
             }
-
+            
+            
             if let value = labels {
+                
                 if !value.isEmpty {
                     try container.encode(value, forKey: .labels)
                 }
+                
             }
-
+            
+            
             if let value = viewer {
+                
                 try container.encode(value, forKey: .viewer)
+                
             }
-
+            
+            
             if let value = indexedAt {
+                
                 try container.encode(value, forKey: .indexedAt)
+                
             }
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -168,49 +203,148 @@ public enum AppBskyGraphDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
             guard let other = other as? Self else { return false }
-
-            if uri != other.uri {
+            
+            if self.uri != other.uri {
                 return false
             }
-
-            if cid != other.cid {
+            
+            
+            if self.cid != other.cid {
                 return false
             }
-
-            if name != other.name {
+            
+            
+            if self.name != other.name {
                 return false
             }
-
-            if purpose != other.purpose {
+            
+            
+            if self.purpose != other.purpose {
                 return false
             }
-
+            
+            
             if avatar != other.avatar {
                 return false
             }
-
+            
+            
             if listItemCount != other.listItemCount {
                 return false
             }
-
+            
+            
             if labels != other.labels {
                 return false
             }
-
+            
+            
             if viewer != other.viewer {
                 return false
             }
-
+            
+            
             if indexedAt != other.indexedAt {
                 return false
             }
-
+            
             return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
             return lhs.isEqual(to: rhs)
+        }
+
+        // DAGCBOR encoding with field ordering
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            
+            // Always add $type first (AT Protocol convention)
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            
+            // Add remaining fields in lexicon-defined order
+            
+            
+            
+            let uriValue = try (uri as? DAGCBOREncodable)?.toCBORValue() ?? uri
+            map = map.adding(key: "uri", value: uriValue)
+            
+            
+            
+            
+            let cidValue = try (cid as? DAGCBOREncodable)?.toCBORValue() ?? cid
+            map = map.adding(key: "cid", value: cidValue)
+            
+            
+            
+            
+            let nameValue = try (name as? DAGCBOREncodable)?.toCBORValue() ?? name
+            map = map.adding(key: "name", value: nameValue)
+            
+            
+            
+            
+            let purposeValue = try (purpose as? DAGCBOREncodable)?.toCBORValue() ?? purpose
+            map = map.adding(key: "purpose", value: purposeValue)
+            
+            
+            
+            if let value = avatar {
+                
+                
+                let avatarValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "avatar", value: avatarValue)
+                
+            }
+            
+            
+            
+            if let value = listItemCount {
+                
+                
+                let listItemCountValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "listItemCount", value: listItemCountValue)
+                
+            }
+            
+            
+            
+            if let value = labels {
+                
+                if !value.isEmpty {
+                    
+                    let labelsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                    map = map.adding(key: "labels", value: labelsValue)
+                }
+                
+            }
+            
+            
+            
+            if let value = viewer {
+                
+                
+                let viewerValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "viewer", value: viewerValue)
+                
+            }
+            
+            
+            
+            if let value = indexedAt {
+                
+                
+                let indexedAtValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "indexedAt", value: indexedAtValue)
+                
+            }
+            
+            
+            
+            return map
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -226,26 +360,27 @@ public enum AppBskyGraphDefs {
             case indexedAt
         }
     }
-
-    public struct ListView: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.graph.defs#listView"
-        public let uri: ATProtocolURI
-        public let cid: String
-        public let creator: AppBskyActorDefs.ProfileView
-        public let name: String
-        public let purpose: ListPurpose
-        public let description: String?
-        public let descriptionFacets: [AppBskyRichtextFacet]?
-        public let avatar: URI?
-        public let listItemCount: Int?
-        public let labels: [ComAtprotoLabelDefs.Label]?
-        public let viewer: ListViewerState?
-        public let indexedAt: ATProtocolDate
+        
+public struct ListView: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.graph.defs#listView"
+            public let uri: ATProtocolURI
+            public let cid: CID
+            public let creator: AppBskyActorDefs.ProfileView
+            public let name: String
+            public let purpose: ListPurpose
+            public let description: String?
+            public let descriptionFacets: [AppBskyRichtextFacet]?
+            public let avatar: URI?
+            public let listItemCount: Int?
+            public let labels: [ComAtprotoLabelDefs.Label]?
+            public let viewer: ListViewerState?
+            public let indexedAt: ATProtocolDate
 
         // Standard initializer
         public init(
-            uri: ATProtocolURI, cid: String, creator: AppBskyActorDefs.ProfileView, name: String, purpose: ListPurpose, description: String?, descriptionFacets: [AppBskyRichtextFacet]?, avatar: URI?, listItemCount: Int?, labels: [ComAtprotoLabelDefs.Label]?, viewer: ListViewerState?, indexedAt: ATProtocolDate
+            uri: ATProtocolURI, cid: CID, creator: AppBskyActorDefs.ProfileView, name: String, purpose: ListPurpose, description: String?, descriptionFacets: [AppBskyRichtextFacet]?, avatar: URI?, listItemCount: Int?, labels: [ComAtprotoLabelDefs.Label]?, viewer: ListViewerState?, indexedAt: ATProtocolDate
         ) {
+            
             self.uri = uri
             self.cid = cid
             self.creator = creator
@@ -262,136 +397,174 @@ public enum AppBskyGraphDefs {
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-
+                
+                self.uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'uri': \(error)")
                 throw error
             }
             do {
-                cid = try container.decode(String.self, forKey: .cid)
-
+                
+                self.cid = try container.decode(CID.self, forKey: .cid)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'cid': \(error)")
                 throw error
             }
             do {
-                creator = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: .creator)
-
+                
+                self.creator = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: .creator)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'creator': \(error)")
                 throw error
             }
             do {
-                name = try container.decode(String.self, forKey: .name)
-
+                
+                self.name = try container.decode(String.self, forKey: .name)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'name': \(error)")
                 throw error
             }
             do {
-                purpose = try container.decode(ListPurpose.self, forKey: .purpose)
-
+                
+                self.purpose = try container.decode(ListPurpose.self, forKey: .purpose)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'purpose': \(error)")
                 throw error
             }
             do {
-                description = try container.decodeIfPresent(String.self, forKey: .description)
-
+                
+                self.description = try container.decodeIfPresent(String.self, forKey: .description)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'description': \(error)")
                 throw error
             }
             do {
-                descriptionFacets = try container.decodeIfPresent([AppBskyRichtextFacet].self, forKey: .descriptionFacets)
-
+                
+                self.descriptionFacets = try container.decodeIfPresent([AppBskyRichtextFacet].self, forKey: .descriptionFacets)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'descriptionFacets': \(error)")
                 throw error
             }
             do {
-                avatar = try container.decodeIfPresent(URI.self, forKey: .avatar)
-
+                
+                self.avatar = try container.decodeIfPresent(URI.self, forKey: .avatar)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'avatar': \(error)")
                 throw error
             }
             do {
-                listItemCount = try container.decodeIfPresent(Int.self, forKey: .listItemCount)
-
+                
+                self.listItemCount = try container.decodeIfPresent(Int.self, forKey: .listItemCount)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'listItemCount': \(error)")
                 throw error
             }
             do {
-                labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
-
+                
+                self.labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'labels': \(error)")
                 throw error
             }
             do {
-                viewer = try container.decodeIfPresent(ListViewerState.self, forKey: .viewer)
-
+                
+                self.viewer = try container.decodeIfPresent(ListViewerState.self, forKey: .viewer)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'viewer': \(error)")
                 throw error
             }
             do {
-                indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
-
+                
+                self.indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'indexedAt': \(error)")
                 throw error
             }
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
             try container.encode(uri, forKey: .uri)
-
+            
+            
             try container.encode(cid, forKey: .cid)
-
+            
+            
             try container.encode(creator, forKey: .creator)
-
+            
+            
             try container.encode(name, forKey: .name)
-
+            
+            
             try container.encode(purpose, forKey: .purpose)
-
+            
+            
             if let value = description {
+                
                 try container.encode(value, forKey: .description)
+                
             }
-
+            
+            
             if let value = descriptionFacets {
+                
                 if !value.isEmpty {
                     try container.encode(value, forKey: .descriptionFacets)
                 }
+                
             }
-
+            
+            
             if let value = avatar {
+                
                 try container.encode(value, forKey: .avatar)
+                
             }
-
+            
+            
             if let value = listItemCount {
+                
                 try container.encode(value, forKey: .listItemCount)
+                
             }
-
+            
+            
             if let value = labels {
+                
                 if !value.isEmpty {
                     try container.encode(value, forKey: .labels)
                 }
+                
             }
-
+            
+            
             if let value = viewer {
+                
                 try container.encode(value, forKey: .viewer)
+                
             }
-
+            
+            
             try container.encode(indexedAt, forKey: .indexedAt)
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -434,61 +607,187 @@ public enum AppBskyGraphDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
             guard let other = other as? Self else { return false }
-
-            if uri != other.uri {
+            
+            if self.uri != other.uri {
                 return false
             }
-
-            if cid != other.cid {
+            
+            
+            if self.cid != other.cid {
                 return false
             }
-
-            if creator != other.creator {
+            
+            
+            if self.creator != other.creator {
                 return false
             }
-
-            if name != other.name {
+            
+            
+            if self.name != other.name {
                 return false
             }
-
-            if purpose != other.purpose {
+            
+            
+            if self.purpose != other.purpose {
                 return false
             }
-
+            
+            
             if description != other.description {
                 return false
             }
-
+            
+            
             if descriptionFacets != other.descriptionFacets {
                 return false
             }
-
+            
+            
             if avatar != other.avatar {
                 return false
             }
-
+            
+            
             if listItemCount != other.listItemCount {
                 return false
             }
-
+            
+            
             if labels != other.labels {
                 return false
             }
-
+            
+            
             if viewer != other.viewer {
                 return false
             }
-
-            if indexedAt != other.indexedAt {
+            
+            
+            if self.indexedAt != other.indexedAt {
                 return false
             }
-
+            
             return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
             return lhs.isEqual(to: rhs)
+        }
+
+        // DAGCBOR encoding with field ordering
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            
+            // Always add $type first (AT Protocol convention)
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            
+            // Add remaining fields in lexicon-defined order
+            
+            
+            
+            let uriValue = try (uri as? DAGCBOREncodable)?.toCBORValue() ?? uri
+            map = map.adding(key: "uri", value: uriValue)
+            
+            
+            
+            
+            let cidValue = try (cid as? DAGCBOREncodable)?.toCBORValue() ?? cid
+            map = map.adding(key: "cid", value: cidValue)
+            
+            
+            
+            
+            let creatorValue = try (creator as? DAGCBOREncodable)?.toCBORValue() ?? creator
+            map = map.adding(key: "creator", value: creatorValue)
+            
+            
+            
+            
+            let nameValue = try (name as? DAGCBOREncodable)?.toCBORValue() ?? name
+            map = map.adding(key: "name", value: nameValue)
+            
+            
+            
+            
+            let purposeValue = try (purpose as? DAGCBOREncodable)?.toCBORValue() ?? purpose
+            map = map.adding(key: "purpose", value: purposeValue)
+            
+            
+            
+            if let value = description {
+                
+                
+                let descriptionValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "description", value: descriptionValue)
+                
+            }
+            
+            
+            
+            if let value = descriptionFacets {
+                
+                if !value.isEmpty {
+                    
+                    let descriptionFacetsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                    map = map.adding(key: "descriptionFacets", value: descriptionFacetsValue)
+                }
+                
+            }
+            
+            
+            
+            if let value = avatar {
+                
+                
+                let avatarValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "avatar", value: avatarValue)
+                
+            }
+            
+            
+            
+            if let value = listItemCount {
+                
+                
+                let listItemCountValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "listItemCount", value: listItemCountValue)
+                
+            }
+            
+            
+            
+            if let value = labels {
+                
+                if !value.isEmpty {
+                    
+                    let labelsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                    map = map.adding(key: "labels", value: labelsValue)
+                }
+                
+            }
+            
+            
+            
+            if let value = viewer {
+                
+                
+                let viewerValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "viewer", value: viewerValue)
+                
+            }
+            
+            
+            
+            
+            let indexedAtValue = try (indexedAt as? DAGCBOREncodable)?.toCBORValue() ?? indexedAt
+            map = map.adding(key: "indexedAt", value: indexedAtValue)
+            
+            
+            
+            return map
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -507,46 +806,53 @@ public enum AppBskyGraphDefs {
             case indexedAt
         }
     }
-
-    public struct ListItemView: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.graph.defs#listItemView"
-        public let uri: ATProtocolURI
-        public let subject: AppBskyActorDefs.ProfileView
+        
+public struct ListItemView: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.graph.defs#listItemView"
+            public let uri: ATProtocolURI
+            public let subject: AppBskyActorDefs.ProfileView
 
         // Standard initializer
         public init(
             uri: ATProtocolURI, subject: AppBskyActorDefs.ProfileView
         ) {
+            
             self.uri = uri
             self.subject = subject
         }
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-
+                
+                self.uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'uri': \(error)")
                 throw error
             }
             do {
-                subject = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: .subject)
-
+                
+                self.subject = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: .subject)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'subject': \(error)")
                 throw error
             }
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
             try container.encode(uri, forKey: .uri)
-
+            
+            
             try container.encode(subject, forKey: .subject)
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -555,21 +861,49 @@ public enum AppBskyGraphDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
             guard let other = other as? Self else { return false }
-
-            if uri != other.uri {
+            
+            if self.uri != other.uri {
                 return false
             }
-
-            if subject != other.subject {
+            
+            
+            if self.subject != other.subject {
                 return false
             }
-
+            
             return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
             return lhs.isEqual(to: rhs)
+        }
+
+        // DAGCBOR encoding with field ordering
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            
+            // Always add $type first (AT Protocol convention)
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            
+            // Add remaining fields in lexicon-defined order
+            
+            
+            
+            let uriValue = try (uri as? DAGCBOREncodable)?.toCBORValue() ?? uri
+            map = map.adding(key: "uri", value: uriValue)
+            
+            
+            
+            
+            let subjectValue = try (subject as? DAGCBOREncodable)?.toCBORValue() ?? subject
+            map = map.adding(key: "subject", value: subjectValue)
+            
+            
+            
+            return map
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -578,25 +912,26 @@ public enum AppBskyGraphDefs {
             case subject
         }
     }
-
-    public struct StarterPackView: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.graph.defs#starterPackView"
-        public let uri: ATProtocolURI
-        public let cid: String
-        public let record: ATProtocolValueContainer
-        public let creator: AppBskyActorDefs.ProfileViewBasic
-        public let list: ListViewBasic?
-        public let listItemsSample: [ListItemView]?
-        public let feeds: [AppBskyFeedDefs.GeneratorView]?
-        public let joinedWeekCount: Int?
-        public let joinedAllTimeCount: Int?
-        public let labels: [ComAtprotoLabelDefs.Label]?
-        public let indexedAt: ATProtocolDate
+        
+public struct StarterPackView: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.graph.defs#starterPackView"
+            public let uri: ATProtocolURI
+            public let cid: CID
+            public let record: ATProtocolValueContainer
+            public let creator: AppBskyActorDefs.ProfileViewBasic
+            public let list: ListViewBasic?
+            public let listItemsSample: [ListItemView]?
+            public let feeds: [AppBskyFeedDefs.GeneratorView]?
+            public let joinedWeekCount: Int?
+            public let joinedAllTimeCount: Int?
+            public let labels: [ComAtprotoLabelDefs.Label]?
+            public let indexedAt: ATProtocolDate
 
         // Standard initializer
         public init(
-            uri: ATProtocolURI, cid: String, record: ATProtocolValueContainer, creator: AppBskyActorDefs.ProfileViewBasic, list: ListViewBasic?, listItemsSample: [ListItemView]?, feeds: [AppBskyFeedDefs.GeneratorView]?, joinedWeekCount: Int?, joinedAllTimeCount: Int?, labels: [ComAtprotoLabelDefs.Label]?, indexedAt: ATProtocolDate
+            uri: ATProtocolURI, cid: CID, record: ATProtocolValueContainer, creator: AppBskyActorDefs.ProfileViewBasic, list: ListViewBasic?, listItemsSample: [ListItemView]?, feeds: [AppBskyFeedDefs.GeneratorView]?, joinedWeekCount: Int?, joinedAllTimeCount: Int?, labels: [ComAtprotoLabelDefs.Label]?, indexedAt: ATProtocolDate
         ) {
+            
             self.uri = uri
             self.cid = cid
             self.record = record
@@ -612,129 +947,165 @@ public enum AppBskyGraphDefs {
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-
+                
+                self.uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'uri': \(error)")
                 throw error
             }
             do {
-                cid = try container.decode(String.self, forKey: .cid)
-
+                
+                self.cid = try container.decode(CID.self, forKey: .cid)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'cid': \(error)")
                 throw error
             }
             do {
-                record = try container.decode(ATProtocolValueContainer.self, forKey: .record)
-
+                
+                self.record = try container.decode(ATProtocolValueContainer.self, forKey: .record)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'record': \(error)")
                 throw error
             }
             do {
-                creator = try container.decode(AppBskyActorDefs.ProfileViewBasic.self, forKey: .creator)
-
+                
+                self.creator = try container.decode(AppBskyActorDefs.ProfileViewBasic.self, forKey: .creator)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'creator': \(error)")
                 throw error
             }
             do {
-                list = try container.decodeIfPresent(ListViewBasic.self, forKey: .list)
-
+                
+                self.list = try container.decodeIfPresent(ListViewBasic.self, forKey: .list)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'list': \(error)")
                 throw error
             }
             do {
-                listItemsSample = try container.decodeIfPresent([ListItemView].self, forKey: .listItemsSample)
-
+                
+                self.listItemsSample = try container.decodeIfPresent([ListItemView].self, forKey: .listItemsSample)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'listItemsSample': \(error)")
                 throw error
             }
             do {
-                feeds = try container.decodeIfPresent([AppBskyFeedDefs.GeneratorView].self, forKey: .feeds)
-
+                
+                self.feeds = try container.decodeIfPresent([AppBskyFeedDefs.GeneratorView].self, forKey: .feeds)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'feeds': \(error)")
                 throw error
             }
             do {
-                joinedWeekCount = try container.decodeIfPresent(Int.self, forKey: .joinedWeekCount)
-
+                
+                self.joinedWeekCount = try container.decodeIfPresent(Int.self, forKey: .joinedWeekCount)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'joinedWeekCount': \(error)")
                 throw error
             }
             do {
-                joinedAllTimeCount = try container.decodeIfPresent(Int.self, forKey: .joinedAllTimeCount)
-
+                
+                self.joinedAllTimeCount = try container.decodeIfPresent(Int.self, forKey: .joinedAllTimeCount)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'joinedAllTimeCount': \(error)")
                 throw error
             }
             do {
-                labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
-
+                
+                self.labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'labels': \(error)")
                 throw error
             }
             do {
-                indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
-
+                
+                self.indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'indexedAt': \(error)")
                 throw error
             }
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
             try container.encode(uri, forKey: .uri)
-
+            
+            
             try container.encode(cid, forKey: .cid)
-
+            
+            
             try container.encode(record, forKey: .record)
-
+            
+            
             try container.encode(creator, forKey: .creator)
-
+            
+            
             if let value = list {
+                
                 try container.encode(value, forKey: .list)
+                
             }
-
+            
+            
             if let value = listItemsSample {
+                
                 if !value.isEmpty {
                     try container.encode(value, forKey: .listItemsSample)
                 }
+                
             }
-
+            
+            
             if let value = feeds {
+                
                 if !value.isEmpty {
                     try container.encode(value, forKey: .feeds)
                 }
+                
             }
-
+            
+            
             if let value = joinedWeekCount {
+                
                 try container.encode(value, forKey: .joinedWeekCount)
+                
             }
-
+            
+            
             if let value = joinedAllTimeCount {
+                
                 try container.encode(value, forKey: .joinedAllTimeCount)
+                
             }
-
+            
+            
             if let value = labels {
+                
                 if !value.isEmpty {
                     try container.encode(value, forKey: .labels)
                 }
+                
             }
-
+            
+            
             try container.encode(indexedAt, forKey: .indexedAt)
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -776,57 +1147,178 @@ public enum AppBskyGraphDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
             guard let other = other as? Self else { return false }
-
-            if uri != other.uri {
+            
+            if self.uri != other.uri {
                 return false
             }
-
-            if cid != other.cid {
+            
+            
+            if self.cid != other.cid {
                 return false
             }
-
-            if record != other.record {
+            
+            
+            if self.record != other.record {
                 return false
             }
-
-            if creator != other.creator {
+            
+            
+            if self.creator != other.creator {
                 return false
             }
-
+            
+            
             if list != other.list {
                 return false
             }
-
+            
+            
             if listItemsSample != other.listItemsSample {
                 return false
             }
-
+            
+            
             if feeds != other.feeds {
                 return false
             }
-
+            
+            
             if joinedWeekCount != other.joinedWeekCount {
                 return false
             }
-
+            
+            
             if joinedAllTimeCount != other.joinedAllTimeCount {
                 return false
             }
-
+            
+            
             if labels != other.labels {
                 return false
             }
-
-            if indexedAt != other.indexedAt {
+            
+            
+            if self.indexedAt != other.indexedAt {
                 return false
             }
-
+            
             return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
             return lhs.isEqual(to: rhs)
+        }
+
+        // DAGCBOR encoding with field ordering
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            
+            // Always add $type first (AT Protocol convention)
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            
+            // Add remaining fields in lexicon-defined order
+            
+            
+            
+            let uriValue = try (uri as? DAGCBOREncodable)?.toCBORValue() ?? uri
+            map = map.adding(key: "uri", value: uriValue)
+            
+            
+            
+            
+            let cidValue = try (cid as? DAGCBOREncodable)?.toCBORValue() ?? cid
+            map = map.adding(key: "cid", value: cidValue)
+            
+            
+            
+            
+            let recordValue = try (record as? DAGCBOREncodable)?.toCBORValue() ?? record
+            map = map.adding(key: "record", value: recordValue)
+            
+            
+            
+            
+            let creatorValue = try (creator as? DAGCBOREncodable)?.toCBORValue() ?? creator
+            map = map.adding(key: "creator", value: creatorValue)
+            
+            
+            
+            if let value = list {
+                
+                
+                let listValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "list", value: listValue)
+                
+            }
+            
+            
+            
+            if let value = listItemsSample {
+                
+                if !value.isEmpty {
+                    
+                    let listItemsSampleValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                    map = map.adding(key: "listItemsSample", value: listItemsSampleValue)
+                }
+                
+            }
+            
+            
+            
+            if let value = feeds {
+                
+                if !value.isEmpty {
+                    
+                    let feedsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                    map = map.adding(key: "feeds", value: feedsValue)
+                }
+                
+            }
+            
+            
+            
+            if let value = joinedWeekCount {
+                
+                
+                let joinedWeekCountValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "joinedWeekCount", value: joinedWeekCountValue)
+                
+            }
+            
+            
+            
+            if let value = joinedAllTimeCount {
+                
+                
+                let joinedAllTimeCountValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "joinedAllTimeCount", value: joinedAllTimeCountValue)
+                
+            }
+            
+            
+            
+            if let value = labels {
+                
+                if !value.isEmpty {
+                    
+                    let labelsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                    map = map.adding(key: "labels", value: labelsValue)
+                }
+                
+            }
+            
+            
+            
+            
+            let indexedAtValue = try (indexedAt as? DAGCBOREncodable)?.toCBORValue() ?? indexedAt
+            map = map.adding(key: "indexedAt", value: indexedAtValue)
+            
+            
+            
+            return map
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -844,23 +1336,24 @@ public enum AppBskyGraphDefs {
             case indexedAt
         }
     }
-
-    public struct StarterPackViewBasic: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.graph.defs#starterPackViewBasic"
-        public let uri: ATProtocolURI
-        public let cid: String
-        public let record: ATProtocolValueContainer
-        public let creator: AppBskyActorDefs.ProfileViewBasic
-        public let listItemCount: Int?
-        public let joinedWeekCount: Int?
-        public let joinedAllTimeCount: Int?
-        public let labels: [ComAtprotoLabelDefs.Label]?
-        public let indexedAt: ATProtocolDate
+        
+public struct StarterPackViewBasic: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.graph.defs#starterPackViewBasic"
+            public let uri: ATProtocolURI
+            public let cid: CID
+            public let record: ATProtocolValueContainer
+            public let creator: AppBskyActorDefs.ProfileViewBasic
+            public let listItemCount: Int?
+            public let joinedWeekCount: Int?
+            public let joinedAllTimeCount: Int?
+            public let labels: [ComAtprotoLabelDefs.Label]?
+            public let indexedAt: ATProtocolDate
 
         // Standard initializer
         public init(
-            uri: ATProtocolURI, cid: String, record: ATProtocolValueContainer, creator: AppBskyActorDefs.ProfileViewBasic, listItemCount: Int?, joinedWeekCount: Int?, joinedAllTimeCount: Int?, labels: [ComAtprotoLabelDefs.Label]?, indexedAt: ATProtocolDate
+            uri: ATProtocolURI, cid: CID, record: ATProtocolValueContainer, creator: AppBskyActorDefs.ProfileViewBasic, listItemCount: Int?, joinedWeekCount: Int?, joinedAllTimeCount: Int?, labels: [ComAtprotoLabelDefs.Label]?, indexedAt: ATProtocolDate
         ) {
+            
             self.uri = uri
             self.cid = cid
             self.record = record
@@ -874,103 +1367,131 @@ public enum AppBskyGraphDefs {
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-
+                
+                self.uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'uri': \(error)")
                 throw error
             }
             do {
-                cid = try container.decode(String.self, forKey: .cid)
-
+                
+                self.cid = try container.decode(CID.self, forKey: .cid)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'cid': \(error)")
                 throw error
             }
             do {
-                record = try container.decode(ATProtocolValueContainer.self, forKey: .record)
-
+                
+                self.record = try container.decode(ATProtocolValueContainer.self, forKey: .record)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'record': \(error)")
                 throw error
             }
             do {
-                creator = try container.decode(AppBskyActorDefs.ProfileViewBasic.self, forKey: .creator)
-
+                
+                self.creator = try container.decode(AppBskyActorDefs.ProfileViewBasic.self, forKey: .creator)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'creator': \(error)")
                 throw error
             }
             do {
-                listItemCount = try container.decodeIfPresent(Int.self, forKey: .listItemCount)
-
+                
+                self.listItemCount = try container.decodeIfPresent(Int.self, forKey: .listItemCount)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'listItemCount': \(error)")
                 throw error
             }
             do {
-                joinedWeekCount = try container.decodeIfPresent(Int.self, forKey: .joinedWeekCount)
-
+                
+                self.joinedWeekCount = try container.decodeIfPresent(Int.self, forKey: .joinedWeekCount)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'joinedWeekCount': \(error)")
                 throw error
             }
             do {
-                joinedAllTimeCount = try container.decodeIfPresent(Int.self, forKey: .joinedAllTimeCount)
-
+                
+                self.joinedAllTimeCount = try container.decodeIfPresent(Int.self, forKey: .joinedAllTimeCount)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'joinedAllTimeCount': \(error)")
                 throw error
             }
             do {
-                labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
-
+                
+                self.labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'labels': \(error)")
                 throw error
             }
             do {
-                indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
-
+                
+                self.indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'indexedAt': \(error)")
                 throw error
             }
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
             try container.encode(uri, forKey: .uri)
-
+            
+            
             try container.encode(cid, forKey: .cid)
-
+            
+            
             try container.encode(record, forKey: .record)
-
+            
+            
             try container.encode(creator, forKey: .creator)
-
+            
+            
             if let value = listItemCount {
+                
                 try container.encode(value, forKey: .listItemCount)
+                
             }
-
+            
+            
             if let value = joinedWeekCount {
+                
                 try container.encode(value, forKey: .joinedWeekCount)
+                
             }
-
+            
+            
             if let value = joinedAllTimeCount {
+                
                 try container.encode(value, forKey: .joinedAllTimeCount)
+                
             }
-
+            
+            
             if let value = labels {
+                
                 if !value.isEmpty {
                     try container.encode(value, forKey: .labels)
                 }
+                
             }
-
+            
+            
             try container.encode(indexedAt, forKey: .indexedAt)
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1002,49 +1523,144 @@ public enum AppBskyGraphDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
             guard let other = other as? Self else { return false }
-
-            if uri != other.uri {
+            
+            if self.uri != other.uri {
                 return false
             }
-
-            if cid != other.cid {
+            
+            
+            if self.cid != other.cid {
                 return false
             }
-
-            if record != other.record {
+            
+            
+            if self.record != other.record {
                 return false
             }
-
-            if creator != other.creator {
+            
+            
+            if self.creator != other.creator {
                 return false
             }
-
+            
+            
             if listItemCount != other.listItemCount {
                 return false
             }
-
+            
+            
             if joinedWeekCount != other.joinedWeekCount {
                 return false
             }
-
+            
+            
             if joinedAllTimeCount != other.joinedAllTimeCount {
                 return false
             }
-
+            
+            
             if labels != other.labels {
                 return false
             }
-
-            if indexedAt != other.indexedAt {
+            
+            
+            if self.indexedAt != other.indexedAt {
                 return false
             }
-
+            
             return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
             return lhs.isEqual(to: rhs)
+        }
+
+        // DAGCBOR encoding with field ordering
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            
+            // Always add $type first (AT Protocol convention)
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            
+            // Add remaining fields in lexicon-defined order
+            
+            
+            
+            let uriValue = try (uri as? DAGCBOREncodable)?.toCBORValue() ?? uri
+            map = map.adding(key: "uri", value: uriValue)
+            
+            
+            
+            
+            let cidValue = try (cid as? DAGCBOREncodable)?.toCBORValue() ?? cid
+            map = map.adding(key: "cid", value: cidValue)
+            
+            
+            
+            
+            let recordValue = try (record as? DAGCBOREncodable)?.toCBORValue() ?? record
+            map = map.adding(key: "record", value: recordValue)
+            
+            
+            
+            
+            let creatorValue = try (creator as? DAGCBOREncodable)?.toCBORValue() ?? creator
+            map = map.adding(key: "creator", value: creatorValue)
+            
+            
+            
+            if let value = listItemCount {
+                
+                
+                let listItemCountValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "listItemCount", value: listItemCountValue)
+                
+            }
+            
+            
+            
+            if let value = joinedWeekCount {
+                
+                
+                let joinedWeekCountValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "joinedWeekCount", value: joinedWeekCountValue)
+                
+            }
+            
+            
+            
+            if let value = joinedAllTimeCount {
+                
+                
+                let joinedAllTimeCountValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "joinedAllTimeCount", value: joinedAllTimeCountValue)
+                
+            }
+            
+            
+            
+            if let value = labels {
+                
+                if !value.isEmpty {
+                    
+                    let labelsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                    map = map.adding(key: "labels", value: labelsValue)
+                }
+                
+            }
+            
+            
+            
+            
+            let indexedAtValue = try (indexedAt as? DAGCBOREncodable)?.toCBORValue() ?? indexedAt
+            map = map.adding(key: "indexedAt", value: indexedAtValue)
+            
+            
+            
+            return map
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -1060,50 +1676,61 @@ public enum AppBskyGraphDefs {
             case indexedAt
         }
     }
-
-    public struct ListViewerState: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.graph.defs#listViewerState"
-        public let muted: Bool?
-        public let blocked: ATProtocolURI?
+        
+public struct ListViewerState: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.graph.defs#listViewerState"
+            public let muted: Bool?
+            public let blocked: ATProtocolURI?
 
         // Standard initializer
         public init(
             muted: Bool?, blocked: ATProtocolURI?
         ) {
+            
             self.muted = muted
             self.blocked = blocked
         }
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                muted = try container.decodeIfPresent(Bool.self, forKey: .muted)
-
+                
+                self.muted = try container.decodeIfPresent(Bool.self, forKey: .muted)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'muted': \(error)")
                 throw error
             }
             do {
-                blocked = try container.decodeIfPresent(ATProtocolURI.self, forKey: .blocked)
-
+                
+                self.blocked = try container.decodeIfPresent(ATProtocolURI.self, forKey: .blocked)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'blocked': \(error)")
                 throw error
             }
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
             if let value = muted {
+                
                 try container.encode(value, forKey: .muted)
+                
             }
-
+            
+            
             if let value = blocked {
+                
                 try container.encode(value, forKey: .blocked)
+                
             }
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1120,21 +1747,57 @@ public enum AppBskyGraphDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
             guard let other = other as? Self else { return false }
-
+            
             if muted != other.muted {
                 return false
             }
-
+            
+            
             if blocked != other.blocked {
                 return false
             }
-
+            
             return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
             return lhs.isEqual(to: rhs)
+        }
+
+        // DAGCBOR encoding with field ordering
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            
+            // Always add $type first (AT Protocol convention)
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            
+            // Add remaining fields in lexicon-defined order
+            
+            
+            if let value = muted {
+                
+                
+                let mutedValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "muted", value: mutedValue)
+                
+            }
+            
+            
+            
+            if let value = blocked {
+                
+                
+                let blockedValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "blocked", value: blockedValue)
+                
+            }
+            
+            
+            
+            return map
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -1143,46 +1806,53 @@ public enum AppBskyGraphDefs {
             case blocked
         }
     }
-
-    public struct NotFoundActor: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.graph.defs#notFoundActor"
-        public let actor: String
-        public let notFound: Bool
+        
+public struct NotFoundActor: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.graph.defs#notFoundActor"
+            public let actor: ATIdentifier
+            public let notFound: Bool
 
         // Standard initializer
         public init(
-            actor: String, notFound: Bool
+            actor: ATIdentifier, notFound: Bool
         ) {
+            
             self.actor = actor
             self.notFound = notFound
         }
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                actor = try container.decode(String.self, forKey: .actor)
-
+                
+                self.actor = try container.decode(ATIdentifier.self, forKey: .actor)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'actor': \(error)")
                 throw error
             }
             do {
-                notFound = try container.decode(Bool.self, forKey: .notFound)
-
+                
+                self.notFound = try container.decode(Bool.self, forKey: .notFound)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'notFound': \(error)")
                 throw error
             }
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
             try container.encode(actor, forKey: .actor)
-
+            
+            
             try container.encode(notFound, forKey: .notFound)
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1191,21 +1861,49 @@ public enum AppBskyGraphDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
             guard let other = other as? Self else { return false }
-
-            if actor != other.actor {
+            
+            if self.actor != other.actor {
                 return false
             }
-
-            if notFound != other.notFound {
+            
+            
+            if self.notFound != other.notFound {
                 return false
             }
-
+            
             return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
             return lhs.isEqual(to: rhs)
+        }
+
+        // DAGCBOR encoding with field ordering
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            
+            // Always add $type first (AT Protocol convention)
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            
+            // Add remaining fields in lexicon-defined order
+            
+            
+            
+            let actorValue = try (actor as? DAGCBOREncodable)?.toCBORValue() ?? actor
+            map = map.adding(key: "actor", value: actorValue)
+            
+            
+            
+            
+            let notFoundValue = try (notFound as? DAGCBOREncodable)?.toCBORValue() ?? notFound
+            map = map.adding(key: "notFound", value: notFoundValue)
+            
+            
+            
+            return map
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -1214,17 +1912,18 @@ public enum AppBskyGraphDefs {
             case notFound
         }
     }
-
-    public struct Relationship: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.graph.defs#relationship"
-        public let did: String
-        public let following: ATProtocolURI?
-        public let followedBy: ATProtocolURI?
+        
+public struct Relationship: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.graph.defs#relationship"
+            public let did: DID
+            public let following: ATProtocolURI?
+            public let followedBy: ATProtocolURI?
 
         // Standard initializer
         public init(
-            did: String, following: ATProtocolURI?, followedBy: ATProtocolURI?
+            did: DID, following: ATProtocolURI?, followedBy: ATProtocolURI?
         ) {
+            
             self.did = did
             self.following = following
             self.followedBy = followedBy
@@ -1232,43 +1931,55 @@ public enum AppBskyGraphDefs {
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                did = try container.decode(String.self, forKey: .did)
-
+                
+                self.did = try container.decode(DID.self, forKey: .did)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'did': \(error)")
                 throw error
             }
             do {
-                following = try container.decodeIfPresent(ATProtocolURI.self, forKey: .following)
-
+                
+                self.following = try container.decodeIfPresent(ATProtocolURI.self, forKey: .following)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'following': \(error)")
                 throw error
             }
             do {
-                followedBy = try container.decodeIfPresent(ATProtocolURI.self, forKey: .followedBy)
-
+                
+                self.followedBy = try container.decodeIfPresent(ATProtocolURI.self, forKey: .followedBy)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'followedBy': \(error)")
                 throw error
             }
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
             try container.encode(did, forKey: .did)
-
+            
+            
             if let value = following {
+                
                 try container.encode(value, forKey: .following)
+                
             }
-
+            
+            
             if let value = followedBy {
+                
                 try container.encode(value, forKey: .followedBy)
+                
             }
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1286,25 +1997,68 @@ public enum AppBskyGraphDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
             guard let other = other as? Self else { return false }
-
-            if did != other.did {
+            
+            if self.did != other.did {
                 return false
             }
-
+            
+            
             if following != other.following {
                 return false
             }
-
+            
+            
             if followedBy != other.followedBy {
                 return false
             }
-
+            
             return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
             return lhs.isEqual(to: rhs)
+        }
+
+        // DAGCBOR encoding with field ordering
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            
+            // Always add $type first (AT Protocol convention)
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            
+            // Add remaining fields in lexicon-defined order
+            
+            
+            
+            let didValue = try (did as? DAGCBOREncodable)?.toCBORValue() ?? did
+            map = map.adding(key: "did", value: didValue)
+            
+            
+            
+            if let value = following {
+                
+                
+                let followingValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "following", value: followingValue)
+                
+            }
+            
+            
+            
+            if let value = followedBy {
+                
+                
+                let followedByValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "followedBy", value: followedByValue)
+                
+            }
+            
+            
+            
+            return map
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -1315,43 +2069,56 @@ public enum AppBskyGraphDefs {
         }
     }
 
-    public struct ListPurpose: Codable, ATProtocolCodable, ATProtocolValue {
-        public let rawValue: String
 
-        // Predefined constants
-        //
-        public static let appbskygraphdefsmodlist = ListPurpose(rawValue: "app.bsky.graph.defs#modlist")
-        //
-        public static let appbskygraphdefscuratelist = ListPurpose(rawValue: "app.bsky.graph.defs#curatelist")
-        //
-        public static let appbskygraphdefsreferencelist = ListPurpose(rawValue: "app.bsky.graph.defs#referencelist")
 
-        public init(rawValue: String) {
-            self.rawValue = rawValue
+public struct ListPurpose: Codable, ATProtocolCodable, ATProtocolValue {
+            public let rawValue: String
+            
+            // Predefined constants
+            // 
+            public static let appbskygraphdefsmodlist = ListPurpose(rawValue: "app.bsky.graph.defs#modlist")
+            // 
+            public static let appbskygraphdefscuratelist = ListPurpose(rawValue: "app.bsky.graph.defs#curatelist")
+            // 
+            public static let appbskygraphdefsreferencelist = ListPurpose(rawValue: "app.bsky.graph.defs#referencelist")
+            
+            public init(rawValue: String) {
+                self.rawValue = rawValue
+            }
+            
+            public init(from decoder: Decoder) throws {
+                let container = try decoder.singleValueContainer()
+                rawValue = try container.decode(String.self)
+            }
+            
+            public func encode(to encoder: Encoder) throws {
+                var container = encoder.singleValueContainer()
+                try container.encode(rawValue)
+            }
+            
+            public func isEqual(to other: any ATProtocolValue) -> Bool {
+                guard let otherValue = other as? ListPurpose else { return false }
+                return self.rawValue == otherValue.rawValue
+            }
+            
+            // DAGCBOR encoding with field ordering
+            public func toCBORValue() throws -> Any {
+                // For string-based enum types, we return the raw string value directly
+                return rawValue
+            }
+            
+            // Provide allCases-like functionality
+            public static var predefinedValues: [ListPurpose] {
+                return [
+                    .appbskygraphdefsmodlist,
+                    .appbskygraphdefscuratelist,
+                    .appbskygraphdefsreferencelist,
+                ]
+            }
         }
 
-        public init(from decoder: Decoder) throws {
-            let container = try decoder.singleValueContainer()
-            rawValue = try container.decode(String.self)
-        }
 
-        public func encode(to encoder: Encoder) throws {
-            var container = encoder.singleValueContainer()
-            try container.encode(rawValue)
-        }
-
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? ListPurpose else { return false }
-            return rawValue == otherValue.rawValue
-        }
-
-        // Provide allCases-like functionality
-        public static var predefinedValues: [ListPurpose] {
-            return [
-                .appbskygraphdefsmodlist,
-                .appbskygraphdefscuratelist,
-                .appbskygraphdefsreferencelist,
-            ]
-        }
-    }
 }
+
+
+                           

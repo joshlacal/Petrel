@@ -18,10 +18,24 @@ class TypeConverter:
                 swift_type = "URI" 
             elif string_format == 'at-uri':
                 swift_type = "ATProtocolURI" 
+            elif string_format == 'at-identifier':
+                swift_type = "ATIdentifier"
+            elif string_format == 'cid':
+                swift_type = "CID"
+            elif string_format == 'did':
+                swift_type = "DID"
+            elif string_format == 'handle':
+                swift_type = "Handle"
+            elif string_format == 'nsid':
+                swift_type = "NSID"
+            elif string_format == 'tid':
+                swift_type = "TID"
+            elif string_format == 'record-key':
+                swift_type = "RecordKey"
             elif string_format == 'language':
                 swift_type = "LanguageCodeContainer"
             else:
-                swift_type = "String" 
+                swift_type = "String"
         elif prop_type == 'ref':
             swift_type = convert_ref(prop['ref']) 
         elif prop_type == 'integer':

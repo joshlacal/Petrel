@@ -505,8 +505,8 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
         let baseURL = await configurationManager.baseURL.absoluteString
         // Update user configuration
         try await configurationManager.updateUserConfiguration(
-            did: sessionOutput.did,
-            handle: sessionOutput.handle,
+            did: sessionOutput.did.didString(),
+            handle: sessionOutput.handle.description,
             serviceEndpoint: sessionOutput.didDoc?.service.first?.serviceEndpoint ?? baseURL
         )
 

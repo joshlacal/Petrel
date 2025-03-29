@@ -38,13 +38,13 @@ public extension AppBskyFeedPost {
                     case let .appBskyRichtextFacetMention(mentionFeature):
                         attributedString[range].foregroundColor = .accentColor
                         let encodedDID =
-                            mentionFeature.did.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed)
-                                ?? mentionFeature.did
+                        mentionFeature.did.didString().addingPercentEncoding(withAllowedCharacters: .urlHostAllowed)
+                        ?? mentionFeature.did.didString()
                         let atURIString = "mention://" + encodedDID
                         if let url = URL(string: atURIString) {
                             attributedString[range].link = url
                         }
-                        attributedString[range].richText.mentionLink = mentionFeature.did
+                        attributedString[range].richText.mentionLink = mentionFeature.did.didString()
                     case let .appBskyRichtextFacetTag(tagFeature):
                         attributedString[range].foregroundColor = .accentColor
                         let atURIString = "tag://" + tagFeature.tag
@@ -96,7 +96,7 @@ public extension AttributeScopes {
 // MARK: AttributedString to facets (not tested):
 
 extension AttributedString {
-    public func toFacets() -> [AppBskyRichtextFacet]? {
+    public func toFacets() throws -> [AppBskyRichtextFacet]? {
         var facets: [AppBskyRichtextFacet] = []
         let fullString = String(characters[...]) // Convert entire AttributedString to String once for efficiency
 
@@ -118,7 +118,7 @@ extension AttributedString {
                 if urlString.starts(with: "mention://") {
                     let encodedDID = String(urlString.dropFirst("mention://".count))
                     let did = encodedDID.removingPercentEncoding ?? encodedDID
-                    features.append(.appBskyRichtextFacetMention(AppBskyRichtextFacet.Mention(did: did)))
+                    features.append(.appBskyRichtextFacetMention(AppBskyRichtextFacet.Mention(did: try DID(didString: did))))
                 } else if urlString.starts(with: "tag://") {
                     let tag = String(urlString.dropFirst("tag://".count))
                     features.append(.appBskyRichtextFacetTag(AppBskyRichtextFacet.Tag(tag: tag)))

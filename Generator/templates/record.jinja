@@ -78,6 +78,39 @@
             {%- endfor %}
         }
 
+        // DAGCBOR encoding with field ordering
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            
+            // Always add $type first (AT Protocol convention)
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            
+            // Add remaining fields in lexicon-defined order
+            {% for prop in properties %}
+            {% if prop.optional %}
+            if let value = {{ prop.name }} {
+                {% if '[' in prop.type and ']' in prop.type %}
+                if !value.isEmpty {
+                    {% set var_name = prop.name + 'Value' %}
+                    let {{ var_name }} = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                    map = map.adding(key: "{{ prop.name }}", value: {{ var_name }})
+                }
+                {% else %}
+                {% set var_name = prop.name + 'Value' %}
+                let {{ var_name }} = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "{{ prop.name }}", value: {{ var_name }})
+                {% endif %}
+            }
+            {% else %}
+            {% set var_name = prop.name + 'Value' %}
+            let {{ var_name }} = try ({{ prop.name }} as? DAGCBOREncodable)?.toCBORValue() ?? {{ prop.name }}
+            map = map.adding(key: "{{ prop.name }}", value: {{ var_name }})
+            {% endif %}
+            {% endfor %}
+            
+            return map
+        }
+
         private enum CodingKeys: String, CodingKey {
             case typeIdentifier = "$type"
             {%- for prop in properties %}

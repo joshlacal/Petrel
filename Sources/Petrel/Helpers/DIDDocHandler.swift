@@ -26,6 +26,31 @@ public struct DIDDocument: ATProtocolCodable, ATProtocolValue {
             && verificationMethod == otherDIDDoc.verificationMethod
             && service == otherDIDDoc.service
     }
+
+    public func toCBORValue() throws -> Any {
+        var map = OrderedCBORMap()
+
+        // Add fields in order
+        map = map.adding(key: "@context", value: self.context) // Array of Strings
+        map = map.adding(key: "id", value: self.id)
+        if !self.alsoKnownAs.isEmpty { // Only add if not empty, common practice
+             map = map.adding(key: "alsoKnownAs", value: self.alsoKnownAs)
+        }
+
+        // Convert verificationMethod array
+        let verificationMethodsCBOR = try self.verificationMethod.map { try $0.toCBORValue() }
+        if !verificationMethodsCBOR.isEmpty {
+            map = map.adding(key: "verificationMethod", value: verificationMethodsCBOR)
+        }
+
+        // Convert service array
+        let servicesCBOR = try self.service.map { try $0.toCBORValue() }
+        if !servicesCBOR.isEmpty {
+            map = map.adding(key: "service", value: servicesCBOR)
+        }
+
+        return map
+    }
 }
 
 public struct Service: ATProtocolCodable, ATProtocolValue {
@@ -37,6 +62,14 @@ public struct Service: ATProtocolCodable, ATProtocolValue {
         guard let otherService = other as? Service else { return false }
         return id == otherService.id && type == otherService.type
             && serviceEndpoint == otherService.serviceEndpoint
+    }
+
+    public func toCBORValue() throws -> Any {
+        var map = OrderedCBORMap()
+        map = map.adding(key: "id", value: self.id)
+        map = map.adding(key: "type", value: self.type)
+        map = map.adding(key: "serviceEndpoint", value: self.serviceEndpoint)
+        return map
     }
 }
 
@@ -51,5 +84,14 @@ public struct VerificationMethod: ATProtocolCodable, ATProtocolValue {
         return id == otherVerificationMethod.id && type == otherVerificationMethod.type
             && controller == otherVerificationMethod.controller
             && publicKeyMultibase == otherVerificationMethod.publicKeyMultibase
+    }
+
+    public func toCBORValue() throws -> Any {
+        var map = OrderedCBORMap()
+        map = map.adding(key: "id", value: self.id)
+        map = map.adding(key: "type", value: self.type)
+        map = map.adding(key: "controller", value: self.controller)
+        map = map.adding(key: "publicKeyMultibase", value: self.publicKeyMultibase)
+        return map
     }
 }
