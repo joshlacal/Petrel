@@ -37,7 +37,7 @@ actor DIDResolutionService: DIDResolving {
     }
 
     public func resolveHandleToDID(handle: String) async throws -> String {
-        let input = ComAtprotoIdentityResolveHandle.Parameters(handle: try Handle(handleString: handle))
+        let input = try ComAtprotoIdentityResolveHandle.Parameters(handle: Handle(handleString: handle))
         let endpoint = "com.atproto.identity.resolveHandle"
 
         let queryItems = input.asQueryItems()

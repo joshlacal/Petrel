@@ -1,31 +1,26 @@
 import Foundation
 
-
-
 // lexicon: 1, id: app.bsky.notification.listNotifications
 
-
-public struct AppBskyNotificationListNotifications { 
-
+public enum AppBskyNotificationListNotifications {
     public static let typeIdentifier = "app.bsky.notification.listNotifications"
-        
-public struct Notification: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.notification.listNotifications#notification"
-            public let uri: ATProtocolURI
-            public let cid: CID
-            public let author: AppBskyActorDefs.ProfileView
-            public let reason: String
-            public let reasonSubject: ATProtocolURI?
-            public let record: ATProtocolValueContainer
-            public let isRead: Bool
-            public let indexedAt: ATProtocolDate
-            public let labels: [ComAtprotoLabelDefs.Label]?
+
+    public struct Notification: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.notification.listNotifications#notification"
+        public let uri: ATProtocolURI
+        public let cid: CID
+        public let author: AppBskyActorDefs.ProfileView
+        public let reason: String
+        public let reasonSubject: ATProtocolURI?
+        public let record: ATProtocolValueContainer
+        public let isRead: Bool
+        public let indexedAt: ATProtocolDate
+        public let labels: [ComAtprotoLabelDefs.Label]?
 
         // Standard initializer
         public init(
             uri: ATProtocolURI, cid: CID, author: AppBskyActorDefs.ProfileView, reason: String, reasonSubject: ATProtocolURI?, record: ATProtocolValueContainer, isRead: Bool, indexedAt: ATProtocolDate, labels: [ComAtprotoLabelDefs.Label]?
         ) {
-            
             self.uri = uri
             self.cid = cid
             self.author = author
@@ -39,123 +34,99 @@ public struct Notification: ATProtocolCodable, ATProtocolValue {
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
-            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                
-                self.uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-                
+                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+
             } catch {
                 LogManager.logError("Decoding error for property 'uri': \(error)")
                 throw error
             }
             do {
-                
-                self.cid = try container.decode(CID.self, forKey: .cid)
-                
+                cid = try container.decode(CID.self, forKey: .cid)
+
             } catch {
                 LogManager.logError("Decoding error for property 'cid': \(error)")
                 throw error
             }
             do {
-                
-                self.author = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: .author)
-                
+                author = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: .author)
+
             } catch {
                 LogManager.logError("Decoding error for property 'author': \(error)")
                 throw error
             }
             do {
-                
-                self.reason = try container.decode(String.self, forKey: .reason)
-                
+                reason = try container.decode(String.self, forKey: .reason)
+
             } catch {
                 LogManager.logError("Decoding error for property 'reason': \(error)")
                 throw error
             }
             do {
-                
-                self.reasonSubject = try container.decodeIfPresent(ATProtocolURI.self, forKey: .reasonSubject)
-                
+                reasonSubject = try container.decodeIfPresent(ATProtocolURI.self, forKey: .reasonSubject)
+
             } catch {
                 LogManager.logError("Decoding error for property 'reasonSubject': \(error)")
                 throw error
             }
             do {
-                
-                self.record = try container.decode(ATProtocolValueContainer.self, forKey: .record)
-                
+                record = try container.decode(ATProtocolValueContainer.self, forKey: .record)
+
             } catch {
                 LogManager.logError("Decoding error for property 'record': \(error)")
                 throw error
             }
             do {
-                
-                self.isRead = try container.decode(Bool.self, forKey: .isRead)
-                
+                isRead = try container.decode(Bool.self, forKey: .isRead)
+
             } catch {
                 LogManager.logError("Decoding error for property 'isRead': \(error)")
                 throw error
             }
             do {
-                
-                self.indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
-                
+                indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
+
             } catch {
                 LogManager.logError("Decoding error for property 'indexedAt': \(error)")
                 throw error
             }
             do {
-                
-                self.labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
-                
+                labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
+
             } catch {
                 LogManager.logError("Decoding error for property 'labels': \(error)")
                 throw error
             }
-            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            
+
             try container.encode(uri, forKey: .uri)
-            
-            
+
             try container.encode(cid, forKey: .cid)
-            
-            
+
             try container.encode(author, forKey: .author)
-            
-            
+
             try container.encode(reason, forKey: .reason)
-            
-            
+
             if let value = reasonSubject {
-                
                 try container.encode(value, forKey: .reasonSubject)
-                
             }
-            
-            
+
             try container.encode(record, forKey: .record)
-            
-            
+
             try container.encode(isRead, forKey: .isRead)
-            
-            
+
             try container.encode(indexedAt, forKey: .indexedAt)
-            
-            
+
             if let value = labels {
-                
                 if !value.isEmpty {
                     try container.encode(value, forKey: .labels)
                 }
-                
             }
-            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -179,55 +150,45 @@ public struct Notification: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            
             guard let other = other as? Self else { return false }
-            
-            if self.uri != other.uri {
+
+            if uri != other.uri {
                 return false
             }
-            
-            
-            if self.cid != other.cid {
+
+            if cid != other.cid {
                 return false
             }
-            
-            
-            if self.author != other.author {
+
+            if author != other.author {
                 return false
             }
-            
-            
-            if self.reason != other.reason {
+
+            if reason != other.reason {
                 return false
             }
-            
-            
+
             if reasonSubject != other.reasonSubject {
                 return false
             }
-            
-            
-            if self.record != other.record {
+
+            if record != other.record {
                 return false
             }
-            
-            
-            if self.isRead != other.isRead {
+
+            if isRead != other.isRead {
                 return false
             }
-            
-            
-            if self.indexedAt != other.indexedAt {
+
+            if indexedAt != other.indexedAt {
                 return false
             }
-            
-            
+
             if labels != other.labels {
                 return false
             }
-            
+
             return true
-            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -237,77 +198,45 @@ public struct Notification: ATProtocolCodable, ATProtocolValue {
         // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            
+
             // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-            
+
             // Add remaining fields in lexicon-defined order
-            
-            
-            
+
             let uriValue = try (uri as? DAGCBOREncodable)?.toCBORValue() ?? uri
             map = map.adding(key: "uri", value: uriValue)
-            
-            
-            
-            
+
             let cidValue = try (cid as? DAGCBOREncodable)?.toCBORValue() ?? cid
             map = map.adding(key: "cid", value: cidValue)
-            
-            
-            
-            
+
             let authorValue = try (author as? DAGCBOREncodable)?.toCBORValue() ?? author
             map = map.adding(key: "author", value: authorValue)
-            
-            
-            
-            
+
             let reasonValue = try (reason as? DAGCBOREncodable)?.toCBORValue() ?? reason
             map = map.adding(key: "reason", value: reasonValue)
-            
-            
-            
+
             if let value = reasonSubject {
-                
-                
                 let reasonSubjectValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "reasonSubject", value: reasonSubjectValue)
-                
             }
-            
-            
-            
-            
+
             let recordValue = try (record as? DAGCBOREncodable)?.toCBORValue() ?? record
             map = map.adding(key: "record", value: recordValue)
-            
-            
-            
-            
+
             let isReadValue = try (isRead as? DAGCBOREncodable)?.toCBORValue() ?? isRead
             map = map.adding(key: "isRead", value: isReadValue)
-            
-            
-            
-            
+
             let indexedAtValue = try (indexedAt as? DAGCBOREncodable)?.toCBORValue() ?? indexedAt
             map = map.adding(key: "indexedAt", value: indexedAtValue)
-            
-            
-            
+
             if let value = labels {
-                
                 if !value.isEmpty {
-                    
                     let labelsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                     map = map.adding(key: "labels", value: labelsValue)
                 }
-                
             }
-            
-            
-            
+
             return map
         }
 
@@ -323,188 +252,132 @@ public struct Notification: ATProtocolCodable, ATProtocolValue {
             case indexedAt
             case labels
         }
-    }    
-public struct Parameters: Parametrizable {
+    }
+
+    public struct Parameters: Parametrizable {
         public let reasons: [String]?
         public let limit: Int?
         public let priority: Bool?
         public let cursor: String?
         public let seenAt: ATProtocolDate?
-        
+
         public init(
-            reasons: [String]? = nil, 
-            limit: Int? = nil, 
-            priority: Bool? = nil, 
-            cursor: String? = nil, 
+            reasons: [String]? = nil,
+            limit: Int? = nil,
+            priority: Bool? = nil,
+            cursor: String? = nil,
             seenAt: ATProtocolDate? = nil
-            ) {
+        ) {
             self.reasons = reasons
             self.limit = limit
             self.priority = priority
             self.cursor = cursor
             self.seenAt = seenAt
-            
         }
     }
-    
-public struct Output: ATProtocolCodable {
-        
-        
+
+    public struct Output: ATProtocolCodable {
         public let cursor: String?
-        
+
         public let notifications: [Notification]
-        
+
         public let priority: Bool?
-        
+
         public let seenAt: ATProtocolDate?
-        
-        
-        
+
         // Standard public initializer
         public init(
-            
             cursor: String? = nil,
-            
+
             notifications: [Notification],
-            
+
             priority: Bool? = nil,
-            
+
             seenAt: ATProtocolDate? = nil
-            
-            
+
         ) {
-            
             self.cursor = cursor
-            
+
             self.notifications = notifications
-            
+
             self.priority = priority
-            
+
             self.seenAt = seenAt
-            
-            
         }
-        
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
-            
-            self.cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
-            
-            
-            self.notifications = try container.decode([Notification].self, forKey: .notifications)
-            
-            
-            self.priority = try container.decodeIfPresent(Bool.self, forKey: .priority)
-            
-            
-            self.seenAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .seenAt)
-            
-            
+
+            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+
+            notifications = try container.decode([Notification].self, forKey: .notifications)
+
+            priority = try container.decodeIfPresent(Bool.self, forKey: .priority)
+
+            seenAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .seenAt)
         }
-        
+
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
-            
+
             if let value = cursor {
-                
                 try container.encode(value, forKey: .cursor)
-                
             }
-            
-            
+
             try container.encode(notifications, forKey: .notifications)
-            
-            
+
             if let value = priority {
-                
                 try container.encode(value, forKey: .priority)
-                
             }
-            
-            
+
             if let value = seenAt {
-                
                 try container.encode(value, forKey: .seenAt)
-                
             }
-            
-            
         }
-        
+
         // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
-            
             var map = OrderedCBORMap()
-            
+
             // Add fields in lexicon-defined order
-            
-            
+
             if let value = cursor {
-                
-                
                 let cursorValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "cursor", value: cursorValue)
-                
             }
-            
-            
-            
-            
+
             let notificationsValue = try (notifications as? DAGCBOREncodable)?.toCBORValue() ?? notifications
             map = map.adding(key: "notifications", value: notificationsValue)
-            
-            
-            
+
             if let value = priority {
-                
-                
                 let priorityValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "priority", value: priorityValue)
-                
             }
-            
-            
-            
+
             if let value = seenAt {
-                
-                
                 let seenAtValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "seenAt", value: seenAtValue)
-                
             }
-            
-            
-            
+
             return map
-            
         }
-        
+
         private enum CodingKeys: String, CodingKey {
-            
             case cursor
             case notifications
             case priority
             case seenAt
-            
         }
     }
-
-
-
-
 }
 
-
-extension ATProtoClient.App.Bsky.Notification {
+public extension ATProtoClient.App.Bsky.Notification {
     /// Enumerate notifications for the requesting account. Requires auth.
-    public func listNotifications(input: AppBskyNotificationListNotifications.Parameters) async throws -> (responseCode: Int, data: AppBskyNotificationListNotifications.Output?) {
+    func listNotifications(input: AppBskyNotificationListNotifications.Parameters) async throws -> (responseCode: Int, data: AppBskyNotificationListNotifications.Output?) {
         let endpoint = "app.bsky.notification.listNotifications"
-        
-        
+
         let queryItems = input.asQueryItems()
-        
+
         let urlRequest = try await networkManager.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -512,7 +385,7 @@ extension ATProtoClient.App.Bsky.Notification {
             body: nil,
             queryItems: queryItems
         )
-        
+
         let (responseData, response) = try await networkManager.performRequest(urlRequest)
         let responseCode = response.statusCode
 
@@ -520,17 +393,16 @@ extension ATProtoClient.App.Bsky.Notification {
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
-        
+
         if !contentType.lowercased().contains("application/json") {
             throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
         }
 
         // Data decoding and validation
-        
+
         let decoder = JSONDecoder()
         let decodedData = try? decoder.decode(AppBskyNotificationListNotifications.Output.self, from: responseData)
-        
-        
+
         return (responseCode, decodedData)
     }
-}                           
+}

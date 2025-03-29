@@ -1,14 +1,10 @@
 import Foundation
 
-
-
 // lexicon: 1, id: tools.ozone.moderation.queryEvents
 
-
-public struct ToolsOzoneModerationQueryEvents { 
-
-    public static let typeIdentifier = "tools.ozone.moderation.queryEvents"    
-public struct Parameters: Parametrizable {
+public enum ToolsOzoneModerationQueryEvents {
+    public static let typeIdentifier = "tools.ozone.moderation.queryEvents"
+    public struct Parameters: Parametrizable {
         public let types: [String]?
         public let createdBy: DID?
         public let sortDirection: String?
@@ -28,28 +24,28 @@ public struct Parameters: Parametrizable {
         public let reportTypes: [String]?
         public let policies: [String]?
         public let cursor: String?
-        
+
         public init(
-            types: [String]? = nil, 
-            createdBy: DID? = nil, 
-            sortDirection: String? = nil, 
-            createdAfter: ATProtocolDate? = nil, 
-            createdBefore: ATProtocolDate? = nil, 
-            subject: URI? = nil, 
-            collections: [NSID]? = nil, 
-            subjectType: String? = nil, 
-            includeAllUserRecords: Bool? = nil, 
-            limit: Int? = nil, 
-            hasComment: Bool? = nil, 
-            comment: String? = nil, 
-            addedLabels: [String]? = nil, 
-            removedLabels: [String]? = nil, 
-            addedTags: [String]? = nil, 
-            removedTags: [String]? = nil, 
-            reportTypes: [String]? = nil, 
-            policies: [String]? = nil, 
+            types: [String]? = nil,
+            createdBy: DID? = nil,
+            sortDirection: String? = nil,
+            createdAfter: ATProtocolDate? = nil,
+            createdBefore: ATProtocolDate? = nil,
+            subject: URI? = nil,
+            collections: [NSID]? = nil,
+            subjectType: String? = nil,
+            includeAllUserRecords: Bool? = nil,
+            limit: Int? = nil,
+            hasComment: Bool? = nil,
+            comment: String? = nil,
+            addedLabels: [String]? = nil,
+            removedLabels: [String]? = nil,
+            addedTags: [String]? = nil,
+            removedTags: [String]? = nil,
+            reportTypes: [String]? = nil,
+            policies: [String]? = nil,
             cursor: String? = nil
-            ) {
+        ) {
             self.types = types
             self.createdBy = createdBy
             self.sortDirection = sortDirection
@@ -69,114 +65,75 @@ public struct Parameters: Parametrizable {
             self.reportTypes = reportTypes
             self.policies = policies
             self.cursor = cursor
-            
         }
     }
-    
-public struct Output: ATProtocolCodable {
-        
-        
+
+    public struct Output: ATProtocolCodable {
         public let cursor: String?
-        
+
         public let events: [ToolsOzoneModerationDefs.ModEventView]
-        
-        
-        
+
         // Standard public initializer
         public init(
-            
             cursor: String? = nil,
-            
+
             events: [ToolsOzoneModerationDefs.ModEventView]
-            
-            
+
         ) {
-            
             self.cursor = cursor
-            
+
             self.events = events
-            
-            
         }
-        
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
-            
-            self.cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
-            
-            
-            self.events = try container.decode([ToolsOzoneModerationDefs.ModEventView].self, forKey: .events)
-            
-            
+
+            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+
+            events = try container.decode([ToolsOzoneModerationDefs.ModEventView].self, forKey: .events)
         }
-        
+
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
-            
+
             if let value = cursor {
-                
                 try container.encode(value, forKey: .cursor)
-                
             }
-            
-            
+
             try container.encode(events, forKey: .events)
-            
-            
         }
-        
+
         // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
-            
             var map = OrderedCBORMap()
-            
+
             // Add fields in lexicon-defined order
-            
-            
+
             if let value = cursor {
-                
-                
                 let cursorValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "cursor", value: cursorValue)
-                
             }
-            
-            
-            
-            
+
             let eventsValue = try (events as? DAGCBOREncodable)?.toCBORValue() ?? events
             map = map.adding(key: "events", value: eventsValue)
-            
-            
-            
+
             return map
-            
         }
-        
+
         private enum CodingKeys: String, CodingKey {
-            
             case cursor
             case events
-            
         }
     }
-
-
-
-
 }
 
-
-extension ATProtoClient.Tools.Ozone.Moderation {
+public extension ATProtoClient.Tools.Ozone.Moderation {
     /// List moderation events related to a subject.
-    public func queryEvents(input: ToolsOzoneModerationQueryEvents.Parameters) async throws -> (responseCode: Int, data: ToolsOzoneModerationQueryEvents.Output?) {
+    func queryEvents(input: ToolsOzoneModerationQueryEvents.Parameters) async throws -> (responseCode: Int, data: ToolsOzoneModerationQueryEvents.Output?) {
         let endpoint = "tools.ozone.moderation.queryEvents"
-        
-        
+
         let queryItems = input.asQueryItems()
-        
+
         let urlRequest = try await networkManager.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -184,7 +141,7 @@ extension ATProtoClient.Tools.Ozone.Moderation {
             body: nil,
             queryItems: queryItems
         )
-        
+
         let (responseData, response) = try await networkManager.performRequest(urlRequest)
         let responseCode = response.statusCode
 
@@ -192,17 +149,16 @@ extension ATProtoClient.Tools.Ozone.Moderation {
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
-        
+
         if !contentType.lowercased().contains("application/json") {
             throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
         }
 
         // Data decoding and validation
-        
+
         let decoder = JSONDecoder()
         let decodedData = try? decoder.decode(ToolsOzoneModerationQueryEvents.Output.self, from: responseData)
-        
-        
+
         return (responseCode, decodedData)
     }
-}                           
+}

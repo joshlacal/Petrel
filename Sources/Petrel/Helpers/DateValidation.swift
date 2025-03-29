@@ -7,12 +7,12 @@ public struct ATProtocolDate: Codable, Hashable, Equatable, Sendable, ATProtocol
         }
         return date == otherDate.date
     }
-    
+
     public func toCBORValue() throws -> Any {
         // Convert to a string representation for CBOR
         return iso8601String
     }
-    
+
     public let date: Date
 
     public var toDate: Date { date }

@@ -1,29 +1,24 @@
 import Foundation
 
-
-
 // lexicon: 1, id: com.atproto.server.defs
 
-
-public struct ComAtprotoServerDefs { 
-
+public enum ComAtprotoServerDefs {
     public static let typeIdentifier = "com.atproto.server.defs"
-        
-public struct InviteCode: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "com.atproto.server.defs#inviteCode"
-            public let code: String
-            public let available: Int
-            public let disabled: Bool
-            public let forAccount: String
-            public let createdBy: String
-            public let createdAt: ATProtocolDate
-            public let uses: [InviteCodeUse]
+
+    public struct InviteCode: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "com.atproto.server.defs#inviteCode"
+        public let code: String
+        public let available: Int
+        public let disabled: Bool
+        public let forAccount: String
+        public let createdBy: String
+        public let createdAt: ATProtocolDate
+        public let uses: [InviteCodeUse]
 
         // Standard initializer
         public init(
             code: String, available: Int, disabled: Bool, forAccount: String, createdBy: String, createdAt: ATProtocolDate, uses: [InviteCodeUse]
         ) {
-            
             self.code = code
             self.available = available
             self.disabled = disabled
@@ -35,91 +30,75 @@ public struct InviteCode: ATProtocolCodable, ATProtocolValue {
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
-            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                
-                self.code = try container.decode(String.self, forKey: .code)
-                
+                code = try container.decode(String.self, forKey: .code)
+
             } catch {
                 LogManager.logError("Decoding error for property 'code': \(error)")
                 throw error
             }
             do {
-                
-                self.available = try container.decode(Int.self, forKey: .available)
-                
+                available = try container.decode(Int.self, forKey: .available)
+
             } catch {
                 LogManager.logError("Decoding error for property 'available': \(error)")
                 throw error
             }
             do {
-                
-                self.disabled = try container.decode(Bool.self, forKey: .disabled)
-                
+                disabled = try container.decode(Bool.self, forKey: .disabled)
+
             } catch {
                 LogManager.logError("Decoding error for property 'disabled': \(error)")
                 throw error
             }
             do {
-                
-                self.forAccount = try container.decode(String.self, forKey: .forAccount)
-                
+                forAccount = try container.decode(String.self, forKey: .forAccount)
+
             } catch {
                 LogManager.logError("Decoding error for property 'forAccount': \(error)")
                 throw error
             }
             do {
-                
-                self.createdBy = try container.decode(String.self, forKey: .createdBy)
-                
+                createdBy = try container.decode(String.self, forKey: .createdBy)
+
             } catch {
                 LogManager.logError("Decoding error for property 'createdBy': \(error)")
                 throw error
             }
             do {
-                
-                self.createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
-                
+                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+
             } catch {
                 LogManager.logError("Decoding error for property 'createdAt': \(error)")
                 throw error
             }
             do {
-                
-                self.uses = try container.decode([InviteCodeUse].self, forKey: .uses)
-                
+                uses = try container.decode([InviteCodeUse].self, forKey: .uses)
+
             } catch {
                 LogManager.logError("Decoding error for property 'uses': \(error)")
                 throw error
             }
-            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            
+
             try container.encode(code, forKey: .code)
-            
-            
+
             try container.encode(available, forKey: .available)
-            
-            
+
             try container.encode(disabled, forKey: .disabled)
-            
-            
+
             try container.encode(forAccount, forKey: .forAccount)
-            
-            
+
             try container.encode(createdBy, forKey: .createdBy)
-            
-            
+
             try container.encode(createdAt, forKey: .createdAt)
-            
-            
+
             try container.encode(uses, forKey: .uses)
-            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -133,45 +112,37 @@ public struct InviteCode: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            
             guard let other = other as? Self else { return false }
-            
-            if self.code != other.code {
+
+            if code != other.code {
                 return false
             }
-            
-            
-            if self.available != other.available {
+
+            if available != other.available {
                 return false
             }
-            
-            
-            if self.disabled != other.disabled {
+
+            if disabled != other.disabled {
                 return false
             }
-            
-            
-            if self.forAccount != other.forAccount {
+
+            if forAccount != other.forAccount {
                 return false
             }
-            
-            
-            if self.createdBy != other.createdBy {
+
+            if createdBy != other.createdBy {
                 return false
             }
-            
-            
-            if self.createdAt != other.createdAt {
+
+            if createdAt != other.createdAt {
                 return false
             }
-            
-            
-            if self.uses != other.uses {
+
+            if uses != other.uses {
                 return false
             }
-            
+
             return true
-            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -181,55 +152,33 @@ public struct InviteCode: ATProtocolCodable, ATProtocolValue {
         // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            
+
             // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-            
+
             // Add remaining fields in lexicon-defined order
-            
-            
-            
+
             let codeValue = try (code as? DAGCBOREncodable)?.toCBORValue() ?? code
             map = map.adding(key: "code", value: codeValue)
-            
-            
-            
-            
+
             let availableValue = try (available as? DAGCBOREncodable)?.toCBORValue() ?? available
             map = map.adding(key: "available", value: availableValue)
-            
-            
-            
-            
+
             let disabledValue = try (disabled as? DAGCBOREncodable)?.toCBORValue() ?? disabled
             map = map.adding(key: "disabled", value: disabledValue)
-            
-            
-            
-            
+
             let forAccountValue = try (forAccount as? DAGCBOREncodable)?.toCBORValue() ?? forAccount
             map = map.adding(key: "forAccount", value: forAccountValue)
-            
-            
-            
-            
+
             let createdByValue = try (createdBy as? DAGCBOREncodable)?.toCBORValue() ?? createdBy
             map = map.adding(key: "createdBy", value: createdByValue)
-            
-            
-            
-            
+
             let createdAtValue = try (createdAt as? DAGCBOREncodable)?.toCBORValue() ?? createdAt
             map = map.adding(key: "createdAt", value: createdAtValue)
-            
-            
-            
-            
+
             let usesValue = try (uses as? DAGCBOREncodable)?.toCBORValue() ?? uses
             map = map.adding(key: "uses", value: usesValue)
-            
-            
-            
+
             return map
         }
 
@@ -244,53 +193,46 @@ public struct InviteCode: ATProtocolCodable, ATProtocolValue {
             case uses
         }
     }
-        
-public struct InviteCodeUse: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "com.atproto.server.defs#inviteCodeUse"
-            public let usedBy: DID
-            public let usedAt: ATProtocolDate
+
+    public struct InviteCodeUse: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "com.atproto.server.defs#inviteCodeUse"
+        public let usedBy: DID
+        public let usedAt: ATProtocolDate
 
         // Standard initializer
         public init(
             usedBy: DID, usedAt: ATProtocolDate
         ) {
-            
             self.usedBy = usedBy
             self.usedAt = usedAt
         }
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
-            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                
-                self.usedBy = try container.decode(DID.self, forKey: .usedBy)
-                
+                usedBy = try container.decode(DID.self, forKey: .usedBy)
+
             } catch {
                 LogManager.logError("Decoding error for property 'usedBy': \(error)")
                 throw error
             }
             do {
-                
-                self.usedAt = try container.decode(ATProtocolDate.self, forKey: .usedAt)
-                
+                usedAt = try container.decode(ATProtocolDate.self, forKey: .usedAt)
+
             } catch {
                 LogManager.logError("Decoding error for property 'usedAt': \(error)")
                 throw error
             }
-            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            
+
             try container.encode(usedBy, forKey: .usedBy)
-            
-            
+
             try container.encode(usedAt, forKey: .usedAt)
-            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -299,20 +241,17 @@ public struct InviteCodeUse: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            
             guard let other = other as? Self else { return false }
-            
-            if self.usedBy != other.usedBy {
+
+            if usedBy != other.usedBy {
                 return false
             }
-            
-            
-            if self.usedAt != other.usedAt {
+
+            if usedAt != other.usedAt {
                 return false
             }
-            
+
             return true
-            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -322,25 +261,18 @@ public struct InviteCodeUse: ATProtocolCodable, ATProtocolValue {
         // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            
+
             // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-            
+
             // Add remaining fields in lexicon-defined order
-            
-            
-            
+
             let usedByValue = try (usedBy as? DAGCBOREncodable)?.toCBORValue() ?? usedBy
             map = map.adding(key: "usedBy", value: usedByValue)
-            
-            
-            
-            
+
             let usedAtValue = try (usedAt as? DAGCBOREncodable)?.toCBORValue() ?? usedAt
             map = map.adding(key: "usedAt", value: usedAtValue)
-            
-            
-            
+
             return map
         }
 
@@ -350,10 +282,4 @@ public struct InviteCodeUse: ATProtocolCodable, ATProtocolValue {
             case usedAt
         }
     }
-
-
-
 }
-
-
-                           
