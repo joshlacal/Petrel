@@ -17,7 +17,7 @@ public struct LanguageCodeContainer: Codable, ATProtocolCodable, Hashable, Senda
     public func toCBORValue() throws -> Any {
         return lang.languageCode?.identifier ?? lang.minimalIdentifier
     }
-    
+
     public var lang: Locale.Language
 
     // Standard initializer

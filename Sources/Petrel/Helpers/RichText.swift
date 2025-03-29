@@ -38,8 +38,8 @@ public extension AppBskyFeedPost {
                     case let .appBskyRichtextFacetMention(mentionFeature):
                         attributedString[range].foregroundColor = .accentColor
                         let encodedDID =
-                        mentionFeature.did.didString().addingPercentEncoding(withAllowedCharacters: .urlHostAllowed)
-                        ?? mentionFeature.did.didString()
+                            mentionFeature.did.didString().addingPercentEncoding(withAllowedCharacters: .urlHostAllowed)
+                                ?? mentionFeature.did.didString()
                         let atURIString = "mention://" + encodedDID
                         if let url = URL(string: atURIString) {
                             attributedString[range].link = url
@@ -118,7 +118,7 @@ extension AttributedString {
                 if urlString.starts(with: "mention://") {
                     let encodedDID = String(urlString.dropFirst("mention://".count))
                     let did = encodedDID.removingPercentEncoding ?? encodedDID
-                    features.append(.appBskyRichtextFacetMention(AppBskyRichtextFacet.Mention(did: try DID(didString: did))))
+                    try features.append(.appBskyRichtextFacetMention(AppBskyRichtextFacet.Mention(did: DID(didString: did))))
                 } else if urlString.starts(with: "tag://") {
                     let tag = String(urlString.dropFirst("tag://".count))
                     features.append(.appBskyRichtextFacetTag(AppBskyRichtextFacet.Tag(tag: tag)))

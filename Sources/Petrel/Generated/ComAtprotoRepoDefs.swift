@@ -1,60 +1,49 @@
 import Foundation
 
-
-
 // lexicon: 1, id: com.atproto.repo.defs
 
-
-public struct ComAtprotoRepoDefs { 
-
+public enum ComAtprotoRepoDefs {
     public static let typeIdentifier = "com.atproto.repo.defs"
-        
-public struct CommitMeta: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "com.atproto.repo.defs#commitMeta"
-            public let cid: CID
-            public let rev: TID
+
+    public struct CommitMeta: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "com.atproto.repo.defs#commitMeta"
+        public let cid: CID
+        public let rev: TID
 
         // Standard initializer
         public init(
             cid: CID, rev: TID
         ) {
-            
             self.cid = cid
             self.rev = rev
         }
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
-            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                
-                self.cid = try container.decode(CID.self, forKey: .cid)
-                
+                cid = try container.decode(CID.self, forKey: .cid)
+
             } catch {
                 LogManager.logError("Decoding error for property 'cid': \(error)")
                 throw error
             }
             do {
-                
-                self.rev = try container.decode(TID.self, forKey: .rev)
-                
+                rev = try container.decode(TID.self, forKey: .rev)
+
             } catch {
                 LogManager.logError("Decoding error for property 'rev': \(error)")
                 throw error
             }
-            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            
+
             try container.encode(cid, forKey: .cid)
-            
-            
+
             try container.encode(rev, forKey: .rev)
-            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -63,20 +52,17 @@ public struct CommitMeta: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            
             guard let other = other as? Self else { return false }
-            
-            if self.cid != other.cid {
+
+            if cid != other.cid {
                 return false
             }
-            
-            
-            if self.rev != other.rev {
+
+            if rev != other.rev {
                 return false
             }
-            
+
             return true
-            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -86,25 +72,18 @@ public struct CommitMeta: ATProtocolCodable, ATProtocolValue {
         // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            
+
             // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-            
+
             // Add remaining fields in lexicon-defined order
-            
-            
-            
+
             let cidValue = try (cid as? DAGCBOREncodable)?.toCBORValue() ?? cid
             map = map.adding(key: "cid", value: cidValue)
-            
-            
-            
-            
+
             let revValue = try (rev as? DAGCBOREncodable)?.toCBORValue() ?? rev
             map = map.adding(key: "rev", value: revValue)
-            
-            
-            
+
             return map
         }
 
@@ -114,10 +93,4 @@ public struct CommitMeta: ATProtocolCodable, ATProtocolValue {
             case rev
         }
     }
-
-
-
 }
-
-
-                           
