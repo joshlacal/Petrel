@@ -37,11 +37,8 @@ public enum ToolsOzoneModerationGetSubjects {
             try container.encode(subjects, forKey: .subjects)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let subjectsValue = try (subjects as? DAGCBOREncodable)?.toCBORValue() ?? subjects
             map = map.adding(key: "subjects", value: subjectsValue)

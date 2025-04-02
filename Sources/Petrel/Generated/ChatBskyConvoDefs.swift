@@ -89,10 +89,7 @@ public enum ChatBskyConvoDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let didValue = try (did as? DAGCBOREncodable)?.toCBORValue() ?? did
             map = map.adding(key: "did", value: didValue)
@@ -161,15 +158,11 @@ public enum ChatBskyConvoDefs {
 
             try container.encode(text, forKey: .text)
 
-            if let value = facets {
-                if !value.isEmpty {
-                    try container.encode(value, forKey: .facets)
-                }
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(facets, forKey: .facets)
 
-            if let value = embed {
-                try container.encode(value, forKey: .embed)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(embed, forKey: .embed)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -212,22 +205,21 @@ public enum ChatBskyConvoDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let textValue = try (text as? DAGCBOREncodable)?.toCBORValue() ?? text
             map = map.adding(key: "text", value: textValue)
 
             if let value = facets {
-                if !value.isEmpty {
-                    let facetsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                    map = map.adding(key: "facets", value: facetsValue)
-                }
+                // Encode optional property even if it's an empty array for CBOR
+
+                let facetsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "facets", value: facetsValue)
             }
 
             if let value = embed {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let embedValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "embed", value: embedValue)
             }
@@ -339,21 +331,14 @@ public enum ChatBskyConvoDefs {
 
             try container.encode(text, forKey: .text)
 
-            if let value = facets {
-                if !value.isEmpty {
-                    try container.encode(value, forKey: .facets)
-                }
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(facets, forKey: .facets)
 
-            if let value = embed {
-                try container.encode(value, forKey: .embed)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(embed, forKey: .embed)
 
-            if let value = reactions {
-                if !value.isEmpty {
-                    try container.encode(value, forKey: .reactions)
-                }
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(reactions, forKey: .reactions)
 
             try container.encode(sender, forKey: .sender)
 
@@ -429,10 +414,7 @@ public enum ChatBskyConvoDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let idValue = try (id as? DAGCBOREncodable)?.toCBORValue() ?? id
             map = map.adding(key: "id", value: idValue)
@@ -444,22 +426,24 @@ public enum ChatBskyConvoDefs {
             map = map.adding(key: "text", value: textValue)
 
             if let value = facets {
-                if !value.isEmpty {
-                    let facetsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                    map = map.adding(key: "facets", value: facetsValue)
-                }
+                // Encode optional property even if it's an empty array for CBOR
+
+                let facetsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "facets", value: facetsValue)
             }
 
             if let value = embed {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let embedValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "embed", value: embedValue)
             }
 
             if let value = reactions {
-                if !value.isEmpty {
-                    let reactionsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                    map = map.adding(key: "reactions", value: reactionsValue)
-                }
+                // Encode optional property even if it's an empty array for CBOR
+
+                let reactionsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "reactions", value: reactionsValue)
             }
 
             let senderValue = try (sender as? DAGCBOREncodable)?.toCBORValue() ?? sender
@@ -584,10 +568,7 @@ public enum ChatBskyConvoDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let idValue = try (id as? DAGCBOREncodable)?.toCBORValue() ?? id
             map = map.adding(key: "id", value: idValue)
@@ -665,10 +646,7 @@ public enum ChatBskyConvoDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let didValue = try (did as? DAGCBOREncodable)?.toCBORValue() ?? did
             map = map.adding(key: "did", value: didValue)
@@ -766,10 +744,7 @@ public enum ChatBskyConvoDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let valueValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
             map = map.adding(key: "value", value: valueValue)
@@ -843,10 +818,7 @@ public enum ChatBskyConvoDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let didValue = try (did as? DAGCBOREncodable)?.toCBORValue() ?? did
             map = map.adding(key: "did", value: didValue)
@@ -928,10 +900,7 @@ public enum ChatBskyConvoDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let messageValue = try (message as? DAGCBOREncodable)?.toCBORValue() ?? message
             map = map.adding(key: "message", value: messageValue)
@@ -1045,19 +1014,16 @@ public enum ChatBskyConvoDefs {
 
             try container.encode(members, forKey: .members)
 
-            if let value = lastMessage {
-                try container.encode(value, forKey: .lastMessage)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(lastMessage, forKey: .lastMessage)
 
-            if let value = lastReaction {
-                try container.encode(value, forKey: .lastReaction)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(lastReaction, forKey: .lastReaction)
 
             try container.encode(muted, forKey: .muted)
 
-            if let value = status {
-                try container.encode(value, forKey: .status)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(status, forKey: .status)
 
             try container.encode(unreadCount, forKey: .unreadCount)
         }
@@ -1131,10 +1097,7 @@ public enum ChatBskyConvoDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let idValue = try (id as? DAGCBOREncodable)?.toCBORValue() ?? id
             map = map.adding(key: "id", value: idValue)
@@ -1146,11 +1109,15 @@ public enum ChatBskyConvoDefs {
             map = map.adding(key: "members", value: membersValue)
 
             if let value = lastMessage {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let lastMessageValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "lastMessage", value: lastMessageValue)
             }
 
             if let value = lastReaction {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let lastReactionValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "lastReaction", value: lastReactionValue)
             }
@@ -1159,6 +1126,8 @@ public enum ChatBskyConvoDefs {
             map = map.adding(key: "muted", value: mutedValue)
 
             if let value = status {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let statusValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "status", value: statusValue)
             }
@@ -1250,10 +1219,7 @@ public enum ChatBskyConvoDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let revValue = try (rev as? DAGCBOREncodable)?.toCBORValue() ?? rev
             map = map.adding(key: "rev", value: revValue)
@@ -1339,10 +1305,7 @@ public enum ChatBskyConvoDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let revValue = try (rev as? DAGCBOREncodable)?.toCBORValue() ?? rev
             map = map.adding(key: "rev", value: revValue)
@@ -1428,10 +1391,7 @@ public enum ChatBskyConvoDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let revValue = try (rev as? DAGCBOREncodable)?.toCBORValue() ?? rev
             map = map.adding(key: "rev", value: revValue)
@@ -1517,10 +1477,7 @@ public enum ChatBskyConvoDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let revValue = try (rev as? DAGCBOREncodable)?.toCBORValue() ?? rev
             map = map.adding(key: "rev", value: revValue)
@@ -1606,10 +1563,7 @@ public enum ChatBskyConvoDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let revValue = try (rev as? DAGCBOREncodable)?.toCBORValue() ?? rev
             map = map.adding(key: "rev", value: revValue)
@@ -1711,10 +1665,7 @@ public enum ChatBskyConvoDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let revValue = try (rev as? DAGCBOREncodable)?.toCBORValue() ?? rev
             map = map.adding(key: "rev", value: revValue)
@@ -1820,10 +1771,7 @@ public enum ChatBskyConvoDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let revValue = try (rev as? DAGCBOREncodable)?.toCBORValue() ?? rev
             map = map.adding(key: "rev", value: revValue)
@@ -1929,10 +1877,7 @@ public enum ChatBskyConvoDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let revValue = try (rev as? DAGCBOREncodable)?.toCBORValue() ?? rev
             map = map.adding(key: "rev", value: revValue)
@@ -2054,10 +1999,7 @@ public enum ChatBskyConvoDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let revValue = try (rev as? DAGCBOREncodable)?.toCBORValue() ?? rev
             map = map.adding(key: "rev", value: revValue)
@@ -2183,10 +2125,7 @@ public enum ChatBskyConvoDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let revValue = try (rev as? DAGCBOREncodable)?.toCBORValue() ?? rev
             map = map.adding(key: "rev", value: revValue)
@@ -2289,10 +2228,8 @@ public enum ChatBskyConvoDefs {
 
             switch self {
             case let .appBskyEmbedRecord(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.embed.record")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -2417,10 +2354,8 @@ public enum ChatBskyConvoDefs {
 
             switch self {
             case let .appBskyEmbedRecordView(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.embed.record#view")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -2562,10 +2497,8 @@ public enum ChatBskyConvoDefs {
 
             switch self {
             case let .chatBskyConvoDefsMessageView(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "chat.bsky.convo.defs#messageView")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -2583,10 +2516,8 @@ public enum ChatBskyConvoDefs {
                 }
                 return map
             case let .chatBskyConvoDefsDeletedMessageView(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "chat.bsky.convo.defs#deletedMessageView")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -2719,10 +2650,8 @@ public enum ChatBskyConvoDefs {
 
             switch self {
             case let .chatBskyConvoDefsMessageAndReactionView(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "chat.bsky.convo.defs#messageAndReactionView")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -2864,10 +2793,8 @@ public enum ChatBskyConvoDefs {
 
             switch self {
             case let .chatBskyConvoDefsMessageView(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "chat.bsky.convo.defs#messageView")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -2885,10 +2812,8 @@ public enum ChatBskyConvoDefs {
                 }
                 return map
             case let .chatBskyConvoDefsDeletedMessageView(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "chat.bsky.convo.defs#deletedMessageView")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -3038,10 +2963,8 @@ public enum ChatBskyConvoDefs {
 
             switch self {
             case let .chatBskyConvoDefsMessageView(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "chat.bsky.convo.defs#messageView")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -3059,10 +2982,8 @@ public enum ChatBskyConvoDefs {
                 }
                 return map
             case let .chatBskyConvoDefsDeletedMessageView(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "chat.bsky.convo.defs#deletedMessageView")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -3212,10 +3133,8 @@ public enum ChatBskyConvoDefs {
 
             switch self {
             case let .chatBskyConvoDefsMessageView(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "chat.bsky.convo.defs#messageView")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -3233,10 +3152,8 @@ public enum ChatBskyConvoDefs {
                 }
                 return map
             case let .chatBskyConvoDefsDeletedMessageView(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "chat.bsky.convo.defs#deletedMessageView")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -3386,10 +3303,8 @@ public enum ChatBskyConvoDefs {
 
             switch self {
             case let .chatBskyConvoDefsMessageView(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "chat.bsky.convo.defs#messageView")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -3407,10 +3322,8 @@ public enum ChatBskyConvoDefs {
                 }
                 return map
             case let .chatBskyConvoDefsDeletedMessageView(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "chat.bsky.convo.defs#deletedMessageView")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -3560,10 +3473,8 @@ public enum ChatBskyConvoDefs {
 
             switch self {
             case let .chatBskyConvoDefsMessageView(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "chat.bsky.convo.defs#messageView")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -3581,10 +3492,8 @@ public enum ChatBskyConvoDefs {
                 }
                 return map
             case let .chatBskyConvoDefsDeletedMessageView(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "chat.bsky.convo.defs#deletedMessageView")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 

@@ -43,30 +43,29 @@ public enum ComAtprotoTempCheckSignupQueue {
 
             try container.encode(activated, forKey: .activated)
 
-            if let value = placeInQueue {
-                try container.encode(value, forKey: .placeInQueue)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(placeInQueue, forKey: .placeInQueue)
 
-            if let value = estimatedTimeMs {
-                try container.encode(value, forKey: .estimatedTimeMs)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(estimatedTimeMs, forKey: .estimatedTimeMs)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let activatedValue = try (activated as? DAGCBOREncodable)?.toCBORValue() ?? activated
             map = map.adding(key: "activated", value: activatedValue)
 
             if let value = placeInQueue {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let placeInQueueValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "placeInQueue", value: placeInQueueValue)
             }
 
             if let value = estimatedTimeMs {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let estimatedTimeMsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "estimatedTimeMs", value: estimatedTimeMsValue)
             }

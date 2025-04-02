@@ -43,9 +43,8 @@ public enum ComAtprotoAdminDefs {
 
             try container.encode(applied, forKey: .applied)
 
-            if let value = ref {
-                try container.encode(value, forKey: .ref)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(ref, forKey: .ref)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -79,15 +78,14 @@ public enum ComAtprotoAdminDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let appliedValue = try (applied as? DAGCBOREncodable)?.toCBORValue() ?? applied
             map = map.adding(key: "applied", value: appliedValue)
 
             if let value = ref {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let refValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "ref", value: refValue)
             }
@@ -232,49 +230,34 @@ public enum ComAtprotoAdminDefs {
 
             try container.encode(handle, forKey: .handle)
 
-            if let value = email {
-                try container.encode(value, forKey: .email)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(email, forKey: .email)
 
-            if let value = relatedRecords {
-                if !value.isEmpty {
-                    try container.encode(value, forKey: .relatedRecords)
-                }
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(relatedRecords, forKey: .relatedRecords)
 
             try container.encode(indexedAt, forKey: .indexedAt)
 
-            if let value = invitedBy {
-                try container.encode(value, forKey: .invitedBy)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(invitedBy, forKey: .invitedBy)
 
-            if let value = invites {
-                if !value.isEmpty {
-                    try container.encode(value, forKey: .invites)
-                }
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(invites, forKey: .invites)
 
-            if let value = invitesDisabled {
-                try container.encode(value, forKey: .invitesDisabled)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(invitesDisabled, forKey: .invitesDisabled)
 
-            if let value = emailConfirmedAt {
-                try container.encode(value, forKey: .emailConfirmedAt)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(emailConfirmedAt, forKey: .emailConfirmedAt)
 
-            if let value = inviteNote {
-                try container.encode(value, forKey: .inviteNote)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(inviteNote, forKey: .inviteNote)
 
-            if let value = deactivatedAt {
-                try container.encode(value, forKey: .deactivatedAt)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(deactivatedAt, forKey: .deactivatedAt)
 
-            if let value = threatSignatures {
-                if !value.isEmpty {
-                    try container.encode(value, forKey: .threatSignatures)
-                }
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(threatSignatures, forKey: .threatSignatures)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -390,10 +373,7 @@ public enum ComAtprotoAdminDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let didValue = try (did as? DAGCBOREncodable)?.toCBORValue() ?? did
             map = map.adding(key: "did", value: didValue)
@@ -402,57 +382,69 @@ public enum ComAtprotoAdminDefs {
             map = map.adding(key: "handle", value: handleValue)
 
             if let value = email {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let emailValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "email", value: emailValue)
             }
 
             if let value = relatedRecords {
-                if !value.isEmpty {
-                    let relatedRecordsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                    map = map.adding(key: "relatedRecords", value: relatedRecordsValue)
-                }
+                // Encode optional property even if it's an empty array for CBOR
+
+                let relatedRecordsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "relatedRecords", value: relatedRecordsValue)
             }
 
             let indexedAtValue = try (indexedAt as? DAGCBOREncodable)?.toCBORValue() ?? indexedAt
             map = map.adding(key: "indexedAt", value: indexedAtValue)
 
             if let value = invitedBy {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let invitedByValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "invitedBy", value: invitedByValue)
             }
 
             if let value = invites {
-                if !value.isEmpty {
-                    let invitesValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                    map = map.adding(key: "invites", value: invitesValue)
-                }
+                // Encode optional property even if it's an empty array for CBOR
+
+                let invitesValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "invites", value: invitesValue)
             }
 
             if let value = invitesDisabled {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let invitesDisabledValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "invitesDisabled", value: invitesDisabledValue)
             }
 
             if let value = emailConfirmedAt {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let emailConfirmedAtValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "emailConfirmedAt", value: emailConfirmedAtValue)
             }
 
             if let value = inviteNote {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let inviteNoteValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "inviteNote", value: inviteNoteValue)
             }
 
             if let value = deactivatedAt {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let deactivatedAtValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "deactivatedAt", value: deactivatedAtValue)
             }
 
             if let value = threatSignatures {
-                if !value.isEmpty {
-                    let threatSignaturesValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                    map = map.adding(key: "threatSignatures", value: threatSignaturesValue)
-                }
+                // Encode optional property even if it's an empty array for CBOR
+
+                let threatSignaturesValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "threatSignatures", value: threatSignaturesValue)
             }
 
             return map
@@ -527,10 +519,7 @@ public enum ComAtprotoAdminDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let didValue = try (did as? DAGCBOREncodable)?.toCBORValue() ?? did
             map = map.adding(key: "did", value: didValue)
@@ -593,9 +582,8 @@ public enum ComAtprotoAdminDefs {
 
             try container.encode(cid, forKey: .cid)
 
-            if let value = recordUri {
-                try container.encode(value, forKey: .recordUri)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(recordUri, forKey: .recordUri)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -634,10 +622,7 @@ public enum ComAtprotoAdminDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let didValue = try (did as? DAGCBOREncodable)?.toCBORValue() ?? did
             map = map.adding(key: "did", value: didValue)
@@ -646,6 +631,8 @@ public enum ComAtprotoAdminDefs {
             map = map.adding(key: "cid", value: cidValue)
 
             if let value = recordUri {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let recordUriValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "recordUri", value: recordUriValue)
             }
@@ -729,10 +716,7 @@ public enum ComAtprotoAdminDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let propertyValue = try (property as? DAGCBOREncodable)?.toCBORValue() ?? property
             map = map.adding(key: "property", value: propertyValue)

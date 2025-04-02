@@ -81,24 +81,18 @@ public enum ComAtprotoServerRefreshSession {
 
             try container.encode(did, forKey: .did)
 
-            if let value = didDoc {
-                try container.encode(value, forKey: .didDoc)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(didDoc, forKey: .didDoc)
 
-            if let value = active {
-                try container.encode(value, forKey: .active)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(active, forKey: .active)
 
-            if let value = status {
-                try container.encode(value, forKey: .status)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(status, forKey: .status)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let accessJwtValue = try (accessJwt as? DAGCBOREncodable)?.toCBORValue() ?? accessJwt
             map = map.adding(key: "accessJwt", value: accessJwtValue)
@@ -113,16 +107,22 @@ public enum ComAtprotoServerRefreshSession {
             map = map.adding(key: "did", value: didValue)
 
             if let value = didDoc {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let didDocValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "didDoc", value: didDocValue)
             }
 
             if let value = active {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let activeValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "active", value: activeValue)
             }
 
             if let value = status {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let statusValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "status", value: statusValue)
             }

@@ -502,12 +502,6 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
         else {
             throw APIError.invalidPDSURL
         }
-        
-        if let handle = didDocument.alsoKnownAs.first {
-            let handleString = handle.hasPrefix("at://") ? String(handle.dropFirst(5)) : handle
-            try await configManager.updateUserConfiguration(did: didDocument.id, handle: handleString, serviceEndpoint: serviceURLString)
-        }
-
 
         pdsURL = serviceURL
         // Publish PDS URL updated event
@@ -736,7 +730,6 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
             //            case .requestCompleted(let request, let data, let response):
             //                // Handle request completed event
             //                LogManager.logDebug("ATProtoClient - Request completed: \(request.url?.absoluteString ?? "") with status: \(response.statusCode)")
-            //            // Add cases for additional events as needed
             default:
                 break
             }
@@ -1042,6 +1035,15 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
                 }
             }
 
+            public lazy var communication: Communication = .init(networkManager: self.networkManager)
+
+            public final class Communication: @unchecked Sendable {
+                let networkManager: NetworkManaging
+                init(networkManager: NetworkManaging) {
+                    self.networkManager = networkManager
+                }
+            }
+
             public lazy var server: Server = .init(networkManager: self.networkManager)
 
             public final class Server: @unchecked Sendable {
@@ -1054,15 +1056,6 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
             public lazy var set: Set = .init(networkManager: self.networkManager)
 
             public final class Set: @unchecked Sendable {
-                let networkManager: NetworkManaging
-                init(networkManager: NetworkManaging) {
-                    self.networkManager = networkManager
-                }
-            }
-
-            public lazy var communication: Communication = .init(networkManager: self.networkManager)
-
-            public final class Communication: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
@@ -1105,18 +1098,18 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
                 self.networkManager = networkManager
             }
 
-            public lazy var video: Video = .init(networkManager: self.networkManager)
+            public lazy var embed: Embed = .init(networkManager: self.networkManager)
 
-            public final class Video: @unchecked Sendable {
+            public final class Embed: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
                 }
             }
 
-            public lazy var embed: Embed = .init(networkManager: self.networkManager)
+            public lazy var video: Video = .init(networkManager: self.networkManager)
 
-            public final class Embed: @unchecked Sendable {
+            public final class Video: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
@@ -1159,18 +1152,18 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
                 }
             }
 
-            public lazy var actor: Actor = .init(networkManager: self.networkManager)
+            public lazy var richtext: Richtext = .init(networkManager: self.networkManager)
 
-            public final class Actor: @unchecked Sendable {
+            public final class Richtext: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
                 }
             }
 
-            public lazy var richtext: Richtext = .init(networkManager: self.networkManager)
+            public lazy var actor: Actor = .init(networkManager: self.networkManager)
 
-            public final class Richtext: @unchecked Sendable {
+            public final class Actor: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
@@ -1276,18 +1269,18 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
                 }
             }
 
-            public lazy var server: Server = .init(networkManager: self.networkManager)
+            public lazy var label: Label = .init(networkManager: self.networkManager)
 
-            public final class Server: @unchecked Sendable {
+            public final class Label: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
                 }
             }
 
-            public lazy var label: Label = .init(networkManager: self.networkManager)
+            public lazy var server: Server = .init(networkManager: self.networkManager)
 
-            public final class Label: @unchecked Sendable {
+            public final class Server: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager

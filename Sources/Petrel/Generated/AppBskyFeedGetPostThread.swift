@@ -50,21 +50,19 @@ public enum AppBskyFeedGetPostThread {
 
             try container.encode(thread, forKey: .thread)
 
-            if let value = threadgate {
-                try container.encode(value, forKey: .threadgate)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(threadgate, forKey: .threadgate)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let threadValue = try (thread as? DAGCBOREncodable)?.toCBORValue() ?? thread
             map = map.adding(key: "thread", value: threadValue)
 
             if let value = threadgate {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let threadgateValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "threadgate", value: threadgateValue)
             }
@@ -234,10 +232,8 @@ public enum AppBskyFeedGetPostThread {
 
             switch self {
             case let .appBskyFeedDefsThreadViewPost(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.feed.defs#threadViewPost")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -255,10 +251,8 @@ public enum AppBskyFeedGetPostThread {
                 }
                 return map
             case let .appBskyFeedDefsNotFoundPost(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.feed.defs#notFoundPost")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -276,10 +270,8 @@ public enum AppBskyFeedGetPostThread {
                 }
                 return map
             case let .appBskyFeedDefsBlockedPost(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.feed.defs#blockedPost")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 

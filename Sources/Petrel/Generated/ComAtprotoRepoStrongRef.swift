@@ -52,8 +52,6 @@ public struct ComAtprotoRepoStrongRef: ATProtocolCodable, ATProtocolValue {
     public func toCBORValue() throws -> Any {
         var map = OrderedCBORMap()
 
-        // Add fields in lexicon-defined order to ensure proper CID generation
-
         let uriValue = try (uri as? DAGCBOREncodable)?.toCBORValue() ?? uri
         map = map.adding(key: "uri", value: uriValue)
 

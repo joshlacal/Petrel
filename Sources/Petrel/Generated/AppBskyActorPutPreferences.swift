@@ -28,11 +28,8 @@ public enum AppBskyActorPutPreferences {
             case preferences
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let preferencesValue = try (preferences as? DAGCBOREncodable)?.toCBORValue() ?? preferences
             map = map.adding(key: "preferences", value: preferencesValue)

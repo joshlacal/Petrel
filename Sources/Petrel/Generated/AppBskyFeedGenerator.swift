@@ -67,31 +67,23 @@ public struct AppBskyFeedGenerator: ATProtocolCodable, ATProtocolValue {
 
         try container.encode(displayName, forKey: .displayName)
 
-        if let value = description {
-            try container.encode(value, forKey: .description)
-        }
+        // Encode optional property even if it's an empty array
+        try container.encodeIfPresent(description, forKey: .description)
 
-        if let value = descriptionFacets {
-            if !value.isEmpty {
-                try container.encode(value, forKey: .descriptionFacets)
-            }
-        }
+        // Encode optional property even if it's an empty array
+        try container.encodeIfPresent(descriptionFacets, forKey: .descriptionFacets)
 
-        if let value = avatar {
-            try container.encode(value, forKey: .avatar)
-        }
+        // Encode optional property even if it's an empty array
+        try container.encodeIfPresent(avatar, forKey: .avatar)
 
-        if let value = acceptsInteractions {
-            try container.encode(value, forKey: .acceptsInteractions)
-        }
+        // Encode optional property even if it's an empty array
+        try container.encodeIfPresent(acceptsInteractions, forKey: .acceptsInteractions)
 
-        if let value = labels {
-            try container.encode(value, forKey: .labels)
-        }
+        // Encode optional property even if it's an empty array
+        try container.encodeIfPresent(labels, forKey: .labels)
 
-        if let value = contentMode {
-            try container.encode(value, forKey: .contentMode)
-        }
+        // Encode optional property even if it's an empty array
+        try container.encodeIfPresent(contentMode, forKey: .contentMode)
 
         try container.encode(createdAt, forKey: .createdAt)
     }
@@ -182,10 +174,7 @@ public struct AppBskyFeedGenerator: ATProtocolCodable, ATProtocolValue {
     public func toCBORValue() throws -> Any {
         var map = OrderedCBORMap()
 
-        // Always add $type first (AT Protocol convention)
         map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-        // Add remaining fields in lexicon-defined order
 
         let didValue = try (did as? DAGCBOREncodable)?.toCBORValue() ?? did
         map = map.adding(key: "did", value: didValue)
@@ -194,33 +183,43 @@ public struct AppBskyFeedGenerator: ATProtocolCodable, ATProtocolValue {
         map = map.adding(key: "displayName", value: displayNameValue)
 
         if let value = description {
+            // Encode optional property even if it's an empty array for CBOR
+
             let descriptionValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
             map = map.adding(key: "description", value: descriptionValue)
         }
 
         if let value = descriptionFacets {
-            if !value.isEmpty {
-                let descriptionFacetsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                map = map.adding(key: "descriptionFacets", value: descriptionFacetsValue)
-            }
+            // Encode optional property even if it's an empty array for CBOR
+
+            let descriptionFacetsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+            map = map.adding(key: "descriptionFacets", value: descriptionFacetsValue)
         }
 
         if let value = avatar {
+            // Encode optional property even if it's an empty array for CBOR
+
             let avatarValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
             map = map.adding(key: "avatar", value: avatarValue)
         }
 
         if let value = acceptsInteractions {
+            // Encode optional property even if it's an empty array for CBOR
+
             let acceptsInteractionsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
             map = map.adding(key: "acceptsInteractions", value: acceptsInteractionsValue)
         }
 
         if let value = labels {
+            // Encode optional property even if it's an empty array for CBOR
+
             let labelsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
             map = map.adding(key: "labels", value: labelsValue)
         }
 
         if let value = contentMode {
+            // Encode optional property even if it's an empty array for CBOR
+
             let contentModeValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
             map = map.adding(key: "contentMode", value: contentModeValue)
         }
@@ -321,10 +320,8 @@ public struct AppBskyFeedGenerator: ATProtocolCodable, ATProtocolValue {
 
             switch self {
             case let .comAtprotoLabelDefsSelfLabels(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "com.atproto.label.defs#selfLabels")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 

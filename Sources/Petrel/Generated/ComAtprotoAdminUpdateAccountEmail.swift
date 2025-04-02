@@ -35,11 +35,8 @@ public enum ComAtprotoAdminUpdateAccountEmail {
             case email
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let accountValue = try (account as? DAGCBOREncodable)?.toCBORValue() ?? account
             map = map.adding(key: "account", value: accountValue)

@@ -47,29 +47,23 @@ public enum ToolsOzoneCommunicationUpdateTemplate {
 
             try container.encode(id, forKey: .id)
 
-            if let value = name {
-                try container.encode(value, forKey: .name)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(name, forKey: .name)
 
-            if let value = lang {
-                try container.encode(value, forKey: .lang)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(lang, forKey: .lang)
 
-            if let value = contentMarkdown {
-                try container.encode(value, forKey: .contentMarkdown)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(contentMarkdown, forKey: .contentMarkdown)
 
-            if let value = subject {
-                try container.encode(value, forKey: .subject)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(subject, forKey: .subject)
 
-            if let value = updatedBy {
-                try container.encode(value, forKey: .updatedBy)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(updatedBy, forKey: .updatedBy)
 
-            if let value = disabled {
-                try container.encode(value, forKey: .disabled)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(disabled, forKey: .disabled)
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -82,41 +76,50 @@ public enum ToolsOzoneCommunicationUpdateTemplate {
             case disabled
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let idValue = try (id as? DAGCBOREncodable)?.toCBORValue() ?? id
             map = map.adding(key: "id", value: idValue)
 
             if let value = name {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let nameValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "name", value: nameValue)
             }
 
             if let value = lang {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let langValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "lang", value: langValue)
             }
 
             if let value = contentMarkdown {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let contentMarkdownValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "contentMarkdown", value: contentMarkdownValue)
             }
 
             if let value = subject {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let subjectValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "subject", value: subjectValue)
             }
 
             if let value = updatedBy {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let updatedByValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "updatedBy", value: updatedByValue)
             }
 
             if let value = disabled {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let disabledValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "disabled", value: disabledValue)
             }

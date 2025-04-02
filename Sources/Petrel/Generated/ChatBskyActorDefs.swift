@@ -99,31 +99,23 @@ public enum ChatBskyActorDefs {
 
             try container.encode(handle, forKey: .handle)
 
-            if let value = displayName {
-                try container.encode(value, forKey: .displayName)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(displayName, forKey: .displayName)
 
-            if let value = avatar {
-                try container.encode(value, forKey: .avatar)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(avatar, forKey: .avatar)
 
-            if let value = associated {
-                try container.encode(value, forKey: .associated)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(associated, forKey: .associated)
 
-            if let value = viewer {
-                try container.encode(value, forKey: .viewer)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(viewer, forKey: .viewer)
 
-            if let value = labels {
-                if !value.isEmpty {
-                    try container.encode(value, forKey: .labels)
-                }
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(labels, forKey: .labels)
 
-            if let value = chatDisabled {
-                try container.encode(value, forKey: .chatDisabled)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(chatDisabled, forKey: .chatDisabled)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -207,10 +199,7 @@ public enum ChatBskyActorDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let didValue = try (did as? DAGCBOREncodable)?.toCBORValue() ?? did
             map = map.adding(key: "did", value: didValue)
@@ -219,33 +208,43 @@ public enum ChatBskyActorDefs {
             map = map.adding(key: "handle", value: handleValue)
 
             if let value = displayName {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let displayNameValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "displayName", value: displayNameValue)
             }
 
             if let value = avatar {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let avatarValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "avatar", value: avatarValue)
             }
 
             if let value = associated {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let associatedValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "associated", value: associatedValue)
             }
 
             if let value = viewer {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let viewerValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "viewer", value: viewerValue)
             }
 
             if let value = labels {
-                if !value.isEmpty {
-                    let labelsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                    map = map.adding(key: "labels", value: labelsValue)
-                }
+                // Encode optional property even if it's an empty array for CBOR
+
+                let labelsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "labels", value: labelsValue)
             }
 
             if let value = chatDisabled {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let chatDisabledValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "chatDisabled", value: chatDisabledValue)
             }

@@ -48,10 +48,7 @@ public struct ComAtprotoLexiconSchema: ATProtocolCodable, ATProtocolValue {
     public func toCBORValue() throws -> Any {
         var map = OrderedCBORMap()
 
-        // Always add $type first (AT Protocol convention)
         map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-        // Add remaining fields in lexicon-defined order
 
         let lexiconValue = try (lexicon as? DAGCBOREncodable)?.toCBORValue() ?? lexicon
         map = map.adding(key: "lexicon", value: lexiconValue)

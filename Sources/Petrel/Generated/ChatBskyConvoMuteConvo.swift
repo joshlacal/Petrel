@@ -28,11 +28,8 @@ public enum ChatBskyConvoMuteConvo {
             case convoId
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let convoIdValue = try (convoId as? DAGCBOREncodable)?.toCBORValue() ?? convoId
             map = map.adding(key: "convoId", value: convoIdValue)
@@ -64,11 +61,8 @@ public enum ChatBskyConvoMuteConvo {
             try container.encode(convo, forKey: .convo)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let convoValue = try (convo as? DAGCBOREncodable)?.toCBORValue() ?? convo
             map = map.adding(key: "convo", value: convoValue)

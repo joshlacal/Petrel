@@ -50,11 +50,8 @@ public enum AppBskyUnspeccedGetTrendingTopics {
             try container.encode(suggested, forKey: .suggested)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let topicsValue = try (topics as? DAGCBOREncodable)?.toCBORValue() ?? topics
             map = map.adding(key: "topics", value: topicsValue)

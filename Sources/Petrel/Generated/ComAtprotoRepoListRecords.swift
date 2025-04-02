@@ -89,10 +89,7 @@ public enum ComAtprotoRepoListRecords {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let uriValue = try (uri as? DAGCBOREncodable)?.toCBORValue() ?? uri
             map = map.adding(key: "uri", value: uriValue)
@@ -164,20 +161,18 @@ public enum ComAtprotoRepoListRecords {
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
 
-            if let value = cursor {
-                try container.encode(value, forKey: .cursor)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(cursor, forKey: .cursor)
 
             try container.encode(records, forKey: .records)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Add fields in lexicon-defined order
-
             if let value = cursor {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let cursorValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "cursor", value: cursorValue)
             }

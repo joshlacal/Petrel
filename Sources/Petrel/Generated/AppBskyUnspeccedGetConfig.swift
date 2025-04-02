@@ -25,18 +25,16 @@ public enum AppBskyUnspeccedGetConfig {
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
 
-            if let value = checkEmailConfirmed {
-                try container.encode(value, forKey: .checkEmailConfirmed)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(checkEmailConfirmed, forKey: .checkEmailConfirmed)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Add fields in lexicon-defined order
-
             if let value = checkEmailConfirmed {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let checkEmailConfirmedValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "checkEmailConfirmed", value: checkEmailConfirmedValue)
             }

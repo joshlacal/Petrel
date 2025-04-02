@@ -62,29 +62,28 @@ public enum AppBskyUnspeccedSearchActorsSkeleton {
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
 
-            if let value = cursor {
-                try container.encode(value, forKey: .cursor)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(cursor, forKey: .cursor)
 
-            if let value = hitsTotal {
-                try container.encode(value, forKey: .hitsTotal)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(hitsTotal, forKey: .hitsTotal)
 
             try container.encode(actors, forKey: .actors)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Add fields in lexicon-defined order
-
             if let value = cursor {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let cursorValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "cursor", value: cursorValue)
             }
 
             if let value = hitsTotal {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let hitsTotalValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "hitsTotal", value: hitsTotalValue)
             }

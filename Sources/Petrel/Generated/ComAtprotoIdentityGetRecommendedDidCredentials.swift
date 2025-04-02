@@ -49,53 +49,46 @@ public enum ComAtprotoIdentityGetRecommendedDidCredentials {
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
 
-            if let value = rotationKeys {
-                if !value.isEmpty {
-                    try container.encode(value, forKey: .rotationKeys)
-                }
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(rotationKeys, forKey: .rotationKeys)
 
-            if let value = alsoKnownAs {
-                if !value.isEmpty {
-                    try container.encode(value, forKey: .alsoKnownAs)
-                }
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(alsoKnownAs, forKey: .alsoKnownAs)
 
-            if let value = verificationMethods {
-                try container.encode(value, forKey: .verificationMethods)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(verificationMethods, forKey: .verificationMethods)
 
-            if let value = services {
-                try container.encode(value, forKey: .services)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(services, forKey: .services)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Add fields in lexicon-defined order
-
             if let value = rotationKeys {
-                if !value.isEmpty {
-                    let rotationKeysValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                    map = map.adding(key: "rotationKeys", value: rotationKeysValue)
-                }
+                // Encode optional property even if it's an empty array for CBOR
+
+                let rotationKeysValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "rotationKeys", value: rotationKeysValue)
             }
 
             if let value = alsoKnownAs {
-                if !value.isEmpty {
-                    let alsoKnownAsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                    map = map.adding(key: "alsoKnownAs", value: alsoKnownAsValue)
-                }
+                // Encode optional property even if it's an empty array for CBOR
+
+                let alsoKnownAsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "alsoKnownAs", value: alsoKnownAsValue)
             }
 
             if let value = verificationMethods {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let verificationMethodsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "verificationMethods", value: verificationMethodsValue)
             }
 
             if let value = services {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let servicesValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "services", value: servicesValue)
             }

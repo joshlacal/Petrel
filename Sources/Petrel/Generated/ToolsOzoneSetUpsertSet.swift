@@ -28,11 +28,8 @@ public enum ToolsOzoneSetUpsertSet {
             case data
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let dataValue = try (data as? DAGCBOREncodable)?.toCBORValue() ?? data
             map = map.adding(key: "data", value: dataValue)

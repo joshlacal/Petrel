@@ -49,11 +49,8 @@ public enum AppBskyNotificationRegisterPush {
             case appId
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let serviceDidValue = try (serviceDid as? DAGCBOREncodable)?.toCBORValue() ?? serviceDid
             map = map.adding(key: "serviceDid", value: serviceDidValue)

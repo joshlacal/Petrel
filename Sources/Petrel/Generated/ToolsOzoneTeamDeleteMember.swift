@@ -28,11 +28,8 @@ public enum ToolsOzoneTeamDeleteMember {
             case did
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let didValue = try (did as? DAGCBOREncodable)?.toCBORValue() ?? did
             map = map.adding(key: "did", value: didValue)

@@ -31,13 +31,11 @@ public enum ComAtprotoServerUpdateEmail {
 
             try container.encode(email, forKey: .email)
 
-            if let value = emailAuthFactor {
-                try container.encode(value, forKey: .emailAuthFactor)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(emailAuthFactor, forKey: .emailAuthFactor)
 
-            if let value = token {
-                try container.encode(value, forKey: .token)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(token, forKey: .token)
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -46,21 +44,22 @@ public enum ComAtprotoServerUpdateEmail {
             case token
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let emailValue = try (email as? DAGCBOREncodable)?.toCBORValue() ?? email
             map = map.adding(key: "email", value: emailValue)
 
             if let value = emailAuthFactor {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let emailAuthFactorValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "emailAuthFactor", value: emailAuthFactorValue)
             }
 
             if let value = token {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let tokenValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "token", value: tokenValue)
             }

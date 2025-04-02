@@ -28,11 +28,8 @@ public enum ToolsOzoneCommunicationListTemplates {
             try container.encode(communicationTemplates, forKey: .communicationTemplates)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let communicationTemplatesValue = try (communicationTemplates as? DAGCBOREncodable)?.toCBORValue() ?? communicationTemplates
             map = map.adding(key: "communicationTemplates", value: communicationTemplatesValue)

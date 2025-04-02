@@ -45,20 +45,18 @@ public enum AppBskyGraphGetRelationships {
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
 
-            if let value = actor {
-                try container.encode(value, forKey: .actor)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(actor, forKey: .actor)
 
             try container.encode(relationships, forKey: .relationships)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Add fields in lexicon-defined order
-
             if let value = actor {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let actorValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "actor", value: actorValue)
             }
@@ -176,10 +174,8 @@ public enum AppBskyGraphGetRelationships {
 
             switch self {
             case let .appBskyGraphDefsRelationship(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.graph.defs#relationship")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -197,10 +193,8 @@ public enum AppBskyGraphGetRelationships {
                 }
                 return map
             case let .appBskyGraphDefsNotFoundActor(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.graph.defs#notFoundActor")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 

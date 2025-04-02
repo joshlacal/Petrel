@@ -28,11 +28,8 @@ public enum ComAtprotoTempRequestPhoneVerification {
             case phoneNumber
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let phoneNumberValue = try (phoneNumber as? DAGCBOREncodable)?.toCBORValue() ?? phoneNumber
             map = map.adding(key: "phoneNumber", value: phoneNumberValue)

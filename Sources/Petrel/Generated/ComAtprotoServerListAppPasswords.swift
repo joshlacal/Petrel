@@ -54,9 +54,8 @@ public enum ComAtprotoServerListAppPasswords {
 
             try container.encode(createdAt, forKey: .createdAt)
 
-            if let value = privileged {
-                try container.encode(value, forKey: .privileged)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(privileged, forKey: .privileged)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -95,10 +94,7 @@ public enum ComAtprotoServerListAppPasswords {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let nameValue = try (name as? DAGCBOREncodable)?.toCBORValue() ?? name
             map = map.adding(key: "name", value: nameValue)
@@ -107,6 +103,8 @@ public enum ComAtprotoServerListAppPasswords {
             map = map.adding(key: "createdAt", value: createdAtValue)
 
             if let value = privileged {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let privilegedValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "privileged", value: privilegedValue)
             }
@@ -145,11 +143,8 @@ public enum ComAtprotoServerListAppPasswords {
             try container.encode(passwords, forKey: .passwords)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let passwordsValue = try (passwords as? DAGCBOREncodable)?.toCBORValue() ?? passwords
             map = map.adding(key: "passwords", value: passwordsValue)

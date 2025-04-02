@@ -99,31 +99,23 @@ public struct AppBskyActorDefs {
 
             try container.encode(handle, forKey: .handle)
 
-            if let value = displayName {
-                try container.encode(value, forKey: .displayName)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(displayName, forKey: .displayName)
 
-            if let value = avatar {
-                try container.encode(value, forKey: .avatar)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(avatar, forKey: .avatar)
 
-            if let value = associated {
-                try container.encode(value, forKey: .associated)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(associated, forKey: .associated)
 
-            if let value = viewer {
-                try container.encode(value, forKey: .viewer)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(viewer, forKey: .viewer)
 
-            if let value = labels {
-                if !value.isEmpty {
-                    try container.encode(value, forKey: .labels)
-                }
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(labels, forKey: .labels)
 
-            if let value = createdAt {
-                try container.encode(value, forKey: .createdAt)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(createdAt, forKey: .createdAt)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -207,10 +199,7 @@ public struct AppBskyActorDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let didValue = try (did as? DAGCBOREncodable)?.toCBORValue() ?? did
             map = map.adding(key: "did", value: didValue)
@@ -219,33 +208,43 @@ public struct AppBskyActorDefs {
             map = map.adding(key: "handle", value: handleValue)
 
             if let value = displayName {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let displayNameValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "displayName", value: displayNameValue)
             }
 
             if let value = avatar {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let avatarValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "avatar", value: avatarValue)
             }
 
             if let value = associated {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let associatedValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "associated", value: associatedValue)
             }
 
             if let value = viewer {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let viewerValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "viewer", value: viewerValue)
             }
 
             if let value = labels {
-                if !value.isEmpty {
-                    let labelsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                    map = map.adding(key: "labels", value: labelsValue)
-                }
+                // Encode optional property even if it's an empty array for CBOR
+
+                let labelsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "labels", value: labelsValue)
             }
 
             if let value = createdAt {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let createdAtValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "createdAt", value: createdAtValue)
             }
@@ -378,39 +377,29 @@ public struct AppBskyActorDefs {
 
             try container.encode(handle, forKey: .handle)
 
-            if let value = displayName {
-                try container.encode(value, forKey: .displayName)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(displayName, forKey: .displayName)
 
-            if let value = description {
-                try container.encode(value, forKey: .description)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(description, forKey: .description)
 
-            if let value = avatar {
-                try container.encode(value, forKey: .avatar)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(avatar, forKey: .avatar)
 
-            if let value = associated {
-                try container.encode(value, forKey: .associated)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(associated, forKey: .associated)
 
-            if let value = indexedAt {
-                try container.encode(value, forKey: .indexedAt)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(indexedAt, forKey: .indexedAt)
 
-            if let value = createdAt {
-                try container.encode(value, forKey: .createdAt)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(createdAt, forKey: .createdAt)
 
-            if let value = viewer {
-                try container.encode(value, forKey: .viewer)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(viewer, forKey: .viewer)
 
-            if let value = labels {
-                if !value.isEmpty {
-                    try container.encode(value, forKey: .labels)
-                }
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(labels, forKey: .labels)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -512,10 +501,7 @@ public struct AppBskyActorDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let didValue = try (did as? DAGCBOREncodable)?.toCBORValue() ?? did
             map = map.adding(key: "did", value: didValue)
@@ -524,45 +510,59 @@ public struct AppBskyActorDefs {
             map = map.adding(key: "handle", value: handleValue)
 
             if let value = displayName {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let displayNameValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "displayName", value: displayNameValue)
             }
 
             if let value = description {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let descriptionValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "description", value: descriptionValue)
             }
 
             if let value = avatar {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let avatarValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "avatar", value: avatarValue)
             }
 
             if let value = associated {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let associatedValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "associated", value: associatedValue)
             }
 
             if let value = indexedAt {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let indexedAtValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "indexedAt", value: indexedAtValue)
             }
 
             if let value = createdAt {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let createdAtValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "createdAt", value: createdAtValue)
             }
 
             if let value = viewer {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let viewerValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "viewer", value: viewerValue)
             }
 
             if let value = labels {
-                if !value.isEmpty {
-                    let labelsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                    map = map.adding(key: "labels", value: labelsValue)
-                }
+                // Encode optional property even if it's an empty array for CBOR
+
+                let labelsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "labels", value: labelsValue)
             }
 
             return map
@@ -749,63 +749,47 @@ public struct AppBskyActorDefs {
 
             try container.encode(handle, forKey: .handle)
 
-            if let value = displayName {
-                try container.encode(value, forKey: .displayName)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(displayName, forKey: .displayName)
 
-            if let value = description {
-                try container.encode(value, forKey: .description)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(description, forKey: .description)
 
-            if let value = avatar {
-                try container.encode(value, forKey: .avatar)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(avatar, forKey: .avatar)
 
-            if let value = banner {
-                try container.encode(value, forKey: .banner)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(banner, forKey: .banner)
 
-            if let value = followersCount {
-                try container.encode(value, forKey: .followersCount)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(followersCount, forKey: .followersCount)
 
-            if let value = followsCount {
-                try container.encode(value, forKey: .followsCount)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(followsCount, forKey: .followsCount)
 
-            if let value = postsCount {
-                try container.encode(value, forKey: .postsCount)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(postsCount, forKey: .postsCount)
 
-            if let value = associated {
-                try container.encode(value, forKey: .associated)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(associated, forKey: .associated)
 
-            if let value = joinedViaStarterPack {
-                try container.encode(value, forKey: .joinedViaStarterPack)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(joinedViaStarterPack, forKey: .joinedViaStarterPack)
 
-            if let value = indexedAt {
-                try container.encode(value, forKey: .indexedAt)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(indexedAt, forKey: .indexedAt)
 
-            if let value = createdAt {
-                try container.encode(value, forKey: .createdAt)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(createdAt, forKey: .createdAt)
 
-            if let value = viewer {
-                try container.encode(value, forKey: .viewer)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(viewer, forKey: .viewer)
 
-            if let value = labels {
-                if !value.isEmpty {
-                    try container.encode(value, forKey: .labels)
-                }
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(labels, forKey: .labels)
 
-            if let value = pinnedPost {
-                try container.encode(value, forKey: .pinnedPost)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(pinnedPost, forKey: .pinnedPost)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -961,10 +945,7 @@ public struct AppBskyActorDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let didValue = try (did as? DAGCBOREncodable)?.toCBORValue() ?? did
             map = map.adding(key: "did", value: didValue)
@@ -973,73 +954,99 @@ public struct AppBskyActorDefs {
             map = map.adding(key: "handle", value: handleValue)
 
             if let value = displayName {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let displayNameValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "displayName", value: displayNameValue)
             }
 
             if let value = description {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let descriptionValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "description", value: descriptionValue)
             }
 
             if let value = avatar {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let avatarValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "avatar", value: avatarValue)
             }
 
             if let value = banner {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let bannerValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "banner", value: bannerValue)
             }
 
             if let value = followersCount {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let followersCountValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "followersCount", value: followersCountValue)
             }
 
             if let value = followsCount {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let followsCountValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "followsCount", value: followsCountValue)
             }
 
             if let value = postsCount {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let postsCountValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "postsCount", value: postsCountValue)
             }
 
             if let value = associated {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let associatedValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "associated", value: associatedValue)
             }
 
             if let value = joinedViaStarterPack {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let joinedViaStarterPackValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "joinedViaStarterPack", value: joinedViaStarterPackValue)
             }
 
             if let value = indexedAt {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let indexedAtValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "indexedAt", value: indexedAtValue)
             }
 
             if let value = createdAt {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let createdAtValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "createdAt", value: createdAtValue)
             }
 
             if let value = viewer {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let viewerValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "viewer", value: viewerValue)
             }
 
             if let value = labels {
-                if !value.isEmpty {
-                    let labelsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                    map = map.adding(key: "labels", value: labelsValue)
-                }
+                // Encode optional property even if it's an empty array for CBOR
+
+                let labelsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "labels", value: labelsValue)
             }
 
             if let value = pinnedPost {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let pinnedPostValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "pinnedPost", value: pinnedPostValue)
             }
@@ -1131,25 +1138,20 @@ public struct AppBskyActorDefs {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
 
-            if let value = lists {
-                try container.encode(value, forKey: .lists)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(lists, forKey: .lists)
 
-            if let value = feedgens {
-                try container.encode(value, forKey: .feedgens)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(feedgens, forKey: .feedgens)
 
-            if let value = starterPacks {
-                try container.encode(value, forKey: .starterPacks)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(starterPacks, forKey: .starterPacks)
 
-            if let value = labeler {
-                try container.encode(value, forKey: .labeler)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(labeler, forKey: .labeler)
 
-            if let value = chat {
-                try container.encode(value, forKey: .chat)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(chat, forKey: .chat)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1214,32 +1216,39 @@ public struct AppBskyActorDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            // Add remaining fields in lexicon-defined order
-
             if let value = lists {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let listsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "lists", value: listsValue)
             }
 
             if let value = feedgens {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let feedgensValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "feedgens", value: feedgensValue)
             }
 
             if let value = starterPacks {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let starterPacksValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "starterPacks", value: starterPacksValue)
             }
 
             if let value = labeler {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let labelerValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "labeler", value: labelerValue)
             }
 
             if let value = chat {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let chatValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "chat", value: chatValue)
             }
@@ -1309,10 +1318,7 @@ public struct AppBskyActorDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let allowIncomingValue = try (allowIncoming as? DAGCBOREncodable)?.toCBORValue() ?? allowIncoming
             map = map.adding(key: "allowIncoming", value: allowIncomingValue)
@@ -1416,37 +1422,29 @@ public struct AppBskyActorDefs {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
 
-            if let value = muted {
-                try container.encode(value, forKey: .muted)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(muted, forKey: .muted)
 
-            if let value = mutedByList {
-                try container.encode(value, forKey: .mutedByList)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(mutedByList, forKey: .mutedByList)
 
-            if let value = blockedBy {
-                try container.encode(value, forKey: .blockedBy)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(blockedBy, forKey: .blockedBy)
 
-            if let value = blocking {
-                try container.encode(value, forKey: .blocking)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(blocking, forKey: .blocking)
 
-            if let value = blockingByList {
-                try container.encode(value, forKey: .blockingByList)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(blockingByList, forKey: .blockingByList)
 
-            if let value = following {
-                try container.encode(value, forKey: .following)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(following, forKey: .following)
 
-            if let value = followedBy {
-                try container.encode(value, forKey: .followedBy)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(followedBy, forKey: .followedBy)
 
-            if let value = knownFollowers {
-                try container.encode(value, forKey: .knownFollowers)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(knownFollowers, forKey: .knownFollowers)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1538,47 +1536,60 @@ public struct AppBskyActorDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            // Add remaining fields in lexicon-defined order
-
             if let value = muted {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let mutedValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "muted", value: mutedValue)
             }
 
             if let value = mutedByList {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let mutedByListValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "mutedByList", value: mutedByListValue)
             }
 
             if let value = blockedBy {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let blockedByValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "blockedBy", value: blockedByValue)
             }
 
             if let value = blocking {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let blockingValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "blocking", value: blockingValue)
             }
 
             if let value = blockingByList {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let blockingByListValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "blockingByList", value: blockingByListValue)
             }
 
             if let value = following {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let followingValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "following", value: followingValue)
             }
 
             if let value = followedBy {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let followedByValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "followedBy", value: followedByValue)
             }
 
             if let value = knownFollowers {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let knownFollowersValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "knownFollowers", value: knownFollowersValue)
             }
@@ -1667,10 +1678,7 @@ public struct AppBskyActorDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let countValue = try (count as? DAGCBOREncodable)?.toCBORValue() ?? count
             map = map.adding(key: "count", value: countValue)
@@ -1740,10 +1748,7 @@ public struct AppBskyActorDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let enabledValue = try (enabled as? DAGCBOREncodable)?.toCBORValue() ?? enabled
             map = map.adding(key: "enabled", value: enabledValue)
@@ -1802,9 +1807,8 @@ public struct AppBskyActorDefs {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
 
-            if let value = labelerDid {
-                try container.encode(value, forKey: .labelerDid)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(labelerDid, forKey: .labelerDid)
 
             try container.encode(label, forKey: .label)
 
@@ -1847,12 +1851,11 @@ public struct AppBskyActorDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            // Add remaining fields in lexicon-defined order
-
             if let value = labelerDid {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let labelerDidValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "labelerDid", value: labelerDidValue)
             }
@@ -1974,10 +1977,7 @@ public struct AppBskyActorDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let idValue = try (id as? DAGCBOREncodable)?.toCBORValue() ?? id
             map = map.adding(key: "id", value: idValue)
@@ -2055,10 +2055,7 @@ public struct AppBskyActorDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let itemsValue = try (items as? DAGCBOREncodable)?.toCBORValue() ?? items
             map = map.adding(key: "items", value: itemsValue)
@@ -2121,9 +2118,8 @@ public struct AppBskyActorDefs {
 
             try container.encode(saved, forKey: .saved)
 
-            if let value = timelineIndex {
-                try container.encode(value, forKey: .timelineIndex)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(timelineIndex, forKey: .timelineIndex)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -2162,10 +2158,7 @@ public struct AppBskyActorDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let pinnedValue = try (pinned as? DAGCBOREncodable)?.toCBORValue() ?? pinned
             map = map.adding(key: "pinned", value: pinnedValue)
@@ -2174,6 +2167,8 @@ public struct AppBskyActorDefs {
             map = map.adding(key: "saved", value: savedValue)
 
             if let value = timelineIndex {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let timelineIndexValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "timelineIndex", value: timelineIndexValue)
             }
@@ -2216,9 +2211,8 @@ public struct AppBskyActorDefs {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
 
-            if let value = birthDate {
-                try container.encode(value, forKey: .birthDate)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(birthDate, forKey: .birthDate)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -2247,12 +2241,11 @@ public struct AppBskyActorDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            // Add remaining fields in lexicon-defined order
-
             if let value = birthDate {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let birthDateValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "birthDate", value: birthDateValue)
             }
@@ -2340,25 +2333,20 @@ public struct AppBskyActorDefs {
 
             try container.encode(feed, forKey: .feed)
 
-            if let value = hideReplies {
-                try container.encode(value, forKey: .hideReplies)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(hideReplies, forKey: .hideReplies)
 
-            if let value = hideRepliesByUnfollowed {
-                try container.encode(value, forKey: .hideRepliesByUnfollowed)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(hideRepliesByUnfollowed, forKey: .hideRepliesByUnfollowed)
 
-            if let value = hideRepliesByLikeCount {
-                try container.encode(value, forKey: .hideRepliesByLikeCount)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(hideRepliesByLikeCount, forKey: .hideRepliesByLikeCount)
 
-            if let value = hideReposts {
-                try container.encode(value, forKey: .hideReposts)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(hideReposts, forKey: .hideReposts)
 
-            if let value = hideQuotePosts {
-                try container.encode(value, forKey: .hideQuotePosts)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(hideQuotePosts, forKey: .hideQuotePosts)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -2428,35 +2416,42 @@ public struct AppBskyActorDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let feedValue = try (feed as? DAGCBOREncodable)?.toCBORValue() ?? feed
             map = map.adding(key: "feed", value: feedValue)
 
             if let value = hideReplies {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let hideRepliesValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "hideReplies", value: hideRepliesValue)
             }
 
             if let value = hideRepliesByUnfollowed {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let hideRepliesByUnfollowedValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "hideRepliesByUnfollowed", value: hideRepliesByUnfollowedValue)
             }
 
             if let value = hideRepliesByLikeCount {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let hideRepliesByLikeCountValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "hideRepliesByLikeCount", value: hideRepliesByLikeCountValue)
             }
 
             if let value = hideReposts {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let hideRepostsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "hideReposts", value: hideRepostsValue)
             }
 
             if let value = hideQuotePosts {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let hideQuotePostsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "hideQuotePosts", value: hideQuotePostsValue)
             }
@@ -2511,13 +2506,11 @@ public struct AppBskyActorDefs {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
 
-            if let value = sort {
-                try container.encode(value, forKey: .sort)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(sort, forKey: .sort)
 
-            if let value = prioritizeFollowedUsers {
-                try container.encode(value, forKey: .prioritizeFollowedUsers)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(prioritizeFollowedUsers, forKey: .prioritizeFollowedUsers)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -2555,17 +2548,18 @@ public struct AppBskyActorDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            // Add remaining fields in lexicon-defined order
-
             if let value = sort {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let sortValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "sort", value: sortValue)
             }
 
             if let value = prioritizeFollowedUsers {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let prioritizeFollowedUsersValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "prioritizeFollowedUsers", value: prioritizeFollowedUsersValue)
             }
@@ -2632,10 +2626,7 @@ public struct AppBskyActorDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let tagsValue = try (tags as? DAGCBOREncodable)?.toCBORValue() ?? tags
             map = map.adding(key: "tags", value: tagsValue)
@@ -2712,21 +2703,18 @@ public struct AppBskyActorDefs {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
 
-            if let value = id {
-                try container.encode(value, forKey: .id)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(id, forKey: .id)
 
             try container.encode(value, forKey: .value)
 
             try container.encode(targets, forKey: .targets)
 
-            if let value = actorTarget {
-                try container.encode(value, forKey: .actorTarget)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(actorTarget, forKey: .actorTarget)
 
-            if let value = expiresAt {
-                try container.encode(value, forKey: .expiresAt)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(expiresAt, forKey: .expiresAt)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -2783,12 +2771,11 @@ public struct AppBskyActorDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            // Add remaining fields in lexicon-defined order
-
             if let value = id {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let idValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "id", value: idValue)
             }
@@ -2800,11 +2787,15 @@ public struct AppBskyActorDefs {
             map = map.adding(key: "targets", value: targetsValue)
 
             if let value = actorTarget {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let actorTargetValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "actorTarget", value: actorTargetValue)
             }
 
             if let value = expiresAt {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let expiresAtValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "expiresAt", value: expiresAtValue)
             }
@@ -2874,10 +2865,7 @@ public struct AppBskyActorDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let itemsValue = try (items as? DAGCBOREncodable)?.toCBORValue() ?? items
             map = map.adding(key: "items", value: itemsValue)
@@ -2943,10 +2931,7 @@ public struct AppBskyActorDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let itemsValue = try (items as? DAGCBOREncodable)?.toCBORValue() ?? items
             map = map.adding(key: "items", value: itemsValue)
@@ -3012,10 +2997,7 @@ public struct AppBskyActorDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let labelersValue = try (labelers as? DAGCBOREncodable)?.toCBORValue() ?? labelers
             map = map.adding(key: "labelers", value: labelersValue)
@@ -3081,10 +3063,7 @@ public struct AppBskyActorDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let didValue = try (did as? DAGCBOREncodable)?.toCBORValue() ?? did
             map = map.adding(key: "did", value: didValue)
@@ -3143,21 +3122,14 @@ public struct AppBskyActorDefs {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
 
-            if let value = activeProgressGuide {
-                try container.encode(value, forKey: .activeProgressGuide)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(activeProgressGuide, forKey: .activeProgressGuide)
 
-            if let value = queuedNudges {
-                if !value.isEmpty {
-                    try container.encode(value, forKey: .queuedNudges)
-                }
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(queuedNudges, forKey: .queuedNudges)
 
-            if let value = nuxs {
-                if !value.isEmpty {
-                    try container.encode(value, forKey: .nuxs)
-                }
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(nuxs, forKey: .nuxs)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -3204,28 +3176,27 @@ public struct AppBskyActorDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            // Add remaining fields in lexicon-defined order
-
             if let value = activeProgressGuide {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let activeProgressGuideValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "activeProgressGuide", value: activeProgressGuideValue)
             }
 
             if let value = queuedNudges {
-                if !value.isEmpty {
-                    let queuedNudgesValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                    map = map.adding(key: "queuedNudges", value: queuedNudgesValue)
-                }
+                // Encode optional property even if it's an empty array for CBOR
+
+                let queuedNudgesValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "queuedNudges", value: queuedNudgesValue)
             }
 
             if let value = nuxs {
-                if !value.isEmpty {
-                    let nuxsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                    map = map.adding(key: "nuxs", value: nuxsValue)
-                }
+                // Encode optional property even if it's an empty array for CBOR
+
+                let nuxsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "nuxs", value: nuxsValue)
             }
 
             return map
@@ -3291,10 +3262,7 @@ public struct AppBskyActorDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let guideValue = try (guide as? DAGCBOREncodable)?.toCBORValue() ?? guide
             map = map.adding(key: "guide", value: guideValue)
@@ -3366,13 +3334,11 @@ public struct AppBskyActorDefs {
 
             try container.encode(completed, forKey: .completed)
 
-            if let value = data {
-                try container.encode(value, forKey: .data)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(data, forKey: .data)
 
-            if let value = expiresAt {
-                try container.encode(value, forKey: .expiresAt)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(expiresAt, forKey: .expiresAt)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -3420,10 +3386,7 @@ public struct AppBskyActorDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let idValue = try (id as? DAGCBOREncodable)?.toCBORValue() ?? id
             map = map.adding(key: "id", value: idValue)
@@ -3432,11 +3395,15 @@ public struct AppBskyActorDefs {
             map = map.adding(key: "completed", value: completedValue)
 
             if let value = data {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let dataValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "data", value: dataValue)
             }
 
             if let value = expiresAt {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let expiresAtValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "expiresAt", value: expiresAtValue)
             }
@@ -3489,17 +3456,11 @@ public struct AppBskyActorDefs {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
 
-            if let value = threadgateAllowRules {
-                if !value.isEmpty {
-                    try container.encode(value, forKey: .threadgateAllowRules)
-                }
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(threadgateAllowRules, forKey: .threadgateAllowRules)
 
-            if let value = postgateEmbeddingRules {
-                if !value.isEmpty {
-                    try container.encode(value, forKey: .postgateEmbeddingRules)
-                }
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(postgateEmbeddingRules, forKey: .postgateEmbeddingRules)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -3537,23 +3498,20 @@ public struct AppBskyActorDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            // Add remaining fields in lexicon-defined order
-
             if let value = threadgateAllowRules {
-                if !value.isEmpty {
-                    let threadgateAllowRulesValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                    map = map.adding(key: "threadgateAllowRules", value: threadgateAllowRulesValue)
-                }
+                // Encode optional property even if it's an empty array for CBOR
+
+                let threadgateAllowRulesValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "threadgateAllowRules", value: threadgateAllowRulesValue)
             }
 
             if let value = postgateEmbeddingRules {
-                if !value.isEmpty {
-                    let postgateEmbeddingRulesValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                    map = map.adding(key: "postgateEmbeddingRules", value: postgateEmbeddingRulesValue)
-                }
+                // Encode optional property even if it's an empty array for CBOR
+
+                let postgateEmbeddingRulesValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "postgateEmbeddingRules", value: postgateEmbeddingRulesValue)
             }
 
             return map
@@ -3586,12 +3544,10 @@ public struct AppBskyActorDefs {
         }
 
         public func encode(to encoder: Encoder) throws {
-            // Only encode if the items array is not empty
-            if !items.isEmpty {
-                var container = encoder.unkeyedContainer()
-                for item in items {
-                    try container.encode(item)
-                }
+            // Encode the array regardless of whether it's empty
+            var container = encoder.unkeyedContainer()
+            for item in items {
+                try container.encode(item)
             }
         }
 
@@ -3917,10 +3873,8 @@ public struct AppBskyActorDefs {
 
             switch self {
             case let .adultContentPref(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.actor.defs#adultContentPref")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -3938,10 +3892,8 @@ public struct AppBskyActorDefs {
                 }
                 return map
             case let .contentLabelPref(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.actor.defs#contentLabelPref")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -3959,10 +3911,8 @@ public struct AppBskyActorDefs {
                 }
                 return map
             case let .savedFeedsPref(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.actor.defs#savedFeedsPref")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -3980,10 +3930,8 @@ public struct AppBskyActorDefs {
                 }
                 return map
             case let .savedFeedsPrefV2(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.actor.defs#savedFeedsPrefV2")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -4001,10 +3949,8 @@ public struct AppBskyActorDefs {
                 }
                 return map
             case let .personalDetailsPref(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.actor.defs#personalDetailsPref")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -4022,10 +3968,8 @@ public struct AppBskyActorDefs {
                 }
                 return map
             case let .feedViewPref(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.actor.defs#feedViewPref")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -4043,10 +3987,8 @@ public struct AppBskyActorDefs {
                 }
                 return map
             case let .threadViewPref(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.actor.defs#threadViewPref")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -4064,10 +4006,8 @@ public struct AppBskyActorDefs {
                 }
                 return map
             case let .interestsPref(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.actor.defs#interestsPref")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -4085,10 +4025,8 @@ public struct AppBskyActorDefs {
                 }
                 return map
             case let .mutedWordsPref(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.actor.defs#mutedWordsPref")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -4106,10 +4044,8 @@ public struct AppBskyActorDefs {
                 }
                 return map
             case let .hiddenPostsPref(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.actor.defs#hiddenPostsPref")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -4127,10 +4063,8 @@ public struct AppBskyActorDefs {
                 }
                 return map
             case let .bskyAppStatePref(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.actor.defs#bskyAppStatePref")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -4148,10 +4082,8 @@ public struct AppBskyActorDefs {
                 }
                 return map
             case let .labelersPref(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.actor.defs#labelersPref")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -4169,10 +4101,8 @@ public struct AppBskyActorDefs {
                 }
                 return map
             case let .postInteractionSettingsPref(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.actor.defs#postInteractionSettingsPref")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -4370,10 +4300,8 @@ public struct AppBskyActorDefs {
 
             switch self {
             case let .appBskyFeedThreadgateMentionRule(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#mentionRule")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -4391,10 +4319,8 @@ public struct AppBskyActorDefs {
                 }
                 return map
             case let .appBskyFeedThreadgateFollowerRule(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#followerRule")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -4412,10 +4338,8 @@ public struct AppBskyActorDefs {
                 }
                 return map
             case let .appBskyFeedThreadgateFollowingRule(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#followingRule")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -4433,10 +4357,8 @@ public struct AppBskyActorDefs {
                 }
                 return map
             case let .appBskyFeedThreadgateListRule(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#listRule")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -4585,10 +4507,8 @@ public struct AppBskyActorDefs {
 
             switch self {
             case let .appBskyFeedPostgateDisableRule(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.feed.postgate#disableRule")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 

@@ -69,32 +69,31 @@ public enum AppBskyFeedGetQuotes {
 
             try container.encode(uri, forKey: .uri)
 
-            if let value = cid {
-                try container.encode(value, forKey: .cid)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(cid, forKey: .cid)
 
-            if let value = cursor {
-                try container.encode(value, forKey: .cursor)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(cursor, forKey: .cursor)
 
             try container.encode(posts, forKey: .posts)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let uriValue = try (uri as? DAGCBOREncodable)?.toCBORValue() ?? uri
             map = map.adding(key: "uri", value: uriValue)
 
             if let value = cid {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let cidValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "cid", value: cidValue)
             }
 
             if let value = cursor {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let cursorValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "cursor", value: cursorValue)
             }

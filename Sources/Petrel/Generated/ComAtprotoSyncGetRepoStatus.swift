@@ -62,20 +62,15 @@ public enum ComAtprotoSyncGetRepoStatus {
 
             try container.encode(active, forKey: .active)
 
-            if let value = status {
-                try container.encode(value, forKey: .status)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(status, forKey: .status)
 
-            if let value = rev {
-                try container.encode(value, forKey: .rev)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(rev, forKey: .rev)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let didValue = try (did as? DAGCBOREncodable)?.toCBORValue() ?? did
             map = map.adding(key: "did", value: didValue)
@@ -84,11 +79,15 @@ public enum ComAtprotoSyncGetRepoStatus {
             map = map.adding(key: "active", value: activeValue)
 
             if let value = status {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let statusValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "status", value: statusValue)
             }
 
             if let value = rev {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let revValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "rev", value: revValue)
             }

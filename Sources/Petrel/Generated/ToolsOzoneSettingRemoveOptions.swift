@@ -35,11 +35,8 @@ public enum ToolsOzoneSettingRemoveOptions {
             case scope
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let keysValue = try (keys as? DAGCBOREncodable)?.toCBORValue() ?? keys
             map = map.adding(key: "keys", value: keysValue)
@@ -75,7 +72,6 @@ public enum ToolsOzoneSettingRemoveOptions {
             try container.encode(data, forKey: .data)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             return data
         }

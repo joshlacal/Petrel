@@ -28,11 +28,8 @@ public enum AppBskyFeedSendInteractions {
             case interactions
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let interactionsValue = try (interactions as? DAGCBOREncodable)?.toCBORValue() ?? interactions
             map = map.adding(key: "interactions", value: interactionsValue)
@@ -65,7 +62,6 @@ public enum AppBskyFeedSendInteractions {
             try container.encode(data, forKey: .data)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             return data
         }

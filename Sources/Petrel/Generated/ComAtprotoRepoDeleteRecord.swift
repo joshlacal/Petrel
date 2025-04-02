@@ -43,13 +43,11 @@ public enum ComAtprotoRepoDeleteRecord {
 
             try container.encode(rkey, forKey: .rkey)
 
-            if let value = swapRecord {
-                try container.encode(value, forKey: .swapRecord)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(swapRecord, forKey: .swapRecord)
 
-            if let value = swapCommit {
-                try container.encode(value, forKey: .swapCommit)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(swapCommit, forKey: .swapCommit)
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -60,11 +58,8 @@ public enum ComAtprotoRepoDeleteRecord {
             case swapCommit
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let repoValue = try (repo as? DAGCBOREncodable)?.toCBORValue() ?? repo
             map = map.adding(key: "repo", value: repoValue)
@@ -76,11 +71,15 @@ public enum ComAtprotoRepoDeleteRecord {
             map = map.adding(key: "rkey", value: rkeyValue)
 
             if let value = swapRecord {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let swapRecordValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "swapRecord", value: swapRecordValue)
             }
 
             if let value = swapCommit {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let swapCommitValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "swapCommit", value: swapCommitValue)
             }
@@ -109,18 +108,16 @@ public enum ComAtprotoRepoDeleteRecord {
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
 
-            if let value = commit {
-                try container.encode(value, forKey: .commit)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(commit, forKey: .commit)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Add fields in lexicon-defined order
-
             if let value = commit {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let commitValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "commit", value: commitValue)
             }

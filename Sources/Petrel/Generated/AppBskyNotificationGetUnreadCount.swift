@@ -40,11 +40,8 @@ public enum AppBskyNotificationGetUnreadCount {
             try container.encode(count, forKey: .count)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let countValue = try (count as? DAGCBOREncodable)?.toCBORValue() ?? count
             map = map.adding(key: "count", value: countValue)

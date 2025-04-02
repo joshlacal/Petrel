@@ -44,21 +44,19 @@ public enum ChatBskyConvoGetConvoAvailability {
 
             try container.encode(canChat, forKey: .canChat)
 
-            if let value = convo {
-                try container.encode(value, forKey: .convo)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(convo, forKey: .convo)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let canChatValue = try (canChat as? DAGCBOREncodable)?.toCBORValue() ?? canChat
             map = map.adding(key: "canChat", value: canChatValue)
 
             if let value = convo {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let convoValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "convo", value: convoValue)
             }

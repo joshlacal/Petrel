@@ -153,10 +153,7 @@ public enum ComAtprotoServerDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let codeValue = try (code as? DAGCBOREncodable)?.toCBORValue() ?? code
             map = map.adding(key: "code", value: codeValue)
@@ -262,10 +259,7 @@ public enum ComAtprotoServerDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let usedByValue = try (usedBy as? DAGCBOREncodable)?.toCBORValue() ?? usedBy
             map = map.adding(key: "usedBy", value: usedByValue)

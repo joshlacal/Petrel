@@ -40,19 +40,13 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
 
         try container.encode(post, forKey: .post)
 
-        if let value = allow {
-            if !value.isEmpty {
-                try container.encode(value, forKey: .allow)
-            }
-        }
+        // Encode optional property even if it's an empty array
+        try container.encodeIfPresent(allow, forKey: .allow)
 
         try container.encode(createdAt, forKey: .createdAt)
 
-        if let value = hiddenReplies {
-            if !value.isEmpty {
-                try container.encode(value, forKey: .hiddenReplies)
-            }
-        }
+        // Encode optional property even if it's an empty array
+        try container.encodeIfPresent(hiddenReplies, forKey: .hiddenReplies)
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -100,29 +94,26 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
     public func toCBORValue() throws -> Any {
         var map = OrderedCBORMap()
 
-        // Always add $type first (AT Protocol convention)
         map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-        // Add remaining fields in lexicon-defined order
 
         let postValue = try (post as? DAGCBOREncodable)?.toCBORValue() ?? post
         map = map.adding(key: "post", value: postValue)
 
         if let value = allow {
-            if !value.isEmpty {
-                let allowValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                map = map.adding(key: "allow", value: allowValue)
-            }
+            // Encode optional property even if it's an empty array for CBOR
+
+            let allowValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+            map = map.adding(key: "allow", value: allowValue)
         }
 
         let createdAtValue = try (createdAt as? DAGCBOREncodable)?.toCBORValue() ?? createdAt
         map = map.adding(key: "createdAt", value: createdAtValue)
 
         if let value = hiddenReplies {
-            if !value.isEmpty {
-                let hiddenRepliesValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                map = map.adding(key: "hiddenReplies", value: hiddenRepliesValue)
-            }
+            // Encode optional property even if it's an empty array for CBOR
+
+            let hiddenRepliesValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+            map = map.adding(key: "hiddenReplies", value: hiddenRepliesValue)
         }
 
         return map
@@ -167,10 +158,7 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             return map
         }
@@ -211,10 +199,7 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             return map
         }
@@ -255,10 +240,7 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             return map
         }
@@ -320,10 +302,7 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let listValue = try (list as? DAGCBOREncodable)?.toCBORValue() ?? list
             map = map.adding(key: "list", value: listValue)
@@ -469,10 +448,8 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
 
             switch self {
             case let .appBskyFeedThreadgateMentionRule(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#mentionRule")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -490,10 +467,8 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
                 }
                 return map
             case let .appBskyFeedThreadgateFollowerRule(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#followerRule")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -511,10 +486,8 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
                 }
                 return map
             case let .appBskyFeedThreadgateFollowingRule(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#followingRule")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -532,10 +505,8 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
                 }
                 return map
             case let .appBskyFeedThreadgateListRule(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#listRule")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 

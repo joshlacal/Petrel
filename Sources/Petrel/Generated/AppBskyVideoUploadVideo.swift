@@ -28,11 +28,8 @@ public enum AppBskyVideoUploadVideo {
             try container.encode(jobStatus, forKey: .jobStatus)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let jobStatusValue = try (jobStatus as? DAGCBOREncodable)?.toCBORValue() ?? jobStatus
             map = map.adding(key: "jobStatus", value: jobStatusValue)

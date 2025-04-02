@@ -57,23 +57,17 @@ public struct AppBskyGraphList: ATProtocolCodable, ATProtocolValue {
 
         try container.encode(name, forKey: .name)
 
-        if let value = description {
-            try container.encode(value, forKey: .description)
-        }
+        // Encode optional property even if it's an empty array
+        try container.encodeIfPresent(description, forKey: .description)
 
-        if let value = descriptionFacets {
-            if !value.isEmpty {
-                try container.encode(value, forKey: .descriptionFacets)
-            }
-        }
+        // Encode optional property even if it's an empty array
+        try container.encodeIfPresent(descriptionFacets, forKey: .descriptionFacets)
 
-        if let value = avatar {
-            try container.encode(value, forKey: .avatar)
-        }
+        // Encode optional property even if it's an empty array
+        try container.encodeIfPresent(avatar, forKey: .avatar)
 
-        if let value = labels {
-            try container.encode(value, forKey: .labels)
-        }
+        // Encode optional property even if it's an empty array
+        try container.encodeIfPresent(labels, forKey: .labels)
 
         try container.encode(createdAt, forKey: .createdAt)
     }
@@ -146,10 +140,7 @@ public struct AppBskyGraphList: ATProtocolCodable, ATProtocolValue {
     public func toCBORValue() throws -> Any {
         var map = OrderedCBORMap()
 
-        // Always add $type first (AT Protocol convention)
         map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-        // Add remaining fields in lexicon-defined order
 
         let purposeValue = try (purpose as? DAGCBOREncodable)?.toCBORValue() ?? purpose
         map = map.adding(key: "purpose", value: purposeValue)
@@ -158,23 +149,29 @@ public struct AppBskyGraphList: ATProtocolCodable, ATProtocolValue {
         map = map.adding(key: "name", value: nameValue)
 
         if let value = description {
+            // Encode optional property even if it's an empty array for CBOR
+
             let descriptionValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
             map = map.adding(key: "description", value: descriptionValue)
         }
 
         if let value = descriptionFacets {
-            if !value.isEmpty {
-                let descriptionFacetsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                map = map.adding(key: "descriptionFacets", value: descriptionFacetsValue)
-            }
+            // Encode optional property even if it's an empty array for CBOR
+
+            let descriptionFacetsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+            map = map.adding(key: "descriptionFacets", value: descriptionFacetsValue)
         }
 
         if let value = avatar {
+            // Encode optional property even if it's an empty array for CBOR
+
             let avatarValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
             map = map.adding(key: "avatar", value: avatarValue)
         }
 
         if let value = labels {
+            // Encode optional property even if it's an empty array for CBOR
+
             let labelsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
             map = map.adding(key: "labels", value: labelsValue)
         }
@@ -273,10 +270,8 @@ public struct AppBskyGraphList: ATProtocolCodable, ATProtocolValue {
 
             switch self {
             case let .comAtprotoLabelDefsSelfLabels(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "com.atproto.label.defs#selfLabels")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 

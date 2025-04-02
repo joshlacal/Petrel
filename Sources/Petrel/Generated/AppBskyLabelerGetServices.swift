@@ -40,11 +40,8 @@ public enum AppBskyLabelerGetServices {
             try container.encode(views, forKey: .views)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let viewsValue = try (views as? DAGCBOREncodable)?.toCBORValue() ?? views
             map = map.adding(key: "views", value: viewsValue)
@@ -151,10 +148,8 @@ public enum AppBskyLabelerGetServices {
 
             switch self {
             case let .appBskyLabelerDefsLabelerView(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.labeler.defs#labelerView")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -172,10 +167,8 @@ public enum AppBskyLabelerGetServices {
                 }
                 return map
             case let .appBskyLabelerDefsLabelerViewDetailed(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.labeler.defs#labelerViewDetailed")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 

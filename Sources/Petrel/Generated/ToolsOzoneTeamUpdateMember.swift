@@ -31,13 +31,11 @@ public enum ToolsOzoneTeamUpdateMember {
 
             try container.encode(did, forKey: .did)
 
-            if let value = disabled {
-                try container.encode(value, forKey: .disabled)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(disabled, forKey: .disabled)
 
-            if let value = role {
-                try container.encode(value, forKey: .role)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(role, forKey: .role)
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -46,21 +44,22 @@ public enum ToolsOzoneTeamUpdateMember {
             case role
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let didValue = try (did as? DAGCBOREncodable)?.toCBORValue() ?? did
             map = map.adding(key: "did", value: didValue)
 
             if let value = disabled {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let disabledValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "disabled", value: disabledValue)
             }
 
             if let value = role {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let roleValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "role", value: roleValue)
             }

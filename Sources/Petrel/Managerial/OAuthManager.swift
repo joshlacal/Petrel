@@ -950,7 +950,7 @@ actor OAuthManager {
                     userInfo: [NSLocalizedDescriptionKey: "Unexpected error: \(responseString)"]
                 )
             }
-        } 
+        }
 
         // Decode the token response
         let tokenResponse = try JSONDecoder().decode(TokenResponse.self, from: data)
@@ -1139,11 +1139,11 @@ actor OAuthManager {
                 $0.type == "AtprotoPersonalDataServer"
             })?.serviceEndpoint,
             let serviceURL = URL(string: serviceURLString)
-                
+
         else {
             throw OAuthError.invalidPDSURL
         }
-        
+
         if let handle = response.alsoKnownAs.first {
             let handleString = handle.hasPrefix("at://") ? String(handle.dropFirst(5)) : handle
             try await configurationManager.updateUserConfiguration(did: response.id, handle: handleString, serviceEndpoint: serviceURLString)

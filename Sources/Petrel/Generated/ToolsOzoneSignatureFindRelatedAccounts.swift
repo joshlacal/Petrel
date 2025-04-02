@@ -43,11 +43,8 @@ public enum ToolsOzoneSignatureFindRelatedAccounts {
 
             try container.encode(account, forKey: .account)
 
-            if let value = similarities {
-                if !value.isEmpty {
-                    try container.encode(value, forKey: .similarities)
-                }
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(similarities, forKey: .similarities)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -81,19 +78,16 @@ public enum ToolsOzoneSignatureFindRelatedAccounts {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let accountValue = try (account as? DAGCBOREncodable)?.toCBORValue() ?? account
             map = map.adding(key: "account", value: accountValue)
 
             if let value = similarities {
-                if !value.isEmpty {
-                    let similaritiesValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                    map = map.adding(key: "similarities", value: similaritiesValue)
-                }
+                // Encode optional property even if it's an empty array for CBOR
+
+                let similaritiesValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "similarities", value: similaritiesValue)
             }
 
             return map
@@ -150,20 +144,18 @@ public enum ToolsOzoneSignatureFindRelatedAccounts {
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
 
-            if let value = cursor {
-                try container.encode(value, forKey: .cursor)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(cursor, forKey: .cursor)
 
             try container.encode(accounts, forKey: .accounts)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Add fields in lexicon-defined order
-
             if let value = cursor {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let cursorValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "cursor", value: cursorValue)
             }

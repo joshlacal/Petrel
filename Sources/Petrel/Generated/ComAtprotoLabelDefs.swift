@@ -104,33 +104,28 @@ public enum ComAtprotoLabelDefs {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
 
-            if let value = ver {
-                try container.encode(value, forKey: .ver)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(ver, forKey: .ver)
 
             try container.encode(src, forKey: .src)
 
             try container.encode(uri, forKey: .uri)
 
-            if let value = cid {
-                try container.encode(value, forKey: .cid)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(cid, forKey: .cid)
 
             try container.encode(val, forKey: .val)
 
-            if let value = neg {
-                try container.encode(value, forKey: .neg)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(neg, forKey: .neg)
 
             try container.encode(cts, forKey: .cts)
 
-            if let value = exp {
-                try container.encode(value, forKey: .exp)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(exp, forKey: .exp)
 
-            if let value = sig {
-                try container.encode(value, forKey: .sig)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(sig, forKey: .sig)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -215,12 +210,11 @@ public enum ComAtprotoLabelDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            // Add remaining fields in lexicon-defined order
-
             if let value = ver {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let verValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "ver", value: verValue)
             }
@@ -232,6 +226,8 @@ public enum ComAtprotoLabelDefs {
             map = map.adding(key: "uri", value: uriValue)
 
             if let value = cid {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let cidValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "cid", value: cidValue)
             }
@@ -240,6 +236,8 @@ public enum ComAtprotoLabelDefs {
             map = map.adding(key: "val", value: valValue)
 
             if let value = neg {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let negValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "neg", value: negValue)
             }
@@ -248,11 +246,15 @@ public enum ComAtprotoLabelDefs {
             map = map.adding(key: "cts", value: ctsValue)
 
             if let value = exp {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let expValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "exp", value: expValue)
             }
 
             if let value = sig {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let sigValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "sig", value: sigValue)
             }
@@ -326,10 +328,7 @@ public enum ComAtprotoLabelDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let valuesValue = try (values as? DAGCBOREncodable)?.toCBORValue() ?? values
             map = map.adding(key: "values", value: valuesValue)
@@ -395,10 +394,7 @@ public enum ComAtprotoLabelDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let valValue = try (val as? DAGCBOREncodable)?.toCBORValue() ?? val
             map = map.adding(key: "val", value: valValue)
@@ -490,13 +486,11 @@ public enum ComAtprotoLabelDefs {
 
             try container.encode(blurs, forKey: .blurs)
 
-            if let value = defaultSetting {
-                try container.encode(value, forKey: .defaultSetting)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(defaultSetting, forKey: .defaultSetting)
 
-            if let value = adultOnly {
-                try container.encode(value, forKey: .adultOnly)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(adultOnly, forKey: .adultOnly)
 
             try container.encode(locales, forKey: .locales)
         }
@@ -556,10 +550,7 @@ public enum ComAtprotoLabelDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let identifierValue = try (identifier as? DAGCBOREncodable)?.toCBORValue() ?? identifier
             map = map.adding(key: "identifier", value: identifierValue)
@@ -571,11 +562,15 @@ public enum ComAtprotoLabelDefs {
             map = map.adding(key: "blurs", value: blursValue)
 
             if let value = defaultSetting {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let defaultSettingValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "defaultSetting", value: defaultSettingValue)
             }
 
             if let value = adultOnly {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let adultOnlyValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "adultOnly", value: adultOnlyValue)
             }
@@ -681,10 +676,7 @@ public enum ComAtprotoLabelDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let langValue = try (lang as? DAGCBOREncodable)?.toCBORValue() ?? lang
             map = map.adding(key: "lang", value: langValue)

@@ -58,23 +58,21 @@ public enum AppBskyGraphGetFollowers {
 
             try container.encode(subject, forKey: .subject)
 
-            if let value = cursor {
-                try container.encode(value, forKey: .cursor)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(cursor, forKey: .cursor)
 
             try container.encode(followers, forKey: .followers)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let subjectValue = try (subject as? DAGCBOREncodable)?.toCBORValue() ?? subject
             map = map.adding(key: "subject", value: subjectValue)
 
             if let value = cursor {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let cursorValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "cursor", value: cursorValue)
             }

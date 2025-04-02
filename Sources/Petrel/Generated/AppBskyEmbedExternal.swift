@@ -42,8 +42,6 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
     public func toCBORValue() throws -> Any {
         var map = OrderedCBORMap()
 
-        // Add fields in lexicon-defined order to ensure proper CID generation
-
         let externalValue = try (external as? DAGCBOREncodable)?.toCBORValue() ?? external
         map = map.adding(key: "external", value: externalValue)
 
@@ -114,9 +112,8 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
 
             try container.encode(description, forKey: .description)
 
-            if let value = thumb {
-                try container.encode(value, forKey: .thumb)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(thumb, forKey: .thumb)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -160,10 +157,7 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let uriValue = try (uri as? DAGCBOREncodable)?.toCBORValue() ?? uri
             map = map.adding(key: "uri", value: uriValue)
@@ -175,6 +169,8 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             map = map.adding(key: "description", value: descriptionValue)
 
             if let value = thumb {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let thumbValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "thumb", value: thumbValue)
             }
@@ -243,10 +239,7 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let externalValue = try (external as? DAGCBOREncodable)?.toCBORValue() ?? external
             map = map.adding(key: "external", value: externalValue)
@@ -320,9 +313,8 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
 
             try container.encode(description, forKey: .description)
 
-            if let value = thumb {
-                try container.encode(value, forKey: .thumb)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(thumb, forKey: .thumb)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -366,10 +358,7 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let uriValue = try (uri as? DAGCBOREncodable)?.toCBORValue() ?? uri
             map = map.adding(key: "uri", value: uriValue)
@@ -381,6 +370,8 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             map = map.adding(key: "description", value: descriptionValue)
 
             if let value = thumb {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let thumbValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "thumb", value: thumbValue)
             }

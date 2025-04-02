@@ -50,29 +50,19 @@ public struct AppBskyLabelerService: ATProtocolCodable, ATProtocolValue {
 
         try container.encode(policies, forKey: .policies)
 
-        if let value = labels {
-            try container.encode(value, forKey: .labels)
-        }
+        // Encode optional property even if it's an empty array
+        try container.encodeIfPresent(labels, forKey: .labels)
 
         try container.encode(createdAt, forKey: .createdAt)
 
-        if let value = reasonTypes {
-            if !value.isEmpty {
-                try container.encode(value, forKey: .reasonTypes)
-            }
-        }
+        // Encode optional property even if it's an empty array
+        try container.encodeIfPresent(reasonTypes, forKey: .reasonTypes)
 
-        if let value = subjectTypes {
-            if !value.isEmpty {
-                try container.encode(value, forKey: .subjectTypes)
-            }
-        }
+        // Encode optional property even if it's an empty array
+        try container.encodeIfPresent(subjectTypes, forKey: .subjectTypes)
 
-        if let value = subjectCollections {
-            if !value.isEmpty {
-                try container.encode(value, forKey: .subjectCollections)
-            }
-        }
+        // Encode optional property even if it's an empty array
+        try container.encodeIfPresent(subjectCollections, forKey: .subjectCollections)
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -138,15 +128,14 @@ public struct AppBskyLabelerService: ATProtocolCodable, ATProtocolValue {
     public func toCBORValue() throws -> Any {
         var map = OrderedCBORMap()
 
-        // Always add $type first (AT Protocol convention)
         map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-        // Add remaining fields in lexicon-defined order
 
         let policiesValue = try (policies as? DAGCBOREncodable)?.toCBORValue() ?? policies
         map = map.adding(key: "policies", value: policiesValue)
 
         if let value = labels {
+            // Encode optional property even if it's an empty array for CBOR
+
             let labelsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
             map = map.adding(key: "labels", value: labelsValue)
         }
@@ -155,24 +144,24 @@ public struct AppBskyLabelerService: ATProtocolCodable, ATProtocolValue {
         map = map.adding(key: "createdAt", value: createdAtValue)
 
         if let value = reasonTypes {
-            if !value.isEmpty {
-                let reasonTypesValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                map = map.adding(key: "reasonTypes", value: reasonTypesValue)
-            }
+            // Encode optional property even if it's an empty array for CBOR
+
+            let reasonTypesValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+            map = map.adding(key: "reasonTypes", value: reasonTypesValue)
         }
 
         if let value = subjectTypes {
-            if !value.isEmpty {
-                let subjectTypesValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                map = map.adding(key: "subjectTypes", value: subjectTypesValue)
-            }
+            // Encode optional property even if it's an empty array for CBOR
+
+            let subjectTypesValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+            map = map.adding(key: "subjectTypes", value: subjectTypesValue)
         }
 
         if let value = subjectCollections {
-            if !value.isEmpty {
-                let subjectCollectionsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                map = map.adding(key: "subjectCollections", value: subjectCollectionsValue)
-            }
+            // Encode optional property even if it's an empty array for CBOR
+
+            let subjectCollectionsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+            map = map.adding(key: "subjectCollections", value: subjectCollectionsValue)
         }
 
         return map
@@ -265,10 +254,8 @@ public struct AppBskyLabelerService: ATProtocolCodable, ATProtocolValue {
 
             switch self {
             case let .comAtprotoLabelDefsSelfLabels(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "com.atproto.label.defs#selfLabels")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 

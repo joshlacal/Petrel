@@ -88,25 +88,20 @@ public enum ToolsOzoneTeamDefs {
 
             try container.encode(did, forKey: .did)
 
-            if let value = disabled {
-                try container.encode(value, forKey: .disabled)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(disabled, forKey: .disabled)
 
-            if let value = profile {
-                try container.encode(value, forKey: .profile)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(profile, forKey: .profile)
 
-            if let value = createdAt {
-                try container.encode(value, forKey: .createdAt)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(createdAt, forKey: .createdAt)
 
-            if let value = updatedAt {
-                try container.encode(value, forKey: .updatedAt)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(updatedAt, forKey: .updatedAt)
 
-            if let value = lastUpdatedBy {
-                try container.encode(value, forKey: .lastUpdatedBy)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(lastUpdatedBy, forKey: .lastUpdatedBy)
 
             try container.encode(role, forKey: .role)
         }
@@ -183,35 +178,42 @@ public enum ToolsOzoneTeamDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let didValue = try (did as? DAGCBOREncodable)?.toCBORValue() ?? did
             map = map.adding(key: "did", value: didValue)
 
             if let value = disabled {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let disabledValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "disabled", value: disabledValue)
             }
 
             if let value = profile {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let profileValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "profile", value: profileValue)
             }
 
             if let value = createdAt {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let createdAtValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "createdAt", value: createdAtValue)
             }
 
             if let value = updatedAt {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let updatedAtValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "updatedAt", value: updatedAtValue)
             }
 
             if let value = lastUpdatedBy {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let lastUpdatedByValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "lastUpdatedBy", value: lastUpdatedByValue)
             }

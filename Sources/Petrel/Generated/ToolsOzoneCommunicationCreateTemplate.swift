@@ -43,13 +43,11 @@ public enum ToolsOzoneCommunicationCreateTemplate {
 
             try container.encode(subject, forKey: .subject)
 
-            if let value = lang {
-                try container.encode(value, forKey: .lang)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(lang, forKey: .lang)
 
-            if let value = createdBy {
-                try container.encode(value, forKey: .createdBy)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(createdBy, forKey: .createdBy)
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -60,11 +58,8 @@ public enum ToolsOzoneCommunicationCreateTemplate {
             case createdBy
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let nameValue = try (name as? DAGCBOREncodable)?.toCBORValue() ?? name
             map = map.adding(key: "name", value: nameValue)
@@ -76,11 +71,15 @@ public enum ToolsOzoneCommunicationCreateTemplate {
             map = map.adding(key: "subject", value: subjectValue)
 
             if let value = lang {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let langValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "lang", value: langValue)
             }
 
             if let value = createdBy {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let createdByValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "createdBy", value: createdByValue)
             }

@@ -21,22 +21,20 @@ public enum ComAtprotoServerReserveSigningKey {
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
 
-            if let value = did {
-                try container.encode(value, forKey: .did)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(did, forKey: .did)
         }
 
         private enum CodingKeys: String, CodingKey {
             case did
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Add fields in lexicon-defined order
-
             if let value = did {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let didValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "did", value: didValue)
             }
@@ -68,11 +66,8 @@ public enum ComAtprotoServerReserveSigningKey {
             try container.encode(signingKey, forKey: .signingKey)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let signingKeyValue = try (signingKey as? DAGCBOREncodable)?.toCBORValue() ?? signingKey
             map = map.adding(key: "signingKey", value: signingKeyValue)

@@ -53,39 +53,31 @@ public enum ComAtprotoServerCreateAccount {
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
 
-            if let value = email {
-                try container.encode(value, forKey: .email)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(email, forKey: .email)
 
             try container.encode(handle, forKey: .handle)
 
-            if let value = did {
-                try container.encode(value, forKey: .did)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(did, forKey: .did)
 
-            if let value = inviteCode {
-                try container.encode(value, forKey: .inviteCode)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(inviteCode, forKey: .inviteCode)
 
-            if let value = verificationCode {
-                try container.encode(value, forKey: .verificationCode)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(verificationCode, forKey: .verificationCode)
 
-            if let value = verificationPhone {
-                try container.encode(value, forKey: .verificationPhone)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(verificationPhone, forKey: .verificationPhone)
 
-            if let value = password {
-                try container.encode(value, forKey: .password)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(password, forKey: .password)
 
-            if let value = recoveryKey {
-                try container.encode(value, forKey: .recoveryKey)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(recoveryKey, forKey: .recoveryKey)
 
-            if let value = plcOp {
-                try container.encode(value, forKey: .plcOp)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(plcOp, forKey: .plcOp)
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -100,13 +92,12 @@ public enum ComAtprotoServerCreateAccount {
             case plcOp
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Add fields in lexicon-defined order
-
             if let value = email {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let emailValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "email", value: emailValue)
             }
@@ -115,36 +106,50 @@ public enum ComAtprotoServerCreateAccount {
             map = map.adding(key: "handle", value: handleValue)
 
             if let value = did {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let didValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "did", value: didValue)
             }
 
             if let value = inviteCode {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let inviteCodeValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "inviteCode", value: inviteCodeValue)
             }
 
             if let value = verificationCode {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let verificationCodeValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "verificationCode", value: verificationCodeValue)
             }
 
             if let value = verificationPhone {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let verificationPhoneValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "verificationPhone", value: verificationPhoneValue)
             }
 
             if let value = password {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let passwordValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "password", value: passwordValue)
             }
 
             if let value = recoveryKey {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let recoveryKeyValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "recoveryKey", value: recoveryKeyValue)
             }
 
             if let value = plcOp {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let plcOpValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "plcOp", value: plcOpValue)
             }
@@ -213,16 +218,12 @@ public enum ComAtprotoServerCreateAccount {
 
             try container.encode(did, forKey: .did)
 
-            if let value = didDoc {
-                try container.encode(value, forKey: .didDoc)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(didDoc, forKey: .didDoc)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let accessJwtValue = try (accessJwt as? DAGCBOREncodable)?.toCBORValue() ?? accessJwt
             map = map.adding(key: "accessJwt", value: accessJwtValue)
@@ -237,6 +238,8 @@ public enum ComAtprotoServerCreateAccount {
             map = map.adding(key: "did", value: didValue)
 
             if let value = didDoc {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let didDocValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "didDoc", value: didDocValue)
             }

@@ -52,9 +52,8 @@ public enum ComAtprotoRepoApplyWrites {
 
             try container.encode(collection, forKey: .collection)
 
-            if let value = rkey {
-                try container.encode(value, forKey: .rkey)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(rkey, forKey: .rkey)
 
             try container.encode(value, forKey: .value)
         }
@@ -95,15 +94,14 @@ public enum ComAtprotoRepoApplyWrites {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let collectionValue = try (collection as? DAGCBOREncodable)?.toCBORValue() ?? collection
             map = map.adding(key: "collection", value: collectionValue)
 
             if let value = rkey {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let rkeyValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "rkey", value: rkeyValue)
             }
@@ -206,10 +204,7 @@ public enum ComAtprotoRepoApplyWrites {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let collectionValue = try (collection as? DAGCBOREncodable)?.toCBORValue() ?? collection
             map = map.adding(key: "collection", value: collectionValue)
@@ -299,10 +294,7 @@ public enum ComAtprotoRepoApplyWrites {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let collectionValue = try (collection as? DAGCBOREncodable)?.toCBORValue() ?? collection
             map = map.adding(key: "collection", value: collectionValue)
@@ -369,9 +361,8 @@ public enum ComAtprotoRepoApplyWrites {
 
             try container.encode(cid, forKey: .cid)
 
-            if let value = validationStatus {
-                try container.encode(value, forKey: .validationStatus)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(validationStatus, forKey: .validationStatus)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -410,10 +401,7 @@ public enum ComAtprotoRepoApplyWrites {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let uriValue = try (uri as? DAGCBOREncodable)?.toCBORValue() ?? uri
             map = map.adding(key: "uri", value: uriValue)
@@ -422,6 +410,8 @@ public enum ComAtprotoRepoApplyWrites {
             map = map.adding(key: "cid", value: cidValue)
 
             if let value = validationStatus {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let validationStatusValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "validationStatus", value: validationStatusValue)
             }
@@ -486,9 +476,8 @@ public enum ComAtprotoRepoApplyWrites {
 
             try container.encode(cid, forKey: .cid)
 
-            if let value = validationStatus {
-                try container.encode(value, forKey: .validationStatus)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(validationStatus, forKey: .validationStatus)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -527,10 +516,7 @@ public enum ComAtprotoRepoApplyWrites {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let uriValue = try (uri as? DAGCBOREncodable)?.toCBORValue() ?? uri
             map = map.adding(key: "uri", value: uriValue)
@@ -539,6 +525,8 @@ public enum ComAtprotoRepoApplyWrites {
             map = map.adding(key: "cid", value: cidValue)
 
             if let value = validationStatus {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let validationStatusValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "validationStatus", value: validationStatusValue)
             }
@@ -585,10 +573,7 @@ public enum ComAtprotoRepoApplyWrites {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             return map
         }
@@ -629,15 +614,13 @@ public enum ComAtprotoRepoApplyWrites {
 
             try container.encode(repo, forKey: .repo)
 
-            if let value = validate {
-                try container.encode(value, forKey: .validate)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(validate, forKey: .validate)
 
             try container.encode(writes, forKey: .writes)
 
-            if let value = swapCommit {
-                try container.encode(value, forKey: .swapCommit)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(swapCommit, forKey: .swapCommit)
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -647,16 +630,15 @@ public enum ComAtprotoRepoApplyWrites {
             case swapCommit
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let repoValue = try (repo as? DAGCBOREncodable)?.toCBORValue() ?? repo
             map = map.adding(key: "repo", value: repoValue)
 
             if let value = validate {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let validateValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "validate", value: validateValue)
             }
@@ -665,6 +647,8 @@ public enum ComAtprotoRepoApplyWrites {
             map = map.adding(key: "writes", value: writesValue)
 
             if let value = swapCommit {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let swapCommitValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "swapCommit", value: swapCommitValue)
             }
@@ -701,33 +685,28 @@ public enum ComAtprotoRepoApplyWrites {
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
 
-            if let value = commit {
-                try container.encode(value, forKey: .commit)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(commit, forKey: .commit)
 
-            if let value = results {
-                if !value.isEmpty {
-                    try container.encode(value, forKey: .results)
-                }
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(results, forKey: .results)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Add fields in lexicon-defined order
-
             if let value = commit {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let commitValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "commit", value: commitValue)
             }
 
             if let value = results {
-                if !value.isEmpty {
-                    let resultsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                    map = map.adding(key: "results", value: resultsValue)
-                }
+                // Encode optional property even if it's an empty array for CBOR
+
+                let resultsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "results", value: resultsValue)
             }
 
             return map
@@ -859,10 +838,8 @@ public enum ComAtprotoRepoApplyWrites {
 
             switch self {
             case let .comAtprotoRepoApplyWritesCreate(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "com.atproto.repo.applyWrites#create")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -880,10 +857,8 @@ public enum ComAtprotoRepoApplyWrites {
                 }
                 return map
             case let .comAtprotoRepoApplyWritesUpdate(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "com.atproto.repo.applyWrites#update")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -901,10 +876,8 @@ public enum ComAtprotoRepoApplyWrites {
                 }
                 return map
             case let .comAtprotoRepoApplyWritesDelete(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "com.atproto.repo.applyWrites#delete")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -1081,10 +1054,8 @@ public enum ComAtprotoRepoApplyWrites {
 
             switch self {
             case let .comAtprotoRepoApplyWritesCreateResult(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "com.atproto.repo.applyWrites#createResult")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -1102,10 +1073,8 @@ public enum ComAtprotoRepoApplyWrites {
                 }
                 return map
             case let .comAtprotoRepoApplyWritesUpdateResult(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "com.atproto.repo.applyWrites#updateResult")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -1123,10 +1092,8 @@ public enum ComAtprotoRepoApplyWrites {
                 }
                 return map
             case let .comAtprotoRepoApplyWritesDeleteResult(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "com.atproto.repo.applyWrites#deleteResult")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -1303,10 +1270,8 @@ public enum ComAtprotoRepoApplyWrites {
 
             switch self {
             case let .comAtprotoRepoApplyWritesCreate(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "com.atproto.repo.applyWrites#create")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -1324,10 +1289,8 @@ public enum ComAtprotoRepoApplyWrites {
                 }
                 return map
             case let .comAtprotoRepoApplyWritesUpdate(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "com.atproto.repo.applyWrites#update")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -1345,10 +1308,8 @@ public enum ComAtprotoRepoApplyWrites {
                 }
                 return map
             case let .comAtprotoRepoApplyWritesDelete(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "com.atproto.repo.applyWrites#delete")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 

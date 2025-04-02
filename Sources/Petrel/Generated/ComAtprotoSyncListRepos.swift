@@ -74,13 +74,11 @@ public enum ComAtprotoSyncListRepos {
 
             try container.encode(rev, forKey: .rev)
 
-            if let value = active {
-                try container.encode(value, forKey: .active)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(active, forKey: .active)
 
-            if let value = status {
-                try container.encode(value, forKey: .status)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(status, forKey: .status)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -133,10 +131,7 @@ public enum ComAtprotoSyncListRepos {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let didValue = try (did as? DAGCBOREncodable)?.toCBORValue() ?? did
             map = map.adding(key: "did", value: didValue)
@@ -148,11 +143,15 @@ public enum ComAtprotoSyncListRepos {
             map = map.adding(key: "rev", value: revValue)
 
             if let value = active {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let activeValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "active", value: activeValue)
             }
 
             if let value = status {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let statusValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "status", value: statusValue)
             }
@@ -211,20 +210,18 @@ public enum ComAtprotoSyncListRepos {
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
 
-            if let value = cursor {
-                try container.encode(value, forKey: .cursor)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(cursor, forKey: .cursor)
 
             try container.encode(repos, forKey: .repos)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Add fields in lexicon-defined order
-
             if let value = cursor {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let cursorValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "cursor", value: cursorValue)
             }

@@ -839,7 +839,7 @@ public struct OAuthClaims: Codable, JWTRegisteredFieldsClaims, Sendable {
     public let iat: Date?
     public let jti: String?
     public let scope: String
-    public let cnf: ConfirmationClaims? 
+    public let cnf: ConfirmationClaims?
 
     public struct ConfirmationClaims: Codable, Sendable {
         let jkt: String

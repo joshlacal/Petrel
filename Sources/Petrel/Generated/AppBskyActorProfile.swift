@@ -58,37 +58,29 @@ public struct AppBskyActorProfile: ATProtocolCodable, ATProtocolValue {
         // Encode the $type field
         try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
 
-        if let value = displayName {
-            try container.encode(value, forKey: .displayName)
-        }
+        // Encode optional property even if it's an empty array
+        try container.encodeIfPresent(displayName, forKey: .displayName)
 
-        if let value = description {
-            try container.encode(value, forKey: .description)
-        }
+        // Encode optional property even if it's an empty array
+        try container.encodeIfPresent(description, forKey: .description)
 
-        if let value = avatar {
-            try container.encode(value, forKey: .avatar)
-        }
+        // Encode optional property even if it's an empty array
+        try container.encodeIfPresent(avatar, forKey: .avatar)
 
-        if let value = banner {
-            try container.encode(value, forKey: .banner)
-        }
+        // Encode optional property even if it's an empty array
+        try container.encodeIfPresent(banner, forKey: .banner)
 
-        if let value = labels {
-            try container.encode(value, forKey: .labels)
-        }
+        // Encode optional property even if it's an empty array
+        try container.encodeIfPresent(labels, forKey: .labels)
 
-        if let value = joinedViaStarterPack {
-            try container.encode(value, forKey: .joinedViaStarterPack)
-        }
+        // Encode optional property even if it's an empty array
+        try container.encodeIfPresent(joinedViaStarterPack, forKey: .joinedViaStarterPack)
 
-        if let value = pinnedPost {
-            try container.encode(value, forKey: .pinnedPost)
-        }
+        // Encode optional property even if it's an empty array
+        try container.encodeIfPresent(pinnedPost, forKey: .pinnedPost)
 
-        if let value = createdAt {
-            try container.encode(value, forKey: .createdAt)
-        }
+        // Encode optional property even if it's an empty array
+        try container.encodeIfPresent(createdAt, forKey: .createdAt)
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -180,47 +172,60 @@ public struct AppBskyActorProfile: ATProtocolCodable, ATProtocolValue {
     public func toCBORValue() throws -> Any {
         var map = OrderedCBORMap()
 
-        // Always add $type first (AT Protocol convention)
         map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-        // Add remaining fields in lexicon-defined order
-
         if let value = displayName {
+            // Encode optional property even if it's an empty array for CBOR
+
             let displayNameValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
             map = map.adding(key: "displayName", value: displayNameValue)
         }
 
         if let value = description {
+            // Encode optional property even if it's an empty array for CBOR
+
             let descriptionValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
             map = map.adding(key: "description", value: descriptionValue)
         }
 
         if let value = avatar {
+            // Encode optional property even if it's an empty array for CBOR
+
             let avatarValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
             map = map.adding(key: "avatar", value: avatarValue)
         }
 
         if let value = banner {
+            // Encode optional property even if it's an empty array for CBOR
+
             let bannerValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
             map = map.adding(key: "banner", value: bannerValue)
         }
 
         if let value = labels {
+            // Encode optional property even if it's an empty array for CBOR
+
             let labelsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
             map = map.adding(key: "labels", value: labelsValue)
         }
 
         if let value = joinedViaStarterPack {
+            // Encode optional property even if it's an empty array for CBOR
+
             let joinedViaStarterPackValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
             map = map.adding(key: "joinedViaStarterPack", value: joinedViaStarterPackValue)
         }
 
         if let value = pinnedPost {
+            // Encode optional property even if it's an empty array for CBOR
+
             let pinnedPostValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
             map = map.adding(key: "pinnedPost", value: pinnedPostValue)
         }
 
         if let value = createdAt {
+            // Encode optional property even if it's an empty array for CBOR
+
             let createdAtValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
             map = map.adding(key: "createdAt", value: createdAtValue)
         }
@@ -317,10 +322,8 @@ public struct AppBskyActorProfile: ATProtocolCodable, ATProtocolValue {
 
             switch self {
             case let .comAtprotoLabelDefsSelfLabels(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "com.atproto.label.defs#selfLabels")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 

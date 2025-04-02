@@ -56,21 +56,19 @@ public enum ToolsOzoneSetQuerySets {
 
             try container.encode(sets, forKey: .sets)
 
-            if let value = cursor {
-                try container.encode(value, forKey: .cursor)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(cursor, forKey: .cursor)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let setsValue = try (sets as? DAGCBOREncodable)?.toCBORValue() ?? sets
             map = map.adding(key: "sets", value: setsValue)
 
             if let value = cursor {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let cursorValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "cursor", value: cursorValue)
             }

@@ -108,11 +108,8 @@ public enum ComAtprotoServerCheckAccountStatus {
             try container.encode(importedBlobs, forKey: .importedBlobs)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let activatedValue = try (activated as? DAGCBOREncodable)?.toCBORValue() ?? activated
             map = map.adding(key: "activated", value: activatedValue)

@@ -105,10 +105,7 @@ public enum ChatBskyModerationGetActorMetadata {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let messagesSentValue = try (messagesSent as? DAGCBOREncodable)?.toCBORValue() ?? messagesSent
             map = map.adding(key: "messagesSent", value: messagesSentValue)
@@ -187,11 +184,8 @@ public enum ChatBskyModerationGetActorMetadata {
             try container.encode(all, forKey: .all)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let dayValue = try (day as? DAGCBOREncodable)?.toCBORValue() ?? day
             map = map.adding(key: "day", value: dayValue)

@@ -40,11 +40,8 @@ public enum ComAtprotoServerGetAccountInviteCodes {
             try container.encode(codes, forKey: .codes)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let codesValue = try (codes as? DAGCBOREncodable)?.toCBORValue() ?? codes
             map = map.adding(key: "codes", value: codesValue)

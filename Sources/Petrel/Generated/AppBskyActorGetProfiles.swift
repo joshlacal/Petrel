@@ -37,11 +37,8 @@ public enum AppBskyActorGetProfiles {
             try container.encode(profiles, forKey: .profiles)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let profilesValue = try (profiles as? DAGCBOREncodable)?.toCBORValue() ?? profiles
             map = map.adding(key: "profiles", value: profilesValue)

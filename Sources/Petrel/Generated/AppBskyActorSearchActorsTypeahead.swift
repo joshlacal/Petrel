@@ -43,11 +43,8 @@ public enum AppBskyActorSearchActorsTypeahead {
             try container.encode(actors, forKey: .actors)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let actorsValue = try (actors as? DAGCBOREncodable)?.toCBORValue() ?? actors
             map = map.adding(key: "actors", value: actorsValue)

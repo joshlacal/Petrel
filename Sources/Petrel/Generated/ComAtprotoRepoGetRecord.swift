@@ -61,23 +61,21 @@ public enum ComAtprotoRepoGetRecord {
 
             try container.encode(uri, forKey: .uri)
 
-            if let value = cid {
-                try container.encode(value, forKey: .cid)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(cid, forKey: .cid)
 
             try container.encode(value, forKey: .value)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let uriValue = try (uri as? DAGCBOREncodable)?.toCBORValue() ?? uri
             map = map.adding(key: "uri", value: uriValue)
 
             if let value = cid {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let cidValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "cid", value: cidValue)
             }

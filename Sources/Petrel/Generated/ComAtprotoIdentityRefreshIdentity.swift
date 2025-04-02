@@ -28,11 +28,8 @@ public enum ComAtprotoIdentityRefreshIdentity {
             case identifier
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let identifierValue = try (identifier as? DAGCBOREncodable)?.toCBORValue() ?? identifier
             map = map.adding(key: "identifier", value: identifierValue)

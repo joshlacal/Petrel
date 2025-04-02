@@ -41,13 +41,11 @@ public enum ComAtprotoServerDescribeServer {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
 
-            if let value = privacyPolicy {
-                try container.encode(value, forKey: .privacyPolicy)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(privacyPolicy, forKey: .privacyPolicy)
 
-            if let value = termsOfService {
-                try container.encode(value, forKey: .termsOfService)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(termsOfService, forKey: .termsOfService)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -85,17 +83,18 @@ public enum ComAtprotoServerDescribeServer {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            // Add remaining fields in lexicon-defined order
-
             if let value = privacyPolicy {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let privacyPolicyValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "privacyPolicy", value: privacyPolicyValue)
             }
 
             if let value = termsOfService {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let termsOfServiceValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "termsOfService", value: termsOfServiceValue)
             }
@@ -137,9 +136,8 @@ public enum ComAtprotoServerDescribeServer {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
 
-            if let value = email {
-                try container.encode(value, forKey: .email)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(email, forKey: .email)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -168,12 +166,11 @@ public enum ComAtprotoServerDescribeServer {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            // Add remaining fields in lexicon-defined order
-
             if let value = email {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let emailValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "email", value: emailValue)
             }
@@ -247,39 +244,36 @@ public enum ComAtprotoServerDescribeServer {
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
 
-            if let value = inviteCodeRequired {
-                try container.encode(value, forKey: .inviteCodeRequired)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(inviteCodeRequired, forKey: .inviteCodeRequired)
 
-            if let value = phoneVerificationRequired {
-                try container.encode(value, forKey: .phoneVerificationRequired)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(phoneVerificationRequired, forKey: .phoneVerificationRequired)
 
             try container.encode(availableUserDomains, forKey: .availableUserDomains)
 
-            if let value = links {
-                try container.encode(value, forKey: .links)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(links, forKey: .links)
 
-            if let value = contact {
-                try container.encode(value, forKey: .contact)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(contact, forKey: .contact)
 
             try container.encode(did, forKey: .did)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Add fields in lexicon-defined order
-
             if let value = inviteCodeRequired {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let inviteCodeRequiredValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "inviteCodeRequired", value: inviteCodeRequiredValue)
             }
 
             if let value = phoneVerificationRequired {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let phoneVerificationRequiredValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "phoneVerificationRequired", value: phoneVerificationRequiredValue)
             }
@@ -288,11 +282,15 @@ public enum ComAtprotoServerDescribeServer {
             map = map.adding(key: "availableUserDomains", value: availableUserDomainsValue)
 
             if let value = links {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let linksValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "links", value: linksValue)
             }
 
             if let value = contact {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let contactValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "contact", value: contactValue)
             }

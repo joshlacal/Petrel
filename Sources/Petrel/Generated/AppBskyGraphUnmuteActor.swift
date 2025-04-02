@@ -28,11 +28,8 @@ public enum AppBskyGraphUnmuteActor {
             case actor
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let actorValue = try (actor as? DAGCBOREncodable)?.toCBORValue() ?? actor
             map = map.adding(key: "actor", value: actorValue)

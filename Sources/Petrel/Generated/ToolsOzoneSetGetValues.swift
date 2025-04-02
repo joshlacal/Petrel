@@ -60,16 +60,12 @@ public enum ToolsOzoneSetGetValues {
 
             try container.encode(values, forKey: .values)
 
-            if let value = cursor {
-                try container.encode(value, forKey: .cursor)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(cursor, forKey: .cursor)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let setValue = try (set as? DAGCBOREncodable)?.toCBORValue() ?? set
             map = map.adding(key: "set", value: setValue)
@@ -78,6 +74,8 @@ public enum ToolsOzoneSetGetValues {
             map = map.adding(key: "values", value: valuesValue)
 
             if let value = cursor {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let cursorValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "cursor", value: cursorValue)
             }

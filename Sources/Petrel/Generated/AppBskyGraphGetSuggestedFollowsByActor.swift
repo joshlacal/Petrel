@@ -52,30 +52,29 @@ public enum AppBskyGraphGetSuggestedFollowsByActor {
 
             try container.encode(suggestions, forKey: .suggestions)
 
-            if let value = isFallback {
-                try container.encode(value, forKey: .isFallback)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(isFallback, forKey: .isFallback)
 
-            if let value = recId {
-                try container.encode(value, forKey: .recId)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(recId, forKey: .recId)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let suggestionsValue = try (suggestions as? DAGCBOREncodable)?.toCBORValue() ?? suggestions
             map = map.adding(key: "suggestions", value: suggestionsValue)
 
             if let value = isFallback {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let isFallbackValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "isFallback", value: isFallbackValue)
             }
 
             if let value = recId {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let recIdValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "recId", value: recIdValue)
             }

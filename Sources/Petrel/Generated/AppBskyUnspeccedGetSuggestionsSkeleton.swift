@@ -67,28 +67,24 @@ public enum AppBskyUnspeccedGetSuggestionsSkeleton {
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
 
-            if let value = cursor {
-                try container.encode(value, forKey: .cursor)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(cursor, forKey: .cursor)
 
             try container.encode(actors, forKey: .actors)
 
-            if let value = relativeToDid {
-                try container.encode(value, forKey: .relativeToDid)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(relativeToDid, forKey: .relativeToDid)
 
-            if let value = recId {
-                try container.encode(value, forKey: .recId)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(recId, forKey: .recId)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Add fields in lexicon-defined order
-
             if let value = cursor {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let cursorValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "cursor", value: cursorValue)
             }
@@ -97,11 +93,15 @@ public enum AppBskyUnspeccedGetSuggestionsSkeleton {
             map = map.adding(key: "actors", value: actorsValue)
 
             if let value = relativeToDid {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let relativeToDidValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "relativeToDid", value: relativeToDidValue)
             }
 
             if let value = recId {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let recIdValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "recId", value: recIdValue)
             }

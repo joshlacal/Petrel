@@ -21,22 +21,20 @@ public enum ChatBskyConvoUpdateAllRead {
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
 
-            if let value = status {
-                try container.encode(value, forKey: .status)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(status, forKey: .status)
         }
 
         private enum CodingKeys: String, CodingKey {
             case status
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Add fields in lexicon-defined order
-
             if let value = status {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let statusValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "status", value: statusValue)
             }
@@ -68,11 +66,8 @@ public enum ChatBskyConvoUpdateAllRead {
             try container.encode(updatedCount, forKey: .updatedCount)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let updatedCountValue = try (updatedCount as? DAGCBOREncodable)?.toCBORValue() ?? updatedCount
             map = map.adding(key: "updatedCount", value: updatedCountValue)

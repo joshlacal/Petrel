@@ -28,11 +28,8 @@ public enum ComAtprotoServerRequestEmailUpdate {
             try container.encode(tokenRequired, forKey: .tokenRequired)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let tokenRequiredValue = try (tokenRequired as? DAGCBOREncodable)?.toCBORValue() ?? tokenRequired
             map = map.adding(key: "tokenRequired", value: tokenRequiredValue)

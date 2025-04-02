@@ -41,7 +41,6 @@ public enum ComAtprotoSyncGetRepo {
             try container.encode(data, forKey: .data)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             return data
         }

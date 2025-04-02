@@ -28,11 +28,8 @@ public enum ComAtprotoIdentitySubmitPlcOperation {
             case operation
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let operationValue = try (operation as? DAGCBOREncodable)?.toCBORValue() ?? operation
             map = map.adding(key: "operation", value: operationValue)

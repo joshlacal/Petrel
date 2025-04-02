@@ -37,11 +37,8 @@ public enum ToolsOzoneSignatureFindCorrelation {
             try container.encode(details, forKey: .details)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let detailsValue = try (details as? DAGCBOREncodable)?.toCBORValue() ?? details
             map = map.adding(key: "details", value: detailsValue)

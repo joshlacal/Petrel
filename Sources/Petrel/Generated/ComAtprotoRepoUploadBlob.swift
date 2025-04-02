@@ -34,11 +34,8 @@ public enum ComAtprotoRepoUploadBlob {
             try container.encode(blob, forKey: .blob)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let blobValue = try (blob as? DAGCBOREncodable)?.toCBORValue() ?? blob
             map = map.adding(key: "blob", value: blobValue)

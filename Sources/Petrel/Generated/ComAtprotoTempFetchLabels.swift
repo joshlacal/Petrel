@@ -40,11 +40,8 @@ public enum ComAtprotoTempFetchLabels {
             try container.encode(labels, forKey: .labels)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let labelsValue = try (labels as? DAGCBOREncodable)?.toCBORValue() ?? labels
             map = map.adding(key: "labels", value: labelsValue)

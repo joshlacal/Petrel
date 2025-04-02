@@ -42,8 +42,6 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
     public func toCBORValue() throws -> Any {
         var map = OrderedCBORMap()
 
-        // Add fields in lexicon-defined order to ensure proper CID generation
-
         let imagesValue = try (images as? DAGCBOREncodable)?.toCBORValue() ?? images
         map = map.adding(key: "images", value: imagesValue)
 
@@ -103,9 +101,8 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
 
             try container.encode(alt, forKey: .alt)
 
-            if let value = aspectRatio {
-                try container.encode(value, forKey: .aspectRatio)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(aspectRatio, forKey: .aspectRatio)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -144,10 +141,7 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let imageValue = try (image as? DAGCBOREncodable)?.toCBORValue() ?? image
             map = map.adding(key: "image", value: imageValue)
@@ -156,6 +150,8 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
             map = map.adding(key: "alt", value: altValue)
 
             if let value = aspectRatio {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let aspectRatioValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "aspectRatio", value: aspectRatioValue)
             }
@@ -223,10 +219,7 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let imagesValue = try (images as? DAGCBOREncodable)?.toCBORValue() ?? images
             map = map.adding(key: "images", value: imagesValue)
@@ -300,9 +293,8 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
 
             try container.encode(alt, forKey: .alt)
 
-            if let value = aspectRatio {
-                try container.encode(value, forKey: .aspectRatio)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(aspectRatio, forKey: .aspectRatio)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -346,10 +338,7 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let thumbValue = try (thumb as? DAGCBOREncodable)?.toCBORValue() ?? thumb
             map = map.adding(key: "thumb", value: thumbValue)
@@ -361,6 +350,8 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
             map = map.adding(key: "alt", value: altValue)
 
             if let value = aspectRatio {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let aspectRatioValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "aspectRatio", value: aspectRatioValue)
             }

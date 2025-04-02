@@ -73,10 +73,7 @@ public enum ComAtprotoServerCreateInviteCodes {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let accountValue = try (account as? DAGCBOREncodable)?.toCBORValue() ?? account
             map = map.adding(key: "account", value: accountValue)
@@ -123,11 +120,8 @@ public enum ComAtprotoServerCreateInviteCodes {
 
             try container.encode(useCount, forKey: .useCount)
 
-            if let value = forAccounts {
-                if !value.isEmpty {
-                    try container.encode(value, forKey: .forAccounts)
-                }
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(forAccounts, forKey: .forAccounts)
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -136,11 +130,8 @@ public enum ComAtprotoServerCreateInviteCodes {
             case forAccounts
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let codeCountValue = try (codeCount as? DAGCBOREncodable)?.toCBORValue() ?? codeCount
             map = map.adding(key: "codeCount", value: codeCountValue)
@@ -149,10 +140,10 @@ public enum ComAtprotoServerCreateInviteCodes {
             map = map.adding(key: "useCount", value: useCountValue)
 
             if let value = forAccounts {
-                if !value.isEmpty {
-                    let forAccountsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                    map = map.adding(key: "forAccounts", value: forAccountsValue)
-                }
+                // Encode optional property even if it's an empty array for CBOR
+
+                let forAccountsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "forAccounts", value: forAccountsValue)
             }
 
             return map
@@ -182,11 +173,8 @@ public enum ComAtprotoServerCreateInviteCodes {
             try container.encode(codes, forKey: .codes)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let codesValue = try (codes as? DAGCBOREncodable)?.toCBORValue() ?? codes
             map = map.adding(key: "codes", value: codesValue)

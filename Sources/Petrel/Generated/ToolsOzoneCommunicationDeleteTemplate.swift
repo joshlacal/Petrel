@@ -28,11 +28,8 @@ public enum ToolsOzoneCommunicationDeleteTemplate {
             case id
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let idValue = try (id as? DAGCBOREncodable)?.toCBORValue() ?? id
             map = map.adding(key: "id", value: idValue)

@@ -28,11 +28,8 @@ public enum ComAtprotoIdentityUpdateHandle {
             case handle
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let handleValue = try (handle as? DAGCBOREncodable)?.toCBORValue() ?? handle
             map = map.adding(key: "handle", value: handleValue)

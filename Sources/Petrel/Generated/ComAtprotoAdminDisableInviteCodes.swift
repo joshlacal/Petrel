@@ -25,17 +25,11 @@ public enum ComAtprotoAdminDisableInviteCodes {
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
 
-            if let value = codes {
-                if !value.isEmpty {
-                    try container.encode(value, forKey: .codes)
-                }
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(codes, forKey: .codes)
 
-            if let value = accounts {
-                if !value.isEmpty {
-                    try container.encode(value, forKey: .accounts)
-                }
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(accounts, forKey: .accounts)
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -43,24 +37,21 @@ public enum ComAtprotoAdminDisableInviteCodes {
             case accounts
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Add fields in lexicon-defined order
-
             if let value = codes {
-                if !value.isEmpty {
-                    let codesValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                    map = map.adding(key: "codes", value: codesValue)
-                }
+                // Encode optional property even if it's an empty array for CBOR
+
+                let codesValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "codes", value: codesValue)
             }
 
             if let value = accounts {
-                if !value.isEmpty {
-                    let accountsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                    map = map.adding(key: "accounts", value: accountsValue)
-                }
+                // Encode optional property even if it's an empty array for CBOR
+
+                let accountsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "accounts", value: accountsValue)
             }
 
             return map

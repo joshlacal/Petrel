@@ -89,10 +89,7 @@ public enum AppBskyUnspeccedGetTaggedSuggestions {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let tagValue = try (tag as? DAGCBOREncodable)?.toCBORValue() ?? tag
             map = map.adding(key: "tag", value: tagValue)
@@ -142,11 +139,8 @@ public enum AppBskyUnspeccedGetTaggedSuggestions {
             try container.encode(suggestions, forKey: .suggestions)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let suggestionsValue = try (suggestions as? DAGCBOREncodable)?.toCBORValue() ?? suggestions
             map = map.adding(key: "suggestions", value: suggestionsValue)

@@ -59,48 +59,49 @@ public enum AppBskyVideoGetUploadLimits {
 
             try container.encode(canUpload, forKey: .canUpload)
 
-            if let value = remainingDailyVideos {
-                try container.encode(value, forKey: .remainingDailyVideos)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(remainingDailyVideos, forKey: .remainingDailyVideos)
 
-            if let value = remainingDailyBytes {
-                try container.encode(value, forKey: .remainingDailyBytes)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(remainingDailyBytes, forKey: .remainingDailyBytes)
 
-            if let value = message {
-                try container.encode(value, forKey: .message)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(message, forKey: .message)
 
-            if let value = error {
-                try container.encode(value, forKey: .error)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(error, forKey: .error)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let canUploadValue = try (canUpload as? DAGCBOREncodable)?.toCBORValue() ?? canUpload
             map = map.adding(key: "canUpload", value: canUploadValue)
 
             if let value = remainingDailyVideos {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let remainingDailyVideosValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "remainingDailyVideos", value: remainingDailyVideosValue)
             }
 
             if let value = remainingDailyBytes {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let remainingDailyBytesValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "remainingDailyBytes", value: remainingDailyBytesValue)
             }
 
             if let value = message {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let messageValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "message", value: messageValue)
             }
 
             if let value = error {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let errorValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "error", value: errorValue)
             }

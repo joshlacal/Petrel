@@ -112,9 +112,8 @@ public enum AppBskyNotificationListNotifications {
 
             try container.encode(reason, forKey: .reason)
 
-            if let value = reasonSubject {
-                try container.encode(value, forKey: .reasonSubject)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(reasonSubject, forKey: .reasonSubject)
 
             try container.encode(record, forKey: .record)
 
@@ -122,11 +121,8 @@ public enum AppBskyNotificationListNotifications {
 
             try container.encode(indexedAt, forKey: .indexedAt)
 
-            if let value = labels {
-                if !value.isEmpty {
-                    try container.encode(value, forKey: .labels)
-                }
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(labels, forKey: .labels)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -199,10 +195,7 @@ public enum AppBskyNotificationListNotifications {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let uriValue = try (uri as? DAGCBOREncodable)?.toCBORValue() ?? uri
             map = map.adding(key: "uri", value: uriValue)
@@ -217,6 +210,8 @@ public enum AppBskyNotificationListNotifications {
             map = map.adding(key: "reason", value: reasonValue)
 
             if let value = reasonSubject {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let reasonSubjectValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "reasonSubject", value: reasonSubjectValue)
             }
@@ -231,10 +226,10 @@ public enum AppBskyNotificationListNotifications {
             map = map.adding(key: "indexedAt", value: indexedAtValue)
 
             if let value = labels {
-                if !value.isEmpty {
-                    let labelsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                    map = map.adding(key: "labels", value: labelsValue)
-                }
+                // Encode optional property even if it's an empty array for CBOR
+
+                let labelsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "labels", value: labelsValue)
             }
 
             return map
@@ -320,28 +315,24 @@ public enum AppBskyNotificationListNotifications {
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
 
-            if let value = cursor {
-                try container.encode(value, forKey: .cursor)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(cursor, forKey: .cursor)
 
             try container.encode(notifications, forKey: .notifications)
 
-            if let value = priority {
-                try container.encode(value, forKey: .priority)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(priority, forKey: .priority)
 
-            if let value = seenAt {
-                try container.encode(value, forKey: .seenAt)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(seenAt, forKey: .seenAt)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Add fields in lexicon-defined order
-
             if let value = cursor {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let cursorValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "cursor", value: cursorValue)
             }
@@ -350,11 +341,15 @@ public enum AppBskyNotificationListNotifications {
             map = map.adding(key: "notifications", value: notificationsValue)
 
             if let value = priority {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let priorityValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "priority", value: priorityValue)
             }
 
             if let value = seenAt {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let seenAtValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "seenAt", value: seenAtValue)
             }

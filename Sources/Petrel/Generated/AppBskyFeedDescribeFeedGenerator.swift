@@ -57,10 +57,7 @@ public enum AppBskyFeedDescribeFeedGenerator {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let uriValue = try (uri as? DAGCBOREncodable)?.toCBORValue() ?? uri
             map = map.adding(key: "uri", value: uriValue)
@@ -110,13 +107,11 @@ public enum AppBskyFeedDescribeFeedGenerator {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
 
-            if let value = privacyPolicy {
-                try container.encode(value, forKey: .privacyPolicy)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(privacyPolicy, forKey: .privacyPolicy)
 
-            if let value = termsOfService {
-                try container.encode(value, forKey: .termsOfService)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(termsOfService, forKey: .termsOfService)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -154,17 +149,18 @@ public enum AppBskyFeedDescribeFeedGenerator {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            // Add remaining fields in lexicon-defined order
-
             if let value = privacyPolicy {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let privacyPolicyValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "privacyPolicy", value: privacyPolicyValue)
             }
 
             if let value = termsOfService {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let termsOfServiceValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "termsOfService", value: termsOfServiceValue)
             }
@@ -219,16 +215,12 @@ public enum AppBskyFeedDescribeFeedGenerator {
 
             try container.encode(feeds, forKey: .feeds)
 
-            if let value = links {
-                try container.encode(value, forKey: .links)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(links, forKey: .links)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let didValue = try (did as? DAGCBOREncodable)?.toCBORValue() ?? did
             map = map.adding(key: "did", value: didValue)
@@ -237,6 +229,8 @@ public enum AppBskyFeedDescribeFeedGenerator {
             map = map.adding(key: "feeds", value: feedsValue)
 
             if let value = links {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let linksValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "links", value: linksValue)
             }

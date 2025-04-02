@@ -43,9 +43,8 @@ public enum ToolsOzoneSetDefs {
 
             try container.encode(name, forKey: .name)
 
-            if let value = description {
-                try container.encode(value, forKey: .description)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(description, forKey: .description)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -79,15 +78,14 @@ public enum ToolsOzoneSetDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let nameValue = try (name as? DAGCBOREncodable)?.toCBORValue() ?? name
             map = map.adding(key: "name", value: nameValue)
 
             if let value = description {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let descriptionValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "description", value: descriptionValue)
             }
@@ -167,9 +165,8 @@ public enum ToolsOzoneSetDefs {
 
             try container.encode(name, forKey: .name)
 
-            if let value = description {
-                try container.encode(value, forKey: .description)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(description, forKey: .description)
 
             try container.encode(setSize, forKey: .setSize)
 
@@ -224,15 +221,14 @@ public enum ToolsOzoneSetDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let nameValue = try (name as? DAGCBOREncodable)?.toCBORValue() ?? name
             map = map.adding(key: "name", value: nameValue)
 
             if let value = description {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let descriptionValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "description", value: descriptionValue)
             }

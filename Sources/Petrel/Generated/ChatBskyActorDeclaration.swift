@@ -48,10 +48,7 @@ public struct ChatBskyActorDeclaration: ATProtocolCodable, ATProtocolValue {
     public func toCBORValue() throws -> Any {
         var map = OrderedCBORMap()
 
-        // Always add $type first (AT Protocol convention)
         map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-        // Add remaining fields in lexicon-defined order
 
         let allowIncomingValue = try (allowIncoming as? DAGCBOREncodable)?.toCBORValue() ?? allowIncoming
         map = map.adding(key: "allowIncoming", value: allowIncomingValue)

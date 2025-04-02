@@ -32,9 +32,8 @@ public enum ToolsOzoneServerGetConfig {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
 
-            if let value = url {
-                try container.encode(value, forKey: .url)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(url, forKey: .url)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -63,12 +62,11 @@ public enum ToolsOzoneServerGetConfig {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            // Add remaining fields in lexicon-defined order
-
             if let value = url {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let urlValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "url", value: urlValue)
             }
@@ -109,9 +107,8 @@ public enum ToolsOzoneServerGetConfig {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
 
-            if let value = role {
-                try container.encode(value, forKey: .role)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(role, forKey: .role)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -140,12 +137,11 @@ public enum ToolsOzoneServerGetConfig {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            // Add remaining fields in lexicon-defined order
-
             if let value = role {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let roleValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "role", value: roleValue)
             }
@@ -211,54 +207,56 @@ public enum ToolsOzoneServerGetConfig {
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
 
-            if let value = appview {
-                try container.encode(value, forKey: .appview)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(appview, forKey: .appview)
 
-            if let value = pds {
-                try container.encode(value, forKey: .pds)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(pds, forKey: .pds)
 
-            if let value = blobDivert {
-                try container.encode(value, forKey: .blobDivert)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(blobDivert, forKey: .blobDivert)
 
-            if let value = chat {
-                try container.encode(value, forKey: .chat)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(chat, forKey: .chat)
 
-            if let value = viewer {
-                try container.encode(value, forKey: .viewer)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(viewer, forKey: .viewer)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Add fields in lexicon-defined order
-
             if let value = appview {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let appviewValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "appview", value: appviewValue)
             }
 
             if let value = pds {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let pdsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "pds", value: pdsValue)
             }
 
             if let value = blobDivert {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let blobDivertValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "blobDivert", value: blobDivertValue)
             }
 
             if let value = chat {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let chatValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "chat", value: chatValue)
             }
 
             if let value = viewer {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let viewerValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "viewer", value: viewerValue)
             }

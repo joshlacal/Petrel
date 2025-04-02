@@ -108,17 +108,15 @@ public enum ToolsOzoneCommunicationDefs {
 
             try container.encode(name, forKey: .name)
 
-            if let value = subject {
-                try container.encode(value, forKey: .subject)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(subject, forKey: .subject)
 
             try container.encode(contentMarkdown, forKey: .contentMarkdown)
 
             try container.encode(disabled, forKey: .disabled)
 
-            if let value = lang {
-                try container.encode(value, forKey: .lang)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(lang, forKey: .lang)
 
             try container.encode(lastUpdatedBy, forKey: .lastUpdatedBy)
 
@@ -197,10 +195,7 @@ public enum ToolsOzoneCommunicationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let idValue = try (id as? DAGCBOREncodable)?.toCBORValue() ?? id
             map = map.adding(key: "id", value: idValue)
@@ -209,6 +204,8 @@ public enum ToolsOzoneCommunicationDefs {
             map = map.adding(key: "name", value: nameValue)
 
             if let value = subject {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let subjectValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "subject", value: subjectValue)
             }
@@ -220,6 +217,8 @@ public enum ToolsOzoneCommunicationDefs {
             map = map.adding(key: "disabled", value: disabledValue)
 
             if let value = lang {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let langValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "lang", value: langValue)
             }

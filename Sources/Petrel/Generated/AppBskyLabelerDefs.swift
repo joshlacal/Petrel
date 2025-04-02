@@ -92,21 +92,16 @@ public enum AppBskyLabelerDefs {
 
             try container.encode(creator, forKey: .creator)
 
-            if let value = likeCount {
-                try container.encode(value, forKey: .likeCount)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(likeCount, forKey: .likeCount)
 
-            if let value = viewer {
-                try container.encode(value, forKey: .viewer)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(viewer, forKey: .viewer)
 
             try container.encode(indexedAt, forKey: .indexedAt)
 
-            if let value = labels {
-                if !value.isEmpty {
-                    try container.encode(value, forKey: .labels)
-                }
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(labels, forKey: .labels)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -173,10 +168,7 @@ public enum AppBskyLabelerDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let uriValue = try (uri as? DAGCBOREncodable)?.toCBORValue() ?? uri
             map = map.adding(key: "uri", value: uriValue)
@@ -188,11 +180,15 @@ public enum AppBskyLabelerDefs {
             map = map.adding(key: "creator", value: creatorValue)
 
             if let value = likeCount {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let likeCountValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "likeCount", value: likeCountValue)
             }
 
             if let value = viewer {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let viewerValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "viewer", value: viewerValue)
             }
@@ -201,10 +197,10 @@ public enum AppBskyLabelerDefs {
             map = map.adding(key: "indexedAt", value: indexedAtValue)
 
             if let value = labels {
-                if !value.isEmpty {
-                    let labelsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                    map = map.adding(key: "labels", value: labelsValue)
-                }
+                // Encode optional property even if it's an empty array for CBOR
+
+                let labelsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "labels", value: labelsValue)
             }
 
             return map
@@ -347,39 +343,25 @@ public enum AppBskyLabelerDefs {
 
             try container.encode(policies, forKey: .policies)
 
-            if let value = likeCount {
-                try container.encode(value, forKey: .likeCount)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(likeCount, forKey: .likeCount)
 
-            if let value = viewer {
-                try container.encode(value, forKey: .viewer)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(viewer, forKey: .viewer)
 
             try container.encode(indexedAt, forKey: .indexedAt)
 
-            if let value = labels {
-                if !value.isEmpty {
-                    try container.encode(value, forKey: .labels)
-                }
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(labels, forKey: .labels)
 
-            if let value = reasonTypes {
-                if !value.isEmpty {
-                    try container.encode(value, forKey: .reasonTypes)
-                }
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(reasonTypes, forKey: .reasonTypes)
 
-            if let value = subjectTypes {
-                if !value.isEmpty {
-                    try container.encode(value, forKey: .subjectTypes)
-                }
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(subjectTypes, forKey: .subjectTypes)
 
-            if let value = subjectCollections {
-                if !value.isEmpty {
-                    try container.encode(value, forKey: .subjectCollections)
-                }
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(subjectCollections, forKey: .subjectCollections)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -478,10 +460,7 @@ public enum AppBskyLabelerDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let uriValue = try (uri as? DAGCBOREncodable)?.toCBORValue() ?? uri
             map = map.adding(key: "uri", value: uriValue)
@@ -496,11 +475,15 @@ public enum AppBskyLabelerDefs {
             map = map.adding(key: "policies", value: policiesValue)
 
             if let value = likeCount {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let likeCountValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "likeCount", value: likeCountValue)
             }
 
             if let value = viewer {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let viewerValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "viewer", value: viewerValue)
             }
@@ -509,31 +492,31 @@ public enum AppBskyLabelerDefs {
             map = map.adding(key: "indexedAt", value: indexedAtValue)
 
             if let value = labels {
-                if !value.isEmpty {
-                    let labelsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                    map = map.adding(key: "labels", value: labelsValue)
-                }
+                // Encode optional property even if it's an empty array for CBOR
+
+                let labelsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "labels", value: labelsValue)
             }
 
             if let value = reasonTypes {
-                if !value.isEmpty {
-                    let reasonTypesValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                    map = map.adding(key: "reasonTypes", value: reasonTypesValue)
-                }
+                // Encode optional property even if it's an empty array for CBOR
+
+                let reasonTypesValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "reasonTypes", value: reasonTypesValue)
             }
 
             if let value = subjectTypes {
-                if !value.isEmpty {
-                    let subjectTypesValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                    map = map.adding(key: "subjectTypes", value: subjectTypesValue)
-                }
+                // Encode optional property even if it's an empty array for CBOR
+
+                let subjectTypesValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "subjectTypes", value: subjectTypesValue)
             }
 
             if let value = subjectCollections {
-                if !value.isEmpty {
-                    let subjectCollectionsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                    map = map.adding(key: "subjectCollections", value: subjectCollectionsValue)
-                }
+                // Encode optional property even if it's an empty array for CBOR
+
+                let subjectCollectionsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "subjectCollections", value: subjectCollectionsValue)
             }
 
             return map
@@ -582,9 +565,8 @@ public enum AppBskyLabelerDefs {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
 
-            if let value = like {
-                try container.encode(value, forKey: .like)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(like, forKey: .like)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -613,12 +595,11 @@ public enum AppBskyLabelerDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            // Add remaining fields in lexicon-defined order
-
             if let value = like {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let likeValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "like", value: likeValue)
             }
@@ -670,11 +651,8 @@ public enum AppBskyLabelerDefs {
 
             try container.encode(labelValues, forKey: .labelValues)
 
-            if let value = labelValueDefinitions {
-                if !value.isEmpty {
-                    try container.encode(value, forKey: .labelValueDefinitions)
-                }
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(labelValueDefinitions, forKey: .labelValueDefinitions)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -708,19 +686,16 @@ public enum AppBskyLabelerDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let labelValuesValue = try (labelValues as? DAGCBOREncodable)?.toCBORValue() ?? labelValues
             map = map.adding(key: "labelValues", value: labelValuesValue)
 
             if let value = labelValueDefinitions {
-                if !value.isEmpty {
-                    let labelValueDefinitionsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                    map = map.adding(key: "labelValueDefinitions", value: labelValueDefinitionsValue)
-                }
+                // Encode optional property even if it's an empty array for CBOR
+
+                let labelValueDefinitionsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "labelValueDefinitions", value: labelValueDefinitionsValue)
             }
 
             return map

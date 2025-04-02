@@ -42,20 +42,18 @@ public enum ChatBskyConvoGetLog {
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
 
-            if let value = cursor {
-                try container.encode(value, forKey: .cursor)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(cursor, forKey: .cursor)
 
             try container.encode(logs, forKey: .logs)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Add fields in lexicon-defined order
-
             if let value = cursor {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let cursorValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "cursor", value: cursorValue)
             }
@@ -318,10 +316,8 @@ public enum ChatBskyConvoGetLog {
 
             switch self {
             case let .chatBskyConvoDefsLogBeginConvo(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logBeginConvo")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -339,10 +335,8 @@ public enum ChatBskyConvoGetLog {
                 }
                 return map
             case let .chatBskyConvoDefsLogAcceptConvo(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logAcceptConvo")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -360,10 +354,8 @@ public enum ChatBskyConvoGetLog {
                 }
                 return map
             case let .chatBskyConvoDefsLogLeaveConvo(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logLeaveConvo")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -381,10 +373,8 @@ public enum ChatBskyConvoGetLog {
                 }
                 return map
             case let .chatBskyConvoDefsLogMuteConvo(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logMuteConvo")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -402,10 +392,8 @@ public enum ChatBskyConvoGetLog {
                 }
                 return map
             case let .chatBskyConvoDefsLogUnmuteConvo(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logUnmuteConvo")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -423,10 +411,8 @@ public enum ChatBskyConvoGetLog {
                 }
                 return map
             case let .chatBskyConvoDefsLogCreateMessage(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logCreateMessage")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -444,10 +430,8 @@ public enum ChatBskyConvoGetLog {
                 }
                 return map
             case let .chatBskyConvoDefsLogDeleteMessage(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logDeleteMessage")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -465,10 +449,8 @@ public enum ChatBskyConvoGetLog {
                 }
                 return map
             case let .chatBskyConvoDefsLogReadMessage(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logReadMessage")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -486,10 +468,8 @@ public enum ChatBskyConvoGetLog {
                 }
                 return map
             case let .chatBskyConvoDefsLogAddReaction(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logAddReaction")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -507,10 +487,8 @@ public enum ChatBskyConvoGetLog {
                 }
                 return map
             case let .chatBskyConvoDefsLogRemoveReaction(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logRemoveReaction")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 

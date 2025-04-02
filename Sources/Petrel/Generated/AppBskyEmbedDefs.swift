@@ -73,10 +73,7 @@ public enum AppBskyEmbedDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let widthValue = try (width as? DAGCBOREncodable)?.toCBORValue() ?? width
             map = map.adding(key: "width", value: widthValue)

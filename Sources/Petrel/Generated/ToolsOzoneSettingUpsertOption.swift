@@ -43,13 +43,11 @@ public enum ToolsOzoneSettingUpsertOption {
 
             try container.encode(value, forKey: .value)
 
-            if let value = description {
-                try container.encode(value, forKey: .description)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(description, forKey: .description)
 
-            if let value = managerRole {
-                try container.encode(value, forKey: .managerRole)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(managerRole, forKey: .managerRole)
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -60,11 +58,8 @@ public enum ToolsOzoneSettingUpsertOption {
             case managerRole
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let keyValue = try (key as? DAGCBOREncodable)?.toCBORValue() ?? key
             map = map.adding(key: "key", value: keyValue)
@@ -76,11 +71,15 @@ public enum ToolsOzoneSettingUpsertOption {
             map = map.adding(key: "value", value: valueValue)
 
             if let value = description {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let descriptionValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "description", value: descriptionValue)
             }
 
             if let value = managerRole {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let managerRoleValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "managerRole", value: managerRoleValue)
             }
@@ -112,11 +111,8 @@ public enum ToolsOzoneSettingUpsertOption {
             try container.encode(option, forKey: .option)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let optionValue = try (option as? DAGCBOREncodable)?.toCBORValue() ?? option
             map = map.adding(key: "option", value: optionValue)

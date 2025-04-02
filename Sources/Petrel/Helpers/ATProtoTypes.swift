@@ -22,7 +22,6 @@ public enum ATProtocolError: Error {
 // MARK: URIs
 
 public struct ATProtocolURI: ATProtocolValue, CustomStringConvertible, QueryParameterConvertible {
-    
     public let authority: String
     public let collection: String?
     public let recordKey: String?

@@ -33,19 +33,14 @@ public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue {
 
         try container.encode(video, forKey: .video)
 
-        if let value = captions {
-            if !value.isEmpty {
-                try container.encode(value, forKey: .captions)
-            }
-        }
+        // Encode optional property even if it's an empty array
+        try container.encodeIfPresent(captions, forKey: .captions)
 
-        if let value = alt {
-            try container.encode(value, forKey: .alt)
-        }
+        // Encode optional property even if it's an empty array
+        try container.encodeIfPresent(alt, forKey: .alt)
 
-        if let value = aspectRatio {
-            try container.encode(value, forKey: .aspectRatio)
-        }
+        // Encode optional property even if it's an empty array
+        try container.encodeIfPresent(aspectRatio, forKey: .aspectRatio)
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -92,24 +87,26 @@ public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue {
     public func toCBORValue() throws -> Any {
         var map = OrderedCBORMap()
 
-        // Add fields in lexicon-defined order to ensure proper CID generation
-
         let videoValue = try (video as? DAGCBOREncodable)?.toCBORValue() ?? video
         map = map.adding(key: "video", value: videoValue)
 
         if let value = captions {
-            if !value.isEmpty {
-                let captionsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                map = map.adding(key: "captions", value: captionsValue)
-            }
+            // Encode optional property even if it's an empty array for CBOR
+
+            let captionsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+            map = map.adding(key: "captions", value: captionsValue)
         }
 
         if let value = alt {
+            // Encode optional property even if it's an empty array for CBOR
+
             let altValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
             map = map.adding(key: "alt", value: altValue)
         }
 
         if let value = aspectRatio {
+            // Encode optional property even if it's an empty array for CBOR
+
             let aspectRatioValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
             map = map.adding(key: "aspectRatio", value: aspectRatioValue)
         }
@@ -192,10 +189,7 @@ public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let langValue = try (lang as? DAGCBOREncodable)?.toCBORValue() ?? lang
             map = map.adding(key: "lang", value: langValue)
@@ -280,17 +274,14 @@ public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue {
 
             try container.encode(playlist, forKey: .playlist)
 
-            if let value = thumbnail {
-                try container.encode(value, forKey: .thumbnail)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(thumbnail, forKey: .thumbnail)
 
-            if let value = alt {
-                try container.encode(value, forKey: .alt)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(alt, forKey: .alt)
 
-            if let value = aspectRatio {
-                try container.encode(value, forKey: .aspectRatio)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(aspectRatio, forKey: .aspectRatio)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -347,10 +338,7 @@ public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let cidValue = try (cid as? DAGCBOREncodable)?.toCBORValue() ?? cid
             map = map.adding(key: "cid", value: cidValue)
@@ -359,16 +347,22 @@ public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue {
             map = map.adding(key: "playlist", value: playlistValue)
 
             if let value = thumbnail {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let thumbnailValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "thumbnail", value: thumbnailValue)
             }
 
             if let value = alt {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let altValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "alt", value: altValue)
             }
 
             if let value = aspectRatio {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let aspectRatioValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "aspectRatio", value: aspectRatioValue)
             }

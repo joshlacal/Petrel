@@ -92,21 +92,17 @@ public enum AppBskyVideoDefs {
 
             try container.encode(state, forKey: .state)
 
-            if let value = progress {
-                try container.encode(value, forKey: .progress)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(progress, forKey: .progress)
 
-            if let value = blob {
-                try container.encode(value, forKey: .blob)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(blob, forKey: .blob)
 
-            if let value = error {
-                try container.encode(value, forKey: .error)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(error, forKey: .error)
 
-            if let value = message {
-                try container.encode(value, forKey: .message)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(message, forKey: .message)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -177,10 +173,7 @@ public enum AppBskyVideoDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let jobIdValue = try (jobId as? DAGCBOREncodable)?.toCBORValue() ?? jobId
             map = map.adding(key: "jobId", value: jobIdValue)
@@ -192,21 +185,29 @@ public enum AppBskyVideoDefs {
             map = map.adding(key: "state", value: stateValue)
 
             if let value = progress {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let progressValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "progress", value: progressValue)
             }
 
             if let value = blob {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let blobValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "blob", value: blobValue)
             }
 
             if let value = error {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let errorValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "error", value: errorValue)
             }
 
             if let value = message {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let messageValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "message", value: messageValue)
             }

@@ -60,10 +60,7 @@ public struct AppBskyGraphFollow: ATProtocolCodable, ATProtocolValue {
     public func toCBORValue() throws -> Any {
         var map = OrderedCBORMap()
 
-        // Always add $type first (AT Protocol convention)
         map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-        // Add remaining fields in lexicon-defined order
 
         let subjectValue = try (subject as? DAGCBOREncodable)?.toCBORValue() ?? subject
         map = map.adding(key: "subject", value: subjectValue)

@@ -37,11 +37,8 @@ public enum AppBskyGraphGetStarterPacks {
             try container.encode(starterPacks, forKey: .starterPacks)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let starterPacksValue = try (starterPacks as? DAGCBOREncodable)?.toCBORValue() ?? starterPacks
             map = map.adding(key: "starterPacks", value: starterPacksValue)

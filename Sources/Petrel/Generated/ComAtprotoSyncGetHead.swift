@@ -37,11 +37,8 @@ public enum ComAtprotoSyncGetHead {
             try container.encode(root, forKey: .root)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let rootValue = try (root as? DAGCBOREncodable)?.toCBORValue() ?? root
             map = map.adding(key: "root", value: rootValue)

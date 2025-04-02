@@ -28,11 +28,8 @@ public enum ComAtprotoSyncNotifyOfUpdate {
             case hostname
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let hostnameValue = try (hostname as? DAGCBOREncodable)?.toCBORValue() ?? hostname
             map = map.adding(key: "hostname", value: hostnameValue)

@@ -27,9 +27,8 @@ public enum ComAtprotoServerCreateInviteCode {
 
             try container.encode(useCount, forKey: .useCount)
 
-            if let value = forAccount {
-                try container.encode(value, forKey: .forAccount)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(forAccount, forKey: .forAccount)
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -37,16 +36,15 @@ public enum ComAtprotoServerCreateInviteCode {
             case forAccount
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let useCountValue = try (useCount as? DAGCBOREncodable)?.toCBORValue() ?? useCount
             map = map.adding(key: "useCount", value: useCountValue)
 
             if let value = forAccount {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let forAccountValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "forAccount", value: forAccountValue)
             }
@@ -78,11 +76,8 @@ public enum ComAtprotoServerCreateInviteCode {
             try container.encode(code, forKey: .code)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let codeValue = try (code as? DAGCBOREncodable)?.toCBORValue() ?? code
             map = map.adding(key: "code", value: codeValue)

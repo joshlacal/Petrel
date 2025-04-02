@@ -37,11 +37,8 @@ public enum ToolsOzoneModerationGetRepos {
             try container.encode(repos, forKey: .repos)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let reposValue = try (repos as? DAGCBOREncodable)?.toCBORValue() ?? repos
             map = map.adding(key: "repos", value: reposValue)
@@ -148,10 +145,8 @@ public enum ToolsOzoneModerationGetRepos {
 
             switch self {
             case let .toolsOzoneModerationDefsRepoViewDetail(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#repoViewDetail")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -169,10 +164,8 @@ public enum ToolsOzoneModerationGetRepos {
                 }
                 return map
             case let .toolsOzoneModerationDefsRepoViewNotFound(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#repoViewNotFound")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 

@@ -47,11 +47,8 @@ public enum ComAtprotoSyncGetLatestCommit {
             try container.encode(rev, forKey: .rev)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let cidValue = try (cid as? DAGCBOREncodable)?.toCBORValue() ?? cid
             map = map.adding(key: "cid", value: cidValue)

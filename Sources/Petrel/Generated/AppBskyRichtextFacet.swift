@@ -52,8 +52,6 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
     public func toCBORValue() throws -> Any {
         var map = OrderedCBORMap()
 
-        // Add fields in lexicon-defined order to ensure proper CID generation
-
         let indexValue = try (index as? DAGCBOREncodable)?.toCBORValue() ?? index
         map = map.adding(key: "index", value: indexValue)
 
@@ -120,10 +118,7 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let didValue = try (did as? DAGCBOREncodable)?.toCBORValue() ?? did
             map = map.adding(key: "did", value: didValue)
@@ -189,10 +184,7 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let uriValue = try (uri as? DAGCBOREncodable)?.toCBORValue() ?? uri
             map = map.adding(key: "uri", value: uriValue)
@@ -258,10 +250,7 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let tagValue = try (tag as? DAGCBOREncodable)?.toCBORValue() ?? tag
             map = map.adding(key: "tag", value: tagValue)
@@ -343,10 +332,7 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let byteStartValue = try (byteStart as? DAGCBOREncodable)?.toCBORValue() ?? byteStart
             map = map.adding(key: "byteStart", value: byteStartValue)
@@ -477,10 +463,8 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
 
             switch self {
             case let .appBskyRichtextFacetMention(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.richtext.facet#mention")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -498,10 +482,8 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
                 }
                 return map
             case let .appBskyRichtextFacetLink(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.richtext.facet#link")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -519,10 +501,8 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
                 }
                 return map
             case let .appBskyRichtextFacetTag(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.richtext.facet#tag")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -606,12 +586,10 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
         }
 
         public func encode(to encoder: Encoder) throws {
-            // Only encode if the items array is not empty
-            if !items.isEmpty {
-                var container = encoder.unkeyedContainer()
-                for item in items {
-                    try container.encode(item)
-                }
+            // Encode the array regardless of whether it's empty
+            var container = encoder.unkeyedContainer()
+            for item in items {
+                try container.encode(item)
             }
         }
 
@@ -747,10 +725,8 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
 
             switch self {
             case let .mention(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "Mention")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -768,10 +744,8 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
                 }
                 return map
             case let .link(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "Link")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -789,10 +763,8 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
                 }
                 return map
             case let .tag(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "Tag")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 

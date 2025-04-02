@@ -27,9 +27,8 @@ public enum ComAtprotoAdminDisableAccountInvites {
 
             try container.encode(account, forKey: .account)
 
-            if let value = note {
-                try container.encode(value, forKey: .note)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(note, forKey: .note)
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -37,16 +36,15 @@ public enum ComAtprotoAdminDisableAccountInvites {
             case note
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let accountValue = try (account as? DAGCBOREncodable)?.toCBORValue() ?? account
             map = map.adding(key: "account", value: accountValue)
 
             if let value = note {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let noteValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "note", value: noteValue)
             }

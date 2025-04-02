@@ -52,8 +52,6 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
     public func toCBORValue() throws -> Any {
         var map = OrderedCBORMap()
 
-        // Add fields in lexicon-defined order to ensure proper CID generation
-
         let recordValue = try (record as? DAGCBOREncodable)?.toCBORValue() ?? record
         map = map.adding(key: "record", value: recordValue)
 
@@ -136,10 +134,7 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let recordValue = try (record as? DAGCBOREncodable)?.toCBORValue() ?? record
             map = map.adding(key: "record", value: recordValue)
@@ -270,10 +265,8 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
 
             switch self {
             case let .appBskyEmbedImagesView(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.embed.images#view")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -291,10 +284,8 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
                 }
                 return map
             case let .appBskyEmbedVideoView(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.embed.video#view")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -312,10 +303,8 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
                 }
                 return map
             case let .appBskyEmbedExternalView(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.embed.external#view")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -492,10 +481,8 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
 
             switch self {
             case let .appBskyEmbedImages(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.embed.images")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -513,10 +500,8 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
                 }
                 return map
             case let .appBskyEmbedVideo(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.embed.video")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -534,10 +519,8 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
                 }
                 return map
             case let .appBskyEmbedExternal(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.embed.external")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 

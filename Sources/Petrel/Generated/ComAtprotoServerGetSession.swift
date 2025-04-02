@@ -85,36 +85,27 @@ public enum ComAtprotoServerGetSession {
 
             try container.encode(did, forKey: .did)
 
-            if let value = email {
-                try container.encode(value, forKey: .email)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(email, forKey: .email)
 
-            if let value = emailConfirmed {
-                try container.encode(value, forKey: .emailConfirmed)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(emailConfirmed, forKey: .emailConfirmed)
 
-            if let value = emailAuthFactor {
-                try container.encode(value, forKey: .emailAuthFactor)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(emailAuthFactor, forKey: .emailAuthFactor)
 
-            if let value = didDoc {
-                try container.encode(value, forKey: .didDoc)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(didDoc, forKey: .didDoc)
 
-            if let value = active {
-                try container.encode(value, forKey: .active)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(active, forKey: .active)
 
-            if let value = status {
-                try container.encode(value, forKey: .status)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(status, forKey: .status)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let handleValue = try (handle as? DAGCBOREncodable)?.toCBORValue() ?? handle
             map = map.adding(key: "handle", value: handleValue)
@@ -123,31 +114,43 @@ public enum ComAtprotoServerGetSession {
             map = map.adding(key: "did", value: didValue)
 
             if let value = email {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let emailValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "email", value: emailValue)
             }
 
             if let value = emailConfirmed {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let emailConfirmedValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "emailConfirmed", value: emailConfirmedValue)
             }
 
             if let value = emailAuthFactor {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let emailAuthFactorValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "emailAuthFactor", value: emailAuthFactorValue)
             }
 
             if let value = didDoc {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let didDocValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "didDoc", value: didDocValue)
             }
 
             if let value = active {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let activeValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "active", value: activeValue)
             }
 
             if let value = status {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let statusValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "status", value: statusValue)
             }

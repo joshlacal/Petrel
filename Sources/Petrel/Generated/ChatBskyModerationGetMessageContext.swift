@@ -46,11 +46,8 @@ public enum ChatBskyModerationGetMessageContext {
             try container.encode(messages, forKey: .messages)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let messagesValue = try (messages as? DAGCBOREncodable)?.toCBORValue() ?? messages
             map = map.adding(key: "messages", value: messagesValue)
@@ -157,10 +154,8 @@ public enum ChatBskyModerationGetMessageContext {
 
             switch self {
             case let .chatBskyConvoDefsMessageView(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "chat.bsky.convo.defs#messageView")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -178,10 +173,8 @@ public enum ChatBskyModerationGetMessageContext {
                 }
                 return map
             case let .chatBskyConvoDefsDeletedMessageView(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "chat.bsky.convo.defs#deletedMessageView")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 

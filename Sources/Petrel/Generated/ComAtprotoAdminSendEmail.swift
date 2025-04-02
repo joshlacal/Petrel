@@ -41,15 +41,13 @@ public enum ComAtprotoAdminSendEmail {
 
             try container.encode(content, forKey: .content)
 
-            if let value = subject {
-                try container.encode(value, forKey: .subject)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(subject, forKey: .subject)
 
             try container.encode(senderDid, forKey: .senderDid)
 
-            if let value = comment {
-                try container.encode(value, forKey: .comment)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(comment, forKey: .comment)
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -60,11 +58,8 @@ public enum ComAtprotoAdminSendEmail {
             case comment
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let recipientDidValue = try (recipientDid as? DAGCBOREncodable)?.toCBORValue() ?? recipientDid
             map = map.adding(key: "recipientDid", value: recipientDidValue)
@@ -73,6 +68,8 @@ public enum ComAtprotoAdminSendEmail {
             map = map.adding(key: "content", value: contentValue)
 
             if let value = subject {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let subjectValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "subject", value: subjectValue)
             }
@@ -81,6 +78,8 @@ public enum ComAtprotoAdminSendEmail {
             map = map.adding(key: "senderDid", value: senderDidValue)
 
             if let value = comment {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let commentValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "comment", value: commentValue)
             }
@@ -112,11 +111,8 @@ public enum ComAtprotoAdminSendEmail {
             try container.encode(sent, forKey: .sent)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let sentValue = try (sent as? DAGCBOREncodable)?.toCBORValue() ?? sent
             map = map.adding(key: "sent", value: sentValue)

@@ -42,17 +42,11 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
 
         try container.encode(post, forKey: .post)
 
-        if let value = detachedEmbeddingUris {
-            if !value.isEmpty {
-                try container.encode(value, forKey: .detachedEmbeddingUris)
-            }
-        }
+        // Encode optional property even if it's an empty array
+        try container.encodeIfPresent(detachedEmbeddingUris, forKey: .detachedEmbeddingUris)
 
-        if let value = embeddingRules {
-            if !value.isEmpty {
-                try container.encode(value, forKey: .embeddingRules)
-            }
-        }
+        // Encode optional property even if it's an empty array
+        try container.encodeIfPresent(embeddingRules, forKey: .embeddingRules)
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -100,10 +94,7 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
     public func toCBORValue() throws -> Any {
         var map = OrderedCBORMap()
 
-        // Always add $type first (AT Protocol convention)
         map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-        // Add remaining fields in lexicon-defined order
 
         let createdAtValue = try (createdAt as? DAGCBOREncodable)?.toCBORValue() ?? createdAt
         map = map.adding(key: "createdAt", value: createdAtValue)
@@ -112,17 +103,17 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
         map = map.adding(key: "post", value: postValue)
 
         if let value = detachedEmbeddingUris {
-            if !value.isEmpty {
-                let detachedEmbeddingUrisValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                map = map.adding(key: "detachedEmbeddingUris", value: detachedEmbeddingUrisValue)
-            }
+            // Encode optional property even if it's an empty array for CBOR
+
+            let detachedEmbeddingUrisValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+            map = map.adding(key: "detachedEmbeddingUris", value: detachedEmbeddingUrisValue)
         }
 
         if let value = embeddingRules {
-            if !value.isEmpty {
-                let embeddingRulesValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                map = map.adding(key: "embeddingRules", value: embeddingRulesValue)
-            }
+            // Encode optional property even if it's an empty array for CBOR
+
+            let embeddingRulesValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+            map = map.adding(key: "embeddingRules", value: embeddingRulesValue)
         }
 
         return map
@@ -167,10 +158,7 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             return map
         }
@@ -257,10 +245,8 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
 
             switch self {
             case let .appBskyFeedPostgateDisableRule(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "app.bsky.feed.postgate#disableRule")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 

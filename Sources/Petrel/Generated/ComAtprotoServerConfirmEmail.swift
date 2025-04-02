@@ -35,11 +35,8 @@ public enum ComAtprotoServerConfirmEmail {
             case token
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let emailValue = try (email as? DAGCBOREncodable)?.toCBORValue() ?? email
             map = map.adding(key: "email", value: emailValue)

@@ -37,11 +37,8 @@ public enum ComAtprotoIdentityResolveDid {
             try container.encode(didDoc, forKey: .didDoc)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let didDocValue = try (didDoc as? DAGCBOREncodable)?.toCBORValue() ?? didDoc
             map = map.adding(key: "didDoc", value: didDocValue)

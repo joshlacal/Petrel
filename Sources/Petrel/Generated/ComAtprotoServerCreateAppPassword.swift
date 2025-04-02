@@ -65,9 +65,8 @@ public enum ComAtprotoServerCreateAppPassword {
 
             try container.encode(createdAt, forKey: .createdAt)
 
-            if let value = privileged {
-                try container.encode(value, forKey: .privileged)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(privileged, forKey: .privileged)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -111,10 +110,7 @@ public enum ComAtprotoServerCreateAppPassword {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let nameValue = try (name as? DAGCBOREncodable)?.toCBORValue() ?? name
             map = map.adding(key: "name", value: nameValue)
@@ -126,6 +122,8 @@ public enum ComAtprotoServerCreateAppPassword {
             map = map.adding(key: "createdAt", value: createdAtValue)
 
             if let value = privileged {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let privilegedValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "privileged", value: privilegedValue)
             }
@@ -165,9 +163,8 @@ public enum ComAtprotoServerCreateAppPassword {
 
             try container.encode(name, forKey: .name)
 
-            if let value = privileged {
-                try container.encode(value, forKey: .privileged)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(privileged, forKey: .privileged)
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -175,16 +172,15 @@ public enum ComAtprotoServerCreateAppPassword {
             case privileged
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let nameValue = try (name as? DAGCBOREncodable)?.toCBORValue() ?? name
             map = map.adding(key: "name", value: nameValue)
 
             if let value = privileged {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let privilegedValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "privileged", value: privilegedValue)
             }

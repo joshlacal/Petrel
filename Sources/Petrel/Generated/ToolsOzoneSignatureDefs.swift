@@ -73,10 +73,7 @@ public enum ToolsOzoneSignatureDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let propertyValue = try (property as? DAGCBOREncodable)?.toCBORValue() ?? property
             map = map.adding(key: "property", value: propertyValue)

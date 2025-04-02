@@ -35,11 +35,8 @@ public enum ComAtprotoServerResetPassword {
             case password
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let tokenValue = try (token as? DAGCBOREncodable)?.toCBORValue() ?? token
             map = map.adding(key: "token", value: tokenValue)

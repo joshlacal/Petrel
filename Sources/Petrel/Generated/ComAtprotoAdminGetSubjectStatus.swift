@@ -58,30 +58,29 @@ public enum ComAtprotoAdminGetSubjectStatus {
 
             try container.encode(subject, forKey: .subject)
 
-            if let value = takedown {
-                try container.encode(value, forKey: .takedown)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(takedown, forKey: .takedown)
 
-            if let value = deactivated {
-                try container.encode(value, forKey: .deactivated)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(deactivated, forKey: .deactivated)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let subjectValue = try (subject as? DAGCBOREncodable)?.toCBORValue() ?? subject
             map = map.adding(key: "subject", value: subjectValue)
 
             if let value = takedown {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let takedownValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "takedown", value: takedownValue)
             }
 
             if let value = deactivated {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let deactivatedValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "deactivated", value: deactivatedValue)
             }
@@ -209,10 +208,8 @@ public enum ComAtprotoAdminGetSubjectStatus {
 
             switch self {
             case let .comAtprotoAdminDefsRepoRef(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "com.atproto.admin.defs#repoRef")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -230,10 +227,8 @@ public enum ComAtprotoAdminGetSubjectStatus {
                 }
                 return map
             case let .comAtprotoRepoStrongRef(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "com.atproto.repo.strongRef")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -251,10 +246,8 @@ public enum ComAtprotoAdminGetSubjectStatus {
                 }
                 return map
             case let .comAtprotoAdminDefsRepoBlobRef(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "com.atproto.admin.defs#repoBlobRef")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 

@@ -48,20 +48,18 @@ public enum ChatBskyConvoGetMessages {
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
 
-            if let value = cursor {
-                try container.encode(value, forKey: .cursor)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(cursor, forKey: .cursor)
 
             try container.encode(messages, forKey: .messages)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Add fields in lexicon-defined order
-
             if let value = cursor {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let cursorValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "cursor", value: cursorValue)
             }
@@ -172,10 +170,8 @@ public enum ChatBskyConvoGetMessages {
 
             switch self {
             case let .chatBskyConvoDefsMessageView(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "chat.bsky.convo.defs#messageView")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -193,10 +189,8 @@ public enum ChatBskyConvoGetMessages {
                 }
                 return map
             case let .chatBskyConvoDefsDeletedMessageView(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "chat.bsky.convo.defs#deletedMessageView")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 

@@ -107,13 +107,11 @@ public enum ToolsOzoneModerationDefs {
 
             try container.encode(createdAt, forKey: .createdAt)
 
-            if let value = creatorHandle {
-                try container.encode(value, forKey: .creatorHandle)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(creatorHandle, forKey: .creatorHandle)
 
-            if let value = subjectHandle {
-                try container.encode(value, forKey: .subjectHandle)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(subjectHandle, forKey: .subjectHandle)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -181,10 +179,7 @@ public enum ToolsOzoneModerationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let idValue = try (id as? DAGCBOREncodable)?.toCBORValue() ?? id
             map = map.adding(key: "id", value: idValue)
@@ -205,11 +200,15 @@ public enum ToolsOzoneModerationDefs {
             map = map.adding(key: "createdAt", value: createdAtValue)
 
             if let value = creatorHandle {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let creatorHandleValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "creatorHandle", value: creatorHandleValue)
             }
 
             if let value = subjectHandle {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let subjectHandleValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "subjectHandle", value: subjectHandleValue)
             }
@@ -362,10 +361,7 @@ public enum ToolsOzoneModerationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let idValue = try (id as? DAGCBOREncodable)?.toCBORValue() ?? id
             map = map.adding(key: "id", value: idValue)
@@ -619,19 +615,14 @@ public enum ToolsOzoneModerationDefs {
 
             try container.encode(subject, forKey: .subject)
 
-            if let value = hosting {
-                try container.encode(value, forKey: .hosting)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(hosting, forKey: .hosting)
 
-            if let value = subjectBlobCids {
-                if !value.isEmpty {
-                    try container.encode(value, forKey: .subjectBlobCids)
-                }
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(subjectBlobCids, forKey: .subjectBlobCids)
 
-            if let value = subjectRepoHandle {
-                try container.encode(value, forKey: .subjectRepoHandle)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(subjectRepoHandle, forKey: .subjectRepoHandle)
 
             try container.encode(updatedAt, forKey: .updatedAt)
 
@@ -639,63 +630,47 @@ public enum ToolsOzoneModerationDefs {
 
             try container.encode(reviewState, forKey: .reviewState)
 
-            if let value = comment {
-                try container.encode(value, forKey: .comment)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(comment, forKey: .comment)
 
-            if let value = priorityScore {
-                try container.encode(value, forKey: .priorityScore)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(priorityScore, forKey: .priorityScore)
 
-            if let value = muteUntil {
-                try container.encode(value, forKey: .muteUntil)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(muteUntil, forKey: .muteUntil)
 
-            if let value = muteReportingUntil {
-                try container.encode(value, forKey: .muteReportingUntil)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(muteReportingUntil, forKey: .muteReportingUntil)
 
-            if let value = lastReviewedBy {
-                try container.encode(value, forKey: .lastReviewedBy)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(lastReviewedBy, forKey: .lastReviewedBy)
 
-            if let value = lastReviewedAt {
-                try container.encode(value, forKey: .lastReviewedAt)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(lastReviewedAt, forKey: .lastReviewedAt)
 
-            if let value = lastReportedAt {
-                try container.encode(value, forKey: .lastReportedAt)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(lastReportedAt, forKey: .lastReportedAt)
 
-            if let value = lastAppealedAt {
-                try container.encode(value, forKey: .lastAppealedAt)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(lastAppealedAt, forKey: .lastAppealedAt)
 
-            if let value = takendown {
-                try container.encode(value, forKey: .takendown)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(takendown, forKey: .takendown)
 
-            if let value = appealed {
-                try container.encode(value, forKey: .appealed)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(appealed, forKey: .appealed)
 
-            if let value = suspendUntil {
-                try container.encode(value, forKey: .suspendUntil)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(suspendUntil, forKey: .suspendUntil)
 
-            if let value = tags {
-                if !value.isEmpty {
-                    try container.encode(value, forKey: .tags)
-                }
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(tags, forKey: .tags)
 
-            if let value = accountStats {
-                try container.encode(value, forKey: .accountStats)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(accountStats, forKey: .accountStats)
 
-            if let value = recordsStats {
-                try container.encode(value, forKey: .recordsStats)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(recordsStats, forKey: .recordsStats)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -893,10 +868,7 @@ public enum ToolsOzoneModerationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let idValue = try (id as? DAGCBOREncodable)?.toCBORValue() ?? id
             map = map.adding(key: "id", value: idValue)
@@ -905,18 +877,22 @@ public enum ToolsOzoneModerationDefs {
             map = map.adding(key: "subject", value: subjectValue)
 
             if let value = hosting {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let hostingValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "hosting", value: hostingValue)
             }
 
             if let value = subjectBlobCids {
-                if !value.isEmpty {
-                    let subjectBlobCidsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                    map = map.adding(key: "subjectBlobCids", value: subjectBlobCidsValue)
-                }
+                // Encode optional property even if it's an empty array for CBOR
+
+                let subjectBlobCidsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "subjectBlobCids", value: subjectBlobCidsValue)
             }
 
             if let value = subjectRepoHandle {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let subjectRepoHandleValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "subjectRepoHandle", value: subjectRepoHandleValue)
             }
@@ -931,73 +907,99 @@ public enum ToolsOzoneModerationDefs {
             map = map.adding(key: "reviewState", value: reviewStateValue)
 
             if let value = comment {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let commentValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "comment", value: commentValue)
             }
 
             if let value = priorityScore {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let priorityScoreValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "priorityScore", value: priorityScoreValue)
             }
 
             if let value = muteUntil {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let muteUntilValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "muteUntil", value: muteUntilValue)
             }
 
             if let value = muteReportingUntil {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let muteReportingUntilValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "muteReportingUntil", value: muteReportingUntilValue)
             }
 
             if let value = lastReviewedBy {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let lastReviewedByValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "lastReviewedBy", value: lastReviewedByValue)
             }
 
             if let value = lastReviewedAt {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let lastReviewedAtValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "lastReviewedAt", value: lastReviewedAtValue)
             }
 
             if let value = lastReportedAt {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let lastReportedAtValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "lastReportedAt", value: lastReportedAtValue)
             }
 
             if let value = lastAppealedAt {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let lastAppealedAtValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "lastAppealedAt", value: lastAppealedAtValue)
             }
 
             if let value = takendown {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let takendownValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "takendown", value: takendownValue)
             }
 
             if let value = appealed {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let appealedValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "appealed", value: appealedValue)
             }
 
             if let value = suspendUntil {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let suspendUntilValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "suspendUntil", value: suspendUntilValue)
             }
 
             if let value = tags {
-                if !value.isEmpty {
-                    let tagsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                    map = map.adding(key: "tags", value: tagsValue)
-                }
+                // Encode optional property even if it's an empty array for CBOR
+
+                let tagsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "tags", value: tagsValue)
             }
 
             if let value = accountStats {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let accountStatsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "accountStats", value: accountStatsValue)
             }
 
             if let value = recordsStats {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let recordsStatsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "recordsStats", value: recordsStatsValue)
             }
@@ -1108,21 +1110,17 @@ public enum ToolsOzoneModerationDefs {
 
             try container.encode(subject, forKey: .subject)
 
-            if let value = status {
-                try container.encode(value, forKey: .status)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(status, forKey: .status)
 
-            if let value = repo {
-                try container.encode(value, forKey: .repo)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(repo, forKey: .repo)
 
-            if let value = profile {
-                try container.encode(value, forKey: .profile)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(profile, forKey: .profile)
 
-            if let value = record {
-                try container.encode(value, forKey: .record)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(record, forKey: .record)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1188,10 +1186,7 @@ public enum ToolsOzoneModerationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let typeValue = try (type as? DAGCBOREncodable)?.toCBORValue() ?? type
             map = map.adding(key: "type", value: typeValue)
@@ -1200,21 +1195,29 @@ public enum ToolsOzoneModerationDefs {
             map = map.adding(key: "subject", value: subjectValue)
 
             if let value = status {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let statusValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "status", value: statusValue)
             }
 
             if let value = repo {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let repoValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "repo", value: repoValue)
             }
 
             if let value = profile {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let profileValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "profile", value: profileValue)
             }
 
             if let value = record {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let recordValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "record", value: recordValue)
             }
@@ -1296,25 +1299,20 @@ public enum ToolsOzoneModerationDefs {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
 
-            if let value = reportCount {
-                try container.encode(value, forKey: .reportCount)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(reportCount, forKey: .reportCount)
 
-            if let value = appealCount {
-                try container.encode(value, forKey: .appealCount)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(appealCount, forKey: .appealCount)
 
-            if let value = suspendCount {
-                try container.encode(value, forKey: .suspendCount)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(suspendCount, forKey: .suspendCount)
 
-            if let value = escalateCount {
-                try container.encode(value, forKey: .escalateCount)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(escalateCount, forKey: .escalateCount)
 
-            if let value = takedownCount {
-                try container.encode(value, forKey: .takedownCount)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(takedownCount, forKey: .takedownCount)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1379,32 +1377,39 @@ public enum ToolsOzoneModerationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            // Add remaining fields in lexicon-defined order
-
             if let value = reportCount {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let reportCountValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "reportCount", value: reportCountValue)
             }
 
             if let value = appealCount {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let appealCountValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "appealCount", value: appealCountValue)
             }
 
             if let value = suspendCount {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let suspendCountValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "suspendCount", value: suspendCountValue)
             }
 
             if let value = escalateCount {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let escalateCountValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "escalateCount", value: escalateCountValue)
             }
 
             if let value = takedownCount {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let takedownCountValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "takedownCount", value: takedownCountValue)
             }
@@ -1512,37 +1517,29 @@ public enum ToolsOzoneModerationDefs {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
 
-            if let value = totalReports {
-                try container.encode(value, forKey: .totalReports)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(totalReports, forKey: .totalReports)
 
-            if let value = reportedCount {
-                try container.encode(value, forKey: .reportedCount)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(reportedCount, forKey: .reportedCount)
 
-            if let value = escalatedCount {
-                try container.encode(value, forKey: .escalatedCount)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(escalatedCount, forKey: .escalatedCount)
 
-            if let value = appealedCount {
-                try container.encode(value, forKey: .appealedCount)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(appealedCount, forKey: .appealedCount)
 
-            if let value = subjectCount {
-                try container.encode(value, forKey: .subjectCount)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(subjectCount, forKey: .subjectCount)
 
-            if let value = pendingCount {
-                try container.encode(value, forKey: .pendingCount)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(pendingCount, forKey: .pendingCount)
 
-            if let value = processedCount {
-                try container.encode(value, forKey: .processedCount)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(processedCount, forKey: .processedCount)
 
-            if let value = takendownCount {
-                try container.encode(value, forKey: .takendownCount)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(takendownCount, forKey: .takendownCount)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1634,47 +1631,60 @@ public enum ToolsOzoneModerationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            // Add remaining fields in lexicon-defined order
-
             if let value = totalReports {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let totalReportsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "totalReports", value: totalReportsValue)
             }
 
             if let value = reportedCount {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let reportedCountValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "reportedCount", value: reportedCountValue)
             }
 
             if let value = escalatedCount {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let escalatedCountValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "escalatedCount", value: escalatedCountValue)
             }
 
             if let value = appealedCount {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let appealedCountValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "appealedCount", value: appealedCountValue)
             }
 
             if let value = subjectCount {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let subjectCountValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "subjectCount", value: subjectCountValue)
             }
 
             if let value = pendingCount {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let pendingCountValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "pendingCount", value: pendingCountValue)
             }
 
             if let value = processedCount {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let processedCountValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "processedCount", value: processedCountValue)
             }
 
             if let value = takendownCount {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let takendownCountValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "takendownCount", value: takendownCountValue)
             }
@@ -1749,23 +1759,17 @@ public enum ToolsOzoneModerationDefs {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
 
-            if let value = comment {
-                try container.encode(value, forKey: .comment)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(comment, forKey: .comment)
 
-            if let value = durationInHours {
-                try container.encode(value, forKey: .durationInHours)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(durationInHours, forKey: .durationInHours)
 
-            if let value = acknowledgeAccountSubjects {
-                try container.encode(value, forKey: .acknowledgeAccountSubjects)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(acknowledgeAccountSubjects, forKey: .acknowledgeAccountSubjects)
 
-            if let value = policies {
-                if !value.isEmpty {
-                    try container.encode(value, forKey: .policies)
-                }
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(policies, forKey: .policies)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1821,31 +1825,34 @@ public enum ToolsOzoneModerationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            // Add remaining fields in lexicon-defined order
-
             if let value = comment {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let commentValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "comment", value: commentValue)
             }
 
             if let value = durationInHours {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let durationInHoursValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "durationInHours", value: durationInHoursValue)
             }
 
             if let value = acknowledgeAccountSubjects {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let acknowledgeAccountSubjectsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "acknowledgeAccountSubjects", value: acknowledgeAccountSubjectsValue)
             }
 
             if let value = policies {
-                if !value.isEmpty {
-                    let policiesValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                    map = map.adding(key: "policies", value: policiesValue)
-                }
+                // Encode optional property even if it's an empty array for CBOR
+
+                let policiesValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "policies", value: policiesValue)
             }
 
             return map
@@ -1887,9 +1894,8 @@ public enum ToolsOzoneModerationDefs {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
 
-            if let value = comment {
-                try container.encode(value, forKey: .comment)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(comment, forKey: .comment)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1918,12 +1924,11 @@ public enum ToolsOzoneModerationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            // Add remaining fields in lexicon-defined order
-
             if let value = comment {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let commentValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "comment", value: commentValue)
             }
@@ -1964,9 +1969,8 @@ public enum ToolsOzoneModerationDefs {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
 
-            if let value = comment {
-                try container.encode(value, forKey: .comment)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(comment, forKey: .comment)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1995,12 +1999,11 @@ public enum ToolsOzoneModerationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            // Add remaining fields in lexicon-defined order
-
             if let value = comment {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let commentValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "comment", value: commentValue)
             }
@@ -2050,13 +2053,11 @@ public enum ToolsOzoneModerationDefs {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
 
-            if let value = comment {
-                try container.encode(value, forKey: .comment)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(comment, forKey: .comment)
 
-            if let value = sticky {
-                try container.encode(value, forKey: .sticky)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(sticky, forKey: .sticky)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -2094,17 +2095,18 @@ public enum ToolsOzoneModerationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            // Add remaining fields in lexicon-defined order
-
             if let value = comment {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let commentValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "comment", value: commentValue)
             }
 
             if let value = sticky {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let stickyValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "sticky", value: stickyValue)
             }
@@ -2164,13 +2166,11 @@ public enum ToolsOzoneModerationDefs {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
 
-            if let value = comment {
-                try container.encode(value, forKey: .comment)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(comment, forKey: .comment)
 
-            if let value = isReporterMuted {
-                try container.encode(value, forKey: .isReporterMuted)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(isReporterMuted, forKey: .isReporterMuted)
 
             try container.encode(reportType, forKey: .reportType)
         }
@@ -2215,17 +2215,18 @@ public enum ToolsOzoneModerationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            // Add remaining fields in lexicon-defined order
-
             if let value = comment {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let commentValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "comment", value: commentValue)
             }
 
             if let value = isReporterMuted {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let isReporterMutedValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "isReporterMuted", value: isReporterMutedValue)
             }
@@ -2298,17 +2299,15 @@ public enum ToolsOzoneModerationDefs {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
 
-            if let value = comment {
-                try container.encode(value, forKey: .comment)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(comment, forKey: .comment)
 
             try container.encode(createLabelVals, forKey: .createLabelVals)
 
             try container.encode(negateLabelVals, forKey: .negateLabelVals)
 
-            if let value = durationInHours {
-                try container.encode(value, forKey: .durationInHours)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(durationInHours, forKey: .durationInHours)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -2356,12 +2355,11 @@ public enum ToolsOzoneModerationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            // Add remaining fields in lexicon-defined order
-
             if let value = comment {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let commentValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "comment", value: commentValue)
             }
@@ -2373,6 +2371,8 @@ public enum ToolsOzoneModerationDefs {
             map = map.adding(key: "negateLabelVals", value: negateLabelValsValue)
 
             if let value = durationInHours {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let durationInHoursValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "durationInHours", value: durationInHoursValue)
             }
@@ -2425,9 +2425,8 @@ public enum ToolsOzoneModerationDefs {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
 
-            if let value = comment {
-                try container.encode(value, forKey: .comment)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(comment, forKey: .comment)
 
             try container.encode(score, forKey: .score)
         }
@@ -2463,12 +2462,11 @@ public enum ToolsOzoneModerationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            // Add remaining fields in lexicon-defined order
-
             if let value = comment {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let commentValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "comment", value: commentValue)
             }
@@ -2522,13 +2520,11 @@ public enum ToolsOzoneModerationDefs {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
 
-            if let value = comment {
-                try container.encode(value, forKey: .comment)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(comment, forKey: .comment)
 
-            if let value = acknowledgeAccountSubjects {
-                try container.encode(value, forKey: .acknowledgeAccountSubjects)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(acknowledgeAccountSubjects, forKey: .acknowledgeAccountSubjects)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -2566,17 +2562,18 @@ public enum ToolsOzoneModerationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            // Add remaining fields in lexicon-defined order
-
             if let value = comment {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let commentValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "comment", value: commentValue)
             }
 
             if let value = acknowledgeAccountSubjects {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let acknowledgeAccountSubjectsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "acknowledgeAccountSubjects", value: acknowledgeAccountSubjectsValue)
             }
@@ -2618,9 +2615,8 @@ public enum ToolsOzoneModerationDefs {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
 
-            if let value = comment {
-                try container.encode(value, forKey: .comment)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(comment, forKey: .comment)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -2649,12 +2645,11 @@ public enum ToolsOzoneModerationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            // Add remaining fields in lexicon-defined order
-
             if let value = comment {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let commentValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "comment", value: commentValue)
             }
@@ -2704,9 +2699,8 @@ public enum ToolsOzoneModerationDefs {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
 
-            if let value = comment {
-                try container.encode(value, forKey: .comment)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(comment, forKey: .comment)
 
             try container.encode(durationInHours, forKey: .durationInHours)
         }
@@ -2742,12 +2736,11 @@ public enum ToolsOzoneModerationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            // Add remaining fields in lexicon-defined order
-
             if let value = comment {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let commentValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "comment", value: commentValue)
             }
@@ -2792,9 +2785,8 @@ public enum ToolsOzoneModerationDefs {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
 
-            if let value = comment {
-                try container.encode(value, forKey: .comment)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(comment, forKey: .comment)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -2823,12 +2815,11 @@ public enum ToolsOzoneModerationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            // Add remaining fields in lexicon-defined order
-
             if let value = comment {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let commentValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "comment", value: commentValue)
             }
@@ -2878,13 +2869,11 @@ public enum ToolsOzoneModerationDefs {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
 
-            if let value = comment {
-                try container.encode(value, forKey: .comment)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(comment, forKey: .comment)
 
-            if let value = durationInHours {
-                try container.encode(value, forKey: .durationInHours)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(durationInHours, forKey: .durationInHours)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -2922,17 +2911,18 @@ public enum ToolsOzoneModerationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            // Add remaining fields in lexicon-defined order
-
             if let value = comment {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let commentValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "comment", value: commentValue)
             }
 
             if let value = durationInHours {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let durationInHoursValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "durationInHours", value: durationInHoursValue)
             }
@@ -2974,9 +2964,8 @@ public enum ToolsOzoneModerationDefs {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
 
-            if let value = comment {
-                try container.encode(value, forKey: .comment)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(comment, forKey: .comment)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -3005,12 +2994,11 @@ public enum ToolsOzoneModerationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            // Add remaining fields in lexicon-defined order
-
             if let value = comment {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let commentValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "comment", value: commentValue)
             }
@@ -3071,13 +3059,11 @@ public enum ToolsOzoneModerationDefs {
 
             try container.encode(subjectLine, forKey: .subjectLine)
 
-            if let value = content {
-                try container.encode(value, forKey: .content)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(content, forKey: .content)
 
-            if let value = comment {
-                try container.encode(value, forKey: .comment)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(comment, forKey: .comment)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -3120,20 +3106,21 @@ public enum ToolsOzoneModerationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let subjectLineValue = try (subjectLine as? DAGCBOREncodable)?.toCBORValue() ?? subjectLine
             map = map.adding(key: "subjectLine", value: subjectLineValue)
 
             if let value = content {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let contentValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "content", value: contentValue)
             }
 
             if let value = comment {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let commentValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "comment", value: commentValue)
             }
@@ -3176,9 +3163,8 @@ public enum ToolsOzoneModerationDefs {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
 
-            if let value = comment {
-                try container.encode(value, forKey: .comment)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(comment, forKey: .comment)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -3207,12 +3193,11 @@ public enum ToolsOzoneModerationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            // Add remaining fields in lexicon-defined order
-
             if let value = comment {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let commentValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "comment", value: commentValue)
             }
@@ -3275,9 +3260,8 @@ public enum ToolsOzoneModerationDefs {
 
             try container.encode(remove, forKey: .remove)
 
-            if let value = comment {
-                try container.encode(value, forKey: .comment)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(comment, forKey: .comment)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -3316,10 +3300,7 @@ public enum ToolsOzoneModerationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let addValue = try (add as? DAGCBOREncodable)?.toCBORValue() ?? add
             map = map.adding(key: "add", value: addValue)
@@ -3328,6 +3309,8 @@ public enum ToolsOzoneModerationDefs {
             map = map.adding(key: "remove", value: removeValue)
 
             if let value = comment {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let commentValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "comment", value: commentValue)
             }
@@ -3397,15 +3380,13 @@ public enum ToolsOzoneModerationDefs {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
 
-            if let value = comment {
-                try container.encode(value, forKey: .comment)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(comment, forKey: .comment)
 
             try container.encode(active, forKey: .active)
 
-            if let value = status {
-                try container.encode(value, forKey: .status)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(status, forKey: .status)
 
             try container.encode(timestamp, forKey: .timestamp)
         }
@@ -3455,12 +3436,11 @@ public enum ToolsOzoneModerationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            // Add remaining fields in lexicon-defined order
-
             if let value = comment {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let commentValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "comment", value: commentValue)
             }
@@ -3469,6 +3449,8 @@ public enum ToolsOzoneModerationDefs {
             map = map.adding(key: "active", value: activeValue)
 
             if let value = status {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let statusValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "status", value: statusValue)
             }
@@ -3551,21 +3533,17 @@ public enum ToolsOzoneModerationDefs {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
 
-            if let value = comment {
-                try container.encode(value, forKey: .comment)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(comment, forKey: .comment)
 
-            if let value = handle {
-                try container.encode(value, forKey: .handle)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(handle, forKey: .handle)
 
-            if let value = pdsHost {
-                try container.encode(value, forKey: .pdsHost)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(pdsHost, forKey: .pdsHost)
 
-            if let value = tombstone {
-                try container.encode(value, forKey: .tombstone)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(tombstone, forKey: .tombstone)
 
             try container.encode(timestamp, forKey: .timestamp)
         }
@@ -3628,27 +3606,32 @@ public enum ToolsOzoneModerationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            // Add remaining fields in lexicon-defined order
-
             if let value = comment {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let commentValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "comment", value: commentValue)
             }
 
             if let value = handle {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let handleValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "handle", value: handleValue)
             }
 
             if let value = pdsHost {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let pdsHostValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "pdsHost", value: pdsHostValue)
             }
 
             if let value = tombstone {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let tombstoneValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "tombstone", value: tombstoneValue)
             }
@@ -3723,15 +3706,13 @@ public enum ToolsOzoneModerationDefs {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
 
-            if let value = comment {
-                try container.encode(value, forKey: .comment)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(comment, forKey: .comment)
 
             try container.encode(op, forKey: .op)
 
-            if let value = cid {
-                try container.encode(value, forKey: .cid)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(cid, forKey: .cid)
 
             try container.encode(timestamp, forKey: .timestamp)
         }
@@ -3781,12 +3762,11 @@ public enum ToolsOzoneModerationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            // Add remaining fields in lexicon-defined order
-
             if let value = comment {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let commentValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "comment", value: commentValue)
             }
@@ -3795,6 +3775,8 @@ public enum ToolsOzoneModerationDefs {
             map = map.adding(key: "op", value: opValue)
 
             if let value = cid {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let cidValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "cid", value: cidValue)
             }
@@ -3935,9 +3917,8 @@ public enum ToolsOzoneModerationDefs {
 
             try container.encode(handle, forKey: .handle)
 
-            if let value = email {
-                try container.encode(value, forKey: .email)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(email, forKey: .email)
 
             try container.encode(relatedRecords, forKey: .relatedRecords)
 
@@ -3945,27 +3926,20 @@ public enum ToolsOzoneModerationDefs {
 
             try container.encode(moderation, forKey: .moderation)
 
-            if let value = invitedBy {
-                try container.encode(value, forKey: .invitedBy)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(invitedBy, forKey: .invitedBy)
 
-            if let value = invitesDisabled {
-                try container.encode(value, forKey: .invitesDisabled)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(invitesDisabled, forKey: .invitesDisabled)
 
-            if let value = inviteNote {
-                try container.encode(value, forKey: .inviteNote)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(inviteNote, forKey: .inviteNote)
 
-            if let value = deactivatedAt {
-                try container.encode(value, forKey: .deactivatedAt)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(deactivatedAt, forKey: .deactivatedAt)
 
-            if let value = threatSignatures {
-                if !value.isEmpty {
-                    try container.encode(value, forKey: .threatSignatures)
-                }
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(threatSignatures, forKey: .threatSignatures)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -4064,10 +4038,7 @@ public enum ToolsOzoneModerationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let didValue = try (did as? DAGCBOREncodable)?.toCBORValue() ?? did
             map = map.adding(key: "did", value: didValue)
@@ -4076,6 +4047,8 @@ public enum ToolsOzoneModerationDefs {
             map = map.adding(key: "handle", value: handleValue)
 
             if let value = email {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let emailValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "email", value: emailValue)
             }
@@ -4090,30 +4063,38 @@ public enum ToolsOzoneModerationDefs {
             map = map.adding(key: "moderation", value: moderationValue)
 
             if let value = invitedBy {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let invitedByValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "invitedBy", value: invitedByValue)
             }
 
             if let value = invitesDisabled {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let invitesDisabledValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "invitesDisabled", value: invitesDisabledValue)
             }
 
             if let value = inviteNote {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let inviteNoteValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "inviteNote", value: inviteNoteValue)
             }
 
             if let value = deactivatedAt {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let deactivatedAtValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "deactivatedAt", value: deactivatedAtValue)
             }
 
             if let value = threatSignatures {
-                if !value.isEmpty {
-                    let threatSignaturesValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                    map = map.adding(key: "threatSignatures", value: threatSignaturesValue)
-                }
+                // Encode optional property even if it's an empty array for CBOR
+
+                let threatSignaturesValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "threatSignatures", value: threatSignaturesValue)
             }
 
             return map
@@ -4283,9 +4264,8 @@ public enum ToolsOzoneModerationDefs {
 
             try container.encode(handle, forKey: .handle)
 
-            if let value = email {
-                try container.encode(value, forKey: .email)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(email, forKey: .email)
 
             try container.encode(relatedRecords, forKey: .relatedRecords)
 
@@ -4293,43 +4273,29 @@ public enum ToolsOzoneModerationDefs {
 
             try container.encode(moderation, forKey: .moderation)
 
-            if let value = labels {
-                if !value.isEmpty {
-                    try container.encode(value, forKey: .labels)
-                }
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(labels, forKey: .labels)
 
-            if let value = invitedBy {
-                try container.encode(value, forKey: .invitedBy)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(invitedBy, forKey: .invitedBy)
 
-            if let value = invites {
-                if !value.isEmpty {
-                    try container.encode(value, forKey: .invites)
-                }
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(invites, forKey: .invites)
 
-            if let value = invitesDisabled {
-                try container.encode(value, forKey: .invitesDisabled)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(invitesDisabled, forKey: .invitesDisabled)
 
-            if let value = inviteNote {
-                try container.encode(value, forKey: .inviteNote)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(inviteNote, forKey: .inviteNote)
 
-            if let value = emailConfirmedAt {
-                try container.encode(value, forKey: .emailConfirmedAt)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(emailConfirmedAt, forKey: .emailConfirmedAt)
 
-            if let value = deactivatedAt {
-                try container.encode(value, forKey: .deactivatedAt)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(deactivatedAt, forKey: .deactivatedAt)
 
-            if let value = threatSignatures {
-                if !value.isEmpty {
-                    try container.encode(value, forKey: .threatSignatures)
-                }
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(threatSignatures, forKey: .threatSignatures)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -4455,10 +4421,7 @@ public enum ToolsOzoneModerationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let didValue = try (did as? DAGCBOREncodable)?.toCBORValue() ?? did
             map = map.adding(key: "did", value: didValue)
@@ -4467,6 +4430,8 @@ public enum ToolsOzoneModerationDefs {
             map = map.adding(key: "handle", value: handleValue)
 
             if let value = email {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let emailValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "email", value: emailValue)
             }
@@ -4481,49 +4446,59 @@ public enum ToolsOzoneModerationDefs {
             map = map.adding(key: "moderation", value: moderationValue)
 
             if let value = labels {
-                if !value.isEmpty {
-                    let labelsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                    map = map.adding(key: "labels", value: labelsValue)
-                }
+                // Encode optional property even if it's an empty array for CBOR
+
+                let labelsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "labels", value: labelsValue)
             }
 
             if let value = invitedBy {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let invitedByValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "invitedBy", value: invitedByValue)
             }
 
             if let value = invites {
-                if !value.isEmpty {
-                    let invitesValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                    map = map.adding(key: "invites", value: invitesValue)
-                }
+                // Encode optional property even if it's an empty array for CBOR
+
+                let invitesValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "invites", value: invitesValue)
             }
 
             if let value = invitesDisabled {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let invitesDisabledValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "invitesDisabled", value: invitesDisabledValue)
             }
 
             if let value = inviteNote {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let inviteNoteValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "inviteNote", value: inviteNoteValue)
             }
 
             if let value = emailConfirmedAt {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let emailConfirmedAtValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "emailConfirmedAt", value: emailConfirmedAtValue)
             }
 
             if let value = deactivatedAt {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let deactivatedAtValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "deactivatedAt", value: deactivatedAtValue)
             }
 
             if let value = threatSignatures {
-                if !value.isEmpty {
-                    let threatSignaturesValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                    map = map.adding(key: "threatSignatures", value: threatSignaturesValue)
-                }
+                // Encode optional property even if it's an empty array for CBOR
+
+                let threatSignaturesValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "threatSignatures", value: threatSignaturesValue)
             }
 
             return map
@@ -4600,10 +4575,7 @@ public enum ToolsOzoneModerationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let didValue = try (did as? DAGCBOREncodable)?.toCBORValue() ?? did
             map = map.adding(key: "did", value: didValue)
@@ -4765,10 +4737,7 @@ public enum ToolsOzoneModerationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let uriValue = try (uri as? DAGCBOREncodable)?.toCBORValue() ?? uri
             map = map.adding(key: "uri", value: uriValue)
@@ -4904,11 +4873,8 @@ public enum ToolsOzoneModerationDefs {
 
             try container.encode(blobs, forKey: .blobs)
 
-            if let value = labels {
-                if !value.isEmpty {
-                    try container.encode(value, forKey: .labels)
-                }
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(labels, forKey: .labels)
 
             try container.encode(indexedAt, forKey: .indexedAt)
 
@@ -4978,10 +4944,7 @@ public enum ToolsOzoneModerationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let uriValue = try (uri as? DAGCBOREncodable)?.toCBORValue() ?? uri
             map = map.adding(key: "uri", value: uriValue)
@@ -4996,10 +4959,10 @@ public enum ToolsOzoneModerationDefs {
             map = map.adding(key: "blobs", value: blobsValue)
 
             if let value = labels {
-                if !value.isEmpty {
-                    let labelsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                    map = map.adding(key: "labels", value: labelsValue)
-                }
+                // Encode optional property even if it's an empty array for CBOR
+
+                let labelsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "labels", value: labelsValue)
             }
 
             let indexedAtValue = try (indexedAt as? DAGCBOREncodable)?.toCBORValue() ?? indexedAt
@@ -5079,10 +5042,7 @@ public enum ToolsOzoneModerationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let uriValue = try (uri as? DAGCBOREncodable)?.toCBORValue() ?? uri
             map = map.adding(key: "uri", value: uriValue)
@@ -5123,9 +5083,8 @@ public enum ToolsOzoneModerationDefs {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
 
-            if let value = subjectStatus {
-                try container.encode(value, forKey: .subjectStatus)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(subjectStatus, forKey: .subjectStatus)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -5154,12 +5113,11 @@ public enum ToolsOzoneModerationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            // Add remaining fields in lexicon-defined order
-
             if let value = subjectStatus {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let subjectStatusValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "subjectStatus", value: subjectStatusValue)
             }
@@ -5200,9 +5158,8 @@ public enum ToolsOzoneModerationDefs {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
 
-            if let value = subjectStatus {
-                try container.encode(value, forKey: .subjectStatus)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(subjectStatus, forKey: .subjectStatus)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -5231,12 +5188,11 @@ public enum ToolsOzoneModerationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            // Add remaining fields in lexicon-defined order
-
             if let value = subjectStatus {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let subjectStatusValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "subjectStatus", value: subjectStatusValue)
             }
@@ -5330,13 +5286,11 @@ public enum ToolsOzoneModerationDefs {
 
             try container.encode(createdAt, forKey: .createdAt)
 
-            if let value = details {
-                try container.encode(value, forKey: .details)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(details, forKey: .details)
 
-            if let value = moderation {
-                try container.encode(value, forKey: .moderation)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(moderation, forKey: .moderation)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -5394,10 +5348,7 @@ public enum ToolsOzoneModerationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let cidValue = try (cid as? DAGCBOREncodable)?.toCBORValue() ?? cid
             map = map.adding(key: "cid", value: cidValue)
@@ -5412,11 +5363,15 @@ public enum ToolsOzoneModerationDefs {
             map = map.adding(key: "createdAt", value: createdAtValue)
 
             if let value = details {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let detailsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "details", value: detailsValue)
             }
 
             if let value = moderation {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let moderationValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "moderation", value: moderationValue)
             }
@@ -5503,10 +5458,7 @@ public enum ToolsOzoneModerationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let widthValue = try (width as? DAGCBOREncodable)?.toCBORValue() ?? width
             map = map.adding(key: "width", value: widthValue)
@@ -5608,10 +5560,7 @@ public enum ToolsOzoneModerationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let widthValue = try (width as? DAGCBOREncodable)?.toCBORValue() ?? width
             map = map.adding(key: "width", value: widthValue)
@@ -5707,25 +5656,20 @@ public enum ToolsOzoneModerationDefs {
 
             try container.encode(status, forKey: .status)
 
-            if let value = updatedAt {
-                try container.encode(value, forKey: .updatedAt)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(updatedAt, forKey: .updatedAt)
 
-            if let value = createdAt {
-                try container.encode(value, forKey: .createdAt)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(createdAt, forKey: .createdAt)
 
-            if let value = deletedAt {
-                try container.encode(value, forKey: .deletedAt)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(deletedAt, forKey: .deletedAt)
 
-            if let value = deactivatedAt {
-                try container.encode(value, forKey: .deactivatedAt)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(deactivatedAt, forKey: .deactivatedAt)
 
-            if let value = reactivatedAt {
-                try container.encode(value, forKey: .reactivatedAt)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(reactivatedAt, forKey: .reactivatedAt)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -5795,35 +5739,42 @@ public enum ToolsOzoneModerationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let statusValue = try (status as? DAGCBOREncodable)?.toCBORValue() ?? status
             map = map.adding(key: "status", value: statusValue)
 
             if let value = updatedAt {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let updatedAtValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "updatedAt", value: updatedAtValue)
             }
 
             if let value = createdAt {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let createdAtValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "createdAt", value: createdAtValue)
             }
 
             if let value = deletedAt {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let deletedAtValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "deletedAt", value: deletedAtValue)
             }
 
             if let value = deactivatedAt {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let deactivatedAtValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "deactivatedAt", value: deactivatedAtValue)
             }
 
             if let value = reactivatedAt {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let reactivatedAtValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "reactivatedAt", value: reactivatedAtValue)
             }
@@ -5898,17 +5849,14 @@ public enum ToolsOzoneModerationDefs {
 
             try container.encode(status, forKey: .status)
 
-            if let value = updatedAt {
-                try container.encode(value, forKey: .updatedAt)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(updatedAt, forKey: .updatedAt)
 
-            if let value = createdAt {
-                try container.encode(value, forKey: .createdAt)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(createdAt, forKey: .createdAt)
 
-            if let value = deletedAt {
-                try container.encode(value, forKey: .deletedAt)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(deletedAt, forKey: .deletedAt)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -5960,25 +5908,28 @@ public enum ToolsOzoneModerationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let statusValue = try (status as? DAGCBOREncodable)?.toCBORValue() ?? status
             map = map.adding(key: "status", value: statusValue)
 
             if let value = updatedAt {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let updatedAtValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "updatedAt", value: updatedAtValue)
             }
 
             if let value = createdAt {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let createdAtValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "createdAt", value: createdAtValue)
             }
 
             if let value = deletedAt {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let deletedAtValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "deletedAt", value: deletedAtValue)
             }
@@ -6175,10 +6126,7 @@ public enum ToolsOzoneModerationDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let didValue = try (did as? DAGCBOREncodable)?.toCBORValue() ?? did
             map = map.adding(key: "did", value: didValue)
@@ -6641,10 +6589,8 @@ public enum ToolsOzoneModerationDefs {
 
             switch self {
             case let .toolsOzoneModerationDefsModEventTakedown(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventTakedown")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -6662,10 +6608,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventReverseTakedown(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventReverseTakedown")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -6683,10 +6627,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventComment(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventComment")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -6704,10 +6646,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventReport(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventReport")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -6725,10 +6665,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventLabel(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventLabel")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -6746,10 +6684,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventAcknowledge(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventAcknowledge")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -6767,10 +6703,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventEscalate(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventEscalate")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -6788,10 +6722,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventMute(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventMute")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -6809,10 +6741,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventUnmute(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventUnmute")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -6830,10 +6760,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventMuteReporter(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventMuteReporter")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -6851,10 +6779,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventUnmuteReporter(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventUnmuteReporter")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -6872,10 +6798,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventEmail(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventEmail")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -6893,10 +6817,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventResolveAppeal(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventResolveAppeal")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -6914,10 +6836,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventDivert(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventDivert")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -6935,10 +6855,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventTag(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventTag")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -6956,10 +6874,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsAccountEvent(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#accountEvent")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -6977,10 +6893,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsIdentityEvent(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#identityEvent")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -6998,10 +6912,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsRecordEvent(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#recordEvent")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -7019,10 +6931,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventPriorityScore(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventPriorityScore")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -7327,10 +7237,8 @@ public enum ToolsOzoneModerationDefs {
 
             switch self {
             case let .comAtprotoAdminDefsRepoRef(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "com.atproto.admin.defs#repoRef")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -7348,10 +7256,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .comAtprotoRepoStrongRef(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "com.atproto.repo.strongRef")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -7369,10 +7275,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .chatBskyConvoDefsMessageRef(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "chat.bsky.convo.defs#messageRef")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -7853,10 +7757,8 @@ public enum ToolsOzoneModerationDefs {
 
             switch self {
             case let .toolsOzoneModerationDefsModEventTakedown(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventTakedown")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -7874,10 +7776,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventReverseTakedown(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventReverseTakedown")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -7895,10 +7795,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventComment(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventComment")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -7916,10 +7814,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventReport(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventReport")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -7937,10 +7833,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventLabel(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventLabel")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -7958,10 +7852,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventAcknowledge(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventAcknowledge")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -7979,10 +7871,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventEscalate(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventEscalate")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -8000,10 +7890,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventMute(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventMute")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -8021,10 +7909,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventUnmute(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventUnmute")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -8042,10 +7928,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventMuteReporter(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventMuteReporter")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -8063,10 +7947,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventUnmuteReporter(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventUnmuteReporter")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -8084,10 +7966,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventEmail(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventEmail")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -8105,10 +7985,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventResolveAppeal(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventResolveAppeal")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -8126,10 +8004,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventDivert(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventDivert")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -8147,10 +8023,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventTag(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventTag")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -8168,10 +8042,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsAccountEvent(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#accountEvent")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -8189,10 +8061,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsIdentityEvent(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#identityEvent")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -8210,10 +8080,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsRecordEvent(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#recordEvent")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -8231,10 +8099,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventPriorityScore(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventPriorityScore")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -8558,10 +8424,8 @@ public enum ToolsOzoneModerationDefs {
 
             switch self {
             case let .toolsOzoneModerationDefsRepoView(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#repoView")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -8579,10 +8443,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsRepoViewNotFound(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#repoViewNotFound")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -8600,10 +8462,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsRecordView(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#recordView")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -8621,10 +8481,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsRecordViewNotFound(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#recordViewNotFound")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -8790,10 +8648,8 @@ public enum ToolsOzoneModerationDefs {
 
             switch self {
             case let .comAtprotoAdminDefsRepoRef(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "com.atproto.admin.defs#repoRef")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -8811,10 +8667,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .comAtprotoRepoStrongRef(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "com.atproto.repo.strongRef")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -8964,10 +8818,8 @@ public enum ToolsOzoneModerationDefs {
 
             switch self {
             case let .toolsOzoneModerationDefsAccountHosting(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#accountHosting")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -8985,10 +8837,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsRecordHosting(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#recordHosting")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -9266,10 +9116,8 @@ public enum ToolsOzoneModerationDefs {
 
             switch self {
             case let .toolsOzoneModerationDefsImageDetails(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#imageDetails")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -9287,10 +9135,8 @@ public enum ToolsOzoneModerationDefs {
                 }
                 return map
             case let .toolsOzoneModerationDefsVideoDetails(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#videoDetails")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 

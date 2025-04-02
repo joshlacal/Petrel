@@ -33,9 +33,8 @@ public enum ChatBskyModerationUpdateActorAccess {
 
             try container.encode(allowAccess, forKey: .allowAccess)
 
-            if let value = ref {
-                try container.encode(value, forKey: .ref)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(ref, forKey: .ref)
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -44,11 +43,8 @@ public enum ChatBskyModerationUpdateActorAccess {
             case ref
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let actorValue = try (actor as? DAGCBOREncodable)?.toCBORValue() ?? actor
             map = map.adding(key: "actor", value: actorValue)
@@ -57,6 +53,8 @@ public enum ChatBskyModerationUpdateActorAccess {
             map = map.adding(key: "allowAccess", value: allowAccessValue)
 
             if let value = ref {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let refValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "ref", value: refValue)
             }

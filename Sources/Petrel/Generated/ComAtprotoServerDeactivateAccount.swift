@@ -21,22 +21,20 @@ public enum ComAtprotoServerDeactivateAccount {
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
 
-            if let value = deleteAfter {
-                try container.encode(value, forKey: .deleteAfter)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(deleteAfter, forKey: .deleteAfter)
         }
 
         private enum CodingKeys: String, CodingKey {
             case deleteAfter
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Add fields in lexicon-defined order
-
             if let value = deleteAfter {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let deleteAfterValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "deleteAfter", value: deleteAfterValue)
             }

@@ -28,11 +28,8 @@ public enum AppBskyNotificationUpdateSeen {
             case seenAt
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let seenAtValue = try (seenAt as? DAGCBOREncodable)?.toCBORValue() ?? seenAt
             map = map.adding(key: "seenAt", value: seenAtValue)

@@ -51,19 +51,16 @@ public enum ComAtprotoRepoPutRecord {
 
             try container.encode(rkey, forKey: .rkey)
 
-            if let value = validate {
-                try container.encode(value, forKey: .validate)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(validate, forKey: .validate)
 
             try container.encode(record, forKey: .record)
 
-            if let value = swapRecord {
-                try container.encode(value, forKey: .swapRecord)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(swapRecord, forKey: .swapRecord)
 
-            if let value = swapCommit {
-                try container.encode(value, forKey: .swapCommit)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(swapCommit, forKey: .swapCommit)
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -76,11 +73,8 @@ public enum ComAtprotoRepoPutRecord {
             case swapCommit
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let repoValue = try (repo as? DAGCBOREncodable)?.toCBORValue() ?? repo
             map = map.adding(key: "repo", value: repoValue)
@@ -92,6 +86,8 @@ public enum ComAtprotoRepoPutRecord {
             map = map.adding(key: "rkey", value: rkeyValue)
 
             if let value = validate {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let validateValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "validate", value: validateValue)
             }
@@ -100,11 +96,15 @@ public enum ComAtprotoRepoPutRecord {
             map = map.adding(key: "record", value: recordValue)
 
             if let value = swapRecord {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let swapRecordValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "swapRecord", value: swapRecordValue)
             }
 
             if let value = swapCommit {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let swapCommitValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "swapCommit", value: swapCommitValue)
             }
@@ -161,20 +161,15 @@ public enum ComAtprotoRepoPutRecord {
 
             try container.encode(cid, forKey: .cid)
 
-            if let value = commit {
-                try container.encode(value, forKey: .commit)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(commit, forKey: .commit)
 
-            if let value = validationStatus {
-                try container.encode(value, forKey: .validationStatus)
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(validationStatus, forKey: .validationStatus)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let uriValue = try (uri as? DAGCBOREncodable)?.toCBORValue() ?? uri
             map = map.adding(key: "uri", value: uriValue)
@@ -183,11 +178,15 @@ public enum ComAtprotoRepoPutRecord {
             map = map.adding(key: "cid", value: cidValue)
 
             if let value = commit {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let commitValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "commit", value: commitValue)
             }
 
             if let value = validationStatus {
+                // Encode optional property even if it's an empty array for CBOR
+
                 let validationStatusValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "validationStatus", value: validationStatusValue)
             }

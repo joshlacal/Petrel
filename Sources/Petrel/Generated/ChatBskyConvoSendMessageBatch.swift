@@ -73,10 +73,7 @@ public enum ChatBskyConvoSendMessageBatch {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            // Always add $type first (AT Protocol convention)
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            // Add remaining fields in lexicon-defined order
 
             let convoIdValue = try (convoId as? DAGCBOREncodable)?.toCBORValue() ?? convoId
             map = map.adding(key: "convoId", value: convoIdValue)
@@ -118,11 +115,8 @@ public enum ChatBskyConvoSendMessageBatch {
             case items
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let itemsValue = try (items as? DAGCBOREncodable)?.toCBORValue() ?? items
             map = map.adding(key: "items", value: itemsValue)
@@ -154,11 +148,8 @@ public enum ChatBskyConvoSendMessageBatch {
             try container.encode(items, forKey: .items)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let itemsValue = try (items as? DAGCBOREncodable)?.toCBORValue() ?? items
             map = map.adding(key: "items", value: itemsValue)

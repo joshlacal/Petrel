@@ -57,11 +57,8 @@ public enum AppBskyFeedGetFeedGenerator {
             try container.encode(isValid, forKey: .isValid)
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let viewValue = try (view as? DAGCBOREncodable)?.toCBORValue() ?? view
             map = map.adding(key: "view", value: viewValue)

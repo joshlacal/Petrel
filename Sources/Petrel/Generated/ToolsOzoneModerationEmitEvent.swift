@@ -37,11 +37,8 @@ public enum ToolsOzoneModerationEmitEvent {
 
             try container.encode(subject, forKey: .subject)
 
-            if let value = subjectBlobCids {
-                if !value.isEmpty {
-                    try container.encode(value, forKey: .subjectBlobCids)
-                }
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(subjectBlobCids, forKey: .subjectBlobCids)
 
             try container.encode(createdBy, forKey: .createdBy)
         }
@@ -53,11 +50,8 @@ public enum ToolsOzoneModerationEmitEvent {
             case createdBy
         }
 
-        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
-            // Add fields in lexicon-defined order
 
             let eventValue = try (event as? DAGCBOREncodable)?.toCBORValue() ?? event
             map = map.adding(key: "event", value: eventValue)
@@ -66,10 +60,10 @@ public enum ToolsOzoneModerationEmitEvent {
             map = map.adding(key: "subject", value: subjectValue)
 
             if let value = subjectBlobCids {
-                if !value.isEmpty {
-                    let subjectBlobCidsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                    map = map.adding(key: "subjectBlobCids", value: subjectBlobCidsValue)
-                }
+                // Encode optional property even if it's an empty array for CBOR
+
+                let subjectBlobCidsValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                map = map.adding(key: "subjectBlobCids", value: subjectBlobCidsValue)
             }
 
             let createdByValue = try (createdBy as? DAGCBOREncodable)?.toCBORValue() ?? createdBy
@@ -505,10 +499,8 @@ public enum ToolsOzoneModerationEmitEvent {
 
             switch self {
             case let .toolsOzoneModerationDefsModEventTakedown(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventTakedown")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -526,10 +518,8 @@ public enum ToolsOzoneModerationEmitEvent {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventAcknowledge(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventAcknowledge")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -547,10 +537,8 @@ public enum ToolsOzoneModerationEmitEvent {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventEscalate(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventEscalate")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -568,10 +556,8 @@ public enum ToolsOzoneModerationEmitEvent {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventComment(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventComment")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -589,10 +575,8 @@ public enum ToolsOzoneModerationEmitEvent {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventLabel(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventLabel")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -610,10 +594,8 @@ public enum ToolsOzoneModerationEmitEvent {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventReport(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventReport")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -631,10 +613,8 @@ public enum ToolsOzoneModerationEmitEvent {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventMute(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventMute")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -652,10 +632,8 @@ public enum ToolsOzoneModerationEmitEvent {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventUnmute(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventUnmute")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -673,10 +651,8 @@ public enum ToolsOzoneModerationEmitEvent {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventMuteReporter(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventMuteReporter")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -694,10 +670,8 @@ public enum ToolsOzoneModerationEmitEvent {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventUnmuteReporter(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventUnmuteReporter")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -715,10 +689,8 @@ public enum ToolsOzoneModerationEmitEvent {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventReverseTakedown(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventReverseTakedown")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -736,10 +708,8 @@ public enum ToolsOzoneModerationEmitEvent {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventResolveAppeal(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventResolveAppeal")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -757,10 +727,8 @@ public enum ToolsOzoneModerationEmitEvent {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventEmail(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventEmail")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -778,10 +746,8 @@ public enum ToolsOzoneModerationEmitEvent {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventDivert(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventDivert")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -799,10 +765,8 @@ public enum ToolsOzoneModerationEmitEvent {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventTag(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventTag")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -820,10 +784,8 @@ public enum ToolsOzoneModerationEmitEvent {
                 }
                 return map
             case let .toolsOzoneModerationDefsAccountEvent(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#accountEvent")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -841,10 +803,8 @@ public enum ToolsOzoneModerationEmitEvent {
                 }
                 return map
             case let .toolsOzoneModerationDefsIdentityEvent(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#identityEvent")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -862,10 +822,8 @@ public enum ToolsOzoneModerationEmitEvent {
                 }
                 return map
             case let .toolsOzoneModerationDefsRecordEvent(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#recordEvent")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -883,10 +841,8 @@ public enum ToolsOzoneModerationEmitEvent {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventPriorityScore(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventPriorityScore")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -1172,10 +1128,8 @@ public enum ToolsOzoneModerationEmitEvent {
 
             switch self {
             case let .comAtprotoAdminDefsRepoRef(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "com.atproto.admin.defs#repoRef")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -1193,10 +1147,8 @@ public enum ToolsOzoneModerationEmitEvent {
                 }
                 return map
             case let .comAtprotoRepoStrongRef(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "com.atproto.repo.strongRef")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -1669,10 +1621,8 @@ public enum ToolsOzoneModerationEmitEvent {
 
             switch self {
             case let .toolsOzoneModerationDefsModEventTakedown(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventTakedown")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -1690,10 +1640,8 @@ public enum ToolsOzoneModerationEmitEvent {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventAcknowledge(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventAcknowledge")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -1711,10 +1659,8 @@ public enum ToolsOzoneModerationEmitEvent {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventEscalate(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventEscalate")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -1732,10 +1678,8 @@ public enum ToolsOzoneModerationEmitEvent {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventComment(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventComment")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -1753,10 +1697,8 @@ public enum ToolsOzoneModerationEmitEvent {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventLabel(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventLabel")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -1774,10 +1716,8 @@ public enum ToolsOzoneModerationEmitEvent {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventReport(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventReport")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -1795,10 +1735,8 @@ public enum ToolsOzoneModerationEmitEvent {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventMute(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventMute")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -1816,10 +1754,8 @@ public enum ToolsOzoneModerationEmitEvent {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventUnmute(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventUnmute")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -1837,10 +1773,8 @@ public enum ToolsOzoneModerationEmitEvent {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventMuteReporter(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventMuteReporter")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -1858,10 +1792,8 @@ public enum ToolsOzoneModerationEmitEvent {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventUnmuteReporter(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventUnmuteReporter")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -1879,10 +1811,8 @@ public enum ToolsOzoneModerationEmitEvent {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventReverseTakedown(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventReverseTakedown")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -1900,10 +1830,8 @@ public enum ToolsOzoneModerationEmitEvent {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventResolveAppeal(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventResolveAppeal")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -1921,10 +1849,8 @@ public enum ToolsOzoneModerationEmitEvent {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventEmail(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventEmail")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -1942,10 +1868,8 @@ public enum ToolsOzoneModerationEmitEvent {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventDivert(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventDivert")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -1963,10 +1887,8 @@ public enum ToolsOzoneModerationEmitEvent {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventTag(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventTag")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -1984,10 +1906,8 @@ public enum ToolsOzoneModerationEmitEvent {
                 }
                 return map
             case let .toolsOzoneModerationDefsAccountEvent(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#accountEvent")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -2005,10 +1925,8 @@ public enum ToolsOzoneModerationEmitEvent {
                 }
                 return map
             case let .toolsOzoneModerationDefsIdentityEvent(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#identityEvent")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -2026,10 +1944,8 @@ public enum ToolsOzoneModerationEmitEvent {
                 }
                 return map
             case let .toolsOzoneModerationDefsRecordEvent(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#recordEvent")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -2047,10 +1963,8 @@ public enum ToolsOzoneModerationEmitEvent {
                 }
                 return map
             case let .toolsOzoneModerationDefsModEventPriorityScore(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "tools.ozone.moderation.defs#modEventPriorityScore")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -2336,10 +2250,8 @@ public enum ToolsOzoneModerationEmitEvent {
 
             switch self {
             case let .comAtprotoAdminDefsRepoRef(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "com.atproto.admin.defs#repoRef")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
@@ -2357,10 +2269,8 @@ public enum ToolsOzoneModerationEmitEvent {
                 }
                 return map
             case let .comAtprotoRepoStrongRef(value):
-                // Always add $type first
                 map = map.adding(key: "$type", value: "com.atproto.repo.strongRef")
 
-                // Add the value's fields while preserving their order
                 if let encodableValue = value as? DAGCBOREncodable {
                     let valueDict = try encodableValue.toCBORValue()
 
