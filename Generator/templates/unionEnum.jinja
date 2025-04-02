@@ -181,10 +181,8 @@ public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProt
         switch self {
         {%- for variant in variants %}
         case .{{ variant | convertRefToSwift | lowerCamelCase }}(let value):
-            // Always add $type first
             map = map.adding(key: "$type", value: "{{ variant }}")
             
-            // Add the value's fields while preserving their order
             if let encodableValue = value as? DAGCBOREncodable {
                 let valueDict = try encodableValue.toCBORValue()
                 

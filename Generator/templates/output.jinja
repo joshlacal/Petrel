@@ -48,15 +48,8 @@
             {% if properties %}
             {%- for prop in properties %}
             {% if prop.optional %}
-            if let value = {{ prop.name }} {
-                {% if '[' in prop.type and ']' in prop.type %}
-                if !value.isEmpty {
-                    try container.encode(value, forKey: .{{ prop.name }})
-                }
-                {% else %}
-                try container.encode(value, forKey: .{{ prop.name }})
-                {% endif %}
-            }
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent({{ prop.name }}, forKey: .{{ prop.name }})
             {% else %}
             try container.encode({{ prop.name }}, forKey: .{{ prop.name }})
             {% endif %}
@@ -65,27 +58,18 @@
             try container.encode(data, forKey: .data)
             {% endif %}
         }
-        
-        // DAGCBOR encoding with field ordering
+
         public func toCBORValue() throws -> Any {
             {% if properties %}
             var map = OrderedCBORMap()
-            
-            // Add fields in lexicon-defined order
+
             {% for prop in properties %}
             {% if prop.optional %}
             if let value = {{ prop.name }} {
-                {% if '[' in prop.type and ']' in prop.type %}
-                if !value.isEmpty {
-                    {% set var_name = prop.name + 'Value' %}
-                    let {{ var_name }} = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                    map = map.adding(key: "{{ prop.name }}", value: {{ var_name }})
-                }
-                {% else %}
+                // Encode optional property even if it's an empty array for CBOR
                 {% set var_name = prop.name + 'Value' %}
                 let {{ var_name }} = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
                 map = map.adding(key: "{{ prop.name }}", value: {{ var_name }})
-                {% endif %}
             }
             {% else %}
             {% set var_name = prop.name + 'Value' %}
@@ -93,7 +77,7 @@
             map = map.adding(key: "{{ prop.name }}", value: {{ var_name }})
             {% endif %}
             {% endfor %}
-            
+
             return map
             {% else %}
             return data

@@ -223,7 +223,7 @@ actor ConfigurationManager: ConfigurationManaging {
 
         do {
             try KeychainManager.store(
-                key: key("handle"),
+                key: keychainKey(for: did, baseKey: "handle"),
                 value: handle.data(using: .utf8) ?? Data(),
                 namespace: namespace,
                 accessibility: kSecAttrAccessibleAfterFirstUnlock
@@ -504,7 +504,7 @@ actor ConfigurationManager: ConfigurationManaging {
         }
 
         // Load handle
-        let handleKey = key("handle")
+        let handleKey = keychainKey(for: did, baseKey: "handle")
         LogManager.logError("CONFIG_LOAD: Using key '\(handleKey)' for handle lookup")
         do {
             let handleData = try KeychainManager.retrieve(key: handleKey, namespace: namespace)
@@ -640,12 +640,12 @@ actor ConfigurationManager: ConfigurationManaging {
     }
 
     func getHandle() async -> String? {
-        if let handle = handle {
-            return handle
-        }
-
+//        if let handle = handle {
+//            return handle
+//        }
+//
         do {
-            let handleData = try KeychainManager.retrieve(key: key("handle"), namespace: namespace)
+            let handleData = try KeychainManager.retrieve(key: keychainKey(for: did, baseKey: "handle"), namespace: namespace)
             let handleString = String(data: handleData, encoding: .utf8)
             handle = handleString
             return handleString
@@ -960,7 +960,6 @@ actor ConfigurationManager: ConfigurationManaging {
                 authorizationServerMetadata = nil
                 currentAuthorizationServer = nil
 
-                // Add this line to clear default settings when removing the last account
                 await clearSettings()
             }
         }
@@ -973,10 +972,10 @@ actor ConfigurationManager: ConfigurationManaging {
     }
 
     func getHandle(forAccount did: String) async -> String? {
-        if did == self.did, let handle = handle {
-            return handle
-        }
-
+//        if did == self.did, let handle = handle {
+//            return handle
+//        }
+//
         do {
             let handleData = try KeychainManager.retrieve(
                 key: userSpecificKey("handle", did: did), namespace: namespace

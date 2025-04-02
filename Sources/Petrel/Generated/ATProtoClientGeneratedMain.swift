@@ -502,6 +502,12 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
         else {
             throw APIError.invalidPDSURL
         }
+        
+        if let handle = didDocument.alsoKnownAs.first {
+            let handleString = handle.hasPrefix("at://") ? String(handle.dropFirst(5)) : handle
+            try await configManager.updateUserConfiguration(did: didDocument.id, handle: handleString, serviceEndpoint: serviceURLString)
+        }
+
 
         pdsURL = serviceURL
         // Publish PDS URL updated event

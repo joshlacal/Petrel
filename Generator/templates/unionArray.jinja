@@ -18,12 +18,10 @@ public struct {{ union_name | convertRefToSwift }}: Codable, ATProtocolCodable, 
     }
 
     public func encode(to encoder: Encoder) throws {
-        // Only encode if the items array is not empty
-        if !items.isEmpty {
-            var container = encoder.unkeyedContainer()
-            for item in items {
-                try container.encode(item)
-            }
+        // Encode the array regardless of whether it's empty
+        var container = encoder.unkeyedContainer()
+        for item in items {
+            try container.encode(item)
         }
     }
 
@@ -134,10 +132,8 @@ public enum {{ union_name | convertRefToSwift }}ForUnionArray: Codable, ATProtoc
         switch self {
         {%- for ref in refs %}
         case .{{ ref.camel_case_label | lowerCamelCase }}(let value):
-            // Always add $type first
             map = map.adding(key: "$type", value: "{{ ref.ref }}")
             
-            // Add the value's fields while preserving their order
             if let encodableValue = value as? DAGCBOREncodable {
                 let valueDict = try encodableValue.toCBORValue()
                 

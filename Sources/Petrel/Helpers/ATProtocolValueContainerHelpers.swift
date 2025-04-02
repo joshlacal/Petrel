@@ -9,7 +9,6 @@ import Foundation
 
 // MARK: Safe Decoding
 
-// Add this for handling raw JSON
 public struct JSONValue: Codable {
     let value: Any
 

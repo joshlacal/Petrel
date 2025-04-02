@@ -839,9 +839,8 @@ public struct OAuthClaims: Codable, JWTRegisteredFieldsClaims, Sendable {
     public let iat: Date?
     public let jti: String?
     public let scope: String
-    public let cnf: ConfirmationClaims? // Add this
+    public let cnf: ConfirmationClaims? 
 
-    // Add this struct
     public struct ConfirmationClaims: Codable, Sendable {
         let jkt: String
     }
@@ -850,7 +849,7 @@ public struct OAuthClaims: Codable, JWTRegisteredFieldsClaims, Sendable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         iss = try container.decodeIfPresent(String.self, forKey: .iss)
         sub = try container.decodeIfPresent(String.self, forKey: .sub)
-        cnf = try container.decodeIfPresent(ConfirmationClaims.self, forKey: .cnf) // Add this
+        cnf = try container.decodeIfPresent(ConfirmationClaims.self, forKey: .cnf)
 
         // Decode `aud` as either String or Array
         if let audArray = try? container.decode([String].self, forKey: .aud) {
@@ -863,9 +862,7 @@ public struct OAuthClaims: Codable, JWTRegisteredFieldsClaims, Sendable {
 
         // Decode date fields from Int (Unix timestamp) to Date
         if let expInt = try container.decodeIfPresent(Int.self, forKey: .exp) {
-            print("Raw exp timestamp: \(expInt)") // Let's see the Unix timestamp
             exp = Date(timeIntervalSince1970: TimeInterval(expInt))
-            print("Converted to date: \(String(describing: exp))")
         } else {
             exp = nil
         }
@@ -908,8 +905,6 @@ public struct OAuthClaims: Codable, JWTRegisteredFieldsClaims, Sendable {
     }
 
     public func validateExtraClaims() throws {
-        // Implement any additional claim validations here
-        // For example, you might want to check if the scope is valid
         if scope.isEmpty {
             throw JWTError.invalidClaim(name: "scope", reason: "Scope cannot be empty")
         }
