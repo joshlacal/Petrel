@@ -402,10 +402,10 @@ actor ConfigurationManager: ConfigurationManaging {
             try KeychainManager.delete(key: "did.default", namespace: namespace)
             try KeychainManager.delete(key: "handle.default", namespace: namespace)
             try KeychainManager.delete(key: "pdsURL.default", namespace: namespace)
-            
+
             // Add explicit clear of lastActiveDID
             try KeychainManager.delete(key: "lastActiveDID", namespace: namespace)
-            
+
             // If we have the current DID, also clear its specific settings
             if let currentDID = did {
                 try KeychainManager.delete(key: "handle.\(currentDID)", namespace: namespace)
@@ -429,8 +429,7 @@ actor ConfigurationManager: ConfigurationManaging {
         authorizationServerMetadata = nil
         currentAuthorizationServer = nil
     }
-    
-    
+
     // MARK: - Configuration Methods
 
     // Simplified key generation that prioritizes the explicit DID parameter

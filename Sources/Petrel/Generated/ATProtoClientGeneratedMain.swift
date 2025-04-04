@@ -291,7 +291,7 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
     }
 
     // MARK: - OAuth Flow Methods
-    
+
     /// Starts the OAuth flow for account creation
     /// - Parameter pdsURL: The PDS URL to use (defaults to bsky.social)
     /// - Returns: The authorization URL to present to the user
@@ -318,13 +318,12 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
             }
             authURL = try await authenticationService.startOAuthFlowForSignUp(pdsURL: pdsURL)
         }
-        
+
         // Publish OAuth flow started event
         await EventBus.shared.publish(.oauthFlowStarted(authURL))
         return authURL
     }
-    
-    
+
     /// Handles the OAuth callback by processing the redirect URL.
     ///
     /// - Parameter url: The callback URL containing authorization data.
@@ -438,14 +437,14 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
             await configManager.clearSettings()
             LogManager.logError("LOGOUT: Attempting to manually clear lastActiveDID")
             await TokenManager.clearLastActiveDID(namespace: namespace)
-            
+
             // Also explicitly clear DID-specific handles
             try? KeychainManager.delete(key: "handle.\(currentDID)", namespace: namespace)
             try? KeychainManager.delete(key: "pdsURL.\(currentDID)", namespace: namespace)
             try? KeychainManager.delete(key: "protectedResourceMetadata.\(currentDID)", namespace: namespace)
             try? KeychainManager.delete(key: "authorizationServerMetadata.\(currentDID)", namespace: namespace)
             try? KeychainManager.delete(key: "currentAuthorizationServer.\(currentDID)", namespace: namespace)
-            
+
             LogManager.logError("LOGOUT: Manual lastActiveDID clearing completed")
         }
 
@@ -489,35 +488,34 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
         await EventBus.shared.publish(.authenticationRequired)
         LogManager.logError("LOGOUT: Logout complete for DID: \(currentDID)")
     }
-    
+
     public func nukeEverything() async {
         LogManager.logInfo("ATProtoClient - Complete keychain reset requested")
-        
+
         // Reset all in-memory state
         did = nil
         handle = nil
         pdsURL = nil
-        
+
         // Clear all keychain items
         let success = KeychainManager.nukeAllKeychainItems(forNamespace: namespace)
-        
+
         // Reset configuration manager
         await configManager.clearSettings()
-        
+
         // Reset token manager state
         await TokenManager.clearLastActiveDID(namespace: namespace)
-        
+
         // Clear any session state
         try? await middlewareService.clearSession()
-        
+
         // Notify that authentication is required
         await authDelegate?.authenticationRequired(client: self)
         await EventBus.shared.publish(.authenticationRequired)
-        
+
         LogManager.logInfo("ATProtoClient - Keychain reset complete, success: \(success)")
     }
-    
-    
+
     // MARK: - Utility Functions
 
     /// Resolves a user's handle to their DID.
@@ -956,13 +954,13 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
 
             // Also clear any handles associated with this DID
             try? KeychainManager.delete(key: "handle.\(did)", namespace: namespace)
-            
+
             // Explicitly force clear all related items
             try? KeychainManager.delete(key: "pdsURL.\(did)", namespace: namespace)
             try? KeychainManager.delete(key: "protectedResourceMetadata.\(did)", namespace: namespace)
             try? KeychainManager.delete(key: "authorizationServerMetadata.\(did)", namespace: namespace)
             try? KeychainManager.delete(key: "currentAuthorizationServer.\(did)", namespace: namespace)
-            
+
             LogManager.logError("REMOVE_ACCOUNT: Cleared all settings")
             await configManager.clearSettings()
             LogManager.logError("REMOVE_ACCOUNT: Finished clearing settings")
@@ -1005,8 +1003,7 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
 
         LogManager.logError("REMOVE_ACCOUNT: Successfully completed removal of account: \(did)")
     }
-    
-    
+
     /// Returns information about the currently active account
     ///
     /// - Returns: A tuple containing the DID, handle, and PDS URL of the active account
@@ -1086,6 +1083,15 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
                 }
             }
 
+            public lazy var server: Server = .init(networkManager: self.networkManager)
+
+            public final class Server: @unchecked Sendable {
+                let networkManager: NetworkManaging
+                init(networkManager: NetworkManaging) {
+                    self.networkManager = networkManager
+                }
+            }
+
             public lazy var team: Team = .init(networkManager: self.networkManager)
 
             public final class Team: @unchecked Sendable {
@@ -1098,15 +1104,6 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
             public lazy var communication: Communication = .init(networkManager: self.networkManager)
 
             public final class Communication: @unchecked Sendable {
-                let networkManager: NetworkManaging
-                init(networkManager: NetworkManaging) {
-                    self.networkManager = networkManager
-                }
-            }
-
-            public lazy var server: Server = .init(networkManager: self.networkManager)
-
-            public final class Server: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
@@ -1158,18 +1155,18 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
                 self.networkManager = networkManager
             }
 
-            public lazy var embed: Embed = .init(networkManager: self.networkManager)
+            public lazy var video: Video = .init(networkManager: self.networkManager)
 
-            public final class Embed: @unchecked Sendable {
+            public final class Video: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
                 }
             }
 
-            public lazy var video: Video = .init(networkManager: self.networkManager)
+            public lazy var embed: Embed = .init(networkManager: self.networkManager)
 
-            public final class Video: @unchecked Sendable {
+            public final class Embed: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
@@ -1329,18 +1326,18 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
                 }
             }
 
-            public lazy var label: Label = .init(networkManager: self.networkManager)
+            public lazy var server: Server = .init(networkManager: self.networkManager)
 
-            public final class Label: @unchecked Sendable {
+            public final class Server: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager
                 }
             }
 
-            public lazy var server: Server = .init(networkManager: self.networkManager)
+            public lazy var label: Label = .init(networkManager: self.networkManager)
 
-            public final class Server: @unchecked Sendable {
+            public final class Label: @unchecked Sendable {
                 let networkManager: NetworkManaging
                 init(networkManager: NetworkManaging) {
                     self.networkManager = networkManager

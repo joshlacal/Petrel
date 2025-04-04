@@ -492,7 +492,7 @@ actor OAuthManager {
             payload["nonce"] = nonce
             LogManager.logInfo("Including nonce in DPoP proof for DID \(didToUse), domain \(domain): \(nonce)")
         }
-        
+
         // Only include 'ath' claim for resource requests, not auth-related endpoints
         if let additional = additionalClaims {
             let isAuthEndpoint =
@@ -582,18 +582,18 @@ actor OAuthManager {
     }
 
     // MARK: - OAuth Flow Methods
-    
+
     func startOAuthFlowForSignUp(pdsURL: URL) async throws -> URL {
         resetOAuthFlow()
-        
+
         var authServerMetadata: AuthorizationServerMetadata
         var authorizationServerURL: URL
-        
+
         // Try fetching Protected Resource Metadata first
         do {
             let protectedResourceMetadata = try await fetchProtectedResourceMetadata(pdsURL: pdsURL)
             LogManager.logDebug("Protected Resource Metadata: \(protectedResourceMetadata)")
-            
+
             // Extract Authorization Server URL
             guard let authServerURL = protectedResourceMetadata.authorizationServers.first else {
                 LogManager.logError("Invalid Authorization Server URL")
@@ -605,7 +605,7 @@ actor OAuthManager {
             LogManager.logInfo("Protected Resource Metadata fetch failed, using direct authorization server URL")
             authorizationServerURL = pdsURL
         }
-        
+
         // Fetch Authorization Server Metadata
         authServerMetadata = try await fetchAuthorizationServerMetadata(
             authServerURL: authorizationServerURL)
@@ -614,15 +614,15 @@ actor OAuthManager {
         // Step 4: Generate PKCE code verifier and challenge
         let codeVerifier = generateCodeVerifier()
         let codeChallenge = generateCodeChallenge(from: codeVerifier)
-        
+
         // Step 5: Generate and store state
         let state = UUID().uuidString
         try await tokenManager.storeCodeVerifier(codeVerifier, for: state)
         try await tokenManager.storeState(state)
-        
+
         LogManager.logDebug("Generated code_verifier: \(codeVerifier)")
         LogManager.logDebug("Generated state: \(state)")
-        
+
         // Step 6: Create Pushed Authorization Request (PAR) WITHOUT login_hint
         let parEndpoint = authServerMetadata.pushedAuthorizationRequestEndpoint
         let requestURI = try await pushAuthorizationRequestForSignUp(
@@ -631,7 +631,7 @@ actor OAuthManager {
             authServerURL: authorizationServerURL,
             state: state
         )
-        
+
         // Step 7: Build Authorization URL
         var components = URLComponents(string: authServerMetadata.authorizationEndpoint)!
         components.queryItems = [
@@ -639,14 +639,14 @@ actor OAuthManager {
             URLQueryItem(name: "client_id", value: oauthConfig.clientId),
             URLQueryItem(name: "redirect_uri", value: oauthConfig.redirectUri),
         ]
-        
+
         guard let authorizationURL = components.url else {
             throw OAuthError.invalidPDSURL
         }
-        
+
         return authorizationURL
     }
-    
+
     func pushAuthorizationRequestForSignUp(
         codeChallenge: String,
         endpoint: String,
@@ -654,7 +654,7 @@ actor OAuthManager {
         state: String
     ) async throws -> String {
         LogManager.logInfo("Starting PAR request for sign-up flow")
-        
+
         // Similar to pushAuthorizationRequest but without login_hint
         let parameters: [String: String] = [
             "client_id": oauthConfig.clientId,
@@ -666,7 +666,7 @@ actor OAuthManager {
             "response_type": "code",
             // login_hint is intentionally omitted for sign-up flow
         ]
-        
+
         let body = parameters.percentEncoded()
         var attempt = 0
         let maxRetries = 3
@@ -1121,11 +1121,11 @@ actor OAuthManager {
 
         if currentDID == nil {
             // This was a sign-up flow, so we need to properly initialize everything with the new DID
-            await tokenManager.setCurrentDID(sub)  // Use 'sub' instead of 'did' here
+            await tokenManager.setCurrentDID(sub) // Use 'sub' instead of 'did' here
             currentDID = sub
-            
+
             // Generate DPoP key for the new DID
-            let _ = try getOrCreateDPoPKeyForDID(sub)
+            _ = try getOrCreateDPoPKeyForDID(sub)
         }
 
         // After successful token exchange, resolve the PDS URL and update it
