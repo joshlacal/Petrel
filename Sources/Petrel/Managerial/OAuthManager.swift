@@ -485,14 +485,14 @@ actor OAuthManager {
         ]
 
         // Add nonce if available for the current DID and domain
-        if let did = currentDID,
-           let domain = URL(string: url)?.host?.lowercased(),
-           let nonce = getDPoPNonceForDID(did, domain: domain)
+        let didToUse = currentDID ?? "default"
+        if let domain = URL(string: url)?.host?.lowercased(),
+           let nonce = getDPoPNonceForDID(didToUse, domain: domain)
         {
             payload["nonce"] = nonce
-            LogManager.logInfo("Including nonce in DPoP proof for DID \(did), domain \(domain): \(nonce)")
+            LogManager.logInfo("Including nonce in DPoP proof for DID \(didToUse), domain \(domain): \(nonce)")
         }
-
+        
         // Only include 'ath' claim for resource requests, not auth-related endpoints
         if let additional = additionalClaims {
             let isAuthEndpoint =
@@ -581,9 +581,168 @@ actor OAuthManager {
         }
     }
 
-    // Other methods remain the same...
-
     // MARK: - OAuth Flow Methods
+    
+    func startOAuthFlowForSignUp(pdsURL: URL) async throws -> URL {
+        resetOAuthFlow()
+        
+        var authServerMetadata: AuthorizationServerMetadata
+        var authorizationServerURL: URL
+        
+        // Try fetching Protected Resource Metadata first
+        do {
+            let protectedResourceMetadata = try await fetchProtectedResourceMetadata(pdsURL: pdsURL)
+            LogManager.logDebug("Protected Resource Metadata: \(protectedResourceMetadata)")
+            
+            // Extract Authorization Server URL
+            guard let authServerURL = protectedResourceMetadata.authorizationServers.first else {
+                LogManager.logError("Invalid Authorization Server URL")
+                throw OAuthError.missingServerMetadata
+            }
+            authorizationServerURL = authServerURL
+        } catch {
+            // Fall back to direct authorization server URL if resource metadata fetch fails
+            LogManager.logInfo("Protected Resource Metadata fetch failed, using direct authorization server URL")
+            authorizationServerURL = pdsURL
+        }
+        
+        // Fetch Authorization Server Metadata
+        authServerMetadata = try await fetchAuthorizationServerMetadata(
+            authServerURL: authorizationServerURL)
+        authorizationServerMetadata = authServerMetadata
+
+        // Step 4: Generate PKCE code verifier and challenge
+        let codeVerifier = generateCodeVerifier()
+        let codeChallenge = generateCodeChallenge(from: codeVerifier)
+        
+        // Step 5: Generate and store state
+        let state = UUID().uuidString
+        try await tokenManager.storeCodeVerifier(codeVerifier, for: state)
+        try await tokenManager.storeState(state)
+        
+        LogManager.logDebug("Generated code_verifier: \(codeVerifier)")
+        LogManager.logDebug("Generated state: \(state)")
+        
+        // Step 6: Create Pushed Authorization Request (PAR) WITHOUT login_hint
+        let parEndpoint = authServerMetadata.pushedAuthorizationRequestEndpoint
+        let requestURI = try await pushAuthorizationRequestForSignUp(
+            codeChallenge: codeChallenge,
+            endpoint: parEndpoint,
+            authServerURL: authorizationServerURL,
+            state: state
+        )
+        
+        // Step 7: Build Authorization URL
+        var components = URLComponents(string: authServerMetadata.authorizationEndpoint)!
+        components.queryItems = [
+            URLQueryItem(name: "request_uri", value: requestURI),
+            URLQueryItem(name: "client_id", value: oauthConfig.clientId),
+            URLQueryItem(name: "redirect_uri", value: oauthConfig.redirectUri),
+        ]
+        
+        guard let authorizationURL = components.url else {
+            throw OAuthError.invalidPDSURL
+        }
+        
+        return authorizationURL
+    }
+    
+    func pushAuthorizationRequestForSignUp(
+        codeChallenge: String,
+        endpoint: String,
+        authServerURL: URL,
+        state: String
+    ) async throws -> String {
+        LogManager.logInfo("Starting PAR request for sign-up flow")
+        
+        // Similar to pushAuthorizationRequest but without login_hint
+        let parameters: [String: String] = [
+            "client_id": oauthConfig.clientId,
+            "code_challenge": codeChallenge,
+            "code_challenge_method": "S256",
+            "scope": oauthConfig.scope,
+            "state": state,
+            "redirect_uri": oauthConfig.redirectUri,
+            "response_type": "code",
+            // login_hint is intentionally omitted for sign-up flow
+        ]
+        
+        let body = parameters.percentEncoded()
+        var attempt = 0
+        let maxRetries = 3
+
+        while attempt < maxRetries {
+            do {
+                // Generate a new DPoP proof for each attempt - without ath claim
+                let dpopProof = try createDPoPProof(for: "POST", url: endpoint)
+
+                let request = try await networkManager.createURLRequest(
+                    endpoint: endpoint,
+                    method: "POST",
+                    headers: [
+                        "Content-Type": "application/x-www-form-urlencoded",
+                        "DPoP": dpopProof,
+                    ],
+                    body: body,
+                    queryItems: nil
+                )
+
+                LogManager.logDebug("PAR Request Headers: \(request.allHTTPHeaderFields ?? [:])")
+
+                let (data, response) = try await networkManager.performRequest(request)
+                // No need to cast response, it's already HTTPURLResponse
+
+                // Handle DPoP nonce updates
+                if let newNonce = response.value(forHTTPHeaderField: "DPoP-Nonce"),
+                   let endpointURL = URL(string: endpoint)
+                {
+                    await updateDPoPNonce(for: endpointURL, from: ["DPoP-Nonce": newNonce]) // Fixed argument type
+                    LogManager.logInfo("Received new DPoP nonce from server: \(newNonce)")
+                }
+
+                switch response.statusCode { // Use response directly
+                case 200, 201:
+                    guard let parResponse = try? JSONDecoder().decode(PARResponse.self, from: data) else {
+                        throw OAuthError.authorizationFailed
+                    }
+                    return parResponse.requestURI
+
+                case 400, 401:
+                    if let errorDetails = try? JSONDecoder().decode(OAuthErrorResponse.self, from: data) {
+                        switch errorDetails.error {
+                        case "use_dpop_nonce":
+                            attempt += 1
+                            continue
+
+                        case "invalid_dpop_proof":
+                            // Clear stale state and retry
+                            LogManager.logInfo("Invalid DPoP proof, regenerating state")
+                            regenerateDPoPKeyPair()
+                            dpopNonces.removeAll()
+                            attempt += 1
+                            continue
+
+                        default:
+                            throw OAuthError.authorizationFailed
+                        }
+                    }
+                    throw OAuthError.authorizationFailed
+
+                default:
+                    throw OAuthError.authorizationFailed
+                }
+            } catch {
+                if attempt >= maxRetries - 1 {
+                    throw error
+                }
+                attempt += 1
+                // Add exponential backoff
+                try? await Task.sleep(nanoseconds: UInt64(pow(2.0, Double(attempt)) * 1_000_000_000))
+            }
+        }
+
+        throw OAuthError.maxRetriesReached
+    }
 
     func startOAuthFlow(identifier: String) async throws -> URL {
         resetOAuthFlow()
@@ -958,6 +1117,15 @@ actor OAuthManager {
         // Verify the 'sub' claim
         guard let sub = tokenResponse.sub, sub.starts(with: "did:") else {
             throw OAuthError.invalidSubClaim
+        }
+
+        if currentDID == nil {
+            // This was a sign-up flow, so we need to properly initialize everything with the new DID
+            await tokenManager.setCurrentDID(sub)  // Use 'sub' instead of 'did' here
+            currentDID = sub
+            
+            // Generate DPoP key for the new DID
+            let _ = try getOrCreateDPoPKeyForDID(sub)
         }
 
         // After successful token exchange, resolve the PDS URL and update it

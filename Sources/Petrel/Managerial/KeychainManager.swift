@@ -14,11 +14,24 @@ enum KeychainError: Error {
     case itemRetrievalError(status: OSStatus)
     case dataFormatError
     case unableToCreateKey
+    case deletionError(status: OSStatus)
 }
 
 enum KeychainManager {
     // MARK: - Generic Data Methods
 
+    static func deleteExplicitKey(_ exactKey: String) throws {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: exactKey
+        ]
+        
+        let status = SecItemDelete(query as CFDictionary)
+        if status != errSecSuccess && status != errSecItemNotFound {
+            throw KeychainError.deletionError(status: status)
+        }
+    }
+    
     /// Stores data in the keychain with a specified key and namespace.
     static func store(
         key: String,
@@ -121,6 +134,55 @@ enum KeychainManager {
         }
         LogManager.logError(
             "KEYCHAIN_MANAGER: Successfully deleted item for key \(namespacedKey). Status: \(status)")
+    }
+    
+    static func nukeAllKeychainItems(forNamespace namespace: String) -> Bool {
+        // Get all items in the keychain for your app
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: namespace,
+            kSecMatchLimit as String: kSecMatchLimitAll,
+            kSecReturnAttributes as String: true
+        ]
+        
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        
+        if status == errSecSuccess, let items = result as? [[String: Any]] {
+            var allSucceeded = true
+            
+            // Log what we're about to delete
+            LogManager.logInfo("KeychainManager - Nuking \(items.count) items from keychain for namespace: \(namespace)")
+            
+            // Delete each item individually
+            for item in items {
+                if let account = item[kSecAttrAccount as String] as? String {
+                    LogManager.logInfo("KeychainManager - Deleting keychain item: \(account)")
+                    
+                    let deleteQuery: [String: Any] = [
+                        kSecClass as String: kSecClassGenericPassword,
+                        kSecAttrService as String: namespace,
+                        kSecAttrAccount as String: account
+                    ]
+                    
+                    let deleteStatus = SecItemDelete(deleteQuery as CFDictionary)
+                    if deleteStatus != errSecSuccess {
+                        LogManager.logError("KeychainManager - Failed to delete item \(account): \(deleteStatus)")
+                        allSucceeded = false
+                    }
+                }
+            }
+            
+            return allSucceeded
+        } else if status == errSecItemNotFound {
+            // No items found, technically a success
+            LogManager.logInfo("KeychainManager - No items found in keychain for namespace: \(namespace)")
+            return true
+        } else {
+            // Something went wrong with the query
+            LogManager.logError("KeychainManager - Failed to query keychain items: \(status)")
+            return false
+        }
     }
 
     // MARK: - DPoP Key Methods

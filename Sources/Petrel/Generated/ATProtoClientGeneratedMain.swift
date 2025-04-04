@@ -291,18 +291,40 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
     }
 
     // MARK: - OAuth Flow Methods
+    
+    /// Starts the OAuth flow for account creation
+    /// - Parameter pdsURL: The PDS URL to use (defaults to bsky.social)
+    /// - Returns: The authorization URL to present to the user
+    public func startSignUpFlow(pdsURL: URL = URL(string: "https://bsky.social")!) async throws -> URL {
+        // This will call a modified version of the startOAuthFlow that doesn't require an identifier
+        return try await startOAuthFlow(identifier: nil, pdsURL: pdsURL)
+    }
 
     /// Starts the OAuth flow by obtaining the authorization URL.
     ///
-    /// - Parameter identifier: The user's identifier.
+    /// - Parameters:
+    ///   - identifier: The user's identifier (optional for sign-up flow)
+    ///   - pdsURL: The PDS URL to use (required when identifier is nil)
     /// - Returns: The authorization URL to be presented to the user.
-    public func startOAuthFlow(identifier: String) async throws -> URL {
-        let authURL = try await authenticationService.startOAuthFlow(identifier: identifier)
+    public func startOAuthFlow(identifier: String? = nil, pdsURL: URL? = nil) async throws -> URL {
+        let authURL: URL
+        if let identifier = identifier {
+            // Existing login flow with identifier
+            authURL = try await authenticationService.startOAuthFlow(identifier: identifier)
+        } else {
+            // New sign-up flow without identifier
+            guard let pdsURL = pdsURL else {
+                throw AuthenticationError.invalidOAuthConfiguration
+            }
+            authURL = try await authenticationService.startOAuthFlowForSignUp(pdsURL: pdsURL)
+        }
+        
         // Publish OAuth flow started event
         await EventBus.shared.publish(.oauthFlowStarted(authURL))
         return authURL
     }
-
+    
+    
     /// Handles the OAuth callback by processing the redirect URL.
     ///
     /// - Parameter url: The callback URL containing authorization data.
@@ -345,14 +367,12 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
 
     public func logout() async throws {
         LogManager.logInfo("ATProtoClient - Attempting logout")
-        LogManager.logError(
-            "LOGOUT_DEBUG: Value of self.did right before guard: \(String(describing: did))")
+        LogManager.logError("LOGOUT_DEBUG: Value of self.did right before guard: \(String(describing: did))")
 
         // Get the current DID either from memory or from lastActiveDID in Keychain
         var effectiveDID = did
         if effectiveDID == nil {
-            LogManager.logError(
-                "LOGOUT_DEBUG: self.did is nil, trying to fetch lastActiveDID as fallback")
+            LogManager.logError("LOGOUT_DEBUG: self.did is nil, trying to fetch lastActiveDID as fallback")
             // Attempt to grab the last known DID from Keychain for proper cleanup
             effectiveDID = await TokenManager.getLastActiveDID(namespace: namespace)
             if let recoveredDID = effectiveDID {
@@ -363,8 +383,7 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
         }
 
         guard let currentDID = effectiveDID else {
-            LogManager.logError(
-                "LOGOUT_DEBUG: No DID available (not even fallback). Using generic cleanup only.")
+            LogManager.logError("LOGOUT_DEBUG: No DID available (not even fallback). Using generic cleanup only.")
             // Attempt legacy cleanup just in case
             try? await tokenManager.deleteTokens()
 
@@ -419,6 +438,14 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
             await configManager.clearSettings()
             LogManager.logError("LOGOUT: Attempting to manually clear lastActiveDID")
             await TokenManager.clearLastActiveDID(namespace: namespace)
+            
+            // Also explicitly clear DID-specific handles
+            try? KeychainManager.delete(key: "handle.\(currentDID)", namespace: namespace)
+            try? KeychainManager.delete(key: "pdsURL.\(currentDID)", namespace: namespace)
+            try? KeychainManager.delete(key: "protectedResourceMetadata.\(currentDID)", namespace: namespace)
+            try? KeychainManager.delete(key: "authorizationServerMetadata.\(currentDID)", namespace: namespace)
+            try? KeychainManager.delete(key: "currentAuthorizationServer.\(currentDID)", namespace: namespace)
+            
             LogManager.logError("LOGOUT: Manual lastActiveDID clearing completed")
         }
 
@@ -462,7 +489,35 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
         await EventBus.shared.publish(.authenticationRequired)
         LogManager.logError("LOGOUT: Logout complete for DID: \(currentDID)")
     }
-
+    
+    public func nukeEverything() async {
+        LogManager.logInfo("ATProtoClient - Complete keychain reset requested")
+        
+        // Reset all in-memory state
+        did = nil
+        handle = nil
+        pdsURL = nil
+        
+        // Clear all keychain items
+        let success = KeychainManager.nukeAllKeychainItems(forNamespace: namespace)
+        
+        // Reset configuration manager
+        await configManager.clearSettings()
+        
+        // Reset token manager state
+        await TokenManager.clearLastActiveDID(namespace: namespace)
+        
+        // Clear any session state
+        try? await middlewareService.clearSession()
+        
+        // Notify that authentication is required
+        await authDelegate?.authenticationRequired(client: self)
+        await EventBus.shared.publish(.authenticationRequired)
+        
+        LogManager.logInfo("ATProtoClient - Keychain reset complete, success: \(success)")
+    }
+    
+    
     // MARK: - Utility Functions
 
     /// Resolves a user's handle to their DID.
@@ -891,17 +946,24 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
 
         // 5. Check if any accounts remain
         let remainingAccounts = await listAccounts()
-        LogManager.logError(
-            "REMOVE_ACCOUNT: Remaining accounts after deletion attempt: \(remainingAccounts)")
+        LogManager.logError("REMOVE_ACCOUNT: Remaining accounts after deletion attempt: \(remainingAccounts)")
 
         if remainingAccounts.isEmpty {
-            LogManager.logError(
-                "REMOVE_ACCOUNT: No accounts remaining. ATTEMPTING TO CLEAR lastActiveDID.")
+            LogManager.logError("REMOVE_ACCOUNT: No accounts remaining. ATTEMPTING TO CLEAR lastActiveDID.")
             // If no accounts are left, clear the last active DID marker
             await TokenManager.clearLastActiveDID(namespace: namespace)
             LogManager.logError("REMOVE_ACCOUNT: FINISHED attempting to clear lastActiveDID.")
 
-            LogManager.logError("REMOVE_ACCOUNT: Clearing all settings")
+            // Also clear any handles associated with this DID
+            try? KeychainManager.delete(key: "handle.\(did)", namespace: namespace)
+            
+            // Explicitly force clear all related items
+            try? KeychainManager.delete(key: "pdsURL.\(did)", namespace: namespace)
+            try? KeychainManager.delete(key: "protectedResourceMetadata.\(did)", namespace: namespace)
+            try? KeychainManager.delete(key: "authorizationServerMetadata.\(did)", namespace: namespace)
+            try? KeychainManager.delete(key: "currentAuthorizationServer.\(did)", namespace: namespace)
+            
+            LogManager.logError("REMOVE_ACCOUNT: Cleared all settings")
             await configManager.clearSettings()
             LogManager.logError("REMOVE_ACCOUNT: Finished clearing settings")
 
@@ -915,13 +977,11 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
             await EventBus.shared.publish(.accountRemoved(did: did))
             await EventBus.shared.publish(.authenticationRequired)
         } else if isCurrent {
-            LogManager.logError(
-                "REMOVE_ACCOUNT: This was the current account, \(remainingAccounts.count) remain.")
+            LogManager.logError("REMOVE_ACCOUNT: This was the current account, \(remainingAccounts.count) remain.")
             // Try to switch to another account if available
             if let firstAccount = remainingAccounts.first {
                 do {
-                    LogManager.logError(
-                        "REMOVE_ACCOUNT: Attempting to switch to fallback account: \(firstAccount)")
+                    LogManager.logError("REMOVE_ACCOUNT: Attempting to switch to fallback account: \(firstAccount)")
                     _ = try await switchToAccount(did: firstAccount)
                     LogManager.logInfo("ATProtoClient - Switched to fallback account: \(firstAccount)")
                 } catch {
@@ -938,15 +998,15 @@ public actor ATProtoClient: AuthenticationDelegate, DIDResolving {
                 }
             }
         } else {
-            LogManager.logError(
-                "REMOVE_ACCOUNT: This was not the current account. Just notifying removal.")
+            LogManager.logError("REMOVE_ACCOUNT: This was not the current account. Just notifying removal.")
             // Just notify that account was removed
             await EventBus.shared.publish(.accountRemoved(did: did))
         }
 
         LogManager.logError("REMOVE_ACCOUNT: Successfully completed removal of account: \(did)")
     }
-
+    
+    
     /// Returns information about the currently active account
     ///
     /// - Returns: A tuple containing the DID, handle, and PDS URL of the active account

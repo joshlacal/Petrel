@@ -313,6 +313,17 @@ actor AuthenticationService: Authenticator, TokenRefreshing, AuthenticationServi
         }
         try await createSession(identifier: identifier, password: password)
     }
+    
+    public func startOAuthFlowForSignUp(pdsURL: URL) async throws -> URL {
+        guard authMethod == AuthMethod.oauth, let oauthManager = oauthManager else {
+            throw AuthenticationError.methodNotSupported
+        }
+        
+        // Start OAuth flow without an identifier
+        let authURL = try await oauthManager.startOAuthFlowForSignUp(pdsURL: pdsURL)
+        await EventBus.shared.publish(.oauthFlowStarted(authURL))
+        return authURL
+    }
 
     public func startOAuthFlow(identifier: String) async throws -> URL {
         guard authMethod == AuthMethod.oauth, let oauthManager = oauthManager else {
