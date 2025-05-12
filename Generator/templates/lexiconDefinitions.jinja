@@ -100,12 +100,12 @@
             if let value = {{ prop.name }} {
                 // Encode optional property even if it's an empty array for CBOR
                 {% set var_name = prop.name + 'Value' %}
-                let {{ var_name }} = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                let {{ var_name }} = try value.toCBORValue()
                 map = map.adding(key: "{{ prop.name }}", value: {{ var_name }})
             }
             {% else %}
             {% set var_name = prop.name + 'Value' %}
-            let {{ var_name }} = try ({{ prop.name }} as? DAGCBOREncodable)?.toCBORValue() ?? {{ prop.name }}
+            let {{ var_name }} = try {{ prop.name }}.toCBORValue()
             map = map.adding(key: "{{ prop.name }}", value: {{ var_name }})
             {% endif %}
             {% endfor %}
@@ -221,12 +221,12 @@
                 if let value = {{ prop.name }} {
                     // Encode optional property even if it's an empty array for CBOR
                     {% set var_name = prop.name + 'Value' %}
-                    let {{ var_name }} = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                    let {{ var_name }} = try value.toCBORValue()
                     map = map.adding(key: "{{ prop.name }}", value: {{ var_name }})
                 }
                 {% else %}
                 {% set var_name = prop.name + 'Value' %}
-                let {{ var_name }} = try ({{ prop.name }} as? DAGCBOREncodable)?.toCBORValue() ?? {{ prop.name }}
+                let {{ var_name }} = try {{ prop.name }}.toCBORValue()
                 map = map.adding(key: "{{ prop.name }}", value: {{ var_name }})
                 {% endif %}
                 {% endfor %}

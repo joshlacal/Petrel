@@ -23,6 +23,11 @@ public enum NetworkError: Error {
     case invalidContentType(expected: String, actual: String)
     case authenticationFailed
     case badRequest(description: String)
+    case serverError
+    case invalidResponse
+    case unauthorized
+    case securityViolation
+
 }
 
 extension NetworkError: LocalizedError {
@@ -58,6 +63,14 @@ extension NetworkError: LocalizedError {
             return "Received bad request. \(description)."
         case .invalidRequest:
             return "The request was invalid."
+        case .serverError:
+            return "The server encountered an error."
+        case .invalidResponse:
+            return "Received an invalid response from the server."
+        case .unauthorized:
+            return "Unauthorized access."
+        case .securityViolation:
+            return "Security violation detected."
         }
     }
 }

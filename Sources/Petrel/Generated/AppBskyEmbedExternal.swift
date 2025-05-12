@@ -1,68 +1,82 @@
 import Foundation
 
+
+
 // lexicon: 1, id: app.bsky.embed.external
 
-public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
+
+public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue { 
+
     public static let typeIdentifier = "app.bsky.embed.external"
-    public let external: External
+        public let external: External
 
-    public init(external: External) {
-        self.external = external
-    }
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-
-        external = try container.decode(External.self, forKey: .external)
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-
-        try container.encode(external, forKey: .external)
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(external)
-    }
-
-    public func isEqual(to other: any ATProtocolValue) -> Bool {
-        guard let other = other as? Self else { return false }
-        if external != other.external {
-            return false
+        public init(external: External) {
+            self.external = external
+            
         }
-        return true
-    }
 
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
-    }
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            
+            self.external = try container.decode(External.self, forKey: .external)
+            
+        }
 
-    // DAGCBOR encoding with field ordering
-    public func toCBORValue() throws -> Any {
-        var map = OrderedCBORMap()
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            
+            try container.encode(external, forKey: .external)
+            
+        }
 
-        let externalValue = try (external as? DAGCBOREncodable)?.toCBORValue() ?? external
-        map = map.adding(key: "external", value: externalValue)
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(external)
+        }
 
-        return map
-    }
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+            if self.external != other.external {
+                return false
+            }
+            return true
+        }
+ 
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
 
-    private enum CodingKeys: String, CodingKey {
-        case external
-    }
+        // DAGCBOR encoding with field ordering
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
 
-    public struct External: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.embed.external#external"
-        public let uri: URI
-        public let title: String
-        public let description: String
-        public let thumb: Blob?
+            
+            
+            let externalValue = try external.toCBORValue()
+            map = map.adding(key: "external", value: externalValue)
+            
+            
+
+            return map
+        }
+
+
+
+        private enum CodingKeys: String, CodingKey {
+            case external
+        }
+        
+public struct External: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.embed.external#external"
+            public let uri: URI
+            public let title: String
+            public let description: String
+            public let thumb: Blob?
 
         // Standard initializer
         public init(
             uri: URI, title: String, description: String, thumb: Blob?
         ) {
+            
             self.uri = uri
             self.title = title
             self.description = description
@@ -71,49 +85,59 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                uri = try container.decode(URI.self, forKey: .uri)
-
+                
+                self.uri = try container.decode(URI.self, forKey: .uri)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'uri': \(error)")
                 throw error
             }
             do {
-                title = try container.decode(String.self, forKey: .title)
-
+                
+                self.title = try container.decode(String.self, forKey: .title)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'title': \(error)")
                 throw error
             }
             do {
-                description = try container.decode(String.self, forKey: .description)
-
+                
+                self.description = try container.decode(String.self, forKey: .description)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'description': \(error)")
                 throw error
             }
             do {
-                thumb = try container.decodeIfPresent(Blob.self, forKey: .thumb)
-
+                
+                self.thumb = try container.decodeIfPresent(Blob.self, forKey: .thumb)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'thumb': \(error)")
                 throw error
             }
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
             try container.encode(uri, forKey: .uri)
-
+            
+            
             try container.encode(title, forKey: .title)
-
+            
+            
             try container.encode(description, forKey: .description)
-
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(thumb, forKey: .thumb)
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -128,25 +152,30 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
             guard let other = other as? Self else { return false }
-
-            if uri != other.uri {
+            
+            if self.uri != other.uri {
                 return false
             }
-
-            if title != other.title {
+            
+            
+            if self.title != other.title {
                 return false
             }
-
-            if description != other.description {
+            
+            
+            if self.description != other.description {
                 return false
             }
-
+            
+            
             if thumb != other.thumb {
                 return false
             }
-
+            
             return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -159,21 +188,34 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
 
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            let uriValue = try (uri as? DAGCBOREncodable)?.toCBORValue() ?? uri
+            
+            
+            
+            let uriValue = try uri.toCBORValue()
             map = map.adding(key: "uri", value: uriValue)
-
-            let titleValue = try (title as? DAGCBOREncodable)?.toCBORValue() ?? title
+            
+            
+            
+            
+            let titleValue = try title.toCBORValue()
             map = map.adding(key: "title", value: titleValue)
-
-            let descriptionValue = try (description as? DAGCBOREncodable)?.toCBORValue() ?? description
+            
+            
+            
+            
+            let descriptionValue = try description.toCBORValue()
             map = map.adding(key: "description", value: descriptionValue)
-
+            
+            
+            
             if let value = thumb {
                 // Encode optional property even if it's an empty array for CBOR
-
-                let thumbValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                
+                let thumbValue = try value.toCBORValue()
                 map = map.adding(key: "thumb", value: thumbValue)
             }
+            
+            
 
             return map
         }
@@ -186,35 +228,40 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             case thumb
         }
     }
-
-    public struct View: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.embed.external#view"
-        public let external: ViewExternal
+        
+public struct View: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.embed.external#view"
+            public let external: ViewExternal
 
         // Standard initializer
         public init(
             external: ViewExternal
         ) {
+            
             self.external = external
         }
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                external = try container.decode(ViewExternal.self, forKey: .external)
-
+                
+                self.external = try container.decode(ViewExternal.self, forKey: .external)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'external': \(error)")
                 throw error
             }
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
             try container.encode(external, forKey: .external)
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -222,13 +269,15 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
             guard let other = other as? Self else { return false }
-
-            if external != other.external {
+            
+            if self.external != other.external {
                 return false
             }
-
+            
             return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -241,8 +290,13 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
 
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            let externalValue = try (external as? DAGCBOREncodable)?.toCBORValue() ?? external
+            
+            
+            
+            let externalValue = try external.toCBORValue()
             map = map.adding(key: "external", value: externalValue)
+            
+            
 
             return map
         }
@@ -252,18 +306,19 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             case external
         }
     }
-
-    public struct ViewExternal: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.embed.external#viewExternal"
-        public let uri: URI
-        public let title: String
-        public let description: String
-        public let thumb: URI?
+        
+public struct ViewExternal: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.embed.external#viewExternal"
+            public let uri: URI
+            public let title: String
+            public let description: String
+            public let thumb: URI?
 
         // Standard initializer
         public init(
             uri: URI, title: String, description: String, thumb: URI?
         ) {
+            
             self.uri = uri
             self.title = title
             self.description = description
@@ -272,49 +327,59 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                uri = try container.decode(URI.self, forKey: .uri)
-
+                
+                self.uri = try container.decode(URI.self, forKey: .uri)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'uri': \(error)")
                 throw error
             }
             do {
-                title = try container.decode(String.self, forKey: .title)
-
+                
+                self.title = try container.decode(String.self, forKey: .title)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'title': \(error)")
                 throw error
             }
             do {
-                description = try container.decode(String.self, forKey: .description)
-
+                
+                self.description = try container.decode(String.self, forKey: .description)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'description': \(error)")
                 throw error
             }
             do {
-                thumb = try container.decodeIfPresent(URI.self, forKey: .thumb)
-
+                
+                self.thumb = try container.decodeIfPresent(URI.self, forKey: .thumb)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'thumb': \(error)")
                 throw error
             }
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
             try container.encode(uri, forKey: .uri)
-
+            
+            
             try container.encode(title, forKey: .title)
-
+            
+            
             try container.encode(description, forKey: .description)
-
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(thumb, forKey: .thumb)
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -329,25 +394,30 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
             guard let other = other as? Self else { return false }
-
-            if uri != other.uri {
+            
+            if self.uri != other.uri {
                 return false
             }
-
-            if title != other.title {
+            
+            
+            if self.title != other.title {
                 return false
             }
-
-            if description != other.description {
+            
+            
+            if self.description != other.description {
                 return false
             }
-
+            
+            
             if thumb != other.thumb {
                 return false
             }
-
+            
             return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -360,21 +430,34 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
 
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            let uriValue = try (uri as? DAGCBOREncodable)?.toCBORValue() ?? uri
+            
+            
+            
+            let uriValue = try uri.toCBORValue()
             map = map.adding(key: "uri", value: uriValue)
-
-            let titleValue = try (title as? DAGCBOREncodable)?.toCBORValue() ?? title
+            
+            
+            
+            
+            let titleValue = try title.toCBORValue()
             map = map.adding(key: "title", value: titleValue)
-
-            let descriptionValue = try (description as? DAGCBOREncodable)?.toCBORValue() ?? description
+            
+            
+            
+            
+            let descriptionValue = try description.toCBORValue()
             map = map.adding(key: "description", value: descriptionValue)
-
+            
+            
+            
             if let value = thumb {
                 // Encode optional property even if it's an empty array for CBOR
-
-                let thumbValue = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+                
+                let thumbValue = try value.toCBORValue()
                 map = map.adding(key: "thumb", value: thumbValue)
             }
+            
+            
 
             return map
         }
@@ -387,4 +470,10 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             case thumb
         }
     }
+
+
+
 }
+
+
+                           

@@ -20,3 +20,5 @@ Generator/__pycache__/swift_code_generator.cpython-312.pyc
 Generator/__pycache__/templates.cpython-312.pyc
 Generator/__pycache__/type_converter.cpython-312.pyc
 Generator/__pycache__/utils.cpython-312.pyc
+
+**/.claude/settings.local.json

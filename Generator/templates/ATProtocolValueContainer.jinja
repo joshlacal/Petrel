@@ -137,7 +137,7 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
     public func toCBORValue() throws -> Any {
         switch self {
         case .knownType(let value):
-            return try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
+            return try value.toCBORValue()
         case .string(let string):
             return string
         case .number(let number):

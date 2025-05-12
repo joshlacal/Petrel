@@ -21,6 +21,8 @@ async def generate_swift_from_lexicons_recursive(folder_path: str, output_folder
 
             if 'subscribe' in lexicon_id:
                 return
+            if 'ozone' in lexicon_id:
+                return
 
             defs = lexicon.get('defs', {})
 
@@ -85,7 +87,7 @@ def generate_ATProtocolValueContainer_enum(type_dict):
     json_value_enum_code = template.render(type_cases=type_cases)
     return json_value_enum_code
 
-def generate_swift_namespace_classes(namespace_hierarchy, network_manager="NetworkManaging", depth=0):
+def generate_swift_namespace_classes(namespace_hierarchy, network_manager="NetworkService", depth=0):
     swift_code = ""
     indent = "    " * depth
 
@@ -93,22 +95,22 @@ def generate_swift_namespace_classes(namespace_hierarchy, network_manager="Netwo
         for namespace, sub_hierarchy in namespace_hierarchy.items():
             namespace_class = convert_to_camel_case(namespace)
             swift_code += f"public lazy var {namespace.lower()}: {namespace_class} = {{\n"
-            swift_code += f"    return {namespace_class}(networkManager: self.networkManager)\n}}()\n\n"
+            swift_code += f"    return {namespace_class}(networkService: self.networkService)\n}}()\n\n"
             swift_code += f"public final class {namespace_class}: @unchecked Sendable {{\n"
-            swift_code += f"    internal let networkManager: NetworkManaging\n"
-            swift_code += f"    internal init(networkManager: NetworkManaging) {{\n"
-            swift_code += f"        self.networkManager = networkManager\n    }}\n\n"
+            swift_code += f"    internal let networkService: NetworkService\n"
+            swift_code += f"    internal init(networkService: NetworkService) {{\n"
+            swift_code += f"        self.networkService = networkService\n    }}\n\n"
             swift_code += generate_swift_namespace_classes(sub_hierarchy, network_manager, depth + 1)
             swift_code += "}\n\n"
     else:
         for namespace, sub_namespaces in namespace_hierarchy.items():
             class_name = convert_to_camel_case(namespace)
             swift_code += f"{indent}public lazy var {namespace.lower()}: {class_name} = {{\n"
-            swift_code += f"{indent}    return {class_name}(networkManager: self.networkManager)\n{indent}}}()\n\n"
+            swift_code += f"{indent}    return {class_name}(networkService: self.networkService)\n{indent}}}()\n\n"
             swift_code += f"{indent}public final class {class_name}: @unchecked Sendable {{\n"
-            swift_code += f"{indent}    internal let networkManager: NetworkManaging\n"
-            swift_code += f"{indent}    internal init(networkManager: NetworkManaging) {{\n"
-            swift_code += f"{indent}        self.networkManager = networkManager\n{indent}    }}\n\n"
+            swift_code += f"{indent}    internal let networkService: NetworkService\n"
+            swift_code += f"{indent}    internal init(networkService: NetworkService) {{\n"
+            swift_code += f"{indent}        self.networkService = networkService\n{indent}    }}\n\n"
             if sub_namespaces:
                 swift_code += generate_swift_namespace_classes(sub_namespaces, network_manager, depth + 1)
             swift_code += f"{indent}}}\n\n"

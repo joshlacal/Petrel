@@ -19,6 +19,7 @@ public enum ATProtocolError: Error {
     case invalidTID(String)
 }
 
+
 // MARK: URIs
 
 public struct ATProtocolURI: ATProtocolValue, CustomStringConvertible, QueryParameterConvertible {
@@ -106,77 +107,6 @@ public struct ATProtocolURI: ATProtocolValue, CustomStringConvertible, QueryPara
         return uriString()
     }
 }
-
-/*
- public struct ATProtocolURI: ATProtocolValue, CustomStringConvertible, QueryParameterConvertible {
-     public let authority: String
-     public let collection: String?
-     public let recordKey: String?
-
-     public init(from decoder: Decoder) throws {
-         let container = try decoder.singleValueContainer()
-         let uriString = try container.decode(String.self)
-
-         try self.init(uriString: uriString)
-     }
-
-     public init(uriString: String) throws {
-         guard uriString.hasPrefix("at://"),
-               uriString.utf8.count <= 8192
-         else {
-             throw ATProtocolError.invalidURI("Invalid AT URI format or length")
-         }
-
-         let trimmedString = String(uriString.dropFirst(5)) // Remove "at://"
-         let components = trimmedString.components(separatedBy: "/").filter { !$0.isEmpty }
-
-         guard let authorityComponent = components.first,
-               !authorityComponent.isEmpty
-         else {
-             throw ATProtocolError.invalidURI("Invalid AT URI: missing or empty authority")
-         }
-
-         authority = authorityComponent
-         collection = components.count > 1 ? components[1] : nil
-         recordKey = components.count > 2 ? components[2] : nil
-     }
-
-     public var description: String {
-         return uriString()
-     }
-
-     public func uriString() -> String {
-         var uri = "at://\(authority)"
-         if let collection = collection {
-             uri += "/\(collection)"
-         }
-         if let recordKey = recordKey {
-             uri += "/\(recordKey)"
-         }
-         return uri
-     }
-
-     public func isEqual(to other: any ATProtocolValue) -> Bool {
-         guard let otherURI = other as? ATProtocolURI else {
-             return false
-         }
-
-         return authority == otherURI.authority && collection == otherURI.collection
-             && recordKey == otherURI.recordKey
-     }
-
-     public func encode(to encoder: Encoder) throws {
-         var container = encoder.singleValueContainer()
-         let uriString = self.uriString()
-         try container.encode(uriString)
-     }
-
-     func asQueryItem(name: String) -> URLQueryItem? {
-         return URLQueryItem(name: name, value: uriString())
-     }
- }
-
- */
 
 public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConvertible,
     ExpressibleByStringLiteral
@@ -405,42 +335,6 @@ public struct Blob: Codable, ATProtocolCodable, Hashable, Equatable, Sendable {
     }
 }
 
-// public struct ATProtoLink: Codable, ATProtocolCodable, Hashable, Equatable, Sendable {
-//  public let cid: String
-//
-//  enum CodingKeys: String, CodingKey {
-//    case cid = "$link"
-//  }
-//
-//  public init(cid: String) {
-//    self.cid = cid
-//  }
-//
-//  public init(from decoder: Decoder) throws {
-//    let container = try decoder.container(keyedBy: CodingKeys.self)
-//    cid = try container.decode(String.self, forKey: .cid)
-//  }
-//
-//  public func encode(to encoder: Encoder) throws {
-//    var container = encoder.container(keyedBy: CodingKeys.self)
-//    try container.encode(cid, forKey: .cid)
-//  }
-//
-//  public func hash(into hasher: inout Hasher) {
-//    hasher.combine(cid)
-//  }
-//
-//  public func isEqual(to other: any ATProtocolCodable) -> Bool {
-//    guard let otherLink = other as? ATProtoLink else { return false }
-//    return self == otherLink
-//  }
-//
-//  public func toCBORValue() throws -> Any {
-//    var map = OrderedCBORMap()
-//    map = map.adding(key: "$link", value: self.cid)
-//    return map
-//  }
-// }
 
 // MARK: $bytes
 
@@ -491,8 +385,6 @@ public struct Bytes: Codable, ATProtocolCodable, Hashable, Equatable, Sendable {
     }
 
     public func toCBORValue() throws -> Any {
-        var map = OrderedCBORMap()
-        // Bytes should be encoded directly as CBOR bytes, not base64 string in a map
         return data
     }
 }
@@ -1042,114 +934,34 @@ extension AppBskyFeedDefs.FeedViewPost: Identifiable {
     }
 }
 
-/*
- extension ATProtocolValueContainer: Equatable {
-     public static func == (lhs: ATProtocolValueContainer, rhs: ATProtocolValueContainer) -> Bool {
-         switch (lhs, rhs) {
-         case (.knownType(let lhsValue), .knownType(let rhsValue)):
-             return lhsValue.isEqual(to: rhsValue)
-         case (.string(let lhsValue), .string(let rhsValue)):
-             return lhsValue == rhsValue
-         case (.number(let lhsValue), .number(let rhsValue)):
-             return lhsValue == rhsValue
-         case (.bigNumber(let lhsValue), .bigNumber(let rhsValue)):
-             return lhsValue == rhsValue
-         case (.object(let lhsValue), .object(let rhsValue)):
-             return lhsValue == rhsValue
-         case (.array(let lhsValue), .array(let rhsValue)):
-             return lhsValue == rhsValue
-         case (.bool(let lhsValue), .bool(let rhsValue)):
-             return lhsValue == rhsValue
-         case (.null, .null):
-             return true
-         case (.link(let lhsValue), .link(let rhsValue)):
-             return lhsValue == rhsValue
-         case (.bytes(let lhsValue), .bytes(let rhsValue)):
-             return lhsValue == rhsValue
-         case (.unknownType(let lhsType, let lhsValue), .unknownType(let rhsType, let rhsValue)):
-             return lhsType == rhsType && lhsValue == rhsValue
-         case (.decodeError(let lhsError), .decodeError(let rhsError)):
-             return lhsError == rhsError
-         default:
-             return false
-         }
-     }
- }
+// MARK: - Swift Standard Types DAGCBOREncodable Extensions
 
- public extension ATProtocolValueContainer {
-     func isEqual(to other: any ATProtocolValue) -> Bool {
-         guard let otherValue = other as? ATProtocolValueContainer else { return false }
+extension String: DAGCBOREncodable {
+    public func toCBORValue() throws -> Any {
+        return self
+    }
+}
 
-         switch (self, otherValue) {
-         case (.knownType(let lhsValue), .knownType(let rhsValue)):
-             return lhsValue.isEqual(to: rhsValue)
-         case (.string(let lhsValue), .string(let rhsValue)):
-             return lhsValue == rhsValue
-         case (.number(let lhsValue), .number(let rhsValue)):
-             return lhsValue == rhsValue
-         case (.bigNumber(let lhsValue), .bigNumber(let rhsValue)):
-             return lhsValue == rhsValue
-         case (.object(let lhsValue), .object(let rhsValue)):
-             return lhsValue == rhsValue
-         case (.array(let lhsValue), .array(let rhsValue)):
-             return lhsValue == rhsValue
-         case (.bool(let lhsValue), .bool(let rhsValue)):
-             return lhsValue == rhsValue
-         case (.null, .null):
-             return true
-         case (.link(let lhsValue), .link(let rhsValue)):
-             return lhsValue == rhsValue
-         case (.bytes(let lhsValue), .bytes(let rhsValue)):
-             return lhsValue == rhsValue
-         case (.unknownType(let lhsType, let lhsValue), .unknownType(let rhsType, let rhsValue)):
-             return lhsType == rhsType && lhsValue == rhsValue
-         case (.decodeError(let lhsError), .decodeError(let rhsError)):
-             return lhsError == rhsError
-         default:
-             return false
-         }
-     }
- }
+extension Array: DAGCBOREncodable where Element: DAGCBOREncodable {
+    public func toCBORValue() throws -> Any {
+        return try self.map { try $0.toCBORValue() }
+    }
+}
 
- extension ATProtocolValueContainer: Hashable {
-     public func hash(into hasher: inout Hasher) {
-         switch self {
-         case .knownType(let customValue):
-             customValue.hash(into: &hasher)
-         case .string(let stringValue):
-             hasher.combine("string")
-             hasher.combine(stringValue)
-         case .number(let intValue):
-             hasher.combine("number")
-             hasher.combine(intValue)
-         case .bigNumber(let bigNumberString):
-             hasher.combine("bigNumber")
-             hasher.combine(bigNumberString)
-         case .object(let objectValue):
-             hasher.combine("object")
-             hasher.combine(objectValue)
-         case .array(let arrayValue):
-             hasher.combine("array")
-             hasher.combine(arrayValue)
-         case .bool(let boolValue):
-             hasher.combine("bool")
-             hasher.combine(boolValue)
-         case .null:
-             hasher.combine("null")
-         case .link(let linkValue):
-             hasher.combine("link")
-             hasher.combine(linkValue)
-         case .bytes(let bytesValue):
-             hasher.combine("bytes")
-             hasher.combine(bytesValue)
-         case .unknownType(let type, let value):
-             hasher.combine("unknownType")
-             hasher.combine(type)
-             hasher.combine(value)
-         case .decodeError(let errorMessage):
-             hasher.combine("decodeError")
-             hasher.combine(errorMessage)
-         }
-     }
- }
-  */
+extension Int: DAGCBOREncodable {
+    public func toCBORValue() throws -> Any {
+        return self
+    }
+}
+
+extension Bool: DAGCBOREncodable {
+    public func toCBORValue() throws -> Any {
+        return self
+    }
+}
+
+extension Data: DAGCBOREncodable {
+    public func toCBORValue() throws -> Any {
+        return self
+    }
+}

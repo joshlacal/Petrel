@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import SwiftCBOR
 
 // MARK: Safe Decoding
 

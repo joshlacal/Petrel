@@ -1,34 +1,39 @@
 extension ATProtoClient.{{ template_namespace_name }} {
+    // MARK: - {{ query_name | lowerCamelCase }}
+
     /// {{ description }}
+    /// {% if input_struct_name %}
+    /// - Parameter input: The input parameters for the request
+    /// {% endif %}
+    /// - Returns: A tuple containing the HTTP response code and the decoded response data
+    /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func {{ query_name | lowerCamelCase }}({% if input_struct_name %}input: {{ input_struct_name }}{% endif %}) async throws -> (responseCode: Int, data: {{ output_type }}?) {
         let endpoint = "{{ endpoint }}"
-        
+
         {% if input_struct_name %}
         let queryItems = input.asQueryItems()
         {% else %}
         let queryItems: [URLQueryItem]? = nil
         {% endif %}
-        let urlRequest = try await networkManager.createURLRequest(
+        let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
             headers: ["Accept": "{{ output_encoding }}"],
             body: nil,
             queryItems: queryItems
         )
-        
-        let (responseData, response) = try await networkManager.performRequest(urlRequest)
+
+        let (responseData, response) = try await networkService.performRequest(urlRequest)
         let responseCode = response.statusCode
 
-        // Content-Type validation
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "{{ output_encoding }}", actual: "nil")
         }
-        
+
         if !contentType.lowercased().contains("{{ output_encoding.lower() }}") {
             throw NetworkError.invalidContentType(expected: "{{ output_encoding }}", actual: contentType)
         }
 
-        // Data decoding and validation
         {% if output_encoding == "application/json" %}
         let decoder = JSONDecoder()
         let decodedData = try? decoder.decode({{ output_type }}.self, from: responseData)
@@ -37,7 +42,7 @@ extension ATProtoClient.{{ template_namespace_name }} {
         {% else %}
         let decodedData = {{ output_type }}(data: responseData)
         {% endif %}
-        
+
         return (responseCode, decodedData)
     }
 }

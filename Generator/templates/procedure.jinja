@@ -1,5 +1,17 @@
 extension ATProtoClient.{{ template_namespace_name }} {
+    // MARK: - {{ procedure_name | lowerCamelCase }}
+
     /// {{ description }}
+    /// {% if is_blob_upload %}
+    /// - Parameters:
+    ///   - data: The binary data to upload
+    ///   - mimeType: The MIME type of the data being uploaded
+    ///   - stripMetadata: Whether to strip metadata from images (default: true)
+    /// {% elif input_struct_name %}
+    /// - Parameter input: The input parameters for the request
+    /// {% endif %}
+    /// - Returns: {% if output_type %}A tuple containing the HTTP response code and the decoded response data{% else %}The HTTP response code{% endif %}
+    /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func {{ procedure_name | lowerCamelCase }}(
         {% if is_blob_upload %}
         data: Data,
@@ -31,30 +43,28 @@ extension ATProtoClient.{{ template_namespace_name }} {
         {% if output_encoding %}
         headers["Accept"] = "{{ output_encoding }}"
         {% endif %}
-        
+
         let requestData: Data? = {% if input_struct_name %}try JSONEncoder().encode(input){% else %}nil{% endif %}
-        let urlRequest = try await networkManager.createURLRequest(
+        let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
-            headers: headers, 
+            headers: headers,
             body: {% if is_blob_upload %}dataToUpload{% else %}requestData{% endif %},
             queryItems: nil
         )
-        
+
         {% if output_type %}
-        let (responseData, response) = try await networkManager.performRequest(urlRequest)
+        let (responseData, response) = try await networkService.performRequest(urlRequest)
         let responseCode = response.statusCode
 
-        // Content-Type validation
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "{{ output_encoding }}", actual: "nil")
         }
-        
+
         if !contentType.lowercased().contains("{{ output_encoding.lower() }}") {
             throw NetworkError.invalidContentType(expected: "{{ output_encoding }}", actual: contentType)
         }
 
-        // Data decoding and validation
         {% if output_encoding == "application/json" %}
         let decoder = JSONDecoder()
         let decodedData = try? decoder.decode({{ output_type }}.self, from: responseData)
@@ -63,15 +73,20 @@ extension ATProtoClient.{{ template_namespace_name }} {
         {% else %}
         let decodedData = {{ output_type }}(data: responseData)
         {% endif %}
-        
+
         return (responseCode, decodedData)
         {% else %}
-        let (_, response) = try await networkManager.performRequest(urlRequest)
+        let (_, response) = try await networkService.performRequest(urlRequest)
         let responseCode = response.statusCode
         return responseCode
         {% endif %}
     }
     {% if is_blob_upload %}
+    /// Compresses an image while maintaining reasonable quality
+    /// - Parameters:
+    ///   - imageData: The original image data
+    ///   - maxSizeInBytes: The maximum target size in bytes (default: 1MB)
+    /// - Returns: Compressed image data, or nil if compression failed
     private func compressImage(_ imageData: Data, maxSizeInBytes: Int = 1000000) -> Data? {
         #if canImport(UIKit)
         guard let image = UIImage(data: imageData) else { return nil }

@@ -48,14 +48,12 @@ public struct Input: ATProtocolCodable {
                 {% if prop.optional %}
                 if let value = {{ prop.name }} {
                     // Encode optional property even if it's an empty array for CBOR
-                    {% set var_name = prop.name + 'Value' %}
-                    let {{ var_name }} = try (value as? DAGCBOREncodable)?.toCBORValue() ?? value
-                    map = map.adding(key: "{{ prop.name }}", value: {{ var_name }})
+                    let {{ prop.name }}Value = try value.toCBORValue()
+                    map = map.adding(key: "{{ prop.name }}", value: {{ prop.name }}Value)
                 }
                 {% else %}
-                {% set var_name = prop.name + 'Value' %}
-                let {{ var_name }} = try ({{ prop.name }} as? DAGCBOREncodable)?.toCBORValue() ?? {{ prop.name }}
-                map = map.adding(key: "{{ prop.name }}", value: {{ var_name }})
+                let {{ prop.name }}Value = try {{ prop.name }}.toCBORValue()
+                map = map.adding(key: "{{ prop.name }}", value: {{ prop.name }}Value)
                 {% endif %}
                 {% endfor %}
 
