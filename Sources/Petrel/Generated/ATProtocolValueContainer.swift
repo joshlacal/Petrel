@@ -323,11 +323,21 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
             
             decoders["app.bsky.graph.listblock"] = { decoder in
                 do {
-                    let decodedObject = try AppBskyGraphListblock(from: decoder)
+                    let decodedObject = try AppBskyGraphList(from: decoder)
                     return .knownType(decodedObject)
                 } catch {
-                    LogManager.logError("Error decoding AppBskyGraphListblock: \(error)")
-                    return .decodeError("Error decoding AppBskyGraphListblock: \(error)")
+                    LogManager.logError("Error decoding AppBskyGraphList: \(error)")
+                    return .decodeError("Error decoding AppBskyGraphList: \(error)")
+                }
+            }
+
+            decoders["app.bsky.feed.generator"] = { decoder in
+                do {
+                    let decodedObject = try AppBskyFeedGenerator(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logError("Error decoding AppBskyFeedGenerator: \(error)")
+                    return .decodeError("Error decoding AppBskyFeedGenerator: \(error)")
                 }
             }
             
@@ -873,7 +883,7 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
             
             decoders["app.bsky.labeler.defs#labelerView"] = { decoder in
                 do {
-                    let decodedObject = try AppBskyLabelerDefs.LabelerView(from: decoder)
+                    let decodedObject = try ChatBskyConvoSendMessageBatch.BatchItem(from: decoder)
                     return .knownType(decodedObject)
                 } catch {
                     LogManager.logError("Error decoding AppBskyLabelerDefs.LabelerView: \(error)")
@@ -1673,7 +1683,7 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
             
             decoders["com.atproto.sync.listReposByCollection#repo"] = { decoder in
                 do {
-                    let decodedObject = try ComAtprotoSyncListReposByCollection.Repo(from: decoder)
+                    let decodedObject = try ComAtprotoRepoDefs.CommitMeta(from: decoder)
                     return .knownType(decodedObject)
                 } catch {
                     LogManager.logError("Error decoding ComAtprotoSyncListReposByCollection.Repo: \(error)")

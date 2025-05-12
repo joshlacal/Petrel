@@ -111,18 +111,18 @@ actor KeychainManager {
     static func deleteExplicitKey(_ exactKey: String) throws {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrAccount as String: exactKey
+            kSecAttrAccount as String: exactKey,
         ]
-        
+
         let status = SecItemDelete(query as CFDictionary)
-        if status != errSecSuccess && status != errSecItemNotFound {
+        if status != errSecSuccess, status != errSecItemNotFound {
             throw KeychainError.deletionError(status: status)
         }
         
         // Remove from cache
         dataCache.removeObject(forKey: exactKey as NSString)
     }
-    
+
     /// Stores data in the keychain with a specified key and namespace.
     static func store(
         key: String,
@@ -243,7 +243,7 @@ actor KeychainManager {
         LogManager.logError(
             "KEYCHAIN_MANAGER: Successfully deleted item for key \(namespacedKey). Status: \(status)")
     }
-    
+
     static func nukeAllKeychainItems(forNamespace namespace: String) -> Bool {
         // Handle generic passwords first
         let genericSuccess = nukeGenericPasswords(withNamespacePrefix: namespace)
@@ -262,12 +262,12 @@ actor KeychainManager {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecMatchLimit as String: kSecMatchLimitAll,
-            kSecReturnAttributes as String: true
+            kSecReturnAttributes as String: true,
         ]
-        
+
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
-        
+
         if status == errSecSuccess, let items = result as? [[String: Any]] {
             var allSucceeded = true
             var matchedCount = 0
@@ -278,12 +278,12 @@ actor KeychainManager {
                    account.hasPrefix("\(namespace).") {
                     matchedCount += 1
                     LogManager.logInfo("KeychainManager - Deleting keychain item: \(account)")
-                    
+
                     let deleteQuery: [String: Any] = [
                         kSecClass as String: kSecClassGenericPassword,
                         kSecAttrAccount as String: account
                     ]
-                    
+
                     let deleteStatus = SecItemDelete(deleteQuery as CFDictionary)
                     if deleteStatus != errSecSuccess {
                         LogManager.logError("KeychainManager - Failed to delete item \(account): \(deleteStatus)")
