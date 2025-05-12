@@ -11,13 +11,13 @@ import Foundation
 public struct OAuthConfig: Sendable {
     /// The client ID used to identify the application.
     public let clientId: String
-    
+
     /// The redirect URI that will receive the authorization code.
     public let redirectUri: String
-    
+
     /// The scope of access being requested.
     public let scope: String
-    
+
     /// Initializes a new OAuthConfig instance.
     /// - Parameters:
     ///   - clientId: The client ID.
@@ -28,7 +28,7 @@ public struct OAuthConfig: Sendable {
         self.redirectUri = redirectUri
         self.scope = scope
     }
-    
+
     /// Extracts the scheme from the redirect URI.
     public var redirectUriScheme: String {
         URL(string: redirectUri)?.scheme ?? ""

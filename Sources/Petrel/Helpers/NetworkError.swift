@@ -27,7 +27,6 @@ public enum NetworkError: Error {
     case invalidResponse
     case unauthorized
     case securityViolation
-
 }
 
 extension NetworkError: LocalizedError {

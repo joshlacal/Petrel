@@ -19,7 +19,6 @@ public enum ATProtocolError: Error {
     case invalidTID(String)
 }
 
-
 // MARK: URIs
 
 public struct ATProtocolURI: ATProtocolValue, CustomStringConvertible, QueryParameterConvertible {
@@ -334,7 +333,6 @@ public struct Blob: Codable, ATProtocolCodable, Hashable, Equatable, Sendable {
         return map
     }
 }
-
 
 // MARK: $bytes
 
@@ -944,7 +942,7 @@ extension String: DAGCBOREncodable {
 
 extension Array: DAGCBOREncodable where Element: DAGCBOREncodable {
     public func toCBORValue() throws -> Any {
-        return try self.map { try $0.toCBORValue() }
+        return try map { try $0.toCBORValue() }
     }
 }
 

@@ -1,9 +1,9 @@
- //
- //  KeychainManager.swift
- //  Petrel
- //
- //  Created by Josh LaCalamito on 11/20/23.
- //
+//
+//  KeychainManager.swift
+//  Petrel
+//
+//  Created by Josh LaCalamito on 11/20/23.
+//
 
 import CryptoKit
 import Foundation
@@ -19,93 +19,95 @@ enum KeychainError: Error {
 
 actor KeychainManager {
     // MARK: - Cache
-    
+
     // Thread-safe caches with automatic memory management
     private static let dataCache: NSCache<NSString, NSData> = {
         let cache = NSCache<NSString, NSData>()
         cache.countLimit = 100
         return cache
     }()
-    
+
     private static let dpopKeyCache: NSCache<NSString, CachedDPoPKey> = {
         let cache = NSCache<NSString, CachedDPoPKey>()
         cache.countLimit = 100
         return cache
     }()
-    
+
     // Wrapper class for P256.Signing.PrivateKey to make it cacheable
     private class CachedDPoPKey: NSObject {
         let key: P256.Signing.PrivateKey
-        
+
         init(key: P256.Signing.PrivateKey) {
             self.key = key
             super.init()
         }
     }
-    
+
     // Configure cache limits
     static func configureCaches(countLimit: Int = 100) {
         dataCache.countLimit = countLimit
         dpopKeyCache.countLimit = countLimit
     }
-    
+
     // MARK: - Cache Management
-    
+
     /// Clears all cached items
     static func clearCache() {
         dataCache.removeAllObjects()
         dpopKeyCache.removeAllObjects()
         LogManager.logDebug("KeychainManager - Cache cleared.")
     }
-    
+
     /// Clears cached items for a specific namespace
     static func clearCache(forNamespace namespace: String) {
         // Since NSCache doesn't support partial clearing based on key prefix,
         // we need a separate approach for namespace-specific clearing
-        
+
         // Get all keychain items for the namespace and remove them from cache
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecMatchLimit as String: kSecMatchLimitAll,
-            kSecReturnAttributes as String: true
+            kSecReturnAttributes as String: true,
         ]
-        
+
         var result: AnyObject?
         var status = SecItemCopyMatching(query as CFDictionary, &result)
-        
+
         if status == errSecSuccess, let items = result as? [[String: Any]] {
             for item in items {
                 if let account = item[kSecAttrAccount as String] as? String,
-                   account.hasPrefix("\(namespace).") {
+                   account.hasPrefix("\(namespace).")
+                {
                     // Remove from data cache
                     dataCache.removeObject(forKey: account as NSString)
                 }
             }
         }
-        
+
         // Do the same for DPoP keys
         let keysQuery: [String: Any] = [
             kSecClass as String: kSecClassKey,
             kSecMatchLimit as String: kSecMatchLimitAll,
-            kSecReturnAttributes as String: true
+            kSecReturnAttributes as String: true,
         ]
-        
+
         status = SecItemCopyMatching(keysQuery as CFDictionary, &result)
-        
+
         if status == errSecSuccess, let items = result as? [[String: Any]] {
             for item in items {
                 if let tagData = item[kSecAttrApplicationTag as String] as? Data,
                    let tagString = String(data: tagData, encoding: .utf8),
-                   tagString.hasPrefix("\(namespace).") {
+                   tagString.hasPrefix("\(namespace).")
+                {
                     // Remove from dpop key cache
                     dpopKeyCache.removeObject(forKey: tagString as NSString)
                 }
             }
         }
-        
+
         LogManager.logDebug("KeychainManager - Cache cleared for namespace: \(namespace).")
     }
-    
+
     // MARK: - Generic Data Methods
 
     static func deleteExplicitKey(_ exactKey: String) throws {
@@ -118,7 +120,7 @@ actor KeychainManager {
         if status != errSecSuccess, status != errSecItemNotFound {
             throw KeychainError.deletionError(status: status)
         }
-        
+
         // Remove from cache
         dataCache.removeObject(forKey: exactKey as NSString)
     }
@@ -159,17 +161,17 @@ actor KeychainManager {
                 "KeychainManager - Failed to store item for key \(namespacedKey). Status: \(status)")
             throw KeychainError.itemStoreError(status: status)
         }
-        
+
         // Update cache
         dataCache.setObject(value as NSData, forKey: namespacedKey as NSString)
-        
+
         LogManager.logDebug("KeychainManager - Successfully stored item for key \(namespacedKey).")
     }
 
     /// Retrieves data from the keychain for a specified key and namespace.
     static func retrieve(key: String, namespace: String) throws -> Data {
         let namespacedKey = "\(namespace).\(key)"
-        
+
         // Check cache first
         if let cachedData = dataCache.object(forKey: namespacedKey as NSString) {
             LogManager.logDebug("KeychainManager - Retrieved item from cache for key \(namespacedKey).")
@@ -200,7 +202,7 @@ actor KeychainManager {
             LogManager.logError("KeychainManager - Data format error for key \(namespacedKey).")
             throw KeychainError.dataFormatError
         }
-        
+
         // Store in cache
         dataCache.setObject(data as NSData, forKey: namespacedKey as NSString)
 
@@ -236,10 +238,10 @@ actor KeychainManager {
                 "KeychainManager - Failed to delete item for key \(namespacedKey). Status: \(status)")
             throw KeychainError.itemStoreError(status: status)
         }
-        
+
         // Remove from cache
         dataCache.removeObject(forKey: namespacedKey as NSString)
-        
+
         LogManager.logError(
             "KEYCHAIN_MANAGER: Successfully deleted item for key \(namespacedKey). Status: \(status)")
     }
@@ -247,13 +249,13 @@ actor KeychainManager {
     static func nukeAllKeychainItems(forNamespace namespace: String) -> Bool {
         // Handle generic passwords first
         let genericSuccess = nukeGenericPasswords(withNamespacePrefix: namespace)
-        
+
         // Then handle crypto keys
         let keysSuccess = nukeCryptoKeys(withNamespacePrefix: namespace)
-        
+
         // Clear cache for this namespace
         clearCache(forNamespace: namespace)
-        
+
         return genericSuccess && keysSuccess
     }
 
@@ -271,17 +273,18 @@ actor KeychainManager {
         if status == errSecSuccess, let items = result as? [[String: Any]] {
             var allSucceeded = true
             var matchedCount = 0
-            
+
             // Filter and delete items that match our namespace
             for item in items {
                 if let account = item[kSecAttrAccount as String] as? String,
-                   account.hasPrefix("\(namespace).") {
+                   account.hasPrefix("\(namespace).")
+                {
                     matchedCount += 1
                     LogManager.logInfo("KeychainManager - Deleting keychain item: \(account)")
 
                     let deleteQuery: [String: Any] = [
                         kSecClass as String: kSecClassGenericPassword,
-                        kSecAttrAccount as String: account
+                        kSecAttrAccount as String: account,
                     ]
 
                     let deleteStatus = SecItemDelete(deleteQuery as CFDictionary)
@@ -289,12 +292,12 @@ actor KeychainManager {
                         LogManager.logError("KeychainManager - Failed to delete item \(account): \(deleteStatus)")
                         allSucceeded = false
                     }
-                    
+
                     // Remove from cache
                     dataCache.removeObject(forKey: account as NSString)
                 }
             }
-            
+
             LogManager.logInfo("KeychainManager - Nuked \(matchedCount) generic passwords from keychain for namespace: \(namespace)")
             return allSucceeded
         } else if status == errSecItemNotFound {
@@ -311,41 +314,42 @@ actor KeychainManager {
         let query: [String: Any] = [
             kSecClass as String: kSecClassKey,
             kSecMatchLimit as String: kSecMatchLimitAll,
-            kSecReturnAttributes as String: true
+            kSecReturnAttributes as String: true,
         ]
-        
+
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
-        
+
         if status == errSecSuccess, let items = result as? [[String: Any]] {
             var allSucceeded = true
             var matchedCount = 0
-            
+
             // Filter and delete keys
             for item in items {
                 // For keys, check the application tag
                 if let tagData = item[kSecAttrApplicationTag as String] as? Data,
                    let tagString = String(data: tagData, encoding: .utf8),
-                   tagString.hasPrefix("\(namespace).") {
+                   tagString.hasPrefix("\(namespace).")
+                {
                     matchedCount += 1
                     LogManager.logInfo("KeychainManager - Deleting key: \(tagString)")
-                    
+
                     let deleteQuery: [String: Any] = [
                         kSecClass as String: kSecClassKey,
-                        kSecAttrApplicationTag as String: tagData
+                        kSecAttrApplicationTag as String: tagData,
                     ]
-                    
+
                     let deleteStatus = SecItemDelete(deleteQuery as CFDictionary)
                     if deleteStatus != errSecSuccess {
                         LogManager.logError("KeychainManager - Failed to delete key \(tagString): \(deleteStatus)")
                         allSucceeded = false
                     }
-                    
+
                     // Remove from cache
                     dpopKeyCache.removeObject(forKey: tagString as NSString)
                 }
             }
-            
+
             LogManager.logInfo("KeychainManager - Nuked \(matchedCount) keys from keychain for namespace: \(namespace)")
             return allSucceeded
         } else if status == errSecItemNotFound {
@@ -356,7 +360,7 @@ actor KeychainManager {
             return false
         }
     }
-    
+
     // MARK: - DPoP Key Methods
 
     /// Stores a DPoP private key in the keychain with a specified key tag.
@@ -390,10 +394,10 @@ actor KeychainManager {
                 "KeychainManager - Failed to store DPoP key for tag \(keyTag). Status: \(status)")
             throw KeychainError.itemStoreError(status: status)
         }
-        
+
         // Update cache
         dpopKeyCache.setObject(CachedDPoPKey(key: key), forKey: keyTag as NSString)
-        
+
         LogManager.logDebug("KeychainManager - Successfully stored DPoP key for tag \(keyTag).")
     }
 
@@ -404,7 +408,7 @@ actor KeychainManager {
             LogManager.logDebug("KeychainManager - Retrieved DPoP key from cache for tag \(keyTag).")
             return cachedKey.key
         }
-        
+
         guard let tagData = keyTag.data(using: .utf8) else {
             throw KeychainError.dataFormatError
         }
@@ -437,10 +441,10 @@ actor KeychainManager {
 
         do {
             let privateKey = try P256.Signing.PrivateKey(x963Representation: keyData)
-            
+
             // Store in cache
             dpopKeyCache.setObject(CachedDPoPKey(key: privateKey), forKey: keyTag as NSString)
-            
+
             LogManager.logDebug("KeychainManager - Successfully retrieved DPoP key for tag \(keyTag).")
             return privateKey
         } catch {
@@ -468,10 +472,10 @@ actor KeychainManager {
                 "KeychainManager - Failed to delete DPoP key for tag \(keyTag). Status: \(status)")
             throw KeychainError.itemStoreError(status: status)
         }
-        
+
         // Remove from cache
         dpopKeyCache.removeObject(forKey: keyTag as NSString)
-        
+
         LogManager.logDebug("KeychainManager - Successfully deleted DPoP key for tag \(keyTag).")
     }
 
@@ -512,10 +516,10 @@ actor KeychainManager {
             )
             throw KeychainError.itemStoreError(status: status)
         }
-        
+
         // Remove from cache
         dataCache.removeObject(forKey: bindingsKey as NSString)
-        
+
         LogManager.logDebug(
             "KeychainManager - Successfully deleted DPoP key bindings for namespace \(namespace).")
     }
@@ -535,15 +539,15 @@ actor KeychainManager {
                 "KeychainManager - Failed to delete DPoP key bindings for DID \(did). Status: \(status)")
             throw KeychainError.itemStoreError(status: status)
         }
-        
+
         // Remove from cache
         dataCache.removeObject(forKey: bindingsKey as NSString)
-        
+
         LogManager.logDebug("KeychainManager - Successfully deleted DPoP key bindings for DID \(did).")
     }
-    
+
     // MARK: - Initialization
-    
+
     // Call this at app startup
     static func initialize() {
         configureCaches()

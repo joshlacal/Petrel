@@ -1,147 +1,105 @@
 import Foundation
 
-
-
 // lexicon: 1, id: chat.bsky.convo.updateAllRead
 
-
-public struct ChatBskyConvoUpdateAllRead { 
-
+public enum ChatBskyConvoUpdateAllRead {
     public static let typeIdentifier = "chat.bsky.convo.updateAllRead"
-public struct Input: ATProtocolCodable {
-            public let status: String?
+    public struct Input: ATProtocolCodable {
+        public let status: String?
 
-            // Standard public initializer
-            public init(status: String? = nil) {
-                self.status = status
-                
-            }
-            
-            public init(from decoder: Decoder) throws {
-                let container = try decoder.container(keyedBy: CodingKeys.self)
-                
-                self.status = try container.decodeIfPresent(String.self, forKey: .status)
-                
-            }
-            
-            public func encode(to encoder: Encoder) throws {
-                var container = encoder.container(keyedBy: CodingKeys.self)
-                
-                // Encode optional property even if it's an empty array
-                try container.encodeIfPresent(status, forKey: .status)
-                
-            }
-            
-            private enum CodingKeys: String, CodingKey {
-                case status
-            }
-            
-            public func toCBORValue() throws -> Any {
-                var map = OrderedCBORMap()
-
-                
-                
-                if let value = status {
-                    // Encode optional property even if it's an empty array for CBOR
-                    let statusValue = try value.toCBORValue()
-                    map = map.adding(key: "status", value: statusValue)
-                }
-                
-                
-
-                return map
-            }
-        }
-    
-public struct Output: ATProtocolCodable {
-        
-        
-        public let updatedCount: Int
-        
-        
-        
         // Standard public initializer
-        public init(
-            
-            updatedCount: Int
-            
-            
-        ) {
-            
-            self.updatedCount = updatedCount
-            
-            
+        public init(status: String? = nil) {
+            self.status = status
         }
-        
+
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
-            
-            self.updatedCount = try container.decode(Int.self, forKey: .updatedCount)
-            
-            
+
+            status = try container.decodeIfPresent(String.self, forKey: .status)
         }
-        
+
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
-            
-            try container.encode(updatedCount, forKey: .updatedCount)
-            
-            
+
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(status, forKey: .status)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case status
         }
 
         public func toCBORValue() throws -> Any {
-            
             var map = OrderedCBORMap()
 
-            
-            
-            let updatedCountValue = try updatedCount.toCBORValue()
-            map = map.adding(key: "updatedCount", value: updatedCountValue)
-            
-            
+            if let value = status {
+                // Encode optional property even if it's an empty array for CBOR
+                let statusValue = try value.toCBORValue()
+                map = map.adding(key: "status", value: statusValue)
+            }
 
             return map
-            
-        }
-        
-        private enum CodingKeys: String, CodingKey {
-            
-            case updatedCount
-            
         }
     }
 
+    public struct Output: ATProtocolCodable {
+        public let updatedCount: Int
 
+        // Standard public initializer
+        public init(
+            updatedCount: Int
 
+        ) {
+            self.updatedCount = updatedCount
+        }
 
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            updatedCount = try container.decode(Int.self, forKey: .updatedCount)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(updatedCount, forKey: .updatedCount)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+
+            let updatedCountValue = try updatedCount.toCBORValue()
+            map = map.adding(key: "updatedCount", value: updatedCountValue)
+
+            return map
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case updatedCount
+        }
+    }
 }
 
-extension ATProtoClient.Chat.Bsky.Convo {
+public extension ATProtoClient.Chat.Bsky.Convo {
     // MARK: - updateAllRead
 
-    /// 
-    /// 
+    ///
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func updateAllRead(
-        
+    func updateAllRead(
         input: ChatBskyConvoUpdateAllRead.Input
-        
+
     ) async throws -> (responseCode: Int, data: ChatBskyConvoUpdateAllRead.Output?) {
         let endpoint = "chat.bsky.convo.updateAllRead"
-        
+
         var headers: [String: String] = [:]
-        
+
         headers["Content-Type"] = "application/json"
-        
-        
-        
+
         headers["Accept"] = "application/json"
-        
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -152,7 +110,6 @@ extension ATProtoClient.Chat.Bsky.Convo {
             queryItems: nil
         )
 
-        
         let (responseData, response) = try await networkService.performRequest(urlRequest)
         let responseCode = response.statusCode
 
@@ -164,14 +121,9 @@ extension ATProtoClient.Chat.Bsky.Convo {
             throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
         }
 
-        
         let decoder = JSONDecoder()
         let decodedData = try? decoder.decode(ChatBskyConvoUpdateAllRead.Output.self, from: responseData)
-        
 
         return (responseCode, decodedData)
-        
     }
-    
 }
-                           

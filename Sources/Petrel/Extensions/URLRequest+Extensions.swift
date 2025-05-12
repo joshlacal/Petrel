@@ -1,33 +1,33 @@
 import Foundation
 
 extension URLRequest {
-  func createNewRequestObject() -> URLRequest {
-    var newRequest = URLRequest(url: self.url!)
-    newRequest.httpMethod = self.httpMethod
-    newRequest.httpBody = self.httpBody
+    func createNewRequestObject() -> URLRequest {
+        var newRequest = URLRequest(url: url!)
+        newRequest.httpMethod = httpMethod
+        newRequest.httpBody = httpBody
 
-    // Copy headers except authentication ones that need to be regenerated
-    for (key, value) in self.allHTTPHeaderFields ?? [:] {
-      if key != "Authorization" && key != "DPoP" {
-        newRequest.setValue(value, forHTTPHeaderField: key)
-      }
+        // Copy headers except authentication ones that need to be regenerated
+        for (key, value) in allHTTPHeaderFields ?? [:] {
+            if key != "Authorization" && key != "DPoP" {
+                newRequest.setValue(value, forHTTPHeaderField: key)
+            }
+        }
+
+        return newRequest
     }
 
-    return newRequest
-  }
+    func createFreshRequestWithoutAuthHeaders() -> URLRequest {
+        var newRequest = URLRequest(url: url!)
+        newRequest.httpMethod = httpMethod
+        newRequest.httpBody = httpBody
 
-  func createFreshRequestWithoutAuthHeaders() -> URLRequest {
-    var newRequest = URLRequest(url: self.url!)
-    newRequest.httpMethod = self.httpMethod
-    newRequest.httpBody = self.httpBody
+        // Copy all non-auth headers
+        for (key, value) in allHTTPHeaderFields ?? [:] {
+            if key != "Authorization" && key != "DPoP" {
+                newRequest.setValue(value, forHTTPHeaderField: key)
+            }
+        }
 
-    // Copy all non-auth headers
-    for (key, value) in self.allHTTPHeaderFields ?? [:] {
-      if key != "Authorization" && key != "DPoP" {
-        newRequest.setValue(value, forHTTPHeaderField: key)
-      }
+        return newRequest
     }
-
-    return newRequest
-  }
 }
