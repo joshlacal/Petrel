@@ -144,15 +144,25 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
         }
         LogManager.logDebug("Target PDS URL from OAuth state: \(pdsURL.absoluteString)")
 
-        // Fetch metadata - consider caching this
-        let protectedResourceMetadata = try await fetchProtectedResourceMetadata(pdsURL: pdsURL)
-        guard let authServerURL = protectedResourceMetadata.authorizationServers.first else {
-            LogManager.logError(
-                "No authorization server found in protected resource metadata for \(pdsURL.absoluteString)")
-            throw AuthError.invalidOAuthConfiguration
+        // Try to fetch protected resource metadata first (as per OAuth spec)
+        let authServerURL: URL
+        do {
+            let metadata = try await fetchProtectedResourceMetadata(pdsURL: pdsURL)
+            if let foundAuthServerURL = metadata.authorizationServers.first {
+                authServerURL = foundAuthServerURL
+                LogManager.logDebug("Found authorization server from protected resource metadata: \(authServerURL)")
+            } else {
+                // Protected resource metadata exists but has no auth servers listed
+                LogManager.logError("Protected resource metadata has no authorization servers")
+                throw AuthError.invalidOAuthConfiguration
+            }
+        } catch {
+            // If protected resource metadata fetch fails (e.g., 404), 
+            // fall back to treating the URL as the authorization server itself
+            LogManager.logDebug("Could not fetch protected resource metadata from \(pdsURL), treating it as authorization server")
+            authServerURL = pdsURL
         }
-        LogManager.logDebug("Authorization server URL: \(authServerURL.absoluteString)")
-
+        
         let authServerMetadata = try await fetchAuthorizationServerMetadata(
             authServerURL: authServerURL)
         let tokenEndpoint = authServerMetadata.tokenEndpoint
@@ -216,13 +226,25 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
         // Check if account exists, otherwise create a new one
         var account = await accountManager.getAccount(did: did)
         let isNewAccount = account == nil
+        
+        // Try to fetch protected resource metadata for the account
+        // This might have already been fetched earlier, but we need it for account creation
+        let protectedResourceMetadata: ProtectedResourceMetadata?
+        do {
+            protectedResourceMetadata = try await fetchProtectedResourceMetadata(pdsURL: pdsURL)
+            LogManager.logDebug("Successfully fetched protected resource metadata for account")
+        } catch {
+            LogManager.logDebug("Could not fetch protected resource metadata for account (will use nil): \(error)")
+            protectedResourceMetadata = nil
+        }
+        
         if isNewAccount {
             LogManager.logDebug("Creating new account for DID: \(did)")
             account = Account(
                 did: did,
                 handle: oauthState.initialIdentifier, // Use handle from initial state if available
                 pdsURL: pdsURL, // Use the PDS URL from the state
-                protectedResourceMetadata: protectedResourceMetadata, // Store fetched metadata
+                protectedResourceMetadata: protectedResourceMetadata, // Store fetched metadata (may be nil)
                 authorizationServerMetadata: authServerMetadata // Store fetched metadata
             )
         } else {
@@ -520,12 +542,25 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
             pdsURL = URL(string: "https://bsky.social")!
         }
 
-        // Fetch Protected Resource Metadata
-        let protectedResourceMetadata = try await fetchProtectedResourceMetadata(pdsURL: pdsURL)
-
-        // Get the Authorization Server URL from metadata
-        guard let authServerURL = protectedResourceMetadata.authorizationServers.first else {
-            throw AuthError.authorizationFailed as Error
+        // Try to fetch protected resource metadata first (as per OAuth spec)
+        let authServerURL: URL
+        let protectedResourceMetadata: ProtectedResourceMetadata?
+        do {
+            let metadata = try await fetchProtectedResourceMetadata(pdsURL: pdsURL)
+            protectedResourceMetadata = metadata
+            if let foundAuthServerURL = metadata.authorizationServers.first {
+                authServerURL = foundAuthServerURL
+                LogManager.logDebug("Found authorization server from protected resource metadata: \(authServerURL)")
+            } else {
+                // Protected resource metadata exists but has no auth servers listed
+                LogManager.logError("Protected resource metadata has no authorization servers")
+                throw AuthError.invalidOAuthConfiguration
+            }
+        } catch {
+            // If protected resource metadata fetch fails (e.g., 404), 
+            // fall back to treating the URL as the authorization server itself
+            LogManager.logDebug("Could not fetch protected resource metadata from \(pdsURL), treating it as authorization server")
+            authServerURL = pdsURL
         }
 
         // Fetch Authorization Server Metadata
@@ -616,12 +651,25 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
         // Save the initial state (optional, but good practice if PAR fails before nonce is known)
         // try await storage.saveOAuthState(oauthState) // Consider if needed
 
-        // Fetch metadata
-        let protectedResourceMetadata = try await fetchProtectedResourceMetadata(pdsURL: pdsURL)
-        guard let authServerURL = protectedResourceMetadata.authorizationServers.first else {
-            throw AuthError.authorizationFailed as Error
+        // Try to fetch protected resource metadata first (as per OAuth spec)
+        let authServerURL: URL
+        do {
+            let protectedResourceMetadata = try await fetchProtectedResourceMetadata(pdsURL: pdsURL)
+            if let foundAuthServerURL = protectedResourceMetadata.authorizationServers.first {
+                authServerURL = foundAuthServerURL
+                LogManager.logDebug("Found authorization server from protected resource metadata: \(authServerURL)")
+            } else {
+                // Protected resource metadata exists but has no auth servers listed
+                LogManager.logError("Protected resource metadata has no authorization servers")
+                throw AuthError.invalidOAuthConfiguration
+            }
+        } catch {
+            // If protected resource metadata fetch fails (e.g., 404), 
+            // fall back to treating the URL as the authorization server itself
+            LogManager.logDebug("Could not fetch protected resource metadata from \(pdsURL), treating it as authorization server")
+            authServerURL = pdsURL
         }
-
+        
         let authServerMetadata = try await fetchAuthorizationServerMetadata(
             authServerURL: authServerURL)
 
