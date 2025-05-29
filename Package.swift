@@ -21,6 +21,7 @@ let package = Package(
             url: "https://github.com/apple/swift-async-dns-resolver",
             .upToNextMajor(from: "0.1.0")
         ),
+        .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.4.0"),
     ],
     targets: [
         .target(
