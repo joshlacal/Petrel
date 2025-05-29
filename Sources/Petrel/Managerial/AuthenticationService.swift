@@ -72,24 +72,24 @@ public enum AuthError: Error, Equatable {
 /// Actor responsible for handling authentication operations.
 public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
     public func handleOAuthCallback(url: URL) async throws {
-        LogManager.logInfo("Handling OAuth callback: \(url.absoluteString)")
+        LogManager.logInfo("Handling OAuth callback", category: .authentication)
 
         // 1. Extract code and state
         guard let code = extractAuthorizationCode(from: url),
               let stateToken = extractState(from: url)
         else {
-            LogManager.logError("Callback URL missing code or state.")
+            LogManager.logError("Callback URL missing code or state", category: .authentication)
             throw AuthError.invalidCallbackURL
         }
-        LogManager.logDebug("Extracted state: \(stateToken), code: \(code.prefix(4))...")
+        LogManager.logDebug("Extracted authorization code and state token", category: .authentication)
 
         // 2. Retrieve OAuthState using the stateToken
         guard let oauthState = try await storage.getOAuthState(for: stateToken) else {
-            LogManager.logError("No matching OAuth state found for state: \(stateToken)")
+            LogManager.logError("No matching OAuth state found for state token", category: .authentication)
             // It's possible the state was already used or expired.
             throw AuthError.invalidCallbackURL // Or a more specific state error
         }
-        LogManager.logDebug("Successfully retrieved OAuth state for state: \(stateToken)")
+        LogManager.logDebug("Successfully retrieved OAuth state", category: .authentication)
 
         // 3. Extract necessary info from oauthState
         let codeVerifier = oauthState.codeVerifier
@@ -101,7 +101,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
         // --- Get ephemeral key directly from OAuthState ---
         guard let keyData = oauthState.ephemeralDPoPKey else {
             LogManager.logError(
-                "Ephemeral DPoP key data missing in retrieved OAuth state for state: \(stateToken)")
+                "Ephemeral DPoP key data missing in retrieved OAuth state", category: .authentication)
             try? await storage.deleteOAuthState(for: stateToken)
             throw AuthError.dpopKeyError
         }
@@ -109,28 +109,24 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
         let privateKey: P256.Signing.PrivateKey
         do {
             privateKey = try P256.Signing.PrivateKey(rawRepresentation: keyData)
-            LogManager.logDebug("Successfully deserialized ephemeral DPoP key from OAuth state.")
-            // Log the deserialized key's x coordinate for debugging
-            let publicKey = privateKey.publicKey
-            let x = publicKey.x963Representation.dropFirst().prefix(32).base64URLEscaped()
-            LogManager.logDebug(
-                "Using deserialized ephemeral key with x coordinate: \(x) for token exchange")
+            LogManager.logDebug("Successfully deserialized ephemeral DPoP key from OAuth state", category: .authentication)
+            // Log that we're using the key for token exchange
+            LogManager.logDebug("Using deserialized ephemeral key for token exchange", category: .authentication)
         } catch {
-            LogManager.logError("Failed to deserialize ephemeral DPoP key: \(error)")
+            LogManager.logError("Failed to deserialize ephemeral DPoP key: \(error)", category: .authentication)
             try? await storage.deleteOAuthState(for: stateToken)
             throw AuthError.dpopKeyError
         }
 
-        LogManager.logDebug("Using nonce for token exchange: \(initialNonce ?? "nil")")
-        LogManager.logDebug("Using nonce for token exchange: \(initialNonce ?? "nil")")
+        LogManager.logDebug("Token exchange nonce status: \(initialNonce != nil ? "present" : "none")", category: .authentication)
         // --- End Key Retrieval ---
 
         // 4. Delete the OAuthState *after* successfully retrieving all needed info
         do {
             try await storage.deleteOAuthState(for: stateToken)
-            LogManager.logDebug("Successfully deleted OAuth state for state: \(stateToken)")
+            LogManager.logDebug("Successfully deleted OAuth state", category: .authentication)
         } catch {
-            LogManager.logError("Failed to delete OAuth state for \(stateToken): \(error)")
+            LogManager.logError("Failed to delete OAuth state: \(error)", category: .authentication)
             // Decide if you should proceed or throw. Proceeding might be okay if token exchange works,
             // but it leaves stale data. Throwing might be safer.
             throw AuthError.networkError(error)
@@ -139,10 +135,10 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
         // 3. Fetch Authorization Server Metadata (needed for token endpoint)
         // We stored the targetPDSURL in the OAuthState
         guard let pdsURL = oauthState.targetPDSURL else {
-            LogManager.logError("Missing target PDS URL in OAuth state.")
+            LogManager.logError("Missing target PDS URL in OAuth state", category: .authentication)
             throw AuthError.invalidOAuthConfiguration // Or a more specific state error
         }
-        LogManager.logDebug("Target PDS URL from OAuth state: \(pdsURL.absoluteString)")
+        LogManager.logDebug("Retrieved target PDS URL from OAuth state", category: .authentication)
 
         // Try to fetch protected resource metadata first (as per OAuth spec)
         let authServerURL: URL
@@ -174,7 +170,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
         // Add debug logging to show the key thumbprint
         let jwk = try createJWK(from: privateKey)
         let thumbprint = try calculateJWKThumbprint(jwk: jwk)
-        LogManager.logDebug("Using ephemeral key with thumbprint: \(thumbprint) for token exchange")
+        LogManager.logDebug("Using ephemeral key for token exchange", category: .authentication)
 
         let tokenResponse = try await exchangeCodeForTokens(
             code: code,
@@ -187,10 +183,10 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
 
         // 5. Process Token Response
         guard let did = tokenResponse.sub else {
-            LogManager.logError("Token response is missing 'sub' (DID).")
+            LogManager.logError("Token response is missing 'sub' (DID)", category: .authentication)
             throw AuthError.invalidResponse // Or a more specific error
         }
-        LogManager.logInfo("Successfully exchanged code for tokens. Received DID: \(did)")
+        LogManager.logInfo("Successfully exchanged code for tokens. Received DID: \(LogManager.logDID(did))", category: .authentication)
 
         // Transfer any OAuth flow nonces to this new DID
         if !oauthFlowNonces.isEmpty {
@@ -199,12 +195,12 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
             // Copy OAuth nonces to the confirmed DID's nonce storage
             for (domain, nonce) in oauthFlowNonces {
                 didNonces[domain] = nonce
-                LogManager.logDebug("Transferred nonce for domain \(domain) to new DID \(did)")
+                LogManager.logDebug("Transferred nonce for domain \(domain) to DID", category: .authentication)
             }
 
             try await storage.saveDPoPNonces(didNonces, for: did)
             oauthFlowNonces = [:] // Clear memory store
-            LogManager.logInfo("Transferred \(oauthFlowNonces.count) OAuth flow nonces to DID \(did)")
+            LogManager.logInfo("Transferred OAuth flow nonces to DID", category: .authentication)
         }
 
         // Determine token type based on response
@@ -317,7 +313,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
             return
         }
 
-        LogManager.logInfo("Logging out account with DID: \(did)")
+        LogManager.logInfo("Logging out account with DID: \(LogManager.logDID(did))", category: .authentication)
 
         // 1. Attempt to revoke token (optional but good practice)
         if let account = await accountManager.getAccount(did: did),
@@ -580,9 +576,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
         // Removed caching of the key
 
         // Add debug logging for key tracking
-        let publicKey = ephemeralKey.publicKey
-        let x = publicKey.x963Representation.dropFirst().prefix(32).base64URLEscaped()
-        LogManager.logDebug("Generated ephemeral DPoP key for OAuth session with x coordinate: \(x)")
+        LogManager.logDebug("Generated ephemeral DPoP key for OAuth session", category: .authentication)
 
         // Create Pushed Authorization Request (PAR)
         let parEndpoint = authServerMetadata.pushedAuthorizationRequestEndpoint
@@ -605,7 +599,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
             parResponseNonce: parNonce
         )
         try await storage.saveOAuthState(oauthState)
-        LogManager.logDebug("Saved OAuth state including PAR nonce: \(parNonce ?? "nil")")
+        LogManager.logDebug("Saved OAuth state with PAR nonce status: \(parNonce != nil ? "present" : "none")", category: .authentication)
 
         // Build Authorization URL
         var components = URLComponents(string: authServerMetadata.authorizationEndpoint)!
@@ -690,7 +684,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
         // Ensure key data is set (redundant if initial save is removed, but safe)
         finalOauthState.ephemeralDPoPKey = ephemeralKey.rawRepresentation
         try await storage.saveOAuthState(finalOauthState) // Save the complete state
-        LogManager.logDebug("Saved OAuth state for sign-up including PAR nonce: \(parNonce ?? "nil")")
+        LogManager.logDebug("Saved OAuth state for sign-up with PAR nonce status: \(parNonce != nil ? "present" : "none")", category: .authentication)
         // Build authorization URL
         var components = URLComponents(string: authServerMetadata.authorizationEndpoint)!
         components.queryItems = [
@@ -785,7 +779,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
 
             if isNonceError, let receivedNonce = dpopNonceHeader {
                 LogManager.logInfo(
-                    "Received use_dpop_nonce error on Sign-Up PAR. Retrying with nonce: \(receivedNonce)")
+                    "Received use_dpop_nonce error on Sign-Up PAR. Retrying with received nonce", category: .authentication)
                 var retryRequest = request // Create a mutable copy for retry
                 // Use the same ephemeral key for the retry proof
                 let retryProof = try await createDPoPProof(
@@ -949,7 +943,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
 
             if isNonceError, let receivedNonce = dpopNonceHeader {
                 LogManager.logInfo(
-                    "Received use_dpop_nonce error on PAR. Retrying with nonce: \(receivedNonce)")
+                    "Received use_dpop_nonce error on PAR. Retrying with received nonce", category: .authentication)
                 var retryRequest = request // Create a mutable copy for retry
                 // Use the same ephemeral key for the retry proof
                 let retryProof = try await createDPoPProof(
@@ -1298,9 +1292,8 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
                 LogManager.logDebug("Updated DPoP nonce for domain \(responseDomain) after token refresh attempt")
             }
 
-            // Log the response data for debugging
-            let responseString = String(data: data, encoding: .utf8) ?? "Unable to decode as string"
-            LogManager.logDebug("Token refresh raw response: \(responseString)")
+            // Log status without exposing sensitive token data
+            LogManager.logDebug("Token refresh response received (\(data.count) bytes)", category: .authentication)
 
             // Check for DPoP nonce mismatch and retry
             if httpResponse.statusCode == 400 {
@@ -1463,7 +1456,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
                 let domain = urlObject.host?.lowercased()
         {
             finalNonce = oauthFlowNonces[domain]
-            LogManager.logDebug("OAuth flow - using in-memory nonce for domain \(domain): \(finalNonce ?? "nil")")
+            LogManager.logDebug("OAuth flow - using stored nonce for domain \(domain)", category: .authentication)
         }
         // Case 3: Authenticated flow - get from storage
         else if let targetDID = targetDID, let urlObject = URL(string: url),
@@ -1480,7 +1473,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
             finalNonce = nil
         }
 
-        LogManager.logDebug("Using DPoP nonce for proof: \(finalNonce ?? "nil") for domain \(URL(string: url)?.host?.lowercased() ?? "N/A")") // Added Logging
+        LogManager.logDebug("DPoP proof nonce status: \(finalNonce != nil ? "present" : "none") for domain \(URL(string: url)?.host?.lowercased() ?? "N/A")", category: .authentication)
 
         // Create the encodable payload struct
         let payload = DPoPPayload(
@@ -1537,7 +1530,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
     ///   - did: The DID to update the nonce for.
     private func updateDPoPNonce(domain: String, nonce: String, for did: String) async {
         do {
-            LogManager.logDebug("Storing DPoP nonce '\(nonce)' for domain '\(domain)' for DID \(did)") // Added Logging
+            LogManager.logDebug("Storing DPoP nonce for domain '\(domain)' for DID", category: .authentication)
             var nonces = try await storage.getDPoPNonces(for: did) ?? [:]
             nonces[domain] = nonce
             try await storage.saveDPoPNonces(nonces, for: did)
@@ -1727,7 +1720,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
                     LogManager.logError("Failed to decode token response: \(error)")
                     // Log the actual response body for debugging
                     let responseBody = String(data: data, encoding: .utf8) ?? "Could not decode response body"
-                    LogManager.logError("Token Exchange Response Body (on decode failure): \(responseBody)")
+                    LogManager.logError("Token exchange response decode failed", category: .authentication)
                     throw AuthError.invalidResponse
                 }
             }
@@ -1748,7 +1741,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
 
                 if isNonceError, let receivedNonce = dpopNonceHeader {
                     LogManager.logInfo(
-                        "Received use_dpop_nonce error on token exchange. Retrying with nonce: \(receivedNonce)"
+                        "Received use_dpop_nonce error on token exchange. Retrying with received nonce", category: .authentication
                     )
 
                     // Create a new DPoP proof with the nonce
