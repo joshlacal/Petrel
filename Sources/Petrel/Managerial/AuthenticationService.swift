@@ -162,14 +162,14 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
         let authServerMetadata = try await fetchAuthorizationServerMetadata(
             authServerURL: authServerURL)
         let tokenEndpoint = authServerMetadata.tokenEndpoint
-        LogManager.logDebug("Token endpoint: \(tokenEndpoint)")
+        LogManager.logDebug("Retrieved token endpoint", category: .authentication)
 
         // 4. Exchange code for tokens directly
         // Pass the extracted codeVerifier and the ephemeralKey
 
         // Add debug logging to show the key thumbprint
         let jwk = try createJWK(from: privateKey)
-        let thumbprint = try calculateJWKThumbprint(jwk: jwk)
+        _ = try calculateJWKThumbprint(jwk: jwk)
         LogManager.logDebug("Using ephemeral key for token exchange", category: .authentication)
 
         let tokenResponse = try await exchangeCodeForTokens(
@@ -263,9 +263,9 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
         // This ensures the same key used in token exchange is used for subsequent API calls
         do {
             try await storage.saveDPoPKey(privateKey, for: did)
-            LogManager.logInfo("Stored the ephemeral DPoP key used in token exchange as the active key for DID: \(did)")
+            LogManager.logInfo("Stored the ephemeral DPoP key used in token exchange as the active key for DID", category: .authentication)
         } catch {
-            LogManager.logError("Failed to save the active DPoP key for DID \(did) after token exchange: \(error)")
+            LogManager.logError("Failed to save the active DPoP key for DID after token exchange: \(error)", category: .authentication)
             throw AuthError.dpopKeyError
         }
         // --- End DPoP Key Handling ---
@@ -453,7 +453,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
         // If refresh was successful, retry the request
         if refreshed {
             var newRequest = request
-            if let session = try? await storage.getSession(for: did) {
+            if (try? await storage.getSession(for: did)) != nil {
                 // Prepare the authenticated request
                 newRequest = try await prepareAuthenticatedRequest(newRequest)
 
@@ -532,18 +532,22 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
         if let identifier = identifier {
             // Resolve handle to DID and DID to PDS URL
             did = try await didResolver.resolveHandleToDID(handle: identifier)
-            pdsURL = try await didResolver.resolveDIDToPDSURL(did: did!)
+            guard let resolvedDID = did else {
+                throw AuthError.invalidCredentials
+            }
+            pdsURL = try await didResolver.resolveDIDToPDSURL(did: resolvedDID)
         } else {
             // Use default PDS URL for sign-up
-            pdsURL = URL(string: "https://bsky.social")!
+            guard let defaultURL = URL(string: "https://bsky.social") else {
+                throw AuthError.invalidOAuthConfiguration
+            }
+            pdsURL = defaultURL
         }
 
         // Try to fetch protected resource metadata first (as per OAuth spec)
         let authServerURL: URL
-        let protectedResourceMetadata: ProtectedResourceMetadata?
         do {
             let metadata = try await fetchProtectedResourceMetadata(pdsURL: pdsURL)
-            protectedResourceMetadata = metadata
             if let foundAuthServerURL = metadata.authorizationServers.first {
                 authServerURL = foundAuthServerURL
                 LogManager.logDebug("Found authorization server from protected resource metadata: \(authServerURL)")
@@ -602,7 +606,9 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
         LogManager.logDebug("Saved OAuth state with PAR nonce status: \(parNonce != nil ? "present" : "none")", category: .authentication)
 
         // Build Authorization URL
-        var components = URLComponents(string: authServerMetadata.authorizationEndpoint)!
+        guard var components = URLComponents(string: authServerMetadata.authorizationEndpoint) else {
+            throw AuthError.invalidOAuthConfiguration
+        }
         components.queryItems = [
             URLQueryItem(name: "request_uri", value: requestURI),
             URLQueryItem(name: "client_id", value: oauthConfig.clientId), // FIX: Use self.oauthConfig
@@ -619,9 +625,20 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
     /// Starts the OAuth flow for a new account signup (without requiring a handle)
     /// - Parameter pdsURL: The PDS URL to use for sign-up
     /// - Returns: The authorization URL to present to the user
-    public func startOAuthFlowForSignUp(pdsURL: URL = URL(string: "https://bsky.social")!)
+    public func startOAuthFlowForSignUp(pdsURL: URL? = nil)
         async throws -> URL
     {
+        // Use provided URL or default to bsky.social
+        let finalPDSURL: URL
+        if let providedURL = pdsURL {
+            finalPDSURL = providedURL
+        } else {
+            guard let defaultURL = URL(string: "https://bsky.social") else {
+                throw AuthError.invalidOAuthConfiguration
+            }
+            finalPDSURL = defaultURL
+        }
+        
         // Create a special OAuth state for sign-up
         let stateToken = UUID().uuidString
         let codeVerifier = generateCodeVerifier()
@@ -638,7 +655,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
             codeVerifier: codeVerifier,
             createdAt: Date(),
             initialIdentifier: nil,
-            targetPDSURL: pdsURL,
+            targetPDSURL: finalPDSURL,
             ephemeralDPoPKey: ephemeralKey.rawRepresentation,
             parResponseNonce: nil // Initialize explicitly as nil, will update after PAR
         )
@@ -648,7 +665,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
         // Try to fetch protected resource metadata first (as per OAuth spec)
         let authServerURL: URL
         do {
-            let protectedResourceMetadata = try await fetchProtectedResourceMetadata(pdsURL: pdsURL)
+            let protectedResourceMetadata = try await fetchProtectedResourceMetadata(pdsURL: finalPDSURL)
             if let foundAuthServerURL = protectedResourceMetadata.authorizationServers.first {
                 authServerURL = foundAuthServerURL
                 LogManager.logDebug("Found authorization server from protected resource metadata: \(authServerURL)")
@@ -660,8 +677,8 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
         } catch {
             // If protected resource metadata fetch fails (e.g., 404), 
             // fall back to treating the URL as the authorization server itself
-            LogManager.logDebug("Could not fetch protected resource metadata from \(pdsURL), treating it as authorization server")
-            authServerURL = pdsURL
+            LogManager.logDebug("Could not fetch protected resource metadata from \(finalPDSURL), treating it as authorization server")
+            authServerURL = finalPDSURL
         }
         
         let authServerMetadata = try await fetchAuthorizationServerMetadata(
@@ -686,7 +703,9 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
         try await storage.saveOAuthState(finalOauthState) // Save the complete state
         LogManager.logDebug("Saved OAuth state for sign-up with PAR nonce status: \(parNonce != nil ? "present" : "none")", category: .authentication)
         // Build authorization URL
-        var components = URLComponents(string: authServerMetadata.authorizationEndpoint)!
+        guard var components = URLComponents(string: authServerMetadata.authorizationEndpoint) else {
+            throw AuthError.invalidOAuthConfiguration
+        }
         components.queryItems = [
             URLQueryItem(name: "request_uri", value: requestURI),
             URLQueryItem(name: "client_id", value: oauthConfig.clientId), // FIX: Use self.oauthConfig
@@ -715,7 +734,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
         state: String,
         ephemeralKey: P256.Signing.PrivateKey // <-- ADD Parameter
     ) async throws -> (requestURI: String, parNonce: String?) { // <-- MODIFIED Return Type
-        var parameters: [String: String] = [
+        let parameters: [String: String] = [
             "client_id": oauthConfig.clientId, // FIX: Use self.oauthConfig
             "redirect_uri": oauthConfig.redirectUri, // FIX: Use self.oauthConfig
             "response_type": "code",
@@ -727,7 +746,10 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
 
         let body = encodeFormData(parameters)
 
-        var request = URLRequest(url: URL(string: endpoint)!)
+        guard let endpointURL = URL(string: endpoint) else {
+            throw AuthError.invalidOAuthConfiguration
+        }
+        var request = URLRequest(url: endpointURL)
         request.httpMethod = "POST"
         request.httpBody = body
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
@@ -868,7 +890,10 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
         let body = encodeFormData(parameters)
 
         // Create the request
-        var request = URLRequest(url: URL(string: endpoint)!)
+        guard let endpointURL = URL(string: endpoint) else {
+            throw AuthError.invalidOAuthConfiguration
+        }
+        var request = URLRequest(url: endpointURL)
         request.httpMethod = "POST"
         request.httpBody = body
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
@@ -1034,7 +1059,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
         // Use the coordinator to prevent concurrent refreshes
         do {
             // The coordinator expects a function returning the raw response data and response object
-            let (refreshData, refreshResponse): (Data, HTTPURLResponse) = try await refreshCoordinator.coordinateRefresh(
+            let (refreshData, _): (Data, HTTPURLResponse) = try await refreshCoordinator.coordinateRefresh(
                 performing: { () async throws -> (Data, HTTPURLResponse) in
                     // Perform the token refresh call
                     let (data, response) = try await self.performTokenRefresh(for: account.did)
@@ -1263,7 +1288,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
         request.httpBody = encodeFormData(requestBody)
 
         // Get the domain for nonce lookup
-        let domain = endpointURL.host?.lowercased() ?? ""
+        _ = endpointURL.host?.lowercased() ?? ""
 
         // Add DPoP proof
         let dpopProof = try await createDPoPProof(
@@ -1434,11 +1459,11 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
 
         // Create JWK from the determined private key
         let jwk = try createJWK(from: privateKey)
-        let jwkThumbprint = try calculateJWKThumbprint(jwk: jwk) // Needed for token requests
+        _ = try calculateJWKThumbprint(jwk: jwk) // Needed for token requests
 
         // Prepare DPoP payload
-        let jti = UUID().uuidString
-        let iat = Int(Date().timeIntervalSince1970)
+        _ = UUID().uuidString
+        _ = Int(Date().timeIntervalSince1970)
         var ath: String? = nil
 
         if type == .resourceAccess, let token = accessToken {
@@ -1719,7 +1744,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
                 } catch {
                     LogManager.logError("Failed to decode token response: \(error)")
                     // Log the actual response body for debugging
-                    let responseBody = String(data: data, encoding: .utf8) ?? "Could not decode response body"
+                    _ = String(data: data, encoding: .utf8) ?? "Could not decode response body"
                     LogManager.logError("Token exchange response decode failed", category: .authentication)
                     throw AuthError.invalidResponse
                 }
@@ -1975,7 +2000,10 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
     /// - Returns: The protected resource metadata.
     private func fetchProtectedResourceMetadata(pdsURL: URL) async throws -> ProtectedResourceMetadata {
         let endpoint = "\(pdsURL.absoluteString)/.well-known/oauth-protected-resource"
-        let request = URLRequest(url: URL(string: endpoint)!)
+        guard let endpointURL = URL(string: endpoint) else {
+            throw AuthError.invalidOAuthConfiguration
+        }
+        let request = URLRequest(url: endpointURL)
 
         let (data, _) = try await networkService.request(request)
         let metadata = try JSONDecoder().decode(ProtectedResourceMetadata.self, from: data)
@@ -1990,7 +2018,10 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
         -> AuthorizationServerMetadata
     {
         let endpoint = "\(authServerURL.absoluteString)/.well-known/oauth-authorization-server"
-        let request = URLRequest(url: URL(string: endpoint)!)
+        guard let endpointURL = URL(string: endpoint) else {
+            throw AuthError.invalidOAuthConfiguration
+        }
+        let request = URLRequest(url: endpointURL)
 
         let (data, _) = try await networkService.request(request)
         let metadata = try JSONDecoder().decode(AuthorizationServerMetadata.self, from: data)

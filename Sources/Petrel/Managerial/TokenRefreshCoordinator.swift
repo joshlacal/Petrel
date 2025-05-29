@@ -156,7 +156,7 @@ actor TokenRefreshCoordinator {
             let typedContinuation = AnyTypedContinuation<T>(continuation)
 
             // Check if a refresh is already in progress.
-            if let existingTask = refreshTask {
+            if refreshTask != nil {
                 LogManager.logInfo(
                     "TokenRefreshCoordinator: Refresh already in progress for \(T.self), adding to \(waitingContinuations.count) waiters."
                 )
@@ -203,7 +203,7 @@ actor TokenRefreshCoordinator {
 
                             } catch {
                                 LogManager.logError(
-                                    "TokenRefreshCoordinator: Failed to decode successful refresh response: \(error). Data: \(String(data: data, encoding: .utf8) ?? "nil")"
+                                    "TokenRefreshCoordinator: Failed to decode successful refresh response: \(error)", category: .authentication
                                 )
                                 // If decoding fails on a 2xx response, it's a critical error.
                                 throw RefreshError.decodingError(error, "Decoding 2xx response")
@@ -251,9 +251,8 @@ actor TokenRefreshCoordinator {
     /// Creates a specific `RefreshError` based on HTTP status code and data.
     private func createErrorFromResult(data: Data, response: HTTPURLResponse) -> RefreshError {
         let statusCode = response.statusCode
-        let bodyString = String(data: data, encoding: .utf8) ?? "Could not decode body"
         LogManager.logError(
-            "TokenRefreshCoordinator: Creating error for status \(statusCode). Body: \(bodyString)")
+            "TokenRefreshCoordinator: Creating error for status \(statusCode)", category: .authentication)
 
         // Try decoding as standard OAuth error first
         if let errorResponse = try? JSONDecoder().decode(OAuthErrorResponse.self, from: data) {
@@ -268,12 +267,12 @@ actor TokenRefreshCoordinator {
             default:
                 // Treat other known OAuth errors as specific network errors, including description
                 return .networkError(
-                    statusCode, "\(errorResponse.error): \(errorResponse.errorDescription ?? bodyString)"
+                    statusCode, "\(errorResponse.error): \(errorResponse.errorDescription ?? "Unknown error")"
                 )
             }
         } else {
             // If not a standard OAuth error, return a generic network error
-            return .networkError(statusCode, "HTTP Error: \(bodyString)")
+            return .networkError(statusCode, "HTTP Error: \(statusCode)")
         }
     }
 

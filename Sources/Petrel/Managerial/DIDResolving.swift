@@ -89,8 +89,13 @@ actor DIDResolutionService: DIDResolving {
         do {
             let (data, response) = try await networkService.performRequest(request)
 
-            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-                logger.warning("Non-200 response from well-known endpoint: \(response.statusCode)")
+            guard let httpResponse = response as? HTTPURLResponse else {
+                logger.warning("Invalid response type from well-known endpoint")
+                return nil
+            }
+            
+            guard httpResponse.statusCode == 200 else {
+                logger.warning("Non-200 response from well-known endpoint: \(httpResponse.statusCode)")
                 return nil
             }
 
@@ -132,10 +137,15 @@ actor DIDResolutionService: DIDResolving {
         )
 
         let (responseData, response) = try await networkService.performRequest(urlRequest)
-        let responseCode = response.statusCode
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        let responseCode = httpResponse.statusCode
 
         // Content-Type validation
-        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+        guard let contentType = httpResponse.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
 
@@ -247,9 +257,14 @@ actor DIDResolutionService: DIDResolving {
 
         let (data, response) = try await networkService.performRequest(request)
 
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+        guard let httpResponse = response as? HTTPURLResponse else {
             throw DIDResolutionError.networkError(
-                NSError(domain: "DIDResolution", code: response.statusCode))
+                NSError(domain: "DIDResolution", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response type"]))
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            throw DIDResolutionError.networkError(
+                NSError(domain: "DIDResolution", code: httpResponse.statusCode))
         }
 
         let decoder = JSONDecoder()
@@ -286,9 +301,14 @@ actor DIDResolutionService: DIDResolving {
 
         let (data, response) = try await networkService.performRequest(request)
 
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+        guard let httpResponse = response as? HTTPURLResponse else {
             throw DIDResolutionError.networkError(
-                NSError(domain: "DIDResolution", code: response.statusCode))
+                NSError(domain: "DIDResolution", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response type"]))
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            throw DIDResolutionError.networkError(
+                NSError(domain: "DIDResolution", code: httpResponse.statusCode))
         }
 
         let decoder = JSONDecoder()

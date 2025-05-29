@@ -227,7 +227,7 @@ public actor NetworkService: NetworkServiceProtocol {
     ///   - name: The header name.
     ///   - value: The header value.
     public func setHeader(name: String, value: String) async {
-        LogManager.logDebug("Network Service - Setting header: \(name) = \(value)")
+        LogManager.logSensitiveValue(value, label: "Network Service - Setting header: \(name)", category: .network)
         headers[name] = value
     }
 
@@ -500,8 +500,10 @@ public actor NetworkService: NetworkServiceProtocol {
                     }
 
                     if let nonce = foundNonce {
-                        LogManager.logDebug(
-                            "Network Service - Storing nonce '\(nonce)' from \(httpResponse.statusCode) response for \(url.host ?? "N/A")."
+                        LogManager.logSensitiveValue(
+                            nonce,
+                            label: "Network Service - Storing nonce from \(httpResponse.statusCode) response for \(url.host ?? "N/A")",
+                            category: .network
                         )
 
                         // Create a header dictionary with the expected case for the key
@@ -511,7 +513,7 @@ public actor NetworkService: NetworkServiceProtocol {
                         await authProvider.updateDPoPNonce(for: url, from: nonceHeaders)
 
                         LogManager.logDebug(
-                            "Network Service - Nonce storage complete for \(url.host ?? "N/A"): \(nonce)")
+                            "Network Service - Nonce storage complete for \(url.host ?? "N/A")", category: .network)
                     } else {
                         LogManager.logDebug(
                             "Network Service - No DPoP-Nonce header found in \(httpResponse.statusCode) response."
@@ -582,8 +584,10 @@ public actor NetworkService: NetworkServiceProtocol {
                         let responseHeaders = httpResponse.allHeaderFields as? [String: String] ?? [:]
                         if let nonce = responseHeaders["DPoP-Nonce"] {
                             // Explicitly store the nonce again, to be double-sure
-                            LogManager.logInfo(
-                                "Network Service - Re-storing nonce '\(nonce)' for domain \(url.host?.lowercased() ?? "unknown") before retry."
+                            LogManager.logSensitiveValue(
+                                nonce,
+                                label: "Network Service - Re-storing nonce for domain \(url.host?.lowercased() ?? "unknown") before retry",
+                                category: .network
                             )
 
                             // Add an explicit delay to ensure storage completes before retry

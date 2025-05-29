@@ -42,7 +42,10 @@ public struct ATProtocolURI: ATProtocolValue, CustomStringConvertible, QueryPara
             throw ATProtocolError.invalidURI("Invalid AT URI format")
         }
 
-        // Use simple string manipulation
+        // Use simple string manipulation with bounds checking
+        guard uriString.count > 5 else {
+            throw ATProtocolError.invalidURI("Invalid AT URI: too short")
+        }
         let parts = uriString.dropFirst(5).split(separator: "/", omittingEmptySubsequences: false)
 
         guard !parts.isEmpty else {
@@ -63,6 +66,10 @@ public struct ATProtocolURI: ATProtocolValue, CustomStringConvertible, QueryPara
             throw ATProtocolError.invalidURI("Invalid AT URI format or length")
         }
 
+        // Safe string trimming with bounds checking
+        guard uriString.count > 5 else {
+            throw ATProtocolError.invalidURI("Invalid AT URI: too short")
+        }
         let trimmedString = String(uriString.dropFirst(5)) // Remove "at://"
         let components = trimmedString.split(separator: "/", omittingEmptySubsequences: false)
 
@@ -135,7 +142,7 @@ public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConve
             }
             scheme = String(components[0])
             authority = String(components[1])
-            path = components.dropFirst(2).joined(separator: ":")
+            path = components.count > 2 ? components.dropFirst(2).joined(separator: ":") : nil
             query = nil
             fragment = nil
         } else {
@@ -154,7 +161,7 @@ public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConve
             isDID = true
             let components = uriString.split(separator: ":")
             scheme = "did"
-            authority = String(components[1])
+            authority = components.count > 1 ? String(components[1]) : ""
             path = components.count > 2 ? components.dropFirst(2).joined(separator: ":") : nil
             query = nil
             fragment = nil
@@ -410,6 +417,10 @@ public struct DID: ATProtocolValue, CustomStringConvertible, QueryParameterConve
             throw ATProtocolError.invalidURI("Invalid DID format or length")
         }
 
+        // Safe DID string parsing with bounds checking
+        guard didString.count > 4 else {
+            throw ATProtocolError.invalidURI("Invalid DID: too short")
+        }
         let components = didString.dropFirst(4).split(separator: ":", omittingEmptySubsequences: false)
 
         guard !components.isEmpty, !components[0].isEmpty else {
@@ -494,8 +505,14 @@ public struct Handle: ATProtocolValue, CustomStringConvertible, QueryParameterCo
     }
 
     private static func isValidHandle(_ handle: String) -> Bool {
-        guard let regex = try? NSRegularExpression(pattern: handlePattern) else {
+        // Basic validation before regex
+        guard !handle.isEmpty, handle.count <= 253 else {
             return false
+        }
+        
+        guard let regex = try? NSRegularExpression(pattern: handlePattern, options: []) else {
+            // Fallback validation without regex
+            return handle.allSatisfy { $0.isLetter || $0.isNumber || $0 == "." || $0 == "-" }
         }
 
         let range = NSRange(location: 0, length: handle.utf16.count)
@@ -631,13 +648,25 @@ public struct NSID: ATProtocolValue, CustomStringConvertible, QueryParameterConv
         }
 
         let components = nsidString.split(separator: ".")
+        guard !components.isEmpty else {
+            throw ATProtocolError.invalidURI("Invalid NSID: no components found")
+        }
         name = String(components.last ?? "")
-        authority = components.dropLast().joined(separator: ".")
+        authority = components.count > 1 ? components.dropLast().joined(separator: ".") : ""
     }
 
     private static func isValidNSID(_ nsid: String) -> Bool {
-        guard let regex = try? NSRegularExpression(pattern: nsidPattern) else {
+        // Basic validation before regex
+        guard !nsid.isEmpty, nsid.count <= 584 else {
             return false
+        }
+        
+        guard let regex = try? NSRegularExpression(pattern: nsidPattern, options: []) else {
+            // Fallback validation without regex
+            let components = nsid.split(separator: ".")
+            return components.count >= 3 && components.allSatisfy { component in
+                !component.isEmpty && component.allSatisfy { $0.isLetter || $0.isNumber || $0 == "-" }
+            }
         }
 
         let range = NSRange(location: 0, length: nsid.utf16.count)
@@ -707,8 +736,16 @@ public struct RecordKey: ATProtocolValue, CustomStringConvertible, QueryParamete
     }
 
     private static func isValidRecordKey(_ key: String) -> Bool {
-        guard let regex = try? NSRegularExpression(pattern: recordKeyPattern) else {
+        // Basic validation before regex
+        guard !key.isEmpty, key.count <= 512 else {
             return false
+        }
+        
+        guard let regex = try? NSRegularExpression(pattern: recordKeyPattern, options: []) else {
+            // Fallback validation without regex
+            return key.allSatisfy { char in
+                char.isLetter || char.isNumber || "-_.:%".contains(char)
+            }
         }
 
         let range = NSRange(location: 0, length: key.utf16.count)
