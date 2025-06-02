@@ -23,7 +23,13 @@ extension ATProtoClient.{{ template_namespace_name }} {
             queryItems: queryItems
         )
 
+        {% if endpoint.startswith('chat.bsky') %}
+        // Chat endpoint - use proxy header
+        let proxyHeaders = ["atproto-proxy": "did:web:api.bsky.chat#bsky_chat"]
+        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        {% else %}
         let (responseData, response) = try await networkService.performRequest(urlRequest)
+        {% endif %}
         let responseCode = response.statusCode
 
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {

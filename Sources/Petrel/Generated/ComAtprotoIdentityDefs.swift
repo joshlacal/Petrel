@@ -1,20 +1,25 @@
 import Foundation
 
+
+
 // lexicon: 1, id: com.atproto.identity.defs
 
-public enum ComAtprotoIdentityDefs {
-    public static let typeIdentifier = "com.atproto.identity.defs"
 
-    public struct IdentityInfo: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "com.atproto.identity.defs#identityInfo"
-        public let did: DID
-        public let handle: Handle
-        public let didDoc: DIDDocument
+public struct ComAtprotoIdentityDefs { 
+
+    public static let typeIdentifier = "com.atproto.identity.defs"
+        
+public struct IdentityInfo: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "com.atproto.identity.defs#identityInfo"
+            public let did: DID
+            public let handle: Handle
+            public let didDoc: DIDDocument
 
         // Standard initializer
         public init(
             did: DID, handle: Handle, didDoc: DIDDocument
         ) {
+            
             self.did = did
             self.handle = handle
             self.didDoc = didDoc
@@ -22,39 +27,47 @@ public enum ComAtprotoIdentityDefs {
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                did = try container.decode(DID.self, forKey: .did)
-
+                
+                self.did = try container.decode(DID.self, forKey: .did)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'did': \(error)")
                 throw error
             }
             do {
-                handle = try container.decode(Handle.self, forKey: .handle)
-
+                
+                self.handle = try container.decode(Handle.self, forKey: .handle)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'handle': \(error)")
                 throw error
             }
             do {
-                didDoc = try container.decode(DIDDocument.self, forKey: .didDoc)
-
+                
+                self.didDoc = try container.decode(DIDDocument.self, forKey: .didDoc)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'didDoc': \(error)")
                 throw error
             }
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
             try container.encode(did, forKey: .did)
-
+            
+            
             try container.encode(handle, forKey: .handle)
-
+            
+            
             try container.encode(didDoc, forKey: .didDoc)
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -64,21 +77,25 @@ public enum ComAtprotoIdentityDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
             guard let other = other as? Self else { return false }
-
-            if did != other.did {
+            
+            if self.did != other.did {
                 return false
             }
-
-            if handle != other.handle {
+            
+            
+            if self.handle != other.handle {
                 return false
             }
-
-            if didDoc != other.didDoc {
+            
+            
+            if self.didDoc != other.didDoc {
                 return false
             }
-
+            
             return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -91,14 +108,25 @@ public enum ComAtprotoIdentityDefs {
 
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
+            
+            
+            
             let didValue = try did.toCBORValue()
             map = map.adding(key: "did", value: didValue)
-
+            
+            
+            
+            
             let handleValue = try handle.toCBORValue()
             map = map.adding(key: "handle", value: handleValue)
-
+            
+            
+            
+            
             let didDocValue = try didDoc.toCBORValue()
             map = map.adding(key: "didDoc", value: didDocValue)
+            
+            
 
             return map
         }
@@ -110,4 +138,10 @@ public enum ComAtprotoIdentityDefs {
             case didDoc
         }
     }
+
+
+
 }
+
+
+                           
