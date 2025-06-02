@@ -54,7 +54,13 @@ extension ATProtoClient.{{ template_namespace_name }} {
         )
 
         {% if output_type %}
+        {% if endpoint.startswith('chat.bsky') %}
+        // Chat endpoint - use proxy header
+        let proxyHeaders = ["atproto-proxy": "did:web:api.bsky.chat#bsky_chat"]
+        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        {% else %}
         let (responseData, response) = try await networkService.performRequest(urlRequest)
+        {% endif %}
         let responseCode = response.statusCode
 
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
@@ -76,7 +82,13 @@ extension ATProtoClient.{{ template_namespace_name }} {
 
         return (responseCode, decodedData)
         {% else %}
+        {% if endpoint.startswith('chat.bsky') %}
+        // Chat endpoint - use proxy header
+        let proxyHeaders = ["atproto-proxy": "did:web:api.bsky.chat#bsky_chat"]
+        let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        {% else %}
         let (_, response) = try await networkService.performRequest(urlRequest)
+        {% endif %}
         let responseCode = response.statusCode
         return responseCode
         {% endif %}

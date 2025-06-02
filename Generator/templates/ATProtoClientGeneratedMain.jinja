@@ -249,14 +249,6 @@ public actor ATProtoClient {
         networkService.removeHeader(name: "atproto-proxy")
     }
     
-    public func setProxyHeader(did: String, service: String) async {
-        await networkService.setHeader(name: "atproto-proxy", value: "\(did)#\(service)")
-    }
-    
-    public func clearProxyHeader() async {
-        networkService.removeHeader(name: "atproto-proxy")
-    }
-
 
 
     // MARK: - Authentication Flow Methods

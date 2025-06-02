@@ -1,98 +1,136 @@
 import Foundation
 
+
+
 // lexicon: 1, id: com.atproto.label.queryLabels
 
-public enum ComAtprotoLabelQueryLabels {
-    public static let typeIdentifier = "com.atproto.label.queryLabels"
-    public struct Parameters: Parametrizable {
+
+public struct ComAtprotoLabelQueryLabels { 
+
+    public static let typeIdentifier = "com.atproto.label.queryLabels"    
+public struct Parameters: Parametrizable {
         public let uriPatterns: [String]
         public let sources: [DID]?
         public let limit: Int?
         public let cursor: String?
-
+        
         public init(
-            uriPatterns: [String],
-            sources: [DID]? = nil,
-            limit: Int? = nil,
+            uriPatterns: [String], 
+            sources: [DID]? = nil, 
+            limit: Int? = nil, 
             cursor: String? = nil
-        ) {
+            ) {
             self.uriPatterns = uriPatterns
             self.sources = sources
             self.limit = limit
             self.cursor = cursor
+            
         }
     }
-
-    public struct Output: ATProtocolCodable {
+    
+public struct Output: ATProtocolCodable {
+        
+        
         public let cursor: String?
-
+        
         public let labels: [ComAtprotoLabelDefs.Label]
-
+        
+        
+        
         // Standard public initializer
         public init(
+            
             cursor: String? = nil,
-
+            
             labels: [ComAtprotoLabelDefs.Label]
-
+            
+            
         ) {
+            
             self.cursor = cursor
-
+            
             self.labels = labels
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
-            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
-
-            labels = try container.decode([ComAtprotoLabelDefs.Label].self, forKey: .labels)
+            
+            
+            self.cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+            
+            
+            self.labels = try container.decode([ComAtprotoLabelDefs.Label].self, forKey: .labels)
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(cursor, forKey: .cursor)
-
+            
+            
             try container.encode(labels, forKey: .labels)
+            
+            
         }
 
         public func toCBORValue() throws -> Any {
+            
             var map = OrderedCBORMap()
 
+            
+            
             if let value = cursor {
                 // Encode optional property even if it's an empty array for CBOR
                 let cursorValue = try value.toCBORValue()
                 map = map.adding(key: "cursor", value: cursorValue)
             }
-
+            
+            
+            
             let labelsValue = try labels.toCBORValue()
             map = map.adding(key: "labels", value: labelsValue)
+            
+            
 
             return map
+            
         }
-
+        
         private enum CodingKeys: String, CodingKey {
+            
             case cursor
             case labels
+            
         }
     }
+
+
+
+
 }
 
-public extension ATProtoClient.Com.Atproto.Label {
+
+extension ATProtoClient.Com.Atproto.Label {
     // MARK: - queryLabels
 
     /// Find labels relevant to the provided AT-URI patterns. Public endpoint for moderation services, though may return different or additional results with auth.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-    ///
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    func queryLabels(input: ComAtprotoLabelQueryLabels.Parameters) async throws -> (responseCode: Int, data: ComAtprotoLabelQueryLabels.Output?) {
+    public func queryLabels(input: ComAtprotoLabelQueryLabels.Parameters) async throws -> (responseCode: Int, data: ComAtprotoLabelQueryLabels.Output?) {
         let endpoint = "com.atproto.label.queryLabels"
 
+        
         let queryItems = input.asQueryItems()
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -101,7 +139,9 @@ public extension ATProtoClient.Com.Atproto.Label {
             queryItems: queryItems
         )
 
+        
         let (responseData, response) = try await networkService.performRequest(urlRequest)
+        
         let responseCode = response.statusCode
 
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
@@ -112,9 +152,11 @@ public extension ATProtoClient.Com.Atproto.Label {
             throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
         }
 
+        
         let decoder = JSONDecoder()
         let decodedData = try? decoder.decode(ComAtprotoLabelQueryLabels.Output.self, from: responseData)
+        
 
         return (responseCode, decodedData)
     }
-}
+}                           

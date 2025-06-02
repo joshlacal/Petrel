@@ -39,19 +39,22 @@ public protocol NetworkServiceProtocol: Sendable {
     /// Performs a network request with the provided URLRequest.
     /// - Parameter request: The URLRequest to perform.
     /// - Parameter skipTokenRefresh: Whether to skip token refresh (to avoid circular dependencies).
+    /// - Parameter additionalHeaders: Optional additional headers to include with this specific request.
     /// - Returns: A tuple containing the response data and URLResponse.
-    func request(_ request: URLRequest, skipTokenRefresh: Bool) async throws -> (Data, URLResponse)
+    func request(_ request: URLRequest, skipTokenRefresh: Bool, additionalHeaders: [String: String]?) async throws -> (Data, URLResponse)
 
     /// Performs a GET request to the specified endpoint.
     /// - Parameters:
     ///   - endpoint: The API endpoint path.
     ///   - queryItems: Optional query parameters.
     ///   - requiresAuth: Whether the request requires authentication.
+    ///   - additionalHeaders: Optional additional headers to include with this specific request.
     /// - Returns: The decoded response data.
     func get<T: Decodable & Sendable>(
         endpoint: String,
         queryItems: [URLQueryItem]?,
-        requiresAuth: Bool
+        requiresAuth: Bool,
+        additionalHeaders: [String: String]?
     ) async throws -> T
 
     /// Performs a POST request to the specified endpoint.
@@ -59,11 +62,13 @@ public protocol NetworkServiceProtocol: Sendable {
     ///   - endpoint: The API endpoint path.
     ///   - body: The request body to send.
     ///   - requiresAuth: Whether the request requires authentication.
+    ///   - additionalHeaders: Optional additional headers to include with this specific request.
     /// - Returns: The decoded response data.
     func post<T: Decodable & Sendable, B: Encodable & Sendable>(
         endpoint: String,
         body: B?,
-        requiresAuth: Bool
+        requiresAuth: Bool,
+        additionalHeaders: [String: String]?
     ) async throws -> T
 
     /// Sets the base URL for API requests.
@@ -411,8 +416,9 @@ public actor NetworkService: NetworkServiceProtocol {
     /// Performs a network request with the provided URLRequest.
     /// - Parameter request: The URLRequest to perform.
     /// - Parameter skipTokenRefresh: Whether to skip token refresh.
+    /// - Parameter additionalHeaders: Optional additional headers to include with this specific request.
     /// - Returns: A tuple containing the response data and URLResponse.
-    public func request(_ request: URLRequest, skipTokenRefresh: Bool = false) async throws -> (
+    public func request(_ request: URLRequest, skipTokenRefresh: Bool = false, additionalHeaders: [String: String]? = nil) async throws -> (
         Data, URLResponse
     ) {
         let currentRequest = request
@@ -462,6 +468,13 @@ public actor NetworkService: NetworkServiceProtocol {
             // Add custom headers
             for (name, value) in headers {
                 requestToSend.setValue(value, forHTTPHeaderField: name)
+            }
+            
+            // Add additional headers for this specific request
+            if let additionalHeaders = additionalHeaders {
+                for (name, value) in additionalHeaders {
+                    requestToSend.setValue(value, forHTTPHeaderField: name)
+                }
             }
             if let userAgent = userAgent {
                 requestToSend.setValue(userAgent, forHTTPHeaderField: "User-Agent")
@@ -706,11 +719,13 @@ public actor NetworkService: NetworkServiceProtocol {
     ///   - endpoint: The API endpoint path.
     ///   - queryItems: Optional query parameters.
     ///   - requiresAuth: Whether the request requires authentication.
+    ///   - additionalHeaders: Optional additional headers to include with this specific request.
     /// - Returns: The decoded response data.
     public func get<T: Decodable & Sendable>(
         endpoint: String,
         queryItems: [URLQueryItem]? = nil,
-        requiresAuth: Bool = true
+        requiresAuth: Bool = true,
+        additionalHeaders: [String: String]? = nil
     ) async throws -> T {
         let urlRequest = try await createURLRequest(
             endpoint: endpoint,
@@ -720,7 +735,7 @@ public actor NetworkService: NetworkServiceProtocol {
             queryItems: queryItems
         )
 
-        let (data, _) = try await request(urlRequest)
+        let (data, _) = try await request(urlRequest, additionalHeaders: additionalHeaders)
 
         do {
             return try jsonDecoder.decode(T.self, from: data)
@@ -735,11 +750,13 @@ public actor NetworkService: NetworkServiceProtocol {
     ///   - endpoint: The API endpoint path.
     ///   - body: The request body to send.
     ///   - requiresAuth: Whether the request requires authentication.
+    ///   - additionalHeaders: Optional additional headers to include with this specific request.
     /// - Returns: The decoded response data.
     public func post<T: Decodable & Sendable, B: Encodable & Sendable>(
         endpoint: String,
         body: B? = nil,
-        requiresAuth: Bool = true
+        requiresAuth: Bool = true,
+        additionalHeaders: [String: String]? = nil
     ) async throws -> T {
         var bodyData: Data? = nil
         if let body = body {
@@ -754,7 +771,7 @@ public actor NetworkService: NetworkServiceProtocol {
             queryItems: nil
         )
 
-        let (data, _) = try await request(urlRequest)
+        let (data, _) = try await request(urlRequest, additionalHeaders: additionalHeaders)
 
         do {
             return try jsonDecoder.decode(T.self, from: data)
@@ -844,11 +861,12 @@ public actor NetworkService: NetworkServiceProtocol {
     /// - Parameters:
     ///   - request: The URLRequest to perform.
     ///   - skipTokenRefresh: Whether to skip token refresh.
+    ///   - additionalHeaders: Optional additional headers to include with this specific request.
     /// - Returns: A tuple containing the response data and HTTPURLResponse.
-    public func performRequest(_ request: URLRequest, skipTokenRefresh: Bool) async throws -> (
+    public func performRequest(_ request: URLRequest, skipTokenRefresh: Bool, additionalHeaders: [String: String]? = nil) async throws -> (
         Data, HTTPURLResponse
     ) {
-        let (data, response) = try await self.request(request, skipTokenRefresh: skipTokenRefresh)
+        let (data, response) = try await self.request(request, skipTokenRefresh: skipTokenRefresh, additionalHeaders: additionalHeaders)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
         }
