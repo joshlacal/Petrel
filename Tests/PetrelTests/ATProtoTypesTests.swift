@@ -10,7 +10,7 @@ struct ATProtoTypesTests {
         func validDIDCreation() throws {
             #expect(try DID(didString: "did:plc:abcd1234").description == "did:plc:abcd1234")
             #expect(try DID(didString: "did:web:example.com").description == "did:web:example.com")
-            #expect(!try DID(didString: "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK").description.isEmpty)
+            #expect(! try DID(didString: "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK").description.isEmpty)
         }
 
         @Test("Invalid DID creation")
