@@ -1,26 +1,31 @@
 import Foundation
 
+
+
 // lexicon: 1, id: chat.bsky.actor.defs
 
-public enum ChatBskyActorDefs {
-    public static let typeIdentifier = "chat.bsky.actor.defs"
 
-    public struct ProfileViewBasic: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "chat.bsky.actor.defs#profileViewBasic"
-        public let did: DID
-        public let handle: Handle
-        public let displayName: String?
-        public let avatar: URI?
-        public let associated: AppBskyActorDefs.ProfileAssociated?
-        public let viewer: AppBskyActorDefs.ViewerState?
-        public let labels: [ComAtprotoLabelDefs.Label]?
-        public let chatDisabled: Bool?
-        public let verification: AppBskyActorDefs.VerificationState?
+public struct ChatBskyActorDefs { 
+
+    public static let typeIdentifier = "chat.bsky.actor.defs"
+        
+public struct ProfileViewBasic: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "chat.bsky.actor.defs#profileViewBasic"
+            public let did: DID
+            public let handle: Handle
+            public let displayName: String?
+            public let avatar: URI?
+            public let associated: AppBskyActorDefs.ProfileAssociated?
+            public let viewer: AppBskyActorDefs.ViewerState?
+            public let labels: [ComAtprotoLabelDefs.Label]?
+            public let chatDisabled: Bool?
+            public let verification: AppBskyActorDefs.VerificationState?
 
         // Standard initializer
         public init(
             did: DID, handle: Handle, displayName: String?, avatar: URI?, associated: AppBskyActorDefs.ProfileAssociated?, viewer: AppBskyActorDefs.ViewerState?, labels: [ComAtprotoLabelDefs.Label]?, chatDisabled: Bool?, verification: AppBskyActorDefs.VerificationState?
         ) {
+            
             self.did = did
             self.handle = handle
             self.displayName = displayName
@@ -34,100 +39,120 @@ public enum ChatBskyActorDefs {
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                did = try container.decode(DID.self, forKey: .did)
-
+                
+                self.did = try container.decode(DID.self, forKey: .did)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'did': \(error)")
                 throw error
             }
             do {
-                handle = try container.decode(Handle.self, forKey: .handle)
-
+                
+                self.handle = try container.decode(Handle.self, forKey: .handle)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'handle': \(error)")
                 throw error
             }
             do {
-                displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
-
+                
+                self.displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'displayName': \(error)")
                 throw error
             }
             do {
-                avatar = try container.decodeIfPresent(URI.self, forKey: .avatar)
-
+                
+                self.avatar = try container.decodeIfPresent(URI.self, forKey: .avatar)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'avatar': \(error)")
                 throw error
             }
             do {
-                associated = try container.decodeIfPresent(AppBskyActorDefs.ProfileAssociated.self, forKey: .associated)
-
+                
+                self.associated = try container.decodeIfPresent(AppBskyActorDefs.ProfileAssociated.self, forKey: .associated)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'associated': \(error)")
                 throw error
             }
             do {
-                viewer = try container.decodeIfPresent(AppBskyActorDefs.ViewerState.self, forKey: .viewer)
-
+                
+                self.viewer = try container.decodeIfPresent(AppBskyActorDefs.ViewerState.self, forKey: .viewer)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'viewer': \(error)")
                 throw error
             }
             do {
-                labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
-
+                
+                self.labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'labels': \(error)")
                 throw error
             }
             do {
-                chatDisabled = try container.decodeIfPresent(Bool.self, forKey: .chatDisabled)
-
+                
+                self.chatDisabled = try container.decodeIfPresent(Bool.self, forKey: .chatDisabled)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'chatDisabled': \(error)")
                 throw error
             }
             do {
-                verification = try container.decodeIfPresent(AppBskyActorDefs.VerificationState.self, forKey: .verification)
-
+                
+                self.verification = try container.decodeIfPresent(AppBskyActorDefs.VerificationState.self, forKey: .verification)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'verification': \(error)")
                 throw error
             }
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
             try container.encode(did, forKey: .did)
-
+            
+            
             try container.encode(handle, forKey: .handle)
-
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(displayName, forKey: .displayName)
-
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(avatar, forKey: .avatar)
-
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(associated, forKey: .associated)
-
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(viewer, forKey: .viewer)
-
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(labels, forKey: .labels)
-
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(chatDisabled, forKey: .chatDisabled)
-
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(verification, forKey: .verification)
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -171,45 +196,55 @@ public enum ChatBskyActorDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
             guard let other = other as? Self else { return false }
-
-            if did != other.did {
+            
+            if self.did != other.did {
                 return false
             }
-
-            if handle != other.handle {
+            
+            
+            if self.handle != other.handle {
                 return false
             }
-
+            
+            
             if displayName != other.displayName {
                 return false
             }
-
+            
+            
             if avatar != other.avatar {
                 return false
             }
-
+            
+            
             if associated != other.associated {
                 return false
             }
-
+            
+            
             if viewer != other.viewer {
                 return false
             }
-
+            
+            
             if labels != other.labels {
                 return false
             }
-
+            
+            
             if chatDisabled != other.chatDisabled {
                 return false
             }
-
+            
+            
             if verification != other.verification {
                 return false
             }
-
+            
             return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -222,60 +257,82 @@ public enum ChatBskyActorDefs {
 
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
+            
+            
+            
             let didValue = try did.toCBORValue()
             map = map.adding(key: "did", value: didValue)
-
+            
+            
+            
+            
             let handleValue = try handle.toCBORValue()
             map = map.adding(key: "handle", value: handleValue)
-
+            
+            
+            
             if let value = displayName {
                 // Encode optional property even if it's an empty array for CBOR
-
+                
                 let displayNameValue = try value.toCBORValue()
                 map = map.adding(key: "displayName", value: displayNameValue)
             }
-
+            
+            
+            
             if let value = avatar {
                 // Encode optional property even if it's an empty array for CBOR
-
+                
                 let avatarValue = try value.toCBORValue()
                 map = map.adding(key: "avatar", value: avatarValue)
             }
-
+            
+            
+            
             if let value = associated {
                 // Encode optional property even if it's an empty array for CBOR
-
+                
                 let associatedValue = try value.toCBORValue()
                 map = map.adding(key: "associated", value: associatedValue)
             }
-
+            
+            
+            
             if let value = viewer {
                 // Encode optional property even if it's an empty array for CBOR
-
+                
                 let viewerValue = try value.toCBORValue()
                 map = map.adding(key: "viewer", value: viewerValue)
             }
-
+            
+            
+            
             if let value = labels {
                 // Encode optional property even if it's an empty array for CBOR
-
+                
                 let labelsValue = try value.toCBORValue()
                 map = map.adding(key: "labels", value: labelsValue)
             }
-
+            
+            
+            
             if let value = chatDisabled {
                 // Encode optional property even if it's an empty array for CBOR
-
+                
                 let chatDisabledValue = try value.toCBORValue()
                 map = map.adding(key: "chatDisabled", value: chatDisabledValue)
             }
-
+            
+            
+            
             if let value = verification {
                 // Encode optional property even if it's an empty array for CBOR
-
+                
                 let verificationValue = try value.toCBORValue()
                 map = map.adding(key: "verification", value: verificationValue)
             }
+            
+            
 
             return map
         }
@@ -293,4 +350,10 @@ public enum ChatBskyActorDefs {
             case verification
         }
     }
+
+
+
 }
+
+
+                           
