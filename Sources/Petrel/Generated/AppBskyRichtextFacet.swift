@@ -1,121 +1,99 @@
 import Foundation
 
-
-
 // lexicon: 1, id: app.bsky.richtext.facet
 
-
-public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue { 
-
+public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "app.bsky.richtext.facet"
-        public let index: ByteSlice
-        public let features: [AppBskyRichtextFacetFeaturesUnion]
+    public let index: ByteSlice
+    public let features: [AppBskyRichtextFacetFeaturesUnion]
 
-        public init(index: ByteSlice, features: [AppBskyRichtextFacetFeaturesUnion]) {
-            self.index = index
-            self.features = features
-            
+    public init(index: ByteSlice, features: [AppBskyRichtextFacetFeaturesUnion]) {
+        self.index = index
+        self.features = features
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        index = try container.decode(ByteSlice.self, forKey: .index)
+
+        features = try container.decode([AppBskyRichtextFacetFeaturesUnion].self, forKey: .features)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+
+        try container.encode(index, forKey: .index)
+
+        try container.encode(features, forKey: .features)
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(index)
+        hasher.combine(features)
+    }
+
+    public func isEqual(to other: any ATProtocolValue) -> Bool {
+        guard let other = other as? Self else { return false }
+        if index != other.index {
+            return false
         }
-
-        public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            
-            self.index = try container.decode(ByteSlice.self, forKey: .index)
-            
-            
-            self.features = try container.decode([AppBskyRichtextFacetFeaturesUnion].self, forKey: .features)
-            
+        if features != other.features {
+            return false
         }
+        return true
+    }
 
-        public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-            
-            try container.encode(index, forKey: .index)
-            
-            
-            try container.encode(features, forKey: .features)
-            
-        }
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        return lhs.isEqual(to: rhs)
+    }
 
-        public func hash(into hasher: inout Hasher) {
-            hasher.combine(index)
-            hasher.combine(features)
-        }
+    // DAGCBOR encoding with field ordering
+    public func toCBORValue() throws -> Any {
+        var map = OrderedCBORMap()
 
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let other = other as? Self else { return false }
-            if self.index != other.index {
-                return false
-            }
-            if self.features != other.features {
-                return false
-            }
-            return true
-        }
- 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
+        let indexValue = try index.toCBORValue()
+        map = map.adding(key: "index", value: indexValue)
 
-        // DAGCBOR encoding with field ordering
-        public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+        let featuresValue = try features.toCBORValue()
+        map = map.adding(key: "features", value: featuresValue)
 
-            
-            
-            let indexValue = try index.toCBORValue()
-            map = map.adding(key: "index", value: indexValue)
-            
-            
-            
-            let featuresValue = try features.toCBORValue()
-            map = map.adding(key: "features", value: featuresValue)
-            
-            
+        return map
+    }
 
-            return map
-        }
+    private enum CodingKeys: String, CodingKey {
+        case index
+        case features
+    }
 
-
-
-        private enum CodingKeys: String, CodingKey {
-            case index
-            case features
-        }
-        
-public struct Mention: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.richtext.facet#mention"
-            public let did: DID
+    public struct Mention: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.richtext.facet#mention"
+        public let did: DID
 
         // Standard initializer
         public init(
             did: DID
         ) {
-            
             self.did = did
         }
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
-            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                
-                self.did = try container.decode(DID.self, forKey: .did)
-                
+                did = try container.decode(DID.self, forKey: .did)
+
             } catch {
                 LogManager.logError("Decoding error for property 'did': \(error)")
                 throw error
             }
-            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            
+
             try container.encode(did, forKey: .did)
-            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -123,15 +101,13 @@ public struct Mention: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            
             guard let other = other as? Self else { return false }
-            
-            if self.did != other.did {
+
+            if did != other.did {
                 return false
             }
-            
+
             return true
-            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -144,13 +120,8 @@ public struct Mention: ATProtocolCodable, ATProtocolValue {
 
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            
-            
-            
             let didValue = try did.toCBORValue()
             map = map.adding(key: "did", value: didValue)
-            
-            
 
             return map
         }
@@ -160,40 +131,35 @@ public struct Mention: ATProtocolCodable, ATProtocolValue {
             case did
         }
     }
-        
-public struct Link: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.richtext.facet#link"
-            public let uri: URI
+
+    public struct Link: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.richtext.facet#link"
+        public let uri: URI
 
         // Standard initializer
         public init(
             uri: URI
         ) {
-            
             self.uri = uri
         }
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
-            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                
-                self.uri = try container.decode(URI.self, forKey: .uri)
-                
+                uri = try container.decode(URI.self, forKey: .uri)
+
             } catch {
                 LogManager.logError("Decoding error for property 'uri': \(error)")
                 throw error
             }
-            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            
+
             try container.encode(uri, forKey: .uri)
-            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -201,15 +167,13 @@ public struct Link: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            
             guard let other = other as? Self else { return false }
-            
-            if self.uri != other.uri {
+
+            if uri != other.uri {
                 return false
             }
-            
+
             return true
-            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -222,13 +186,8 @@ public struct Link: ATProtocolCodable, ATProtocolValue {
 
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            
-            
-            
             let uriValue = try uri.toCBORValue()
             map = map.adding(key: "uri", value: uriValue)
-            
-            
 
             return map
         }
@@ -238,40 +197,35 @@ public struct Link: ATProtocolCodable, ATProtocolValue {
             case uri
         }
     }
-        
-public struct Tag: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.richtext.facet#tag"
-            public let tag: String
+
+    public struct Tag: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.richtext.facet#tag"
+        public let tag: String
 
         // Standard initializer
         public init(
             tag: String
         ) {
-            
             self.tag = tag
         }
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
-            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                
-                self.tag = try container.decode(String.self, forKey: .tag)
-                
+                tag = try container.decode(String.self, forKey: .tag)
+
             } catch {
                 LogManager.logError("Decoding error for property 'tag': \(error)")
                 throw error
             }
-            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            
+
             try container.encode(tag, forKey: .tag)
-            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -279,15 +233,13 @@ public struct Tag: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            
             guard let other = other as? Self else { return false }
-            
-            if self.tag != other.tag {
+
+            if tag != other.tag {
                 return false
             }
-            
+
             return true
-            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -300,13 +252,8 @@ public struct Tag: ATProtocolCodable, ATProtocolValue {
 
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            
-            
-            
             let tagValue = try tag.toCBORValue()
             map = map.adding(key: "tag", value: tagValue)
-            
-            
 
             return map
         }
@@ -316,53 +263,46 @@ public struct Tag: ATProtocolCodable, ATProtocolValue {
             case tag
         }
     }
-        
-public struct ByteSlice: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.richtext.facet#byteSlice"
-            public let byteStart: Int
-            public let byteEnd: Int
+
+    public struct ByteSlice: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.richtext.facet#byteSlice"
+        public let byteStart: Int
+        public let byteEnd: Int
 
         // Standard initializer
         public init(
             byteStart: Int, byteEnd: Int
         ) {
-            
             self.byteStart = byteStart
             self.byteEnd = byteEnd
         }
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
-            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                
-                self.byteStart = try container.decode(Int.self, forKey: .byteStart)
-                
+                byteStart = try container.decode(Int.self, forKey: .byteStart)
+
             } catch {
                 LogManager.logError("Decoding error for property 'byteStart': \(error)")
                 throw error
             }
             do {
-                
-                self.byteEnd = try container.decode(Int.self, forKey: .byteEnd)
-                
+                byteEnd = try container.decode(Int.self, forKey: .byteEnd)
+
             } catch {
                 LogManager.logError("Decoding error for property 'byteEnd': \(error)")
                 throw error
             }
-            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            
+
             try container.encode(byteStart, forKey: .byteStart)
-            
-            
+
             try container.encode(byteEnd, forKey: .byteEnd)
-            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -371,20 +311,17 @@ public struct ByteSlice: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            
             guard let other = other as? Self else { return false }
-            
-            if self.byteStart != other.byteStart {
+
+            if byteStart != other.byteStart {
                 return false
             }
-            
-            
-            if self.byteEnd != other.byteEnd {
+
+            if byteEnd != other.byteEnd {
                 return false
             }
-            
+
             return true
-            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -397,19 +334,11 @@ public struct ByteSlice: ATProtocolCodable, ATProtocolValue {
 
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            
-            
-            
             let byteStartValue = try byteStart.toCBORValue()
             map = map.adding(key: "byteStart", value: byteStartValue)
-            
-            
-            
-            
+
             let byteEndValue = try byteEnd.toCBORValue()
             map = map.adding(key: "byteEnd", value: byteEndValue)
-            
-            
 
             return map
         }
@@ -421,431 +350,428 @@ public struct ByteSlice: ATProtocolCodable, ATProtocolValue {
         }
     }
 
+    public enum AppBskyRichtextFacetFeaturesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
+        case appBskyRichtextFacetMention(AppBskyRichtextFacet.Mention)
+        case appBskyRichtextFacetLink(AppBskyRichtextFacet.Link)
+        case appBskyRichtextFacetTag(AppBskyRichtextFacet.Tag)
+        case unexpected(ATProtocolValueContainer)
 
-
-
-
-public enum AppBskyRichtextFacetFeaturesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
-    case appBskyRichtextFacetMention(AppBskyRichtextFacet.Mention)
-    case appBskyRichtextFacetLink(AppBskyRichtextFacet.Link)
-    case appBskyRichtextFacetTag(AppBskyRichtextFacet.Tag)
-    case unexpected(ATProtocolValueContainer)
-    
-    public init(_ value: AppBskyRichtextFacet.Mention) {
-        self = .appBskyRichtextFacetMention(value)
-    }
-    public init(_ value: AppBskyRichtextFacet.Link) {
-        self = .appBskyRichtextFacetLink(value)
-    }
-    public init(_ value: AppBskyRichtextFacet.Tag) {
-        self = .appBskyRichtextFacetTag(value)
-    }
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        let typeValue = try container.decode(String.self, forKey: .type)
-        
-
-        switch typeValue {
-        case "app.bsky.richtext.facet#mention":
-            let value = try AppBskyRichtextFacet.Mention(from: decoder)
+        public init(_ value: AppBskyRichtextFacet.Mention) {
             self = .appBskyRichtextFacetMention(value)
-        case "app.bsky.richtext.facet#link":
-            let value = try AppBskyRichtextFacet.Link(from: decoder)
+        }
+
+        public init(_ value: AppBskyRichtextFacet.Link) {
             self = .appBskyRichtextFacetLink(value)
-        case "app.bsky.richtext.facet#tag":
-            let value = try AppBskyRichtextFacet.Tag(from: decoder)
+        }
+
+        public init(_ value: AppBskyRichtextFacet.Tag) {
             self = .appBskyRichtextFacetTag(value)
-        default:
-            let unknownValue = try ATProtocolValueContainer(from: decoder)
-            self = .unexpected(unknownValue)
         }
-    }
 
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let typeValue = try container.decode(String.self, forKey: .type)
 
-        switch self {
-        case .appBskyRichtextFacetMention(let value):
-            try container.encode("app.bsky.richtext.facet#mention", forKey: .type)
-            try value.encode(to: encoder)
-        case .appBskyRichtextFacetLink(let value):
-            try container.encode("app.bsky.richtext.facet#link", forKey: .type)
-            try value.encode(to: encoder)
-        case .appBskyRichtextFacetTag(let value):
-            try container.encode("app.bsky.richtext.facet#tag", forKey: .type)
-            try value.encode(to: encoder)
-        case .unexpected(let container):
-            try container.encode(to: encoder)
-        
-        }
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        switch self {
-        case .appBskyRichtextFacetMention(let value):
-            hasher.combine("app.bsky.richtext.facet#mention")
-            hasher.combine(value)
-        case .appBskyRichtextFacetLink(let value):
-            hasher.combine("app.bsky.richtext.facet#link")
-            hasher.combine(value)
-        case .appBskyRichtextFacetTag(let value):
-            hasher.combine("app.bsky.richtext.facet#tag")
-            hasher.combine(value)
-        case .unexpected(let container):
-            hasher.combine("unexpected")
-            hasher.combine(container)
-        
-        }
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case type = "$type"
-    }
-    
-    public static func == (lhs: AppBskyRichtextFacetFeaturesUnion, rhs: AppBskyRichtextFacetFeaturesUnion) -> Bool {
-        switch (lhs, rhs) {
-        case (.appBskyRichtextFacetMention(let lhsValue),
-              .appBskyRichtextFacetMention(let rhsValue)):
-            return lhsValue == rhsValue
-        case (.appBskyRichtextFacetLink(let lhsValue),
-              .appBskyRichtextFacetLink(let rhsValue)):
-            return lhsValue == rhsValue
-        case (.appBskyRichtextFacetTag(let lhsValue),
-              .appBskyRichtextFacetTag(let rhsValue)):
-            return lhsValue == rhsValue
-        case (.unexpected(let lhsValue), .unexpected(let rhsValue)):
-            return lhsValue.isEqual(to: rhsValue)
-        
-        default:
-            return false
-        }
-    }
-    
-    public func isEqual(to other: any ATProtocolValue) -> Bool {
-        guard let other = other as? AppBskyRichtextFacetFeaturesUnion else { return false }
-        return self == other
-    }
-    
-    // DAGCBOR encoding with field ordering
-    public func toCBORValue() throws -> Any {
-        // Create an ordered map to maintain field order
-        var map = OrderedCBORMap()
-        
-        switch self {
-        case .appBskyRichtextFacetMention(let value):
-            map = map.adding(key: "$type", value: "app.bsky.richtext.facet#mention")
-            
-            let valueDict = try value.toCBORValue()
-
-            // If the value is already an OrderedCBORMap, merge its entries
-            if let orderedMap = valueDict as? OrderedCBORMap {
-                for (key, value) in orderedMap.entries where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
-            } else if let dict = valueDict as? [String: Any] {
-                // Otherwise add each key-value pair from the dictionary
-                for (key, value) in dict where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
+            switch typeValue {
+            case "app.bsky.richtext.facet#mention":
+                let value = try AppBskyRichtextFacet.Mention(from: decoder)
+                self = .appBskyRichtextFacetMention(value)
+            case "app.bsky.richtext.facet#link":
+                let value = try AppBskyRichtextFacet.Link(from: decoder)
+                self = .appBskyRichtextFacetLink(value)
+            case "app.bsky.richtext.facet#tag":
+                let value = try AppBskyRichtextFacet.Tag(from: decoder)
+                self = .appBskyRichtextFacetTag(value)
+            default:
+                let unknownValue = try ATProtocolValueContainer(from: decoder)
+                self = .unexpected(unknownValue)
             }
-            return map
-        case .appBskyRichtextFacetLink(let value):
-            map = map.adding(key: "$type", value: "app.bsky.richtext.facet#link")
-            
-            let valueDict = try value.toCBORValue()
+        }
 
-            // If the value is already an OrderedCBORMap, merge its entries
-            if let orderedMap = valueDict as? OrderedCBORMap {
-                for (key, value) in orderedMap.entries where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
-            } else if let dict = valueDict as? [String: Any] {
-                // Otherwise add each key-value pair from the dictionary
-                for (key, value) in dict where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            switch self {
+            case let .appBskyRichtextFacetMention(value):
+                try container.encode("app.bsky.richtext.facet#mention", forKey: .type)
+                try value.encode(to: encoder)
+            case let .appBskyRichtextFacetLink(value):
+                try container.encode("app.bsky.richtext.facet#link", forKey: .type)
+                try value.encode(to: encoder)
+            case let .appBskyRichtextFacetTag(value):
+                try container.encode("app.bsky.richtext.facet#tag", forKey: .type)
+                try value.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
             }
-            return map
-        case .appBskyRichtextFacetTag(let value):
-            map = map.adding(key: "$type", value: "app.bsky.richtext.facet#tag")
-            
-            let valueDict = try value.toCBORValue()
+        }
 
-            // If the value is already an OrderedCBORMap, merge its entries
-            if let orderedMap = valueDict as? OrderedCBORMap {
-                for (key, value) in orderedMap.entries where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
-            } else if let dict = valueDict as? [String: Any] {
-                // Otherwise add each key-value pair from the dictionary
-                for (key, value) in dict where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
+        public func hash(into hasher: inout Hasher) {
+            switch self {
+            case let .appBskyRichtextFacetMention(value):
+                hasher.combine("app.bsky.richtext.facet#mention")
+                hasher.combine(value)
+            case let .appBskyRichtextFacetLink(value):
+                hasher.combine("app.bsky.richtext.facet#link")
+                hasher.combine(value)
+            case let .appBskyRichtextFacetTag(value):
+                hasher.combine("app.bsky.richtext.facet#tag")
+                hasher.combine(value)
+            case let .unexpected(container):
+                hasher.combine("unexpected")
+                hasher.combine(container)
             }
-            return map
-        case .unexpected(let container):
-            return try container.toCBORValue()
-        
-        }
-    }
-    
-    /// Property that indicates if this enum contains pending data that needs loading
-    public var hasPendingData: Bool {
-        switch self {
-        
-        case .appBskyRichtextFacetMention(let value):
-            return value.hasPendingData
-        case .appBskyRichtextFacetLink(let value):
-            return value.hasPendingData
-        case .appBskyRichtextFacetTag(let value):
-            return value.hasPendingData
-        case .unexpected:
-            return false
-        }
-    }
-    
-    /// Attempts to load any pending data in this enum or its children
-    public mutating func loadPendingData() async {
-        switch self {
-        
-        case .appBskyRichtextFacetMention(var value):
-            // Since ATProtocolValue already includes PendingDataLoadable,
-            // we can directly call loadPendingData without conditional casting
-            await value.loadPendingData()
-            // Update the enum case with the potentially updated value
-            self = .appBskyRichtextFacetMention(value)
-        case .appBskyRichtextFacetLink(var value):
-            // Since ATProtocolValue already includes PendingDataLoadable,
-            // we can directly call loadPendingData without conditional casting
-            await value.loadPendingData()
-            // Update the enum case with the potentially updated value
-            self = .appBskyRichtextFacetLink(value)
-        case .appBskyRichtextFacetTag(var value):
-            // Since ATProtocolValue already includes PendingDataLoadable,
-            // we can directly call loadPendingData without conditional casting
-            await value.loadPendingData()
-            // Update the enum case with the potentially updated value
-            self = .appBskyRichtextFacetTag(value)
-        case .unexpected:
-            // Nothing to load for unexpected values
-            break
-        }
-    }
-}
-
-// Union Array Type
-
-
-public struct Features: Codable, ATProtocolCodable, ATProtocolValue {
-    public let items: [FeaturesForUnionArray]
-    
-    public init(items: [FeaturesForUnionArray]) {
-        self.items = items
-    }
-
-    public init(from decoder: Decoder) throws {
-        var container = try decoder.unkeyedContainer()
-        var items = [FeaturesForUnionArray]()
-        while !container.isAtEnd {
-            let item = try container.decode(FeaturesForUnionArray.self)
-            items.append(item)
-        }
-        self.items = items
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        // Encode the array regardless of whether it's empty
-        var container = encoder.unkeyedContainer()
-        for item in items {
-            try container.encode(item)
-        }
-    }
-
-    public func isEqual(to other: any ATProtocolValue) -> Bool {
-        guard let other = other as? Features else { return false }
-        
-        if self.items != other.items {
-            return false
         }
 
-        return true
-    }
-    
-    // DAGCBOR encoding with field ordering
-    public func toCBORValue() throws -> Any {
-        // For union arrays, we need to encode each item while preserving its order
-        var itemsArray = [Any]()
-        
-        for item in items {
-            let itemValue = try item.toCBORValue()
-            itemsArray.append(itemValue)
+        private enum CodingKeys: String, CodingKey {
+            case type = "$type"
         }
-        
-        return itemsArray
+
+        public static func == (lhs: AppBskyRichtextFacetFeaturesUnion, rhs: AppBskyRichtextFacetFeaturesUnion) -> Bool {
+            switch (lhs, rhs) {
+            case let (
+                .appBskyRichtextFacetMention(lhsValue),
+                .appBskyRichtextFacetMention(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .appBskyRichtextFacetLink(lhsValue),
+                .appBskyRichtextFacetLink(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .appBskyRichtextFacetTag(lhsValue),
+                .appBskyRichtextFacetTag(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
+            default:
+                return false
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? AppBskyRichtextFacetFeaturesUnion else { return false }
+            return self == other
+        }
+
+        // DAGCBOR encoding with field ordering
+        public func toCBORValue() throws -> Any {
+            // Create an ordered map to maintain field order
+            var map = OrderedCBORMap()
+
+            switch self {
+            case let .appBskyRichtextFacetMention(value):
+                map = map.adding(key: "$type", value: "app.bsky.richtext.facet#mention")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .appBskyRichtextFacetLink(value):
+                map = map.adding(key: "$type", value: "app.bsky.richtext.facet#link")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .appBskyRichtextFacetTag(value):
+                map = map.adding(key: "$type", value: "app.bsky.richtext.facet#tag")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .unexpected(container):
+                return try container.toCBORValue()
+            }
+        }
+
+        /// Property that indicates if this enum contains pending data that needs loading
+        public var hasPendingData: Bool {
+            switch self {
+            case let .appBskyRichtextFacetMention(value):
+                return value.hasPendingData
+            case let .appBskyRichtextFacetLink(value):
+                return value.hasPendingData
+            case let .appBskyRichtextFacetTag(value):
+                return value.hasPendingData
+            case .unexpected:
+                return false
+            }
+        }
+
+        /// Attempts to load any pending data in this enum or its children
+        public mutating func loadPendingData() async {
+            switch self {
+            case var .appBskyRichtextFacetMention(value):
+                // Since ATProtocolValue already includes PendingDataLoadable,
+                // we can directly call loadPendingData without conditional casting
+                await value.loadPendingData()
+                // Update the enum case with the potentially updated value
+                self = .appBskyRichtextFacetMention(value)
+            case var .appBskyRichtextFacetLink(value):
+                // Since ATProtocolValue already includes PendingDataLoadable,
+                // we can directly call loadPendingData without conditional casting
+                await value.loadPendingData()
+                // Update the enum case with the potentially updated value
+                self = .appBskyRichtextFacetLink(value)
+            case var .appBskyRichtextFacetTag(value):
+                // Since ATProtocolValue already includes PendingDataLoadable,
+                // we can directly call loadPendingData without conditional casting
+                await value.loadPendingData()
+                // Update the enum case with the potentially updated value
+                self = .appBskyRichtextFacetTag(value)
+            case .unexpected:
+                // Nothing to load for unexpected values
+                break
+            }
+        }
     }
 
-}
+    // Union Array Type
 
+    public struct Features: Codable, ATProtocolCodable, ATProtocolValue {
+        public let items: [FeaturesForUnionArray]
 
-public enum FeaturesForUnionArray: Codable, ATProtocolCodable, ATProtocolValue {
-    case mention(Mention)
-    case link(Link)
-    case tag(Tag)
-    case unexpected(ATProtocolValueContainer)
-    public init(_ value: Mention) {
-        self = .mention(value)
+        public init(items: [FeaturesForUnionArray]) {
+            self.items = items
+        }
+
+        public init(from decoder: Decoder) throws {
+            var container = try decoder.unkeyedContainer()
+            var items = [FeaturesForUnionArray]()
+            while !container.isAtEnd {
+                let item = try container.decode(FeaturesForUnionArray.self)
+                items.append(item)
+            }
+            self.items = items
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            // Encode the array regardless of whether it's empty
+            var container = encoder.unkeyedContainer()
+            for item in items {
+                try container.encode(item)
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Features else { return false }
+
+            if items != other.items {
+                return false
+            }
+
+            return true
+        }
+
+        // DAGCBOR encoding with field ordering
+        public func toCBORValue() throws -> Any {
+            // For union arrays, we need to encode each item while preserving its order
+            var itemsArray = [Any]()
+
+            for item in items {
+                let itemValue = try item.toCBORValue()
+                itemsArray.append(itemValue)
+            }
+
+            return itemsArray
+        }
     }
-    public init(_ value: Link) {
-        self = .link(value)
-    }
-    public init(_ value: Tag) {
-        self = .tag(value)
-    }
 
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        let typeValue = try container.decode(String.self, forKey: .type)
-
-        switch typeValue {
-        case "Mention":
-            let value = try Mention(from: decoder)
+    public enum FeaturesForUnionArray: Codable, ATProtocolCodable, ATProtocolValue {
+        case mention(Mention)
+        case link(Link)
+        case tag(Tag)
+        case unexpected(ATProtocolValueContainer)
+        public init(_ value: Mention) {
             self = .mention(value)
-        case "Link":
-            let value = try Link(from: decoder)
+        }
+
+        public init(_ value: Link) {
             self = .link(value)
-        case "Tag":
-            let value = try Tag(from: decoder)
+        }
+
+        public init(_ value: Tag) {
             self = .tag(value)
-        default:
-            let unknownValue = try ATProtocolValueContainer(from: decoder)
-            self = .unexpected(unknownValue)
         }
-    }
 
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let typeValue = try container.decode(String.self, forKey: .type)
 
-        switch self {
-        case .mention(let value):
-            try container.encode("Mention", forKey: .type)
-            try value.encode(to: encoder)
-        case .link(let value):
-            try container.encode("Link", forKey: .type)
-            try value.encode(to: encoder)
-        case .tag(let value):
-            try container.encode("Tag", forKey: .type)
-            try value.encode(to: encoder)
-        case .unexpected(let ATProtocolValueContainer):
-            try ATProtocolValueContainer.encode(to: encoder)
-        }
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        switch self {
-        case .mention(let value):
-            hasher.combine("Mention")
-            hasher.combine(value)
-        case .link(let value):
-            hasher.combine("Link")
-            hasher.combine(value)
-        case .tag(let value):
-            hasher.combine("Tag")
-            hasher.combine(value)
-        case .unexpected(let ATProtocolValueContainer):
-            hasher.combine("unexpected")
-            hasher.combine(ATProtocolValueContainer)
-        }
-    }
-
-    public func isEqual(to other: any ATProtocolValue) -> Bool {
-        guard let otherValue = other as? FeaturesForUnionArray else { return false }
-
-        switch (self, otherValue) {
-        case (.mention(let selfValue), 
-              .mention(let otherValue)):
-            return selfValue == otherValue
-        case (.link(let selfValue), 
-              .link(let otherValue)):
-            return selfValue == otherValue
-        case (.tag(let selfValue), 
-              .tag(let otherValue)):
-            return selfValue == otherValue
-        case (.unexpected(let selfValue), .unexpected(let otherValue)):
-            return selfValue.isEqual(to: otherValue)
-        default:
-            return false
-        }
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case type = "$type"
-    }
-    
-    // DAGCBOR encoding with field ordering
-    public func toCBORValue() throws -> Any {
-        var map = OrderedCBORMap()
-        
-        switch self {
-        case .mention(let value):
-            map = map.adding(key: "$type", value: "Mention")
-            
-            let valueDict = try value.toCBORValue()
-
-            // If the value is already an OrderedCBORMap, merge its entries
-            if let orderedMap = valueDict as? OrderedCBORMap {
-                for (key, value) in orderedMap.entries where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
-            } else if let dict = valueDict as? [String: Any] {
-                // Otherwise add each key-value pair from the dictionary
-                for (key, value) in dict where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
+            switch typeValue {
+            case "Mention":
+                let value = try Mention(from: decoder)
+                self = .mention(value)
+            case "Link":
+                let value = try Link(from: decoder)
+                self = .link(value)
+            case "Tag":
+                let value = try Tag(from: decoder)
+                self = .tag(value)
+            default:
+                let unknownValue = try ATProtocolValueContainer(from: decoder)
+                self = .unexpected(unknownValue)
             }
-            return map
-        case .link(let value):
-            map = map.adding(key: "$type", value: "Link")
-            
-            let valueDict = try value.toCBORValue()
+        }
 
-            // If the value is already an OrderedCBORMap, merge its entries
-            if let orderedMap = valueDict as? OrderedCBORMap {
-                for (key, value) in orderedMap.entries where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
-            } else if let dict = valueDict as? [String: Any] {
-                // Otherwise add each key-value pair from the dictionary
-                for (key, value) in dict where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
-            }
-            return map
-        case .tag(let value):
-            map = map.adding(key: "$type", value: "Tag")
-            
-            let valueDict = try value.toCBORValue()
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
 
-            // If the value is already an OrderedCBORMap, merge its entries
-            if let orderedMap = valueDict as? OrderedCBORMap {
-                for (key, value) in orderedMap.entries where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
-            } else if let dict = valueDict as? [String: Any] {
-                // Otherwise add each key-value pair from the dictionary
-                for (key, value) in dict where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
+            switch self {
+            case let .mention(value):
+                try container.encode("Mention", forKey: .type)
+                try value.encode(to: encoder)
+            case let .link(value):
+                try container.encode("Link", forKey: .type)
+                try value.encode(to: encoder)
+            case let .tag(value):
+                try container.encode("Tag", forKey: .type)
+                try value.encode(to: encoder)
+            case let .unexpected(ATProtocolValueContainer):
+                try ATProtocolValueContainer.encode(to: encoder)
             }
-            return map
-        case .unexpected(let container):
-            return try container.toCBORValue()
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            switch self {
+            case let .mention(value):
+                hasher.combine("Mention")
+                hasher.combine(value)
+            case let .link(value):
+                hasher.combine("Link")
+                hasher.combine(value)
+            case let .tag(value):
+                hasher.combine("Tag")
+                hasher.combine(value)
+            case let .unexpected(ATProtocolValueContainer):
+                hasher.combine("unexpected")
+                hasher.combine(ATProtocolValueContainer)
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? FeaturesForUnionArray else { return false }
+
+            switch (self, otherValue) {
+            case let (
+                .mention(selfValue),
+                .mention(otherValue)
+            ):
+                return selfValue == otherValue
+            case let (
+                .link(selfValue),
+                .link(otherValue)
+            ):
+                return selfValue == otherValue
+            case let (
+                .tag(selfValue),
+                .tag(otherValue)
+            ):
+                return selfValue == otherValue
+            case let (.unexpected(selfValue), .unexpected(otherValue)):
+                return selfValue.isEqual(to: otherValue)
+            default:
+                return false
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case type = "$type"
+        }
+
+        // DAGCBOR encoding with field ordering
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+
+            switch self {
+            case let .mention(value):
+                map = map.adding(key: "$type", value: "Mention")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .link(value):
+                map = map.adding(key: "$type", value: "Link")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .tag(value):
+                map = map.adding(key: "$type", value: "Tag")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .unexpected(container):
+                return try container.toCBORValue()
+            }
         }
     }
 }
-
-
-}
-
-
-                           
