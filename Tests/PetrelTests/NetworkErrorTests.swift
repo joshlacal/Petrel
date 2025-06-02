@@ -114,6 +114,6 @@ struct TIDGeneratorTests {
     @Test("TID struct generation")
     func tIDStructGeneration() async {
         let tidStruct = await TIDGenerator.nextTID()
-        #expect(tidStruct.tidString.count == 13)
+        #expect(tidStruct.description.count == 13)
     }
 }
