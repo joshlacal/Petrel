@@ -469,7 +469,7 @@ public actor NetworkService: NetworkServiceProtocol {
             for (name, value) in headers {
                 requestToSend.setValue(value, forHTTPHeaderField: name)
             }
-            
+
             // Add additional headers for this specific request
             if let additionalHeaders = additionalHeaders {
                 for (name, value) in additionalHeaders {
@@ -526,7 +526,8 @@ public actor NetworkService: NetworkServiceProtocol {
                         await authProvider.updateDPoPNonce(for: url, from: nonceHeaders)
 
                         LogManager.logDebug(
-                            "Network Service - Nonce storage complete for \(url.host ?? "N/A")", category: .network)
+                            "Network Service - Nonce storage complete for \(url.host ?? "N/A")", category: .network
+                        )
                     } else {
                         LogManager.logDebug(
                             "Network Service - No DPoP-Nonce header found in \(httpResponse.statusCode) response."

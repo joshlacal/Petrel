@@ -101,7 +101,8 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
         // --- Get ephemeral key directly from OAuthState ---
         guard let keyData = oauthState.ephemeralDPoPKey else {
             LogManager.logError(
-                "Ephemeral DPoP key data missing in retrieved OAuth state", category: .authentication)
+                "Ephemeral DPoP key data missing in retrieved OAuth state", category: .authentication
+            )
             try? await storage.deleteOAuthState(for: stateToken)
             throw AuthError.dpopKeyError
         }
@@ -153,12 +154,12 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
                 throw AuthError.invalidOAuthConfiguration
             }
         } catch {
-            // If protected resource metadata fetch fails (e.g., 404), 
+            // If protected resource metadata fetch fails (e.g., 404),
             // fall back to treating the URL as the authorization server itself
             LogManager.logDebug("Could not fetch protected resource metadata from \(pdsURL), treating it as authorization server")
             authServerURL = pdsURL
         }
-        
+
         let authServerMetadata = try await fetchAuthorizationServerMetadata(
             authServerURL: authServerURL)
         let tokenEndpoint = authServerMetadata.tokenEndpoint
@@ -222,7 +223,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
         // Check if account exists, otherwise create a new one
         var account = await accountManager.getAccount(did: did)
         let isNewAccount = account == nil
-        
+
         // Try to fetch protected resource metadata for the account
         // This might have already been fetched earlier, but we need it for account creation
         let protectedResourceMetadata: ProtectedResourceMetadata?
@@ -233,7 +234,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
             LogManager.logDebug("Could not fetch protected resource metadata for account (will use nil): \(error)")
             protectedResourceMetadata = nil
         }
-        
+
         if isNewAccount {
             LogManager.logDebug("Creating new account for DID: \(did)")
             account = Account(
@@ -557,7 +558,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
                 throw AuthError.invalidOAuthConfiguration
             }
         } catch {
-            // If protected resource metadata fetch fails (e.g., 404), 
+            // If protected resource metadata fetch fails (e.g., 404),
             // fall back to treating the URL as the authorization server itself
             LogManager.logDebug("Could not fetch protected resource metadata from \(pdsURL), treating it as authorization server")
             authServerURL = pdsURL
@@ -638,7 +639,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
             }
             finalPDSURL = defaultURL
         }
-        
+
         // Create a special OAuth state for sign-up
         let stateToken = UUID().uuidString
         let codeVerifier = generateCodeVerifier()
@@ -675,12 +676,12 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
                 throw AuthError.invalidOAuthConfiguration
             }
         } catch {
-            // If protected resource metadata fetch fails (e.g., 404), 
+            // If protected resource metadata fetch fails (e.g., 404),
             // fall back to treating the URL as the authorization server itself
             LogManager.logDebug("Could not fetch protected resource metadata from \(finalPDSURL), treating it as authorization server")
             authServerURL = finalPDSURL
         }
-        
+
         let authServerMetadata = try await fetchAuthorizationServerMetadata(
             authServerURL: authServerURL)
 
@@ -801,7 +802,8 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
 
             if isNonceError, let receivedNonce = dpopNonceHeader {
                 LogManager.logInfo(
-                    "Received use_dpop_nonce error on Sign-Up PAR. Retrying with received nonce", category: .authentication)
+                    "Received use_dpop_nonce error on Sign-Up PAR. Retrying with received nonce", category: .authentication
+                )
                 var retryRequest = request // Create a mutable copy for retry
                 // Use the same ephemeral key for the retry proof
                 let retryProof = try await createDPoPProof(
@@ -968,7 +970,8 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
 
             if isNonceError, let receivedNonce = dpopNonceHeader {
                 LogManager.logInfo(
-                    "Received use_dpop_nonce error on PAR. Retrying with received nonce", category: .authentication)
+                    "Received use_dpop_nonce error on PAR. Retrying with received nonce", category: .authentication
+                )
                 var retryRequest = request // Create a mutable copy for retry
                 // Use the same ephemeral key for the retry proof
                 let retryProof = try await createDPoPProof(

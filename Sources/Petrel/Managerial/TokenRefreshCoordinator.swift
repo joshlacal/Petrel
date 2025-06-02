@@ -252,7 +252,8 @@ actor TokenRefreshCoordinator {
     private func createErrorFromResult(data: Data, response: HTTPURLResponse) -> RefreshError {
         let statusCode = response.statusCode
         LogManager.logError(
-            "TokenRefreshCoordinator: Creating error for status \(statusCode)", category: .authentication)
+            "TokenRefreshCoordinator: Creating error for status \(statusCode)", category: .authentication
+        )
 
         // Try decoding as standard OAuth error first
         if let errorResponse = try? JSONDecoder().decode(OAuthErrorResponse.self, from: data) {

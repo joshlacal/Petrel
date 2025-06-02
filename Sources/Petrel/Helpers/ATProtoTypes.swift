@@ -509,7 +509,7 @@ public struct Handle: ATProtocolValue, CustomStringConvertible, QueryParameterCo
         guard !handle.isEmpty, handle.count <= 253 else {
             return false
         }
-        
+
         guard let regex = try? NSRegularExpression(pattern: handlePattern, options: []) else {
             // Fallback validation without regex
             return handle.allSatisfy { $0.isLetter || $0.isNumber || $0 == "." || $0 == "-" }
@@ -660,7 +660,7 @@ public struct NSID: ATProtocolValue, CustomStringConvertible, QueryParameterConv
         guard !nsid.isEmpty, nsid.count <= 584 else {
             return false
         }
-        
+
         guard let regex = try? NSRegularExpression(pattern: nsidPattern, options: []) else {
             // Fallback validation without regex
             let components = nsid.split(separator: ".")
@@ -740,7 +740,7 @@ public struct RecordKey: ATProtocolValue, CustomStringConvertible, QueryParamete
         guard !key.isEmpty, key.count <= 512 else {
             return false
         }
-        
+
         guard let regex = try? NSRegularExpression(pattern: recordKeyPattern, options: []) else {
             // Fallback validation without regex
             return key.allSatisfy { char in
