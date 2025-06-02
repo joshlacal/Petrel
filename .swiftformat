@@ -1,6 +1,0 @@
---indent 4
---tabwidth 4
---stripunusedargs closure-only
---wraparguments before-first
---wrapcollections before-first
---removelines enabled
