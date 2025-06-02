@@ -874,6 +874,17 @@ public actor NetworkService: NetworkServiceProtocol {
         return (data, httpResponse)
     }
 
+    /// Performs a network request (protocol compatibility method)
+    /// - Parameters:
+    ///   - request: The URLRequest to perform.
+    ///   - skipTokenRefresh: Whether to skip token refresh.
+    /// - Returns: A tuple containing the response data and HTTPURLResponse.
+    public func performRequest(_ request: URLRequest, skipTokenRefresh: Bool) async throws -> (
+        Data, HTTPURLResponse
+    ) {
+        try await performRequest(request, skipTokenRefresh: skipTokenRefresh, additionalHeaders: nil)
+    }
+
     /// Performs a network request (compatibility method)
     /// - Parameter request: The URLRequest to perform.
     /// - Returns: A tuple containing the response data and HTTPURLResponse.
