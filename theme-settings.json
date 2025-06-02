@@ -1,0 +1,12 @@
+{
+  "theme": {
+    "aside": {
+      "border-color": "var(--color-grid)",
+      "border-width": "1px"
+    },
+    "code": {
+      "border-color": "var(--color-grid)",
+      "border-width": "1px"
+    }
+  }
+}
