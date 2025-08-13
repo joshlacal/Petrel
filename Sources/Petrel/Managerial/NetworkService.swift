@@ -16,7 +16,7 @@ public protocol AuthenticationProvider: Sendable {
 
     /// Refreshes the authentication token if needed
     /// - Returns: A boolean indicating whether refresh was needed
-    func refreshTokenIfNeeded() async throws -> Bool
+    func refreshTokenIfNeeded() async throws -> TokenRefreshResult
 
     /// Handles a 401 unauthorized response
     /// - Parameters:
@@ -161,6 +161,7 @@ public actor NetworkService: NetworkServiceProtocol {
     private var userAgent: String?
     private(set) var protectedResourceMetadata: ProtectedResourceMetadata?
     private(set) var authorizationServerMetadata: AuthorizationServerMetadata?
+    private let requestDeduplicator = RequestDeduplicator()
 
     // MARK: - Initialization
 
@@ -480,10 +481,21 @@ public actor NetworkService: NetworkServiceProtocol {
                 requestToSend.setValue(userAgent, forHTTPHeaderField: "User-Agent")
             }
 
-            // Perform the request
+            // Perform the request with deduplication
             do {
                 LogManager.logRequest(requestToSend)
-                let (data, response) = try await session.data(for: requestToSend)
+                
+                let request = requestToSend
+                
+                // Use deduplicator for non-refresh requests to prevent concurrent identical calls
+                let (data, response) = if !skipTokenRefresh {
+                    try await requestDeduplicator.deduplicate(request: request) { @Sendable in
+                        return try await self.session.data(for: request)
+                    }
+                } else {
+                    // Skip deduplication for refresh requests to avoid circular dependencies
+                    try await session.data(for: requestToSend)
+                }
 
                 // Get data and ensure we have a valid HTTP response
                 guard let httpResponse = response as? HTTPURLResponse else {
@@ -675,8 +687,19 @@ public actor NetworkService: NetworkServiceProtocol {
                         "Network Service - Server error \(httpResponse.statusCode) for \(requestToSend.url?.absoluteString ?? "Unknown URL"). Retry \(retryCount + 1)/\(maxRetries)."
                     )
                     retryCount += 1
-                    // Implement exponential backoff
-                    try await Task.sleep(nanoseconds: UInt64(pow(2.0, Double(retryCount))) * 1_000_000_000) // 2^retryCount seconds
+                    if retryCount >= maxRetries {
+                        throw NetworkError.responseError(statusCode: httpResponse.statusCode)
+                    }
+                    
+                    // Enhanced exponential backoff with jitter
+                    let baseDelay = min(pow(2.0, Double(retryCount)), 8.0) // Cap at 8 seconds
+                    let jitter = Double.random(in: 0.8...1.2) // Add ±20% jitter
+                    let delaySeconds = baseDelay * jitter
+                    
+                    LogManager.logInfo(
+                        "Network Service - Waiting \(String(format: "%.1f", delaySeconds))s before retry \(retryCount)/\(maxRetries)"
+                    )
+                    try await Task.sleep(nanoseconds: UInt64(delaySeconds * 1_000_000_000))
                     continue // Go to next iteration of the while loop
 
                 default:
@@ -698,8 +721,16 @@ public actor NetworkService: NetworkServiceProtocol {
                     LogManager.logError("Network Service - Max retries reached for network error.")
                     throw NetworkError.requestFailed // Or map specific URLError codes
                 }
-                // Implement exponential backoff
-                try await Task.sleep(nanoseconds: UInt64(pow(2.0, Double(retryCount))) * 1_000_000_000) // 2^retryCount seconds
+                
+                // Enhanced exponential backoff for network errors with jitter
+                let baseDelay = min(pow(2.0, Double(retryCount)), 10.0) // Cap at 10 seconds for network errors
+                let jitter = Double.random(in: 0.7...1.3) // Add ±30% jitter for network errors
+                let delaySeconds = baseDelay * jitter
+                
+                LogManager.logInfo(
+                    "Network Service - Waiting \(String(format: "%.1f", delaySeconds))s before network retry \(retryCount)/\(maxRetries)"
+                )
+                try await Task.sleep(nanoseconds: UInt64(delaySeconds * 1_000_000_000))
                 continue // Go to next iteration
             } catch {
                 // Handle other errors

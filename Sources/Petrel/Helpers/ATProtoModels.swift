@@ -157,9 +157,10 @@ public struct Session: Codable, Equatable, Sendable {
         Date() > createdAt.addingTimeInterval(expiresIn)
     }
 
-    /// Whether the token is expiring soon (within 5 minutes)
+    /// Whether the token is expiring soon (within 15 minutes)
+    /// Increased from 5 to 15 minutes to handle server clock skew and shorter-than-expected token lifetimes
     public var isExpiringSoon: Bool {
-        Date() > createdAt.addingTimeInterval(expiresIn - 300)
+        Date() > createdAt.addingTimeInterval(expiresIn - 900)
     }
 
     public init(

@@ -156,7 +156,7 @@ public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConve
         }
     }
 
-    init(uriString: String) {
+    public init(uriString: String) {
         if uriString.starts(with: "did:") {
             isDID = true
             let components = uriString.split(separator: ":")
@@ -177,7 +177,7 @@ public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConve
         }
     }
 
-    func isValid() -> Bool {
+    public func isValid() -> Bool {
         if isDID {
             return scheme == "did" && !authority.isEmpty
         } else {
@@ -185,7 +185,7 @@ public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConve
         }
     }
 
-    func asQueryItem(name: String) -> URLQueryItem? {
+    public func asQueryItem(name: String) -> URLQueryItem? {
         guard isValid() else {
             return nil
         }
@@ -292,15 +292,29 @@ public struct Blob: Codable, ATProtocolCodable, Hashable, Equatable, Sendable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        type = try container.decode(String.self, forKey: .type)
-        ref = try container.decodeIfPresent(ATProtoLink.self, forKey: .ref)
-        mimeType = try container.decode(String.self, forKey: .mimeType)
-        size = try container.decode(Int.self, forKey: .size)
-        cid = try container.decodeIfPresent(String.self, forKey: .cid)
+        
+        // Check if this is the legacy format (has cid but no $type)
+        if container.contains(.cid) && !container.contains(.type) {
+            // Legacy blob format: { "cid": "...", "mimeType": "..." }
+            type = "blob" // Default type for legacy blobs
+            ref = nil // Legacy format doesn't have ref
+            mimeType = try container.decode(String.self, forKey: .mimeType)
+            size = 0 // Legacy format doesn't include size, use 0 as placeholder
+            cid = try container.decode(String.self, forKey: .cid)
+        } else {
+            // Modern blob format: { "$type": "blob", "ref": {...}, "mimeType": "...", "size": ... }
+            type = try container.decode(String.self, forKey: .type)
+            ref = try container.decodeIfPresent(ATProtoLink.self, forKey: .ref)
+            mimeType = try container.decode(String.self, forKey: .mimeType)
+            size = try container.decode(Int.self, forKey: .size)
+            cid = try container.decodeIfPresent(String.self, forKey: .cid)
+        }
     }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
+        
+        // Always encode in modern format when writing
         try container.encode(type, forKey: .type)
         try container.encodeIfPresent(ref, forKey: .ref)
         try container.encode(mimeType, forKey: .mimeType)

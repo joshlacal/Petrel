@@ -30,13 +30,25 @@ public protocol AuthServiceProtocol: Actor {
     func tokensExist() async -> Bool
 
     /// Refreshes the authentication token if needed.
-    /// - Returns: True if token was refreshed or is still valid, false otherwise.
-    func refreshTokenIfNeeded() async throws -> Bool
+    /// - Returns: Result indicating whether token was refreshed, still valid, or skipped
+    func refreshTokenIfNeeded() async throws -> TokenRefreshResult
+    
+    /// Refreshes the authentication token if needed.
+    /// - Parameter forceRefresh: If true, forces a refresh regardless of calculated expiry time
+    /// - Returns: Result indicating whether token was refreshed, still valid, or skipped
+    func refreshTokenIfNeeded(forceRefresh: Bool) async throws -> TokenRefreshResult
 
     /// Prepares an authenticated request by adding necessary authentication headers.
     /// - Parameter request: The original request to authenticate.
     /// - Returns: The request with authentication headers added.
     func prepareAuthenticatedRequest(_ request: URLRequest) async throws -> URLRequest
+}
+
+/// Result of a token refresh attempt
+public enum TokenRefreshResult: Sendable {
+    case refreshedSuccessfully  // Token was actually refreshed
+    case stillValid            // Token is still valid, no refresh needed
+    case skippedDueToRateLimit // Refresh was skipped due to rate limiting
 }
 
 /// Errors that can occur during authentication.
@@ -208,12 +220,13 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
         let tokenType: TokenType = (tokenResponse.tokenType.lowercased() == "dpop") ? .dpop : .bearer
         LogManager.logDebug("Determined token type: \(tokenType.rawValue)")
 
-        // 6. Create Session
+        // 6. Create Session with clock skew protection
+        let adjustedExpiresIn = applyClockSkewProtection(to: tokenResponse.expiresIn)
         let newSession = Session(
             accessToken: tokenResponse.accessToken,
             refreshToken: tokenResponse.refreshToken,
             createdAt: Date(), // Use current time
-            expiresIn: TimeInterval(tokenResponse.expiresIn),
+            expiresIn: adjustedExpiresIn,
             tokenType: tokenType,
             did: did
         )
@@ -277,7 +290,13 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
         try await accountManager.addAccount(finalAccount) // Changed from addOrUpdateAccount to add(account:)
         LogManager.logDebug("Added/Updated account in AccountManager for DID: \(did)")
         try await accountManager.setCurrentAccount(did: did) // Set as current account
-        LogManager.logInfo("Set current account to DID: \(did)")
+        
+        // Log successful OAuth completion
+        LogManager.logInfo(
+            "🎉 TOKEN_LIFECYCLE: OAuth flow completed successfully for DID \(LogManager.logDID(did)) " +
+            "(token_type=\(tokenType.rawValue), expires_in=\(Int(adjustedExpiresIn))s)",
+            category: .authentication
+        )
 
         // 9. Store DPoP key binding if applicable
         if tokenType == .dpop, let jkt = tokenResponse.dpopJkt {
@@ -374,7 +393,12 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
             // try? await accountManager.setCurrentAccount(did: "") // Or handle more gracefully
         }
 
-        LogManager.logInfo("Logout process completed for DID: \(did)")
+        // Log logout completion
+        LogManager.logInfo(
+            "🚪 TOKEN_LIFECYCLE: Logout completed for DID \(LogManager.logDID(did)) " +
+            "(session_cleared=true, account_removed=true)",
+            category: .authentication
+        )
     }
 
     /// Attempts to revoke a refresh token at the authorization server.
@@ -448,14 +472,17 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
             throw AuthError.noActiveAccount as Error
         }
 
-        // Refresh the token
-        let refreshed = try await refreshTokenIfNeeded()
+        // Force refresh the token on 401 - ignore calculated expiry since server rejected our token
+        LogManager.logInfo("🚨 Received 401 unauthorized - attempting token refresh")
+        let refreshResult = try await refreshTokenIfNeeded(forceRefresh: true)
 
-        // If refresh was successful, retry the request
-        if refreshed {
+        // Only retry if we ACTUALLY refreshed the token
+        switch refreshResult {
+        case .refreshedSuccessfully:
+            LogManager.logInfo("Token was refreshed successfully, retrying request")
             var newRequest = request
             if (try? await storage.getSession(for: did)) != nil {
-                // Prepare the authenticated request
+                // Prepare the authenticated request with the new token
                 newRequest = try await prepareAuthenticatedRequest(newRequest)
 
                 // Perform the request
@@ -469,7 +496,17 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
             } else {
                 throw AuthError.tokenRefreshFailed as Error
             }
-        } else {
+            
+        case .stillValid:
+            // Token is supposedly still valid, but we got a 401
+            // This shouldn't happen, but if it does, don't retry to avoid loops
+            LogManager.logError("Token reported as still valid but got 401. Not retrying to avoid loop.")
+            throw AuthError.tokenRefreshFailed as Error
+            
+        case .skippedDueToRateLimit:
+            // Refresh was skipped due to rate limiting
+            // Don't retry with the same token - it will just fail again
+            LogManager.logError("Token refresh skipped due to rate limiting. Cannot retry request.")
             throw AuthError.tokenRefreshFailed as Error
         }
     }
@@ -494,8 +531,14 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
     private let oauthConfig: OAuthConfig
     private let didResolver: DIDResolving
     private let refreshCoordinator = TokenRefreshCoordinator()
+    private let refreshCircuitBreaker = RefreshCircuitBreaker()
     // Simple in-memory store for OAuth flow nonces (independent of any account)
     private var oauthFlowNonces: [String: String] = [:]
+    // Track last refresh attempt time per DID for rate limiting
+    private var lastRefreshAttempt: [String: Date] = [:]
+    private var lastSuccessfulRefresh: [String: Date] = [:]
+    private let minimumRefreshInterval: TimeInterval = 0.5 // 500ms between attempts
+    private let minimumRefreshIntervalAfterSuccess: TimeInterval = 30.0 // 30 seconds after successful refresh
 
     // MARK: - Initialization
 
@@ -1040,24 +1083,95 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
     }
 
     /// Refreshes the authentication token if needed.
-    /// - Returns: True if token was refreshed or is still valid, false otherwise.
-    public func refreshTokenIfNeeded() async throws -> Bool {
+    /// - Parameter forceRefresh: If true, forces a refresh regardless of calculated expiry time
+    /// - Returns: Result indicating whether token was refreshed, still valid, or skipped
+    public func refreshTokenIfNeeded(forceRefresh: Bool = false) async throws -> TokenRefreshResult {
         // Get current account and session
         guard let account = await accountManager.getCurrentAccount(),
               let session = try? await storage.getSession(for: account.did)
         else {
-            return false
+            throw AuthError.noActiveAccount
+        }
+
+        let did = account.did
+
+        // Check circuit breaker first
+        guard await refreshCircuitBreaker.canAttemptRefresh(for: did) else {
+            LogManager.logError(
+                "RefreshCircuitBreaker: Circuit is OPEN for DID \(LogManager.logDID(did)). Refusing refresh attempt.",
+                category: .authentication
+            )
+            throw AuthError.tokenRefreshFailed
+        }
+
+        // Smart rate limiting check
+        let now = Date()
+        
+        // Check if we recently had a successful refresh
+        if let lastSuccess = lastSuccessfulRefresh[did] {
+            let timeSinceSuccess = now.timeIntervalSince(lastSuccess)
+            if timeSinceSuccess < minimumRefreshIntervalAfterSuccess && !forceRefresh {
+                LogManager.logDebug(
+                    "Token was successfully refreshed \(timeSinceSuccess)s ago for DID \(LogManager.logDID(did)). Skipping refresh (minimum interval after success: \(minimumRefreshIntervalAfterSuccess)s).",
+                    category: .authentication
+                )
+                return .stillValid // Token was recently refreshed
+            }
+        }
+        
+        // Check minimum interval between attempts
+        if let lastAttempt = lastRefreshAttempt[did] {
+            let timeSinceLastAttempt = now.timeIntervalSince(lastAttempt)
+            if timeSinceLastAttempt < minimumRefreshInterval {
+                LogManager.logDebug(
+                    "Token refresh attempted too soon for DID \(LogManager.logDID(did)). Last attempt was \(timeSinceLastAttempt)s ago. Minimum interval is \(minimumRefreshInterval)s.",
+                    category: .authentication
+                )
+                // Don't count this as a failure - just skip it
+                return .skippedDueToRateLimit // Signal that we skipped due to rate limiting
+            }
+        }
+
+        // DON'T record attempt time here - only after successful refresh
+        // This prevents race conditions where parallel requests see an attempt
+        // but the refresh hasn't actually completed yet
+        
+        // Log token lifecycle event
+        LogManager.logInfo(
+            "🔄 TOKEN_LIFECYCLE: Refresh attempt started for DID \(LogManager.logDID(did)) " +
+            "(force=\(forceRefresh), session_expires_soon=\(session.isExpiringSoon), " +
+            "expires_in=\(Int(session.expiresIn))s, created=\(Int(Date().timeIntervalSince(session.createdAt)))s ago)",
+            category: .authentication
+        )
+
+        // Validate current token state before proceeding
+        guard validateTokenState(session) else {
+            LogManager.logError(
+                "Token state validation failed for DID \(LogManager.logDID(did)). Token appears corrupted.",
+                category: .authentication
+            )
+            // Record failure and attempt cleanup
+            await refreshCircuitBreaker.recordFailure(for: did)
+            try await logout() // Clean up corrupted state
+            throw AuthError.tokenRefreshFailed
         }
 
         // Check if token is still valid (restore this check to avoid unnecessary refreshes)
-        if !session.isExpiringSoon {
-            LogManager.logDebug("Token for DID: \(account.did) is not expiring soon, skipping refresh")
-            return true // Token is still valid
+        if !forceRefresh && !session.isExpiringSoon {
+            LogManager.logDebug("Token for DID: \(did) is not expiring soon, skipping refresh")
+            // Record this as a successful "refresh" (token is still valid)
+            lastSuccessfulRefresh[did] = Date()
+            await refreshCircuitBreaker.recordSuccess(for: did)
+            return .stillValid // Token is still valid
+        }
+        
+        if forceRefresh {
+            LogManager.logInfo("🔄 Force refresh requested - bypassing expiry check for DID: \(did)")
         }
 
         // Set in-progress flag to handle app termination during refresh
         // This helps detect and recover from incomplete refresh operations
-        try await markRefreshInProgress(for: account.did, inProgress: true)
+        try await markRefreshInProgress(for: did, inProgress: true)
 
         // Use the coordinator to prevent concurrent refreshes
         do {
@@ -1075,43 +1189,59 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
             let decoder = JSONDecoder()
             let tokenResponse = try decoder.decode(TokenResponse.self, from: refreshData)
 
-            // Save the new session details from the successful refresh
+            // Save the new session details from the successful refresh with clock skew protection
+            let adjustedExpiresIn = applyClockSkewProtection(to: tokenResponse.expiresIn)
             let newSession = Session(
                 accessToken: tokenResponse.accessToken,
                 refreshToken: tokenResponse.refreshToken,
                 createdAt: Date(), // Use current time as the refresh time
-                expiresIn: TimeInterval(tokenResponse.expiresIn),
+                expiresIn: adjustedExpiresIn,
                 tokenType: session.tokenType, // Assume token type doesn't change on refresh
                 did: account.did
             )
 
-            // Save session and verify it was saved correctly
-            try await storage.saveSession(newSession, for: account.did)
-
-            // Verify the session was saved correctly (important check!)
-            guard let savedSession = try await storage.getSession(for: account.did),
-                  savedSession.refreshToken == tokenResponse.refreshToken
-            else {
-                LogManager.logError("Token storage verification failed for DID: \(account.did)")
+            // Save session with enhanced validation
+            guard try await saveAndVerifySession(newSession, for: account.did) else {
+                LogManager.logError("Token storage and verification failed for DID: \(account.did)")
                 throw AuthError.tokenRefreshFailed
             }
 
             // Clear the in-progress flag only after successful save and verification
             try await markRefreshInProgress(for: account.did, inProgress: false)
 
-            LogManager.logInfo("Successfully refreshed, saved and verified token for DID: \(account.did)")
-            return true // Indicate success
+            // Record success with circuit breaker
+            await refreshCircuitBreaker.recordSuccess(for: account.did)
+            
+            // Record successful refresh time AND attempt time
+            let now = Date()
+            lastSuccessfulRefresh[account.did] = now
+            lastRefreshAttempt[account.did] = now
+
+            // Log successful token lifecycle event
+            LogManager.logInfo(
+                "✅ TOKEN_LIFECYCLE: Refresh completed successfully for DID \(LogManager.logDID(account.did)) " +
+                "(new_expires_in=\(Int(adjustedExpiresIn))s, token_type=\(session.tokenType.rawValue))",
+                category: .authentication
+            )
+            return .refreshedSuccessfully // Indicate actual refresh happened
 
         } catch let error as TokenRefreshCoordinator.RefreshError {
             // Clear in-progress flag regardless of error type
             try? await markRefreshInProgress(for: account.did, inProgress: false)
+            
+            // Record failure with circuit breaker
+            await refreshCircuitBreaker.recordFailure(for: account.did)
 
             switch error {
             case let .invalidGrant(description):
-                LogManager.logError("Token refresh failed with invalid_grant for DID \(account.did): \(description ?? "No details"). Logging out.")
+                LogManager.logError(
+                    "❌ TOKEN_LIFECYCLE: Refresh failed with invalid_grant for DID \(LogManager.logDID(account.did)): " +
+                    "\(description ?? "No details"). Triggering automatic logout.",
+                    category: .authentication
+                )
                 // The refresh token is invalid, trigger logout
                 try await logout() // Perform full logout to clear state
-                return false // Indicate failure
+                throw AuthError.tokenRefreshFailed // Throw instead of returning
             case let .dpopError(description):
                 // We should rarely hit this error now with our retry logic in performTokenRefreshWithRetry,
                 // but handle it gracefully if it does occur
@@ -1129,12 +1259,13 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
                             let decoder = JSONDecoder()
                             let tokenResponse = try decoder.decode(TokenResponse.self, from: retryData)
 
-                            // Create and save new session
+                            // Create and save new session with clock skew protection
+                            let adjustedExpiresIn = applyClockSkewProtection(to: tokenResponse.expiresIn)
                             let newSession = Session(
                                 accessToken: tokenResponse.accessToken,
                                 refreshToken: tokenResponse.refreshToken,
                                 createdAt: Date(),
-                                expiresIn: TimeInterval(tokenResponse.expiresIn),
+                                expiresIn: adjustedExpiresIn,
                                 tokenType: session.tokenType,
                                 did: account.did
                             )
@@ -1148,7 +1279,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
                             }
 
                             LogManager.logInfo("Successfully recovered from DPoP nonce mismatch for DID: \(account.did)")
-                            return true
+                            return .refreshedSuccessfully
                         }
                     } catch {
                         LogManager.logError("Final nonce recovery attempt failed: \(error)")
@@ -1175,10 +1306,19 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
             // Catch any other errors (e.g., from performTokenRefresh before coordinator call)
             // Ensure we clear the in-progress flag for any unexpected errors
             try? await markRefreshInProgress(for: account.did, inProgress: false)
+            
+            // Record failure with circuit breaker
+            await refreshCircuitBreaker.recordFailure(for: account.did)
 
             LogManager.logError("Token refresh failed with unexpected error for DID \(account.did): \(error)")
             throw AuthError.tokenRefreshFailed // General refresh failure
         }
+    }
+
+    /// Refreshes the authentication token if needed (overload without forceRefresh parameter).
+    /// - Returns: Result indicating whether token was refreshed, still valid, or skipped
+    public func refreshTokenIfNeeded() async throws -> TokenRefreshResult {
+        return try await refreshTokenIfNeeded(forceRefresh: false)
     }
 
     /// Helper method to mark a refresh operation as in progress
@@ -1226,8 +1366,12 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
 
             // Force a token refresh to get a fresh token
             do {
-                _ = try await refreshTokenIfNeeded()
-                LogManager.logInfo("Successfully recovered from interrupted refresh operation")
+                let result = try await refreshTokenIfNeeded()
+                if result == .refreshedSuccessfully {
+                    LogManager.logInfo("Successfully recovered from interrupted refresh operation")
+                } else {
+                    LogManager.logInfo("Recovery attempted but token was already valid or skipped")
+                }
             } catch {
                 LogManager.logError("Failed to recover from interrupted refresh: \(error)")
                 // Consider further recovery steps here
@@ -1356,6 +1500,11 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
                         throw AuthError.invalidResponse
                     }
 
+                    // Add detailed token refresh expiry logging for debugging
+                    let tokenCreatedAt = Date()
+                    let serverExpiresIn = TimeInterval(tokenResponse.expiresIn)
+                    let calculatedExpiry = tokenCreatedAt.addingTimeInterval(serverExpiresIn)
+                    LogManager.logInfo("🔄 Token Refresh Success - Server expires_in: \(tokenResponse.expiresIn)s, Created: \(tokenCreatedAt), Calculated expiry: \(calculatedExpiry)")
                     LogManager.logDebug("Successfully decoded token response with expiration in \(tokenResponse.expiresIn) seconds")
                 } catch {
                     LogManager.logError("Failed to decode successful token response: \(error)")
@@ -1568,6 +1717,131 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
     }
 
     // MARK: - Helper Methods
+    
+    /// Validates the integrity and consistency of a token session
+    /// - Parameter session: The session to validate
+    /// - Returns: True if the session is valid, false if corrupted
+    /// - Note: All tokens (access and refresh) MUST be treated as opaque tokens.
+    ///         Do NOT attempt to parse or validate their internal structure.
+    private func validateTokenState(_ session: Session) -> Bool {
+        // Basic presence checks - tokens must exist but are treated as opaque
+        guard !session.accessToken.isEmpty,
+              let refreshToken = session.refreshToken, !refreshToken.isEmpty else {
+            LogManager.logError("Token validation failed: Empty tokens detected")
+            return false
+        }
+        
+        // IMPORTANT: Do NOT validate token format or structure
+        // Both access tokens and refresh tokens are opaque and their format
+        // is implementation-specific to the authorization server
+        
+        // Timestamp validation
+        if session.createdAt > Date() {
+            LogManager.logError("Token validation failed: Created timestamp is in the future")
+            return false
+        }
+        
+        // Expiry validation
+        if session.expiresIn <= 0 {
+            LogManager.logError("Token validation failed: Invalid expiry time")
+            return false
+        }
+        
+        // DID format validation
+        if !session.did.hasPrefix("did:") {
+            LogManager.logError("Token validation failed: Invalid DID format")
+            return false
+        }
+        
+        return true
+    }
+    
+
+    /// Enhanced token state validation with transaction-like save verification
+    /// - Parameters:
+    ///   - newSession: The session to save
+    ///   - did: The DID to save for
+    /// - Returns: True if save was successful and verified
+    /// - Note: Tokens are treated as opaque and only validated for presence, not format
+    private func saveAndVerifySession(_ newSession: Session, for did: String) async throws -> Bool {
+        // Validate session before saving
+        guard validateTokenState(newSession) else {
+            LogManager.logError("Session validation failed before save for DID: \(LogManager.logDID(did))")
+            return false
+        }
+        
+        // Save session
+        try await storage.saveSession(newSession, for: did)
+        
+        // Verify the session was saved correctly with all-or-nothing semantics
+        guard let savedSession = try await storage.getSession(for: did) else {
+            LogManager.logError("Session verification failed: Could not retrieve saved session for DID: \(LogManager.logDID(did))")
+            return false
+        }
+        
+        // Verify critical fields match
+        guard savedSession.accessToken == newSession.accessToken,
+              savedSession.refreshToken == newSession.refreshToken,
+              savedSession.did == newSession.did,
+              savedSession.tokenType == newSession.tokenType else {
+            LogManager.logError("Session verification failed: Saved session does not match expected values for DID: \(LogManager.logDID(did))")
+            return false
+        }
+        
+        // Additional validation on the saved session
+        guard validateTokenState(savedSession) else {
+            LogManager.logError("Session validation failed after save for DID: \(LogManager.logDID(did))")
+            return false
+        }
+        
+        return true
+    }
+
+    /// Applies dynamic clock skew protection to server-provided expiry time
+    /// Adjusts expiry time based on token lifetime and observed refresh patterns
+    /// - Parameter serverExpiresIn: The expiry time in seconds provided by the server
+    /// - Returns: Adjusted expiry time with dynamic safety margin applied
+    private func applyClockSkewProtection(to serverExpiresIn: Int) -> TimeInterval {
+        let originalExpiry = TimeInterval(serverExpiresIn)
+        
+        // Dynamic safety margin based on token lifetime
+        let safetyMargin: TimeInterval = {
+            if originalExpiry < 900 { // Less than 15 minutes
+                // Short-lived tokens: use 20% of total time, minimum 60 seconds
+                return max(originalExpiry * 0.2, 60)
+            } else if originalExpiry < 3600 { // Less than 1 hour
+                // Medium-lived tokens: use 300 seconds (5 minutes)
+                return 300
+            } else {
+                // Long-lived tokens: use 600 seconds (10 minutes)
+                return 600
+            }
+        }()
+        
+        // Minimum expiry based on token type
+        let minimumExpiry: TimeInterval = {
+            if originalExpiry < 900 {
+                // For short tokens, ensure at least 5 minutes remain
+                return 300
+            } else {
+                // For longer tokens, ensure at least 10 minutes remain
+                return 600
+            }
+        }()
+        
+        let adjustedExpiry = max(originalExpiry - safetyMargin, minimumExpiry)
+        
+        // Only log if there's a significant change (more than 30 seconds)
+        if abs(adjustedExpiry - originalExpiry) > 30 {
+            let marginPercent = Int((safetyMargin / originalExpiry) * 100)
+            LogManager.logInfo(
+                "🕐 Dynamic clock skew protection: Server expires_in=\(serverExpiresIn)s, " +
+                "margin=\(Int(safetyMargin))s (\(marginPercent)%), adjusted to \(Int(adjustedExpiry))s"
+            )
+        }
+        
+        return adjustedExpiry
+    }
 
     /// Creates a JWK from a private key.
     /// - Parameter privateKey: The private key to use.
@@ -1743,6 +2017,13 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
                 do {
                     let tokenResponse = try decoder.decode(TokenResponse.self, from: data)
                     LogManager.logDebug("Successfully decoded token response.")
+                    
+                    // Add detailed token expiry logging for debugging
+                    let tokenCreatedAt = Date()
+                    let serverExpiresIn = TimeInterval(tokenResponse.expiresIn)
+                    let calculatedExpiry = tokenCreatedAt.addingTimeInterval(serverExpiresIn)
+                    LogManager.logInfo("🔐 Token Exchange Success - Server expires_in: \(tokenResponse.expiresIn)s, Created: \(tokenCreatedAt), Calculated expiry: \(calculatedExpiry)")
+                    
                     return tokenResponse
                 } catch {
                     LogManager.logError("Failed to decode token response: \(error)")
@@ -1797,7 +2078,15 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
 
                     if (200 ..< 300).contains(retryHttpResponse.statusCode) {
                         let decoder = JSONDecoder()
-                        return try decoder.decode(TokenResponse.self, from: retryData)
+                        let tokenResponse = try decoder.decode(TokenResponse.self, from: retryData)
+                        
+                        // Add detailed token expiry logging for debugging
+                        let tokenCreatedAt = Date()
+                        let serverExpiresIn = TimeInterval(tokenResponse.expiresIn)
+                        let calculatedExpiry = tokenCreatedAt.addingTimeInterval(serverExpiresIn)
+                        LogManager.logInfo("🔐 Token Exchange Retry Success - Server expires_in: \(tokenResponse.expiresIn)s, Created: \(tokenCreatedAt), Calculated expiry: \(calculatedExpiry)")
+                        
+                        return tokenResponse
                     } else {
                         // If retry failed, throw appropriate error
                         let statusCode = retryHttpResponse.statusCode

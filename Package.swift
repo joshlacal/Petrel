@@ -15,8 +15,10 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(url: "https://github.com/beatt83/jose-swift.git", .upToNextMajor(from: "5.0.0")),
-        .package(url: "https://github.com/valpackett/SwiftCBOR.git", branch: "master"),
+        .package(url: "https://github.com/joshlacal/jose-swift.git", .branchItem("main")),
+//        .package(url: "https://github.com/joshlacal/jose-swift.git", .upToNextMajor(from: "5.0.0")),
+//        .package(url: "https://github.com/beatt83/jose-swift.git", .upToNextMajor(from: "5.0.0")),
+        .package(url: "https://github.com/valpackett/SwiftCBOR.git", .upToNextMajor(from: "0.5.0")),
         .package(
             url: "https://github.com/apple/swift-async-dns-resolver",
             .upToNextMajor(from: "0.1.0")
@@ -30,7 +32,7 @@ let package = Package(
                 "jose-swift",
                 "SwiftCBOR",
                 .product(name: "AsyncDNSResolver", package: "swift-async-dns-resolver"),
-            ]
+            ],
         ),
         .testTarget(
             name: "PetrelTests",

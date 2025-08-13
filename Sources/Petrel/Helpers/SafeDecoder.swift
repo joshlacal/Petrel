@@ -120,7 +120,7 @@ public enum SafeDecoder {
     }
 
     /// Decode JSON data into a model safely
-    public static func decode<T: Decodable>(_ type: T.Type, from data: Data) async throws -> T {
+    public static func decode<T: Decodable & Sendable>(_ type: T.Type, from data: Data) async throws -> T {
         await debugLog("Starting to decode \(String(describing: type))", data: data)
 
         // Create decoder with the original data in userInfo
@@ -264,7 +264,7 @@ public enum SafeDecoder {
     }
 
     /// Load nested data from a pending object
-    public static func loadPendingObject<T: Decodable>(
+    public static func loadPendingObject<T: Decodable & Sendable>(
         pendingData: PendingDecodeData, expectedType: String
     ) async -> T? {
         await debugLog("Loading pending object, expected type: \(expectedType)")

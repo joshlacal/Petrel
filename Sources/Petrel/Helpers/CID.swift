@@ -50,9 +50,21 @@ public enum CIDCodec: UInt8, ATProtocolValue {
 
     public func toCBORValue() throws -> Any { return rawValue }
 
-    case dagCBOR = 0x71
     case raw = 0x55
-    var name: String { self == .dagCBOR ? "dag-cbor" : "raw" }
+    case dagPB = 0x70
+    case dagCBOR = 0x71
+    case gitRaw = 0x78
+    case identity = 0x00
+    
+    var name: String { 
+        switch self {
+        case .raw: return "raw"
+        case .dagPB: return "dag-pb"
+        case .dagCBOR: return "dag-cbor"
+        case .gitRaw: return "git-raw"
+        case .identity: return "identity"
+        }
+    }
 }
 
 /// Represents a multihash structure as used in IPFS and AT Protocol
@@ -64,16 +76,44 @@ public struct Multihash: ATProtocolValue {
 
     public func toCBORValue() throws -> Any { return bytes }
 
-    static let sha256Code: UInt8 = 0x12
-    static let sha256Length: UInt8 = 0x20 // 32 bytes
+    // Common hash algorithm codes (from multihash table)
+    public static let sha1Code: UInt8 = 0x11
+    public static let sha1Length: UInt8 = 0x14 // 20 bytes
+    public static let sha256Code: UInt8 = 0x12
+    public static let sha256Length: UInt8 = 0x20 // 32 bytes
+    public static let sha512Code: UInt8 = 0x13
+    public static let sha512Length: UInt8 = 0x40 // 64 bytes
+    public static let blake2b256Code: UInt8 = 0xb2
+    public static let blake2b256Length: UInt8 = 0x20 // 32 bytes
+    /// Get a human-readable name for the hash algorithm
+    public var algorithmName: String {
+        switch algorithm {
+        case Multihash.sha1Code:
+            return "SHA-1"
+        case Multihash.sha256Code:
+            return "SHA-256"
+        case Multihash.sha512Code:
+            return "SHA-512"
+        case Multihash.blake2b256Code:
+            return "BLAKE2b-256"
+        default:
+            return "Unknown (0x\(String(format: "%02X", algorithm)))"
+        }
+    }
 
-    let algorithm: UInt8
-    let length: UInt8
-    let digest: Data
+    public let algorithm: UInt8
+    public let length: UInt8
+    public let digest: Data
 
-    var bytes: Data { Data([algorithm, length]) + digest }
+    public init(algorithm: UInt8, length: UInt8, digest: Data) {
+        self.algorithm = algorithm
+        self.length = length
+        self.digest = digest
+    }
 
-    static func sha256(_ data: Data) -> Multihash {
+    public var bytes: Data { Data([algorithm, length]) + digest }
+
+    public static func sha256(_ data: Data) -> Multihash {
         Multihash(
             algorithm: sha256Code,
             length: sha256Length,
@@ -148,8 +188,8 @@ public struct ATProtoLink: Codable, ATProtocolCodable, Hashable, Equatable, Send
 /// Content Identifier (CID) implementation for AT Protocol (v1, SHA-256)
 public struct CID: Equatable, Hashable, Codable, CustomStringConvertible, ATProtocolValue {
     static let version: UInt8 = 0x01
-    let codec: CIDCodec
-    let multihash: Multihash
+    public let codec: CIDCodec
+    public let multihash: Multihash
 
     public init(codec: CIDCodec, multihash: Multihash) {
         self.codec = codec
@@ -193,11 +233,15 @@ public struct CID: Equatable, Hashable, Codable, CustomStringConvertible, ATProt
     }
 
     /// Initialize CID from its raw binary representation (version + codec + multihash)
-    init(bytes cidBytes: Data) throws {
+    public init(bytes cidBytes: Data) throws {
         guard cidBytes.count >= 4 else { throw CIDParseError.insufficientLength }
         guard cidBytes[0] == CID.version else { throw CIDParseError.invalidVersion(cidBytes[0]) }
         guard let codec = CIDCodec(rawValue: cidBytes[1]) else {
-            throw CIDParseError.unsupportedCodec(cidBytes[1])
+            let codecByte = cidBytes[1]
+            print("EXPERIMENTAL CAR Parser: Unsupported CID codec: 0x\(String(format: "%02X", codecByte)) (\(codecByte) decimal)")
+            print("CID bytes: \(cidBytes.map { String(format: "%02X", $0) }.joined(separator: " "))")
+            print("Known codecs: raw=0x55, dag-pb=0x70, dag-cbor=0x71, git-raw=0x78, identity=0x00")
+            throw CIDParseError.unsupportedCodec(codecByte)
         }
 
         let hashAlgorithm = cidBytes[2]
@@ -211,14 +255,13 @@ public struct CID: Equatable, Hashable, Codable, CustomStringConvertible, ATProt
         self.codec = codec
         multihash = Multihash(algorithm: hashAlgorithm, length: hashLength, digest: Data(digest))
 
-        // Optional: Verify hash algorithm matches expected (e.g., SHA-256 for ATP)
-        guard hashAlgorithm == Multihash.sha256Code && hashLength == Multihash.sha256Length else {
-            // Allow parsing, but maybe log a warning if it's not the 'blessed' format
+        // AT Protocol typically uses SHA-256, but CAR files may contain other hash algorithms
+        // Log informational message but allow parsing to continue
+        if hashAlgorithm != Multihash.sha256Code || hashLength != Multihash.sha256Length {
+            let algorithmName = multihash.algorithmName
             print(
-                "Warning: Parsed CID uses non-standard hash algorithm/length for ATProto: \(hashAlgorithm)/\(hashLength)"
+                "Info: Parsed CID uses \(algorithmName) with length \(hashLength) (AT Protocol standard is SHA-256: 32 bytes)"
             )
-            // Alternatively, throw: throw CIDParseError.invalidHashAlgorithm(hashAlgorithm, hashLength)
-            return
         }
     }
 

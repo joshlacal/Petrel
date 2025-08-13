@@ -17,24 +17,24 @@ enum KeychainError: Error {
     case deletionError(status: OSStatus)
 }
 
-actor KeychainManager {
+final class KeychainManager {
     // MARK: - Cache
 
     // Thread-safe caches with automatic memory management
-    private static let dataCache: NSCache<NSString, NSData> = {
+    nonisolated(unsafe) private static let dataCache: NSCache<NSString, NSData> = {
         let cache = NSCache<NSString, NSData>()
         cache.countLimit = 100
         return cache
     }()
 
-    private static let dpopKeyCache: NSCache<NSString, CachedDPoPKey> = {
+    nonisolated(unsafe) private static var dpopKeyCache: NSCache<NSString, CachedDPoPKey> = {
         let cache = NSCache<NSString, CachedDPoPKey>()
         cache.countLimit = 100
         return cache
     }()
 
     // Wrapper class for P256.Signing.PrivateKey to make it cacheable
-    private class CachedDPoPKey: NSObject {
+    private final class CachedDPoPKey: NSObject, @unchecked Sendable {
         let key: P256.Signing.PrivateKey
 
         init(key: P256.Signing.PrivateKey) {

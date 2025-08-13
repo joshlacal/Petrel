@@ -223,7 +223,9 @@ public actor ATProtoClient {
         }
         
         do {
-            return try await authService.refreshTokenIfNeeded()
+            let result = try await authService.refreshTokenIfNeeded()
+            // Token is valid if it was refreshed or still valid (not just rate limited)
+            return result != .skippedDueToRateLimit
         } catch {
             return false
         }
@@ -233,7 +235,9 @@ public actor ATProtoClient {
     /// - Returns: Boolean indicating whether token was refreshed
     /// - Throws: Error if token refresh fails
     public func refreshToken() async throws -> Bool {
-        return try await authService.refreshTokenIfNeeded()
+        let result = try await authService.refreshTokenIfNeeded()
+        // Return true if token was actually refreshed
+        return result == .refreshedSuccessfully
     }
 
     // MARK: - Moderation Methods
