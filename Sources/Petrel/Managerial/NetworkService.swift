@@ -484,9 +484,9 @@ public actor NetworkService: NetworkServiceProtocol {
             // Perform the request with deduplication
             do {
                 LogManager.logRequest(requestToSend)
-                
+
                 let request = requestToSend
-                
+
                 // Use deduplicator for non-refresh requests to prevent concurrent identical calls
                 let (data, response) = if !skipTokenRefresh {
                     try await requestDeduplicator.deduplicate(request: request) { @Sendable in
@@ -690,12 +690,12 @@ public actor NetworkService: NetworkServiceProtocol {
                     if retryCount >= maxRetries {
                         throw NetworkError.responseError(statusCode: httpResponse.statusCode)
                     }
-                    
+
                     // Enhanced exponential backoff with jitter
                     let baseDelay = min(pow(2.0, Double(retryCount)), 8.0) // Cap at 8 seconds
-                    let jitter = Double.random(in: 0.8...1.2) // Add ±20% jitter
+                    let jitter = Double.random(in: 0.8 ... 1.2) // Add ±20% jitter
                     let delaySeconds = baseDelay * jitter
-                    
+
                     LogManager.logInfo(
                         "Network Service - Waiting \(String(format: "%.1f", delaySeconds))s before retry \(retryCount)/\(maxRetries)"
                     )
@@ -721,12 +721,12 @@ public actor NetworkService: NetworkServiceProtocol {
                     LogManager.logError("Network Service - Max retries reached for network error.")
                     throw NetworkError.requestFailed // Or map specific URLError codes
                 }
-                
+
                 // Enhanced exponential backoff for network errors with jitter
                 let baseDelay = min(pow(2.0, Double(retryCount)), 10.0) // Cap at 10 seconds for network errors
-                let jitter = Double.random(in: 0.7...1.3) // Add ±30% jitter for network errors
+                let jitter = Double.random(in: 0.7 ... 1.3) // Add ±30% jitter for network errors
                 let delaySeconds = baseDelay * jitter
-                
+
                 LogManager.logInfo(
                     "Network Service - Waiting \(String(format: "%.1f", delaySeconds))s before network retry \(retryCount)/\(maxRetries)"
                 )

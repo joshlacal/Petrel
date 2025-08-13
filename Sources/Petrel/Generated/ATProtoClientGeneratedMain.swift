@@ -222,7 +222,9 @@ public actor ATProtoClient {
         }
 
         do {
-            return try await authService.refreshTokenIfNeeded()
+            let result = try await authService.refreshTokenIfNeeded()
+            // Token is valid if it was refreshed or still valid (not just rate limited)
+            return result != .skippedDueToRateLimit
         } catch {
             return false
         }
@@ -232,7 +234,9 @@ public actor ATProtoClient {
     /// - Returns: Boolean indicating whether token was refreshed
     /// - Throws: Error if token refresh fails
     public func refreshToken() async throws -> Bool {
-        return try await authService.refreshTokenIfNeeded()
+        let result = try await authService.refreshTokenIfNeeded()
+        // Return true if token was actually refreshed
+        return result == .refreshedSuccessfully
     }
 
     // MARK: - Moderation Methods
@@ -386,18 +390,18 @@ public actor ATProtoClient {
                 self.networkService = networkService
             }
 
-            public lazy var embed: Embed = .init(networkService: self.networkService)
+            public lazy var video: Video = .init(networkService: self.networkService)
 
-            public final class Embed: @unchecked Sendable {
+            public final class Video: @unchecked Sendable {
                 let networkService: NetworkService
                 init(networkService: NetworkService) {
                     self.networkService = networkService
                 }
             }
 
-            public lazy var video: Video = .init(networkService: self.networkService)
+            public lazy var embed: Embed = .init(networkService: self.networkService)
 
-            public final class Video: @unchecked Sendable {
+            public final class Embed: @unchecked Sendable {
                 let networkService: NetworkService
                 init(networkService: NetworkService) {
                     self.networkService = networkService
@@ -557,18 +561,18 @@ public actor ATProtoClient {
                 }
             }
 
-            public lazy var server: Server = .init(networkService: self.networkService)
+            public lazy var label: Label = .init(networkService: self.networkService)
 
-            public final class Server: @unchecked Sendable {
+            public final class Label: @unchecked Sendable {
                 let networkService: NetworkService
                 init(networkService: NetworkService) {
                     self.networkService = networkService
                 }
             }
 
-            public lazy var label: Label = .init(networkService: self.networkService)
+            public lazy var server: Server = .init(networkService: self.networkService)
 
-            public final class Label: @unchecked Sendable {
+            public final class Server: @unchecked Sendable {
                 let networkService: NetworkService
                 init(networkService: NetworkService) {
                     self.networkService = networkService

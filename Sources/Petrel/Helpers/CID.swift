@@ -55,8 +55,8 @@ public enum CIDCodec: UInt8, ATProtocolValue {
     case dagCBOR = 0x71
     case gitRaw = 0x78
     case identity = 0x00
-    
-    var name: String { 
+
+    var name: String {
         switch self {
         case .raw: return "raw"
         case .dagPB: return "dag-pb"
@@ -83,7 +83,7 @@ public struct Multihash: ATProtocolValue {
     public static let sha256Length: UInt8 = 0x20 // 32 bytes
     public static let sha512Code: UInt8 = 0x13
     public static let sha512Length: UInt8 = 0x40 // 64 bytes
-    public static let blake2b256Code: UInt8 = 0xb2
+    public static let blake2b256Code: UInt8 = 0xB2
     public static let blake2b256Length: UInt8 = 0x20 // 32 bytes
     /// Get a human-readable name for the hash algorithm
     public var algorithmName: String {
