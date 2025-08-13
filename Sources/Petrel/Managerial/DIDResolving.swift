@@ -40,7 +40,7 @@ actor DIDResolutionService: DIDResolving {
         cache.countLimit = 100 // Adjust as needed
     }
 
-    public func resolveHandleToDID(handle: String) async throws -> String {
+    func resolveHandleToDID(handle: String) async throws -> String {
         // Check cache
         if let cachedDID = getCachedDID(for: handle) {
             return cachedDID
@@ -212,11 +212,11 @@ actor DIDResolutionService: DIDResolving {
         return nil
     }
 
-    public func resolveDIDToPDSURL(did: String) async throws -> URL {
+    func resolveDIDToPDSURL(did: String) async throws -> URL {
         return try await resolveDIDToHandleAndPDSURL(did: did).1
     }
 
-    public func resolveDIDToHandleAndPDSURL(did: String) async throws -> (String, URL) {
+    func resolveDIDToHandleAndPDSURL(did: String) async throws -> (String, URL) {
         // Check cache first
         if let cachedURL = getCachedPDSURL(for: did), let cachedHandle = getCachedHandle(for: did) {
             return (cachedHandle, cachedURL)

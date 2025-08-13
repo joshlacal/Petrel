@@ -17,17 +17,17 @@ enum KeychainError: Error {
     case deletionError(status: OSStatus)
 }
 
-final class KeychainManager {
+enum KeychainManager {
     // MARK: - Cache
 
     // Thread-safe caches with automatic memory management
-    nonisolated(unsafe) private static let dataCache: NSCache<NSString, NSData> = {
+    private nonisolated(unsafe) static let dataCache: NSCache<NSString, NSData> = {
         let cache = NSCache<NSString, NSData>()
         cache.countLimit = 100
         return cache
     }()
 
-    nonisolated(unsafe) private static var dpopKeyCache: NSCache<NSString, CachedDPoPKey> = {
+    private nonisolated(unsafe) static var dpopKeyCache: NSCache<NSString, CachedDPoPKey> = {
         let cache = NSCache<NSString, CachedDPoPKey>()
         cache.countLimit = 100
         return cache

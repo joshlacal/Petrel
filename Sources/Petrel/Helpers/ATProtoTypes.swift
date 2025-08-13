@@ -292,9 +292,9 @@ public struct Blob: Codable, ATProtocolCodable, Hashable, Equatable, Sendable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        
+
         // Check if this is the legacy format (has cid but no $type)
-        if container.contains(.cid) && !container.contains(.type) {
+        if container.contains(.cid), !container.contains(.type) {
             // Legacy blob format: { "cid": "...", "mimeType": "..." }
             type = "blob" // Default type for legacy blobs
             ref = nil // Legacy format doesn't have ref
@@ -313,7 +313,7 @@ public struct Blob: Codable, ATProtocolCodable, Hashable, Equatable, Sendable {
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        
+
         // Always encode in modern format when writing
         try container.encode(type, forKey: .type)
         try container.encodeIfPresent(ref, forKey: .ref)

@@ -32,7 +32,7 @@ public protocol AuthServiceProtocol: Actor {
     /// Refreshes the authentication token if needed.
     /// - Returns: Result indicating whether token was refreshed, still valid, or skipped
     func refreshTokenIfNeeded() async throws -> TokenRefreshResult
-    
+
     /// Refreshes the authentication token if needed.
     /// - Parameter forceRefresh: If true, forces a refresh regardless of calculated expiry time
     /// - Returns: Result indicating whether token was refreshed, still valid, or skipped
@@ -46,8 +46,8 @@ public protocol AuthServiceProtocol: Actor {
 
 /// Result of a token refresh attempt
 public enum TokenRefreshResult: Sendable {
-    case refreshedSuccessfully  // Token was actually refreshed
-    case stillValid            // Token is still valid, no refresh needed
+    case refreshedSuccessfully // Token was actually refreshed
+    case stillValid // Token is still valid, no refresh needed
     case skippedDueToRateLimit // Refresh was skipped due to rate limiting
 }
 
@@ -290,11 +290,11 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
         try await accountManager.addAccount(finalAccount) // Changed from addOrUpdateAccount to add(account:)
         LogManager.logDebug("Added/Updated account in AccountManager for DID: \(did)")
         try await accountManager.setCurrentAccount(did: did) // Set as current account
-        
+
         // Log successful OAuth completion
         LogManager.logInfo(
             "🎉 TOKEN_LIFECYCLE: OAuth flow completed successfully for DID \(LogManager.logDID(did)) " +
-            "(token_type=\(tokenType.rawValue), expires_in=\(Int(adjustedExpiresIn))s)",
+                "(token_type=\(tokenType.rawValue), expires_in=\(Int(adjustedExpiresIn))s)",
             category: .authentication
         )
 
@@ -396,7 +396,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
         // Log logout completion
         LogManager.logInfo(
             "🚪 TOKEN_LIFECYCLE: Logout completed for DID \(LogManager.logDID(did)) " +
-            "(session_cleared=true, account_removed=true)",
+                "(session_cleared=true, account_removed=true)",
             category: .authentication
         )
     }
@@ -496,13 +496,13 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
             } else {
                 throw AuthError.tokenRefreshFailed as Error
             }
-            
+
         case .stillValid:
             // Token is supposedly still valid, but we got a 401
             // This shouldn't happen, but if it does, don't retry to avoid loops
             LogManager.logError("Token reported as still valid but got 401. Not retrying to avoid loop.")
             throw AuthError.tokenRefreshFailed as Error
-            
+
         case .skippedDueToRateLimit:
             // Refresh was skipped due to rate limiting
             // Don't retry with the same token - it will just fail again
@@ -1106,7 +1106,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
 
         // Smart rate limiting check
         let now = Date()
-        
+
         // Check if we recently had a successful refresh
         if let lastSuccess = lastSuccessfulRefresh[did] {
             let timeSinceSuccess = now.timeIntervalSince(lastSuccess)
@@ -1118,7 +1118,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
                 return .stillValid // Token was recently refreshed
             }
         }
-        
+
         // Check minimum interval between attempts
         if let lastAttempt = lastRefreshAttempt[did] {
             let timeSinceLastAttempt = now.timeIntervalSince(lastAttempt)
@@ -1135,12 +1135,12 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
         // DON'T record attempt time here - only after successful refresh
         // This prevents race conditions where parallel requests see an attempt
         // but the refresh hasn't actually completed yet
-        
+
         // Log token lifecycle event
         LogManager.logInfo(
             "🔄 TOKEN_LIFECYCLE: Refresh attempt started for DID \(LogManager.logDID(did)) " +
-            "(force=\(forceRefresh), session_expires_soon=\(session.isExpiringSoon), " +
-            "expires_in=\(Int(session.expiresIn))s, created=\(Int(Date().timeIntervalSince(session.createdAt)))s ago)",
+                "(force=\(forceRefresh), session_expires_soon=\(session.isExpiringSoon), " +
+                "expires_in=\(Int(session.expiresIn))s, created=\(Int(Date().timeIntervalSince(session.createdAt)))s ago)",
             category: .authentication
         )
 
@@ -1164,7 +1164,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
             await refreshCircuitBreaker.recordSuccess(for: did)
             return .stillValid // Token is still valid
         }
-        
+
         if forceRefresh {
             LogManager.logInfo("🔄 Force refresh requested - bypassing expiry check for DID: \(did)")
         }
@@ -1211,7 +1211,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
 
             // Record success with circuit breaker
             await refreshCircuitBreaker.recordSuccess(for: account.did)
-            
+
             // Record successful refresh time AND attempt time
             let now = Date()
             lastSuccessfulRefresh[account.did] = now
@@ -1220,7 +1220,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
             // Log successful token lifecycle event
             LogManager.logInfo(
                 "✅ TOKEN_LIFECYCLE: Refresh completed successfully for DID \(LogManager.logDID(account.did)) " +
-                "(new_expires_in=\(Int(adjustedExpiresIn))s, token_type=\(session.tokenType.rawValue))",
+                    "(new_expires_in=\(Int(adjustedExpiresIn))s, token_type=\(session.tokenType.rawValue))",
                 category: .authentication
             )
             return .refreshedSuccessfully // Indicate actual refresh happened
@@ -1228,7 +1228,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
         } catch let error as TokenRefreshCoordinator.RefreshError {
             // Clear in-progress flag regardless of error type
             try? await markRefreshInProgress(for: account.did, inProgress: false)
-            
+
             // Record failure with circuit breaker
             await refreshCircuitBreaker.recordFailure(for: account.did)
 
@@ -1236,7 +1236,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
             case let .invalidGrant(description):
                 LogManager.logError(
                     "❌ TOKEN_LIFECYCLE: Refresh failed with invalid_grant for DID \(LogManager.logDID(account.did)): " +
-                    "\(description ?? "No details"). Triggering automatic logout.",
+                        "\(description ?? "No details"). Triggering automatic logout.",
                     category: .authentication
                 )
                 // The refresh token is invalid, trigger logout
@@ -1306,7 +1306,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
             // Catch any other errors (e.g., from performTokenRefresh before coordinator call)
             // Ensure we clear the in-progress flag for any unexpected errors
             try? await markRefreshInProgress(for: account.did, inProgress: false)
-            
+
             // Record failure with circuit breaker
             await refreshCircuitBreaker.recordFailure(for: account.did)
 
@@ -1474,7 +1474,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
                     let errorResponse = try JSONDecoder().decode(OAuthErrorResponse.self, from: data)
 
                     // Check specifically for DPoP nonce error
-                    if errorResponse.error == "use_dpop_nonce" && retryCount == 0 {
+                    if errorResponse.error == "use_dpop_nonce", retryCount == 0 {
                         LogManager.logInfo("Detected DPoP nonce mismatch during token refresh. Will retry with updated nonce.")
 
                         // Wait a moment to ensure the nonce is properly stored
@@ -1495,7 +1495,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
                     let decoder = JSONDecoder()
                     let tokenResponse = try decoder.decode(TokenResponse.self, from: data)
                     // Validation that we received expected fields
-                    guard !tokenResponse.accessToken.isEmpty && !tokenResponse.refreshToken.isEmpty else {
+                    guard !tokenResponse.accessToken.isEmpty, !tokenResponse.refreshToken.isEmpty else {
                         LogManager.logError("Token refresh succeeded but received empty tokens")
                         throw AuthError.invalidResponse
                     }
@@ -1717,7 +1717,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
     }
 
     // MARK: - Helper Methods
-    
+
     /// Validates the integrity and consistency of a token session
     /// - Parameter session: The session to validate
     /// - Returns: True if the session is valid, false if corrupted
@@ -1726,36 +1726,36 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
     private func validateTokenState(_ session: Session) -> Bool {
         // Basic presence checks - tokens must exist but are treated as opaque
         guard !session.accessToken.isEmpty,
-              let refreshToken = session.refreshToken, !refreshToken.isEmpty else {
+              let refreshToken = session.refreshToken, !refreshToken.isEmpty
+        else {
             LogManager.logError("Token validation failed: Empty tokens detected")
             return false
         }
-        
+
         // IMPORTANT: Do NOT validate token format or structure
         // Both access tokens and refresh tokens are opaque and their format
         // is implementation-specific to the authorization server
-        
+
         // Timestamp validation
         if session.createdAt > Date() {
             LogManager.logError("Token validation failed: Created timestamp is in the future")
             return false
         }
-        
+
         // Expiry validation
         if session.expiresIn <= 0 {
             LogManager.logError("Token validation failed: Invalid expiry time")
             return false
         }
-        
+
         // DID format validation
         if !session.did.hasPrefix("did:") {
             LogManager.logError("Token validation failed: Invalid DID format")
             return false
         }
-        
+
         return true
     }
-    
 
     /// Enhanced token state validation with transaction-like save verification
     /// - Parameters:
@@ -1769,31 +1769,32 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
             LogManager.logError("Session validation failed before save for DID: \(LogManager.logDID(did))")
             return false
         }
-        
+
         // Save session
         try await storage.saveSession(newSession, for: did)
-        
+
         // Verify the session was saved correctly with all-or-nothing semantics
         guard let savedSession = try await storage.getSession(for: did) else {
             LogManager.logError("Session verification failed: Could not retrieve saved session for DID: \(LogManager.logDID(did))")
             return false
         }
-        
+
         // Verify critical fields match
         guard savedSession.accessToken == newSession.accessToken,
               savedSession.refreshToken == newSession.refreshToken,
               savedSession.did == newSession.did,
-              savedSession.tokenType == newSession.tokenType else {
+              savedSession.tokenType == newSession.tokenType
+        else {
             LogManager.logError("Session verification failed: Saved session does not match expected values for DID: \(LogManager.logDID(did))")
             return false
         }
-        
+
         // Additional validation on the saved session
         guard validateTokenState(savedSession) else {
             LogManager.logError("Session validation failed after save for DID: \(LogManager.logDID(did))")
             return false
         }
-        
+
         return true
     }
 
@@ -1803,7 +1804,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
     /// - Returns: Adjusted expiry time with dynamic safety margin applied
     private func applyClockSkewProtection(to serverExpiresIn: Int) -> TimeInterval {
         let originalExpiry = TimeInterval(serverExpiresIn)
-        
+
         // Dynamic safety margin based on token lifetime
         let safetyMargin: TimeInterval = {
             if originalExpiry < 900 { // Less than 15 minutes
@@ -1817,7 +1818,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
                 return 600
             }
         }()
-        
+
         // Minimum expiry based on token type
         let minimumExpiry: TimeInterval = {
             if originalExpiry < 900 {
@@ -1828,18 +1829,18 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
                 return 600
             }
         }()
-        
+
         let adjustedExpiry = max(originalExpiry - safetyMargin, minimumExpiry)
-        
+
         // Only log if there's a significant change (more than 30 seconds)
         if abs(adjustedExpiry - originalExpiry) > 30 {
             let marginPercent = Int((safetyMargin / originalExpiry) * 100)
             LogManager.logInfo(
                 "🕐 Dynamic clock skew protection: Server expires_in=\(serverExpiresIn)s, " +
-                "margin=\(Int(safetyMargin))s (\(marginPercent)%), adjusted to \(Int(adjustedExpiry))s"
+                    "margin=\(Int(safetyMargin))s (\(marginPercent)%), adjusted to \(Int(adjustedExpiry))s"
             )
         }
-        
+
         return adjustedExpiry
     }
 
@@ -2017,13 +2018,13 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
                 do {
                     let tokenResponse = try decoder.decode(TokenResponse.self, from: data)
                     LogManager.logDebug("Successfully decoded token response.")
-                    
+
                     // Add detailed token expiry logging for debugging
                     let tokenCreatedAt = Date()
                     let serverExpiresIn = TimeInterval(tokenResponse.expiresIn)
                     let calculatedExpiry = tokenCreatedAt.addingTimeInterval(serverExpiresIn)
                     LogManager.logInfo("🔐 Token Exchange Success - Server expires_in: \(tokenResponse.expiresIn)s, Created: \(tokenCreatedAt), Calculated expiry: \(calculatedExpiry)")
-                    
+
                     return tokenResponse
                 } catch {
                     LogManager.logError("Failed to decode token response: \(error)")
@@ -2079,13 +2080,13 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
                     if (200 ..< 300).contains(retryHttpResponse.statusCode) {
                         let decoder = JSONDecoder()
                         let tokenResponse = try decoder.decode(TokenResponse.self, from: retryData)
-                        
+
                         // Add detailed token expiry logging for debugging
                         let tokenCreatedAt = Date()
                         let serverExpiresIn = TimeInterval(tokenResponse.expiresIn)
                         let calculatedExpiry = tokenCreatedAt.addingTimeInterval(serverExpiresIn)
                         LogManager.logInfo("🔐 Token Exchange Retry Success - Server expires_in: \(tokenResponse.expiresIn)s, Created: \(tokenCreatedAt), Calculated expiry: \(calculatedExpiry)")
-                        
+
                         return tokenResponse
                     } else {
                         // If retry failed, throw appropriate error
