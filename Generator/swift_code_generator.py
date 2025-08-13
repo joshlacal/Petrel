@@ -33,8 +33,8 @@ class SwiftCodeGenerator:
 
     def check_if_blob_upload(self, lexicon: Dict[str, Any]) -> bool:
         main_def = lexicon.get('defs', {}).get('main', {})
-        return main_def.get('type') == 'procedure' and \
-               main_def.get('input', {}).get('encoding') == '*/*'
+        encoding = main_def.get('input', {}).get('encoding', '')
+        return main_def.get('type') == 'procedure' and encoding == '*/*'
 
     def handle_main_def(self):
         main_def = self.defs.get('main', {})
@@ -74,15 +74,25 @@ class SwiftCodeGenerator:
         return self.template_manager.query_parameters_template.render(properties=properties)
 
     def generate_input_struct(self, input_obj: Optional[Dict[str, Any]]) -> str:
-        if not input_obj or 'schema' not in input_obj:
+        if not input_obj:
             return ""
         
-        input_schema = input_obj['schema']
         encoding = input_obj.get('encoding', '')
+        
+        # Handle input with encoding but no schema (like CAR files)
+        if 'schema' not in input_obj:
+            if encoding != '' and encoding != 'application/json':
+                properties = [{"name": "data", "type": "Data", "optional": False}]
+                conformance = ""
+                return self.template_manager.input_struct_template.render(properties=properties, conformance=conformance)
+            else:
+                return ""
+        
+        input_schema = input_obj['schema']
         conformance = ": ATProtocolCodable" if encoding == "application/json" else ""
 
         properties = ""
-        if encoding == "*/*":
+        if encoding != '' and encoding != 'application/json':
             properties = [{"name": "data", "type": "Data", "optional": False}]
         elif input_schema.get('type') == 'ref':
             ref_type = convert_ref(input_schema['ref'])
@@ -323,7 +333,9 @@ class SwiftCodeGenerator:
         procedure_name = convert_to_camel_case(lexicon_id.split('.')[-1])
                 
         # Determine if the procedure is a blob upload based on the input encoding
-        is_blob_upload = 'input' in main_def and main_def['input'].get('encoding') == '*/*'
+        input_encoding = main_def.get('input', {}).get('encoding', '') if 'input' in main_def else None
+        is_blob_upload = 'input' in main_def and input_encoding == '*/*'
+        is_binary_data = 'input' in main_def and input_encoding != '' and input_encoding != 'application/json' and input_encoding != '*/*'
         
         input_parameters = ''
         input_values = ''
@@ -358,6 +370,7 @@ class SwiftCodeGenerator:
             endpoint=endpoint,
             description=self.description,
             is_blob_upload=is_blob_upload,
+            is_binary_data=is_binary_data,
             input_encoding=input_encoding,    # Pass the input encoding to the template
             output_encoding=output_encoding   # Pass the output encoding to the template
         )

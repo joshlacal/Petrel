@@ -7,6 +7,8 @@ extension ATProtoClient.{{ template_namespace_name }} {
     ///   - data: The binary data to upload
     ///   - mimeType: The MIME type of the data being uploaded
     ///   - stripMetadata: Whether to strip metadata from images (default: true)
+    /// {% elif is_binary_data %}
+    /// - Parameter data: The binary data to upload
     /// {% elif input_struct_name %}
     /// - Parameter input: The input parameters for the request
     /// {% endif %}
@@ -17,6 +19,8 @@ extension ATProtoClient.{{ template_namespace_name }} {
         data: Data,
         mimeType: String,
         stripMetadata: Bool = true
+        {% elif is_binary_data %}
+        data: Data
         {% elif input_struct_name %}
         input: {{ input_struct_name }}
         {% endif %}
@@ -34,6 +38,12 @@ extension ATProtoClient.{{ template_namespace_name }} {
             "Content-Type": mimeType,
             "Content-Length": "\(dataToUpload.count)"
         ]
+        {% elif is_binary_data %}
+        let dataToUpload = data
+        var headers: [String: String] = [
+            "Content-Type": "{{ input_encoding }}",
+            "Content-Length": "\(dataToUpload.count)"
+        ]
         {% else %}
         var headers: [String: String] = [:]
         {% if input_encoding %}
@@ -49,7 +59,7 @@ extension ATProtoClient.{{ template_namespace_name }} {
             endpoint: endpoint,
             method: "POST",
             headers: headers,
-            body: {% if is_blob_upload %}dataToUpload{% else %}requestData{% endif %},
+            body: {% if is_blob_upload or is_binary_data %}dataToUpload{% else %}requestData{% endif %},
             queryItems: nil
         )
 

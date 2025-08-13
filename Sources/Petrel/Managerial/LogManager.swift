@@ -22,7 +22,7 @@ public class LogManager {
     )
 
     private static let sensitiveHeaders = [
-        "authorization", "x-dpop", "cookie", "set-cookie",
+        "authorization", "dpop", "x-dpop", "dpop-nonce", "cookie", "set-cookie",
         "x-api-key", "x-auth-token", "bearer",
     ]
 
