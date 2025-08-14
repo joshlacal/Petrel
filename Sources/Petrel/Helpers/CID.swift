@@ -288,7 +288,7 @@ public struct CID: Equatable, Hashable, Codable, CustomStringConvertible, ATProt
     /// using Tag 42 *when it's the value being processed* (e.g., returned by ATProtoLink.toCBORValue).
     /// It should NOT be encoded this way when it's just a string value within another structure (like StrongRef).
     public func toCBORValue() throws -> Any {
-        return self // Return the struct itself
+        return self.string // Return the string representation for consistent CBOR encoding
     }
 }
 
