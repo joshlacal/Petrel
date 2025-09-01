@@ -228,78 +228,77 @@ public struct CID: Equatable, Hashable, Codable, CustomStringConvertible, ATProt
         guard !cidString.isEmpty else {
             throw CIDParseError.invalidPrefix("CID string cannot be empty")
         }
-        
-        guard cidString.hasPrefix("b") else { 
-            throw CIDParseError.invalidPrefix("Requires 'b' prefix") 
+
+        guard cidString.hasPrefix("b") else {
+            throw CIDParseError.invalidPrefix("Requires 'b' prefix")
         }
-        
+
         // Validate reasonable length (CIDs should be around 50-60 characters typically)
         guard cidString.count >= 10 && cidString.count <= 100 else {
             throw CIDParseError.invalidPrefix("CID string length out of valid range")
         }
-        
+
         let base32Part = String(cidString.dropFirst())
-        
+
         guard let cidBytes = base32Decode(base32Part.uppercased()) else {
             throw CIDParseError.invalidBase32Encoding
         }
-        
+
         return try CID(bytes: cidBytes)
     }
 
     /// Initialize CID from its raw binary representation (version + codec + multihash)
     public init(bytes cidBytes: Data) throws {
-        
         // Basic length validation
-        guard cidBytes.count >= 4 else { 
-            throw CIDParseError.insufficientLength 
+        guard cidBytes.count >= 4 else {
+            throw CIDParseError.insufficientLength
         }
-        
+
         // Safe array access with bounds checking
         guard cidBytes.indices.contains(0) else {
             throw CIDParseError.insufficientLength
         }
-        
-        guard cidBytes[0] == CID.version else { 
-            throw CIDParseError.invalidVersion(cidBytes[0]) 
+
+        guard cidBytes[0] == CID.version else {
+            throw CIDParseError.invalidVersion(cidBytes[0])
         }
-        
+
         guard cidBytes.indices.contains(1) else {
             throw CIDParseError.insufficientLength
         }
-        
+
         guard let codec = CIDCodec(rawValue: cidBytes[1]) else {
             let codecByte = cidBytes[1]
             throw CIDParseError.unsupportedCodec(codecByte)
         }
 
         // Safe access to hash algorithm and length bytes
-        guard cidBytes.indices.contains(2) && cidBytes.indices.contains(3) else {
+        guard cidBytes.indices.contains(2), cidBytes.indices.contains(3) else {
             throw CIDParseError.insufficientLength
         }
-        
+
         let hashAlgorithm = cidBytes[2]
         let hashLength = cidBytes[3]
         let digestStart = 4
-        
+
         // Validate hash length is reasonable (prevent overflow attacks)
-        guard hashLength > 0 && hashLength <= 64 else {
+        guard hashLength > 0, hashLength <= 64 else {
             throw CIDParseError.insufficientLength
         }
-        
+
         let expectedTotalLength = digestStart + Int(hashLength)
         guard cidBytes.count == expectedTotalLength else {
             throw CIDParseError.insufficientLength
         }
-        
+
         // Safe digest extraction with bounds validation
-        guard digestStart >= 0 && digestStart <= cidBytes.count else {
+        guard digestStart >= 0, digestStart <= cidBytes.count else {
             throw CIDParseError.insufficientLength
         }
-        
+
         // Create digest safely - avoid suffix() which may cause runtime issues
         let digestBytes = Data(cidBytes[digestStart...])
-        
+
         // Final validation that we got the expected digest length
         guard digestBytes.count == Int(hashLength) else {
             throw CIDParseError.insufficientLength
@@ -391,7 +390,6 @@ public class DAGCBOR {
             }
             return a.utf8Bytes.lexicographicallyPrecedes(b.utf8Bytes)
         }
-
 
         // 3. Create map header (using minimal encoding based on count)
         var result = Data()
@@ -666,12 +664,12 @@ public func base32Decode(_ string: String) -> Data? {
     guard !string.isEmpty else {
         return nil
     }
-    
+
     // Validate reasonable length to prevent memory exhaustion attacks
     guard string.count <= 200 else {
         return nil
     }
-    
+
     // Work with lowercase internally
     let lowercasedString = string.lowercased()
     var result = Data()
@@ -696,7 +694,7 @@ public func base32Decode(_ string: String) -> Data? {
 
     // The check `bits >= 8` handles completion. Any remaining bits < 8 are padding
     // and discarded in unpadded base32 as used by CIDs.
-    
+
     return result
 }
 
