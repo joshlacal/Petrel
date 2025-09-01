@@ -191,7 +191,8 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
             tokenEndpoint: tokenEndpoint,
             authServerURL: authServerURL, // Pass the auth server URL for DPoP proof
             ephemeralKey: privateKey, // Pass the ephemeral key
-            initialNonce: initialNonce
+            initialNonce: initialNonce,
+            resourceURL: pdsURL
         )
 
         // 5. Process Token Response
@@ -291,6 +292,9 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
         LogManager.logDebug("Added/Updated account in AccountManager for DID: \(did)")
         try await accountManager.setCurrentAccount(did: did) // Set as current account
 
+        // Reset circuit breaker for fresh start after successful OAuth
+        await refreshCircuitBreaker.reset(for: did)
+        
         // Log successful OAuth completion
         LogManager.logInfo(
             "🎉 TOKEN_LIFECYCLE: OAuth flow completed successfully for DID \(LogManager.logDID(did)) " +
@@ -385,6 +389,13 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
         do {
             try await accountManager.removeAccount(did: did)
             LogManager.logInfo("Removed account and updated current account status.")
+            // If another account is now current, immediately align networking state
+            if let newAccount = await accountManager.getCurrentAccount() {
+                // Ensure subsequent API calls target the correct protected resource
+                networkService.setBaseURL(newAccount.pdsURL)
+                // Clear any per-request headers carried from the previous account
+                await networkService.clearHeaders()
+            }
         } catch {
             LogManager.logError(
                 "Failed during account removal/switching after logout for DID \(did): \(error)")
@@ -393,12 +404,27 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
             // try? await accountManager.setCurrentAccount(did: "") // Or handle more gracefully
         }
 
+        // Reset circuit breaker state for this DID
+        await refreshCircuitBreaker.reset(for: did)
+        
         // Log logout completion
         LogManager.logInfo(
             "🚪 TOKEN_LIFECYCLE: Logout completed for DID \(LogManager.logDID(did)) " +
-                "(session_cleared=true, account_removed=true)",
+                "(session_cleared=true, account_removed=true, circuit_reset=true)",
             category: .authentication
         )
+    }
+
+    // MARK: - Audience Override (one-shot)
+
+    /// Optionally override the OAuth Resource Indicator for the next refresh only.
+    /// This helps recover from an "invalid audience" 401 by minting a token for the
+    /// specific protected resource that produced the failure.
+    private var nextRefreshResourceOverride: String?
+
+    public func setNextRefreshResourceOverride(_ resource: String) async {
+        nextRefreshResourceOverride = resource
+        LogManager.logInfo("AuthenticationService: Next refresh will use resource override: \(resource)")
     }
 
     /// Attempts to revoke a refresh token at the authorization server.
@@ -1123,12 +1149,23 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
         if let lastAttempt = lastRefreshAttempt[did] {
             let timeSinceLastAttempt = now.timeIntervalSince(lastAttempt)
             if timeSinceLastAttempt < minimumRefreshInterval {
-                LogManager.logDebug(
-                    "Token refresh attempted too soon for DID \(LogManager.logDID(did)). Last attempt was \(timeSinceLastAttempt)s ago. Minimum interval is \(minimumRefreshInterval)s.",
-                    category: .authentication
-                )
-                // Don't count this as a failure - just skip it
-                return .skippedDueToRateLimit // Signal that we skipped due to rate limiting
+                if forceRefresh {
+                    // For forced refresh (e.g., 401 handling), wait just enough to honor the minimum interval,
+                    // then proceed. This prevents immediate failures while still avoiding tight retry loops.
+                    let waitSeconds = minimumRefreshInterval - timeSinceLastAttempt
+                    LogManager.logDebug(
+                        "Forced refresh requested \(String(format: "%.3f", timeSinceLastAttempt))s after last attempt for DID \(LogManager.logDID(did)). Waiting \(String(format: "%.3f", waitSeconds))s to avoid thrash.",
+                        category: .authentication
+                    )
+                    try? await Task.sleep(nanoseconds: UInt64(max(0, waitSeconds) * 1_000_000_000))
+                } else {
+                    LogManager.logDebug(
+                        "Token refresh attempted too soon for DID \(LogManager.logDID(did)). Last attempt was \(timeSinceLastAttempt)s ago. Minimum interval is \(minimumRefreshInterval)s.",
+                        category: .authentication
+                    )
+                    // Don't count this as a failure - just skip it
+                    return .skippedDueToRateLimit // Signal that we skipped due to rate limiting
+                }
             }
         }
 
@@ -1423,11 +1460,30 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
             throw AuthError.tokenRefreshFailed
         }
 
-        let requestBody: [String: String] = [
+        // Determine the intended audience/resource for this token per RFC 8707.
+        // Prefer a one-shot override if provided (set upon detecting invalid audience),
+        // otherwise use protected resource metadata value; fall back to the PDS base URL.
+        var resourceValue: String? = nil
+        if let override = nextRefreshResourceOverride, !override.isEmpty {
+            resourceValue = override
+            // Clear the override immediately to keep it one-shot
+            nextRefreshResourceOverride = nil
+            LogManager.logInfo("Using one-shot resource override for refresh: \(resourceValue!)")
+        } else if let prm = account.protectedResourceMetadata {
+            resourceValue = prm.resource.absoluteString
+        } else {
+            resourceValue = account.pdsURL.absoluteString
+        }
+
+        var requestBody: [String: String] = [
             "grant_type": "refresh_token",
             "refresh_token": refreshToken,
             "client_id": oauthConfig.clientId,
         ]
+        if let resourceValue {
+            requestBody["resource"] = resourceValue
+            LogManager.logInfo("Including OAuth resource parameter for refresh: \(resourceValue)")
+        }
 
         var request = URLRequest(url: endpointURL)
         request.httpMethod = "POST"
@@ -2159,7 +2215,8 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
         tokenEndpoint: String,
         authServerURL: URL,
         ephemeralKey: P256.Signing.PrivateKey?,
-        initialNonce: String?
+        initialNonce: String?,
+        resourceURL: URL? = nil
     ) async throws -> TokenResponse {
         guard let url = URL(string: tokenEndpoint) else {
             LogManager.logError("Invalid token endpoint URL provided: \(tokenEndpoint)")
@@ -2171,13 +2228,17 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
 
-        let params: [String: String] = [
+        var params: [String: String] = [
             "grant_type": "authorization_code",
             "code": code,
             "redirect_uri": oauthConfig.redirectUri,
             "client_id": oauthConfig.clientId,
             "code_verifier": codeVerifier,
         ]
+        if let resourceURL {
+            params["resource"] = resourceURL.absoluteString
+            LogManager.logInfo("Including OAuth resource parameter for code exchange: \(resourceURL.absoluteString)")
+        }
         request.httpBody = encodeFormData(params)
 
         LogManager.logDebug("Preparing to exchange authorization code for tokens at: \(tokenEndpoint)")

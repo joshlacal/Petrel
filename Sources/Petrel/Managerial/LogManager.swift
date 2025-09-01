@@ -58,16 +58,9 @@ public class LogManager {
         #endif
     }
 
-    /// Logs a DID with truncation for privacy
-    public static func logDID(_ did: String?, label: String = "DID", category: LogCategory = .authentication) {
-        #if DEBUG
-            if let did = did, !did.isEmpty {
-                let truncated = String(did.prefix(12)) + "...[REDACTED]"
-                logDebug("\(label): \(truncated)", category: category)
-            } else {
-                logDebug("\(label): nil", category: category)
-            }
-        #endif
+    /// Returns a DID for logging (DIDs are public identifiers, not sensitive)
+    public static func logDID(_ did: String?) -> String {
+        return did ?? "nil"
     }
 
     public static func logRequest(_ request: URLRequest) {
