@@ -145,7 +145,13 @@ public actor KeychainStorage {
     ///   - did: The DID associated with the key
     public func saveDPoPKey(_ key: P256.Signing.PrivateKey, for did: String) async throws {
         let keyTag = makeKey("dpopKey", did: did)
-        try KeychainManager.storeDPoPKey(key, keyTag: keyTag)
+        do {
+            try KeychainManager.storeDPoPKey(key, keyTag: keyTag)
+            LogManager.logDebug("Successfully saved DPoP key to Keychain for DID \(LogManager.logDID(did))")
+        } catch {
+            LogManager.logError("Failed to save DPoP key to Keychain (error: \(error)). This will likely cause authentication issues.")
+            throw error // Re-throw so the calling code can handle this properly
+        }
     }
 
     /// Retrieves a DPoP key from the keychain.
@@ -153,7 +159,15 @@ public actor KeychainStorage {
     /// - Returns: The private key if found, or nil if not found
     public func getDPoPKey(for did: String) async throws -> P256.Signing.PrivateKey? {
         let keyTag = makeKey("dpopKey", did: did)
-        return try KeychainManager.retrieveDPoPKey(keyTag: keyTag)
+        do {
+            return try KeychainManager.retrieveDPoPKey(keyTag: keyTag)
+        } catch KeychainError.itemRetrievalError(let status) where status == errSecItemNotFound {
+            LogManager.logDebug("DPoP key not found in Keychain for DID: \(did). A new key will be generated if needed.")
+            return nil
+        } catch {
+            LogManager.logError("Failed to retrieve DPoP key from Keychain (error: \(error)). A new key will be generated if needed.")
+            return nil
+        }
     }
 
     /// Deletes a DPoP key from the keychain.

@@ -2,7 +2,7 @@ import Foundation
 
 /// Ordered map structure for DAG-CBOR encoding
 public struct OrderedCBORMap: DAGCBOREncodable {
-    let entries: [(key: String, value: Any)]
+    public let entries: [(key: String, value: Any)]
 
     public init() {
         entries = []

@@ -18,6 +18,29 @@ enum KeychainError: Error {
 }
 
 enum KeychainManager {
+    // MARK: - Platform-specific Configuration
+    
+    /// Returns the appropriate keychain accessibility for the current platform
+    private static var defaultAccessibility: CFString {
+        #if os(iOS)
+        return kSecAttrAccessibleAfterFirstUnlock
+        #elseif os(macOS)
+        return kSecAttrAccessibleWhenUnlocked
+        #endif
+    }
+    
+    /// Returns platform-specific keychain query attributes
+    private static func platformSpecificAttributes() -> [String: Any] {
+        var attributes: [String: Any] = [:]
+        
+        #if os(macOS)
+        // Disable iCloud sync for app-specific keychain items on macOS
+        attributes[kSecAttrSynchronizable as String] = false
+        #endif
+        
+        return attributes
+    }
+    
     // MARK: - Cache
 
     // Thread-safe caches with automatic memory management
@@ -130,16 +153,19 @@ enum KeychainManager {
         key: String,
         value: Data,
         namespace: String,
-        accessibility: CFString = kSecAttrAccessibleAfterFirstUnlock
+        accessibility: CFString? = nil
     ) throws {
         let namespacedKey = "\(namespace).\(key)"
 
-        let query: [String: Any] = [
+        var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: namespacedKey,
             kSecValueData as String: value,
-            kSecAttrAccessible as String: accessibility,
+            kSecAttrAccessible as String: accessibility ?? defaultAccessibility,
         ]
+        
+        // Add platform-specific attributes
+        query.merge(platformSpecificAttributes()) { (_, new) in new }
 
         // Delete any existing item with the same key
         let deleteStatus = SecItemDelete(query as CFDictionary)
@@ -223,7 +249,7 @@ enum KeychainManager {
     /// Deletes data from the keychain for a specified key and namespace.
     static func delete(key: String, namespace: String) throws {
         let namespacedKey = "\(namespace).\(key)"
-        LogManager.logError("KEYCHAIN_MANAGER: Attempting to delete key: \(namespacedKey)")
+        LogManager.logDebug("KEYCHAIN_MANAGER: Attempting to delete key: \(namespacedKey)")
 
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -231,7 +257,7 @@ enum KeychainManager {
         ]
 
         let status = SecItemDelete(query as CFDictionary)
-        LogManager.logError("KEYCHAIN_MANAGER: Delete status for key \(namespacedKey): \(status)")
+        LogManager.logDebug("KEYCHAIN_MANAGER: Delete status for key \(namespacedKey): \(status)")
 
         if status != errSecSuccess, status != errSecItemNotFound {
             LogManager.logError(
@@ -242,7 +268,7 @@ enum KeychainManager {
         // Remove from cache
         dataCache.removeObject(forKey: namespacedKey as NSString)
 
-        LogManager.logError(
+        LogManager.logDebug(
             "KEYCHAIN_MANAGER: Successfully deleted item for key \(namespacedKey). Status: \(status)")
     }
 
@@ -365,41 +391,160 @@ enum KeychainManager {
 
     /// Stores a DPoP private key in the keychain with a specified key tag.
     static func storeDPoPKey(_ key: P256.Signing.PrivateKey, keyTag: String) throws {
+        #if os(iOS)
+        try storeDPoPKeyiOS(key, keyTag: keyTag)
+        #elseif os(macOS)
+        try storeDPoPKeymacOS(key, keyTag: keyTag)
+        #endif
+        
+        // Update cache
+        dpopKeyCache.setObject(CachedDPoPKey(key: key), forKey: keyTag as NSString)
+    }
+    
+    /// iOS-specific DPoP key storage using kSecClassKey (works fine on iOS)
+    #if os(iOS)
+    private static func storeDPoPKeyiOS(_ key: P256.Signing.PrivateKey, keyTag: String) throws {
         guard let tagData = keyTag.data(using: .utf8) else {
             throw KeychainError.dataFormatError
         }
 
-        let query: [String: Any] = [
+        var query: [String: Any] = [
             kSecClass as String: kSecClassKey,
             kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
             kSecAttrKeySizeInBits as String: 256,
             kSecAttrApplicationTag as String: tagData,
             kSecValueData as String: key.x963Representation,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
+            kSecAttrAccessible as String: defaultAccessibility,
         ]
-
-        // Delete any existing key with the same tag
-        let deleteStatus = SecItemDelete(query as CFDictionary)
-        if deleteStatus != errSecSuccess, deleteStatus != errSecItemNotFound {
-            LogManager.logError(
-                "KeychainManager - Failed to delete existing DPoP key for tag \(keyTag). Status: \(deleteStatus)"
-            )
-            throw KeychainError.itemStoreError(status: deleteStatus)
-        }
-
-        // Add the new key to the keychain
+        
+        // Delete any existing key first
+        let deleteQuery: [String: Any] = [
+            kSecClass as String: kSecClassKey,
+            kSecAttrApplicationTag as String: tagData,
+        ]
+        
+        let deleteStatus = SecItemDelete(deleteQuery as CFDictionary)
+        LogManager.logDebug("KeychainManager - iOS delete status: \(deleteStatus)")
+        
+        // Add the new key
         let status = SecItemAdd(query as CFDictionary, nil)
-        guard status == errSecSuccess else {
-            LogManager.logError(
-                "KeychainManager - Failed to store DPoP key for tag \(keyTag). Status: \(status)")
+        if status == errSecDuplicateItem {
+            // Try update
+            let updateAttributes: [String: Any] = [
+                kSecValueData as String: key.x963Representation,
+            ]
+            let updateStatus = SecItemUpdate(deleteQuery as CFDictionary, updateAttributes as CFDictionary)
+            guard updateStatus == errSecSuccess else {
+                LogManager.logError("KeychainManager - iOS update failed: \(updateStatus)")
+                throw KeychainError.itemStoreError(status: updateStatus)
+            }
+            LogManager.logDebug("KeychainManager - iOS key updated for tag \(keyTag)")
+        } else if status != errSecSuccess {
+            LogManager.logError("KeychainManager - iOS add failed: \(status)")
             throw KeychainError.itemStoreError(status: status)
+        } else {
+            LogManager.logDebug("KeychainManager - iOS key added for tag \(keyTag)")
         }
-
-        // Update cache
-        dpopKeyCache.setObject(CachedDPoPKey(key: key), forKey: keyTag as NSString)
-
-        LogManager.logDebug("KeychainManager - Successfully stored DPoP key for tag \(keyTag).")
     }
+    #endif
+    
+    /// macOS-specific DPoP key storage using SecKey conversion
+    #if os(macOS)
+    private static func storeDPoPKeymacOS(_ key: P256.Signing.PrivateKey, keyTag: String) throws {
+        LogManager.logDebug("KeychainManager - Storing DPoP key on macOS using SecKey approach for tag: \(keyTag)")
+        
+        // First, try to delete any existing key (multiple approaches)
+        try? deleteDPoPKeymacOS(keyTag: keyTag)
+        
+        // Convert CryptoKit key to SecKey
+        let keyData = key.x963Representation
+        let attributes: [String: Any] = [
+            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
+            kSecAttrKeyClass as String: kSecAttrKeyClassPrivate,
+            kSecAttrKeySizeInBits as String: 256,
+        ]
+        
+        var error: Unmanaged<CFError>?
+        guard let secKey = SecKeyCreateWithData(keyData as CFData, attributes as CFDictionary, &error) else {
+            let errorDescription = error?.takeRetainedValue().localizedDescription ?? "unknown error"
+            LogManager.logError("KeychainManager - Failed to create SecKey from P256 data: \(errorDescription)")
+            
+            // Fallback: store as generic password
+            LogManager.logDebug("KeychainManager - Falling back to generic password storage for tag: \(keyTag)")
+            try storeDPoPKeyAsPasswordmacOS(key, keyTag: keyTag)
+            return
+        }
+        
+        // Store SecKey in keychain
+        guard let tagData = keyTag.data(using: .utf8) else {
+            throw KeychainError.dataFormatError
+        }
+        
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassKey,
+            kSecAttrApplicationTag as String: tagData,
+            kSecValueRef as String: secKey,
+            kSecAttrAccessible as String: defaultAccessibility,
+            kSecAttrSynchronizable as String: false,
+        ]
+        
+        let status = SecItemAdd(query as CFDictionary, nil)
+        if status == errSecDuplicateItem {
+            // Try update
+            let updateQuery: [String: Any] = [
+                kSecClass as String: kSecClassKey,
+                kSecAttrApplicationTag as String: tagData,
+            ]
+            let updateAttributes: [String: Any] = [
+                kSecValueRef as String: secKey,
+            ]
+            let updateStatus = SecItemUpdate(updateQuery as CFDictionary, updateAttributes as CFDictionary)
+            guard updateStatus == errSecSuccess else {
+                LogManager.logError("KeychainManager - macOS SecKey update failed: \(updateStatus)")
+                // Fallback to password storage
+                try storeDPoPKeyAsPasswordmacOS(key, keyTag: keyTag)
+                return
+            }
+            LogManager.logDebug("KeychainManager - macOS SecKey updated for tag \(keyTag)")
+        } else if status != errSecSuccess {
+            LogManager.logError("KeychainManager - macOS SecKey add failed: \(status)")
+            // Fallback to password storage
+            try storeDPoPKeyAsPasswordmacOS(key, keyTag: keyTag)
+            return
+        } else {
+            LogManager.logDebug("KeychainManager - macOS SecKey added for tag \(keyTag)")
+        }
+    }
+    
+    /// Fallback: Store DPoP key as generic password on macOS
+    private static func storeDPoPKeyAsPasswordmacOS(_ key: P256.Signing.PrivateKey, keyTag: String) throws {
+        LogManager.logDebug("KeychainManager - Storing DPoP key as password for tag: \(keyTag)")
+        
+        let passwordKey = "\(keyTag).password"
+        try store(key: passwordKey, value: key.x963Representation, namespace: "dpopkeys")
+        
+        LogManager.logDebug("KeychainManager - Successfully stored DPoP key as password for tag: \(keyTag)")
+    }
+    
+    /// Helper to delete existing macOS keys (tries multiple approaches)
+    private static func deleteDPoPKeymacOS(keyTag: String) throws {
+        guard let tagData = keyTag.data(using: .utf8) else {
+            throw KeychainError.dataFormatError
+        }
+        
+        // Try to delete SecKey
+        let keyQuery: [String: Any] = [
+            kSecClass as String: kSecClassKey,
+            kSecAttrApplicationTag as String: tagData,
+        ]
+        let keyStatus = SecItemDelete(keyQuery as CFDictionary)
+        LogManager.logDebug("KeychainManager - macOS SecKey delete status: \(keyStatus)")
+        
+        // Try to delete password fallback
+        let passwordKey = "\(keyTag).password"
+        try? delete(key: passwordKey, namespace: "dpopkeys")
+    }
+    #endif
 
     /// Retrieves a DPoP private key from the keychain with a specified key tag.
     static func retrieveDPoPKey(keyTag: String) throws -> P256.Signing.PrivateKey {
@@ -408,7 +553,23 @@ enum KeychainManager {
             LogManager.logDebug("KeychainManager - Retrieved DPoP key from cache for tag \(keyTag).")
             return cachedKey.key
         }
-
+        
+        let key: P256.Signing.PrivateKey
+        
+        #if os(iOS)
+        key = try retrieveDPoPKeyiOS(keyTag: keyTag)
+        #elseif os(macOS)
+        key = try retrieveDPoPKeymacOS(keyTag: keyTag)
+        #endif
+        
+        // Update cache
+        dpopKeyCache.setObject(CachedDPoPKey(key: key), forKey: keyTag as NSString)
+        return key
+    }
+    
+    /// iOS-specific DPoP key retrieval
+    #if os(iOS)
+    private static func retrieveDPoPKeyiOS(keyTag: String) throws -> P256.Signing.PrivateKey {
         guard let tagData = keyTag.data(using: .utf8) else {
             throw KeychainError.dataFormatError
         }
@@ -424,39 +585,105 @@ enum KeychainManager {
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
 
-        if status == errSecItemNotFound {
-            LogManager.logError("KeychainManager - DPoP key not found for tag \(keyTag).")
+        guard status == errSecSuccess, let data = item as? Data else {
+            LogManager.logError("KeychainManager - iOS failed to retrieve DPoP key for tag \(keyTag). Status: \(status)")
             throw KeychainError.itemRetrievalError(status: status)
-        }
-
-        guard status == errSecSuccess else {
-            LogManager.logError(
-                "KeychainManager - Failed to retrieve DPoP key for tag \(keyTag). Status: \(status)")
-            throw KeychainError.itemRetrievalError(status: status)
-        }
-        guard let keyData = item as? Data else {
-            LogManager.logError("KeychainManager - DPoP key data format error for tag \(keyTag).")
-            throw KeychainError.dataFormatError
         }
 
         do {
-            let privateKey = try P256.Signing.PrivateKey(x963Representation: keyData)
-
-            // Store in cache
-            dpopKeyCache.setObject(CachedDPoPKey(key: privateKey), forKey: keyTag as NSString)
-
-            LogManager.logDebug("KeychainManager - Successfully retrieved DPoP key for tag \(keyTag).")
-            return privateKey
+            let key = try P256.Signing.PrivateKey(x963Representation: data)
+            LogManager.logDebug("KeychainManager - iOS successfully retrieved DPoP key for tag \(keyTag)")
+            return key
         } catch {
-            LogManager.logError(
-                "KeychainManager - Unable to create P256.Signing.PrivateKey from data for tag \(keyTag). Error: \(error)"
-            )
+            LogManager.logError("KeychainManager - iOS failed to reconstruct P256 key: \(error)")
             throw KeychainError.unableToCreateKey
         }
     }
+    #endif
+    
+    /// macOS-specific DPoP key retrieval
+    #if os(macOS)
+    private static func retrieveDPoPKeymacOS(keyTag: String) throws -> P256.Signing.PrivateKey {
+        // First try to retrieve as SecKey
+        if let key = try? retrieveDPoPKeyAsSecKeymacOS(keyTag: keyTag) {
+            return key
+        }
+        
+        // Fallback: try to retrieve as password
+        LogManager.logDebug("KeychainManager - SecKey retrieval failed, trying password fallback for tag: \(keyTag)")
+        return try retrieveDPoPKeyAsPasswordmacOS(keyTag: keyTag)
+    }
+    
+    /// Retrieve DPoP key as SecKey on macOS
+    private static func retrieveDPoPKeyAsSecKeymacOS(keyTag: String) throws -> P256.Signing.PrivateKey {
+        guard let tagData = keyTag.data(using: .utf8) else {
+            throw KeychainError.dataFormatError
+        }
+        
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassKey,
+            kSecAttrApplicationTag as String: tagData,
+            kSecReturnRef as String: kCFBooleanTrue!,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+        
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        
+        guard status == errSecSuccess, let secKey = item else {
+            LogManager.logDebug("KeychainManager - SecKey not found for tag \(keyTag). Status: \(status)")
+            throw KeychainError.itemRetrievalError(status: status)
+        }
+        
+        // Convert SecKey back to raw data
+        var error: Unmanaged<CFError>?
+        guard let keyData = SecKeyCopyExternalRepresentation(secKey as! SecKey, &error) else {
+            let errorDescription = error?.takeRetainedValue().localizedDescription ?? "unknown error"
+            LogManager.logError("KeychainManager - Failed to extract data from SecKey: \(errorDescription)")
+            throw KeychainError.unableToCreateKey
+        }
+        
+        do {
+            let key = try P256.Signing.PrivateKey(x963Representation: keyData as Data)
+            LogManager.logDebug("KeychainManager - Successfully retrieved DPoP key as SecKey for tag \(keyTag)")
+            return key
+        } catch {
+            LogManager.logError("KeychainManager - Failed to reconstruct P256 key from SecKey data: \(error)")
+            throw KeychainError.unableToCreateKey
+        }
+    }
+    
+    /// Retrieve DPoP key as password on macOS (fallback)
+    private static func retrieveDPoPKeyAsPasswordmacOS(keyTag: String) throws -> P256.Signing.PrivateKey {
+        let passwordKey = "\(keyTag).password"
+        
+        do {
+            let data = try retrieve(key: passwordKey, namespace: "dpopkeys")
+            let key = try P256.Signing.PrivateKey(x963Representation: data)
+            LogManager.logDebug("KeychainManager - Successfully retrieved DPoP key as password for tag \(keyTag)")
+            return key
+        } catch {
+            LogManager.logError("KeychainManager - Failed to retrieve DPoP key as password for tag \(keyTag): \(error)")
+            throw KeychainError.itemRetrievalError(status: errSecItemNotFound)
+        }
+    }
+    #endif
 
     /// Deletes a DPoP private key from the keychain with a specified key tag.
     static func deleteDPoPKey(keyTag: String) throws {
+        #if os(iOS)
+        try deleteDPoPKeyiOS(keyTag: keyTag)
+        #elseif os(macOS)
+        try deleteDPoPKeymacOS(keyTag: keyTag)
+        #endif
+        
+        // Remove from cache
+        dpopKeyCache.removeObject(forKey: keyTag as NSString)
+    }
+    
+    /// iOS-specific DPoP key deletion
+    #if os(iOS)
+    private static func deleteDPoPKeyiOS(keyTag: String) throws {
         guard let tagData = keyTag.data(using: .utf8) else {
             throw KeychainError.dataFormatError
         }
@@ -468,16 +695,13 @@ enum KeychainManager {
 
         let status = SecItemDelete(query as CFDictionary)
         if status != errSecSuccess, status != errSecItemNotFound {
-            LogManager.logError(
-                "KeychainManager - Failed to delete DPoP key for tag \(keyTag). Status: \(status)")
+            LogManager.logError("KeychainManager - iOS failed to delete DPoP key for tag \(keyTag). Status: \(status)")
             throw KeychainError.itemStoreError(status: status)
         }
 
-        // Remove from cache
-        dpopKeyCache.removeObject(forKey: keyTag as NSString)
-
-        LogManager.logDebug("KeychainManager - Successfully deleted DPoP key for tag \(keyTag).")
+        LogManager.logDebug("KeychainManager - iOS successfully deleted DPoP key for tag \(keyTag)")
     }
+    #endif
 
     /// Stores a DPoP private key in the keychain within a specified namespace.
     /// Legacy support for existing code.

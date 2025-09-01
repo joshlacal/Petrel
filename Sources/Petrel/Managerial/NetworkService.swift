@@ -646,6 +646,23 @@ public actor NetworkService: NetworkServiceProtocol {
                         LogManager.logInfo(
                             "Network Service - Attempting standard token refresh/handling for 401 on \(url.absoluteString)."
                         )
+                        // If the 401 is due to invalid audience, set a one-shot resource override
+                        do {
+                            struct OAuthErrorResponse: Decodable { let error: String; let errorDescription: String?; enum CodingKeys: String, CodingKey { case error; case errorDescription = "error_description" } }
+                            if let err = try? jsonDecoder.decode(OAuthErrorResponse.self, from: data) {
+                                let desc = err.errorDescription?.lowercased() ?? ""
+                                let isInvalidAudience = (err.error == "invalid_audience") || (err.error == "invalid_token" && desc.contains("invalid audience"))
+                                if isInvalidAudience {
+                                    if let scheme = url.scheme, let host = url.host {
+                                        let resource = "\(scheme)://\(host)"
+                                        LogManager.logInfo("Network Service - Preparing one-shot refresh for resource: \(resource)")
+                                        if let svc = self.authProvider as? AuthenticationService {
+                                            await svc.setNextRefreshResourceOverride(resource)
+                                        }
+                                    }
+                                }
+                            }
+                        }
                         do {
                             // Use the authProvider's handler (which should attempt refresh)
                             let (retryData, retryResponse) = try await authProvider.handleUnauthorizedResponse(
