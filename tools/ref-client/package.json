@@ -1,0 +1,12 @@
+{
+  "name": "atproto-ref-client",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "@atproto/oauth-client-node": "^0.5.0",
+    "@atproto/jwk-jose": "^0.5.0",
+    "@atproto-labs/simple-store": "^0.2.0"
+  }
+}
+

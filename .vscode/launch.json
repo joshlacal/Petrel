@@ -4,9 +4,6 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-        
-
-
         {
             "type": "lldb",
             "request": "launch",
@@ -14,6 +11,24 @@
             "program": "${workspaceFolder}/<executable file>",
             "args": [],
             "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:Petrel}",
+            "name": "Debug PetrelLoad",
+            "program": "${workspaceFolder:Petrel}/.build/debug/PetrelLoad",
+            "preLaunchTask": "swift: Build Debug PetrelLoad"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:Petrel}",
+            "name": "Release PetrelLoad",
+            "program": "${workspaceFolder:Petrel}/.build/release/PetrelLoad",
+            "preLaunchTask": "swift: Build Release PetrelLoad"
         }
     ]
 }

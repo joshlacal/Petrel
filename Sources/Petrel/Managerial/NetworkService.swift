@@ -219,11 +219,7 @@ public actor NetworkService: NetworkServiceProtocol {
 
     /// Sets the base URL for API requests.
     /// - Parameter url: The new base URL.
-    public nonisolated func setBaseURL(_ url: URL) {
-        Task { await _setBaseURL(url) }
-    }
-
-    private func _setBaseURL(_ url: URL) {
+    public func setBaseURL(_ url: URL) async {
         baseURL = url
         LogManager.logInfo("Network Service - Base URL updated to: \(url)")
     }
@@ -261,11 +257,7 @@ public actor NetworkService: NetworkServiceProtocol {
     }
 
     /// Clears all custom headers
-    public nonisolated func clearHeaders() {
-        Task { await _clearHeaders() }
-    }
-
-    private func _clearHeaders() {
+    public func clearHeaders() async {
         LogManager.logDebug("Network Service - Clearing all custom headers")
         headers.removeAll()
     }
