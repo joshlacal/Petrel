@@ -1,7 +1,7 @@
 import Foundation
 import Petrel
 
-struct PetrelLoadCLI {
+enum PetrelLoadCLI {
     static func printUsageAndExit() -> Never {
         let usage = """
         Usage: PetrelLoad --namespace <keychain-namespace> --endpoint <xrpc endpoint or URL> [options]
@@ -82,16 +82,16 @@ struct PetrelLoadCLI {
         let timeout = TimeInterval(args["timeout"] ?? "30") ?? 30
         let bodyString = args["body"]
         let targetRps = Double(args["target-rps"] ?? "0") ?? 0
-        
+
         // OAuth stress testing options
         let oauthStressMode = (args["oauth-stress"] ?? "false").lowercased() == "true"
         let oauthTestScenario = args["oauth-test"]
         let dpopTestMode = args["dpop-test"]
-        let _ = TimeInterval(args["force-refresh-interval"] ?? "0") ?? 0
-        let _ = (args["simulate-expiry"] ?? "false").lowercased() == "true"
-        let _ = Int(args["burst-size"] ?? "50") ?? 50
-        let _ = TimeInterval(args["burst-delay"] ?? "0.1") ?? 0.1
-        let _ = (args["multi-account"] ?? "false").lowercased() == "true"
+        _ = TimeInterval(args["force-refresh-interval"] ?? "0") ?? 0
+        _ = (args["simulate-expiry"] ?? "false").lowercased() == "true"
+        _ = Int(args["burst-size"] ?? "50") ?? 50
+        _ = TimeInterval(args["burst-delay"] ?? "0.1") ?? 0.1
+        _ = (args["multi-account"] ?? "false").lowercased() == "true"
 
         // Determine base URL for initial setup
         var baseURL: URL
@@ -115,7 +115,7 @@ struct PetrelLoadCLI {
             oauthConfig: oauthConfig,
             namespace: namespace
         )
-        
+
         // Debug: Check if the client has an account and what base URL it's using after init
         print("DEBUG - After ATProtoClient initialization:")
         let (initDid, initHandle, initPdsURL) = await client.getActiveAccountInfo()
@@ -131,18 +131,18 @@ struct PetrelLoadCLI {
                 print("Starting OAuth flow for: \(identifier ?? "user")")
                 print("Opening browser for authentication...")
                 print("OAuth URL: \(url.absoluteString)")
-                
+
                 // Try to open the browser automatically
                 #if os(macOS)
-                let openProcess = Process()
-                openProcess.launchPath = "/usr/bin/open"
-                openProcess.arguments = [url.absoluteString]
-                try openProcess.run()
-                print("✓ Browser opened automatically")
+                    let openProcess = Process()
+                    openProcess.launchPath = "/usr/bin/open"
+                    openProcess.arguments = [url.absoluteString]
+                    try openProcess.run()
+                    print("✓ Browser opened automatically")
                 #else
-                print("Please open this URL in your browser:")
+                    print("Please open this URL in your browser:")
                 #endif
-                
+
                 print("\nAfter authorizing in the browser:")
                 print("1. Look for the callback URL that starts with 'https://87a6c075b410.ngrok-free.app/callback?code=...'")
                 print("2. Copy the ENTIRE callback URL from your browser's address bar")
@@ -165,20 +165,20 @@ struct PetrelLoadCLI {
                 print("DEBUG - About to call handleOAuthCallback...")
                 try await client.handleOAuthCallback(url: url)
                 print("DEBUG - handleOAuthCallback completed successfully")
-                
+
                 // RACE CONDITION FIX: Wait a moment for account setup to complete
                 print("DEBUG - Waiting for account setup to complete...")
                 try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-                
+
                 print("OAuth completed and tokens saved to Keychain for namespace \(namespace). You can now run load tests.")
-                
+
                 // Show account info and test if base URL was switched
                 let (did, handle, pdsURL) = await client.getActiveAccountInfo()
                 if let did = did, let handle = handle, let pdsURL = pdsURL {
                     print("✓ Authenticated as: \(handle)")
                     print("✓ DID: \(did)")
                     print("✓ PDS: \(pdsURL)")
-                    
+
                     // Test if the API actually works now
                     print("\nDEBUG - Testing API call after OAuth completion and delay...")
                     do {
@@ -206,20 +206,20 @@ struct PetrelLoadCLI {
                 fputs("Cannot run OAuth stress tests with --unauth flag.\n", stderr)
                 exit(1)
             }
-            
+
             // Check if we have a valid session
             let hasSession = await client.hasValidSession()
             if !hasSession {
                 fputs("No valid OAuth session found. Please run --oauth-start first.\n", stderr)
                 exit(1)
             }
-            
+
             print("OAuth stress testing with ATProtoClient")
             print("Note: Using authenticated session for stress testing")
-            
+
             if oauthStressMode {
                 print("Running comprehensive OAuth stress test...")
-                
+
                 // Debug: Check what base URL the client is actually using
                 let (did, handle, pdsURL) = await client.getActiveAccountInfo()
                 print("DEBUG - Account info from client:")
@@ -227,7 +227,7 @@ struct PetrelLoadCLI {
                 print("  Handle: \(handle ?? "nil")")
                 print("  PDS URL: \(pdsURL?.absoluteString ?? "nil")")
                 print("  Original base URL from init: \(baseURL)")
-                
+
                 // Try a single API call to see the exact error
                 print("\nDEBUG - Testing single API call...")
                 do {
@@ -239,12 +239,12 @@ struct PetrelLoadCLI {
                     print("ERROR: API call failed with: \(error)")
                     print("Error type: \(type(of: error))")
                 }
-                
+
                 // Demonstrate with basic API calls
                 await runBasicStressTest(client: client, endpoint: endpoint, iterations: total, concurrency: concurrency)
                 return
             }
-            
+
             if let scenario = oauthTestScenario {
                 switch scenario {
                 case "dpop_nonce_thrash":
@@ -252,7 +252,7 @@ struct PetrelLoadCLI {
                     await runBasicStressTest(client: client, endpoint: endpoint, iterations: total, concurrency: concurrency)
                 case "token_refresh_race":
                     print("Testing token refresh...")
-                    for _ in 0..<5 {
+                    for _ in 0 ..< 5 {
                         let refreshed = try? await client.refreshToken()
                         print("Token refresh result: \(refreshed ?? false)")
                     }
@@ -267,7 +267,7 @@ struct PetrelLoadCLI {
                 }
                 return
             }
-            
+
             if let mode = dpopTestMode {
                 switch mode {
                 case "compliance":
@@ -307,29 +307,29 @@ func runBasicStressTest(client: ATProtoClient, endpoint: String, iterations: Int
     print("=== ATProtoClient Stress Test ===")
     print("Endpoint: \(endpoint)")
     print("Iterations: \(iterations), Concurrency: \(concurrency)")
-    
+
     struct WorkerResult {
         let successes: Int
-        let failures: Int  
+        let failures: Int
         let latencies: [TimeInterval]
         let sampleError: String?
     }
-    
+
     let startTime = Date()
-    
+
     let results = await withTaskGroup(of: WorkerResult.self) { group in
         let iterationsPerWorker = iterations / concurrency
-        
-        for workerIndex in 0..<concurrency {
+
+        for workerIndex in 0 ..< concurrency {
             group.addTask {
                 var workerSuccesses = 0
                 var workerFailures = 0
                 var workerLatencies: [TimeInterval] = []
                 var sampleError: String? = nil
-                
-                for iteration in 0..<iterationsPerWorker {
+
+                for iteration in 0 ..< iterationsPerWorker {
                     let requestStart = Date()
-                    
+
                     do {
                         // Use the actual ATProto API based on endpoint
                         if endpoint == "app.bsky.actor.getProfile" {
@@ -347,41 +347,41 @@ func runBasicStressTest(client: ATProtoClient, endpoint: String, iterations: Int
                             let params = AppBskyActorGetProfile.Parameters(actor: actor)
                             _ = try await client.app.bsky.actor.getProfile(input: params)
                         }
-                        
+
                         let latency = Date().timeIntervalSince(requestStart)
                         workerSuccesses += 1
                         workerLatencies.append(latency)
-                        
+
                     } catch {
                         workerFailures += 1
-                        if iteration == 0 && workerIndex == 0 && sampleError == nil {
+                        if iteration == 0, workerIndex == 0, sampleError == nil {
                             sampleError = "Sample error: \(error)"
                         }
                     }
                 }
-                
+
                 return WorkerResult(successes: workerSuccesses, failures: workerFailures, latencies: workerLatencies, sampleError: sampleError)
             }
         }
-        
+
         var allResults: [WorkerResult] = []
         for await result in group {
             allResults.append(result)
         }
         return allResults
     }
-    
+
     let totalTime = Date().timeIntervalSince(startTime)
     let successes = results.reduce(0) { $0 + $1.successes }
     let failures = results.reduce(0) { $0 + $1.failures }
     let latencies = results.flatMap { $0.latencies }
     let totalRequests = successes + failures
     let rps = Double(totalRequests) / totalTime
-    
+
     if let firstError = results.compactMap({ $0.sampleError }).first {
         print(firstError)
     }
-    
+
     print("\n=== Results ===")
     print("Total time: \(String(format: "%.2f", totalTime))s")
     print("Total requests: \(totalRequests)")
@@ -389,14 +389,14 @@ func runBasicStressTest(client: ATProtoClient, endpoint: String, iterations: Int
     print("Failures: \(failures)")
     print("Success rate: \(String(format: "%.1f", Double(successes) / Double(totalRequests) * 100))%")
     print("RPS: \(String(format: "%.1f", rps))")
-    
+
     if !latencies.isEmpty {
         let sorted = latencies.sorted()
         let avg = latencies.reduce(0, +) / Double(latencies.count)
         let p50 = sorted[Int(Double(sorted.count - 1) * 0.5)]
         let p95 = sorted[Int(Double(sorted.count - 1) * 0.95)]
         let p99 = sorted[Int(Double(sorted.count - 1) * 0.99)]
-        
+
         print("Latency - avg: \(String(format: "%.3f", avg))s, p50: \(String(format: "%.3f", p50))s, p95: \(String(format: "%.3f", p95))s, p99: \(String(format: "%.3f", p99))s")
     }
 }

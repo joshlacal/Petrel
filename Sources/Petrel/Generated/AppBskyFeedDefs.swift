@@ -12,6 +12,7 @@ public enum AppBskyFeedDefs {
         public let author: AppBskyActorDefs.ProfileViewBasic
         public let record: ATProtocolValueContainer
         public let embed: PostViewEmbedUnion?
+        public let bookmarkCount: Int?
         public let replyCount: Int?
         public let repostCount: Int?
         public let likeCount: Int?
@@ -23,13 +24,14 @@ public enum AppBskyFeedDefs {
 
         // Standard initializer
         public init(
-            uri: ATProtocolURI, cid: CID, author: AppBskyActorDefs.ProfileViewBasic, record: ATProtocolValueContainer, embed: PostViewEmbedUnion?, replyCount: Int?, repostCount: Int?, likeCount: Int?, quoteCount: Int?, indexedAt: ATProtocolDate, viewer: ViewerState?, labels: [ComAtprotoLabelDefs.Label]?, threadgate: ThreadgateView?
+            uri: ATProtocolURI, cid: CID, author: AppBskyActorDefs.ProfileViewBasic, record: ATProtocolValueContainer, embed: PostViewEmbedUnion?, bookmarkCount: Int?, replyCount: Int?, repostCount: Int?, likeCount: Int?, quoteCount: Int?, indexedAt: ATProtocolDate, viewer: ViewerState?, labels: [ComAtprotoLabelDefs.Label]?, threadgate: ThreadgateView?
         ) {
             self.uri = uri
             self.cid = cid
             self.author = author
             self.record = record
             self.embed = embed
+            self.bookmarkCount = bookmarkCount
             self.replyCount = replyCount
             self.repostCount = repostCount
             self.likeCount = likeCount
@@ -76,6 +78,13 @@ public enum AppBskyFeedDefs {
 
             } catch {
                 LogManager.logError("Decoding error for property 'embed': \(error)")
+                throw error
+            }
+            do {
+                bookmarkCount = try container.decodeIfPresent(Int.self, forKey: .bookmarkCount)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'bookmarkCount': \(error)")
                 throw error
             }
             do {
@@ -152,6 +161,9 @@ public enum AppBskyFeedDefs {
             try container.encodeIfPresent(embed, forKey: .embed)
 
             // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(bookmarkCount, forKey: .bookmarkCount)
+
+            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(replyCount, forKey: .replyCount)
 
             // Encode optional property even if it's an empty array
@@ -181,6 +193,11 @@ public enum AppBskyFeedDefs {
             hasher.combine(author)
             hasher.combine(record)
             if let value = embed {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = bookmarkCount {
                 hasher.combine(value)
             } else {
                 hasher.combine(nil as Int?)
@@ -243,6 +260,10 @@ public enum AppBskyFeedDefs {
             }
 
             if embed != other.embed {
+                return false
+            }
+
+            if bookmarkCount != other.bookmarkCount {
                 return false
             }
 
@@ -310,6 +331,13 @@ public enum AppBskyFeedDefs {
                 map = map.adding(key: "embed", value: embedValue)
             }
 
+            if let value = bookmarkCount {
+                // Encode optional property even if it's an empty array for CBOR
+
+                let bookmarkCountValue = try value.toCBORValue()
+                map = map.adding(key: "bookmarkCount", value: bookmarkCountValue)
+            }
+
             if let value = replyCount {
                 // Encode optional property even if it's an empty array for CBOR
 
@@ -372,6 +400,7 @@ public enum AppBskyFeedDefs {
             case author
             case record
             case embed
+            case bookmarkCount
             case replyCount
             case repostCount
             case likeCount
@@ -387,6 +416,7 @@ public enum AppBskyFeedDefs {
         public static let typeIdentifier = "app.bsky.feed.defs#viewerState"
         public let repost: ATProtocolURI?
         public let like: ATProtocolURI?
+        public let bookmarked: Bool?
         public let threadMuted: Bool?
         public let replyDisabled: Bool?
         public let embeddingDisabled: Bool?
@@ -394,10 +424,11 @@ public enum AppBskyFeedDefs {
 
         // Standard initializer
         public init(
-            repost: ATProtocolURI?, like: ATProtocolURI?, threadMuted: Bool?, replyDisabled: Bool?, embeddingDisabled: Bool?, pinned: Bool?
+            repost: ATProtocolURI?, like: ATProtocolURI?, bookmarked: Bool?, threadMuted: Bool?, replyDisabled: Bool?, embeddingDisabled: Bool?, pinned: Bool?
         ) {
             self.repost = repost
             self.like = like
+            self.bookmarked = bookmarked
             self.threadMuted = threadMuted
             self.replyDisabled = replyDisabled
             self.embeddingDisabled = embeddingDisabled
@@ -419,6 +450,13 @@ public enum AppBskyFeedDefs {
 
             } catch {
                 LogManager.logError("Decoding error for property 'like': \(error)")
+                throw error
+            }
+            do {
+                bookmarked = try container.decodeIfPresent(Bool.self, forKey: .bookmarked)
+
+            } catch {
+                LogManager.logError("Decoding error for property 'bookmarked': \(error)")
                 throw error
             }
             do {
@@ -462,6 +500,9 @@ public enum AppBskyFeedDefs {
             try container.encodeIfPresent(like, forKey: .like)
 
             // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(bookmarked, forKey: .bookmarked)
+
+            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(threadMuted, forKey: .threadMuted)
 
             // Encode optional property even if it's an empty array
@@ -481,6 +522,11 @@ public enum AppBskyFeedDefs {
                 hasher.combine(nil as Int?)
             }
             if let value = like {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = bookmarked {
                 hasher.combine(value)
             } else {
                 hasher.combine(nil as Int?)
@@ -515,6 +561,10 @@ public enum AppBskyFeedDefs {
             }
 
             if like != other.like {
+                return false
+            }
+
+            if bookmarked != other.bookmarked {
                 return false
             }
 
@@ -561,6 +611,13 @@ public enum AppBskyFeedDefs {
                 map = map.adding(key: "like", value: likeValue)
             }
 
+            if let value = bookmarked {
+                // Encode optional property even if it's an empty array for CBOR
+
+                let bookmarkedValue = try value.toCBORValue()
+                map = map.adding(key: "bookmarked", value: bookmarkedValue)
+            }
+
             if let value = threadMuted {
                 // Encode optional property even if it's an empty array for CBOR
 
@@ -596,6 +653,7 @@ public enum AppBskyFeedDefs {
             case typeIdentifier = "$type"
             case repost
             case like
+            case bookmarked
             case threadMuted
             case replyDisabled
             case embeddingDisabled
