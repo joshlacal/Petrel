@@ -294,7 +294,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
 
         // Reset circuit breaker for fresh start after successful OAuth
         await refreshCircuitBreaker.reset(for: did)
-        
+
         // Log successful OAuth completion
         LogManager.logInfo(
             "🎉 TOKEN_LIFECYCLE: OAuth flow completed successfully for DID \(LogManager.logDID(did)) " +
@@ -406,7 +406,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
 
         // Reset circuit breaker state for this DID
         await refreshCircuitBreaker.reset(for: did)
-        
+
         // Log logout completion
         LogManager.logInfo(
             "🚪 TOKEN_LIFECYCLE: Logout completed for DID \(LogManager.logDID(did)) " +

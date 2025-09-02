@@ -1,8 +1,8 @@
+import CryptoKit
 import Foundation
 @testable import Petrel
-import Testing
 import SwiftCBOR
-import CryptoKit
+import Testing
 
 @Suite("CID Tests")
 struct CIDTests {
@@ -109,61 +109,61 @@ struct CIDTests {
         // They should be different since they use different codecs
         #expect(dagCBORCID != blobCID)
     }
-    
+
     // MARK: - CBOR Encoding Tests
-    
+
     @Test("CID CBOR encoding returns string")
     func cidCBOREncoding() throws {
         let testData = "Hello, AT Protocol!".data(using: .utf8)!
         let cid = CID.fromDAGCBOR(testData)
-        
+
         // Test how CID encodes to CBOR value
         let cborValue = try cid.toCBORValue()
         print("✓ CID.toCBORValue() returns: \(type(of: cborValue)) = \(cborValue)")
-        
+
         // Should return string representation (current implementation)
         #expect(cborValue is String, "CID.toCBORValue() should return String")
         if let cidString = cborValue as? String {
             #expect(cidString == cid.string, "Should return CID string representation")
         }
     }
-    
+
     @Test("StrongRef CBOR encoding")
     func strongRefCBOREncoding() throws {
         let testCID = CID.fromDAGCBOR("test".data(using: .utf8)!)
         let testURI = try ATProtocolURI(uriString: "at://did:plc:test/app.bsky.feed.post/123")
-        
+
         let strongRef = ComAtprotoRepoStrongRef(uri: testURI, cid: testCID)
-        
+
         // Test how StrongRef encodes to CBOR
         let cborValue = try strongRef.toCBORValue()
         print("✓ StrongRef.toCBORValue() returns: \(type(of: cborValue))")
-        
+
         #expect(cborValue is OrderedCBORMap, "StrongRef should return OrderedCBORMap")
-        
+
         if let orderedMap = cborValue as? OrderedCBORMap {
             print("✓ StrongRef entries:")
             for (key, value) in orderedMap.entries {
                 print("  - \(key): \(type(of: value)) = \(value)")
             }
         }
-        
+
         // Encode the StrongRef to CBOR data
         let cborData = try strongRef.encodedDAGCBOR()
         print("✓ StrongRef CBOR length: \(cborData.count) bytes")
         print("✓ StrongRef CBOR hex: \(cborData.map { String(format: "%02x", $0) }.joined())")
     }
-    
+
     @Test("Post with reply CBOR encoding")
     func postWithReplyCBOREncoding() throws {
         // Create a parent post
         let parentCID = CID.fromDAGCBOR("parent post".data(using: .utf8)!)
         let parentURI = try ATProtocolURI(uriString: "at://did:plc:parent/app.bsky.feed.post/parent123")
-        
+
         // Create reply reference
         let parentRef = ComAtprotoRepoStrongRef(uri: parentURI, cid: parentCID)
         let replyRef = AppBskyFeedPost.ReplyRef(root: parentRef, parent: parentRef)
-        
+
         // Create reply post
         let replyPost = AppBskyFeedPost(
             text: "This is a reply!",
@@ -174,17 +174,17 @@ struct CIDTests {
             langs: nil,
             labels: nil,
             tags: nil,
-            createdAt: ATProtocolDate(date: Date(timeIntervalSince1970: 1640995200)) // Fixed timestamp
+            createdAt: ATProtocolDate(date: Date(timeIntervalSince1970: 1_640_995_200)) // Fixed timestamp
         )
-        
+
         // Test CBOR encoding
         let cborData = try replyPost.encodedDAGCBOR()
         let calculatedCID = CID.fromDAGCBOR(cborData)
-        
+
         print("✓ Reply post CBOR length: \(cborData.count) bytes")
         print("✓ Reply post CID: \(calculatedCID.string)")
         print("✓ Parent CID in reply: \(parentCID.string)")
-        
+
         // Decode and examine the CBOR structure
         let decodedCBOR = try CBOR.decode([UInt8](cborData))
         if let cborItem = decodedCBOR {
@@ -192,37 +192,39 @@ struct CIDTests {
             print("✓ Decoded CBOR structure:")
             printCBORStructure(decodedValue, indent: "  ")
         }
-        
+
         // The CBOR should be deterministic
         let cborData2 = try replyPost.encodedDAGCBOR()
         let calculatedCID2 = CID.fromDAGCBOR(cborData2)
-        
+
         #expect(cborData == cborData2, "CBOR encoding should be deterministic")
         #expect(calculatedCID == calculatedCID2, "CID should be deterministic")
     }
-    
+
     @Test("ATProtoLink vs CID string encoding")
     func atProtoLinkVsCIDString() throws {
         let testCID = CID.fromDAGCBOR("test".data(using: .utf8)!)
-        
+
         // Test ATProtoLink encoding (should use Tag 42)
         let atprotoLink = ATProtoLink(cid: testCID)
         let linkCBORValue = try atprotoLink.toCBORValue()
         print("✓ ATProtoLink.toCBORValue() returns: \(type(of: linkCBORValue))")
-        
+
         // Test direct CID encoding (should be string)
         let cidCBORValue = try testCID.toCBORValue()
         print("✓ CID.toCBORValue() returns: \(type(of: cidCBORValue))")
-        
+
         // They should be different
-        #expect(type(of: linkCBORValue) != type(of: cidCBORValue), 
-                "ATProtoLink and CID should encode differently")
-        
+        #expect(
+            type(of: linkCBORValue) != type(of: cidCBORValue),
+            "ATProtoLink and CID should encode differently"
+        )
+
         // Test full CBOR encoding
         let linkCBORData = try atprotoLink.encodedDAGCBOR()
         print("✓ ATProtoLink CBOR length: \(linkCBORData.count) bytes")
         print("✓ ATProtoLink CBOR hex: \(linkCBORData.map { String(format: "%02x", $0) }.joined())")
-        
+
         // Decode and check for Tag 42
         let decodedCBOR = try CBOR.decode([UInt8](linkCBORData))
         if let cborItem = decodedCBOR {
@@ -230,7 +232,7 @@ struct CIDTests {
             #expect(hasTag42, "ATProtoLink should contain CBOR Tag 42")
         }
     }
-    
+
     @Test("CBOR canonical encoding consistency")
     func cborCanonicalEncoding() throws {
         // Test that our CBOR encoding is canonical/deterministic
@@ -243,46 +245,46 @@ struct CIDTests {
             langs: nil,
             labels: nil,
             tags: nil,
-            createdAt: ATProtocolDate(date: Date(timeIntervalSince1970: 1640995200)) // Fixed timestamp
+            createdAt: ATProtocolDate(date: Date(timeIntervalSince1970: 1_640_995_200)) // Fixed timestamp
         )
-        
+
         let cbor1 = try post.encodedDAGCBOR()
         let cbor2 = try post.encodedDAGCBOR()
-        
+
         #expect(cbor1 == cbor2, "CBOR encoding should be deterministic")
-        
+
         let cid1 = CID.fromDAGCBOR(cbor1)
         let cid2 = CID.fromDAGCBOR(cbor2)
-        
+
         #expect(cid1 == cid2, "CIDs should be identical for same data")
-        
+
         print("✓ CBOR canonical encoding test passed")
         print("  - CBOR length: \(cbor1.count) bytes")
         print("  - CID: \(cid1.string)")
     }
-    
+
     @Test("CID format compliance")
     func cidFormatCompliance() throws {
         let testData = "Hello, AT Protocol!".data(using: .utf8)!
         let cid = CID.fromDAGCBOR(testData)
-        
+
         // Verify CID format compliance with AT Protocol spec
         #expect(cid.string.hasPrefix("b"), "CID should start with 'b' prefix (base32)")
         #expect(cid.codec == .dagCBOR, "Post CID should use dag-cbor codec (0x71)")
         #expect(cid.multihash.algorithm == Multihash.sha256Code, "Should use SHA-256 (0x12)")
         #expect(cid.multihash.length == Multihash.sha256Length, "Should use 32-byte hash")
-        
+
         // Test blob CID
         let blobCID = CID.fromBlob(testData)
         #expect(blobCID.codec == .raw, "Blob CID should use raw codec (0x55)")
-        
+
         print("✓ CID format compliance verified")
         print("  - DAG-CBOR CID: \(cid.string)")
         print("  - Raw CID: \(blobCID.string)")
     }
-    
+
     // MARK: - Helper Methods
-    
+
     private func printCBORStructure(_ value: Any, indent: String) {
         switch value {
         case let dict as [String: Any]:
@@ -309,7 +311,7 @@ struct CIDTests {
             print("\(indent)\(type(of: value)): \(value)")
         }
     }
-    
+
     private func checkForTag42(_ cbor: CBOR) -> Bool {
         switch cbor {
         case let .tagged(tag, value):

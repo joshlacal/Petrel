@@ -561,18 +561,18 @@ public actor ATProtoClient {
                 }
             }
 
-            public lazy var label: Label = .init(networkService: self.networkService)
+            public lazy var server: Server = .init(networkService: self.networkService)
 
-            public final class Label: @unchecked Sendable {
+            public final class Server: @unchecked Sendable {
                 let networkService: NetworkService
                 init(networkService: NetworkService) {
                     self.networkService = networkService
                 }
             }
 
-            public lazy var server: Server = .init(networkService: self.networkService)
+            public lazy var label: Label = .init(networkService: self.networkService)
 
-            public final class Server: @unchecked Sendable {
+            public final class Label: @unchecked Sendable {
                 let networkService: NetworkService
                 init(networkService: NetworkService) {
                     self.networkService = networkService

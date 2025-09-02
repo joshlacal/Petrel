@@ -161,7 +161,7 @@ public actor KeychainStorage {
         let keyTag = makeKey("dpopKey", did: did)
         do {
             return try KeychainManager.retrieveDPoPKey(keyTag: keyTag)
-        } catch KeychainError.itemRetrievalError(let status) where status == errSecItemNotFound {
+        } catch let KeychainError.itemRetrievalError(status) where status == errSecItemNotFound {
             LogManager.logDebug("DPoP key not found in Keychain for DID: \(did). A new key will be generated if needed.")
             return nil
         } catch {
