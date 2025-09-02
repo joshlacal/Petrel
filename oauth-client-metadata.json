@@ -1,0 +1,24 @@
+{
+  "client_id": "https://87a6c075b410.ngrok-free.app/client-metadata.json",
+  "client_name": "Petrel OAuth Test Client",
+  "client_uri": "https://87a6c075b410.ngrok-free.app/",
+  "logo_uri": "https://87a6c075b410.ngrok-free.app/logo.png",
+  "tos_uri": "https://87a6c075b410.ngrok-free.app/tos",
+  "policy_uri": "https://87a6c075b410.ngrok-free.app/policy",
+  "redirect_uris": [
+    "https://87a6c075b410.ngrok-free.app/callback",
+    "http://127.0.0.1:8080/callback"
+  ],
+  "scope": "atproto transition:generic",
+  "grant_types": [
+    "authorization_code",
+    "refresh_token"
+  ],
+  "response_types": [
+    "code"
+  ],
+  "application_type": "native",
+  "token_endpoint_auth_method": "none",
+  "dpop_bound_access_tokens": true,
+  "client_id_issued_at": 1725307681
+}

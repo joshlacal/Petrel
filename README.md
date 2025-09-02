@@ -1,293 +1,202 @@
-# Petrel
+# PetrelLoad OAuth Stress Testing Suite
 
-A comprehensive Swift library for the AT Protocol and Bluesky social network, featuring automatic code generation, modern Swift concurrency, and robust authentication.
+A comprehensive stress testing tool for OAuth, DPoP, and authentication edge cases in the Petrel ATProto Swift library.
 
-![Swift](https://img.shields.io/badge/Swift-6.0-orange.svg)
-![Platforms](https://img.shields.io/badge/Platforms-iOS%2017%2B%20%7C%20macOS%2014%2B-blue.svg)
-![License](https://img.shields.io/badge/License-MIT-green.svg)
+## Features
 
-## Overview
-
-Petrel provides a complete Swift implementation of the AT Protocol APIs, enabling developers to build native iOS and macOS applications that interact with Bluesky and other AT Protocol-based services. The library features:
-
-- 🚀 **Automatic Code Generation** - Swift types and networking code generated from official Lexicon specifications
-- ⚡ **Modern Swift Concurrency** - Built with async/await and actors for thread-safe operations
-- 🔐 **Robust Authentication** - Support for OAuth 2.0 and legacy authentication with automatic token refresh
-- 📦 **Type-Safe APIs** - Strongly typed request/response models with compile-time safety
-- 🛡️ **Secure Storage** - Credentials stored securely in the system keychain
-- 🎯 **Comprehensive Coverage** - Full implementation of Bluesky APIs including feeds, posts, profiles, and more
-
-## Installation
-
-### Swift Package Manager
-
-Add Petrel to your `Package.swift` file:
-
-```swift
-dependencies: [
-    .package(url: "https://github.com/joshlacal/Petrel.git", from: "1.0.0")
-]
-```
-
-Then add it to your target dependencies:
-
-```swift
-.target(
-    name: "YourApp",
-    dependencies: ["Petrel"]
-)
-```
-
-### Xcode
-
-1. In Xcode, go to File → Add Package Dependencies
-2. Enter the repository URL: `https://github.com/joshlacal/Petrel.git`
-3. Choose your version requirements
-4. Add Petrel to your target
-
-## Quick Start
-
-### Basic Usage (Unauthenticated)
-
-```swift
-import Petrel
-
-// Create a client
-let client = ATProtoClient()
-
-// Fetch a user's profile
-let profile = try await client.app.bsky.actor.getProfile(
-    AppBskyActorGetProfile.Parameters(actor: "alice.bsky.social")
-)
-
-print("Name: \(profile.displayName ?? "")")
-print("Bio: \(profile.description ?? "")")
-print("Followers: \(profile.followersCount ?? 0)")
-```
-
-### Authenticated Usage
-
-```swift
-import Petrel
-
-// Create authentication service
-let authService = AuthenticationService()
-
-// Authenticate with password (use app passwords!)
-let account = try await authService.authenticateWithPassword(
-    identifier: "alice.bsky.social",
-    password: "your-app-password"
-)
-
-// Create authenticated client
-let client = ATProtoClient(authenticationService: authService)
-
-// Create a post
-let post = AppBskyFeedPost(
-    text: "Hello from Petrel! 🐦",
-    createdAt: Date()
-)
-
-let result = try await client.com.atproto.repo.createRecord(
-    ComAtprotoRepoCreateRecord.Input(
-        repo: account.did,
-        collection: "app.bsky.feed.post",
-        record: .appBskyFeedPost(post)
-    )
-)
-
-print("Post created: \(result.uri)")
-```
-
-### OAuth Authentication (Recommended)
-
-```swift
-// Start OAuth flow
-let authURL = try await authService.startOAuthAuthentication(
-    identifier: "alice.bsky.social"
-)
-
-// Open authURL in browser or web view
-// ... 
-
-// Handle callback after user authorization
-let account = try await authService.handleOAuthCallback(
-    callbackURL: receivedCallbackURL
-)
-```
-
-## Core Features
-
-### 🔄 Automatic Token Refresh
-
-Petrel automatically handles token expiration and refresh:
-
-```swift
-// Tokens are automatically refreshed when needed
-let timeline = try await client.app.bsky.feed.getTimeline(
-    AppBskyFeedGetTimeline.Parameters(limit: 50)
-)
-```
-
-### 📝 Rich Text Support
-
-Create posts with mentions, links, and hashtags:
-
-```swift
-let richText = RichText(text: "Hello @alice.bsky.social! Check out #Petrel")
-let facets = try await richText.buildFacets(client: client)
-
-let post = AppBskyFeedPost(
-    text: richText.text,
-    facets: facets,
-    createdAt: Date()
-)
-```
-
-### 🖼️ Media Upload
-
-Upload images and videos:
-
-```swift
-// Upload image
-let imageData = try Data(contentsOf: imageURL)
-let blob = try await client.com.atproto.repo.uploadBlob(imageData)
-
-// Create post with image
-let post = AppBskyFeedPost(
-    text: "Check out this photo!",
-    embed: .appBskyEmbedImages(AppBskyEmbedImages(
-        images: [AppBskyEmbedImages.Image(
-            image: blob.blob,
-            alt: "Description of image"
-        )]
-    )),
-    createdAt: Date()
-)
-```
-
-### 🔍 Search and Discovery
-
-```swift
-// Search for users
-let searchResults = try await client.app.bsky.actor.searchActors(
-    AppBskyActorSearchActors.Parameters(q: "swift developer")
-)
-
-// Get suggested follows
-let suggestions = try await client.app.bsky.actor.getSuggestions(
-    AppBskyActorGetSuggestions.Parameters(limit: 20)
-)
-```
-
-### 💬 Social Interactions
-
-```swift
-// Like a post
-let like = AppBskyFeedLike(
-    subject: StrongRef(uri: postUri, cid: postCid),
-    createdAt: Date()
-)
-
-try await client.com.atproto.repo.createRecord(
-    ComAtprotoRepoCreateRecord.Input(
-        repo: account.did,
-        collection: "app.bsky.feed.like",
-        record: .appBskyFeedLike(like)
-    )
-)
-
-// Follow a user
-let follow = AppBskyGraphFollow(
-    subject: userDid,
-    createdAt: Date()
-)
-
-try await client.com.atproto.repo.createRecord(
-    ComAtprotoRepoCreateRecord.Input(
-        repo: account.did,
-        collection: "app.bsky.graph.follow",
-        record: .appBskyGraphFollow(follow)
-    )
-)
-```
-
-## Architecture
-
-### Code Generation
-
-Petrel uses automated code generation from official AT Protocol Lexicon JSON files:
-
+### Basic Load Testing
+Standard HTTP load testing with authentication:
 ```bash
-# Regenerate Swift code from latest Lexicons
-cd Petrel
-python Generator/main.py
+PetrelLoad --namespace com.example.app --endpoint app.bsky.feed.getTimeline --requests 500 --concurrency 25
 ```
 
-Generated files are placed in `Sources/Petrel/Generated/` with a 1:1 mapping:
-- `app.bsky.feed.post` → `AppBskyFeedPost.swift`
-- `com.atproto.repo.createRecord` → `ComAtprotoRepoCreateRecord.swift`
-
-### API Structure
-
-APIs are organized using namespace properties on the main client:
-
-```swift
-client.app.bsky.feed.getTimeline()     // app.bsky.feed.getTimeline
-client.com.atproto.repo.createRecord() // com.atproto.repo.createRecord
+### OAuth Stress Testing Suite
+Run all OAuth stress scenarios:
+```bash
+PetrelLoad --namespace com.example.app --endpoint app.bsky.actor.getProfile --oauth-stress
 ```
 
-### Thread Safety
+### Individual OAuth Test Scenarios
 
-Petrel uses Swift's actor model for thread-safe operations:
-
-```swift
-// ATProtoClient is an actor - all operations are thread-safe
-await client.app.bsky.feed.getTimeline(...)
+#### DPoP Nonce Thrashing
+Tests concurrent DPoP nonce rotation and recovery:
+```bash
+PetrelLoad --namespace com.example.app --endpoint app.bsky.actor.getProfile --oauth-test dpop_nonce_thrash --requests 200 --concurrency 20
 ```
 
-## Documentation
+#### Token Refresh Race Conditions
+Tests concurrent token refresh scenarios:
+```bash
+PetrelLoad --namespace com.example.app --endpoint app.bsky.actor.getProfile --oauth-test token_refresh_race --concurrency 15
+```
 
-- [Getting Started Guide](./GETTING_STARTED.md) - Detailed setup and first steps
-- [API Reference](./API_REFERENCE.md) - Complete API documentation
-- [Contributing Guide](./CONTRIBUTING.md) - How to contribute to Petrel
-- [DocC Documentation](https://joshlacal.github.io/Petrel/documentation/petrel/) - Full API documentation
+#### Account Switching Under Load
+Tests rapid account switching with concurrent requests (requires 2+ stored accounts):
+```bash
+PetrelLoad --namespace com.example.app --endpoint app.bsky.actor.getProfile --oauth-test account_switch_storm --multi-account
+```
 
-## Example App
+#### Audience Mismatch Recovery
+Tests recovery from audience/resource indicator mismatches:
+```bash
+PetrelLoad --namespace com.example.app --endpoint app.bsky.actor.getProfile --oauth-test audience_mismatch
+```
 
-Check out [Catbird](https://github.com/joshlacal/Catbird), a full-featured iOS client for Bluesky built with Petrel, to see the library in action.
+#### Rate Limit Compliance
+Tests burst behavior and rate limit handling:
+```bash
+PetrelLoad --namespace com.example.app --endpoint app.bsky.feed.getTimeline --oauth-test rate_limit_compliance --burst-size 100 --burst-delay 0.05
+```
 
-## Requirements
+### DPoP-Specific Testing
 
-- iOS 17.0+ / macOS 14.0+
-- Xcode 16.0+
-- Swift 6.0+
+#### Compliance Validation
+Basic DPoP implementation compliance check:
+```bash
+PetrelLoad --namespace com.example.app --endpoint app.bsky.actor.getProfile --dpop-test compliance
+```
 
-## Dependencies
+#### Nonce Exhaustion Test
+Long-running test to trigger nonce rotations:
+```bash
+PetrelLoad --namespace com.example.app --endpoint app.bsky.actor.getProfile --dpop-test nonce-exhaustion
+```
 
-- [jose-swift](https://github.com/beatt83/jose-swift.git) - JWT and DPoP support
-- [SwiftCBOR](https://github.com/valpackett/SwiftCBOR.git) - CBOR encoding/decoding
-- [AsyncDNSResolver](https://github.com/apple/swift-async-dns-resolver) - Async DNS resolution
+#### Specific DPoP Edge Cases
+Test individual DPoP edge cases:
+```bash
+# JTI replay detection
+PetrelLoad --namespace com.example.app --endpoint app.bsky.actor.getProfile --dpop-test replay-jti
 
-## Contributing
+# Access token hash validation
+PetrelLoad --namespace com.example.app --endpoint app.bsky.actor.getProfile --dpop-test wrong-ath
 
-We welcome contributions! Please see our [Contributing Guide](./CONTRIBUTING.md) for details on:
+# Clock skew tolerance
+PetrelLoad --namespace com.example.app --endpoint app.bsky.actor.getProfile --dpop-test clock-skew
 
-- Setting up your development environment
-- Code generation workflow
-- Testing guidelines
-- Pull request process
+# Stale nonce handling
+PetrelLoad --namespace com.example.app --endpoint app.bsky.actor.getProfile --dpop-test stale-nonce
 
-## License
+# Malformed proof rejection
+PetrelLoad --namespace com.example.app --endpoint app.bsky.actor.getProfile --dpop-test malformed-proof
+```
 
-Petrel is available under the MIT license. See the [LICENSE](./LICENSE) file for details.
+## Test Scenarios Explained
 
-## Acknowledgments
+### DPoP Nonce Thrashing (`dpop_nonce_thrash`)
+- Fires concurrent requests to force multiple `use_dpop_nonce` errors
+- Tests nonce rotation and recovery mechanisms
+- Measures recovery time from nonce mismatches
+- **Key Metrics**: Nonce rotations, recovery success rate, latency distribution
 
-- The [Bluesky](https://bsky.social) team for creating AT Protocol
-- The Swift community for excellent open-source packages
-- Contributors and users of Petrel
+### Token Refresh Race (`token_refresh_race`)
+- Triggers concurrent token refresh attempts
+- Tests thread safety of refresh coordination
+- Validates refresh token rotation behavior
+- **Key Metrics**: Refresh attempts, success rate, race condition detection
 
----
+### Account Switch Storm (`account_switch_storm`)
+- Rapidly switches between stored accounts during load
+- Tests DPoP key isolation per account
+- Validates authentication provider updates
+- **Key Metrics**: Account switches, authentication failures, isolation effectiveness
 
-Made with ❤️ for the Bluesky community
+### Audience Mismatch (`audience_mismatch`)
+- Tests requests to different PDS origins with same token
+- Validates `invalid_audience` error recovery
+- Tests audience override mechanisms
+- **Key Metrics**: Audience errors, recovery time, cross-origin behavior
+
+### Rate Limit Compliance (`rate_limit_compliance`)
+- Sends burst traffic to test rate limiting
+- Measures server-side rate limit enforcement
+- Tests client-side rate limit respect
+- **Key Metrics**: Rate limit hits, throttling behavior, compliance
+
+### Resource Indicator (`resource_indicator`)
+- Tests token binding to specific protected resources
+- Validates resource-specific token scoping
+- Tests cross-resource request failures
+- **Key Metrics**: Binding violations, resource isolation, token scope
+
+## Metrics and Output
+
+Each test provides detailed metrics:
+- **Request latencies**: p50, p95, p99 percentiles
+- **Error categorization**: By type and frequency
+- **Recovery times**: From various error conditions
+- **Success rates**: For different operations
+- **OAuth-specific metrics**: Token refreshes, nonce rotations, account switches
+
+## Setting Up for Testing
+
+1. **Initial OAuth setup**:
+   ```bash
+   PetrelLoad --namespace com.example.app --endpoint app.bsky.actor.getProfile --oauth-start
+   # Follow the OAuth flow, then:
+   PetrelLoad --namespace com.example.app --endpoint app.bsky.actor.getProfile --oauth-complete "http://localhost/callback?code=..."
+   ```
+
+2. **Multiple accounts** (for account switching tests):
+   - Repeat the OAuth setup with different `--identifier` values
+   - Store multiple accounts in the same namespace
+
+3. **Test environment**:
+   - Use a test/staging PDS when possible
+   - Monitor server-side logs for compliance
+   - Ensure network stability for consistent results
+
+## Interpreting Results
+
+### Good Signs
+- High recovery success rates (>95%)
+- Fast recovery times (<1s)
+- Proper error categorization
+- Consistent latency distributions
+- No authentication race conditions
+
+### Warning Signs
+- Low recovery rates
+- Long recovery times
+- Uncategorized errors
+- High authentication failure rates
+- Memory leaks during long tests
+
+### Critical Issues
+- Authentication bypass
+- Token leakage between accounts
+- Persistent nonce failures
+- Unhandled race conditions
+- PKCE challenge reuse
+
+## Comparison with Node.js Reference
+
+Use alongside a Node.js ATProto client for validation:
+1. Run identical test scenarios
+2. Compare DPoP proof structures
+3. Verify error handling patterns
+4. Cross-validate compliance behavior
+
+## Advanced Usage
+
+### Custom Test Scenarios
+The `OAuthStressTest` class can be extended with custom scenarios for specific edge cases in your implementation.
+
+### Integration with CI/CD
+Tests can be automated for regression detection:
+```bash
+# Quick smoke test
+PetrelLoad --namespace ci.test --endpoint app.bsky.actor.getProfile --dpop-test compliance
+
+# Full stress test (longer running)
+PetrelLoad --namespace ci.test --endpoint app.bsky.actor.getProfile --oauth-stress --requests 1000 --concurrency 50
+```
+
+## Limitations
+
+- Some DPoP edge cases require internal access to proof generation
+- PKCE replay testing is limited without OAuth flow control
+- Rate limit testing depends on server configuration
+- Clock skew testing simulates rather than actually manipulating timestamps
+
+These limitations are noted in the tool output when encountered.

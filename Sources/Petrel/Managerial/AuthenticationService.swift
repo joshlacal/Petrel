@@ -392,7 +392,7 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
             // If another account is now current, immediately align networking state
             if let newAccount = await accountManager.getCurrentAccount() {
                 // Ensure subsequent API calls target the correct protected resource
-                networkService.setBaseURL(newAccount.pdsURL)
+                await networkService.setBaseURL(newAccount.pdsURL)
                 // Clear any per-request headers carried from the previous account
                 await networkService.clearHeaders()
             }

@@ -153,7 +153,7 @@ public actor ATProtoClient {
     private func initializeFromStoredAccount() async {
         if let account = await accountManager.getCurrentAccount() {
             // Update the network service base URL
-            networkService.setBaseURL(account.pdsURL)
+            await networkService.setBaseURL(account.pdsURL)
 
             // Check for interrupted refresh operations
             await handleAppStartup()
@@ -296,7 +296,7 @@ public actor ATProtoClient {
 
         // After successful authentication, update the base URL
         if let account = await accountManager.getCurrentAccount() {
-            networkService.setBaseURL(account.pdsURL)
+            await networkService.setBaseURL(account.pdsURL)
         }
     }
 
@@ -330,7 +330,7 @@ public actor ATProtoClient {
 
         // Update network service base URL
         if let account = await accountManager.getAccount(did: did) {
-            networkService.setBaseURL(account.pdsURL)
+            await networkService.setBaseURL(account.pdsURL)
         }
     }
 

@@ -1,22 +1,22 @@
 {
-  "originHash" : "5ecf1462ed57aa242b195b8845e9146826ff9d81a59878e6b311bf55d595788f",
+  "originHash" : "93ab8b06f349cb825802c7fc6ef1b12f9df40bd0cdca460ca7caff04544c2050",
   "pins" : [
     {
       "identity" : "cryptoswift",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/beatt83/CryptoSwift.git",
+      "location" : "https://github.com/krzyzanowskim/CryptoSwift.git",
       "state" : {
-        "revision" : "15fc223bca9a81491193de82c33308879c5f34e6",
-        "version" : "1.8.7"
+        "revision" : "e45a26384239e028ec87fbcc788f513b67e10d8f",
+        "version" : "1.9.0"
       }
     },
     {
       "identity" : "jose-swift",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/joshlacal/jose-swift.git",
+      "location" : "https://github.com/beatt83/jose-swift.git",
       "state" : {
-        "branch" : "main",
-        "revision" : "f5f2670f33830857c7f7cdf9f28c527b88581ff7"
+        "revision" : "8d087c7d8333310449aff4c9eb2431fbb4f1eb9f",
+        "version" : "6.0.0"
       }
     },
     {
@@ -51,8 +51,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-certificates.git",
       "state" : {
-        "revision" : "870f4d5fe5fcfedc13f25d70e103150511746404",
-        "version" : "1.11.0"
+        "revision" : "20c451f1ad8e344e61ddbb34ef196653d4b73ea6",
+        "version" : "1.13.0"
       }
     },
     {
@@ -60,8 +60,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-crypto.git",
       "state" : {
-        "revision" : "176abc28e002a9952470f08745cd26fad9286776",
-        "version" : "3.13.3"
+        "revision" : "d1c6b70f7c5f19fb0b8750cb8dcdf2ea6e2d8c34",
+        "version" : "3.15.0"
       }
     },
     {
