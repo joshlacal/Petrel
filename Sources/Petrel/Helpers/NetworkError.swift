@@ -72,7 +72,7 @@ extension NetworkError: LocalizedError {
             return "Security violation detected."
         }
     }
-    
+
     public var failureReason: String? {
         switch self {
         case .requestFailed:
@@ -99,7 +99,7 @@ extension NetworkError: LocalizedError {
             return nil
         }
     }
-    
+
     public var recoverySuggestion: String? {
         switch self {
         case .requestFailed:
