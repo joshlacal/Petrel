@@ -72,4 +72,56 @@ extension NetworkError: LocalizedError {
             return "Security violation detected."
         }
     }
+    
+    public var failureReason: String? {
+        switch self {
+        case .requestFailed:
+            return "Network connectivity issues or server unavailability."
+        case let .responseError(statusCode) where statusCode >= 500:
+            return "The server is experiencing technical difficulties."
+        case let .responseError(statusCode) where statusCode == 429:
+            return "Too many requests sent. Rate limit exceeded."
+        case let .responseError(statusCode) where statusCode >= 400:
+            return "Client request was invalid or malformed."
+        case .expiredToken:
+            return "Your session has timed out for security reasons."
+        case .authenticationFailed:
+            return "Invalid credentials or authentication method."
+        case .unauthorized:
+            return "Access denied with current credentials."
+        case .maxRetryAttemptsReached:
+            return "Network connection is unstable or server is unresponsive."
+        case .oauthManagerNotSet:
+            return "Application configuration is incomplete."
+        case .securityViolation:
+            return "Potential security threat detected in request."
+        default:
+            return nil
+        }
+    }
+    
+    public var recoverySuggestion: String? {
+        switch self {
+        case .requestFailed:
+            return "Check your internet connection and try again."
+        case let .responseError(statusCode) where statusCode >= 500:
+            return "Please wait a moment and try again. If the problem persists, contact support."
+        case let .responseError(statusCode) where statusCode == 429:
+            return "Please wait a few minutes before trying again."
+        case .expiredToken, .authenticationRequired:
+            return "Please log out and log back in to refresh your session."
+        case .authenticationFailed:
+            return "Check your username and password, then try again."
+        case .unauthorized:
+            return "Log out and log back in, or contact support if you believe you should have access."
+        case .maxRetryAttemptsReached:
+            return "Check your internet connection and try again in a few minutes."
+        case .oauthManagerNotSet:
+            return "Please restart the app. If the problem persists, contact support."
+        case .securityViolation:
+            return "Please ensure you're using the official app and try again."
+        default:
+            return "Please try again or contact support if the problem persists."
+        }
+    }
 }

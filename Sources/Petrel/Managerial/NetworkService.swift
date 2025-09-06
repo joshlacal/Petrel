@@ -237,21 +237,12 @@ public actor NetworkService: NetworkServiceProtocol {
     /// - Parameter name: Header name
     /// - Returns: Header value if it exists
     public func getHeader(name: String) async -> String? {
-        return await Task<String?, Never>.detached { await self._getHeader(name) ?? nil }.result.success
-            ?? nil
-    }
-
-    private func _getHeader(_ name: String) -> String? {
         return headers[name]
     }
 
     /// Removes a custom header
     /// - Parameter name: Header name to remove
-    public nonisolated func removeHeader(name: String) {
-        Task { await _removeHeader(name) }
-    }
-
-    private func _removeHeader(_ name: String) {
+    public func removeHeader(name: String) async {
         LogManager.logDebug("Network Service - Removing header: \(name)")
         headers.removeValue(forKey: name)
     }
@@ -293,7 +284,7 @@ public actor NetworkService: NetworkServiceProtocol {
             await setHeader(name: "atproto-accept-labelers", value: headerValue)
         } else {
             // If empty, remove the header
-            _removeHeader("atproto-accept-labelers")
+            await removeHeader(name: "atproto-accept-labelers")
         }
     }
 
@@ -308,8 +299,7 @@ public actor NetworkService: NetworkServiceProtocol {
             return []
         }
 
-        return await Task.detached { await self._parseLabelerHeader(contentLabelers) }.result.success
-            ?? []
+        return parseLabelerHeader(contentLabelers)
     }
 
     /// Sets the authentication provider for authenticated requests
@@ -939,7 +929,7 @@ public actor NetworkService: NetworkServiceProtocol {
     /// Helper to parse a labeler header value according to RFC-8941
     /// - Parameter header: The header value to parse
     /// - Returns: Array of tuples containing labeler DIDs and redaction flags
-    private func _parseLabelerHeader(_ header: String) -> [(did: String, redact: Bool)] {
+    private nonisolated func parseLabelerHeader(_ header: String) -> [(did: String, redact: Bool)] {
         let components = header.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
 
         return components.compactMap { component in

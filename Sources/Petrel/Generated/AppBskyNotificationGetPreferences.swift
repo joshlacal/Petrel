@@ -1,66 +1,102 @@
 import Foundation
 
+
+
 // lexicon: 1, id: app.bsky.notification.getPreferences
 
-public enum AppBskyNotificationGetPreferences {
-    public static let typeIdentifier = "app.bsky.notification.getPreferences"
-    public struct Parameters: Parametrizable {
+
+public struct AppBskyNotificationGetPreferences { 
+
+    public static let typeIdentifier = "app.bsky.notification.getPreferences"    
+public struct Parameters: Parametrizable {
+        
         public init(
-        ) {}
+            ) {
+            
+        }
     }
-
-    public struct Output: ATProtocolCodable {
+    
+public struct Output: ATProtocolCodable {
+        
+        
         public let preferences: AppBskyNotificationDefs.Preferences
-
+        
+        
+        
         // Standard public initializer
         public init(
+            
             preferences: AppBskyNotificationDefs.Preferences
-
+            
+            
         ) {
+            
             self.preferences = preferences
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
-            preferences = try container.decode(AppBskyNotificationDefs.Preferences.self, forKey: .preferences)
+            
+            
+            self.preferences = try container.decode(AppBskyNotificationDefs.Preferences.self, forKey: .preferences)
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
+            
             try container.encode(preferences, forKey: .preferences)
+            
+            
         }
 
         public func toCBORValue() throws -> Any {
+            
             var map = OrderedCBORMap()
 
+            
+            
             let preferencesValue = try preferences.toCBORValue()
             map = map.adding(key: "preferences", value: preferencesValue)
+            
+            
 
             return map
+            
         }
-
+        
         private enum CodingKeys: String, CodingKey {
+            
             case preferences
+            
         }
     }
+
+
+
+
 }
 
-public extension ATProtoClient.App.Bsky.Notification {
+
+extension ATProtoClient.App.Bsky.Notification {
     // MARK: - getPreferences
 
     /// Get notification-related preferences for an account. Requires auth.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-    ///
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    func getPreferences(input: AppBskyNotificationGetPreferences.Parameters) async throws -> (responseCode: Int, data: AppBskyNotificationGetPreferences.Output?) {
+    public func getPreferences(input: AppBskyNotificationGetPreferences.Parameters) async throws -> (responseCode: Int, data: AppBskyNotificationGetPreferences.Output?) {
         let endpoint = "app.bsky.notification.getPreferences"
 
+        
         let queryItems = input.asQueryItems()
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -69,8 +105,9 @@ public extension ATProtoClient.App.Bsky.Notification {
             queryItems: queryItems
         )
 
+        
         let (responseData, response) = try await networkService.performRequest(urlRequest)
-
+        
         let responseCode = response.statusCode
 
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
@@ -81,9 +118,11 @@ public extension ATProtoClient.App.Bsky.Notification {
             throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
         }
 
+        
         let decoder = JSONDecoder()
         let decodedData = try? decoder.decode(AppBskyNotificationGetPreferences.Output.self, from: responseData)
+        
 
         return (responseCode, decodedData)
     }
-}
+}                           

@@ -249,7 +249,7 @@ public actor ATProtoClient {
 
     /// Clears any previously set report labeler
     public func clearReportLabeler() async {
-        networkService.removeHeader(name: "atproto-proxy")
+        await networkService.removeHeader(name: "atproto-proxy")
     }
 
     // MARK: - Authentication Flow Methods

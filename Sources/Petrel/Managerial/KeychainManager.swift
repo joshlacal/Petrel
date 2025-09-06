@@ -9,12 +9,65 @@ import CryptoKit
 import Foundation
 import Security
 
-enum KeychainError: Error {
+enum KeychainError: Error, LocalizedError {
     case itemStoreError(status: OSStatus)
     case itemRetrievalError(status: OSStatus)
     case dataFormatError
     case unableToCreateKey
     case deletionError(status: OSStatus)
+    
+    var errorDescription: String? {
+        switch self {
+        case .itemStoreError(let status):
+            return "Failed to store item in keychain (Status: \(status))."
+        case .itemRetrievalError(let status):
+            return "Failed to retrieve item from keychain (Status: \(status))."
+        case .dataFormatError:
+            return "Keychain data is corrupted or in an invalid format."
+        case .unableToCreateKey:
+            return "Failed to create cryptographic key from keychain data."
+        case .deletionError(let status):
+            return "Failed to delete item from keychain (Status: \(status))."
+        }
+    }
+    
+    var failureReason: String? {
+        switch self {
+        case .itemStoreError(let status) where status == errSecDuplicateItem:
+            return "An item with this key already exists in the keychain."
+        case .itemStoreError(let status) where status == errSecAuthFailed:
+            return "Authentication failed while accessing keychain."
+        case .itemRetrievalError(let status) where status == errSecItemNotFound:
+            return "The requested item was not found in the keychain."
+        case .itemRetrievalError(let status) where status == errSecAuthFailed:
+            return "Authentication failed while accessing keychain."
+        case .dataFormatError:
+            return "The stored keychain data cannot be decoded or is missing required fields."
+        case .unableToCreateKey:
+            return "The cryptographic key data from keychain is invalid or corrupted."
+        case .deletionError(let status) where status == errSecAuthFailed:
+            return "Authentication failed while accessing keychain."
+        default:
+            return "Keychain operation failed due to system restrictions or device state."
+        }
+    }
+    
+    var recoverySuggestion: String? {
+        switch self {
+        case .itemStoreError(let status) where status == errSecAuthFailed,
+             .itemRetrievalError(let status) where status == errSecAuthFailed,
+             .deletionError(let status) where status == errSecAuthFailed:
+            return "Please unlock your device and ensure the app has keychain access."
+        case .itemRetrievalError(let status) where status == errSecItemNotFound:
+            return "You may need to log in again to restore your credentials."
+        case .dataFormatError, .unableToCreateKey:
+            return "Please log out and log back in to reset your stored credentials."
+        case .itemStoreError(let status) where status == errSecDuplicateItem:
+            return "Please restart the app or log out and log back in."
+        default:
+            return "Try restarting the app. If the problem persists, you may need to log out and log back in."
+        }
+    }
 }
 
 enum KeychainManager {
