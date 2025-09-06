@@ -19,13 +19,69 @@ public protocol DIDResolving: Sendable, AnyObject {
 
 // MARK: - DIDResolutionError
 
-enum DIDResolutionError: Error {
-    case invalidHandle
-    case invalidDID
+enum DIDResolutionError: Error, LocalizedError {
+    case invalidHandle(String)
+    case invalidDID(String)
     case networkError(Error)
-    case decodingError
-    case missingPDSEndpoint
-    case handleCouldNotBeResolved
+    case decodingError(String)
+    case missingPDSEndpoint(String)
+    case handleCouldNotBeResolved(String)
+    case dnsResolutionFailed(String)
+    case serverNotResponding(String)
+    case cancelled
+    
+    var errorDescription: String? {
+        switch self {
+        case .invalidHandle(let handle):
+            return "The handle '\(handle)' is not in a valid format."
+        case .invalidDID(let did):
+            return "The DID '\(did)' is not valid or supported."
+        case .networkError(let error):
+            return "Network error during resolution: \(error.localizedDescription)"
+        case .decodingError(let context):
+            return "Failed to decode server response: \(context)"
+        case .missingPDSEndpoint(let did):
+            return "No Personal Data Server (PDS) endpoint found for '\(did)'."
+        case .handleCouldNotBeResolved(let handle):
+            return "Unable to resolve the handle '\(handle)'. It may not exist or be accessible."
+        case .dnsResolutionFailed(let handle):
+            return "DNS resolution failed for handle '\(handle)'."
+        case .serverNotResponding(let server):
+            return "Server '\(server)' is not responding."
+        case .cancelled:
+            return "Resolution was cancelled."
+        }
+    }
+    
+    var failureReason: String? {
+        switch self {
+        case .invalidHandle(let handle):
+            return "Handle '\(handle)' doesn't follow the expected format (e.g., user.bsky.social)."
+        case .handleCouldNotBeResolved(let handle):
+            return "Multiple resolution methods failed for '\(handle)'."
+        case .networkError(let error):
+            return "Network connectivity issue: \(error.localizedDescription)"
+        case .serverNotResponding:
+            return "The authentication server is currently unavailable."
+        default:
+            return nil
+        }
+    }
+    
+    var recoverySuggestion: String? {
+        switch self {
+        case .invalidHandle:
+            return "Check the handle format. It should be like 'username.bsky.social'."
+        case .handleCouldNotBeResolved:
+            return "Verify the handle exists and try again. Check for typos."
+        case .networkError, .serverNotResponding:
+            return "Check your internet connection and try again."
+        case .missingPDSEndpoint:
+            return "This appears to be a configuration issue. Try a different handle."
+        default:
+            return "Please try again or contact support if the problem persists."
+        }
+    }
 }
 
 // MARK: - DIDResolutionService
@@ -41,6 +97,9 @@ actor DIDResolutionService: DIDResolving {
     }
 
     func resolveHandleToDID(handle: String) async throws -> String {
+        // Check for cancellation at the start
+        try Task.checkCancellation()
+        
         // Check cache
         if let cachedDID = getCachedDID(for: handle) {
             return cachedDID
@@ -55,11 +114,17 @@ actor DIDResolutionService: DIDResolving {
             return httpDID
         }
 
+        // Check for cancellation before next attempt
+        try Task.checkCancellation()
+
         // Try well-known second
         if let wellKnownDID = try? await resolveHandleToDIDviaWellKnown(handle: handle) {
             cacheDID(wellKnownDID, for: handle)
             return wellKnownDID
         }
+
+        // Check for cancellation before DNS fallback
+        try Task.checkCancellation()
 
         // Finally fall back to DNS
         if let dnsDID = try? await resolveHandleToDIDviaDNS(handle: handle) {
@@ -67,19 +132,22 @@ actor DIDResolutionService: DIDResolving {
             return dnsDID
         }
 
-        // If all methods fail, throw an error
-        throw DIDResolutionError.handleCouldNotBeResolved
+        // If all methods fail, throw an error with the handle
+        throw DIDResolutionError.handleCouldNotBeResolved(handle)
     }
 
     private func resolveHandleToDIDviaWellKnown(handle: String) async throws -> String? {
         let logger = Logger(subsystem: "com.joshlacalamito.Petrel", category: "DIDResolution")
+
+        // Check for cancellation before network operation
+        try Task.checkCancellation()
 
         logger.info("Starting well-known resolution for handle: \(handle)")
 
         // Form the URL to query
         guard let url = URL(string: "https://\(handle)/.well-known/atproto-did") else {
             logger.error("Invalid handle format cannot form URL: \(handle)")
-            throw DIDResolutionError.invalidHandle
+            throw DIDResolutionError.invalidHandle(handle)
         }
 
         // Create URL request
@@ -105,7 +173,7 @@ actor DIDResolutionService: DIDResolving {
                     in: .whitespacesAndNewlines)
             else {
                 logger.error("Failed to decode response as UTF-8 text")
-                throw DIDResolutionError.decodingError
+                throw DIDResolutionError.decodingError("Failed to decode well-known DID response as UTF-8")
             }
 
             // Validate the DID format
@@ -123,6 +191,9 @@ actor DIDResolutionService: DIDResolving {
     }
 
     private func resolveHandleViaHTTP(handle: String) async throws -> String {
+        // Check for cancellation before network operation
+        try Task.checkCancellation()
+        
         let input = try ComAtprotoIdentityResolveHandle.Parameters(handle: Handle(handleString: handle))
         let endpoint = "com.atproto.identity.resolveHandle"
 
@@ -169,6 +240,9 @@ actor DIDResolutionService: DIDResolving {
 
     private func resolveHandleToDIDviaDNS(handle: String) async throws -> String? {
         let logger = Logger(subsystem: "com.joshlacalamito.Petrel", category: "DIDResolution")
+
+        // Check for cancellation before DNS operation
+        try Task.checkCancellation()
 
         logger.info("Starting DNS resolution for handle: \(handle)")
 
@@ -217,6 +291,9 @@ actor DIDResolutionService: DIDResolving {
     }
 
     func resolveDIDToHandleAndPDSURL(did: String) async throws -> (String, URL) {
+        // Check for cancellation at the start
+        try Task.checkCancellation()
+        
         // Check cache first
         if let cachedURL = getCachedPDSURL(for: did), let cachedHandle = getCachedHandle(for: did) {
             return (cachedHandle, cachedURL)
@@ -235,7 +312,7 @@ actor DIDResolutionService: DIDResolving {
             handle = resolvedHandle
             pdsURL = resolvedPDSURL
         } else {
-            throw DIDResolutionError.invalidDID
+            throw DIDResolutionError.invalidDID(did)
         }
 
         // Cache the result
@@ -246,6 +323,9 @@ actor DIDResolutionService: DIDResolving {
     }
 
     private func resolvePLCDID(_ did: String) async throws -> (String, URL) {
+        // Check for cancellation before network operation
+        try Task.checkCancellation()
+        
         let endpoint = "https://plc.directory/\(did)"
         let request = try await networkService.createURLRequest(
             endpoint: endpoint,
@@ -278,16 +358,19 @@ actor DIDResolutionService: DIDResolving {
                 $0.replacingOccurrences(of: "at://", with: "")
             })
         else {
-            throw DIDResolutionError.missingPDSEndpoint
+            throw DIDResolutionError.missingPDSEndpoint(did)
         }
 
         return (handle, pdsURL)
     }
 
     private func resolveWebDID(_ did: String) async throws -> (String, URL) {
+        // Check for cancellation before network operation
+        try Task.checkCancellation()
+        
         let parts = did.split(separator: ":")
         guard parts.count == 3, let domain = parts.last else {
-            throw DIDResolutionError.invalidDID
+            throw DIDResolutionError.invalidDID(did)
         }
 
         let endpoint = "https://\(domain)/.well-known/did.json"
@@ -322,7 +405,7 @@ actor DIDResolutionService: DIDResolving {
                 $0.replacingOccurrences(of: "at://", with: "")
             })
         else {
-            throw DIDResolutionError.missingPDSEndpoint
+            throw DIDResolutionError.missingPDSEndpoint(did)
         }
 
         return (handle, pdsURL)

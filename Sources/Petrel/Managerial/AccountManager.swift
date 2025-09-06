@@ -159,9 +159,48 @@ public actor AccountManager: AccountManaging {
 }
 
 /// Errors that can occur during account operations.
-public enum AccountError: Error {
+public enum AccountError: Error, LocalizedError {
     case accountNotFound
     case accountExists
     case invalidAccount
     case storageError
+    
+    public var errorDescription: String? {
+        switch self {
+        case .accountNotFound:
+            return "Account not found."
+        case .accountExists:
+            return "Account already exists."
+        case .invalidAccount:
+            return "Invalid account data."
+        case .storageError:
+            return "Failed to store account information."
+        }
+    }
+    
+    public var failureReason: String? {
+        switch self {
+        case .accountNotFound:
+            return "The requested account does not exist in the local storage."
+        case .accountExists:
+            return "An account with the same identifier is already stored."
+        case .invalidAccount:
+            return "The account data is missing required fields or contains invalid values."
+        case .storageError:
+            return "Unable to save account data to secure storage."
+        }
+    }
+    
+    public var recoverySuggestion: String? {
+        switch self {
+        case .accountNotFound:
+            return "Please ensure the account handle is correct and try logging in again."
+        case .accountExists:
+            return "You may need to log out of the existing account first, or use a different handle."
+        case .invalidAccount:
+            return "Please check your login credentials and try again."
+        case .storageError:
+            return "Check that you have sufficient storage space and try again. If the problem persists, restart the app."
+        }
+    }
 }

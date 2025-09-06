@@ -11,6 +11,23 @@ import JSONWebAlgorithms
 import JSONWebKey
 import JSONWebSignature
 
+/// Progress event types that can occur during authentication
+public enum AuthProgressEvent: Sendable {
+    case resolvingHandle(String)
+    case fetchingMetadata(url: String)
+    case generatingParameters
+    case exchangingTokens
+    case creatingSession
+    case retrying(operation: String, attempt: Int, maxAttempts: Int)
+}
+
+/// Delegate protocol for receiving authentication progress updates
+public protocol AuthProgressDelegate: AnyObject, Sendable {
+    /// Called when authentication progress is updated
+    /// - Parameter event: The progress event that occurred
+    func authenticationProgress(_ event: AuthProgressEvent) async
+}
+
 /// Protocol defining the interface for authentication services.
 public protocol AuthServiceProtocol: Actor {
     /// Starts the OAuth flow for an existing user.
@@ -24,6 +41,9 @@ public protocol AuthServiceProtocol: Actor {
 
     /// Logs out the current user, invalidating their session.
     func logout() async throws
+
+    /// Cancels any ongoing OAuth authentication flows.
+    func cancelOAuthFlow() async
 
     /// Indicates whether authentication tokens exist for the current account.
     /// - Returns: True if tokens exist, false otherwise.
@@ -42,6 +62,10 @@ public protocol AuthServiceProtocol: Actor {
     /// - Parameter request: The original request to authenticate.
     /// - Returns: The request with authentication headers added.
     func prepareAuthenticatedRequest(_ request: URLRequest) async throws -> URLRequest
+    
+    /// Sets the authentication progress delegate
+    /// - Parameter delegate: The delegate to receive progress updates
+    func setProgressDelegate(_ delegate: AuthProgressDelegate?) async
 }
 
 /// Result of a token refresh attempt
@@ -52,9 +76,12 @@ public enum TokenRefreshResult: Sendable {
 }
 
 /// Errors that can occur during authentication.
-public enum AuthError: Error, Equatable {
+public enum AuthError: Error, LocalizedError, Equatable {
     case noActiveAccount
     case invalidCredentials
+    case invalidHandle(String)
+    case handleNotFound(String)
+    case serverUnavailable(String)
     case invalidOAuthConfiguration
     case tokenRefreshFailed
     case authorizationFailed
@@ -62,6 +89,98 @@ public enum AuthError: Error, Equatable {
     case dpopKeyError
     case networkError(Error)
     case invalidResponse
+    case cancelled
+    case timeout
+    case rateLimited
+    case serverError(Int, String?)
+    case serviceMaintenance
+    
+    public var errorDescription: String? {
+        switch self {
+        case .noActiveAccount:
+            return "No active account found. Please sign in to continue."
+        case .invalidCredentials:
+            return "The username or password you entered is incorrect. Please try again."
+        case .invalidHandle(let handle):
+            return "The handle '\(handle)' is not valid. Please check the format and try again."
+        case .handleNotFound(let handle):
+            return "The handle '\(handle)' could not be found. Please check the spelling and try again."
+        case .serverUnavailable(let server):
+            return "The server '\(server)' is currently unavailable. Please try again later."
+        case .invalidOAuthConfiguration:
+            return "Authentication configuration error. Please contact support if this continues."
+        case .tokenRefreshFailed:
+            return "Your session has expired. Please sign in again."
+        case .authorizationFailed:
+            return "Authentication failed. Please check your credentials and try again."
+        case .invalidCallbackURL:
+            return "Authentication callback failed. Please try signing in again."
+        case .dpopKeyError:
+            return "Security key error occurred during authentication. Please try again."
+        case .networkError(let error):
+            return "Network connection error: \(error.localizedDescription)"
+        case .invalidResponse:
+            return "Received an invalid response from the server. Please try again."
+        case .cancelled:
+            return "Authentication was cancelled."
+        case .timeout:
+            return "Authentication timed out. Please check your connection and try again."
+        case .rateLimited:
+            return "Too many authentication attempts. Please wait a moment and try again."
+        case .serverError(let code, let message):
+            if let message = message {
+                return "Server error (\(code)): \(message)"
+            } else {
+                return "Server error occurred (code \(code)). Please try again."
+            }
+        case .serviceMaintenance:
+            return "The service is temporarily under maintenance. Please try again later."
+        }
+    }
+    
+    public var failureReason: String? {
+        switch self {
+        case .noActiveAccount:
+            return "No authentication credentials are available."
+        case .invalidCredentials:
+            return "The provided credentials do not match any known account."
+        case .invalidHandle(let handle):
+            return "Handle '\(handle)' does not follow the expected format."
+        case .handleNotFound(let handle):
+            return "No account exists with the handle '\(handle)'."
+        case .serverUnavailable(let server):
+            return "Server '\(server)' is not responding or is temporarily offline."
+        case .networkError(let error):
+            return "Network connectivity issue: \(error.localizedDescription)"
+        case .timeout:
+            return "The authentication request took too long to complete."
+        case .rateLimited:
+            return "Authentication rate limit exceeded."
+        default:
+            return nil
+        }
+    }
+    
+    public var recoverySuggestion: String? {
+        switch self {
+        case .noActiveAccount, .tokenRefreshFailed:
+            return "Please sign in with your username and password."
+        case .invalidCredentials:
+            return "Double-check your username and password, then try again."
+        case .invalidHandle, .handleNotFound:
+            return "Verify the handle format (e.g., username.bsky.social) and spelling."
+        case .serverUnavailable, .serviceMaintenance:
+            return "Wait a few minutes and try again, or check service status."
+        case .networkError, .timeout:
+            return "Check your internet connection and try again."
+        case .rateLimited:
+            return "Wait a few minutes before attempting to sign in again."
+        case .serverError:
+            return "If this continues, please contact support."
+        default:
+            return "Please try again or contact support if the problem persists."
+        }
+    }
 
     public static func == (lhs: AuthError, rhs: AuthError) -> Bool {
         switch (lhs, rhs) {
@@ -73,8 +192,20 @@ public enum AuthError: Error, Equatable {
              (.invalidCallbackURL, .invalidCallbackURL),
              (.dpopKeyError, .dpopKeyError),
              (.networkError, .networkError),
-             (.invalidResponse, .invalidResponse):
+             (.invalidResponse, .invalidResponse),
+             (.cancelled, .cancelled),
+             (.timeout, .timeout),
+             (.rateLimited, .rateLimited),
+             (.serviceMaintenance, .serviceMaintenance):
             return true
+        case (.invalidHandle(let lhs), .invalidHandle(let rhs)):
+            return lhs == rhs
+        case (.handleNotFound(let lhs), .handleNotFound(let rhs)):
+            return lhs == rhs
+        case (.serverUnavailable(let lhs), .serverUnavailable(let rhs)):
+            return lhs == rhs
+        case (.serverError(let lhsCode, let lhsMsg), .serverError(let rhsCode, let rhsMsg)):
+            return lhsCode == rhsCode && lhsMsg == rhsMsg
         default:
             return false
         }
@@ -83,8 +214,39 @@ public enum AuthError: Error, Equatable {
 
 /// Actor responsible for handling authentication operations.
 public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
+    // MARK: - Properties
+    
+    /// Delegate for authentication progress updates
+    private weak var progressDelegate: AuthProgressDelegate?
+
+    /// Prevents concurrent OAuth start flows from stepping on each other
+    /// and causing request cancellations (-999). When true, subsequent callers
+    /// will wait until the in‑flight start completes and then proceed.
+    private var oauthStartInProgress = false
+
+    /// Single-flight registry for startOAuthFlow tasks keyed by identifier (or signup key when nil)
+    private var oauthStartTasks: [String: Task<URL, Error>] = [:]
+
+    /// Normalized key for a given identifier
+    private func flowKey(for identifier: String?) -> String { identifier?.lowercased() ?? "__signup__" }
+    
+    /// Sets the authentication progress delegate
+    /// - Parameter delegate: The delegate to receive progress updates
+    public func setProgressDelegate(_ delegate: AuthProgressDelegate?) async {
+        progressDelegate = delegate
+    }
+    
+    /// Emits a progress update to the delegate
+    /// - Parameter event: The progress event to emit
+    private func emitProgress(_ event: AuthProgressEvent) async {
+        await progressDelegate?.authenticationProgress(event)
+    }
+    
+    // MARK: - OAuth Callback Handling
+    
     public func handleOAuthCallback(url: URL) async throws {
         LogManager.logInfo("Handling OAuth callback", category: .authentication)
+        await emitProgress(.exchangingTokens)
 
         // 1. Extract code and state
         guard let code = extractAuthorizationCode(from: url),
@@ -222,6 +384,8 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
         LogManager.logDebug("Determined token type: \(tokenType.rawValue)")
 
         // 6. Create Session with clock skew protection
+        await emitProgress(.creatingSession)
+        
         let adjustedExpiresIn = applyClockSkewProtection(to: tokenResponse.expiresIn)
         let newSession = Session(
             accessToken: tokenResponse.accessToken,
@@ -595,16 +759,74 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
     /// - Parameter identifier: The user identifier (handle), optional if signing up.
     /// - Returns: The authorization URL to present to the user.
     public func startOAuthFlow(identifier: String? = nil) async throws -> URL {
+        // Coalesce concurrent calls per-identifier and decouple from caller cancellation
+        let key = flowKey(for: identifier)
+
+        if let existing = oauthStartTasks[key] {
+            LogManager.logInfo("OAuth start already in progress for key=\(key), joining existing task", category: .authentication)
+            return try await existing.value
+        }
+
+        // Run flow on a detached root task so user-initiated cancellation of the caller
+        // does not cancel underlying URLSession tasks (prevents -999 cancellations).
+        let task = Task.detached(priority: .userInitiated) { [weak self] () throws -> URL in
+            guard let self else { throw AuthError.invalidOAuthConfiguration }
+            return try await self._startOAuthFlowImpl(identifier: identifier)
+        }
+        oauthStartTasks[key] = task
+        defer { oauthStartTasks.removeValue(forKey: key) }
+        return try await task.value
+    }
+
+    /// Cancels any ongoing OAuth authentication flows.
+    public func cancelOAuthFlow() async {
+        LogManager.logInfo("Cancelling all OAuth flows", category: .authentication)
+        
+        // Cancel all running OAuth tasks
+        for (key, task) in oauthStartTasks {
+            LogManager.logDebug("Cancelling OAuth task for key: \(key)", category: .authentication)
+            task.cancel()
+        }
+        
+        // Clear the tasks dictionary
+        oauthStartTasks.removeAll()
+        
+        // Reset the global flag
+        oauthStartInProgress = false
+    }
+
+    /// Internal implementation of the OAuth start flow. Kept actor-isolated; invoked from a detached task
+    /// to shield underlying URLSession operations from parent Task cancellation.
+    private func _startOAuthFlowImpl(identifier: String?) async throws -> URL {
+        // Gate concurrent starts globally to keep legacy protection too
+        if oauthStartInProgress {
+            LogManager.logInfo("OAuth start already in progress (global), waiting for completion", category: .authentication)
+            while oauthStartInProgress { try? await Task.sleep(nanoseconds: 50_000_000) }
+        }
+
+        oauthStartInProgress = true
+        defer { oauthStartInProgress = false }
         let pdsURL: URL
         var did: String?
 
+        // Check for cancellation at the start
+        try Task.checkCancellation()
+
         // For sign-up flow (no identifier), use default PDS URL
         if let identifier = identifier {
+            await emitProgress(.resolvingHandle(identifier))
+            
+            // Check for cancellation before network operations
+            try Task.checkCancellation()
+            
             // Resolve handle to DID and DID to PDS URL
             did = try await didResolver.resolveHandleToDID(handle: identifier)
             guard let resolvedDID = did else {
                 throw AuthError.invalidCredentials
             }
+            
+            try Task.checkCancellation()
+            
             pdsURL = try await didResolver.resolveDIDToPDSURL(did: resolvedDID)
         } else {
             // Use default PDS URL for sign-up
@@ -614,7 +836,12 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
             pdsURL = defaultURL
         }
 
+        // Check for cancellation before metadata fetch
+        try Task.checkCancellation()
+
         // Try to fetch protected resource metadata first (as per OAuth spec)
+        await emitProgress(.fetchingMetadata(url: pdsURL.absoluteString))
+        
         let authServerURL: URL
         do {
             let metadata = try await fetchProtectedResourceMetadata(pdsURL: pdsURL)
@@ -638,6 +865,8 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
             authServerURL: authServerURL)
 
         // Generate PKCE code verifier and challenge
+        await emitProgress(.generatingParameters)
+        
         let codeVerifier = generateCodeVerifier()
         let codeChallenge = generateCodeChallenge(from: codeVerifier)
 
@@ -2359,10 +2588,43 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
         }
         let request = URLRequest(url: endpointURL)
 
-        let (data, _) = try await networkService.request(request)
-        let metadata = try JSONDecoder().decode(ProtectedResourceMetadata.self, from: data)
+        // More resilient handling for local cancellations (-999): retry up to 3x with jittered backoff.
+        // Other errors retain the prior behavior (single retry), to avoid masking real failures.
+        let maxCancelledRetries = 3
+        let maxGeneralRetries = 2
+        var lastError: Error?
+        for attempt in 1 ... maxCancelledRetries {
+            do {
+                let (data, _) = try await networkService.request(request)
+                let metadata = try JSONDecoder().decode(ProtectedResourceMetadata.self, from: data)
+                return metadata
+            } catch {
+                lastError = error
 
-        return metadata
+                // Detect explicit URLSession cancellation (-999)
+                if let urlErr = error as? URLError, urlErr.code == .cancelled {
+                    LogManager.logDebug("Protected resource metadata fetch cancelled (-999), attempt \(attempt)/\(maxCancelledRetries). Retrying...", category: .authentication)
+
+                    if attempt < maxCancelledRetries {
+                        // Exponential backoff with light jitter: 100ms, 200ms, 400ms (±20%)
+                        let base = pow(2.0, Double(attempt - 1)) * 0.1 // seconds
+                        let jitter = Double.random(in: 0.8 ... 1.2)
+                        let delay = base * jitter
+                        try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                        continue
+                    }
+                } else {
+                    // Maintain prior single retry behavior for non-cancel errors
+                    if attempt < maxGeneralRetries {
+                        LogManager.logDebug("Protected resource metadata fetch attempt \(attempt) failed, retrying once: \(error)", category: .authentication)
+                        try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+                        continue
+                    }
+                }
+            }
+        }
+
+        throw lastError ?? AuthError.networkError(NetworkError.requestFailed)
     }
 
     /// Fetches the authorization server metadata.
@@ -2377,10 +2639,39 @@ public actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider 
         }
         let request = URLRequest(url: endpointURL)
 
-        let (data, _) = try await networkService.request(request)
-        let metadata = try JSONDecoder().decode(AuthorizationServerMetadata.self, from: data)
+        // Resilient handling mirroring protected resource fetch
+        let maxCancelledRetries = 3
+        let maxGeneralRetries = 2
+        var lastError: Error?
+        for attempt in 1 ... maxCancelledRetries {
+            do {
+                let (data, _) = try await networkService.request(request)
+                let metadata = try JSONDecoder().decode(AuthorizationServerMetadata.self, from: data)
+                return metadata
+            } catch {
+                lastError = error
 
-        return metadata
+                if let urlErr = error as? URLError, urlErr.code == .cancelled {
+                    LogManager.logDebug("Authorization server metadata fetch cancelled (-999), attempt \(attempt)/\(maxCancelledRetries). Retrying...", category: .authentication)
+
+                    if attempt < maxCancelledRetries {
+                        let base = pow(2.0, Double(attempt - 1)) * 0.1 // seconds
+                        let jitter = Double.random(in: 0.8 ... 1.2)
+                        let delay = base * jitter
+                        try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                        continue
+                    }
+                } else {
+                    if attempt < maxGeneralRetries {
+                        LogManager.logDebug("Authorization server metadata fetch attempt \(attempt) failed, retrying once: \(error)", category: .authentication)
+                        try? await Task.sleep(nanoseconds: 100_000_000)
+                        continue
+                    }
+                }
+            }
+        }
+
+        throw lastError ?? AuthError.networkError(NetworkError.requestFailed)
     }
 }
 
