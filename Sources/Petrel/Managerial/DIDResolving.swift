@@ -29,37 +29,37 @@ enum DIDResolutionError: Error, LocalizedError {
     case dnsResolutionFailed(String)
     case serverNotResponding(String)
     case cancelled
-    
+
     var errorDescription: String? {
         switch self {
-        case .invalidHandle(let handle):
+        case let .invalidHandle(handle):
             return "The handle '\(handle)' is not in a valid format."
-        case .invalidDID(let did):
+        case let .invalidDID(did):
             return "The DID '\(did)' is not valid or supported."
-        case .networkError(let error):
+        case let .networkError(error):
             return "Network error during resolution: \(error.localizedDescription)"
-        case .decodingError(let context):
+        case let .decodingError(context):
             return "Failed to decode server response: \(context)"
-        case .missingPDSEndpoint(let did):
+        case let .missingPDSEndpoint(did):
             return "No Personal Data Server (PDS) endpoint found for '\(did)'."
-        case .handleCouldNotBeResolved(let handle):
+        case let .handleCouldNotBeResolved(handle):
             return "Unable to resolve the handle '\(handle)'. It may not exist or be accessible."
-        case .dnsResolutionFailed(let handle):
+        case let .dnsResolutionFailed(handle):
             return "DNS resolution failed for handle '\(handle)'."
-        case .serverNotResponding(let server):
+        case let .serverNotResponding(server):
             return "Server '\(server)' is not responding."
         case .cancelled:
             return "Resolution was cancelled."
         }
     }
-    
+
     var failureReason: String? {
         switch self {
-        case .invalidHandle(let handle):
+        case let .invalidHandle(handle):
             return "Handle '\(handle)' doesn't follow the expected format (e.g., user.bsky.social)."
-        case .handleCouldNotBeResolved(let handle):
+        case let .handleCouldNotBeResolved(handle):
             return "Multiple resolution methods failed for '\(handle)'."
-        case .networkError(let error):
+        case let .networkError(error):
             return "Network connectivity issue: \(error.localizedDescription)"
         case .serverNotResponding:
             return "The authentication server is currently unavailable."
@@ -67,7 +67,7 @@ enum DIDResolutionError: Error, LocalizedError {
             return nil
         }
     }
-    
+
     var recoverySuggestion: String? {
         switch self {
         case .invalidHandle:
@@ -99,7 +99,7 @@ actor DIDResolutionService: DIDResolving {
     func resolveHandleToDID(handle: String) async throws -> String {
         // Check for cancellation at the start
         try Task.checkCancellation()
-        
+
         // Check cache
         if let cachedDID = getCachedDID(for: handle) {
             return cachedDID
@@ -193,7 +193,7 @@ actor DIDResolutionService: DIDResolving {
     private func resolveHandleViaHTTP(handle: String) async throws -> String {
         // Check for cancellation before network operation
         try Task.checkCancellation()
-        
+
         let input = try ComAtprotoIdentityResolveHandle.Parameters(handle: Handle(handleString: handle))
         let endpoint = "com.atproto.identity.resolveHandle"
 
@@ -293,7 +293,7 @@ actor DIDResolutionService: DIDResolving {
     func resolveDIDToHandleAndPDSURL(did: String) async throws -> (String, URL) {
         // Check for cancellation at the start
         try Task.checkCancellation()
-        
+
         // Check cache first
         if let cachedURL = getCachedPDSURL(for: did), let cachedHandle = getCachedHandle(for: did) {
             return (cachedHandle, cachedURL)
@@ -325,7 +325,7 @@ actor DIDResolutionService: DIDResolving {
     private func resolvePLCDID(_ did: String) async throws -> (String, URL) {
         // Check for cancellation before network operation
         try Task.checkCancellation()
-        
+
         let endpoint = "https://plc.directory/\(did)"
         let request = try await networkService.createURLRequest(
             endpoint: endpoint,
@@ -367,7 +367,7 @@ actor DIDResolutionService: DIDResolving {
     private func resolveWebDID(_ did: String) async throws -> (String, URL) {
         // Check for cancellation before network operation
         try Task.checkCancellation()
-        
+
         let parts = did.split(separator: ":")
         guard parts.count == 3, let domain = parts.last else {
             throw DIDResolutionError.invalidDID(did)
