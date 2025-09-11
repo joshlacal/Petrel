@@ -56,12 +56,20 @@ Before you begin, ensure you have:
 ```swift
 import Petrel
 
-// Create an unauthenticated client for public API access
-let publicClient = ATProtoClient()
+// Configure OAuth (register your app with an authorization server)
+let oauth = OAuthConfig(
+    clientId: "YOUR_CLIENT_ID",
+    redirectUri: "yourapp://oauth/callback",
+    scope: "atproto app:bsky"
+)
 
-// Or create an authenticated client (see Authentication section)
-let authService = AuthenticationService()
-let authenticatedClient = ATProtoClient(authenticationService: authService)
+// Create the client (namespace identifies your app's keychain sandbox)
+let client = await ATProtoClient(
+    baseURL: URL(string: "https://bsky.social")!,
+    oauthConfig: oauth,
+    namespace: "com.example.yourapp",
+    userAgent: "YourApp/1.0"
+)
 ```
 
 ### Understanding the API Structure
@@ -78,60 +86,17 @@ Petrel mirrors the AT Protocol namespace structure. API calls follow this patter
 
 ## Authentication
 
-### Creating App Passwords
-
-1. Log into your Bluesky account
-2. Go to Settings → Advanced → App Passwords
-3. Create a new app password
-4. Use this password instead of your main account password
-
-### Password Authentication
+### OAuth Authentication
 
 ```swift
-import Petrel
-
-// Initialize authentication service
-let authService = AuthenticationService()
-
+// Start OAuth flow (present this URL to the user)
 do {
-    // Authenticate with your Bluesky handle and app password
-    let account = try await authService.authenticateWithPassword(
-        identifier: "yourhandle.bsky.social",
-        password: "your-app-password"
-    )
-    
-    print("Authenticated as: \(account.handle)")
-    print("DID: \(account.did)")
-    
-    // Create authenticated client
-    let client = ATProtoClient(authenticationService: authService)
-    
-} catch {
-    print("Authentication failed: \(error)")
-}
-```
-
-### OAuth Authentication (Recommended for Production)
-
-```swift
-// Start OAuth flow
-do {
-    let authorizationURL = try await authService.startOAuthAuthentication(
-        identifier: "yourhandle.bsky.social"
-    )
-    
-    // Open this URL in a web browser or in-app browser
-    // The user will authorize your app
+    let authorizationURL = try await client.startOAuthFlow(identifier: "yourhandle.bsky.social")
     print("Open this URL: \(authorizationURL)")
     
-    // After authorization, handle the callback URL
-    // This URL will be redirected to your app
-    let callbackURL = // ... received callback URL
-    
-    let account = try await authService.handleOAuthCallback(
-        callbackURL: callbackURL
-    )
-    
+    // After authorization, your app receives the callback URL
+    let callbackURL: URL = /* incoming callback URL from your app */
+    try await client.handleOAuthCallback(url: callbackURL)
     print("OAuth authentication successful!")
     
 } catch {
@@ -142,17 +107,36 @@ do {
 ### Checking Authentication Status
 
 ```swift
-// Check if authenticated
-if let currentAccount = authService.currentAccount {
-    print("Logged in as: \(currentAccount.handle)")
-} else {
-    print("Not authenticated")
+let hasSession = await client.hasValidSession()
+print("Has valid session: \(hasSession)")
+
+let info = await client.getActiveAccountInfo()
+print("Current DID: \(info.did ?? "-")  handle: \(info.handle ?? "-")")
+```
+
+### Handling OAuth callback (iOS/macOS)
+
+On iOS, implement `application(_:open:options:)` (UIKit) or the SwiftUI `onOpenURL` handler to pass the callback URL to the client:
+
+```swift
+// AppDelegate.swift (UIKit)
+func application(_ app: UIApplication,
+                 open url: URL,
+                 options: [UIApplication.OpenURLOptionsKey : Any] = [:]) -> Bool {
+    Task { await handleOAuthCallback(url) }
+    return true
 }
 
-// Get all stored accounts
-let accounts = authService.storedAccounts
-print("Stored accounts: \(accounts.count)")
+private func handleOAuthCallback(_ url: URL) async {
+    do {
+        try await client.handleOAuthCallback(url: url)
+    } catch {
+        print("OAuth callback handling failed: \(error)")
+    }
+}
 ```
+
+On macOS, use `NSApplicationDelegate.application(_:open:)` similarly to forward the URL to `client.handleOAuthCallback(url:)`.
 
 ## Making Your First API Calls
 

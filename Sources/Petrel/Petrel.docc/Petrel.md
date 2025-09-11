@@ -17,9 +17,9 @@ Petrel provides a complete Swift implementation of the AT Protocol APIs, enablin
 ### Core Components
 
 - ``ATProtoClient``
-- ``AuthenticationService``
-- ``NetworkService``
-- ``AccountManager``
+
+The client encapsulates authentication, networking, and account management. You typically do not interact with
+the internal services directly.
 
 ### Authentication & Security
 

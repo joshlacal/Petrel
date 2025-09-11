@@ -11,7 +11,7 @@ import os
 
 // MARK: - DIDResolving Protocol
 
-public protocol DIDResolving: Sendable, AnyObject {
+protocol DIDResolving: Sendable, AnyObject {
     func resolveHandleToDID(handle: String) async throws -> String
     func resolveDIDToPDSURL(did: String) async throws -> URL
     func resolveDIDToHandleAndPDSURL(did: String) async throws -> (String, URL)

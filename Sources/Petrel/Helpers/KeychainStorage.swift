@@ -202,6 +202,29 @@ public actor KeychainStorage {
         }
     }
 
+    /// Saves DPoP nonces scoped by JKT (key thumbprint) to the keychain.
+    /// - Parameters:
+    ///   - noncesByJKT: Mapping of JKT -> (domain -> nonce)
+    ///   - did: The DID associated with these nonces
+    public func saveDPoPNoncesByJKT(_ noncesByJKT: [String: [String: String]], for did: String) async throws {
+        let key = makeKey("dpopNoncesByJKT", did: did)
+        let data = try JSONEncoder().encode(noncesByJKT)
+        try KeychainManager.store(key: key, value: data, namespace: namespace)
+    }
+
+    /// Retrieves DPoP nonces scoped by JKT (key thumbprint) from the keychain.
+    /// - Parameter did: The DID associated with these nonces
+    /// - Returns: Mapping of JKT -> (domain -> nonce) if found
+    public func getDPoPNoncesByJKT(for did: String) async throws -> [String: [String: String]]? {
+        let key = makeKey("dpopNoncesByJKT", did: did)
+        do {
+            let data = try KeychainManager.retrieve(key: key, namespace: namespace)
+            return try JSONDecoder().decode([String: [String: String]].self, from: data)
+        } catch {
+            return nil
+        }
+    }
+
     // MARK: - OAuth State Management
 
     /// Saves an OAuth state to the keychain.

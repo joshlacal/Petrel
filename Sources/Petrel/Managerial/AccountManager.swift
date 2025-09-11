@@ -8,7 +8,7 @@
 import Foundation
 
 /// Protocol defining the interface for account management.
-public protocol AccountManaging: Actor {
+protocol AccountManaging: Actor {
     /// Adds a new account.
     /// - Parameter account: The account to add.
     func addAccount(_ account: Account) async throws
@@ -36,7 +36,7 @@ public protocol AccountManaging: Actor {
 }
 
 /// Actor responsible for managing user accounts.
-public actor AccountManager: AccountManaging {
+actor AccountManager: AccountManaging {
     /// The storage layer for account data
     private let storage: KeychainStorage
 
@@ -45,7 +45,7 @@ public actor AccountManager: AccountManaging {
 
     /// Initializes a new AccountManager with the specified storage.
     /// - Parameter storage: The KeychainStorage instance to use for account data.
-    public init(storage: KeychainStorage) async {
+    init(storage: KeychainStorage) async {
         self.storage = storage
 
         // Attempt to load the last active DID
@@ -61,7 +61,7 @@ public actor AccountManager: AccountManaging {
 
     /// Adds a new account.
     /// - Parameter account: The account to add.
-    public func addAccount(_ account: Account) async throws {
+    func addAccount(_ account: Account) async throws {
         LogManager.logInfo("AccountManager - Adding account with DID: \(account.did)")
         try await storage.saveAccount(account, for: account.did)
 
@@ -74,7 +74,7 @@ public actor AccountManager: AccountManaging {
     /// Gets an account by DID.
     /// - Parameter did: The DID of the account to retrieve.
     /// - Returns: The account if found, or nil if not found.
-    public func getAccount(did: String) async -> Account? {
+    func getAccount(did: String) async -> Account? {
         do {
             return try await storage.getAccount(for: did)
         } catch {
@@ -85,7 +85,7 @@ public actor AccountManager: AccountManaging {
 
     /// Removes an account by DID.
     /// - Parameter did: The DID of the account to remove.
-    public func removeAccount(did: String) async throws {
+    func removeAccount(did: String) async throws {
         LogManager.logInfo("AccountManager - Removing account with DID: \(did)")
 
         // Delete the account from storage
@@ -113,7 +113,7 @@ public actor AccountManager: AccountManaging {
 
     /// Sets the current active account.
     /// - Parameter did: The DID of the account to set as current.
-    public func setCurrentAccount(did: String) async throws {
+    func setCurrentAccount(did: String) async throws {
         LogManager.logInfo("AccountManager - Setting current account to DID: \(did)")
 
         // Verify the account exists
@@ -129,7 +129,7 @@ public actor AccountManager: AccountManaging {
 
     /// Gets the current active account.
     /// - Returns: The current account if available, or nil if not.
-    public func getCurrentAccount() async -> Account? {
+    func getCurrentAccount() async -> Account? {
         guard let did = currentDID else {
             return nil
         }
@@ -139,7 +139,7 @@ public actor AccountManager: AccountManaging {
 
     /// Lists all available accounts.
     /// - Returns: An array of accounts.
-    public func listAccounts() async -> [Account] {
+    func listAccounts() async -> [Account] {
         do {
             let dids = try await storage.listAccountDIDs()
             var accounts: [Account] = []
@@ -159,7 +159,7 @@ public actor AccountManager: AccountManaging {
 }
 
 /// Errors that can occur during account operations.
-public enum AccountError: Error, LocalizedError {
+enum AccountError: Error, LocalizedError {
     case accountNotFound
     case accountExists
     case invalidAccount

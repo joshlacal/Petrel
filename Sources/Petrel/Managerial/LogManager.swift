@@ -8,7 +8,7 @@
 import Foundation
 import os.log
 
-public class LogManager {
+class LogManager {
     private static let networkLogger = os.Logger(
         subsystem: Bundle.main.bundleIdentifier ?? "Petrel", category: "Network"
     )
@@ -32,22 +32,22 @@ public class LogManager {
         "/oauth/token", "/token",
     ]
 
-    public static func logInfo(_ message: String, category: LogCategory = .general) {
+    static func logInfo(_ message: String, category: LogCategory = .general) {
         getLogger(for: category).info("\(message, privacy: .public)")
     }
 
-    public static func logDebug(_ message: String, category: LogCategory = .general) {
+    static func logDebug(_ message: String, category: LogCategory = .general) {
         #if DEBUG
             getLogger(for: category).debug("\(message, privacy: .public)")
         #endif
     }
 
-    public static func logError(_ message: String, category: LogCategory = .general) {
+    static func logError(_ message: String, category: LogCategory = .general) {
         getLogger(for: category).error("\(message, privacy: .public)")
     }
 
     /// Logs a sensitive value with only the first few characters visible
-    public static func logSensitiveValue(_ value: String?, label: String, category: LogCategory = .authentication) {
+    static func logSensitiveValue(_ value: String?, label: String, category: LogCategory = .authentication) {
         #if DEBUG
             if let value = value, !value.isEmpty {
                 let truncated = String(value.prefix(4)) + "...[REDACTED]"
@@ -59,11 +59,11 @@ public class LogManager {
     }
 
     /// Returns a DID for logging (DIDs are public identifiers, not sensitive)
-    public static func logDID(_ did: String?) -> String {
+    static func logDID(_ did: String?) -> String {
         return did ?? "nil"
     }
 
-    public static func logRequest(_ request: URLRequest) {
+    static func logRequest(_ request: URLRequest) {
         #if DEBUG
             let url = request.url?.absoluteString ?? "N/A"
             var debugMessage = "Request URL: \(url)\n"
@@ -97,7 +97,7 @@ public class LogManager {
         #endif
     }
 
-    public static func logResponse(_ response: HTTPURLResponse, data: Data) {
+    static func logResponse(_ response: HTTPURLResponse, data: Data) {
         #if DEBUG
             let url = response.url?.absoluteString ?? "N/A"
             var debugMessage = "Response URL: \(url)\n"
@@ -135,7 +135,7 @@ public class LogManager {
         #endif
     }
 
-    public static func logError(_ error: Error, category: LogCategory = .general) {
+    static func logError(_ error: Error, category: LogCategory = .general) {
         logError("Error: \(error.localizedDescription)", category: category)
     }
 
@@ -151,7 +151,7 @@ public class LogManager {
     }
 }
 
-public enum LogCategory {
+enum LogCategory {
     case network
     case authentication
     case general

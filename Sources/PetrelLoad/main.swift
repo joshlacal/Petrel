@@ -32,6 +32,7 @@ enum PetrelLoadCLI {
                                        replay-jti, wrong-ath, clock-skew,
                                        stale-nonce, malformed-proof, compliance,
                                        nonce-exhaustion
+          --simulate-ambiguous-timeout  Simulate a token-endpoint timeout and verify defer logic
           --burst-size               Requests per burst for rate limit testing. Default: 50
           --burst-delay              Delay between bursts in seconds. Default: 0.1
           --multi-account            Test with multiple accounts (requires 2+ stored accounts)
@@ -87,6 +88,7 @@ enum PetrelLoadCLI {
         let oauthStressMode = (args["oauth-stress"] ?? "false").lowercased() == "true"
         let oauthTestScenario = args["oauth-test"]
         let dpopTestMode = args["dpop-test"]
+        let simulateAmbiguous = (args["simulate-ambiguous-timeout"] ?? "false").lowercased() == "true"
         _ = TimeInterval(args["force-refresh-interval"] ?? "0") ?? 0
         _ = (args["simulate-expiry"] ?? "false").lowercased() == "true"
         _ = Int(args["burst-size"] ?? "50") ?? 50
@@ -216,6 +218,29 @@ enum PetrelLoadCLI {
 
             print("OAuth stress testing with ATProtoClient")
             print("Note: Using authenticated session for stress testing")
+
+            if simulateAmbiguous {
+                print("Simulating ambiguous refresh timeout…")
+                #if DEBUG
+                await client.simulateAmbiguousRefreshTimeout(durationSeconds: 900)
+                #else
+                print("(simulateAmbiguous is only available in DEBUG builds)")
+                #endif
+                print("Triggering refresh after simulated ambiguous timeout…")
+                let refreshed = try? await client.refreshToken()
+                print("Refresh returned: \(refreshed == true ? "refreshed" : "not refreshed (still valid)")")
+                // Make a quick API call to verify token still works
+                do {
+                    let (did, handle, _) = await client.getActiveAccountInfo()
+                    let actor = try ATIdentifier(string: handle ?? did ?? "bsky.app")
+                    let params = AppBskyActorGetProfile.Parameters(actor: actor)
+                    let result = try await client.app.bsky.actor.getProfile(input: params)
+                    print("✓ API call after ambiguous path: \(result.responseCode)")
+                } catch {
+                    print("✗ API call after ambiguous path failed: \(error)")
+                }
+                return
+            }
 
             if oauthStressMode {
                 print("Running comprehensive OAuth stress test...")
