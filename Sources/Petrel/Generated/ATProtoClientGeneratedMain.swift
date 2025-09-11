@@ -285,6 +285,12 @@ public actor ATProtoClient {
         authDelegate = delegate
     }
 
+    /// Sets the authentication progress delegate.
+    /// - Parameter delegate: The delegate to receive progress updates.
+    public func setAuthProgressDelegate(_ delegate: AuthProgressDelegate?) async {
+        await authService.setProgressDelegate(delegate)
+    }
+
     /// Starts the OAuth flow for authentication.
     /// - Parameter identifier: The user identifier (handle), optional for sign-up.
     /// - Returns: The authorization URL to present to the user.
@@ -309,6 +315,11 @@ public actor ATProtoClient {
     /// Logs out the current user.
     public func logout() async throws {
         try await authService.logout()
+    }
+
+    /// Cancels any ongoing OAuth authentication flows.
+    public func cancelOAuthFlow() async {
+        await authService.cancelOAuthFlow()
     }
 
     // MARK: - Account Management

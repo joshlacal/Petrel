@@ -93,7 +93,7 @@ public actor ATProtoClient {
 
     /// The delegate for authentication events.
     private weak var authDelegate: AuthenticationDelegate?
-    
+
     /// Temporary storage for account info after OAuth callback
     private var justAuthenticatedAccount: (did: String, handle: String?, pdsURL: URL)?
 
@@ -285,6 +285,12 @@ public actor ATProtoClient {
         authDelegate = delegate
     }
 
+    /// Sets the authentication progress delegate.
+    /// - Parameter delegate: The delegate to receive progress updates.
+    public func setAuthProgressDelegate(_ delegate: AuthProgressDelegate?) async {
+        await authService.setProgressDelegate(delegate)
+    }
+
     /// Starts the OAuth flow for authentication.
     /// - Parameter identifier: The user identifier (handle), optional for sign-up.
     /// - Returns: The authorization URL to present to the user.
@@ -297,7 +303,7 @@ public actor ATProtoClient {
     public func handleOAuthCallback(url: URL) async throws {
         // Get account info from auth service
         let accountInfo = try await authService.handleOAuthCallback(url: url)
-        
+
         // Store it temporarily for immediate access
         justAuthenticatedAccount = accountInfo
         LogManager.logInfo("🔍 DEBUG: Stored temporary account info: \(accountInfo.did)")
@@ -311,17 +317,22 @@ public actor ATProtoClient {
         try await authService.logout()
     }
 
+    /// Cancels any ongoing OAuth authentication flows.
+    public func cancelOAuthFlow() async {
+        await authService.cancelOAuthFlow()
+    }
+
     // MARK: - Account Management
 
     /// Gets the current account information.
     /// - Returns: A tuple containing the DID, handle, and PDS URL of the current account.
     public func getActiveAccountInfo() async -> (did: String?, handle: String?, pdsURL: URL?) {
         LogManager.logInfo("🔍 DEBUG: getActiveAccountInfo called")
-        
+
         // Check temporary storage first (for immediate access after OAuth)
         if let tempAccount = justAuthenticatedAccount {
             LogManager.logInfo("🔍 DEBUG: Found temporary account: \(tempAccount.did)")
-            
+
             // Always try AccountManager first, but don't clear temp storage yet
             if let account = await accountManager.getCurrentAccount(), account.did == tempAccount.did {
                 LogManager.logInfo("🔍 DEBUG: AccountManager ready, using AccountManager but keeping temp storage")
@@ -335,7 +346,7 @@ public actor ATProtoClient {
         } else {
             LogManager.logInfo("🔍 DEBUG: No temporary account found")
         }
-        
+
         // Fall back to normal AccountManager query
         LogManager.logInfo("🔍 DEBUG: Falling back to AccountManager query")
         if let account = await accountManager.getCurrentAccount() {
@@ -352,7 +363,7 @@ public actor ATProtoClient {
         LogManager.logInfo("🔍 DEBUG: Clearing temporary account storage")
         justAuthenticatedAccount = nil
     }
-    
+
     /// Lists all available accounts.
     /// - Returns: An array of accounts.
     public func listAccounts() async -> [Account] {
@@ -407,8 +418,9 @@ public actor ATProtoClient {
     public func setUserAgent(_ userAgent: String) async {
         await networkService.setHeader(name: "User-Agent", value: userAgent)
     }
-    
-  // MARK: - Generated API Namespaced Classes
+
+    // MARK: - Generated API Namespaced Classes
+
   
     {{ generated_classes }}
 }
