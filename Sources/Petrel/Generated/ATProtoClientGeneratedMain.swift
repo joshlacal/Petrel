@@ -666,9 +666,7 @@ public actor ATProtoClient {
         }
 
       }
-
     }
-
   }
 
   public lazy var chat: Chat = {
@@ -726,9 +724,7 @@ public actor ATProtoClient {
         }
 
       }
-
     }
-
   }
 
   public lazy var com: Com = {
@@ -858,9 +854,7 @@ public actor ATProtoClient {
         }
 
       }
-
     }
-
   }
 
 }

@@ -164,7 +164,7 @@ enum AccountError: Error, LocalizedError {
     case accountExists
     case invalidAccount
     case storageError
-    
+
     public var errorDescription: String? {
         switch self {
         case .accountNotFound:
@@ -177,7 +177,7 @@ enum AccountError: Error, LocalizedError {
             return "Failed to store account information."
         }
     }
-    
+
     public var failureReason: String? {
         switch self {
         case .accountNotFound:
@@ -190,7 +190,7 @@ enum AccountError: Error, LocalizedError {
             return "Unable to save account data to secure storage."
         }
     }
-    
+
     public var recoverySuggestion: String? {
         switch self {
         case .accountNotFound:
