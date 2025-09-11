@@ -165,7 +165,7 @@ enum AccountError: Error, LocalizedError {
     case invalidAccount
     case storageError
 
-    public var errorDescription: String? {
+    var errorDescription: String? {
         switch self {
         case .accountNotFound:
             return "Account not found."
@@ -178,7 +178,7 @@ enum AccountError: Error, LocalizedError {
         }
     }
 
-    public var failureReason: String? {
+    var failureReason: String? {
         switch self {
         case .accountNotFound:
             return "The requested account does not exist in the local storage."
@@ -191,7 +191,7 @@ enum AccountError: Error, LocalizedError {
         }
     }
 
-    public var recoverySuggestion: String? {
+    var recoverySuggestion: String? {
         switch self {
         case .accountNotFound:
             return "Please ensure the account handle is correct and try logging in again."

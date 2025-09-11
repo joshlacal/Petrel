@@ -12,13 +12,14 @@ import Foundation
 actor RefreshCircuitBreaker {
     // Classify refresh failures for better breaker decisions
     enum RefreshFailureKind {
-        case nonceRecoverable      // use_dpop_nonce: retried and typically succeeds
-        case network               // timeouts, connectivity
-        case server                // 5xx, unexpected server responses
-        case invalidGrant          // refresh token revoked/expired
-        case invalidDPoPProof      // wrong key, bad ath, htm/htu mismatch
+        case nonceRecoverable // use_dpop_nonce: retried and typically succeeds
+        case network // timeouts, connectivity
+        case server // 5xx, unexpected server responses
+        case invalidGrant // refresh token revoked/expired
+        case invalidDPoPProof // wrong key, bad ath, htm/htu mismatch
         case other
     }
+
     // MARK: - Types
 
     /// Circuit breaker states

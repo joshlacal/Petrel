@@ -6,13 +6,12 @@ public extension ATProtoClient {
     func setAcceptLabelers(dids: [String]) async {
         let pairs = dids.map { (did: $0, redact: false) }
         // Access the underlying NetworkService via the App namespace
-        await self.app.networkService.setAcceptLabelers(pairs)
+        await app.networkService.setAcceptLabelers(pairs)
     }
 
     /// Sets the `atproto-accept-labelers` header with optional redaction flags per DID.
     /// - Parameter labelers: Tuples of (did, redact) to map to the RFC-8941 header format.
     func setAcceptLabelers(_ labelers: [(did: String, redact: Bool)]) async {
-        await self.app.networkService.setAcceptLabelers(labelers)
+        await app.networkService.setAcceptLabelers(labelers)
     }
 }
-
