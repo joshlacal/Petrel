@@ -222,9 +222,9 @@ enum PetrelLoadCLI {
             if simulateAmbiguous {
                 print("Simulating ambiguous refresh timeout…")
                 #if DEBUG
-                await client.simulateAmbiguousRefreshTimeout(durationSeconds: 900)
+                    await client.simulateAmbiguousRefreshTimeout(durationSeconds: 900)
                 #else
-                print("(simulateAmbiguous is only available in DEBUG builds)")
+                    print("(simulateAmbiguous is only available in DEBUG builds)")
                 #endif
                 print("Triggering refresh after simulated ambiguous timeout…")
                 let refreshed = try? await client.refreshToken()

@@ -9,8 +9,8 @@ import Foundation
 
 /// Protocol for authentication providers
 struct AuthContext: Sendable {
-    public let did: String?
-    public let jkt: String?
+    let did: String?
+    let jkt: String?
 }
 
 protocol AuthenticationProvider: Sendable {
@@ -181,7 +181,7 @@ actor NetworkService: NetworkServiceProtocol {
     /// - Parameters:
     ///   - baseURL: The base URL for API requests.
     ///   - authService: The authentication service to use for authenticated requests.
-    public init(baseURL: URL, authService: AuthenticationProvider? = nil) {
+    init(baseURL: URL, authService: AuthenticationProvider? = nil) {
         self.baseURL = baseURL
         authProvider = authService
 
@@ -231,7 +231,7 @@ actor NetworkService: NetworkServiceProtocol {
 
     /// Sets the base URL for API requests.
     /// - Parameter url: The new base URL.
-    public func setBaseURL(_ url: URL) async {
+    func setBaseURL(_ url: URL) async {
         baseURL = url
         LogManager.logInfo("Network Service - Base URL updated to: \(url)")
     }
@@ -240,7 +240,7 @@ actor NetworkService: NetworkServiceProtocol {
     /// - Parameters:
     ///   - name: The header name.
     ///   - value: The header value.
-    public func setHeader(name: String, value: String) async {
+    func setHeader(name: String, value: String) async {
         LogManager.logSensitiveValue(value, label: "Network Service - Setting header: \(name)", category: .network)
         headers[name] = value
     }
@@ -248,26 +248,26 @@ actor NetworkService: NetworkServiceProtocol {
     /// Gets the value of a custom header
     /// - Parameter name: Header name
     /// - Returns: Header value if it exists
-    public func getHeader(name: String) async -> String? {
+    func getHeader(name: String) async -> String? {
         return headers[name]
     }
 
     /// Removes a custom header
     /// - Parameter name: Header name to remove
-    public func removeHeader(name: String) async {
+    func removeHeader(name: String) async {
         LogManager.logDebug("Network Service - Removing header: \(name)")
         headers.removeValue(forKey: name)
     }
 
     /// Clears all custom headers
-    public func clearHeaders() async {
+    func clearHeaders() async {
         LogManager.logDebug("Network Service - Clearing all custom headers")
         headers.removeAll()
     }
 
     /// Sets the User-Agent header
     /// - Parameter userAgent: The user agent string
-    public func setUserAgent(_ userAgent: String) async {
+    func setUserAgent(_ userAgent: String) async {
         self.userAgent = userAgent
         await setHeader(name: "User-Agent", value: userAgent)
     }
@@ -276,13 +276,13 @@ actor NetworkService: NetworkServiceProtocol {
     /// - Parameters:
     ///   - did: The DID of the target service
     ///   - service: The service identifier
-    public func setProxyHeader(did: String, service: String) async {
+    func setProxyHeader(did: String, service: String) async {
         await setHeader(name: "atproto-proxy", value: "\(did)#\(service)")
     }
 
     /// Sets the atproto-accept-labelers header with proper formatting
     /// - Parameter labelers: Array of tuples containing labeler DIDs and redaction flags
-    public func setAcceptLabelers(_ labelers: [(did: String, redact: Bool)]) async {
+    func setAcceptLabelers(_ labelers: [(did: String, redact: Bool)]) async {
         // Format according to RFC-8941 structured syntax
         let headerValue = labelers.map { labeler -> String in
             if labeler.redact {
@@ -303,7 +303,7 @@ actor NetworkService: NetworkServiceProtocol {
     /// Extracts the content labelers from a response header
     /// - Parameter response: The HTTP response
     /// - Returns: Array of tuples containing labeler DIDs and redaction flags
-    public nonisolated func extractContentLabelers(from response: HTTPURLResponse) async -> [(
+    nonisolated func extractContentLabelers(from response: HTTPURLResponse) async -> [(
         did: String, redact: Bool
     )] {
         guard let contentLabelers = response.allHeaderFields["atproto-content-labelers"] as? String
@@ -400,7 +400,8 @@ actor NetworkService: NetworkServiceProtocol {
                     var foundNonce: String? = nil
                     for (key, value) in httpResponse.allHeaderFields {
                         if let keyString = key as? String,
-                           keyString.caseInsensitiveCompare("DPoP-Nonce") == .orderedSame {
+                           keyString.caseInsensitiveCompare("DPoP-Nonce") == .orderedSame
+                        {
                             foundNonce = value as? String
                             break
                         }
@@ -442,7 +443,7 @@ actor NetworkService: NetworkServiceProtocol {
     /// - Parameter skipTokenRefresh: Whether to skip token refresh.
     /// - Parameter additionalHeaders: Optional additional headers to include with this specific request.
     /// - Returns: A tuple containing the response data and URLResponse.
-    public func request(_ request: URLRequest, skipTokenRefresh: Bool = false, additionalHeaders: [String: String]? = nil) async throws -> (
+    func request(_ request: URLRequest, skipTokenRefresh: Bool = false, additionalHeaders: [String: String]? = nil) async throws -> (
         Data, URLResponse
     ) {
         let currentRequest = request
@@ -801,7 +802,7 @@ actor NetworkService: NetworkServiceProtocol {
     ///   - requiresAuth: Whether the request requires authentication.
     ///   - additionalHeaders: Optional additional headers to include with this specific request.
     /// - Returns: The decoded response data.
-    public func get<T: Decodable & Sendable>(
+    func get<T: Decodable & Sendable>(
         endpoint: String,
         queryItems: [URLQueryItem]? = nil,
         requiresAuth: Bool = true,
@@ -832,7 +833,7 @@ actor NetworkService: NetworkServiceProtocol {
     ///   - requiresAuth: Whether the request requires authentication.
     ///   - additionalHeaders: Optional additional headers to include with this specific request.
     /// - Returns: The decoded response data.
-    public func post<T: Decodable & Sendable, B: Encodable & Sendable>(
+    func post<T: Decodable & Sendable, B: Encodable & Sendable>(
         endpoint: String,
         body: B? = nil,
         requiresAuth: Bool = true,
@@ -871,7 +872,7 @@ actor NetworkService: NetworkServiceProtocol {
     ///   - body: The HTTP body data.
     ///   - queryItems: Optional query parameters.
     /// - Returns: The configured URLRequest.
-    public func createURLRequest(
+    func createURLRequest(
         endpoint: String,
         method: String,
         headers: [String: String],
@@ -943,7 +944,7 @@ actor NetworkService: NetworkServiceProtocol {
     ///   - skipTokenRefresh: Whether to skip token refresh.
     ///   - additionalHeaders: Optional additional headers to include with this specific request.
     /// - Returns: A tuple containing the response data and HTTPURLResponse.
-    public func performRequest(_ request: URLRequest, skipTokenRefresh: Bool, additionalHeaders: [String: String]? = nil) async throws -> (
+    func performRequest(_ request: URLRequest, skipTokenRefresh: Bool, additionalHeaders: [String: String]? = nil) async throws -> (
         Data, HTTPURLResponse
     ) {
         let (data, response) = try await self.request(request, skipTokenRefresh: skipTokenRefresh, additionalHeaders: additionalHeaders)
@@ -958,7 +959,7 @@ actor NetworkService: NetworkServiceProtocol {
     ///   - request: The URLRequest to perform.
     ///   - skipTokenRefresh: Whether to skip token refresh.
     /// - Returns: A tuple containing the response data and HTTPURLResponse.
-    public func performRequest(_ request: URLRequest, skipTokenRefresh: Bool) async throws -> (
+    func performRequest(_ request: URLRequest, skipTokenRefresh: Bool) async throws -> (
         Data, HTTPURLResponse
     ) {
         try await performRequest(request, skipTokenRefresh: skipTokenRefresh, additionalHeaders: nil)
@@ -967,7 +968,7 @@ actor NetworkService: NetworkServiceProtocol {
     /// Performs a network request (compatibility method)
     /// - Parameter request: The URLRequest to perform.
     /// - Returns: A tuple containing the response data and HTTPURLResponse.
-    public nonisolated func performRequest(_ request: URLRequest) async throws -> (
+    nonisolated func performRequest(_ request: URLRequest) async throws -> (
         Data, HTTPURLResponse
     ) {
         try await performRequest(request, skipTokenRefresh: false)
