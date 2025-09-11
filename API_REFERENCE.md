@@ -24,48 +24,26 @@ The main client actor for making API calls.
 
 ```swift
 public actor ATProtoClient {
-    // Initialize with optional authentication
-    public init(authenticationService: AuthenticationService? = nil)
-    
-    // Namespace properties for API access
+    // Initialize with OAuth configuration and a storage namespace
+    public init(
+        baseURL: URL = URL(string: "https://bsky.social")!,
+        oauthConfig: OAuthConfig,
+        namespace: String,
+        userAgent: String? = nil,
+        didResolver: DIDResolving? = nil
+    )
+
+    // High‑level helpers
+    public func startOAuthFlow(identifier: String?) async throws -> URL
+    public func handleOAuthCallback(url: URL) async throws
+    public func logout() async throws
+    public func refreshToken() async throws -> Bool
+
+    // Namespaces for API access (generated)
     public var app: AppNamespace { get }
     public var com: ComNamespace { get }
     public var chat: ChatNamespace { get }
     public var tools: ToolsNamespace { get }
-}
-```
-
-### AuthenticationService
-
-Handles authentication and token management.
-
-```swift
-public actor AuthenticationService {
-    // Current authenticated account
-    public var currentAccount: Account? { get }
-    
-    // All stored accounts
-    public var storedAccounts: [Account] { get }
-    
-    // Password authentication
-    public func authenticateWithPassword(
-        identifier: String,
-        password: String
-    ) async throws -> Account
-    
-    // OAuth authentication
-    public func startOAuthAuthentication(
-        identifier: String
-    ) async throws -> URL
-    
-    public func handleOAuthCallback(
-        callbackURL: URL
-    ) async throws -> Account
-    
-    // Account management
-    public func switchAccount(to account: Account) async throws
-    public func logout(account: Account) async throws
-    public func logoutAll() async throws
 }
 ```
 

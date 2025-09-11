@@ -8,11 +8,21 @@
 import Foundation
 
 /// Protocol for authentication providers
-public protocol AuthenticationProvider: Sendable {
+struct AuthContext: Sendable {
+    public let did: String?
+    public let jkt: String?
+}
+
+protocol AuthenticationProvider: Sendable {
     /// Prepares a request with authentication headers
     /// - Parameter request: The original request
     /// - Returns: The authenticated request
     func prepareAuthenticatedRequest(_ request: URLRequest) async throws -> URLRequest
+
+    /// Prepares a request with authentication headers and returns auth context (DID + DPoP JKT)
+    /// - Parameter request: The original request
+    /// - Returns: The authenticated request and its associated auth context
+    func prepareAuthenticatedRequestWithContext(_ request: URLRequest) async throws -> (URLRequest, AuthContext)
 
     /// Refreshes the authentication token if needed
     /// - Returns: A boolean indicating whether refresh was needed
@@ -27,15 +37,17 @@ public protocol AuthenticationProvider: Sendable {
     func handleUnauthorizedResponse(_ response: HTTPURLResponse, data: Data, for request: URLRequest)
         async throws -> (Data, HTTPURLResponse)
 
-    /// Updates the DPoP nonce for a URL
+    /// Updates the DPoP nonce for a URL, optionally scoped to a specific DID and DPoP key thumbprint (JKT)
     /// - Parameters:
     ///   - url: The URL to update the nonce for
     ///   - headers: The headers containing the nonce
-    func updateDPoPNonce(for url: URL, from headers: [String: String]) async
+    ///   - did: Optional DID that was used to authenticate the request
+    ///   - jkt: Optional JWK thumbprint (key id) for DPoP key used to sign the request
+    func updateDPoPNonce(for url: URL, from headers: [String: String], did: String?, jkt: String?) async
 }
 
 /// Protocol defining the interface for network services.
-public protocol NetworkServiceProtocol: Sendable {
+protocol NetworkServiceProtocol: Sendable {
     /// Performs a network request with the provided URLRequest.
     /// - Parameter request: The URLRequest to perform.
     /// - Parameter skipTokenRefresh: Whether to skip token refresh (to avoid circular dependencies).
@@ -148,7 +160,7 @@ public protocol NetworkServiceProtocol: Sendable {
 }
 
 /// Class responsible for handling network operations.
-public actor NetworkService: NetworkServiceProtocol {
+actor NetworkService: NetworkServiceProtocol {
     // MARK: - Properties
 
     private(set) var baseURL: URL
@@ -304,7 +316,7 @@ public actor NetworkService: NetworkServiceProtocol {
 
     /// Sets the authentication provider for authenticated requests
     /// - Parameter provider: The authentication provider
-    public func setAuthenticationProvider(_ provider: AuthenticationProvider) {
+    func setAuthenticationProvider(_ provider: AuthenticationProvider) {
         authProvider = provider
     }
 
@@ -347,6 +359,7 @@ public actor NetworkService: NetworkServiceProtocol {
 
         let (_, requiresAuth) = determineEndpointTypeAndAuthRequirement(for: url)
         var requestToSend = request
+        var authCtx_simple: AuthContext? = nil
 
         if requiresAuth {
             guard let authProvider = authProvider else {
@@ -357,7 +370,9 @@ public actor NetworkService: NetworkServiceProtocol {
             do {
                 // Ensure token is fresh before preparing the request
                 _ = try await authProvider.refreshTokenIfNeeded()
-                requestToSend = try await authProvider.prepareAuthenticatedRequest(request)
+                let (authed, ctx) = try await authProvider.prepareAuthenticatedRequestWithContext(request)
+                requestToSend = authed
+                authCtx_simple = ctx
                 LogManager.logDebug("Prepared authenticated request for: \(url.absoluteString)")
             } catch {
                 LogManager.logError(
@@ -379,6 +394,32 @@ public actor NetworkService: NetworkServiceProtocol {
             let (data, response) = try await session.data(for: requestToSend)
             if let httpResponse = response as? HTTPURLResponse {
                 LogManager.logResponse(httpResponse, data: data)
+
+                // Immediately capture and store DPoP-Nonce (case-insensitive) before any status handling
+                if let authProvider = authProvider, let url = requestToSend.url {
+                    var foundNonce: String? = nil
+                    for (key, value) in httpResponse.allHeaderFields {
+                        if let keyString = key as? String,
+                           keyString.caseInsensitiveCompare("DPoP-Nonce") == .orderedSame {
+                            foundNonce = value as? String
+                            break
+                        }
+                    }
+
+                    if let nonce = foundNonce {
+                        LogManager.logSensitiveValue(
+                            nonce,
+                            label: "Network Service (simple) - Storing nonce from status \(httpResponse.statusCode) for \(url.host ?? "N/A")",
+                            category: .network
+                        )
+                        await authProvider.updateDPoPNonce(
+                            for: url,
+                            from: ["DPoP-Nonce": nonce],
+                            did: authCtx_simple?.did,
+                            jkt: authCtx_simple?.jkt
+                        )
+                    }
+                }
             }
             // Basic check for HTTP errors, more detailed handling is in the other request method
             if let httpResponse = response as? HTTPURLResponse,
@@ -410,6 +451,7 @@ public actor NetworkService: NetworkServiceProtocol {
         while retryCount < maxRetries {
             var requestToSend = currentRequest
             var requiresAuth = false // Determine based on URL or context
+            var authCtx: AuthContext? = nil
 
             // Determine if authentication is needed (simplified example)
             if let url = requestToSend.url,
@@ -427,7 +469,9 @@ public actor NetworkService: NetworkServiceProtocol {
                     if !skipTokenRefresh {
                         _ = try await authProvider.refreshTokenIfNeeded()
                     }
-                    requestToSend = try await authProvider.prepareAuthenticatedRequest(requestToSend)
+                    let (authed, ctx) = try await authProvider.prepareAuthenticatedRequestWithContext(requestToSend)
+                    requestToSend = authed
+                    authCtx = ctx
                     LogManager.logDebug(
                         "Prepared authenticated request for: \(requestToSend.url?.absoluteString ?? "Unknown URL")"
                     )
@@ -516,8 +560,13 @@ public actor NetworkService: NetworkServiceProtocol {
                         // Create a header dictionary with the expected case for the key
                         let nonceHeaders = ["DPoP-Nonce": nonce]
 
-                        // Pass the found nonce to the auth provider
-                        await authProvider.updateDPoPNonce(for: url, from: nonceHeaders)
+                        // Pass the found nonce to the auth provider, scoping to DID and JKT
+                        await authProvider.updateDPoPNonce(
+                            for: url,
+                            from: nonceHeaders,
+                            did: authCtx?.did,
+                            jkt: authCtx?.jkt
+                        )
 
                         LogManager.logDebug(
                             "Network Service - Nonce storage complete for \(url.host ?? "N/A")", category: .network
@@ -588,6 +637,7 @@ public actor NetworkService: NetworkServiceProtocol {
 
                     // 3. Handle based on error type
                     if isNonceError {
+                        LogManager.logInfo("METRIC dpop_nonce_retry_total origin=protected_resource jkt=\(authCtx?.jkt ?? "unknown")")
                         // If it's a nonce error, make sure nonce is stored properly before retrying
                         let responseHeaders = httpResponse.allHeaderFields as? [String: String] ?? [:]
                         if let nonce = responseHeaders["DPoP-Nonce"] {
@@ -598,14 +648,13 @@ public actor NetworkService: NetworkServiceProtocol {
                                 category: .network
                             )
 
-                            // Add an explicit delay to ensure storage completes before retry
-                            try await Task.sleep(nanoseconds: 300_000_000) // 300ms delay
-
-                            // Store the nonce specifically for this retry
-                            await authProvider.updateDPoPNonce(for: url, from: responseHeaders)
-
-                            // Another small delay after storing to ensure it propagates
-                            try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+                            // Store the nonce specifically for this retry, using DID/JKT captured for this request if present
+                            await authProvider.updateDPoPNonce(
+                                for: url,
+                                from: responseHeaders,
+                                did: authCtx?.did,
+                                jkt: authCtx?.jkt
+                            )
 
                             LogManager.logInfo(
                                 "Network Service - Nonce storage completed, proceeding with retry.")

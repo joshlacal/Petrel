@@ -15,9 +15,9 @@
 /// - ``ATProtoClient``
 ///
 /// ### Core Services
-/// - ``AuthenticationService``
-/// - ``NetworkService``
-/// - ``AccountManager``
+/// - ``ATProtoClient`` (primary entry point)
+///
+/// Internals such as AuthenticationService, NetworkService, and AccountManager are private implementation details.
 ///
 /// ### Authentication & Security
 /// - ``TokenRefreshCoordinator``

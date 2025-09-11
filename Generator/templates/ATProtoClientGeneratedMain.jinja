@@ -93,6 +93,9 @@ public actor ATProtoClient {
 
     /// The delegate for authentication events.
     private weak var authDelegate: AuthenticationDelegate?
+    
+    /// Temporary storage for account info after OAuth callback
+    private var justAuthenticatedAccount: (did: String, handle: String?, pdsURL: URL)?
 
     /// Namespaces for the AT Protocol APIs.
 
@@ -292,12 +295,15 @@ public actor ATProtoClient {
     /// Handles the OAuth callback URL after user authentication.
     /// - Parameter url: The callback URL received from the authorization server.
     public func handleOAuthCallback(url: URL) async throws {
-        try await authService.handleOAuthCallback(url: url)
+        // Get account info from auth service
+        let accountInfo = try await authService.handleOAuthCallback(url: url)
+        
+        // Store it temporarily for immediate access
+        justAuthenticatedAccount = accountInfo
+        LogManager.logInfo("🔍 DEBUG: Stored temporary account info: \(accountInfo.did)")
 
-        // After successful authentication, update the base URL
-        if let account = await accountManager.getCurrentAccount() {
-            await networkService.setBaseURL(account.pdsURL)
-        }
+        // After successful authentication, reinitialize the client state
+        await initializeFromStoredAccount()
     }
 
     /// Logs out the current user.
@@ -310,13 +316,43 @@ public actor ATProtoClient {
     /// Gets the current account information.
     /// - Returns: A tuple containing the DID, handle, and PDS URL of the current account.
     public func getActiveAccountInfo() async -> (did: String?, handle: String?, pdsURL: URL?) {
+        LogManager.logInfo("🔍 DEBUG: getActiveAccountInfo called")
+        
+        // Check temporary storage first (for immediate access after OAuth)
+        if let tempAccount = justAuthenticatedAccount {
+            LogManager.logInfo("🔍 DEBUG: Found temporary account: \(tempAccount.did)")
+            
+            // Always try AccountManager first, but don't clear temp storage yet
+            if let account = await accountManager.getCurrentAccount(), account.did == tempAccount.did {
+                LogManager.logInfo("🔍 DEBUG: AccountManager ready, using AccountManager but keeping temp storage")
+                // Don't clear temp storage yet - let it persist for multiple calls during OAuth completion
+                return (did: account.did, handle: account.handle, pdsURL: account.pdsURL)
+            } else {
+                LogManager.logInfo("🔍 DEBUG: AccountManager not ready, using temp account")
+                // AccountManager not ready yet, return temp account
+                return (did: tempAccount.did, handle: tempAccount.handle, pdsURL: tempAccount.pdsURL)
+            }
+        } else {
+            LogManager.logInfo("🔍 DEBUG: No temporary account found")
+        }
+        
+        // Fall back to normal AccountManager query
+        LogManager.logInfo("🔍 DEBUG: Falling back to AccountManager query")
         if let account = await accountManager.getCurrentAccount() {
+            LogManager.logInfo("🔍 DEBUG: AccountManager returned account: \(account.did)")
             return (did: account.did, handle: account.handle, pdsURL: account.pdsURL)
         } else {
+            LogManager.logInfo("🔍 DEBUG: AccountManager returned nil - this is the problem!")
             return (did: nil, handle: nil, pdsURL: nil)
         }
     }
 
+    /// Clears temporary account storage after OAuth completion
+    public func clearTemporaryAccountStorage() async {
+        LogManager.logInfo("🔍 DEBUG: Clearing temporary account storage")
+        justAuthenticatedAccount = nil
+    }
+    
     /// Lists all available accounts.
     /// - Returns: An array of accounts.
     public func listAccounts() async -> [Account] {

@@ -10,6 +10,15 @@ import Foundation
 /// Actor responsible for implementing circuit breaker pattern for token refresh operations
 /// to prevent cascade failures when refresh operations repeatedly fail.
 actor RefreshCircuitBreaker {
+    // Classify refresh failures for better breaker decisions
+    enum RefreshFailureKind {
+        case nonceRecoverable      // use_dpop_nonce: retried and typically succeeds
+        case network               // timeouts, connectivity
+        case server                // 5xx, unexpected server responses
+        case invalidGrant          // refresh token revoked/expired
+        case invalidDPoPProof      // wrong key, bad ath, htm/htu mismatch
+        case other
+    }
     // MARK: - Types
 
     /// Circuit breaker states
@@ -130,12 +139,22 @@ actor RefreshCircuitBreaker {
         failureTracking[did] = info
     }
 
-    /// Records a failed refresh operation
-    /// - Parameter did: The DID that failed
-    func recordFailure(for did: String) {
+    /// Records a failed refresh operation with classification.
+    /// - Parameters:
+    ///   - did: The DID that failed
+    ///   - kind: Failure classification
+    func recordFailure(for did: String, kind: RefreshFailureKind = .other) {
         var info = failureTracking[did] ?? FailureInfo()
 
-        info.consecutiveFailures += 1
+        switch kind {
+        case .nonceRecoverable:
+            // Do not count recoverable nonce rotations toward opening the circuit
+            break
+        case .invalidGrant, .invalidDPoPProof:
+            info.consecutiveFailures += 2 // heavier weight for serious failures
+        case .network, .server, .other:
+            info.consecutiveFailures += 1
+        }
         info.lastFailureTime = Date()
 
         switch info.state {
@@ -146,6 +165,7 @@ actor RefreshCircuitBreaker {
                     "RefreshCircuitBreaker: Circuit opened for DID \(LogManager.logDID(did)) after \(info.consecutiveFailures) consecutive failures",
                     category: .authentication
                 )
+                LogManager.logInfo("METRIC circuit_open_total reason=refresh_failures did=\(LogManager.logDID(did))")
             } else {
                 LogManager.logInfo(
                     "RefreshCircuitBreaker: Recorded failure \(info.consecutiveFailures)/\(maxConsecutiveFailures) for DID \(LogManager.logDID(did))"
