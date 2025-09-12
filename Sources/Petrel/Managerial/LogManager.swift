@@ -8,6 +8,14 @@
 import Foundation
 import os.log
 
+public struct PetrelLogEvent: Sendable {
+    public enum Level: Sendable { case debug, info, error }
+    public let level: Level
+    public let category: LogCategory
+    public let message: String
+}
+
+/// Internal logger that also broadcasts events to optional observers.
 class LogManager {
     private static let networkLogger = os.Logger(
         subsystem: Bundle.main.bundleIdentifier ?? "Petrel", category: "Network"
@@ -32,18 +40,44 @@ class LogManager {
         "/oauth/token", "/token",
     ]
 
+    // MARK: - Observer support (Swift Concurrency safe)
+    private actor ObserverStore {
+        private var observers: [(@Sendable (PetrelLogEvent) -> Void)] = []
+        func add(_ observer: @escaping @Sendable (PetrelLogEvent) -> Void) {
+            observers.append(observer)
+        }
+        func snapshot() -> [@Sendable (PetrelLogEvent) -> Void] { observers }
+    }
+
+    private static let observerStore = ObserverStore()
+
+    /// Register a callback to receive Petrel log events.
+    public static func addObserver(_ observer: @escaping @Sendable (PetrelLogEvent) -> Void) {
+        Task { await observerStore.add(observer) }
+    }
+
+    private static func notifyObservers(_ event: PetrelLogEvent) {
+        Task {
+            let current = await observerStore.snapshot()
+            current.forEach { $0(event) }
+        }
+    }
+
     static func logInfo(_ message: String, category: LogCategory = .general) {
         getLogger(for: category).info("\(message, privacy: .public)")
+        notifyObservers(.init(level: .info, category: category, message: message))
     }
 
     static func logDebug(_ message: String, category: LogCategory = .general) {
         #if DEBUG
             getLogger(for: category).debug("\(message, privacy: .public)")
         #endif
+        notifyObservers(.init(level: .debug, category: category, message: message))
     }
 
     static func logError(_ message: String, category: LogCategory = .general) {
         getLogger(for: category).error("\(message, privacy: .public)")
+        notifyObservers(.init(level: .error, category: category, message: message))
     }
 
     /// Logs a sensitive value with only the first few characters visible
@@ -151,8 +185,15 @@ class LogManager {
     }
 }
 
-enum LogCategory {
+public enum LogCategory: Sendable {
     case network
     case authentication
     case general
+}
+
+/// Public facade to register for Petrel log events without exposing internal logger type.
+public enum PetrelLog {
+    public static func addObserver(_ observer: @escaping @Sendable (PetrelLogEvent) -> Void) {
+        LogManager.addObserver(observer)
+    }
 }

@@ -819,7 +819,8 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
     private let networkService: NetworkService
     private let oauthConfig: OAuthConfig
     private let didResolver: DIDResolving
-    private let refreshCoordinator = TokenRefreshCoordinator()
+    // Use per-DID coordinators to avoid cross-account interference during refresh
+    private var refreshCoordinators: [String: TokenRefreshCoordinator] = [:]
     private let refreshCircuitBreaker = RefreshCircuitBreaker()
     // Simple in-memory store for OAuth flow nonces (independent of any account)
     private var oauthFlowNonces: [String: String] = [:]
@@ -862,6 +863,18 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
         self.networkService = networkService
         self.oauthConfig = oauthConfig
         self.didResolver = didResolver
+    }
+
+    // MARK: - Coordinator Access
+
+    /// Gets or creates a token refresh coordinator scoped to a specific DID
+    private func coordinator(for did: String) -> TokenRefreshCoordinator {
+        if let existing = refreshCoordinators[did] {
+            return existing
+        }
+        let created = TokenRefreshCoordinator()
+        refreshCoordinators[did] = created
+        return created
     }
 
     // MARK: - OAuth Flow
@@ -1585,7 +1598,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
         do {
             // The coordinator expects a function returning the raw response data and response object
             let (refreshData, _): (Data, HTTPURLResponse) =
-                try await refreshCoordinator.coordinateRefresh(
+                try await coordinator(for: account.did).coordinateRefresh(
                     performing: { () async throws -> (Data, HTTPURLResponse) in
                         // Perform the token refresh call
                         let (data, response) = try await self.performTokenRefresh(for: account.did)
@@ -1705,10 +1718,11 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
                     LogManager.logError("Immediate DPoP recovery attempt failed: \(error)")
                 }
 
-                // If we reach here, all attempts have failed
+                // If we reach here, all attempts have failed. Treat as a refresh failure (not a key error),
+                // since the key is likely fine and the server required updated nonce.
                 LogManager.logInfo(
                     "METRIC token_refresh_failures_total reason=dpop did=\(LogManager.logDID(did))")
-                throw AuthError.dpopKeyError
+                throw AuthError.tokenRefreshFailed
             case let .networkError(code, details):
                 await refreshCircuitBreaker.recordFailure(for: did, kind: .network)
                 LogManager.logError(
@@ -2040,12 +2054,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
 
         var modifiedRequest = request
 
-        // If refresh is in progress for this DID, wait briefly to avoid transient key access errors
-        if await isRefreshInProgress(for: account.did) {
-            await waitForRefreshToComplete(did: account.did, timeout: 3.0)
-        }
-
-        // If refresh is in progress for this DID, wait briefly to avoid transient key access errors
+        // If refresh is in progress for this DID, wait briefly to avoid transient key/keychain access errors
         if await isRefreshInProgress(for: account.did) {
             await waitForRefreshToComplete(did: account.did, timeout: 3.0)
         }
@@ -2060,13 +2069,35 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
         // Determine proof type based on whether it's the token endpoint or general resource access
         let type: DPoPProofType = isTokenEndpoint ? .tokenRequest : .resourceAccess
 
-        let dpopProof = try await createDPoPProof(
-            for: method,
-            url: urlString,
-            type: type,
-            accessToken: isTokenEndpoint ? nil : session.accessToken, // Only include ath for resource access
-            did: account.did // Use the active account's DID
-        )
+        // Create DPoP proof with a single guarded retry to handle transient keychain issues
+        let dpopProof: String = try await {
+            do {
+                return try await createDPoPProof(
+                    for: method,
+                    url: urlString,
+                    type: type,
+                    accessToken: isTokenEndpoint ? nil : session.accessToken,
+                    did: account.did
+                )
+            } catch {
+                // If a refresh is in progress or we hit a key-related error, wait briefly and retry once
+                if await isRefreshInProgress(for: account.did) {
+                    await waitForRefreshToComplete(did: account.did, timeout: 1.0)
+                } else {
+                    // Small jitter to allow keychain availability in edge cases
+                    try? await Task.sleep(nanoseconds: 150_000_000) // 150ms
+                }
+
+                // Retry once
+                return try await createDPoPProof(
+                    for: method,
+                    url: urlString,
+                    type: type,
+                    accessToken: isTokenEndpoint ? nil : session.accessToken,
+                    did: account.did
+                )
+            }
+        }()
 
         // Add DPoP header
         modifiedRequest.setValue(dpopProof, forHTTPHeaderField: "DPoP")
