@@ -41,18 +41,20 @@ class LogManager {
     ]
 
     // MARK: - Observer support (Swift Concurrency safe)
+
     private actor ObserverStore {
-        private var observers: [(@Sendable (PetrelLogEvent) -> Void)] = []
+        private var observers: [@Sendable (PetrelLogEvent) -> Void] = []
         func add(_ observer: @escaping @Sendable (PetrelLogEvent) -> Void) {
             observers.append(observer)
         }
+
         func snapshot() -> [@Sendable (PetrelLogEvent) -> Void] { observers }
     }
 
     private static let observerStore = ObserverStore()
 
     /// Register a callback to receive Petrel log events.
-    public static func addObserver(_ observer: @escaping @Sendable (PetrelLogEvent) -> Void) {
+    static func addObserver(_ observer: @escaping @Sendable (PetrelLogEvent) -> Void) {
         Task { await observerStore.add(observer) }
     }
 
