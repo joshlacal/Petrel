@@ -36,7 +36,7 @@ let package = Package(
                 .product(name: "AsyncDNSResolver", package: "swift-async-dns-resolver"),
             ],
             swiftSettings: [
-                .swiftLanguageMode(.v6)
+                .swiftLanguageMode(.v6),
             ]
         ),
         .executableTarget(
