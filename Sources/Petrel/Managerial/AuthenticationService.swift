@@ -780,26 +780,34 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
             return
         }
 
-        // Scope first by JKT (key thumbprint) if provided
+        // ENHANCED: Synchronize in-memory and persistent storage atomically
+        let resolvedDID: String? =
+            (did?.isEmpty == false) ? did : await accountManager.getCurrentAccount()?.did
+        
+        // First update in-memory stores
         if let jkt, !jkt.isEmpty {
             var domainMap = noncesByThumbprint[jkt] ?? [:]
             domainMap[domain] = nonce
             noncesByThumbprint[jkt] = domainMap
+            LogManager.logDebug("Updated in-memory JKT-scoped nonce: jkt=\(jkt), domain=\(domain)")
         }
 
-        // Also scope by DID for persistence/fallback across app restarts
-        let resolvedDID: String? =
-            (did?.isEmpty == false) ? did : await accountManager.getCurrentAccount()?.did
+        // Then update persistent storage
         if let resolvedDID {
             await updateDPoPNonce(domain: domain, nonce: nonce, for: resolvedDID)
 
             // Persist JKT-scoped nonces for this DID as well
             if let jkt, !jkt.isEmpty {
-                var persisted = (try? await storage.getDPoPNoncesByJKT(for: resolvedDID)) ?? [:]
-                var doms = persisted[jkt] ?? [:]
-                doms[domain] = nonce
-                persisted[jkt] = doms
-                try? await storage.saveDPoPNoncesByJKT(persisted, for: resolvedDID)
+                do {
+                    var persisted = (try? await storage.getDPoPNoncesByJKT(for: resolvedDID)) ?? [:]
+                    var doms = persisted[jkt] ?? [:]
+                    doms[domain] = nonce
+                    persisted[jkt] = doms
+                    try await storage.saveDPoPNoncesByJKT(persisted, for: resolvedDID)
+                    LogManager.logDebug("Persisted JKT-scoped nonce: did=\(LogManager.logDID(resolvedDID)), jkt=\(jkt), domain=\(domain)")
+                } catch {
+                    LogManager.logError("Failed to persist JKT-scoped nonce: \(error)")
+                }
             }
         }
     }
@@ -1932,8 +1940,38 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
                         LogManager.logInfo(
                             "METRIC dpop_nonce_retry_total origin=auth did=\(LogManager.logDID(did))")
 
-                        // Retry the request with the new nonce
-                        return try await performTokenRefreshWithRetry(for: did, retryCount: retryCount + 1)
+                        // CRITICAL FIX: Ensure we use the most recent nonce for retry
+                        // Atomically update and verify nonce synchronization before retry
+                        var shouldRetry = false
+                        if let refreshedNonce = httpResponse.value(forHTTPHeaderField: "DPoP-Nonce"),
+                           let url = httpResponse.url,
+                           let responseDomain = url.host?.lowercased() {
+                            
+                            // Update and verify nonce synchronization atomically
+                            let nonceUpdateSuccess = await updateAndVerifyNonce(
+                                domain: responseDomain,
+                                nonce: refreshedNonce,
+                                did: did
+                            )
+                            
+                            if nonceUpdateSuccess {
+                                shouldRetry = true
+                                LogManager.logDebug(
+                                    "Successfully synchronized nonce for retry: domain=\(responseDomain), nonce=\(refreshedNonce)")
+                            } else {
+                                LogManager.logError(
+                                    "Failed to synchronize nonce for retry. Aborting retry attempt to prevent loop.")
+                            }
+                        } else {
+                            LogManager.logError(
+                                "Missing DPoP-Nonce header in error response. Cannot retry safely.")
+                        }
+                        
+                        // Only retry if nonce synchronization was successful
+                        if shouldRetry {
+                            return try await performTokenRefreshWithRetry(for: did, retryCount: retryCount + 1)
+                        }
+                        // If we can't sync nonces safely, fall through to normal error handling
                     }
                 } catch {
                     // If we can't decode the error, just continue with normal error handling
@@ -2155,31 +2193,38 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
                 "OAuth flow - using stored nonce for domain \(domain)", category: .authentication
             )
         }
-        // Case 3: Authenticated flow - get from storage
+        // Case 3: Authenticated flow - get from storage with robust synchronization
         else if let targetDID = targetDID, let urlObject = URL(string: url),
                 let domain = urlObject.host?.lowercased()
         {
-            // If we haven't loaded persisted JKT-scoped nonces for this DID yet, pull them in once.
-            if noncesByThumbprint[keyThumbprint] == nil {
-                if let persistedByJKT = try? await storage.getDPoPNoncesByJKT(for: targetDID) {
-                    // Merge persisted JKT maps into memory
-                    for (pjkt, map) in persistedByJKT {
-                        if var existing = noncesByThumbprint[pjkt] {
-                            existing.merge(map) { _, new in new }
-                            noncesByThumbprint[pjkt] = existing
-                        } else {
-                            noncesByThumbprint[pjkt] = map
-                        }
-                    }
+            // Always refresh JKT-scoped nonces from persistence to ensure consistency
+            if let persistedByJKT = try? await storage.getDPoPNoncesByJKT(for: targetDID) {
+                // Merge persisted JKT maps into memory, with persistence taking precedence
+                for (pjkt, map) in persistedByJKT {
+                    var existing = noncesByThumbprint[pjkt] ?? [:]
+                    existing.merge(map) { _, new in new } // Persistent values win
+                    noncesByThumbprint[pjkt] = existing
                 }
             }
-            // Prefer JKT-scoped nonce, fall back to DID-scoped stored nonce
+            
+            // Multi-layer nonce retrieval with preference order:
+            // 1. JKT-scoped in-memory (most recent)
+            // 2. JKT-scoped persistent (cross-restart)
+            // 3. DID-scoped persistent (fallback)
             if let jktNonce = noncesByThumbprint[keyThumbprint]?[domain] {
                 finalNonce = jktNonce
-            } else if let storedNonces = try? await storage.getDPoPNonces(for: targetDID) {
-                finalNonce = storedNonces[domain]
+                LogManager.logDebug("Using JKT-scoped in-memory nonce for domain \(domain)")
+            } else if let persistedJktNonces = try? await storage.getDPoPNoncesByJKT(for: targetDID),
+                      let jktPersistentNonce = persistedJktNonces[keyThumbprint]?[domain] {
+                finalNonce = jktPersistentNonce
+                LogManager.logDebug("Using JKT-scoped persistent nonce for domain \(domain)")
+            } else if let storedNonces = try? await storage.getDPoPNonces(for: targetDID),
+                      let didNonce = storedNonces[domain] {
+                finalNonce = didNonce
+                LogManager.logDebug("Using DID-scoped persistent nonce for domain \(domain)")
             } else {
                 finalNonce = nil
+                LogManager.logDebug("No nonce found for domain \(domain)")
             }
         } else {
             // No explicit nonce, using ephemeral key or couldn't get stored nonce
@@ -2289,6 +2334,59 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
             try await storage.saveDPoPNonces(nonces, for: did)
         } catch {
             LogManager.logError("AuthenticationService - Failed to update DPoP nonce: \(error)")
+        }
+    }
+    
+    /// Atomically updates and verifies nonce synchronization across all storage layers
+    /// - Parameters:
+    ///   - domain: The domain the nonce is for
+    ///   - nonce: The new nonce value
+    ///   - did: The DID to update the nonce for
+    /// - Returns: True if nonce was successfully synchronized and verified, false otherwise
+    private func updateAndVerifyNonce(domain: String, nonce: String, did: String) async -> Bool {
+        do {
+            // Get the key and thumbprint for JKT-scoped storage
+            let key = try await getOrCreateDPoPKey(for: did)
+            let jwk = try createJWK(from: key)
+            let thumbprint = try calculateJWKThumbprint(jwk: jwk)
+            
+            // 1. Update in-memory JKT-scoped nonce store
+            var domainMap = noncesByThumbprint[thumbprint] ?? [:]
+            domainMap[domain] = nonce
+            noncesByThumbprint[thumbprint] = domainMap
+            
+            // 2. Update persistent DID-scoped nonce store
+            var didNonces = try await storage.getDPoPNonces(for: did) ?? [:]
+            didNonces[domain] = nonce
+            try await storage.saveDPoPNonces(didNonces, for: did)
+            
+            // 3. Update persistent JKT-scoped nonce store
+            var jktNonces = (try? await storage.getDPoPNoncesByJKT(for: did)) ?? [:]
+            var jktDomainMap = jktNonces[thumbprint] ?? [:]
+            jktDomainMap[domain] = nonce
+            jktNonces[thumbprint] = jktDomainMap
+            try await storage.saveDPoPNoncesByJKT(jktNonces, for: did)
+            
+            // 4. Verify synchronization by reading back from all stores
+            let verifyInMemory = noncesByThumbprint[thumbprint]?[domain] == nonce
+            let verifyDidPersistent = (try? await storage.getDPoPNonces(for: did))?[domain] == nonce
+            let verifyJktPersistent = (try? await storage.getDPoPNoncesByJKT(for: did))?[thumbprint]?[domain] == nonce
+            
+            let allSynchronized = verifyInMemory && verifyDidPersistent && verifyJktPersistent
+            
+            if allSynchronized {
+                LogManager.logDebug(
+                    "Nonce synchronization verified: domain=\(domain), did=\(LogManager.logDID(did)), jkt=\(thumbprint)")
+            } else {
+                LogManager.logError(
+                    "Nonce synchronization failed: memory=\(verifyInMemory), did_persistent=\(verifyDidPersistent), jkt_persistent=\(verifyJktPersistent)")
+            }
+            
+            return allSynchronized
+            
+        } catch {
+            LogManager.logError("Failed to update and verify nonce: \(error)")
+            return false
         }
     }
 
