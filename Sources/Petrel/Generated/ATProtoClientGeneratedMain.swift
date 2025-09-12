@@ -500,18 +500,18 @@ public actor ATProtoClient {
                 }
             }
 
-            public lazy var actor: Actor = .init(networkService: self.networkService)
+            public lazy var richtext: Richtext = .init(networkService: self.networkService)
 
-            public final class Actor: @unchecked Sendable {
+            public final class Richtext: @unchecked Sendable {
                 let networkService: NetworkService
                 init(networkService: NetworkService) {
                     self.networkService = networkService
                 }
             }
 
-            public lazy var richtext: Richtext = .init(networkService: self.networkService)
+            public lazy var actor: Actor = .init(networkService: self.networkService)
 
-            public final class Richtext: @unchecked Sendable {
+            public final class Actor: @unchecked Sendable {
                 let networkService: NetworkService
                 init(networkService: NetworkService) {
                     self.networkService = networkService
@@ -554,18 +554,18 @@ public actor ATProtoClient {
                 }
             }
 
-            public lazy var actor: Actor = .init(networkService: self.networkService)
+            public lazy var moderation: Moderation = .init(networkService: self.networkService)
 
-            public final class Actor: @unchecked Sendable {
+            public final class Moderation: @unchecked Sendable {
                 let networkService: NetworkService
                 init(networkService: NetworkService) {
                     self.networkService = networkService
                 }
             }
 
-            public lazy var moderation: Moderation = .init(networkService: self.networkService)
+            public lazy var actor: Actor = .init(networkService: self.networkService)
 
-            public final class Moderation: @unchecked Sendable {
+            public final class Actor: @unchecked Sendable {
                 let networkService: NetworkService
                 init(networkService: NetworkService) {
                     self.networkService = networkService
