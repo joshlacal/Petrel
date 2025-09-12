@@ -446,18 +446,18 @@ public actor ATProtoClient {
                 }
             }
 
-            public lazy var embed: Embed = .init(networkService: self.networkService)
+            public lazy var bookmark: Bookmark = .init(networkService: self.networkService)
 
-            public final class Embed: @unchecked Sendable {
+            public final class Bookmark: @unchecked Sendable {
                 let networkService: NetworkService
                 init(networkService: NetworkService) {
                     self.networkService = networkService
                 }
             }
 
-            public lazy var bookmark: Bookmark = .init(networkService: self.networkService)
+            public lazy var embed: Embed = .init(networkService: self.networkService)
 
-            public final class Bookmark: @unchecked Sendable {
+            public final class Embed: @unchecked Sendable {
                 let networkService: NetworkService
                 init(networkService: NetworkService) {
                     self.networkService = networkService
@@ -617,15 +617,6 @@ public actor ATProtoClient {
                 }
             }
 
-            public lazy var server: Server = .init(networkService: self.networkService)
-
-            public final class Server: @unchecked Sendable {
-                let networkService: NetworkService
-                init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
             public lazy var label: Label = .init(networkService: self.networkService)
 
             public final class Label: @unchecked Sendable {
@@ -635,9 +626,9 @@ public actor ATProtoClient {
                 }
             }
 
-            public lazy var lexicon: Lexicon = .init(networkService: self.networkService)
+            public lazy var server: Server = .init(networkService: self.networkService)
 
-            public final class Lexicon: @unchecked Sendable {
+            public final class Server: @unchecked Sendable {
                 let networkService: NetworkService
                 init(networkService: NetworkService) {
                     self.networkService = networkService
@@ -647,6 +638,15 @@ public actor ATProtoClient {
             public lazy var sync: Sync = .init(networkService: self.networkService)
 
             public final class Sync: @unchecked Sendable {
+                let networkService: NetworkService
+                init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+
+            public lazy var lexicon: Lexicon = .init(networkService: self.networkService)
+
+            public final class Lexicon: @unchecked Sendable {
                 let networkService: NetworkService
                 init(networkService: NetworkService) {
                     self.networkService = networkService
