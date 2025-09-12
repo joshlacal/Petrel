@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ main ]
   workflow_dispatch:
+  workflow_run:
+    workflows: ["Generate Swift Code"]
+    types:
+      - completed
 
 permissions:
   contents: read
@@ -19,6 +23,7 @@ concurrency:
 jobs:
   build-docs:
     runs-on: macos-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name != 'workflow_run' }}
     
     steps:
     - name: Checkout

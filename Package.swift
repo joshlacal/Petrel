@@ -35,6 +35,9 @@ let package = Package(
                 "SwiftCBOR",
                 .product(name: "AsyncDNSResolver", package: "swift-async-dns-resolver"),
             ],
+            swiftSettings: [
+                .swiftLanguageMode(.v6)
+            ]
         ),
         .executableTarget(
             name: "PetrelLoad",
