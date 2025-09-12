@@ -783,7 +783,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
         // ENHANCED: Synchronize in-memory and persistent storage atomically
         let resolvedDID: String? =
             (did?.isEmpty == false) ? did : await accountManager.getCurrentAccount()?.did
-        
+
         // First update in-memory stores
         if let jkt, !jkt.isEmpty {
             var domainMap = noncesByThumbprint[jkt] ?? [:]
@@ -1945,15 +1945,15 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
                         var shouldRetry = false
                         if let refreshedNonce = httpResponse.value(forHTTPHeaderField: "DPoP-Nonce"),
                            let url = httpResponse.url,
-                           let responseDomain = url.host?.lowercased() {
-                            
+                           let responseDomain = url.host?.lowercased()
+                        {
                             // Update and verify nonce synchronization atomically
                             let nonceUpdateSuccess = await updateAndVerifyNonce(
                                 domain: responseDomain,
                                 nonce: refreshedNonce,
                                 did: did
                             )
-                            
+
                             if nonceUpdateSuccess {
                                 shouldRetry = true
                                 LogManager.logDebug(
@@ -1966,7 +1966,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
                             LogManager.logError(
                                 "Missing DPoP-Nonce header in error response. Cannot retry safely.")
                         }
-                        
+
                         // Only retry if nonce synchronization was successful
                         if shouldRetry {
                             return try await performTokenRefreshWithRetry(for: did, retryCount: retryCount + 1)
@@ -2206,7 +2206,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
                     noncesByThumbprint[pjkt] = existing
                 }
             }
-            
+
             // Multi-layer nonce retrieval with preference order:
             // 1. JKT-scoped in-memory (most recent)
             // 2. JKT-scoped persistent (cross-restart)
@@ -2215,11 +2215,13 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
                 finalNonce = jktNonce
                 LogManager.logDebug("Using JKT-scoped in-memory nonce for domain \(domain)")
             } else if let persistedJktNonces = try? await storage.getDPoPNoncesByJKT(for: targetDID),
-                      let jktPersistentNonce = persistedJktNonces[keyThumbprint]?[domain] {
+                      let jktPersistentNonce = persistedJktNonces[keyThumbprint]?[domain]
+            {
                 finalNonce = jktPersistentNonce
                 LogManager.logDebug("Using JKT-scoped persistent nonce for domain \(domain)")
             } else if let storedNonces = try? await storage.getDPoPNonces(for: targetDID),
-                      let didNonce = storedNonces[domain] {
+                      let didNonce = storedNonces[domain]
+            {
                 finalNonce = didNonce
                 LogManager.logDebug("Using DID-scoped persistent nonce for domain \(domain)")
             } else {
@@ -2336,7 +2338,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
             LogManager.logError("AuthenticationService - Failed to update DPoP nonce: \(error)")
         }
     }
-    
+
     /// Atomically updates and verifies nonce synchronization across all storage layers
     /// - Parameters:
     ///   - domain: The domain the nonce is for
@@ -2349,31 +2351,31 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
             let key = try await getOrCreateDPoPKey(for: did)
             let jwk = try createJWK(from: key)
             let thumbprint = try calculateJWKThumbprint(jwk: jwk)
-            
+
             // 1. Update in-memory JKT-scoped nonce store
             var domainMap = noncesByThumbprint[thumbprint] ?? [:]
             domainMap[domain] = nonce
             noncesByThumbprint[thumbprint] = domainMap
-            
+
             // 2. Update persistent DID-scoped nonce store
             var didNonces = try await storage.getDPoPNonces(for: did) ?? [:]
             didNonces[domain] = nonce
             try await storage.saveDPoPNonces(didNonces, for: did)
-            
+
             // 3. Update persistent JKT-scoped nonce store
             var jktNonces = (try? await storage.getDPoPNoncesByJKT(for: did)) ?? [:]
             var jktDomainMap = jktNonces[thumbprint] ?? [:]
             jktDomainMap[domain] = nonce
             jktNonces[thumbprint] = jktDomainMap
             try await storage.saveDPoPNoncesByJKT(jktNonces, for: did)
-            
+
             // 4. Verify synchronization by reading back from all stores
             let verifyInMemory = noncesByThumbprint[thumbprint]?[domain] == nonce
             let verifyDidPersistent = (try? await storage.getDPoPNonces(for: did))?[domain] == nonce
             let verifyJktPersistent = (try? await storage.getDPoPNoncesByJKT(for: did))?[thumbprint]?[domain] == nonce
-            
+
             let allSynchronized = verifyInMemory && verifyDidPersistent && verifyJktPersistent
-            
+
             if allSynchronized {
                 LogManager.logDebug(
                     "Nonce synchronization verified: domain=\(domain), did=\(LogManager.logDID(did)), jkt=\(thumbprint)")
@@ -2381,9 +2383,9 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
                 LogManager.logError(
                     "Nonce synchronization failed: memory=\(verifyInMemory), did_persistent=\(verifyDidPersistent), jkt_persistent=\(verifyJktPersistent)")
             }
-            
+
             return allSynchronized
-            
+
         } catch {
             LogManager.logError("Failed to update and verify nonce: \(error)")
             return false
