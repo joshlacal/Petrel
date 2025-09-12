@@ -40,8 +40,23 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add .
-          git commit -m "Update and format generated Swift code" || exit 0
-          git pull --rebase
-          git push
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "Update and format generated Swift code"
+          
+          # Try to push, if it fails due to remote changes, pull and retry once
+          if ! git push; then
+            echo "Push failed, pulling latest changes and retrying..."
+            if git pull --rebase origin main; then
+              git push
+            else
+              echo "Rebase failed due to conflicts. This may require manual intervention."
+              git rebase --abort
+              echo "Creating a pull request instead would be safer for this case."
+              exit 1
+            fi
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
