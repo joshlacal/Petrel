@@ -60,7 +60,12 @@ import Petrel
 let oauth = OAuthConfig(
     clientId: "YOUR_CLIENT_ID",
     redirectUri: "yourapp://oauth/callback",
-    scope: "atproto app:bsky"
+    scope: "atproto app:bsky",
+    // Optional hardening toggles (disabled by default for compatibility):
+    // - require `iss` in callback and verify it matches the server issuer when supported
+    requireIssInCallback: false,
+    // - require that the DID's PDS metadata lists the same authorization server issuer used during auth
+    enforcePDSAuthorizationBinding: false
 )
 
 // Create the client (namespace identifies your app's keychain sandbox)
@@ -71,6 +76,15 @@ let client = await ATProtoClient(
     userAgent: "YourApp/1.0"
 )
 ```
+
+### OAuth Security Hardening Options
+
+Petrel follows the atproto OAuth profile (PKCE + PAR + DPoP). You can opt into stricter checks via `OAuthConfig`:
+
+- `requireIssInCallback` (default: `false`): If the server declares support for the `iss` auth response parameter, require and verify it on callback.
+- `enforcePDSAuthorizationBinding` (default: `false`): After exchanging the code and resolving the account DID → PDS, verify the PDS’s protected resource metadata includes the same authorization server issuer. Fails the flow if not.
+
+These options help detect misconfiguration or phishing-style redirects at the cost of being stricter in edge migrations.
 
 ### Understanding the API Structure
 

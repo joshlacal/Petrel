@@ -262,6 +262,9 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
         }
         LogManager.logDebug("Extracted authorization code and state token", category: .authentication)
 
+        // Optional: extract issuer (iss) returned by the authorization server for stricter validation
+        let callbackIssuer = extractIssuer(from: url)
+
         // 2. Retrieve OAuthState using the stateToken
         guard let oauthState = try await storage.getOAuthState(for: stateToken) else {
             LogManager.logError(
@@ -355,6 +358,26 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
 
         let authServerMetadata = try await fetchAuthorizationServerMetadata(
             authServerURL: authServerURL)
+
+        // If the server supports the authorization response issuer parameter, verify it when present.
+        // If the config requires it and it is missing/mismatched, fail the flow.
+        if let callbackIssuer {
+            if callbackIssuer != authServerMetadata.issuer {
+                LogManager.logError(
+                    "OAuth callback 'iss' (\(callbackIssuer)) does not match metadata issuer (\(authServerMetadata.issuer))",
+                    category: .authentication
+                )
+                if oauthConfig.requireIssInCallback {
+                    throw AuthError.authorizationFailed
+                }
+            }
+        } else if oauthConfig.requireIssInCallback && authServerMetadata.authorizationResponseIssParameterSupported {
+            LogManager.logError(
+                "OAuth callback is missing required 'iss' and server indicates support for it.",
+                category: .authentication
+            )
+            throw AuthError.authorizationFailed
+        }
         let tokenEndpoint = authServerMetadata.tokenEndpoint
         LogManager.logDebug("Retrieved token endpoint", category: .authentication)
 
@@ -387,7 +410,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
         )
 
         // Resolve DID to get the actual PDS URL and handle (for signup flows, the account may live on a different PDS)
-        let actualPDSURL: URL
+        var actualPDSURL: URL
         var resolvedHandle: String?
         do {
             // Use the new resolver method to get both PDS URL and handle in one call
@@ -405,6 +428,28 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
                     category: .authentication
                 )
                 // We'll use actualPDSURL for the account, but keep using pdsURL for this OAuth session
+            }
+
+            // Optional strict binding: ensure the DID's PDS recognizes the same authorization server issuer
+            if oauthConfig.enforcePDSAuthorizationBinding {
+                do {
+                    let actualPR = try await fetchProtectedResourceMetadata(pdsURL: actualPDSURL)
+                    let authIss = URL(string: authServerMetadata.issuer)
+                    let isListed = authIss.map { actualPR.authorizationServers.contains($0) } ?? false
+                    if !isListed {
+                        LogManager.logError(
+                            "Issuer (\(authServerMetadata.issuer)) not listed by PDS (\(actualPDSURL)) in protected resource metadata",
+                            category: .authentication
+                        )
+                        throw AuthError.authorizationFailed
+                    }
+                } catch {
+                    LogManager.logError(
+                        "Strict PDS/issuer binding check failed: \(error)",
+                        category: .authentication
+                    )
+                    throw error
+                }
             }
         } catch {
             LogManager.logError(
@@ -1357,6 +1402,14 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
             dpopProof = try await createDPoPProof(
                 for: "POST", url: endpoint, type: .authorization, ephemeralKey: providedKey
             )
+            // Include the DPoP JWK thumbprint (jkt) to help bind the session key at PAR
+            do {
+                let jwk = try createJWK(from: providedKey)
+                let thumbprint = try calculateJWKThumbprint(jwk: jwk)
+                parameters["dpop_jkt"] = thumbprint
+            } catch {
+                LogManager.logError("Failed to compute DPoP JKT for PAR: \(error)")
+            }
         }
         // Only use persistent key if NO ephemeral key was provided for the flow
         // (Should only happen if called from a context other than startOAuthFlow/startSignUpFlow)
@@ -1872,6 +1925,11 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
             throw AuthError.tokenRefreshFailed
         }
 
+        // Nonce priming: if we don't have a cached nonce for the token endpoint host, perform a lightweight
+        // priming request to obtain a fresh DPoP-Nonce header before the actual refresh. This avoids the
+        // initial 400/use_dpop_nonce round-trip being counted as a refresh failure.
+        await ensureNonceForTokenEndpoint(endpointURL, did: did)
+
         // Determine the intended audience/resource for this token per RFC 8707.
         // Prefer a one-shot override if provided (set upon detecting invalid audience),
         // otherwise use protected resource metadata value; fall back to the PDS base URL.
@@ -2033,6 +2091,68 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
         } catch {
             LogManager.logError("AuthenticationService - Token refresh network request failed: \(error)")
             throw AuthError.tokenRefreshFailed
+        }
+    }
+
+    /// Ensures a fresh DPoP nonce is cached for the token endpoint's host. If no nonce is present, sends a
+    /// lightweight priming POST (missing refresh_token) with a DPoP proof lacking a nonce to elicit a
+    /// `use_dpop_nonce` response and capture `DPoP-Nonce` for subsequent real refresh.
+    private func ensureNonceForTokenEndpoint(_ endpointURL: URL, did: String) async {
+        guard let domain = endpointURL.host?.lowercased() else { return }
+        do {
+            // Check if we already have a nonce (JKT-scoped preferred; fall back to DID-scoped)
+            let key = try await getOrCreateDPoPKey(for: did)
+            let jwk = try createJWK(from: key)
+            let thumbprint = try calculateJWKThumbprint(jwk: jwk)
+
+            let hasJktInMemory = noncesByThumbprint[thumbprint]?[domain] != nil
+            let hasJktPersist = (try? await storage.getDPoPNoncesByJKT(for: did))?[thumbprint]?[domain] != nil
+            let hasDidPersist = (try? await storage.getDPoPNonces(for: did))?[domain] != nil
+
+            if hasJktInMemory || hasJktPersist || hasDidPersist {
+                return // Already primed
+            }
+
+            // Build a minimal form (missing refresh_token) so the server will 400 and include DPoP-Nonce
+            var req = URLRequest(url: endpointURL)
+            req.httpMethod = "POST"
+            req.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+            let params: [String: String] = [
+                "grant_type": "refresh_token",
+                "client_id": oauthConfig.clientId,
+                "redirect_uri": oauthConfig.redirectUri,
+            ]
+            req.httpBody = encodeFormData(params)
+
+            // Add DPoP proof without nonce
+            let proof = try await createDPoPProof(
+                for: "POST",
+                url: endpointURL.absoluteString,
+                type: .tokenRequest,
+                accessToken: nil,
+                did: did,
+                ephemeralKey: nil,
+                nonce: nil
+            )
+            req.setValue(proof, forHTTPHeaderField: "DPoP")
+
+            // Fire the priming request; skip token refresh
+            let (data, response) = try await networkService.request(req, skipTokenRefresh: true)
+            if let http = response as? HTTPURLResponse {
+                // Capture nonce from any response if provided
+                if let nonce = http.value(forHTTPHeaderField: "DPoP-Nonce") {
+                    _ = await updateAndVerifyNonce(domain: domain, nonce: nonce, did: did)
+                }
+                // If 400 with OAuth error body use_dpop_nonce, we already captured the header above
+                if http.statusCode == 400 {
+                    if let err = try? JSONDecoder().decode(OAuthErrorResponse.self, from: data), err.error == "use_dpop_nonce" {
+                        LogManager.logDebug("Primed DPoP nonce for token endpoint host: \(domain)")
+                    }
+                }
+            }
+        } catch {
+            // Priming is best-effort; ignore failures
+            LogManager.logDebug("Nonce priming skipped due to error: \(error)")
         }
     }
 
@@ -2335,7 +2455,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
         }
     }
 
-    // Canonicalize URL for DPoP htu claim: lowercase scheme/host, drop default ports, ensure path, keep query, drop fragment
+    // Canonicalize URL for DPoP htu claim: lowercase scheme/host, drop default ports, ensure path, DROP query, drop fragment
     private func canonicalHTU(_ url: URL) -> String {
         guard var comps = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
             return url.absoluteString
@@ -2349,6 +2469,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
         }
         if comps.path.isEmpty { comps.path = "/" }
         comps.fragment = nil
+        comps.query = nil // RFC 9449: htu should not include query string
         return comps.string ?? url.absoluteString
     }
 
@@ -2660,6 +2781,16 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
         return URLComponents(url: url, resolvingAgainstBaseURL: false)?
             .queryItems?
             .first(where: { $0.name == "state" })?
+            .value
+    }
+
+    /// Extracts the issuer (iss) from a callback URL if present.
+    /// - Parameter url: The callback URL.
+    /// - Returns: The issuer string if provided by the server.
+    private func extractIssuer(from url: URL) -> String? {
+        return URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?
+            .first(where: { $0.name == "iss" })?
             .value
     }
 

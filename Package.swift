@@ -34,6 +34,9 @@ let package = Package(
                 "jose-swift",
                 "SwiftCBOR",
                 .product(name: "AsyncDNSResolver", package: "swift-async-dns-resolver"),
+            ],
+            swiftSettings: [
+                .swiftLanguageMode(.v6)
             ]
         ),
         .executableTarget(
