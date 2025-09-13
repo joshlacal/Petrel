@@ -6,6 +6,8 @@
 //
 
 import Foundation
+import Darwin
+import Network
 
 /// Protocol for authentication providers
 struct AuthContext: Sendable {
@@ -657,20 +659,19 @@ actor NetworkService: NetworkServiceProtocol {
                                 jkt: authCtx?.jkt
                             )
 
-                            LogManager.logInfo(
+                        LogManager.logInfo(
                                 "Network Service - Nonce storage completed, proceeding with retry.")
                         }
 
-                        retryCount += 1
+                        // Limit nonce-based retry strictly to one attempt
+                        if retryCount >= 1 {
+                            LogManager.logError("Network Service - Already retried once for use_dpop_nonce; aborting further retries.")
+                            throw NetworkError.maxRetryAttemptsReached
+                        }
+                        retryCount = 1
                         LogManager.logInfo(
                             "Network Service - Retrying request (\(retryCount)/\(maxRetries)) after storing DPoP nonce for \(url.absoluteString)."
                         )
-                        if retryCount >= maxRetries {
-                            LogManager.logError(
-                                "Network Service - Max retries reached after 'use_dpop_nonce' error for \(url.absoluteString)."
-                            )
-                            throw NetworkError.maxRetryAttemptsReached // Or authenticationFailed
-                        }
 
                         continue // Continue to the next iteration of the while loop
                     } else if !skipTokenRefresh {
@@ -1003,9 +1004,106 @@ actor NetworkService: NetworkServiceProtocol {
             return false
         }
 
-        // Additional validation could be added here
+        // Resolve host and block private / loopback / link-local / unique-local ranges to mitigate SSRF
+        guard let host = url.host, !host.isEmpty else { return false }
+
+        // Quick check: if host is a literal IP, validate directly; otherwise resolve DNS
+        let ips: [String]
+        if IPv4Address(host) != nil || IPv6Address(host) != nil {
+            ips = [host]
+        } else {
+            ips = resolveHostIPs(host: host)
+        }
+
+        if ips.isEmpty {
+            LogManager.logError("Failed to resolve host: \(host)")
+            return false
+        }
+
+        for ip in ips {
+            if isPrivateOrReserved(ip: ip) {
+                LogManager.logError("Blocked request to private/reserved IP: \(ip) for host \(host)")
+                return false
+            }
+        }
 
         return true
+    }
+
+    // MARK: - SSRF Hardeners
+
+    private func resolveHostIPs(host: String) -> [String] {
+        var results: [String] = []
+        var hints = addrinfo(
+            ai_flags: AI_ADDRCONFIG,
+            ai_family: AF_UNSPEC,
+            ai_socktype: SOCK_STREAM,
+            ai_protocol: 0,
+            ai_addrlen: 0,
+            ai_canonname: nil,
+            ai_addr: nil,
+            ai_next: nil
+        )
+        var res: UnsafeMutablePointer<addrinfo>? = nil
+        let status = getaddrinfo(host, nil, &hints, &res)
+        if status == 0, let head = res {
+            var ptr: UnsafeMutablePointer<addrinfo>? = head
+            while let ai = ptr?.pointee {
+                if let sa = ai.ai_addr {
+                    var hostBuffer = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+                    if getnameinfo(
+                        sa,
+                        socklen_t(ai.ai_addrlen),
+                        &hostBuffer,
+                        socklen_t(hostBuffer.count),
+                        nil,
+                        0,
+                        NI_NUMERICHOST
+                    ) == 0 {
+                        let ip = String(cString: hostBuffer)
+                        results.append(ip)
+                    }
+                }
+                ptr = ai.ai_next
+            }
+            freeaddrinfo(head)
+        }
+        return results
+    }
+
+    private func isPrivateOrReserved(ip: String) -> Bool {
+        // IPv4 checks
+        if let v4 = IPv4Address(ip) {
+            let octets = v4.rawValue
+            let a = Int(octets[0])
+            let b = Int(octets[1])
+
+            // 10.0.0.0/8
+            if a == 10 { return true }
+            // 172.16.0.0/12 (172.16.0.0 - 172.31.255.255)
+            if a == 172 && (16...31).contains(b) { return true }
+            // 192.168.0.0/16
+            if a == 192 && b == 168 { return true }
+            // 127.0.0.0/8 loopback
+            if a == 127 { return true }
+            // 169.254.0.0/16 link-local
+            if a == 169 && b == 254 { return true }
+            // 0.0.0.0/8 and 255.255.255.255 broadcast-like
+            if a == 0 || a == 255 { return true }
+        }
+
+        // IPv6 checks
+        if let v6 = IPv6Address(ip) {
+            let bytes = v6.rawValue
+            // ::1 loopback
+            if bytes == Data(repeating: 0, count: 15) + Data([1]) { return true }
+            // fe80::/10 link-local (1111 1110 10 ..)
+            if (bytes[0] == 0xfe) && ((bytes[1] & 0xc0) == 0x80) { return true }
+            // fc00::/7 unique local
+            if (bytes[0] & 0xfe) == 0xfc { return true }
+        }
+
+        return false
     }
 }
 
