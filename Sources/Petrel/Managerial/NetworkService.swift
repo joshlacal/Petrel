@@ -5,8 +5,8 @@
 //  Created by Josh LaCalamito on 4/22/2025.
 //
 
-import Foundation
 import Darwin
+import Foundation
 import Network
 
 /// Protocol for authentication providers
@@ -659,7 +659,7 @@ actor NetworkService: NetworkServiceProtocol {
                                 jkt: authCtx?.jkt
                             )
 
-                        LogManager.logInfo(
+                            LogManager.logInfo(
                                 "Network Service - Nonce storage completed, proceeding with retry.")
                         }
 
@@ -1081,7 +1081,7 @@ actor NetworkService: NetworkServiceProtocol {
             // 10.0.0.0/8
             if a == 10 { return true }
             // 172.16.0.0/12 (172.16.0.0 - 172.31.255.255)
-            if a == 172 && (16...31).contains(b) { return true }
+            if a == 172 && (16 ... 31).contains(b) { return true }
             // 192.168.0.0/16
             if a == 192 && b == 168 { return true }
             // 127.0.0.0/8 loopback
@@ -1098,9 +1098,9 @@ actor NetworkService: NetworkServiceProtocol {
             // ::1 loopback
             if bytes == Data(repeating: 0, count: 15) + Data([1]) { return true }
             // fe80::/10 link-local (1111 1110 10 ..)
-            if (bytes[0] == 0xfe) && ((bytes[1] & 0xc0) == 0x80) { return true }
+            if (bytes[0] == 0xFE) && ((bytes[1] & 0xC0) == 0x80) { return true }
             // fc00::/7 unique local
-            if (bytes[0] & 0xfe) == 0xfc { return true }
+            if (bytes[0] & 0xFE) == 0xFC { return true }
         }
 
         return false

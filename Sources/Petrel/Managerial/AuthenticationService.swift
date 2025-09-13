@@ -371,7 +371,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
                     throw AuthError.authorizationFailed
                 }
             }
-        } else if oauthConfig.requireIssInCallback && authServerMetadata.authorizationResponseIssParameterSupported {
+        } else if oauthConfig.requireIssInCallback, authServerMetadata.authorizationResponseIssParameterSupported {
             LogManager.logError(
                 "OAuth callback is missing required 'iss' and server indicates support for it.",
                 category: .authentication
