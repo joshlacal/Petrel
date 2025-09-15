@@ -33,7 +33,7 @@ protocol AccountManaging: Actor {
     /// Lists all available accounts.
     /// - Returns: An array of accounts.
     func listAccounts() async -> [Account]
-    
+
     /// Clears the current active account without removing any stored accounts.
     func clearCurrentAccount() async
 }

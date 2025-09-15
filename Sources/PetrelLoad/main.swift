@@ -139,7 +139,7 @@ enum PetrelLoadCLI {
                 try? handle.seekToEnd()
                 PetrelLog.addObserver { event in
                     // Filter if incident-only
-                    if incidentOnly && !event.message.contains("AUTH_INCIDENT") {
+                    if incidentOnly, !event.message.contains("AUTH_INCIDENT") {
                         return
                     }
                     let ts = Int(Date().timeIntervalSince1970)

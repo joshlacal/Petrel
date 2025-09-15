@@ -691,7 +691,7 @@ actor NetworkService: NetworkServiceProtocol {
                             // Also try WWW-Authenticate header from resource server
                             if !isInvalidAudience, let www = httpResponse.value(forHTTPHeaderField: "WWW-Authenticate")?.lowercased() {
                                 // Example: DPoP error="invalid_token", error_description="invalid audience"
-                                if www.contains("error=\"invalid_token\"") && www.contains("invalid audience") { isInvalidAudience = true }
+                                if www.contains("error=\"invalid_token\""), www.contains("invalid audience") { isInvalidAudience = true }
                                 if www.contains("error=\"invalid_audience\"") { isInvalidAudience = true }
                             }
                             if isInvalidAudience, let scheme = url.scheme, let host = url.host {

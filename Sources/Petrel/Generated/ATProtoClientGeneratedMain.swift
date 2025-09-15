@@ -143,11 +143,12 @@ public actor ATProtoClient {
             didResolver: self.didResolver
         )
 
+        // Disable silent auto-switch on logout to avoid confusing UX in multi-account scenarios.
+        // Catbird handles prompting and account selection explicitly.
+        await authService.setAutoSwitchOnLogout(false)
+
         // Now set the authentication provider on the network service
         await networkService.setAuthenticationProvider(authService)
-
-        // Disable auto-switching on logout to avoid unexpected context changes
-        await authService.setAutoSwitchOnLogout(false)
 
         // Try to initialize from stored account
         await initializeFromStoredAccount()
@@ -620,15 +621,6 @@ public actor ATProtoClient {
                 }
             }
 
-            public lazy var label: Label = .init(networkService: self.networkService)
-
-            public final class Label: @unchecked Sendable {
-                let networkService: NetworkService
-                init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
             public lazy var server: Server = .init(networkService: self.networkService)
 
             public final class Server: @unchecked Sendable {
@@ -638,9 +630,9 @@ public actor ATProtoClient {
                 }
             }
 
-            public lazy var lexicon: Lexicon = .init(networkService: self.networkService)
+            public lazy var label: Label = .init(networkService: self.networkService)
 
-            public final class Lexicon: @unchecked Sendable {
+            public final class Label: @unchecked Sendable {
                 let networkService: NetworkService
                 init(networkService: NetworkService) {
                     self.networkService = networkService
@@ -650,6 +642,15 @@ public actor ATProtoClient {
             public lazy var sync: Sync = .init(networkService: self.networkService)
 
             public final class Sync: @unchecked Sendable {
+                let networkService: NetworkService
+                init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+
+            public lazy var lexicon: Lexicon = .init(networkService: self.networkService)
+
+            public final class Lexicon: @unchecked Sendable {
                 let networkService: NetworkService
                 init(networkService: NetworkService) {
                     self.networkService = networkService
