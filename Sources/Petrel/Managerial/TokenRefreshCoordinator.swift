@@ -254,6 +254,19 @@ actor TokenRefreshCoordinator {
         LogManager.logError(
             "TokenRefreshCoordinator: Creating error for status \(statusCode)", category: .authentication
         )
+        // Capture relevant auth headers for diagnostics (filtered, non-sensitive)
+        if let wwwAuth = response.value(forHTTPHeaderField: "WWW-Authenticate") {
+            LogManager.logDebug(
+                "TokenRefreshCoordinator: WWW-Authenticate=\(wwwAuth)",
+                category: .authentication
+            )
+        }
+        if let dpopNonce = response.value(forHTTPHeaderField: "DPoP-Nonce") {
+            LogManager.logDebug(
+                "TokenRefreshCoordinator: DPoP-Nonce present (length=\(dpopNonce.count))",
+                category: .authentication
+            )
+        }
 
         // Try decoding as standard OAuth error first
         if let errorResponse = try? JSONDecoder().decode(OAuthErrorResponse.self, from: data) {
@@ -262,6 +275,14 @@ actor TokenRefreshCoordinator {
             )
             switch errorResponse.error {
             case "invalid_grant":
+                LogManager.logAuthIncident(
+                    "RefreshInvalidGrant",
+                    details: [
+                        "status": statusCode,
+                        "error": errorResponse.error,
+                        "desc": errorResponse.errorDescription ?? "",
+                    ]
+                )
                 return .invalidGrant(errorResponse.errorDescription)
             case "use_dpop_nonce", "invalid_dpop_proof":
                 return .dpopError(errorResponse.errorDescription)

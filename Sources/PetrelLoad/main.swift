@@ -18,6 +18,12 @@ enum PetrelLoadCLI {
           --body         JSON string body for POST
           --unauth       Send without auth/DPoP (for baseline)
           --timeout      Per-request timeout seconds. Default: 30
+          --keep-running Continuously loop the test until terminated
+          --target-rps   Target requests per second (best-effort)
+
+        Logging:
+          --log-file     Append JSONL logs to this file (incidents + warnings/errors)
+          --incident-only  Only write AUTH_INCIDENT lines to log file
 
         OAuth Stress Testing:
           --oauth-stress              Run OAuth stress test suite
@@ -83,6 +89,9 @@ enum PetrelLoadCLI {
         let timeout = TimeInterval(args["timeout"] ?? "30") ?? 30
         let bodyString = args["body"]
         let targetRps = Double(args["target-rps"] ?? "0") ?? 0
+        let keepRunning = (args["keep-running"] ?? "false").lowercased() == "true"
+        let logFilePath = args["log-file"]
+        let incidentOnly = (args["incident-only"] ?? "false").lowercased() == "true"
 
         // OAuth stress testing options
         let oauthStressMode = (args["oauth-stress"] ?? "false").lowercased() == "true"
@@ -117,6 +126,43 @@ enum PetrelLoadCLI {
             oauthConfig: oauthConfig,
             namespace: namespace
         )
+
+        // Setup log forwarder if requested
+        if let logFilePath, !logFilePath.isEmpty {
+            let fileURL = URL(fileURLWithPath: logFilePath)
+            // Ensure directory exists
+            try? FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            if !FileManager.default.fileExists(atPath: fileURL.path) {
+                FileManager.default.createFile(atPath: fileURL.path, contents: nil)
+            }
+            if let handle = try? FileHandle(forWritingTo: fileURL) {
+                try? handle.seekToEnd()
+                PetrelLog.addObserver { event in
+                    // Filter if incident-only
+                    if incidentOnly && !event.message.contains("AUTH_INCIDENT") {
+                        return
+                    }
+                    let ts = Int(Date().timeIntervalSince1970)
+                    let line = [
+                        "ts": ts,
+                        "level": String(describing: event.level),
+                        "category": String(describing: event.category),
+                        "msg": event.message,
+                    ] as [String: Any]
+                    let data: Data
+                    if JSONSerialization.isValidJSONObject(line), let d = try? JSONSerialization.data(withJSONObject: line, options: []) {
+                        data = d
+                    } else {
+                        data = ("{\"ts\":\(ts),\"msg\":\"" + event.message.replacingOccurrences(of: "\"", with: "\\\"") + "\"}\n").data(using: .utf8) ?? Data()
+                    }
+                    try? handle.write(contentsOf: data)
+                    try? handle.write(contentsOf: "\n".data(using: .utf8)!)
+                }
+                print("✓ Logging Petrel events to \(fileURL.path) (incidentOnly=\(incidentOnly))")
+            } else {
+                fputs("WARN: Failed to open log file: \(logFilePath)\n", stderr)
+            }
+        }
 
         // Debug: Check if the client has an account and what base URL it's using after init
         print("DEBUG - After ATProtoClient initialization:")
@@ -322,8 +368,16 @@ enum PetrelLoadCLI {
         }
 
         // Default: run ATProtoClient stress test
-        print("Running stress test with ATProtoClient...")
-        await runBasicStressTest(client: client, endpoint: endpoint, iterations: total, concurrency: concurrency)
+        if keepRunning {
+            print("Running continuous stress test. Press Ctrl+C to stop.")
+            while true {
+                await runBasicStressTest(client: client, endpoint: endpoint, iterations: total, concurrency: concurrency)
+                try? await Task.sleep(nanoseconds: 2_000_000_000) // 2s pause between loops
+            }
+        } else {
+            print("Running stress test with ATProtoClient...")
+            await runBasicStressTest(client: client, endpoint: endpoint, iterations: total, concurrency: concurrency)
+        }
     }
 }
 

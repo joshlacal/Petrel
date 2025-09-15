@@ -9,7 +9,7 @@ import Foundation
 import os.log
 
 public struct PetrelLogEvent: Sendable {
-    public enum Level: Sendable { case debug, info, error }
+    public enum Level: Sendable { case debug, info, warning, error }
     public let level: Level
     public let category: LogCategory
     public let message: String
@@ -75,6 +75,13 @@ class LogManager {
             getLogger(for: category).debug("\(message, privacy: .public)")
         #endif
         notifyObservers(.init(level: .debug, category: category, message: message))
+    }
+
+    /// Warning-level logging for noteworthy but non-fatal issues
+    static func logWarning(_ message: String, category: LogCategory = .general) {
+        // Use info channel to ensure widest platform compatibility
+        getLogger(for: category).info("\(message, privacy: .public)")
+        notifyObservers(.init(level: .warning, category: category, message: message))
     }
 
     static func logError(_ message: String, category: LogCategory = .general) {
@@ -173,6 +180,34 @@ class LogManager {
 
     static func logError(_ error: Error, category: LogCategory = .general) {
         logError("Error: \(error.localizedDescription)", category: category)
+    }
+
+    /// Emits a structured authentication incident with rich context as a single-line JSON payload
+    /// - Parameters:
+    ///   - type: Incident type (e.g., "RefreshInvalidGrant", "AccountAutoSwitched", "LogoutNoAutoSwitch")
+    ///   - details: Arbitrary key-value context (strings, numbers, bools)
+    ///   - category: Log category (defaults to authentication)
+    static func logAuthIncident(_ type: String, details: [String: Any], category: LogCategory = .authentication) {
+        var payload: [String: Any] = [
+            "type": type,
+            "ts": Int(Date().timeIntervalSince1970),
+        ]
+        // Merge details, do not overwrite core keys
+        details.forEach { k, v in if payload[k] == nil { payload[k] = v } }
+
+        let json: String
+        if JSONSerialization.isValidJSONObject(payload),
+           let data = try? JSONSerialization.data(withJSONObject: payload, options: [])
+        {
+            json = String(data: data, encoding: .utf8) ?? "{}"
+        } else {
+            // Best-effort fallback
+            json = "{\"type\":\"\(type)\"}"
+        }
+
+        // Emit as a warning to stand out without being fatal
+        let line = "AUTH_INCIDENT \(json)"
+        logWarning(line, category: category)
     }
 
     private static func getLogger(for category: LogCategory) -> os.Logger {

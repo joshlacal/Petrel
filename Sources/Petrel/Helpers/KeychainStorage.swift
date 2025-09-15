@@ -164,9 +164,15 @@ public actor KeychainStorage {
         } catch let KeychainError.itemRetrievalError(status) where status == errSecItemNotFound {
             LogManager.logDebug("DPoP key not found in Keychain for DID: \(did). A new key will be generated if needed.")
             return nil
+        } catch let KeychainError.itemRetrievalError(status) {
+            // For any other keychain retrieval error (e.g., errSecAuthFailed while device locked),
+            // do NOT rotate the DPoP key. Propagate the error so callers can treat this as transient.
+            LogManager.logError("Keychain retrieval error for DPoP key (status=\(status)) for DID: \(did). Will NOT rotate key.")
+            throw KeychainError.itemRetrievalError(status: status)
         } catch {
-            LogManager.logError("Failed to retrieve DPoP key from Keychain (error: \(error)). A new key will be generated if needed.")
-            return nil
+            // Unknown error — propagate so callers can avoid key rotation
+            LogManager.logError("Failed to retrieve DPoP key from Keychain (error: \(error)). Will NOT rotate key.")
+            throw error
         }
     }
 
