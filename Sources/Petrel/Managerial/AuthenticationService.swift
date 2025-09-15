@@ -991,7 +991,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
 
     /// Controls whether logout should automatically switch to another stored account.
     /// Set to false to treat logout as catastrophic and require explicit re-auth.
-    public func setAutoSwitchOnLogout(_ enabled: Bool) {
+    func setAutoSwitchOnLogout(_ enabled: Bool) {
         autoSwitchOnLogout = enabled
         LogManager.logInfo("AuthenticationService: autoSwitchOnLogout set to \(enabled)", category: .authentication)
     }
@@ -1975,7 +1975,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
                 do {
                     try KeychainManager.delete(key: key, namespace: storage.namespace)
                     LogManager.logDebug("Cleared refresh in-progress flag for DID: \(did)")
-                } catch KeychainError.itemRetrievalError(let status) where status == errSecItemNotFound {
+                } catch let KeychainError.itemRetrievalError(status) where status == errSecItemNotFound {
                     // This is expected if the key doesn't exist - not an error
                     LogManager.logDebug("Refresh in-progress flag was already cleared for DID: \(did)")
                 } catch {
@@ -1983,7 +1983,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
                     // Don't throw - this is not critical for refresh operation
                 }
             }
-        } catch KeychainError.itemStoreError(let status) where status == errSecAuthFailed {
+        } catch let KeychainError.itemStoreError(status) where status == errSecAuthFailed {
             LogManager.logError("Keychain authentication failed for refresh progress tracking - device may be locked")
             // Don't throw for auth failures - continue without progress tracking
         } catch {
