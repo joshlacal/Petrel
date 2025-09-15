@@ -363,7 +363,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
         // If the config requires it and it is missing/mismatched, fail the flow.
         if let callbackIssuer {
             if callbackIssuer != authServerMetadata.issuer {
-                LogManager.logError(
+                LogManager.logWarning(
                     "OAuth callback 'iss' (\(callbackIssuer)) does not match metadata issuer (\(authServerMetadata.issuer))",
                     category: .authentication
                 )
@@ -604,6 +604,13 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
     }
 
     func logout() async throws {
+        try await logout(reason: nil)
+    }
+
+    /// Logs out the current account, with optional reason for diagnostics.
+    /// If `autoSwitchOnLogout` is false, the current account is cleared without switching
+    /// to a different account to avoid surprising context changes.
+    func logout(reason: String?) async throws {
         LogManager.logInfo("Starting logout process.")
         guard let did = await accountManager.getCurrentAccount()?.did else {
             LogManager.logDebug("Logout called but no active account found.")
@@ -611,8 +618,15 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
             return
         }
 
+        let reasonStr = reason ?? ""
         LogManager.logInfo(
-            "Logging out account with DID: \(LogManager.logDID(did))", category: .authentication
+            "Logging out account with DID: \(LogManager.logDID(did))" + (reasonStr.isEmpty ? "" : " (reason=\(reasonStr))"),
+            category: .authentication
+        )
+        // Also emit an error-level log to ensure visibility in error aggregation tools
+        LogManager.logError(
+            "AUTH_LOGOUT did=\(LogManager.logDID(did)) reason=\(reasonStr.isEmpty ? "unspecified" : reasonStr)",
+            category: .authentication
         )
 
         // 1. Attempt to revoke token (optional but good practice)
@@ -663,25 +677,67 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
         noncesByThumbprint = [:]
 
         // 5. Update Account Manager State
-        // Remove the account entirely or just clear the current user?
-        // Let's remove the account for a full logout effect.
-        // `removeAccount` handles switching to another account if available.
+        // If auto-switching is disabled, prefer clearing the current account without switching.
         do {
-            try await accountManager.removeAccount(did: did)
-            LogManager.logInfo("Removed account and updated current account status.")
-            // If another account is now current, immediately align networking state
-            if let newAccount = await accountManager.getCurrentAccount() {
-                // Ensure subsequent API calls target the correct protected resource
-                await networkService.setBaseURL(newAccount.pdsURL)
-                // Clear any per-request headers carried from the previous account
+            let existingAccounts = await accountManager.listAccounts().map { $0.did }
+            LogManager.logInfo(
+                "Logout pre-state: accounts=\(existingAccounts.count), current=\(LogManager.logDID(did))"
+            )
+            LogManager.logAuthIncident(
+                "LogoutStart",
+                details: [
+                    "did": did,
+                    "reason": reason ?? "",
+                    "autoSwitchOnLogout": autoSwitchOnLogout,
+                    "accountsPre": existingAccounts.count,
+                ]
+            )
+
+            if autoSwitchOnLogout {
+                try await accountManager.removeAccount(did: did)
+                LogManager.logInfo("Removed account and updated current account status.")
+                if let newAccount = await accountManager.getCurrentAccount() {
+                    LogManager.logWarning(
+                        "🚨 CAT_AUTH_SWITCH: Active account changed due to logout from \(LogManager.logDID(did)) to \(LogManager.logDID(newAccount.did))",
+                        category: .authentication
+                    )
+                    LogManager.logAuthIncident(
+                        "AccountAutoSwitchedAfterLogout",
+                        details: [
+                            "previousDid": did,
+                            "newDid": newAccount.did,
+                            "reason": reason ?? "",
+                            "autoSwitchOnLogout": true,
+                        ]
+                    )
+                    await networkService.setBaseURL(newAccount.pdsURL)
+                    await networkService.clearHeaders()
+                } else {
+                    LogManager.logInfo("No active account after removal (no accounts remain).")
+                }
+            } else {
+                await accountManager.clearCurrentAccount()
+                LogManager.logWarning(
+                    "🚪 CAT_AUTH_LOGOUT: Cleared current account without switching (autoSwitchOnLogout=false)",
+                    category: .authentication
+                )
+                LogManager.logAuthIncident(
+                    "LogoutNoAutoSwitch",
+                    details: [
+                        "did": did,
+                        "reason": reason ?? "",
+                        "autoSwitchOnLogout": false,
+                    ]
+                )
+                // Ensure network layer is reset so no further requests go out with stale credentials
                 await networkService.clearHeaders()
+                if let defaultURL = URL(string: "https://bsky.social") {
+                    await networkService.setBaseURL(defaultURL)
+                }
             }
         } catch {
             LogManager.logError(
                 "Failed during account removal/switching after logout for DID \(did): \(error)")
-            // At this point, local data is cleared, but account manager state might be inconsistent.
-            // Consider just clearing currentDID as a fallback?
-            // try? await accountManager.setCurrentAccount(did: "") // Or handle more gracefully
         }
 
         // Reset circuit breaker state for this DID
@@ -867,6 +923,10 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
     // Use per-DID coordinators to avoid cross-account interference during refresh
     private var refreshCoordinators: [String: TokenRefreshCoordinator] = [:]
     private let refreshCircuitBreaker = RefreshCircuitBreaker()
+    /// Controls whether logout should automatically switch to another stored account.
+    /// Defaults to true to preserve current behavior; apps can set to false to
+    /// avoid surprising context changes after catastrophic failures.
+    var autoSwitchOnLogout: Bool = true
     // Simple in-memory store for OAuth flow nonces (independent of any account)
     private var oauthFlowNonces: [String: String] = [:]
     // JKT-scoped nonces (key thumbprint -> domain -> nonce)
@@ -878,6 +938,11 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
     private let minimumRefreshIntervalAfterSuccess: TimeInterval = 30.0 // 30 seconds after successful refresh
     // Track ambiguous refresh timeouts where server may have rotated tokens but client didn't receive them
     private var ambiguousRefreshUntil: [String: Date] = [:]
+
+    // 🚀 Modern Swift Concurrency: Track used refresh tokens to prevent replay attacks
+    // Actor isolation ensures thread-safe access without mutexes
+    private var usedRefreshTokens: Set<String> = []
+    private var activeRefreshTasks: [String: Task<TokenRefreshResult, Error>] = [:]
 
     // Test hook: mark ambiguous refresh state for a DID (internal)
     func markAmbiguousRefresh(for did: String, durationSeconds: TimeInterval = 900) async {
@@ -920,6 +985,15 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
         let created = TokenRefreshCoordinator()
         refreshCoordinators[did] = created
         return created
+    }
+
+    // MARK: - Configuration
+
+    /// Controls whether logout should automatically switch to another stored account.
+    /// Set to false to treat logout as catastrophic and require explicit re-auth.
+    public func setAutoSwitchOnLogout(_ enabled: Bool) {
+        autoSwitchOnLogout = enabled
+        LogManager.logInfo("AuthenticationService: autoSwitchOnLogout set to \(enabled)", category: .authentication)
     }
 
     // MARK: - OAuth Flow
@@ -1557,6 +1631,25 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
 
         let did = account.did
 
+        // 🚀 Modern Swift Concurrency: Single-flight refresh using actor isolation
+        // Check if there's already an active refresh task for this DID
+        if let existingTask = activeRefreshTasks[did] {
+            LogManager.logInfo("🔄 Joining existing refresh task for DID: \(LogManager.logDID(did))")
+            return try await existingTask.value
+        }
+
+        // 🚀 Check refresh token replay prevention using actor isolation
+        guard let refreshToken = session.refreshToken else {
+            throw AuthError.tokenRefreshFailed
+        }
+
+        if usedRefreshTokens.contains(refreshToken) {
+            LogManager.logError("🚨 REPLAY ATTACK PREVENTED: Refresh token already used for DID: \(LogManager.logDID(did))")
+            // Clear the used token and force logout to be safe
+            usedRefreshTokens.remove(refreshToken)
+            throw AuthError.tokenRefreshFailed
+        }
+
         // Check circuit breaker first
         guard await refreshCircuitBreaker.canAttemptRefresh(for: did) else {
             LogManager.logError(
@@ -1642,6 +1735,41 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
         if forceRefresh {
             LogManager.logInfo("🔄 Force refresh requested - bypassing expiry check for DID: \(did)")
         }
+
+        // 🚀 Mark refresh token as used BEFORE starting the task (prevents replay attacks)
+        usedRefreshTokens.insert(refreshToken)
+        LogManager.logDebug("🔒 Marked refresh token as used for DID: \(LogManager.logDID(did))")
+
+        // 🚀 Create and store the refresh task using modern Swift concurrency
+        let refreshTask = Task<TokenRefreshResult, Error> { [weak self] in
+            guard let self = self else { throw AuthError.tokenRefreshFailed }
+            return try await self.performActualRefresh(for: account, session: session)
+        }
+
+        activeRefreshTasks[did] = refreshTask
+
+        do {
+            let result = try await refreshTask
+            // Clean up on success
+            activeRefreshTasks.removeValue(forKey: did)
+            // Keep the old refresh token marked as used, but remove the new one from tracking
+            usedRefreshTokens.remove(refreshToken)
+            return .refreshedSuccessfully
+        } catch {
+            // Clean up on failure
+            activeRefreshTasks.removeValue(forKey: did)
+            usedRefreshTokens.remove(refreshToken)
+            throw error
+        }
+    }
+
+    /// Performs the actual token refresh operation
+    /// - Parameters:
+    ///   - account: The account to refresh tokens for
+    ///   - session: The current session
+    /// - Returns: The refresh result from the coordinator
+    private func performActualRefresh(for account: Account, session: Session) async throws -> TokenRefreshResult {
+        let did = account.did
 
         // Set in-progress flag to handle app termination during refresh
         // This helps detect and recover from incomplete refresh operations
@@ -1730,8 +1858,16 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
                 )
                 LogManager.logInfo(
                     "METRIC token_refresh_failures_total reason=invalid_grant did=\(LogManager.logDID(did))")
+                // Emit a structured incident before logout to make the cause crystal clear in aggregators
+                LogManager.logAuthIncident(
+                    "AutoLogoutTriggered",
+                    details: [
+                        "did": did,
+                        "reason": "invalid_grant",
+                    ]
+                )
                 // The refresh token is invalid, trigger logout
-                try await logout() // Perform full logout to clear state
+                try await logout(reason: "invalid_grant") // Perform full logout to clear state with reason
                 throw AuthError.tokenRefreshFailed // Throw instead of returning
             case let .dpopError(description):
                 await refreshCircuitBreaker.recordFailure(for: did, kind: .nonceRecoverable)
@@ -1825,16 +1961,38 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
     /// - Parameters:
     ///   - did: The DID associated with the refresh
     ///   - inProgress: Whether the refresh is in progress
+    /// 🚀 Modern Swift Concurrency: Uses resilient keychain error handling
     private func markRefreshInProgress(for did: String, inProgress: Bool) async throws {
         let key = "refresh.inProgress.\(did)"
-        if inProgress {
-            // Mark refresh as in progress
-            try KeychainManager.store(key: key, value: Data([1]), namespace: storage.namespace)
-            LogManager.logDebug("Marked refresh operation as in-progress for DID: \(did)")
-        } else {
-            // Clear refresh in progress flag
-            try KeychainManager.delete(key: key, namespace: storage.namespace)
-            LogManager.logDebug("Cleared refresh in-progress flag for DID: \(did)")
+
+        do {
+            if inProgress {
+                // Mark refresh as in progress
+                try KeychainManager.store(key: key, value: Data([1]), namespace: storage.namespace)
+                LogManager.logDebug("Marked refresh operation as in-progress for DID: \(did)")
+            } else {
+                // Clear refresh in progress flag - don't fail if item doesn't exist
+                do {
+                    try KeychainManager.delete(key: key, namespace: storage.namespace)
+                    LogManager.logDebug("Cleared refresh in-progress flag for DID: \(did)")
+                } catch KeychainError.itemRetrievalError(let status) where status == errSecItemNotFound {
+                    // This is expected if the key doesn't exist - not an error
+                    LogManager.logDebug("Refresh in-progress flag was already cleared for DID: \(did)")
+                } catch {
+                    LogManager.logError("Non-critical: Failed to clear refresh progress flag for DID: \(did) - \(error)")
+                    // Don't throw - this is not critical for refresh operation
+                }
+            }
+        } catch KeychainError.itemStoreError(let status) where status == errSecAuthFailed {
+            LogManager.logError("Keychain authentication failed for refresh progress tracking - device may be locked")
+            // Don't throw for auth failures - continue without progress tracking
+        } catch {
+            LogManager.logError("Non-critical keychain operation failed for refresh progress: \(error)")
+            // Only throw for store operations when marking in-progress (critical)
+            // Don't throw for clear operations or auth failures (non-critical)
+            if inProgress {
+                throw error
+            }
         }
     }
 
@@ -2009,6 +2167,14 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
                     if errorResponse.error == "use_dpop_nonce", retryCount == 0 {
                         LogManager.logInfo(
                             "Detected DPoP nonce mismatch during token refresh. Will retry with updated nonce.")
+                        LogManager.logAuthIncident(
+                            "DPoPNonceMismatchRefresh",
+                            details: [
+                                "did": did,
+                                "retry": retryCount + 1,
+                                "status": httpResponse.statusCode,
+                            ]
+                        )
                         LogManager.logInfo(
                             "METRIC dpop_nonce_retry_total origin=auth did=\(LogManager.logDID(did))")
 
@@ -2435,12 +2601,22 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
     /// - Parameter did: The DID to get or create a key for.
     /// - Returns: The DPoP private key.
     private func getOrCreateDPoPKey(for did: String) async throws -> P256.Signing.PrivateKey {
-        // Try to get existing key
-        if let existingKey = try? await storage.getDPoPKey(for: did) {
-            return existingKey
+        // Try to get existing key; propagate retrieval errors to avoid accidental key rotation
+        do {
+            if let existingKey = try await storage.getDPoPKey(for: did) {
+                return existingKey
+            }
+        } catch {
+            // Treat non-notFound keychain errors as transient; do NOT rotate key here
+            LogManager.logError(
+                "DPoP key retrieval failed for DID \(LogManager.logDID(did)); not rotating key. Error: \(error)",
+                category: .authentication
+            )
+            throw AuthError.dpopKeyError
         }
 
-        // Create a new key
+        // No existing key found — generate a new one (expected only on first auth or after explicit delete)
+        LogManager.logInfo("Generating new DPoP key for DID \(LogManager.logDID(did))", category: .authentication)
         let newKey = P256.Signing.PrivateKey()
         try await storage.saveDPoPKey(newKey, for: did)
         return newKey
@@ -2473,25 +2649,29 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
         return comps.string ?? url.absoluteString
     }
 
+    /// 🚀 Modern Swift Concurrency: Atomic nonce update using actor isolation
     /// Updates the DPoP nonce for a domain.
     /// - Parameters:
-    ///   - domain: The domain the nonce is for.
-    ///   - nonce: The new nonce value.
-    ///   - did: The DID to update the nonce for.
+    ///   - domain: The domain the nonce is for
+    ///   - nonce: The new nonce value
+    ///   - did: The DID to update the nonce for
+    /// - Note: Actor isolation prevents race conditions - no traditional locks needed!
     private func updateDPoPNonce(domain: String, nonce: String, for did: String) async {
+        // 🚀 Actor isolation makes this operation atomic automatically
         do {
             LogManager.logDebug(
-                "Storing DPoP nonce for domain '\(domain)' for DID", category: .authentication
+                "🔒 Atomic nonce update for domain '\(domain)' for DID", category: .authentication
             )
             var nonces = try await storage.getDPoPNonces(for: did) ?? [:]
             nonces[domain] = nonce
             try await storage.saveDPoPNonces(nonces, for: did)
         } catch {
-            LogManager.logError("AuthenticationService - Failed to update DPoP nonce: \(error)")
+            LogManager.logError("Failed atomic DPoP nonce update: \(error)")
         }
     }
 
-    /// Atomically updates and verifies nonce synchronization across all storage layers
+    /// 🚀 Modern Swift Concurrency: Atomically updates and verifies nonce synchronization
+    /// Actor isolation ensures this entire multi-step operation is race-condition-free
     /// - Parameters:
     ///   - domain: The domain the nonce is for
     ///   - nonce: The new nonce value

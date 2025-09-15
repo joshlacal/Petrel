@@ -33,6 +33,9 @@ protocol AccountManaging: Actor {
     /// Lists all available accounts.
     /// - Returns: An array of accounts.
     func listAccounts() async -> [Account]
+    
+    /// Clears the current active account without removing any stored accounts.
+    func clearCurrentAccount() async
 }
 
 /// Actor responsible for managing user accounts.
@@ -42,6 +45,11 @@ actor AccountManager: AccountManaging {
 
     /// The current active DID
     private var currentDID: String?
+
+    /// Whether to automatically switch to another account when the current one is removed.
+    /// Defaults to true to preserve existing behavior. Can be toggled by higher-level services
+    /// (e.g., AuthenticationService) to prevent unexpected account switching after logout.
+    var autoSwitchOnRemoval: Bool = true
 
     /// Initializes a new AccountManager with the specified storage.
     /// - Parameter storage: The KeychainStorage instance to use for account data.
@@ -95,14 +103,29 @@ actor AccountManager: AccountManaging {
         if currentDID == did {
             currentDID = nil
 
-            // Try to switch to another account if available
+            // Try to switch to another account if available, unless disabled
             let dids = try await storage.listAccountDIDs()
-            if let firstDID = dids.first {
+            if autoSwitchOnRemoval, let firstDID = dids.first {
+                let previous = did
                 try await setCurrentAccount(did: firstDID)
+                LogManager.logWarning(
+                    "🚨 CAT_AUTH_SWITCH: Auto-switched active account from \(LogManager.logDID(previous)) to \(LogManager.logDID(firstDID)) after removal.",
+                    category: .authentication
+                )
+                LogManager.logAuthIncident(
+                    "AccountAutoSwitchAfterRemoval",
+                    details: [
+                        "previousDid": previous,
+                        "newDid": firstDID,
+                        "autoSwitchOnRemoval": true,
+                    ]
+                )
                 LogManager.logInfo("AccountManager - Switched to account with DID: \(firstDID)")
             } else {
                 try await storage.saveCurrentDID("")
-                LogManager.logInfo("AccountManager - No accounts left, cleared current DID")
+                LogManager.logInfo(
+                    "AccountManager - Auto-switch disabled or no accounts left, cleared current DID"
+                )
             }
         }
 
@@ -154,6 +177,28 @@ actor AccountManager: AccountManaging {
         } catch {
             LogManager.logError("AccountManager - Failed to list accounts: \(error)")
             return []
+        }
+    }
+
+    /// Clears the current active account without removing any stored accounts.
+    /// Useful when a logout should not implicitly switch to another account.
+    func clearCurrentAccount() async {
+        let previous = currentDID
+        currentDID = nil
+        do {
+            try await storage.saveCurrentDID("")
+            LogManager.logWarning(
+                "🚪 CAT_AUTH_LOGOUT: Cleared current active account (was=\(LogManager.logDID(previous))) without switching",
+                category: .authentication
+            )
+            LogManager.logAuthIncident(
+                "LogoutClearedCurrentAccount",
+                details: [
+                    "previousDid": previous ?? "",
+                ]
+            )
+        } catch {
+            LogManager.logError("AccountManager - Failed to clear current DID: \(error)")
         }
     }
 }

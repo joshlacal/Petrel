@@ -146,6 +146,9 @@ public actor ATProtoClient {
         // Now set the authentication provider on the network service
         await networkService.setAuthenticationProvider(authService)
 
+        // Disable auto-switching on logout to avoid unexpected context changes
+        await authService.setAutoSwitchOnLogout(false)
+
         // Try to initialize from stored account
         await initializeFromStoredAccount()
     }
