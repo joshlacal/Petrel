@@ -201,7 +201,7 @@ public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConve
         // scheme = ALPHA *( ALPHA / DIGIT / "+" / "-" / "." ) ':'
         // Use a lightweight regex
         let pattern = "^[A-Za-z][A-Za-z0-9+.-]*:"
-        return s.range(of: pattern, options: .regularExpression).map { _ in String(s.prefix { $0 != ":" } ) }
+        return s.range(of: pattern, options: .regularExpression).map { _ in String(s.prefix { $0 != ":" }) }
     }
 
     public func isValid() -> Bool {
