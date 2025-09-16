@@ -132,27 +132,36 @@ public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConve
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
-        let uriString = try container.decode(String.self)
+        let raw = try container.decode(String.self).trimmingCharacters(in: .whitespacesAndNewlines)
 
-        if uriString.starts(with: "did:") {
+        if raw.starts(with: "did:") {
             isDID = true
-            let components = uriString.split(separator: ":")
-            guard components.count >= 3 else {
-                throw URIError.invalidDID
-            }
+            let components = raw.split(separator: ":")
+            guard components.count >= 3 else { throw URIError.invalidDID }
             scheme = String(components[0])
             authority = String(components[1])
             path = components.count > 2 ? components.dropFirst(2).joined(separator: ":") : nil
             query = nil
             fragment = nil
         } else {
+            // Defensive parse for non-DID URIs: reject obviously malformed strings like "//"
+            // Require a non-empty scheme and avoid passing bad input to URLComponents.
             isDID = false
-            let urlComponents = URLComponents(string: uriString)
-            scheme = urlComponents?.scheme ?? ""
-            authority = urlComponents?.host ?? ""
-            path = urlComponents?.path.isEmpty ?? true ? nil : urlComponents?.path
-            query = urlComponents?.query
-            fragment = urlComponents?.fragment
+            if raw.isEmpty || raw.hasPrefix("//") || URI.detectScheme(in: raw) == nil {
+                // Safe fallback to a benign invalid host
+                scheme = "https"
+                authority = "invalid.invalid"
+                path = nil
+                query = nil
+                fragment = nil
+            } else {
+                let comps = URLComponents(string: raw)
+                scheme = comps?.scheme ?? ""
+                authority = comps?.host ?? ""
+                path = comps?.path.isEmpty ?? true ? nil : comps?.path
+                query = comps?.query
+                fragment = comps?.fragment
+            }
         }
     }
 
@@ -167,14 +176,32 @@ public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConve
             fragment = nil
         } else {
             isDID = false
-            let urlComponents = URLComponents(string: uriString)
-            let defaultScheme = "https"
-            scheme = urlComponents?.scheme ?? defaultScheme
-            authority = urlComponents?.host ?? ""
-            path = urlComponents?.path.isEmpty ?? true ? nil : urlComponents?.path
-            query = urlComponents?.query
-            fragment = urlComponents?.fragment
+            let raw = uriString.trimmingCharacters(in: .whitespacesAndNewlines)
+            if raw.isEmpty || raw.hasPrefix("//") || URI.detectScheme(in: raw) == nil {
+                // Safe fallback
+                scheme = "https"
+                authority = "invalid.invalid"
+                path = nil
+                query = nil
+                fragment = nil
+            } else {
+                let comps = URLComponents(string: raw)
+                let defaultScheme = "https"
+                scheme = comps?.scheme ?? defaultScheme
+                authority = comps?.host ?? ""
+                path = comps?.path.isEmpty ?? true ? nil : comps?.path
+                query = comps?.query
+                fragment = comps?.fragment
+            }
         }
+    }
+
+    // Detect a valid URI scheme prefix (e.g., https:, http:, ftp:, etc.)
+    private static func detectScheme(in s: String) -> String? {
+        // scheme = ALPHA *( ALPHA / DIGIT / "+" / "-" / "." ) ':'
+        // Use a lightweight regex
+        let pattern = "^[A-Za-z][A-Za-z0-9+.-]*:"
+        return s.range(of: pattern, options: .regularExpression).map { _ in String(s.prefix { $0 != ":" } ) }
     }
 
     public func isValid() -> Bool {
