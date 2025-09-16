@@ -1,49 +1,60 @@
 import Foundation
 
+
+
 // lexicon: 1, id: app.bsky.unspecced.getConfig
 
-public enum AppBskyUnspeccedGetConfig {
-    public static let typeIdentifier = "app.bsky.unspecced.getConfig"
 
-    public struct LiveNowConfig: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.unspecced.getConfig#liveNowConfig"
-        public let did: DID
-        public let domains: [String]
+public struct AppBskyUnspeccedGetConfig { 
+
+    public static let typeIdentifier = "app.bsky.unspecced.getConfig"
+        
+public struct LiveNowConfig: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.unspecced.getConfig#liveNowConfig"
+            public let did: DID
+            public let domains: [String]
 
         // Standard initializer
         public init(
             did: DID, domains: [String]
         ) {
+            
             self.did = did
             self.domains = domains
         }
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                did = try container.decode(DID.self, forKey: .did)
-
+                
+                self.did = try container.decode(DID.self, forKey: .did)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'did': \(error)")
                 throw error
             }
             do {
-                domains = try container.decode([String].self, forKey: .domains)
-
+                
+                self.domains = try container.decode([String].self, forKey: .domains)
+                
             } catch {
                 LogManager.logError("Decoding error for property 'domains': \(error)")
                 throw error
             }
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
             try container.encode(did, forKey: .did)
-
+            
+            
             try container.encode(domains, forKey: .domains)
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -52,17 +63,20 @@ public enum AppBskyUnspeccedGetConfig {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
             guard let other = other as? Self else { return false }
-
-            if did != other.did {
+            
+            if self.did != other.did {
                 return false
             }
-
-            if domains != other.domains {
+            
+            
+            if self.domains != other.domains {
                 return false
             }
-
+            
             return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -75,11 +89,19 @@ public enum AppBskyUnspeccedGetConfig {
 
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
+            
+            
+            
             let didValue = try did.toCBORValue()
             map = map.adding(key: "did", value: didValue)
-
+            
+            
+            
+            
             let domainsValue = try domains.toCBORValue()
             map = map.adding(key: "domains", value: domainsValue)
+            
+            
 
             return map
         }
@@ -90,79 +112,112 @@ public enum AppBskyUnspeccedGetConfig {
             case domains
         }
     }
-
-    public struct Output: ATProtocolCodable {
+    
+public struct Output: ATProtocolCodable {
+        
+        
         public let checkEmailConfirmed: Bool?
-
+        
         public let liveNow: [LiveNowConfig]?
-
+        
+        
+        
         // Standard public initializer
         public init(
+            
             checkEmailConfirmed: Bool? = nil,
-
+            
             liveNow: [LiveNowConfig]? = nil
-
+            
+            
         ) {
+            
             self.checkEmailConfirmed = checkEmailConfirmed
-
+            
             self.liveNow = liveNow
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
-            checkEmailConfirmed = try container.decodeIfPresent(Bool.self, forKey: .checkEmailConfirmed)
-
-            liveNow = try container.decodeIfPresent([LiveNowConfig].self, forKey: .liveNow)
+            
+            
+            self.checkEmailConfirmed = try container.decodeIfPresent(Bool.self, forKey: .checkEmailConfirmed)
+            
+            
+            self.liveNow = try container.decodeIfPresent([LiveNowConfig].self, forKey: .liveNow)
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(checkEmailConfirmed, forKey: .checkEmailConfirmed)
-
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(liveNow, forKey: .liveNow)
+            
+            
         }
 
         public func toCBORValue() throws -> Any {
+            
             var map = OrderedCBORMap()
 
+            
+            
             if let value = checkEmailConfirmed {
                 // Encode optional property even if it's an empty array for CBOR
                 let checkEmailConfirmedValue = try value.toCBORValue()
                 map = map.adding(key: "checkEmailConfirmed", value: checkEmailConfirmedValue)
             }
-
+            
+            
+            
             if let value = liveNow {
                 // Encode optional property even if it's an empty array for CBOR
                 let liveNowValue = try value.toCBORValue()
                 map = map.adding(key: "liveNow", value: liveNowValue)
             }
+            
+            
 
             return map
+            
         }
-
+        
         private enum CodingKeys: String, CodingKey {
+            
             case checkEmailConfirmed
             case liveNow
+            
         }
     }
+
+
+
+
 }
 
-public extension ATProtoClient.App.Bsky.Unspecced {
+
+extension ATProtoClient.App.Bsky.Unspecced {
     // MARK: - getConfig
 
     /// Get miscellaneous runtime configuration.
-    ///
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    func getConfig() async throws -> (responseCode: Int, data: AppBskyUnspeccedGetConfig.Output?) {
+    public func getConfig() async throws -> (responseCode: Int, data: AppBskyUnspeccedGetConfig.Output?) {
         let endpoint = "app.bsky.unspecced.getConfig"
 
+        
         let queryItems: [URLQueryItem]? = nil
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -171,8 +226,9 @@ public extension ATProtoClient.App.Bsky.Unspecced {
             queryItems: queryItems
         )
 
+        
         let (responseData, response) = try await networkService.performRequest(urlRequest)
-
+        
         let responseCode = response.statusCode
 
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
@@ -183,9 +239,22 @@ public extension ATProtoClient.App.Bsky.Unspecced {
             throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
         }
 
-        let decoder = JSONDecoder()
-        let decodedData = try? decoder.decode(AppBskyUnspeccedGetConfig.Output.self, from: responseData)
-
-        return (responseCode, decodedData)
+        // Only decode response data if request was successful
+        if (200...299).contains(responseCode) {
+            do {
+                
+                let decoder = JSONDecoder()
+                let decodedData = try decoder.decode(AppBskyUnspeccedGetConfig.Output.self, from: responseData)
+                
+                return (responseCode, decodedData)
+            } catch {
+                // Log the decoding error for debugging but still return the response code
+                LogManager.logError("Failed to decode successful response for app.bsky.unspecced.getConfig: \(error)")
+                return (responseCode, nil)
+            }
+        } else {
+            // Don't try to decode error responses as success types
+            return (responseCode, nil)
+        }
     }
-}
+}                           

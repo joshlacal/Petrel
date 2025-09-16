@@ -40,15 +40,26 @@ extension ATProtoClient.{{ template_namespace_name }} {
             throw NetworkError.invalidContentType(expected: "{{ output_encoding }}", actual: contentType)
         }
 
-        {% if output_encoding == "application/json" %}
-        let decoder = JSONDecoder()
-        let decodedData = try? decoder.decode({{ output_type }}.self, from: responseData)
-        {% elif output_encoding in ["*/*", "application/vnd.ipld.car", "application/jsonl"] %}
-        let decodedData = {{ output_type }}(data: responseData)
-        {% else %}
-        let decodedData = {{ output_type }}(data: responseData)
-        {% endif %}
-
-        return (responseCode, decodedData)
+        // Only decode response data if request was successful
+        if (200...299).contains(responseCode) {
+            do {
+                {% if output_encoding == "application/json" %}
+                let decoder = JSONDecoder()
+                let decodedData = try decoder.decode({{ output_type }}.self, from: responseData)
+                {% elif output_encoding in ["*/*", "application/vnd.ipld.car", "application/jsonl"] %}
+                let decodedData = {{ output_type }}(data: responseData)
+                {% else %}
+                let decodedData = {{ output_type }}(data: responseData)
+                {% endif %}
+                return (responseCode, decodedData)
+            } catch {
+                // Log the decoding error for debugging but still return the response code
+                LogManager.logError("Failed to decode successful response for {{ endpoint }}: \(error)")
+                return (responseCode, nil)
+            }
+        } else {
+            // Don't try to decode error responses as success types
+            return (responseCode, nil)
+        }
     }
 }
