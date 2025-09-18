@@ -157,7 +157,27 @@ actor AccountManager: AccountManaging {
             return nil
         }
 
-        return await getAccount(did: did)
+        guard let account = await getAccount(did: did) else {
+            LogManager.logError("AccountManager - Current DID \(did) exists but account not found in storage")
+            // Clear the current DID if the account doesn't exist
+            currentDID = nil
+            try? await storage.saveCurrentDID("")
+            return nil
+        }
+
+        // Validate that the account has a corresponding session
+        do {
+            let session = try await storage.getSession(for: did)
+            if session == nil {
+                LogManager.logWarning("AccountManager - Account \(LogManager.logDID(did)) exists but has no session token. This indicates an inconsistent authentication state.", category: .authentication)
+                // Don't clear the account automatically as it might be recoverable
+                // Just log the inconsistency for monitoring purposes
+            }
+        } catch {
+            LogManager.logError("AccountManager - Failed to check session for account \(LogManager.logDID(did)): \(error)")
+        }
+
+        return account
     }
 
     /// Lists all available accounts.
