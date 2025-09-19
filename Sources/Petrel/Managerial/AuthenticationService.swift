@@ -2328,13 +2328,31 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
     /// - Parameter request: The original request to authenticate.
     /// - Returns: The request with authentication headers added.
     func prepareAuthenticatedRequest(_ request: URLRequest) async throws -> URLRequest {
-        guard let account = await accountManager.getCurrentAccount(),
-              let session = try? await storage.getSession(for: account.did)
-        else {
+        guard let account = await accountManager.getCurrentAccount() else {
             // Log the URL that triggered this error for easier debugging
             LogManager.logError(
                 "prepareAuthenticatedRequest: No active account for non-auth endpoint: \(request.url?.absoluteString ?? "Unknown URL")"
             )
+            throw AuthError.noActiveAccount as Error
+        }
+
+        // Check if session exists and handle missing session case
+        var session: Session?
+        do {
+            session = try await storage.getSession(for: account.did)
+        } catch {
+            LogManager.logError("Failed to retrieve session for account \(LogManager.logDID(account.did)): \(error)")
+            throw AuthError.noActiveAccount as Error
+        }
+
+        guard let session = session else {
+            LogManager.logError(
+                "prepareAuthenticatedRequest: Account exists but session is missing for DID: \(LogManager.logDID(account.did)). This indicates an inconsistent authentication state."
+            )
+            
+            // Clear the inconsistent state and require re-authentication
+            try? await accountManager.clearCurrentAccount()
+            
             throw AuthError.noActiveAccount as Error
         }
 
@@ -2400,12 +2418,41 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
     func prepareAuthenticatedRequestWithContext(_ request: URLRequest) async throws -> (
         URLRequest, AuthContext
     ) {
-        guard let account = await accountManager.getCurrentAccount(),
-              let session = try? await storage.getSession(for: account.did)
-        else {
+        guard let account = await accountManager.getCurrentAccount() else {
             LogManager.logError(
                 "prepareAuthenticatedRequestWithContext: No active account for non-auth endpoint: \(request.url?.absoluteString ?? "Unknown URL")"
             )
+            throw AuthError.noActiveAccount as Error
+        }
+
+        // Check if session exists and attempt recovery if missing
+        var session: Session?
+        do {
+            session = try await storage.getSession(for: account.did)
+        } catch {
+            LogManager.logError("Failed to retrieve session for account \(LogManager.logDID(account.did)): \(error)")
+            throw AuthError.noActiveAccount as Error
+        }
+
+        guard let session = session else {
+            LogManager.logError(
+                "prepareAuthenticatedRequestWithContext: Account exists but session is missing for DID: \(LogManager.logDID(account.did)). This indicates an inconsistent authentication state that requires user re-authentication."
+            )
+            
+            // Log this as an authentication incident for monitoring
+            LogManager.logAuthIncident(
+                "SessionMissingForAccount",
+                details: [
+                    "did": account.did,
+                    "endpoint": request.url?.absoluteString ?? "Unknown URL",
+                    "accountExists": true,
+                    "sessionExists": false
+                ]
+            )
+            
+            // Clear the inconsistent state and require re-authentication
+            try? await accountManager.clearCurrentAccount()
+            
             throw AuthError.noActiveAccount as Error
         }
 
