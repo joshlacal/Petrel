@@ -99,22 +99,63 @@ public actor KeychainStorage {
     ///   - session: The session to save
     ///   - did: The DID associated with the session
     public func saveSession(_ session: Session, for did: String) async throws {
-        // First, save to a temporary location to ensure atomic updates
-        let tempKey = makeKey("session.temp", did: did)
         let key = makeKey("session", did: did)
+        let tempKey = makeKey("session.temp", did: did)
+        let backupKey = makeKey("session.backup", did: did)
         let data = try JSONEncoder().encode(session)
 
-        // Use a versioned approach to prevent partial updates
-        // First save to temp location
-        try KeychainManager.store(key: tempKey, value: data, namespace: namespace)
+        // Improved atomic save operation with better error handling and recovery
+        do {
+            // Step 1: Create backup of existing session if it exists
+            if let existingData = try? KeychainManager.retrieve(key: key, namespace: namespace) {
+                try KeychainManager.store(key: backupKey, value: existingData, namespace: namespace)
+                LogManager.logDebug("Session backup created for DID: \(did)")
+            }
 
-        // Then move to final location atomically
-        try KeychainManager.store(key: key, value: data, namespace: namespace)
+            // Step 2: Save to temporary location first
+            try KeychainManager.store(key: tempKey, value: data, namespace: namespace)
+            LogManager.logDebug("Session saved to temporary location for DID: \(did)")
 
-        // Cleanup temp storage
-        try? KeychainManager.delete(key: tempKey, namespace: namespace)
+            // Step 3: Atomic move to final location
+            try KeychainManager.store(key: key, value: data, namespace: namespace)
+            LogManager.logDebug("Session moved to final location for DID: \(did)")
 
-        LogManager.logDebug("Session saved atomically for DID: \(did)")
+            // Step 4: Verify the save was successful by reading it back
+            let verificationData = try KeychainManager.retrieve(key: key, namespace: namespace)
+            let verifiedSession = try JSONDecoder().decode(Session.self, from: verificationData)
+            
+            // Basic verification that the session has required fields
+            guard !verifiedSession.accessToken.isEmpty else {
+                throw KeychainError.dataFormatError
+            }
+            
+            LogManager.logDebug("Session save verification successful for DID: \(did)")
+
+            // Step 5: Cleanup temporary files
+            try? KeychainManager.delete(key: tempKey, namespace: namespace)
+            try? KeychainManager.delete(key: backupKey, namespace: namespace)
+            
+            LogManager.logDebug("Session saved atomically and verified for DID: \(did)")
+            
+        } catch {
+            LogManager.logError("Session save failed for DID: \(did), error: \(error)")
+            
+            // Recovery: Attempt to restore from backup if final save failed
+            if let backupData = try? KeychainManager.retrieve(key: backupKey, namespace: namespace) {
+                do {
+                    try KeychainManager.store(key: key, value: backupData, namespace: namespace)
+                    LogManager.logDebug("Session restored from backup for DID: \(did)")
+                } catch {
+                    LogManager.logError("Failed to restore session backup for DID: \(did), error: \(error)")
+                }
+            }
+            
+            // Cleanup temporary files in error case
+            try? KeychainManager.delete(key: tempKey, namespace: namespace)
+            try? KeychainManager.delete(key: backupKey, namespace: namespace)
+            
+            throw error
+        }
     }
 
     /// Retrieves a session from the keychain.
@@ -122,10 +163,47 @@ public actor KeychainStorage {
     /// - Returns: The session if found, or nil if not found
     public func getSession(for did: String) async throws -> Session? {
         let key = makeKey("session", did: did)
+        let tempKey = makeKey("session.temp", did: did)
+        let backupKey = makeKey("session.backup", did: did)
+        
         do {
             let data = try KeychainManager.retrieve(key: key, namespace: namespace)
             return try JSONDecoder().decode(Session.self, from: data)
         } catch {
+            LogManager.logDebug("Failed to retrieve session from primary location for DID: \(LogManager.logDID(did)), attempting recovery")
+            
+            // Try to recover from temporary location if primary failed
+            if let tempData = try? KeychainManager.retrieve(key: tempKey, namespace: namespace) {
+                do {
+                    let session = try JSONDecoder().decode(Session.self, from: tempData)
+                    LogManager.logDebug("Session recovered from temporary location for DID: \(LogManager.logDID(did))")
+                    
+                    // Try to restore to primary location
+                    try? KeychainManager.store(key: key, value: tempData, namespace: namespace)
+                    try? KeychainManager.delete(key: tempKey, namespace: namespace)
+                    
+                    return session
+                } catch {
+                    LogManager.logError("Failed to decode session from temporary location for DID: \(LogManager.logDID(did))")
+                }
+            }
+            
+            // Try to recover from backup location if primary and temp failed
+            if let backupData = try? KeychainManager.retrieve(key: backupKey, namespace: namespace) {
+                do {
+                    let session = try JSONDecoder().decode(Session.self, from: backupData)
+                    LogManager.logDebug("Session recovered from backup location for DID: \(LogManager.logDID(did))")
+                    
+                    // Try to restore to primary location
+                    try? KeychainManager.store(key: key, value: backupData, namespace: namespace)
+                    try? KeychainManager.delete(key: backupKey, namespace: namespace)
+                    
+                    return session
+                } catch {
+                    LogManager.logError("Failed to decode session from backup location for DID: \(LogManager.logDID(did))")
+                }
+            }
+            
             return nil
         }
     }
