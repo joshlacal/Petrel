@@ -2349,10 +2349,10 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
             LogManager.logError(
                 "prepareAuthenticatedRequest: Account exists but session is missing for DID: \(LogManager.logDID(account.did)). This indicates an inconsistent authentication state."
             )
-            
+
             // Clear the inconsistent state and require re-authentication
             try? await accountManager.clearCurrentAccount()
-            
+
             throw AuthError.noActiveAccount as Error
         }
 
@@ -2438,7 +2438,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
             LogManager.logError(
                 "prepareAuthenticatedRequestWithContext: Account exists but session is missing for DID: \(LogManager.logDID(account.did)). This indicates an inconsistent authentication state that requires user re-authentication."
             )
-            
+
             // Log this as an authentication incident for monitoring
             LogManager.logAuthIncident(
                 "SessionMissingForAccount",
@@ -2446,13 +2446,13 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
                     "did": account.did,
                     "endpoint": request.url?.absoluteString ?? "Unknown URL",
                     "accountExists": true,
-                    "sessionExists": false
+                    "sessionExists": false,
                 ]
             )
-            
+
             // Clear the inconsistent state and require re-authentication
             try? await accountManager.clearCurrentAccount()
-            
+
             throw AuthError.noActiveAccount as Error
         }
 

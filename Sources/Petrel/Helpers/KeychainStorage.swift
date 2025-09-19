@@ -123,23 +123,23 @@ public actor KeychainStorage {
             // Step 4: Verify the save was successful by reading it back
             let verificationData = try KeychainManager.retrieve(key: key, namespace: namespace)
             let verifiedSession = try JSONDecoder().decode(Session.self, from: verificationData)
-            
+
             // Basic verification that the session has required fields
             guard !verifiedSession.accessToken.isEmpty else {
                 throw KeychainError.dataFormatError
             }
-            
+
             LogManager.logDebug("Session save verification successful for DID: \(did)")
 
             // Step 5: Cleanup temporary files
             try? KeychainManager.delete(key: tempKey, namespace: namespace)
             try? KeychainManager.delete(key: backupKey, namespace: namespace)
-            
+
             LogManager.logDebug("Session saved atomically and verified for DID: \(did)")
-            
+
         } catch {
             LogManager.logError("Session save failed for DID: \(did), error: \(error)")
-            
+
             // Recovery: Attempt to restore from backup if final save failed
             if let backupData = try? KeychainManager.retrieve(key: backupKey, namespace: namespace) {
                 do {
@@ -149,11 +149,11 @@ public actor KeychainStorage {
                     LogManager.logError("Failed to restore session backup for DID: \(did), error: \(error)")
                 }
             }
-            
+
             // Cleanup temporary files in error case
             try? KeychainManager.delete(key: tempKey, namespace: namespace)
             try? KeychainManager.delete(key: backupKey, namespace: namespace)
-            
+
             throw error
         }
     }
@@ -165,45 +165,45 @@ public actor KeychainStorage {
         let key = makeKey("session", did: did)
         let tempKey = makeKey("session.temp", did: did)
         let backupKey = makeKey("session.backup", did: did)
-        
+
         do {
             let data = try KeychainManager.retrieve(key: key, namespace: namespace)
             return try JSONDecoder().decode(Session.self, from: data)
         } catch {
             LogManager.logDebug("Failed to retrieve session from primary location for DID: \(LogManager.logDID(did)), attempting recovery")
-            
+
             // Try to recover from temporary location if primary failed
             if let tempData = try? KeychainManager.retrieve(key: tempKey, namespace: namespace) {
                 do {
                     let session = try JSONDecoder().decode(Session.self, from: tempData)
                     LogManager.logDebug("Session recovered from temporary location for DID: \(LogManager.logDID(did))")
-                    
+
                     // Try to restore to primary location
                     try? KeychainManager.store(key: key, value: tempData, namespace: namespace)
                     try? KeychainManager.delete(key: tempKey, namespace: namespace)
-                    
+
                     return session
                 } catch {
                     LogManager.logError("Failed to decode session from temporary location for DID: \(LogManager.logDID(did))")
                 }
             }
-            
+
             // Try to recover from backup location if primary and temp failed
             if let backupData = try? KeychainManager.retrieve(key: backupKey, namespace: namespace) {
                 do {
                     let session = try JSONDecoder().decode(Session.self, from: backupData)
                     LogManager.logDebug("Session recovered from backup location for DID: \(LogManager.logDID(did))")
-                    
+
                     // Try to restore to primary location
                     try? KeychainManager.store(key: key, value: backupData, namespace: namespace)
                     try? KeychainManager.delete(key: backupKey, namespace: namespace)
-                    
+
                     return session
                 } catch {
                     LogManager.logError("Failed to decode session from backup location for DID: \(LogManager.logDID(did))")
                 }
             }
-            
+
             return nil
         }
     }
