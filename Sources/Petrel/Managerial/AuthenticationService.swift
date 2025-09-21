@@ -2385,17 +2385,21 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
             LogManager.logError(
                 "prepareAuthenticatedRequest: Account exists but session is missing for DID: \(LogManager.logDID(account.did)). This indicates an inconsistent authentication state."
             )
-<<<<<<< HEAD
+
+            // Record an authentication incident for monitoring/telemetry
+            LogManager.logAuthIncident(
+                "SessionMissingForAccount",
+                details: [
+                    "did": account.did,
+                    "endpoint": request.url?.absoluteString ?? "Unknown URL",
+                    "accountExists": true,
+                    "sessionExists": false
+                ]
+            )
 
             // Clear the inconsistent state and require re-authentication
             try? await accountManager.clearCurrentAccount()
 
-=======
-            
-            // Clear the inconsistent state and require re-authentication
-            try? await accountManager.clearCurrentAccount()
-            
->>>>>>> pr/1
             throw AuthError.noActiveAccount as Error
         }
 
@@ -2481,11 +2485,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
             LogManager.logError(
                 "prepareAuthenticatedRequestWithContext: Account exists but session is missing for DID: \(LogManager.logDID(account.did)). This indicates an inconsistent authentication state that requires user re-authentication."
             )
-<<<<<<< HEAD
 
-=======
-            
->>>>>>> pr/1
             // Log this as an authentication incident for monitoring
             LogManager.logAuthIncident(
                 "SessionMissingForAccount",
@@ -2493,23 +2493,13 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
                     "did": account.did,
                     "endpoint": request.url?.absoluteString ?? "Unknown URL",
                     "accountExists": true,
-<<<<<<< HEAD
-                    "sessionExists": false,
-                ]
-            )
-
-            // Clear the inconsistent state and require re-authentication
-            try? await accountManager.clearCurrentAccount()
-
-=======
                     "sessionExists": false
                 ]
             )
-            
+
             // Clear the inconsistent state and require re-authentication
             try? await accountManager.clearCurrentAccount()
-            
->>>>>>> pr/1
+
             throw AuthError.noActiveAccount as Error
         }
 
