@@ -1,66 +1,102 @@
 import Foundation
 
+
+
 // lexicon: 1, id: app.bsky.actor.getPreferences
 
-public enum AppBskyActorGetPreferences {
-    public static let typeIdentifier = "app.bsky.actor.getPreferences"
-    public struct Parameters: Parametrizable {
+
+public struct AppBskyActorGetPreferences { 
+
+    public static let typeIdentifier = "app.bsky.actor.getPreferences"    
+public struct Parameters: Parametrizable {
+        
         public init(
-        ) {}
+            ) {
+            
+        }
     }
-
-    public struct Output: ATProtocolCodable {
+    
+public struct Output: ATProtocolCodable {
+        
+        
         public let preferences: AppBskyActorDefs.Preferences
-
+        
+        
+        
         // Standard public initializer
         public init(
+            
             preferences: AppBskyActorDefs.Preferences
-
+            
+            
         ) {
+            
             self.preferences = preferences
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
-            preferences = try container.decode(AppBskyActorDefs.Preferences.self, forKey: .preferences)
+            
+            
+            self.preferences = try container.decode(AppBskyActorDefs.Preferences.self, forKey: .preferences)
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
+            
             try container.encode(preferences, forKey: .preferences)
+            
+            
         }
 
         public func toCBORValue() throws -> Any {
+            
             var map = OrderedCBORMap()
 
+            
+            
             let preferencesValue = try preferences.toCBORValue()
             map = map.adding(key: "preferences", value: preferencesValue)
+            
+            
 
             return map
+            
         }
-
+        
         private enum CodingKeys: String, CodingKey {
+            
             case preferences
+            
         }
     }
+
+
+
+
 }
 
-public extension ATProtoClient.App.Bsky.Actor {
+
+extension ATProtoClient.App.Bsky.Actor {
     // MARK: - getPreferences
 
     /// Get private preferences attached to the current account. Expected use is synchronization between multiple devices, and import/export during account migration. Requires auth.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-    ///
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    func getPreferences(input: AppBskyActorGetPreferences.Parameters) async throws -> (responseCode: Int, data: AppBskyActorGetPreferences.Output?) {
+    public func getPreferences(input: AppBskyActorGetPreferences.Parameters) async throws -> (responseCode: Int, data: AppBskyActorGetPreferences.Output?) {
         let endpoint = "app.bsky.actor.getPreferences"
 
+        
         let queryItems = input.asQueryItems()
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -69,8 +105,9 @@ public extension ATProtoClient.App.Bsky.Actor {
             queryItems: queryItems
         )
 
+        
         let (responseData, response) = try await networkService.performRequest(urlRequest)
-
+        
         let responseCode = response.statusCode
 
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
@@ -82,11 +119,12 @@ public extension ATProtoClient.App.Bsky.Actor {
         }
 
         // Only decode response data if request was successful
-        if (200 ... 299).contains(responseCode) {
+        if (200...299).contains(responseCode) {
             do {
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(AppBskyActorGetPreferences.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -98,4 +136,4 @@ public extension ATProtoClient.App.Bsky.Actor {
             return (responseCode, nil)
         }
     }
-}
+}                           

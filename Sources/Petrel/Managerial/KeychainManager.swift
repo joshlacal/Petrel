@@ -78,7 +78,7 @@ enum KeychainManager {
         #if os(iOS)
             return kSecAttrAccessibleAfterFirstUnlock
         #elseif os(macOS)
-            return kSecAttrAccessibleWhenUnlocked
+            return kSecAttrAccessibleAfterFirstUnlock
         #endif
     }
 
