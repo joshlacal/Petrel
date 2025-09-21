@@ -532,18 +532,18 @@ public actor ATProtoClient {
                 }
             }
 
-            public lazy var labeler: Labeler = .init(networkService: self.networkService)
+            public lazy var richtext: Richtext = .init(networkService: self.networkService)
 
-            public final class Labeler: @unchecked Sendable {
+            public final class Richtext: @unchecked Sendable {
                 let networkService: NetworkService
                 init(networkService: NetworkService) {
                     self.networkService = networkService
                 }
             }
 
-            public lazy var richtext: Richtext = .init(networkService: self.networkService)
+            public lazy var labeler: Labeler = .init(networkService: self.networkService)
 
-            public final class Richtext: @unchecked Sendable {
+            public final class Labeler: @unchecked Sendable {
                 let networkService: NetworkService
                 init(networkService: NetworkService) {
                     self.networkService = networkService
@@ -658,18 +658,18 @@ public actor ATProtoClient {
                 }
             }
 
-            public lazy var lexicon: Lexicon = .init(networkService: self.networkService)
+            public lazy var sync: Sync = .init(networkService: self.networkService)
 
-            public final class Lexicon: @unchecked Sendable {
+            public final class Sync: @unchecked Sendable {
                 let networkService: NetworkService
                 init(networkService: NetworkService) {
                     self.networkService = networkService
                 }
             }
 
-            public lazy var sync: Sync = .init(networkService: self.networkService)
+            public lazy var lexicon: Lexicon = .init(networkService: self.networkService)
 
-            public final class Sync: @unchecked Sendable {
+            public final class Lexicon: @unchecked Sendable {
                 let networkService: NetworkService
                 init(networkService: NetworkService) {
                     self.networkService = networkService
