@@ -150,11 +150,30 @@ public actor ATProtoClient {
         // Now set the authentication provider on the network service
         await networkService.setAuthenticationProvider(authService)
 
+        // Validate and repair authentication state before initialization
+        await validateAuthenticationState()
+
         // Try to initialize from stored account
         await initializeFromStoredAccount()
     }
 
     // MARK: - Initialization Helpers
+
+    /// Validates and repairs authentication state to prevent race condition issues.
+    private func validateAuthenticationState() async {
+        let validationResult = await storage.validateAndRepairAuthenticationState()
+
+        if validationResult.hasIssues {
+            LogManager.logInfo("Authentication state validation completed: \(validationResult.summary)")
+
+            // If we had to clean up orphaned accounts, notify the delegate
+            if !validationResult.cleanedOrphanedAccounts.isEmpty {
+                LogManager.logWarning("Cleaned up \(validationResult.cleanedOrphanedAccounts.count) orphaned accounts due to race condition. Users may need to re-authenticate.")
+            }
+        } else {
+            LogManager.logDebug("Authentication state validation: no issues found")
+        }
+    }
 
     /// Attempts to initialize the client from a stored account.
     private func initializeFromStoredAccount() async {
@@ -310,7 +329,7 @@ public actor ATProtoClient {
 
         // Store it temporarily for immediate access
         justAuthenticatedAccount = accountInfo
-        LogManager.logInfo("🔍 DEBUG: Stored temporary account info: \(accountInfo.did)")
+        LogManager.logDebug("Stored temporary account info: \(accountInfo.did)")
 
         // After successful authentication, reinitialize the client state
         await initializeFromStoredAccount()
@@ -331,40 +350,40 @@ public actor ATProtoClient {
     /// Gets the current account information.
     /// - Returns: A tuple containing the DID, handle, and PDS URL of the current account.
     public func getActiveAccountInfo() async -> (did: String?, handle: String?, pdsURL: URL?) {
-        LogManager.logInfo("🔍 DEBUG: getActiveAccountInfo called")
+        LogManager.logDebug("getActiveAccountInfo called")
 
         // Check temporary storage first (for immediate access after OAuth)
         if let tempAccount = justAuthenticatedAccount {
-            LogManager.logInfo("🔍 DEBUG: Found temporary account: \(tempAccount.did)")
+            LogManager.logDebug("Found temporary account: \(tempAccount.did)")
 
             // Always try AccountManager first, but don't clear temp storage yet
             if let account = await accountManager.getCurrentAccount(), account.did == tempAccount.did {
-                LogManager.logInfo("🔍 DEBUG: AccountManager ready, using AccountManager but keeping temp storage")
+                LogManager.logDebug("AccountManager ready, using AccountManager but keeping temp storage")
                 // Don't clear temp storage yet - let it persist for multiple calls during OAuth completion
                 return (did: account.did, handle: account.handle, pdsURL: account.pdsURL)
             } else {
-                LogManager.logInfo("🔍 DEBUG: AccountManager not ready, using temp account")
+                LogManager.logDebug("AccountManager not ready, using temp account")
                 // AccountManager not ready yet, return temp account
                 return (did: tempAccount.did, handle: tempAccount.handle, pdsURL: tempAccount.pdsURL)
             }
         } else {
-            LogManager.logInfo("🔍 DEBUG: No temporary account found")
+            LogManager.logDebug("No temporary account found")
         }
 
         // Fall back to normal AccountManager query
-        LogManager.logInfo("🔍 DEBUG: Falling back to AccountManager query")
+        LogManager.logDebug("Falling back to AccountManager query")
         if let account = await accountManager.getCurrentAccount() {
-            LogManager.logInfo("🔍 DEBUG: AccountManager returned account: \(account.did)")
+            LogManager.logDebug("AccountManager returned account: \(account.did)")
             return (did: account.did, handle: account.handle, pdsURL: account.pdsURL)
         } else {
-            LogManager.logInfo("🔍 DEBUG: AccountManager returned nil - this is the problem!")
+            LogManager.logWarning("AccountManager returned nil - authentication state may be inconsistent")
             return (did: nil, handle: nil, pdsURL: nil)
         }
     }
 
     /// Clears temporary account storage after OAuth completion
     public func clearTemporaryAccountStorage() async {
-        LogManager.logInfo("🔍 DEBUG: Clearing temporary account storage")
+        LogManager.logDebug("Clearing temporary account storage")
         justAuthenticatedAccount = nil
     }
 
