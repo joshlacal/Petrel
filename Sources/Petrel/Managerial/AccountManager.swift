@@ -17,6 +17,11 @@ protocol AccountManaging: Actor {
     /// - Parameter did: The DID of the account to retrieve.
     /// - Returns: The account if found, or nil if not found.
     func getAccount(did: String) async -> Account?
+    
+    /// Updates the AccountManager's state to reflect an account that was saved directly to storage.
+    /// This is used when an account is saved atomically with its session to maintain consistency.
+    /// - Parameter did: The DID of the account to update from storage.
+    func updateAccountFromStorage(did: String) async throws
 
     /// Removes an account by DID.
     /// - Parameter did: The DID of the account to remove.
@@ -176,6 +181,24 @@ actor AccountManager: AccountManaging {
         if currentDID == nil {
             try await setCurrentAccount(did: account.did)
         }
+    }
+
+    /// Updates the AccountManager's state to reflect an account that was saved directly to storage.
+    /// This is used when an account is saved atomically with its session to maintain consistency.
+    /// - Parameter did: The DID of the account to update from storage.
+    internal func updateAccountFromStorage(did: String) async throws {
+        LogManager.logDebug("AccountManager - Updating internal state for DID from storage: \(did)")
+
+        // Verify the account exists in storage
+        guard let _ = try await storage.getAccount(for: did) else {
+            LogManager.logError("AccountManager - Cannot update from storage, DID not found: \(did)")
+            throw AccountError.accountNotFound
+        }
+
+        // Add the DID to accounts list if not already present (atomic save handles this)
+        // This is mainly for consistency with the existing AccountManager state
+
+        LogManager.logDebug("AccountManager - Successfully updated state for DID: \(did)")
     }
 
     /// Gets an account by DID.

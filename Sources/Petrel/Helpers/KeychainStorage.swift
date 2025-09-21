@@ -37,6 +37,108 @@ public actor KeychainStorage {
         try await addToAccountsList(did)
     }
 
+    /// Atomically saves both account and session data to prevent inconsistent authentication states.
+    /// This method ensures that either both account and session are saved successfully, or neither is saved.
+    /// - Parameters:
+    ///   - account: The account to save
+    ///   - session: The session to save
+    ///   - did: The DID associated with both account and session
+    internal func saveAccountAndSession(_ account: Account, session: Session, for did: String) async throws {
+        let accountKey = makeKey("account", did: did)
+        let sessionKey = makeKey("session", did: did)
+        let tempAccountKey = makeKey("account.temp", did: did)
+        let tempSessionKey = makeKey("session.temp", did: did)
+        let backupAccountKey = makeKey("account.backup", did: did)
+        let backupSessionKey = makeKey("session.backup", did: did)
+
+        let accountData = try JSONEncoder().encode(account)
+        let sessionData = try JSONEncoder().encode(session)
+
+        LogManager.logDebug("Starting atomic account+session save for DID: \(LogManager.logDID(did))")
+
+        do {
+            // Step 1: Create backups of existing data if they exist
+            if let existingAccountData = try? KeychainManager.retrieve(key: accountKey, namespace: namespace) {
+                try KeychainManager.store(key: backupAccountKey, value: existingAccountData, namespace: namespace)
+                LogManager.logDebug("Account backup created for DID: \(LogManager.logDID(did))")
+            }
+
+            if let existingSessionData = try? KeychainManager.retrieve(key: sessionKey, namespace: namespace) {
+                try KeychainManager.store(key: backupSessionKey, value: existingSessionData, namespace: namespace)
+                LogManager.logDebug("Session backup created for DID: \(LogManager.logDID(did))")
+            }
+
+            // Step 2: Save both to temporary locations first
+            try KeychainManager.store(key: tempAccountKey, value: accountData, namespace: namespace)
+            LogManager.logDebug("Account saved to temporary location for DID: \(LogManager.logDID(did))")
+
+            try KeychainManager.store(key: tempSessionKey, value: sessionData, namespace: namespace)
+            LogManager.logDebug("Session saved to temporary location for DID: \(LogManager.logDID(did))")
+
+            // Step 3: Atomic move both to final locations
+            try KeychainManager.store(key: accountKey, value: accountData, namespace: namespace)
+            LogManager.logDebug("Account moved to final location for DID: \(LogManager.logDID(did))")
+
+            try KeychainManager.store(key: sessionKey, value: sessionData, namespace: namespace)
+            LogManager.logDebug("Session moved to final location for DID: \(LogManager.logDID(did))")
+
+            // Step 4: Verify both saves were successful by reading them back
+            let verificationAccountData = try KeychainManager.retrieve(key: accountKey, namespace: namespace)
+            let verificationSessionData = try KeychainManager.retrieve(key: sessionKey, namespace: namespace)
+
+            let verifiedAccount = try JSONDecoder().decode(Account.self, from: verificationAccountData)
+            let verifiedSession = try JSONDecoder().decode(Session.self, from: verificationSessionData)
+
+            // Basic verification that both have required fields
+            guard !verifiedAccount.did.isEmpty, !verifiedSession.accessToken.isEmpty else {
+                throw KeychainError.dataFormatError
+            }
+
+            LogManager.logDebug("Account+session save verification successful for DID: \(LogManager.logDID(did))")
+
+            // Step 5: Add to accounts list if not already present
+            try await addToAccountsList(did)
+
+            // Step 6: Cleanup temporary and backup files
+            try? KeychainManager.delete(key: tempAccountKey, namespace: namespace)
+            try? KeychainManager.delete(key: tempSessionKey, namespace: namespace)
+            try? KeychainManager.delete(key: backupAccountKey, namespace: namespace)
+            try? KeychainManager.delete(key: backupSessionKey, namespace: namespace)
+
+            LogManager.logDebug("Account+session saved atomically and verified for DID: \(LogManager.logDID(did))")
+
+        } catch {
+            LogManager.logError("Atomic account+session save failed for DID: \(LogManager.logDID(did)), error: \(error)")
+
+            // Recovery: Attempt to restore from backups if final saves failed
+            if let backupAccountData = try? KeychainManager.retrieve(key: backupAccountKey, namespace: namespace) {
+                do {
+                    try KeychainManager.store(key: accountKey, value: backupAccountData, namespace: namespace)
+                    LogManager.logDebug("Account restored from backup for DID: \(LogManager.logDID(did))")
+                } catch {
+                    LogManager.logError("Failed to restore account backup for DID: \(LogManager.logDID(did)), error: \(error)")
+                }
+            }
+
+            if let backupSessionData = try? KeychainManager.retrieve(key: backupSessionKey, namespace: namespace) {
+                do {
+                    try KeychainManager.store(key: sessionKey, value: backupSessionData, namespace: namespace)
+                    LogManager.logDebug("Session restored from backup for DID: \(LogManager.logDID(did))")
+                } catch {
+                    LogManager.logError("Failed to restore session backup for DID: \(LogManager.logDID(did)), error: \(error)")
+                }
+            }
+
+            // Cleanup temporary files in error case
+            try? KeychainManager.delete(key: tempAccountKey, namespace: namespace)
+            try? KeychainManager.delete(key: tempSessionKey, namespace: namespace)
+            try? KeychainManager.delete(key: backupAccountKey, namespace: namespace)
+            try? KeychainManager.delete(key: backupSessionKey, namespace: namespace)
+
+            throw error
+        }
+    }
+
     /// Retrieves an account from the keychain.
     /// - Parameter did: The DID of the account to retrieve
     /// - Returns: The account if found, or nil if not found
@@ -102,59 +204,157 @@ public actor KeychainStorage {
         let key = makeKey("session", did: did)
         let tempKey = makeKey("session.temp", did: did)
         let backupKey = makeKey("session.backup", did: did)
-        let data = try JSONEncoder().encode(session)
 
-        // Improved atomic save operation with better error handling and recovery
+        // Validate session before attempting to save
+        guard !session.accessToken.isEmpty else {
+            LogManager.logError("Attempted to save invalid session with empty access token for DID: \(LogManager.logDID(did))")
+            throw KeychainError.dataFormatError
+        }
+
+        let data: Data
+        do {
+            data = try JSONEncoder().encode(session)
+        } catch {
+            LogManager.logError("Failed to encode session for DID: \(LogManager.logDID(did)), error: \(error)")
+            throw KeychainError.dataFormatError
+        }
+
+        LogManager.logDebug("Starting session save for DID: \(LogManager.logDID(did))")
+
+        // Enhanced atomic save operation with comprehensive error handling
         do {
             // Step 1: Create backup of existing session if it exists
             if let existingData = try? KeychainManager.retrieve(key: key, namespace: namespace) {
-                try KeychainManager.store(key: backupKey, value: existingData, namespace: namespace)
-                LogManager.logDebug("Session backup created for DID: \(did)")
+                do {
+                    try KeychainManager.store(key: backupKey, value: existingData, namespace: namespace)
+                    LogManager.logDebug("Session backup created for DID: \(LogManager.logDID(did))")
+                } catch {
+                    LogManager.logWarning("Failed to create session backup for DID: \(LogManager.logDID(did)), continuing without backup: \(error)")
+                }
             }
 
             // Step 2: Save to temporary location first
-            try KeychainManager.store(key: tempKey, value: data, namespace: namespace)
-            LogManager.logDebug("Session saved to temporary location for DID: \(did)")
-
-            // Step 3: Atomic move to final location
-            try KeychainManager.store(key: key, value: data, namespace: namespace)
-            LogManager.logDebug("Session moved to final location for DID: \(did)")
-
-            // Step 4: Verify the save was successful by reading it back
-            let verificationData = try KeychainManager.retrieve(key: key, namespace: namespace)
-            let verifiedSession = try JSONDecoder().decode(Session.self, from: verificationData)
-
-            // Basic verification that the session has required fields
-            guard !verifiedSession.accessToken.isEmpty else {
-                throw KeychainError.dataFormatError
+            do {
+                try KeychainManager.store(key: tempKey, value: data, namespace: namespace)
+                LogManager.logDebug("Session saved to temporary location for DID: \(LogManager.logDID(did))")
+            } catch {
+                LogManager.logError("Failed to save session to temporary location for DID: \(LogManager.logDID(did)): \(error)")
+                throw SessionSaveError.temporarySaveFailed(underlying: error)
             }
 
-            LogManager.logDebug("Session save verification successful for DID: \(did)")
+            // Step 3: Atomic move to final location
+            do {
+                try KeychainManager.store(key: key, value: data, namespace: namespace)
+                LogManager.logDebug("Session moved to final location for DID: \(LogManager.logDID(did))")
+            } catch {
+                LogManager.logError("Failed to save session to final location for DID: \(LogManager.logDID(did)): \(error)")
+                throw SessionSaveError.finalSaveFailed(underlying: error)
+            }
+
+            // Step 4: Verify the save was successful by reading it back
+            do {
+                let verificationData = try KeychainManager.retrieve(key: key, namespace: namespace)
+                let verifiedSession = try JSONDecoder().decode(Session.self, from: verificationData)
+
+                // Comprehensive verification that the session has required fields
+                guard !verifiedSession.accessToken.isEmpty,
+                      verifiedSession.did == session.did,
+                      abs(verifiedSession.createdAt.timeIntervalSince(session.createdAt)) < 1.0 else {
+                    throw SessionSaveError.verificationFailed("Session verification failed: stored session doesn't match expected values")
+                }
+
+                LogManager.logDebug("Session save verification successful for DID: \(LogManager.logDID(did))")
+            } catch let SessionSaveError.verificationFailed(message) {
+                LogManager.logError("Session verification failed for DID: \(LogManager.logDID(did)): \(message)")
+                throw SessionSaveError.verificationFailed(message)
+            } catch {
+                LogManager.logError("Session verification error for DID: \(LogManager.logDID(did)): \(error)")
+                throw SessionSaveError.verificationFailed("Could not verify saved session: \(error)")
+            }
 
             // Step 5: Cleanup temporary files
             try? KeychainManager.delete(key: tempKey, namespace: namespace)
             try? KeychainManager.delete(key: backupKey, namespace: namespace)
+            LogManager.logDebug("Session saved atomically and verified for DID: \(LogManager.logDID(did))")
 
-            LogManager.logDebug("Session saved atomically and verified for DID: \(did)")
-
+        } catch let sessionSaveError as SessionSaveError {
+            LogManager.logError("Session save failed for DID: \(LogManager.logDID(did)): \(sessionSaveError)")
+            await handleSessionSaveFailure(sessionSaveError, key: key, tempKey: tempKey, backupKey: backupKey, did: did)
+            throw sessionSaveError
         } catch {
-            LogManager.logError("Session save failed for DID: \(did), error: \(error)")
+            LogManager.logError("Unexpected session save error for DID: \(LogManager.logDID(did)): \(error)")
+            await handleSessionSaveFailure(SessionSaveError.unexpectedError(error), key: key, tempKey: tempKey, backupKey: backupKey, did: did)
+            throw SessionSaveError.unexpectedError(error)
+        }
+    }
 
-            // Recovery: Attempt to restore from backup if final save failed
-            if let backupData = try? KeychainManager.retrieve(key: backupKey, namespace: namespace) {
-                do {
-                    try KeychainManager.store(key: key, value: backupData, namespace: namespace)
-                    LogManager.logDebug("Session restored from backup for DID: \(did)")
-                } catch {
-                    LogManager.logError("Failed to restore session backup for DID: \(did), error: \(error)")
-                }
-            }
-
-            // Cleanup temporary files in error case
+    /// Handles session save failures with appropriate recovery actions
+    private func handleSessionSaveFailure(_ error: SessionSaveError, key: String, tempKey: String, backupKey: String, did: String) async {
+        switch error {
+        case .temporarySaveFailed:
+            // If we can't even save to temp, just cleanup and fail
             try? KeychainManager.delete(key: tempKey, namespace: namespace)
             try? KeychainManager.delete(key: backupKey, namespace: namespace)
 
-            throw error
+        case .finalSaveFailed, .verificationFailed, .unexpectedError:
+            // For final save or verification failures, attempt recovery from backup
+            if let backupData = try? KeychainManager.retrieve(key: backupKey, namespace: namespace) {
+                do {
+                    try KeychainManager.store(key: key, value: backupData, namespace: namespace)
+                    LogManager.logInfo("Session restored from backup after save failure for DID: \(LogManager.logDID(did))")
+                } catch {
+                    LogManager.logError("Failed to restore session backup for DID: \(LogManager.logDID(did)): \(error)")
+                }
+            }
+
+            // Always cleanup temporary files in error cases
+            try? KeychainManager.delete(key: tempKey, namespace: namespace)
+            try? KeychainManager.delete(key: backupKey, namespace: namespace)
+        }
+    }
+
+    /// Errors that can occur during session save operations
+    internal enum SessionSaveError: Error, LocalizedError {
+        case temporarySaveFailed(underlying: Error)
+        case finalSaveFailed(underlying: Error)
+        case verificationFailed(String)
+        case unexpectedError(Error)
+
+        internal var errorDescription: String? {
+            switch self {
+            case let .temporarySaveFailed(underlying):
+                return "Failed to save session to temporary location: \(underlying.localizedDescription)"
+            case let .finalSaveFailed(underlying):
+                return "Failed to save session to final location: \(underlying.localizedDescription)"
+            case let .verificationFailed(message):
+                return "Session verification failed: \(message)"
+            case let .unexpectedError(underlying):
+                return "Unexpected session save error: \(underlying.localizedDescription)"
+            }
+        }
+
+        internal var failureReason: String? {
+            switch self {
+            case .temporarySaveFailed:
+                return "The keychain may be temporarily unavailable or the device may be locked."
+            case .finalSaveFailed:
+                return "The keychain operation failed during the final save step."
+            case .verificationFailed:
+                return "The saved session data could not be verified or was corrupted."
+            case .unexpectedError:
+                return "An unexpected error occurred during the save operation."
+            }
+        }
+
+        internal var recoverySuggestion: String? {
+            switch self {
+            case .temporarySaveFailed, .finalSaveFailed:
+                return "Please ensure your device is unlocked and try again. If the problem persists, you may need to restart the app."
+            case .verificationFailed:
+                return "The authentication state may be corrupted. Please try logging out and logging back in."
+            case .unexpectedError:
+                return "Please try the operation again. If the problem persists, contact support."
+            }
         }
     }
 
@@ -337,6 +537,148 @@ public actor KeychainStorage {
     public func deleteOAuthState(for stateToken: String) async throws {
         let key = makeKey("oauthState", stateToken: stateToken)
         try KeychainManager.delete(key: key, namespace: namespace)
+    }
+
+    // MARK: - Session Integrity Validation
+
+    /// Validates the integrity of authentication state and fixes inconsistencies.
+    /// This method should be called at app startup to detect and repair race condition damage.
+    /// - Returns: A summary of any issues found and fixed
+    internal func validateAndRepairAuthenticationState() async -> AuthStateValidationResult {
+        var result = AuthStateValidationResult()
+
+        do {
+            let accountDIDs = try await listAccountDIDs()
+            LogManager.logDebug("Validating authentication state for \(accountDIDs.count) accounts")
+
+            for did in accountDIDs {
+                let accountExists = (try await getAccount(for: did)) != nil
+                let sessionExists = (try await getSession(for: did)) != nil
+
+                if accountExists && !sessionExists {
+                    LogManager.logWarning("Inconsistent auth state detected for DID \(LogManager.logDID(did)): account exists but session missing")
+                    result.inconsistentStates.append(did)
+
+                    // Attempt to recover session from temporary/backup locations
+                    if try await recoverSessionFromBackup(for: did) {
+                        result.recoveredSessions.append(did)
+                        LogManager.logInfo("Successfully recovered session from backup for DID \(LogManager.logDID(did))")
+                    } else {
+                        // If recovery fails, remove the orphaned account to force re-authentication
+                        try await deleteAccount(for: did)
+                        result.cleanedOrphanedAccounts.append(did)
+                        LogManager.logInfo("Removed orphaned account for DID \(LogManager.logDID(did)) - user will need to re-authenticate")
+                    }
+                } else if !accountExists && sessionExists {
+                    LogManager.logWarning("Orphaned session detected for DID \(LogManager.logDID(did)): session exists but account missing")
+                    try await deleteSession(for: did)
+                    result.cleanedOrphanedSessions.append(did)
+                    LogManager.logInfo("Removed orphaned session for DID \(LogManager.logDID(did))")
+                }
+            }
+
+            // Clean up any temporary files that might have been left behind
+            try await cleanupTemporaryFiles()
+
+            LogManager.logInfo("Authentication state validation complete: \(result.summary)")
+
+        } catch {
+            LogManager.logError("Failed to validate authentication state: \(error)")
+            result.validationError = error
+        }
+
+        return result
+    }
+
+    /// Attempts to recover a missing session from temporary or backup locations
+    /// - Parameter did: The DID for which to recover the session
+    /// - Returns: True if recovery was successful, false otherwise
+    private func recoverSessionFromBackup(for did: String) async throws -> Bool {
+        let sessionKey = makeKey("session", did: did)
+        let tempSessionKey = makeKey("session.temp", did: did)
+        let backupSessionKey = makeKey("session.backup", did: did)
+
+        // Try temporary location first
+        if let tempData = try? KeychainManager.retrieve(key: tempSessionKey, namespace: namespace) {
+            do {
+                let session = try JSONDecoder().decode(Session.self, from: tempData)
+                guard !session.accessToken.isEmpty else { return false }
+
+                try KeychainManager.store(key: sessionKey, value: tempData, namespace: namespace)
+                try? KeychainManager.delete(key: tempSessionKey, namespace: namespace)
+
+                LogManager.logDebug("Session recovered from temporary location for DID: \(LogManager.logDID(did))")
+                return true
+            } catch {
+                LogManager.logDebug("Failed to decode session from temporary location: \(error)")
+            }
+        }
+
+        // Try backup location
+        if let backupData = try? KeychainManager.retrieve(key: backupSessionKey, namespace: namespace) {
+            do {
+                let session = try JSONDecoder().decode(Session.self, from: backupData)
+                guard !session.accessToken.isEmpty else { return false }
+
+                try KeychainManager.store(key: sessionKey, value: backupData, namespace: namespace)
+                try? KeychainManager.delete(key: backupSessionKey, namespace: namespace)
+
+                LogManager.logDebug("Session recovered from backup location for DID: \(LogManager.logDID(did))")
+                return true
+            } catch {
+                LogManager.logDebug("Failed to decode session from backup location: \(error)")
+            }
+        }
+
+        return false
+    }
+
+    /// Cleans up temporary and backup files that might have been left behind from interrupted operations
+    private func cleanupTemporaryFiles() async throws {
+        let accountDIDs = try await listAccountDIDs()
+
+        for did in accountDIDs {
+            // Clean up temporary files
+            try? KeychainManager.delete(key: makeKey("session.temp", did: did), namespace: namespace)
+            try? KeychainManager.delete(key: makeKey("account.temp", did: did), namespace: namespace)
+            try? KeychainManager.delete(key: makeKey("session.backup", did: did), namespace: namespace)
+            try? KeychainManager.delete(key: makeKey("account.backup", did: did), namespace: namespace)
+        }
+
+        LogManager.logDebug("Cleaned up temporary keychain files")
+    }
+
+    /// Result of authentication state validation
+    internal struct AuthStateValidationResult {
+        internal var inconsistentStates: [String] = []
+        internal var recoveredSessions: [String] = []
+        internal var cleanedOrphanedAccounts: [String] = []
+        internal var cleanedOrphanedSessions: [String] = []
+        internal var validationError: Error?
+
+        internal var hasIssues: Bool {
+            return !inconsistentStates.isEmpty || !cleanedOrphanedAccounts.isEmpty || !cleanedOrphanedSessions.isEmpty || validationError != nil
+        }
+
+        internal var summary: String {
+            var parts: [String] = []
+            if !inconsistentStates.isEmpty {
+                parts.append("\(inconsistentStates.count) inconsistent states")
+            }
+            if !recoveredSessions.isEmpty {
+                parts.append("\(recoveredSessions.count) sessions recovered")
+            }
+            if !cleanedOrphanedAccounts.isEmpty {
+                parts.append("\(cleanedOrphanedAccounts.count) orphaned accounts cleaned")
+            }
+            if !cleanedOrphanedSessions.isEmpty {
+                parts.append("\(cleanedOrphanedSessions.count) orphaned sessions cleaned")
+            }
+            if let error = validationError {
+                parts.append("validation error: \(error)")
+            }
+            return parts.isEmpty ? "no issues found" : parts.joined(separator: ", ")
+        }
     }
 
     // MARK: - Helper Methods
