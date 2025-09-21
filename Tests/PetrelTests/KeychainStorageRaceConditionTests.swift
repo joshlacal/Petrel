@@ -5,9 +5,9 @@
 //  Created by Claude on September 20, 2025.
 //
 
-import XCTest
 import CryptoKit
 @testable import Petrel
+import XCTest
 
 final class KeychainStorageRaceConditionTests: XCTestCase {
     var keychainStorage: KeychainStorage!
@@ -167,7 +167,7 @@ final class KeychainStorageRaceConditionTests: XCTestCase {
 
     func testConcurrentAtomicSaves() async throws {
         let account = createTestAccount()
-        let sessions = (1...5).map { i in
+        let sessions = (1 ... 5).map { i in
             Session(
                 accessToken: "token\(i)",
                 refreshToken: "refresh\(i)",
