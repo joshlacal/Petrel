@@ -2144,7 +2144,18 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
             }
 
             // Immediately handle DPoP nonce update to ensure it's captured regardless of response status
-            if let newNonce = httpResponse.value(forHTTPHeaderField: "DPoP-Nonce"),
+            // Extract nonce case-insensitively to handle servers that return lowercase headers
+            var newNonce: String?
+            for (key, value) in httpResponse.allHeaderFields {
+                if let keyString = key as? String,
+                   keyString.caseInsensitiveCompare("DPoP-Nonce") == .orderedSame
+                {
+                    newNonce = value as? String
+                    break
+                }
+            }
+            
+            if let newNonce = newNonce,
                let url = httpResponse.url,
                let responseDomain = url.host?.lowercased()
             {
@@ -2182,7 +2193,19 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
                         // CRITICAL FIX: Ensure we use the most recent nonce for retry
                         // Atomically update and verify nonce synchronization before retry
                         var shouldRetry = false
-                        if let refreshedNonce = httpResponse.value(forHTTPHeaderField: "DPoP-Nonce"),
+                        
+                        // Extract nonce case-insensitively to handle servers that return lowercase headers
+                        var refreshedNonce: String?
+                        for (key, value) in httpResponse.allHeaderFields {
+                            if let keyString = key as? String,
+                               keyString.caseInsensitiveCompare("DPoP-Nonce") == .orderedSame
+                            {
+                                refreshedNonce = value as? String
+                                break
+                            }
+                        }
+                        
+                        if let refreshedNonce = refreshedNonce,
                            let url = httpResponse.url,
                            let responseDomain = url.host?.lowercased()
                         {
@@ -2307,7 +2330,18 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
             let (data, response) = try await networkService.request(req, skipTokenRefresh: true)
             if let http = response as? HTTPURLResponse {
                 // Capture nonce from any response if provided
-                if let nonce = http.value(forHTTPHeaderField: "DPoP-Nonce") {
+                // Extract nonce case-insensitively to handle servers that return lowercase headers
+                var nonce: String?
+                for (key, value) in http.allHeaderFields {
+                    if let keyString = key as? String,
+                       keyString.caseInsensitiveCompare("DPoP-Nonce") == .orderedSame
+                    {
+                        nonce = value as? String
+                        break
+                    }
+                }
+                
+                if let nonce = nonce {
                     _ = await updateAndVerifyNonce(domain: domain, nonce: nonce, did: did)
                 }
                 // If 400 with OAuth error body use_dpop_nonce, we already captured the header above
