@@ -43,7 +43,7 @@ public actor KeychainStorage {
     ///   - account: The account to save
     ///   - session: The session to save
     ///   - did: The DID associated with both account and session
-    internal func saveAccountAndSession(_ account: Account, session: Session, for did: String) async throws {
+    func saveAccountAndSession(_ account: Account, session: Session, for did: String) async throws {
         let accountKey = makeKey("account", did: did)
         let sessionKey = makeKey("session", did: did)
         let tempAccountKey = makeKey("account.temp", did: did)
@@ -259,7 +259,8 @@ public actor KeychainStorage {
                 // Comprehensive verification that the session has required fields
                 guard !verifiedSession.accessToken.isEmpty,
                       verifiedSession.did == session.did,
-                      abs(verifiedSession.createdAt.timeIntervalSince(session.createdAt)) < 1.0 else {
+                      abs(verifiedSession.createdAt.timeIntervalSince(session.createdAt)) < 1.0
+                else {
                     throw SessionSaveError.verificationFailed("Session verification failed: stored session doesn't match expected values")
                 }
 
@@ -314,13 +315,13 @@ public actor KeychainStorage {
     }
 
     /// Errors that can occur during session save operations
-    internal enum SessionSaveError: Error, LocalizedError {
+    enum SessionSaveError: Error, LocalizedError {
         case temporarySaveFailed(underlying: Error)
         case finalSaveFailed(underlying: Error)
         case verificationFailed(String)
         case unexpectedError(Error)
 
-        internal var errorDescription: String? {
+        var errorDescription: String? {
             switch self {
             case let .temporarySaveFailed(underlying):
                 return "Failed to save session to temporary location: \(underlying.localizedDescription)"
@@ -333,7 +334,7 @@ public actor KeychainStorage {
             }
         }
 
-        internal var failureReason: String? {
+        var failureReason: String? {
             switch self {
             case .temporarySaveFailed:
                 return "The keychain may be temporarily unavailable or the device may be locked."
@@ -346,7 +347,7 @@ public actor KeychainStorage {
             }
         }
 
-        internal var recoverySuggestion: String? {
+        var recoverySuggestion: String? {
             switch self {
             case .temporarySaveFailed, .finalSaveFailed:
                 return "Please ensure your device is unlocked and try again. If the problem persists, you may need to restart the app."
@@ -544,7 +545,7 @@ public actor KeychainStorage {
     /// Validates the integrity of authentication state and fixes inconsistencies.
     /// This method should be called at app startup to detect and repair race condition damage.
     /// - Returns: A summary of any issues found and fixed
-    internal func validateAndRepairAuthenticationState() async -> AuthStateValidationResult {
+    func validateAndRepairAuthenticationState() async -> AuthStateValidationResult {
         var result = AuthStateValidationResult()
 
         do {
@@ -552,8 +553,8 @@ public actor KeychainStorage {
             LogManager.logDebug("Validating authentication state for \(accountDIDs.count) accounts")
 
             for did in accountDIDs {
-                let accountExists = (try await getAccount(for: did)) != nil
-                let sessionExists = (try await getSession(for: did)) != nil
+                let accountExists = try (await getAccount(for: did)) != nil
+                let sessionExists = try (await getSession(for: did)) != nil
 
                 if accountExists && !sessionExists {
                     LogManager.logWarning("Inconsistent auth state detected for DID \(LogManager.logDID(did)): account exists but session missing")
@@ -649,18 +650,18 @@ public actor KeychainStorage {
     }
 
     /// Result of authentication state validation
-    internal struct AuthStateValidationResult {
-        internal var inconsistentStates: [String] = []
-        internal var recoveredSessions: [String] = []
-        internal var cleanedOrphanedAccounts: [String] = []
-        internal var cleanedOrphanedSessions: [String] = []
-        internal var validationError: Error?
+    struct AuthStateValidationResult {
+        var inconsistentStates: [String] = []
+        var recoveredSessions: [String] = []
+        var cleanedOrphanedAccounts: [String] = []
+        var cleanedOrphanedSessions: [String] = []
+        var validationError: Error?
 
-        internal var hasIssues: Bool {
+        var hasIssues: Bool {
             return !inconsistentStates.isEmpty || !cleanedOrphanedAccounts.isEmpty || !cleanedOrphanedSessions.isEmpty || validationError != nil
         }
 
-        internal var summary: String {
+        var summary: String {
             var parts: [String] = []
             if !inconsistentStates.isEmpty {
                 parts.append("\(inconsistentStates.count) inconsistent states")
