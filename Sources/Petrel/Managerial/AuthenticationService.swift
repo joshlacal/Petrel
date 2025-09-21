@@ -554,12 +554,115 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
         }
         // --- End DPoP Key Handling ---
 
-        // 8. Save Session and Account
-        try await storage.saveSession(newSession, for: did)
-        LogManager.logDebug("Saved session for DID: \(did)")
-        try await accountManager.addAccount(finalAccount) // Changed from addOrUpdateAccount to add(account:)
-        LogManager.logDebug("Added/Updated account in AccountManager for DID: \(did)")
-        try await accountManager.setCurrentAccount(did: did) // Set as current account
+        // 8. Save Session and Account (Enhanced atomic operation)
+        do {
+            // Start a transaction-like operation with comprehensive error handling
+            LogManager.logDebug("Starting atomic account creation for DID: \(LogManager.logDID(did))")
+            
+            // Step 1: Save session
+            try await storage.saveSession(newSession, for: did)
+            LogManager.logDebug("✓ Saved session for DID: \(LogManager.logDID(did))")
+            
+            // Step 2: Add account
+            try await accountManager.addAccount(finalAccount)
+            LogManager.logDebug("✓ Added account in AccountManager for DID: \(LogManager.logDID(did))")
+            
+            // Step 3: Verify account was actually saved and can be retrieved
+            guard let verifiedAccount = await accountManager.getAccount(did: did) else {
+                LogManager.logError("Account creation verification failed: account cannot be retrieved after saving for DID: \(LogManager.logDID(did))")
+                throw AuthError.invalidResponse
+            }
+            
+            // Verify the account has the expected properties
+            guard verifiedAccount.did == did else {
+                LogManager.logError("Account creation verification failed: DID mismatch for DID: \(LogManager.logDID(did))")
+                throw AuthError.invalidResponse
+            }
+            
+            LogManager.logDebug("✓ Verified account persistence for DID: \(LogManager.logDID(did))")
+            
+            // Step 4: Set as current account (only after verification)
+            try await accountManager.setCurrentAccount(did: did)
+            LogManager.logDebug("✓ Set current account for DID: \(LogManager.logDID(did))")
+            
+            // Step 5: Final consistency check
+            guard let currentAccount = await accountManager.getCurrentAccount() else {
+                LogManager.logError("Final consistency check failed: cannot retrieve current account after setting for DID: \(LogManager.logDID(did))")
+                throw AuthError.invalidResponse
+            }
+            
+            guard currentAccount.did == did else {
+                LogManager.logError("Final consistency check failed: current account DID mismatch for DID: \(LogManager.logDID(did))")
+                throw AuthError.invalidResponse
+            }
+            
+            LogManager.logInfo("✅ Successfully completed atomic account creation for DID: \(LogManager.logDID(did))")
+            
+            // Log this as a successful authentication incident for monitoring
+            LogManager.logAuthIncident(
+                "OAuthAccountCreationSuccess",
+                details: [
+                    "did": LogManager.logDID(did),
+                    "hasSession": true,
+                    "hasAccount": true,
+                    "isCurrentAccount": true,
+                    "tokenType": tokenType.rawValue
+                ]
+            )
+            
+        } catch {
+            // If any step fails, perform cleanup to prevent inconsistent state
+            LogManager.logError("❌ Atomic account creation failed for DID: \(LogManager.logDID(did)), performing cleanup: \(error)")
+            
+            // Log this as a failed authentication incident for monitoring
+            LogManager.logAuthIncident(
+                "OAuthAccountCreationFailed",
+                details: [
+                    "did": LogManager.logDID(did),
+                    "error": error.localizedDescription,
+                    "action": "performing_cleanup"
+                ]
+            )
+            
+            // Clean up any partial state
+            do {
+                // Remove session if it was saved
+                try await storage.deleteSession(for: did)
+                LogManager.logDebug("Cleaned up session during failure recovery for DID: \(LogManager.logDID(did))")
+            } catch {
+                LogManager.logError("Failed to clean up session during failure recovery: \(error)")
+            }
+            
+            do {
+                // Remove account if it was saved
+                try await accountManager.removeAccount(did: did)
+                LogManager.logDebug("Cleaned up account during failure recovery for DID: \(LogManager.logDID(did))")
+            } catch {
+                LogManager.logDebug("No account to clean up during failure recovery (expected): \(error)")
+            }
+            
+            do {
+                // Clean up DPoP key
+                try await storage.deleteDPoPKey(for: did)
+                LogManager.logDebug("Cleaned up DPoP key during failure recovery for DID: \(LogManager.logDID(did))")
+            } catch {
+                LogManager.logDebug("No DPoP key to clean up during failure recovery (expected): \(error)")
+            }
+            
+            // Clear any current DID reference
+            do {
+                if let currentDID = await accountManager.getCurrentAccount()?.did, currentDID == did {
+                    await accountManager.clearCurrentAccount()
+                    LogManager.logDebug("Cleared current account reference during failure recovery for DID: \(LogManager.logDID(did))")
+                }
+            } catch {
+                LogManager.logError("Failed to clear current account during failure recovery: \(error)")
+            }
+            
+            LogManager.logInfo("Completed cleanup after account creation failure for DID: \(LogManager.logDID(did))")
+            throw error
+        }
+        
         // Immediately point NetworkService at the resolved PDS to avoid early API calls hitting default base URL
         await networkService.setBaseURL(finalAccount.pdsURL)
 

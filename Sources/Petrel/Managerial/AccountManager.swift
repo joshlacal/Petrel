@@ -60,8 +60,107 @@ actor AccountManager: AccountManaging {
         do {
             currentDID = try await storage.getCurrentDID()
             LogManager.logInfo("AccountManager initialized with current DID: \(currentDID ?? "none")")
+            
+            // Perform startup recovery to detect and clean up inconsistent states
+            await performStartupRecovery()
         } catch {
             LogManager.logError("AccountManager initialization - Failed to load current DID: \(error)")
+        }
+    }
+    
+    /// Performs startup recovery to detect and clean up inconsistent authentication states
+    /// This method is called during initialization to ensure the authentication state is consistent
+    private func performStartupRecovery() async {
+        guard let did = currentDID, !did.isEmpty else {
+            LogManager.logDebug("AccountManager - No current DID set, skipping startup recovery")
+            return
+        }
+        
+        LogManager.logDebug("AccountManager - Performing startup recovery for DID: \(LogManager.logDID(did))")
+        
+        // Check if the current DID has a corresponding account
+        let account = await getAccount(did: did)
+        var hasSession = false
+        var hasDPoPKey = false
+        
+        // Check for session
+        do {
+            let session = try await storage.getSession(for: did)
+            hasSession = session != nil
+        } catch {
+            LogManager.logDebug("AccountManager - Error checking session during startup recovery: \(error)")
+            hasSession = false
+        }
+        
+        // Check for DPoP key
+        do {
+            let _ = try await storage.getDPoPKey(for: did)
+            hasDPoPKey = true
+        } catch {
+            LogManager.logDebug("AccountManager - Error checking DPoP key during startup recovery: \(error)")
+            hasDPoPKey = false
+        }
+        
+        // Analyze the state and take corrective action
+        if account == nil {
+            LogManager.logError("AccountManager - Startup recovery detected inconsistent state: currentDID exists but no account found")
+            
+            // Log comprehensive state information
+            LogManager.logAuthIncident(
+                "StartupRecovery_InconsistentState",
+                details: [
+                    "did": LogManager.logDID(did),
+                    "hasAccount": false,
+                    "hasSession": hasSession,
+                    "hasDPoPKey": hasDPoPKey,
+                    "action": "clearing_inconsistent_state"
+                ]
+            )
+            
+            // Clear the inconsistent state
+            await clearInconsistentAuthenticationState(for: did)
+            
+        } else if !hasSession {
+            LogManager.logWarning("AccountManager - Startup recovery detected account without session", category: .authentication)
+            
+            LogManager.logAuthIncident(
+                "StartupRecovery_MissingSession",
+                details: [
+                    "did": LogManager.logDID(did),
+                    "hasAccount": true,
+                    "hasSession": false,
+                    "hasDPoPKey": hasDPoPKey,
+                    "action": "warning_logged"
+                ]
+            )
+            
+        } else if !hasDPoPKey {
+            LogManager.logWarning("AccountManager - Startup recovery detected account without DPoP key", category: .authentication)
+            
+            LogManager.logAuthIncident(
+                "StartupRecovery_MissingDPoPKey",
+                details: [
+                    "did": LogManager.logDID(did),
+                    "hasAccount": true,
+                    "hasSession": hasSession,
+                    "hasDPoPKey": false,
+                    "action": "warning_logged"
+                ]
+            )
+            
+        } else {
+            LogManager.logDebug("AccountManager - Startup recovery completed: authentication state appears consistent")
+            
+            LogManager.logAuthIncident(
+                "StartupRecovery_StateHealthy",
+                details: [
+                    "did": LogManager.logDID(did),
+                    "hasAccount": true,
+                    "hasSession": hasSession,
+                    "hasDPoPKey": hasDPoPKey,
+                    "action": "no_action_needed"
+                ]
+            )
         }
     }
 
@@ -139,15 +238,80 @@ actor AccountManager: AccountManaging {
     func setCurrentAccount(did: String) async throws {
         LogManager.logInfo("AccountManager - Setting current account to DID: \(did)")
 
-        // Verify the account exists
-        guard let _ = try await storage.getAccount(for: did) else {
+        // Enhanced verification: Check account exists and validate its completeness
+        guard let account = try await storage.getAccount(for: did) else {
             LogManager.logError("AccountManager - Cannot set current account, DID not found: \(did)")
+            
+            // Log this as an authentication incident for monitoring
+            LogManager.logAuthIncident(
+                "SetCurrentAccount_AccountNotFound",
+                details: [
+                    "did": LogManager.logDID(did),
+                    "action": "setCurrentAccount_failed"
+                ]
+            )
             throw AccountError.accountNotFound
         }
+        
+        // Additional validation: Ensure the account has required fields
+        guard !account.did.isEmpty else {
+            LogManager.logError("AccountManager - Cannot set current account, account has invalid DID: \(did)")
+            throw AccountError.invalidAccount
+        }
+        
+        // Check if there's a session for this account (warn but don't fail)
+        do {
+            let session = try await storage.getSession(for: did)
+            if session == nil {
+                LogManager.logWarning(
+                    "AccountManager - Setting account \(LogManager.logDID(did)) as current but no session exists. This may cause authentication issues.",
+                    category: .authentication
+                )
+                
+                // Log this as an authentication incident for monitoring
+                LogManager.logAuthIncident(
+                    "SetCurrentAccount_NoSession",
+                    details: [
+                        "did": LogManager.logDID(did),
+                        "hasAccount": true,
+                        "hasSession": false
+                    ]
+                )
+            }
+        } catch {
+            LogManager.logWarning("AccountManager - Failed to check session when setting current account for DID \(LogManager.logDID(did)): \(error)")
+        }
 
-        // Update the current DID in memory and storage
-        currentDID = did
-        try await storage.saveCurrentDID(did)
+        // Update the current DID in memory and storage atomically
+        let previousDID = currentDID
+        do {
+            try await storage.saveCurrentDID(did)
+            currentDID = did
+            LogManager.logInfo("AccountManager - Successfully set current account to DID: \(LogManager.logDID(did))")
+            
+            if let previous = previousDID, previous != did {
+                LogManager.logAuthIncident(
+                    "CurrentAccountChanged",
+                    details: [
+                        "previousDid": LogManager.logDID(previous),
+                        "newDid": LogManager.logDID(did),
+                        "trigger": "setCurrentAccount"
+                    ]
+                )
+            }
+        } catch {
+            LogManager.logError("AccountManager - Failed to save current DID to storage: \(error)")
+            
+            // Log this as an authentication incident for monitoring
+            LogManager.logAuthIncident(
+                "SetCurrentAccount_StorageFailed",
+                details: [
+                    "did": LogManager.logDID(did),
+                    "error": error.localizedDescription
+                ]
+            )
+            throw AccountError.storageError
+        }
     }
 
     /// Gets the current active account.
@@ -159,9 +323,9 @@ actor AccountManager: AccountManaging {
 
         guard let account = await getAccount(did: did) else {
             LogManager.logError("AccountManager - Current DID \(did) exists but account not found in storage")
-            // Clear the current DID if the account doesn't exist
-            currentDID = nil
-            try? await storage.saveCurrentDID("")
+            
+            // Enhanced cleanup: Clear the inconsistent state more aggressively
+            await clearInconsistentAuthenticationState(for: did)
             return nil
         }
 
@@ -170,6 +334,16 @@ actor AccountManager: AccountManaging {
             let session = try await storage.getSession(for: did)
             if session == nil {
                 LogManager.logWarning("AccountManager - Account \(LogManager.logDID(did)) exists but has no session token. This indicates an inconsistent authentication state.", category: .authentication)
+                
+                // Log this as an authentication incident for monitoring
+                LogManager.logAuthIncident(
+                    "InconsistentAuthState_MissingSession",
+                    details: [
+                        "did": LogManager.logDID(did),
+                        "hasAccount": true,
+                        "hasSession": false
+                    ]
+                )
                 // Don't clear the account automatically as it might be recoverable
                 // Just log the inconsistency for monitoring purposes
             }
@@ -178,6 +352,58 @@ actor AccountManager: AccountManaging {
         }
 
         return account
+    }
+    
+    /// Clears inconsistent authentication state for a specific DID
+    /// This method aggressively cleans up all traces of a DID that has a currentDID reference but no actual account
+    private func clearInconsistentAuthenticationState(for did: String) async {
+        LogManager.logError("AccountManager - Clearing inconsistent authentication state for DID: \(LogManager.logDID(did))")
+        
+        // Log this as an authentication incident for monitoring
+        LogManager.logAuthIncident(
+            "InconsistentAuthState_MissingAccount",
+            details: [
+                "did": LogManager.logDID(did),
+                "hasAccount": false,
+                "action": "clearing_state"
+            ]
+        )
+        
+        // Clear current DID
+        currentDID = nil
+        do {
+            try await storage.saveCurrentDID("")
+            LogManager.logDebug("AccountManager - Cleared currentDID from storage")
+        } catch {
+            LogManager.logError("AccountManager - Failed to clear currentDID from storage: \(error)")
+        }
+        
+        // Clean up any orphaned session data
+        do {
+            try await storage.deleteSession(for: did)
+            LogManager.logDebug("AccountManager - Cleaned up orphaned session for DID: \(LogManager.logDID(did))")
+        } catch {
+            LogManager.logDebug("AccountManager - No session to clean up for DID: \(LogManager.logDID(did)) or cleanup failed: \(error)")
+        }
+        
+        // Clean up any orphaned DPoP keys
+        do {
+            try await storage.deleteDPoPKey(for: did)
+            LogManager.logDebug("AccountManager - Cleaned up orphaned DPoP key for DID: \(LogManager.logDID(did))")
+        } catch {
+            LogManager.logDebug("AccountManager - No DPoP key to clean up for DID: \(LogManager.logDID(did)) or cleanup failed: \(error)")
+        }
+        
+        // Clean up any DPoP nonces
+        do {
+            try await storage.saveDPoPNonces([:], for: did)
+            try await storage.saveDPoPNoncesByJKT([:], for: did)
+            LogManager.logDebug("AccountManager - Cleaned up DPoP nonces for DID: \(LogManager.logDID(did))")
+        } catch {
+            LogManager.logDebug("AccountManager - Failed to clean up DPoP nonces for DID: \(LogManager.logDID(did)): \(error)")
+        }
+        
+        LogManager.logInfo("AccountManager - Completed cleanup of inconsistent authentication state for DID: \(LogManager.logDID(did))")
     }
 
     /// Lists all available accounts.
