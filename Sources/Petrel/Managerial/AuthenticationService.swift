@@ -590,11 +590,12 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
             if thumbprint == jkt {
                 LogManager.logDebug("DPoP JKT matches calculated thumbprint for DID: \(did)")
                 // Optionally store the binding, though the key itself is stored securely
-            } else {
-                LogManager.logError(
-                    "DPoP JKT mismatch! Server: \(jkt), Calculated: \(thumbprint) for DID: \(did)")
-                // This indicates a potential security issue or misconfiguration.
-                // Depending on policy, you might want to invalidate the session.
+            // 8. Save Session and Account Atomically (CRITICAL FIX: prevents race condition)
+            try await storage.saveAccountAndSession(finalAccount, session: newSession, for: did)
+            LogManager.logDebug("Atomically saved account and session for DID: \(did)")
+
+            // Update AccountManager's internal state to reflect the saved account
+            try await accountManager.updateAccountFromStorage(did: did)
                 // For now, just log the error. Consider throwing AuthError.dpopKeyError here.
                 throw AuthError.dpopKeyError
             }
@@ -2384,10 +2385,17 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
             LogManager.logError(
                 "prepareAuthenticatedRequest: Account exists but session is missing for DID: \(LogManager.logDID(account.did)). This indicates an inconsistent authentication state."
             )
+<<<<<<< HEAD
 
             // Clear the inconsistent state and require re-authentication
             try? await accountManager.clearCurrentAccount()
 
+=======
+            
+            // Clear the inconsistent state and require re-authentication
+            try? await accountManager.clearCurrentAccount()
+            
+>>>>>>> pr/1
             throw AuthError.noActiveAccount as Error
         }
 
@@ -2473,7 +2481,11 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
             LogManager.logError(
                 "prepareAuthenticatedRequestWithContext: Account exists but session is missing for DID: \(LogManager.logDID(account.did)). This indicates an inconsistent authentication state that requires user re-authentication."
             )
+<<<<<<< HEAD
 
+=======
+            
+>>>>>>> pr/1
             // Log this as an authentication incident for monitoring
             LogManager.logAuthIncident(
                 "SessionMissingForAccount",
@@ -2481,6 +2493,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
                     "did": account.did,
                     "endpoint": request.url?.absoluteString ?? "Unknown URL",
                     "accountExists": true,
+<<<<<<< HEAD
                     "sessionExists": false,
                 ]
             )
@@ -2488,6 +2501,15 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
             // Clear the inconsistent state and require re-authentication
             try? await accountManager.clearCurrentAccount()
 
+=======
+                    "sessionExists": false
+                ]
+            )
+            
+            // Clear the inconsistent state and require re-authentication
+            try? await accountManager.clearCurrentAccount()
+            
+>>>>>>> pr/1
             throw AuthError.noActiveAccount as Error
         }
 
