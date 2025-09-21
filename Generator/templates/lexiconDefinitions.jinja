@@ -29,7 +29,11 @@
                 self.{{ prop.name }} = try container.decode({{ prop.type }}.self, forKey: .{{ prop.name }})
                 {% endif %}
             } catch {
-                LogManager.logError("Decoding error for property '{{ prop.name }}': \(error)")
+                {% if prop.optional %}
+                LogManager.logDebug("Decoding error for optional property '{{ prop.name }}': \(error)")
+                {% else %}
+                LogManager.logError("Decoding error for required property '{{ prop.name }}': \(error)")
+                {% endif %}
                 throw error
             }
             {%- endfor %}
@@ -149,7 +153,11 @@
                     self.{{ prop.name }} = try container.decode({{ prop.type }}.self, forKey: .{{ prop.name }})
                     {% endif %}
                 } catch {
-                    LogManager.logError("Decoding error for sub-struct property '{{ prop.name }}': \(error)")
+                    {% if prop.optional %}
+                    LogManager.logDebug("Decoding error for optional sub-struct property '{{ prop.name }}': \(error)")
+                    {% else %}
+                    LogManager.logError("Decoding error for required sub-struct property '{{ prop.name }}': \(error)")
+                    {% endif %}
                     throw error
                 }
                 {%- endfor %}

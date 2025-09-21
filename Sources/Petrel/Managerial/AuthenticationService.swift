@@ -554,11 +554,12 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
         }
         // --- End DPoP Key Handling ---
 
-        // 8. Save Session and Account
-        try await storage.saveSession(newSession, for: did)
-        LogManager.logDebug("Saved session for DID: \(did)")
-        try await accountManager.addAccount(finalAccount) // Changed from addOrUpdateAccount to add(account:)
-        LogManager.logDebug("Added/Updated account in AccountManager for DID: \(did)")
+        // 8. Save Session and Account Atomically (CRITICAL FIX: prevents race condition)
+        try await storage.saveAccountAndSession(finalAccount, session: newSession, for: did)
+        LogManager.logDebug("Atomically saved account and session for DID: \(did)")
+
+        // Update AccountManager's internal state to reflect the saved account
+        try await accountManager.updateAccountFromStorage(did: did)
         try await accountManager.setCurrentAccount(did: did) // Set as current account
         // Immediately point NetworkService at the resolved PDS to avoid early API calls hitting default base URL
         await networkService.setBaseURL(finalAccount.pdsURL)

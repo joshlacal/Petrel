@@ -1,21 +1,26 @@
 import Foundation
 
+
+
 // lexicon: 1, id: chat.bsky.moderation.getActorMetadata
 
-public enum ChatBskyModerationGetActorMetadata {
-    public static let typeIdentifier = "chat.bsky.moderation.getActorMetadata"
 
-    public struct Metadata: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "chat.bsky.moderation.getActorMetadata#metadata"
-        public let messagesSent: Int
-        public let messagesReceived: Int
-        public let convos: Int
-        public let convosStarted: Int
+public struct ChatBskyModerationGetActorMetadata { 
+
+    public static let typeIdentifier = "chat.bsky.moderation.getActorMetadata"
+        
+public struct Metadata: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "chat.bsky.moderation.getActorMetadata#metadata"
+            public let messagesSent: Int
+            public let messagesReceived: Int
+            public let convos: Int
+            public let convosStarted: Int
 
         // Standard initializer
         public init(
             messagesSent: Int, messagesReceived: Int, convos: Int, convosStarted: Int
         ) {
+            
             self.messagesSent = messagesSent
             self.messagesReceived = messagesReceived
             self.convos = convos
@@ -24,48 +29,66 @@ public enum ChatBskyModerationGetActorMetadata {
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                messagesSent = try container.decode(Int.self, forKey: .messagesSent)
-
+                
+                self.messagesSent = try container.decode(Int.self, forKey: .messagesSent)
+                
             } catch {
-                LogManager.logError("Decoding error for property 'messagesSent': \(error)")
+                
+                LogManager.logError("Decoding error for required property 'messagesSent': \(error)")
+                
                 throw error
             }
             do {
-                messagesReceived = try container.decode(Int.self, forKey: .messagesReceived)
-
+                
+                self.messagesReceived = try container.decode(Int.self, forKey: .messagesReceived)
+                
             } catch {
-                LogManager.logError("Decoding error for property 'messagesReceived': \(error)")
+                
+                LogManager.logError("Decoding error for required property 'messagesReceived': \(error)")
+                
                 throw error
             }
             do {
-                convos = try container.decode(Int.self, forKey: .convos)
-
+                
+                self.convos = try container.decode(Int.self, forKey: .convos)
+                
             } catch {
-                LogManager.logError("Decoding error for property 'convos': \(error)")
+                
+                LogManager.logError("Decoding error for required property 'convos': \(error)")
+                
                 throw error
             }
             do {
-                convosStarted = try container.decode(Int.self, forKey: .convosStarted)
-
+                
+                self.convosStarted = try container.decode(Int.self, forKey: .convosStarted)
+                
             } catch {
-                LogManager.logError("Decoding error for property 'convosStarted': \(error)")
+                
+                LogManager.logError("Decoding error for required property 'convosStarted': \(error)")
+                
                 throw error
             }
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
             try container.encode(messagesSent, forKey: .messagesSent)
-
+            
+            
             try container.encode(messagesReceived, forKey: .messagesReceived)
-
+            
+            
             try container.encode(convos, forKey: .convos)
-
+            
+            
             try container.encode(convosStarted, forKey: .convosStarted)
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -76,25 +99,30 @@ public enum ChatBskyModerationGetActorMetadata {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
             guard let other = other as? Self else { return false }
-
-            if messagesSent != other.messagesSent {
+            
+            if self.messagesSent != other.messagesSent {
                 return false
             }
-
-            if messagesReceived != other.messagesReceived {
+            
+            
+            if self.messagesReceived != other.messagesReceived {
                 return false
             }
-
-            if convos != other.convos {
+            
+            
+            if self.convos != other.convos {
                 return false
             }
-
-            if convosStarted != other.convosStarted {
+            
+            
+            if self.convosStarted != other.convosStarted {
                 return false
             }
-
+            
             return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -107,17 +135,31 @@ public enum ChatBskyModerationGetActorMetadata {
 
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
+            
+            
+            
             let messagesSentValue = try messagesSent.toCBORValue()
             map = map.adding(key: "messagesSent", value: messagesSentValue)
-
+            
+            
+            
+            
             let messagesReceivedValue = try messagesReceived.toCBORValue()
             map = map.adding(key: "messagesReceived", value: messagesReceivedValue)
-
+            
+            
+            
+            
             let convosValue = try convos.toCBORValue()
             map = map.adding(key: "convos", value: convosValue)
-
+            
+            
+            
+            
             let convosStartedValue = try convosStarted.toCBORValue()
             map = map.adding(key: "convosStarted", value: convosStartedValue)
+            
+            
 
             return map
         }
@@ -129,98 +171,135 @@ public enum ChatBskyModerationGetActorMetadata {
             case convos
             case convosStarted
         }
-    }
-
-    public struct Parameters: Parametrizable {
+    }    
+public struct Parameters: Parametrizable {
         public let actor: DID
-
+        
         public init(
             actor: DID
-        ) {
+            ) {
             self.actor = actor
+            
         }
     }
-
-    public struct Output: ATProtocolCodable {
+    
+public struct Output: ATProtocolCodable {
+        
+        
         public let day: Metadata
-
+        
         public let month: Metadata
-
+        
         public let all: Metadata
-
+        
+        
+        
         // Standard public initializer
         public init(
+            
             day: Metadata,
-
+            
             month: Metadata,
-
+            
             all: Metadata
-
+            
+            
         ) {
+            
             self.day = day
-
+            
             self.month = month
-
+            
             self.all = all
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
-            day = try container.decode(Metadata.self, forKey: .day)
-
-            month = try container.decode(Metadata.self, forKey: .month)
-
-            all = try container.decode(Metadata.self, forKey: .all)
+            
+            
+            self.day = try container.decode(Metadata.self, forKey: .day)
+            
+            
+            self.month = try container.decode(Metadata.self, forKey: .month)
+            
+            
+            self.all = try container.decode(Metadata.self, forKey: .all)
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
+            
             try container.encode(day, forKey: .day)
-
+            
+            
             try container.encode(month, forKey: .month)
-
+            
+            
             try container.encode(all, forKey: .all)
+            
+            
         }
 
         public func toCBORValue() throws -> Any {
+            
             var map = OrderedCBORMap()
 
+            
+            
             let dayValue = try day.toCBORValue()
             map = map.adding(key: "day", value: dayValue)
-
+            
+            
+            
             let monthValue = try month.toCBORValue()
             map = map.adding(key: "month", value: monthValue)
-
+            
+            
+            
             let allValue = try all.toCBORValue()
             map = map.adding(key: "all", value: allValue)
+            
+            
 
             return map
+            
         }
-
+        
         private enum CodingKeys: String, CodingKey {
+            
             case day
             case month
             case all
+            
         }
     }
+
+
+
+
 }
 
-public extension ATProtoClient.Chat.Bsky.Moderation {
+
+extension ATProtoClient.Chat.Bsky.Moderation {
     // MARK: - getActorMetadata
 
-    ///
-    ///
+    /// 
+    /// 
     /// - Parameter input: The input parameters for the request
-    ///
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    func getActorMetadata(input: ChatBskyModerationGetActorMetadata.Parameters) async throws -> (responseCode: Int, data: ChatBskyModerationGetActorMetadata.Output?) {
+    public func getActorMetadata(input: ChatBskyModerationGetActorMetadata.Parameters) async throws -> (responseCode: Int, data: ChatBskyModerationGetActorMetadata.Output?) {
         let endpoint = "chat.bsky.moderation.getActorMetadata"
 
+        
         let queryItems = input.asQueryItems()
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -229,10 +308,11 @@ public extension ATProtoClient.Chat.Bsky.Moderation {
             queryItems: queryItems
         )
 
+        
         // Chat endpoint - use proxy header
         let proxyHeaders = ["atproto-proxy": "did:web:api.bsky.chat#bsky_chat"]
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-
+        
         let responseCode = response.statusCode
 
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
@@ -244,11 +324,12 @@ public extension ATProtoClient.Chat.Bsky.Moderation {
         }
 
         // Only decode response data if request was successful
-        if (200 ... 299).contains(responseCode) {
+        if (200...299).contains(responseCode) {
             do {
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(ChatBskyModerationGetActorMetadata.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -260,4 +341,4 @@ public extension ATProtoClient.Chat.Bsky.Moderation {
             return (responseCode, nil)
         }
     }
-}
+}                           

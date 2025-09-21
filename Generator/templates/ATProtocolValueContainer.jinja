@@ -26,7 +26,7 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                     let decodedObject = try {{ swift_type }}(from: decoder)
                     return .knownType(decodedObject)
                 } catch {
-                    LogManager.logError("Error decoding {{ swift_type }}: \(error)")
+                    LogManager.logDebug("Error decoding {{ swift_type }}: \(error)")
                     return .decodeError("Error decoding {{ swift_type }}: \(error)")
                 }
             }
@@ -57,7 +57,7 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
             do {
                 self = try ATProtocolValueContainer.decodeSingleValue(from: decoder)
             } catch {
-                LogManager.logError("Error decoding ATProtocolValueContainer: \(error)")
+                LogManager.logDebug("Error decoding ATProtocolValueContainer: \(error)")
                 self = .decodeError("Decoding error: \(error)")
             }
         }
@@ -91,7 +91,7 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
             return try decodeAny(from: nestedContainer)
         }
 
-        LogManager.logError("Failed to decode as Array or Object, throwing DecodingError.dataCorruptedError")
+        LogManager.logDebug("Failed to decode as Array or Object, throwing DecodingError.dataCorruptedError")
         throw DecodingError.dataCorruptedError(in: container, debugDescription: "ATProtocolValueContainer cannot be decoded")
     }
 
@@ -213,7 +213,7 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
                 dictionary[key.stringValue] = .array(array)
             } else {
-                LogManager.logError("Failed to decode key: \(key.stringValue)")
+                LogManager.logDebug("Failed to decode key: \(key.stringValue)")
                 dictionary[key.stringValue] = .decodeError("Cannot decode value for key: \(key.stringValue)")
             }
         }
@@ -236,7 +236,7 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
             } else if let nestedContainer = try? unkeyedContainer.nestedContainer(keyedBy: DynamicCodingKeys.self) {
                 array.append(try decodeAny(from: nestedContainer))
             } else {
-                LogManager.logError("Cannot decode array element at index \(unkeyedContainer.currentIndex)")
+                LogManager.logDebug("Cannot decode array element at index \(unkeyedContainer.currentIndex)")
                 array.append(.decodeError("Cannot decode array element at index \(unkeyedContainer.currentIndex)"))
                 break
             }
