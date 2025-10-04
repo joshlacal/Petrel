@@ -1,5 +1,5 @@
-import XCTest
 @testable import Petrel
+import XCTest
 
 final class CircularReferenceTests: XCTestCase {
     func testKnownFollowersDecodingDoesNotStackOverflow() throws {
@@ -59,7 +59,7 @@ final class CircularReferenceTests: XCTestCase {
                     createdAt: nil,
                     verification: nil,
                     status: nil
-                )
+                ),
             ]
         )
 

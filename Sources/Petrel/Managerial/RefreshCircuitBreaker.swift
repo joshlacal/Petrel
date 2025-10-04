@@ -251,7 +251,7 @@ actor RefreshCircuitBreaker {
         let exponentialBackoff = baseInterval * pow(2.0, Double(min(info.backoffExponent, 6)))
 
         // Add jitter (±25%) to prevent thundering herd
-        let jitter = Double.random(in: 0.75...1.25)
+        let jitter = Double.random(in: 0.75 ... 1.25)
         let finalInterval = exponentialBackoff * jitter
 
         // Cap at reasonable maximums based on failure type
