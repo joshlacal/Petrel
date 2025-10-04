@@ -5,55 +5,96 @@ import asyncio
 import aiofiles
 from swift_code_generator import SwiftCodeGenerator, convert_json_to_swift
 from utils import convert_to_camel_case
+from cycle_detector import CycleDetector
 
 async def generate_swift_from_lexicons_recursive(folder_path: str, output_folder: str):
     type_dict = {}
     namespace_hierarchy = {}
+    cycle_detector = CycleDetector()
+    lexicons = []  # Store all lexicons for two-pass processing
 
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
-    
-    async def process_lexicon(filepath):
-        async with aiofiles.open(filepath, 'rb') as f:
-            content = await f.read()
-            lexicon = orjson.loads(content)
-            lexicon_id = lexicon.get('id', '')
 
-            if 'subscribe' in lexicon_id:
-                return
-            if 'ozone' in lexicon_id:
-                return
-
-            defs = lexicon.get('defs', {})
-
-            namespace_parts = lexicon_id.split('.')[:3]
-            current_level = namespace_hierarchy
-            for part in namespace_parts:
-                if part not in current_level:
-                    current_level[part] = {}
-                current_level = current_level[part]
-
-            for type_name, type_info in defs.items():
-                type_kind = type_info.get('type', '')
-                swift_lex_id = convert_to_camel_case(lexicon_id)
-                swift_type_name = "." + convert_to_camel_case(type_name) if type_name != 'main' else ""
-                if type_kind in ['object', 'record', 'union', 'array']:
-                    type_key = f"{lexicon_id}#{type_name}" if type_name != 'main' else lexicon_id
-                    type_dict[type_key] = f"{swift_lex_id}{swift_type_name}"
-
-            swift_code = SwiftCodeGenerator(lexicon).convert()
-
-            output_filename = f"{convert_to_camel_case(lexicon_id)}.swift"
-            output_file_path = os.path.join(output_folder, output_filename)
-            async with aiofiles.open(output_file_path, 'w') as swift_file:
-                await swift_file.write(swift_code)
-
-    tasks = []
+    # First pass: Load all lexicons and build dependency graph
     for root, dirs, files in os.walk(folder_path):
         for filename in files:
             if filename.endswith('.json'):
                 filepath = os.path.join(root, filename)
-                tasks.append(asyncio.create_task(process_lexicon(filepath)))
+                async with aiofiles.open(filepath, 'rb') as f:
+                    content = await f.read()
+                    lexicon = orjson.loads(content)
+                    lexicon_id = lexicon.get('id', '')
+
+                    if 'subscribe' in lexicon_id or 'ozone' in lexicon_id:
+                        continue
+
+                    lexicons.append((filepath, lexicon))
+
+                    # Register types with cycle detector
+                    defs = lexicon.get('defs', {})
+                    for def_name, def_schema in defs.items():
+                        cycle_detector.add_type(lexicon_id, def_name, def_schema)
+
+                    # Also register query/procedure output unions
+                    main_def = defs.get('main', {})
+                    if main_def.get('type') in ['query', 'procedure']:
+                        output_schema = main_def.get('output', {}).get('schema', {})
+                        if output_schema.get('type') == 'object':
+                            cycle_detector.add_output_type(lexicon_id, output_schema)
+
+    # Detect circular dependencies
+    cycle_detector.detect_cycles()
+
+    # Debug output
+    print(f"Loaded {len(cycle_detector.type_properties)} types, {len(cycle_detector.union_variants)} unions")
+
+    # Debug: show some union examples
+    union_list = list(cycle_detector.union_variants.keys())
+    if union_list:
+        print(f"Sample unions: {union_list[:3]}")
+
+    if cycle_detector.circular_properties:
+        print(f"Detected {len(cycle_detector.circular_properties)} circular properties:")
+        for type_name, prop_name in cycle_detector.circular_properties:
+            print(f"  - {type_name}.{prop_name}")
+    if cycle_detector.indirect_enums:
+        print(f"Detected {len(cycle_detector.indirect_enums)} indirect enums:")
+        for enum_name in cycle_detector.indirect_enums:
+            print(f"  - {enum_name}")
+    else:
+        print("No indirect enums detected")
+
+    async def process_lexicon(filepath, lexicon):
+        lexicon_id = lexicon.get('id', '')
+        defs = lexicon.get('defs', {})
+
+        namespace_parts = lexicon_id.split('.')[:3]
+        current_level = namespace_hierarchy
+        for part in namespace_parts:
+            if part not in current_level:
+                current_level[part] = {}
+            current_level = current_level[part]
+
+        for type_name, type_info in defs.items():
+            type_kind = type_info.get('type', '')
+            swift_lex_id = convert_to_camel_case(lexicon_id)
+            swift_type_name = "." + convert_to_camel_case(type_name) if type_name != 'main' else ""
+            if type_kind in ['object', 'record', 'union', 'array']:
+                type_key = f"{lexicon_id}#{type_name}" if type_name != 'main' else lexicon_id
+                type_dict[type_key] = f"{swift_lex_id}{swift_type_name}"
+
+        swift_code = SwiftCodeGenerator(lexicon, cycle_detector).convert()
+
+        output_filename = f"{convert_to_camel_case(lexicon_id)}.swift"
+        output_file_path = os.path.join(output_folder, output_filename)
+        async with aiofiles.open(output_file_path, 'w') as swift_file:
+            await swift_file.write(swift_code)
+
+    # Second pass: Generate code with cycle information
+    tasks = []
+    for filepath, lexicon in lexicons:
+        tasks.append(asyncio.create_task(process_lexicon(filepath, lexicon)))
 
     await asyncio.gather(*tasks)
 

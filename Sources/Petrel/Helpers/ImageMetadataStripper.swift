@@ -22,9 +22,15 @@ public class ImageMetadataStripper {
         }
 
         let mutableData = NSMutableData()
+
+        guard let imageType = CGImageSourceGetType(source) else {
+            print("Failed to get image type")
+            return nil
+        }
+
         guard
             let destination = CGImageDestinationCreateWithData(
-                mutableData, CGImageSourceGetType(source)!, 1, nil
+                mutableData, imageType, 1, nil
             )
         else {
             print("Failed to create image destination")

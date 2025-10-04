@@ -103,12 +103,16 @@ extension AttributedString {
         for run in runs {
             let range = run.range
             guard
-                let startOffset = utf8Offset(at: range.lowerBound, in: self, fullString: fullString),
-                let endOffset = utf8Offset(at: range.upperBound, in: self, fullString: fullString),
-                startOffset != endOffset
+                let lowerBound = String.Index(range.lowerBound, within: fullString),
+                let upperBound = String.Index(range.upperBound, within: fullString),
+                lowerBound < upperBound
             else {
                 continue // Skip the current iteration if offsets are nil or identical
             }
+
+            // Derive UTF-8 offsets directly from the source string to avoid character/byte mismatches
+            let byteStart = fullString[..<lowerBound].utf8.count
+            let byteEnd = byteStart + fullString[lowerBound..<upperBound].utf8.count
 
             var features: [AppBskyRichtextFacet.AppBskyRichtextFacetFeaturesUnion] = []
 
@@ -131,7 +135,7 @@ extension AttributedString {
                 continue // Skip if no features were extracted
             }
 
-            let byteSlice = AppBskyRichtextFacet.ByteSlice(byteStart: startOffset, byteEnd: endOffset)
+            let byteSlice = AppBskyRichtextFacet.ByteSlice(byteStart: byteStart, byteEnd: byteEnd)
             let facet = AppBskyRichtextFacet(index: byteSlice, features: features)
             facets.append(facet)
         }
@@ -140,27 +144,4 @@ extension AttributedString {
         return facets.isEmpty ? nil : facets
     }
 
-    /// Calculates the UTF-8 byte offset of a given `AttributedString.Index` within the original `String`.
-    /// - Parameters:
-    ///   - position: The `AttributedString.Index` to find the UTF-8 offset for.
-    ///   - attributedString: The `AttributedString` derived from the original string.
-    ///   - fullString: The original `String` from which the `AttributedString` was created.
-    /// - Returns: The UTF-8 byte offset of the character at `position`, or `nil` if the index is out of range.
-    private func utf8Offset(
-        at position: AttributedString.Index, in attributedString: AttributedString, fullString: String
-    ) -> Int? {
-        if position >= attributedString.endIndex {
-            print(position, attributedString.endIndex)
-            print("Index at or beyond endIndex, handling as a boundary case.")
-            return fullString.utf8.count // Return the total count of UTF-8 bytes as the offset
-        }
-
-        guard let stringIndex = String.Index(position, within: fullString) else {
-            print("Invalid position conversion from AttributedString.Index to String.Index.")
-            return nil
-        }
-
-        let utf8Offset = fullString.utf8.prefix(upTo: stringIndex).count
-        return utf8Offset
-    }
 }

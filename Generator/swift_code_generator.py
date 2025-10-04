@@ -6,7 +6,7 @@ from enum_generator import EnumGenerator
 from type_converter import TypeConverter
 
 class SwiftCodeGenerator:
-    def __init__(self, lexicon: Dict[str, Any]):
+    def __init__(self, lexicon: Dict[str, Any], cycle_detector=None):
         self.lexicon = lexicon
         self.defs = lexicon.get('defs', {})
         self.lexicon_id = lexicon.get('id', '')
@@ -19,12 +19,12 @@ class SwiftCodeGenerator:
         self.enums = ""
         self.generated_unions = set()
         self.enum_definitions = {}
-        self.recursive_unions = {"ThreadViewPostParentUnion", "ThreadViewPostRepliesUnion", "OutputThreadUnion"}
         self.is_blob_upload = self.check_if_blob_upload(lexicon)
+        self.cycle_detector = cycle_detector
 
         self.token_descriptions = {}
         self.generated_tokens = set()
-        
+
         self.template_manager = TemplateManager()
         self.enum_generator = EnumGenerator(self)
         self.type_converter = TypeConverter(self)
@@ -59,11 +59,22 @@ class SwiftCodeGenerator:
             swift_type = self.type_converter.determine_swift_type(name, prop, required_fields, current_struct_name)
             description = prop.get('description', '')
             is_optional = name not in required_fields
+
+            # Check if this property should be boxed to break a circular reference
+            should_box = False
+            if self.cycle_detector:
+                # Build the full Swift type name for checking
+                swift_full_type = convert_to_camel_case(self.lexicon_id)
+                if current_struct_name != convert_to_camel_case(self.lexicon_id):
+                    swift_full_type = f"{swift_full_type}.{current_struct_name}"
+                should_box = self.cycle_detector.should_box_property(swift_full_type, name)
+
             swift_properties.append({
-                'name': name, 
-                'type': swift_type, 
+                'name': name,
+                'type': swift_type,
                 'optional': is_optional,
-                'description': description
+                'description': description,
+                'boxed': should_box
             })
         return swift_properties
 

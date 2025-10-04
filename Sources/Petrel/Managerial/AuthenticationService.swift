@@ -28,6 +28,20 @@ public protocol AuthProgressDelegate: AnyObject, Sendable {
     func authenticationProgress(_ event: AuthProgressEvent) async
 }
 
+/// Delegate protocol for handling catastrophic authentication failures
+public protocol AuthFailureDelegate: AnyObject, Sendable {
+    /// Called when authentication fails due to server/infrastructure issues
+    /// - Parameters:
+    ///   - did: The DID that experienced the failure
+    ///   - error: The specific error that occurred
+    ///   - isRetryable: Whether this error could be resolved by retrying later
+    func handleCatastrophicAuthFailure(did: String, error: Error, isRetryable: Bool) async
+
+    /// Called when the circuit breaker opens due to repeated failures
+    /// - Parameter did: The DID for which the circuit opened
+    func handleCircuitBreakerOpen(did: String) async
+}
+
 /// Protocol defining the interface for authentication services.
 protocol AuthServiceProtocol: Actor {
     /// Starts the OAuth flow for an existing user.
@@ -67,6 +81,10 @@ protocol AuthServiceProtocol: Actor {
     /// Sets the authentication progress delegate
     /// - Parameter delegate: The delegate to receive progress updates
     func setProgressDelegate(_ delegate: AuthProgressDelegate?) async
+
+    /// Sets the authentication failure delegate
+    /// - Parameter delegate: The delegate to handle catastrophic failures
+    func setFailureDelegate(_ delegate: AuthFailureDelegate?) async
 }
 
 /// Result of a token refresh attempt
@@ -237,6 +255,12 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
     /// - Parameter delegate: The delegate to receive progress updates
     func setProgressDelegate(_ delegate: AuthProgressDelegate?) async {
         progressDelegate = delegate
+    }
+
+    /// Sets the authentication failure delegate
+    /// - Parameter delegate: The delegate to handle catastrophic failures
+    func setFailureDelegate(_ delegate: AuthFailureDelegate?) async {
+        authFailureDelegate = delegate
     }
 
     /// Emits a progress update to the delegate
@@ -935,6 +959,8 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
     /// Defaults to true to preserve current behavior; apps can set to false to
     /// avoid surprising context changes after catastrophic failures.
     var autoSwitchOnLogout: Bool = true
+    /// Delegate for handling catastrophic auth failures that require app-level intervention
+    weak var authFailureDelegate: AuthFailureDelegate?
     // Simple in-memory store for OAuth flow nonces (independent of any account)
     private var oauthFlowNonces: [String: String] = [:]
     // JKT-scoped nonces (key thumbprint -> domain -> nonce)
@@ -1004,6 +1030,36 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
         LogManager.logInfo(
             "AuthenticationService: autoSwitchOnLogout set to \(enabled)", category: .authentication
         )
+    }
+
+    /// Attempts to recover from catastrophic auth failures by resetting circuit breakers
+    /// and attempting a fresh token refresh. Should be called when the app detects
+    /// that server issues have been resolved (e.g., network connectivity restored).
+    /// - Parameter did: The DID to attempt recovery for, or nil to attempt for current account
+    func attemptRecoveryFromServerFailures(for did: String? = nil) async throws {
+        let targetDID: String?
+        if let did = did {
+            targetDID = did
+        } else {
+            targetDID = await accountManager.getCurrentAccount()?.did
+        }
+        guard let targetDID = targetDID else {
+            throw AuthError.noActiveAccount
+        }
+
+        LogManager.logInfo("Attempting recovery from server failures for DID: \(LogManager.logDID(targetDID))")
+
+        // Reset circuit breaker to allow retry
+        await refreshCircuitBreaker.reset(for: targetDID)
+
+        // Attempt a forced token refresh to test if the server is back online
+        do {
+            let result = try await refreshTokenIfNeeded(forceRefresh: true)
+            LogManager.logInfo("Recovery successful for DID: \(LogManager.logDID(targetDID)), result: \(result)")
+        } catch {
+            LogManager.logError("Recovery attempt failed for DID: \(LogManager.logDID(targetDID)): \(error)")
+            throw error
+        }
     }
 
     // MARK: - OAuth Flow
@@ -1667,6 +1723,12 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
                 "RefreshCircuitBreaker: Circuit is OPEN for DID \(LogManager.logDID(did)). Refusing refresh attempt.",
                 category: .authentication
             )
+
+            // Notify delegate about circuit breaker being open
+            if let delegate = authFailureDelegate {
+                await delegate.handleCircuitBreakerOpen(did: did)
+            }
+
             throw AuthError.tokenRefreshFailed
         }
 
@@ -1935,12 +1997,30 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
                     "METRIC token_refresh_failures_total reason=dpop did=\(LogManager.logDID(did))")
                 throw AuthError.tokenRefreshFailed
             case let .networkError(code, details):
-                await refreshCircuitBreaker.recordFailure(for: did, kind: .network)
+                // Classify network errors more specifically
+                let failureKind: RefreshCircuitBreaker.RefreshFailureKind
+                let isRetryable: Bool
+                if let details = details, details.contains("OAuth metadata endpoint unreachable") {
+                    failureKind = .metadataUnavailable
+                    isRetryable = true // Metadata issues are typically temporary
+                } else {
+                    failureKind = .network
+                    isRetryable = true // Most network issues are retryable
+                }
+                await refreshCircuitBreaker.recordFailure(for: did, kind: failureKind)
+
                 LogManager.logError(
                     "Token refresh failed due to network error (\(code)) for DID \(account.did): \(details ?? "No details")"
                 )
                 LogManager.logInfo(
-                    "METRIC token_refresh_failures_total reason=network did=\(LogManager.logDID(did))")
+                    "METRIC token_refresh_failures_total reason=\(failureKind == .metadataUnavailable ? "metadata_unavailable" : "network") did=\(LogManager.logDID(did))")
+
+                // Notify delegate about the failure if it's a metadata issue
+                if failureKind == .metadataUnavailable, let delegate = authFailureDelegate {
+                    let authError = AuthError.serverError(code, details)
+                    await delegate.handleCatastrophicAuthFailure(did: did, error: authError, isRetryable: isRetryable)
+                }
+
                 // Logged details above, throw a general error for the caller
                 throw AuthError.tokenRefreshFailed
             case let .decodingError(underlyingError, context):

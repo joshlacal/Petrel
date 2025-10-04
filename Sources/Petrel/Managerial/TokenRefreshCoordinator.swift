@@ -286,6 +286,30 @@ actor TokenRefreshCoordinator {
                 return .invalidGrant(errorResponse.errorDescription)
             case "use_dpop_nonce", "invalid_dpop_proof":
                 return .dpopError(errorResponse.errorDescription)
+            case "invalid_client_metadata":
+                // Handle OAuth client metadata errors - typically indicates server/network issues
+                // The metadata endpoint is unreachable, which is usually temporary
+                LogManager.logAuthIncident(
+                    "InvalidClientMetadata",
+                    details: [
+                        "status": statusCode,
+                        "error": errorResponse.error,
+                        "desc": errorResponse.errorDescription ?? "Client metadata endpoint unreachable",
+                    ]
+                )
+                return .networkError(statusCode, "OAuth metadata endpoint unreachable: \(errorResponse.errorDescription ?? "Server temporarily unavailable")")
+            case "invalid_client":
+                // Handle invalid client errors - this could be temporary or permanent
+                LogManager.logAuthIncident(
+                    "InvalidClient",
+                    details: [
+                        "status": statusCode,
+                        "error": errorResponse.error,
+                        "desc": errorResponse.errorDescription ?? "Client authentication failed",
+                    ]
+                )
+                // For now, treat as network error to allow retry - if it's truly invalid, circuit breaker will handle
+                return .networkError(statusCode, "Client authentication failed: \(errorResponse.errorDescription ?? "Client configuration issue")")
             default:
                 // Treat other known OAuth errors as specific network errors, including description
                 return .networkError(
