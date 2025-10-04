@@ -17,6 +17,7 @@ actor RefreshCircuitBreaker {
         case server // 5xx, unexpected server responses
         case invalidGrant // refresh token revoked/expired
         case invalidDPoPProof // wrong key, bad ath, htm/htu mismatch
+        case metadataUnavailable // OAuth metadata endpoint unreachable
         case other
     }
 
@@ -35,6 +36,8 @@ actor RefreshCircuitBreaker {
         var lastFailureTime: Date?
         var state: State = .closed
         var halfOpenTestInProgress: Bool = false
+        var backoffExponent: Int = 0 // For exponential backoff
+        var lastFailureKind: RefreshFailureKind? = nil
     }
 
     // MARK: - Properties
@@ -89,20 +92,21 @@ actor RefreshCircuitBreaker {
             return true
 
         case .open:
-            // Check if enough time has passed to try again
-            if let lastFailure = info.lastFailureTime,
-               Date().timeIntervalSince(lastFailure) >= resetInterval
-            {
-                // Transition to half-open state
-                var updatedInfo = info
-                updatedInfo.state = .halfOpen
-                updatedInfo.halfOpenTestInProgress = false
-                failureTracking[did] = updatedInfo
+            // Check if enough time has passed to try again with exponential backoff
+            if let lastFailure = info.lastFailureTime {
+                let backoffInterval = calculateBackoffInterval(for: info)
+                if Date().timeIntervalSince(lastFailure) >= backoffInterval {
+                    // Transition to half-open state
+                    var updatedInfo = info
+                    updatedInfo.state = .halfOpen
+                    updatedInfo.halfOpenTestInProgress = false
+                    failureTracking[did] = updatedInfo
 
-                LogManager.logInfo(
-                    "RefreshCircuitBreaker: Circuit transitioning to half-open for DID \(LogManager.logDID(did))"
-                )
-                return true
+                    LogManager.logInfo(
+                        "RefreshCircuitBreaker: Circuit transitioning to half-open for DID \(LogManager.logDID(did)) after \(Int(backoffInterval))s backoff"
+                    )
+                    return true
+                }
             }
             return false
 
@@ -130,6 +134,8 @@ actor RefreshCircuitBreaker {
         info.lastFailureTime = nil
         info.state = .closed
         info.halfOpenTestInProgress = false
+        info.backoffExponent = 0 // Reset backoff on success
+        info.lastFailureKind = nil
 
         if previousState != .closed {
             LogManager.logInfo(
@@ -153,10 +159,16 @@ actor RefreshCircuitBreaker {
             break
         case .invalidGrant, .invalidDPoPProof:
             info.consecutiveFailures += 2 // heavier weight for serious failures
+            info.backoffExponent = min(info.backoffExponent + 2, 6) // Faster escalation for serious failures
+        case .metadataUnavailable:
+            info.consecutiveFailures += 1 // Standard weight but longer backoff for server issues
+            info.backoffExponent = min(info.backoffExponent + 1, 8) // Longer max backoff for server issues
         case .network, .server, .other:
             info.consecutiveFailures += 1
+            info.backoffExponent = min(info.backoffExponent + 1, 5) // Standard escalation
         }
         info.lastFailureTime = Date()
+        info.lastFailureKind = kind
 
         switch info.state {
         case .closed:
@@ -219,6 +231,42 @@ actor RefreshCircuitBreaker {
     }
 
     // MARK: - Private Methods
+
+    /// Calculates the backoff interval for a specific failure info
+    /// Uses exponential backoff with jitter and different base intervals based on failure type
+    private func calculateBackoffInterval(for info: FailureInfo) -> TimeInterval {
+        let baseInterval: TimeInterval
+
+        switch info.lastFailureKind {
+        case .metadataUnavailable:
+            baseInterval = 60.0 // 1 minute base for server issues
+        case .invalidGrant, .invalidDPoPProof:
+            baseInterval = 300.0 // 5 minutes base for serious auth issues
+        case .network, .server:
+            baseInterval = 30.0 // 30 seconds base for network issues
+        default:
+            baseInterval = resetInterval // Use default reset interval
+        }
+
+        let exponentialBackoff = baseInterval * pow(2.0, Double(min(info.backoffExponent, 6)))
+
+        // Add jitter (±25%) to prevent thundering herd
+        let jitter = Double.random(in: 0.75...1.25)
+        let finalInterval = exponentialBackoff * jitter
+
+        // Cap at reasonable maximums based on failure type
+        let maxInterval: TimeInterval
+        switch info.lastFailureKind {
+        case .metadataUnavailable:
+            maxInterval = 3600.0 // 1 hour max for server issues
+        case .invalidGrant, .invalidDPoPProof:
+            maxInterval = 7200.0 // 2 hours max for auth issues
+        default:
+            maxInterval = 1800.0 // 30 minutes max for others
+        }
+
+        return min(finalInterval, maxInterval)
+    }
 
     /// Removes failure records that haven't been updated in a long time
     private func cleanupStaleRecords() {

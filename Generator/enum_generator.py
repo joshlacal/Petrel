@@ -6,7 +6,7 @@ class EnumGenerator:
 
     def generate_enum_for_union(self, context_struct_name, union_name, variants):
         unique_union_name = f"{context_struct_name}{convert_to_camel_case(union_name)}Union"
-        
+
         if unique_union_name in self.swift_code_generator.generated_unions:
             return
 
@@ -16,7 +16,26 @@ class EnumGenerator:
 
         self.swift_code_generator.enum_definitions[unique_union_name] = processed_variants
 
-        is_recursive = unique_union_name in self.swift_code_generator.recursive_unions or self.is_enum_recursive(unique_union_name, processed_variants)
+        # Check if enum should be indirect using cycle detector
+        cycle_detector = self.swift_code_generator.cycle_detector
+        if cycle_detector:
+            # Build fully qualified name for cycle detector lookup
+            # If context_struct_name doesn't contain the base type, prepend it
+            swift_base = convert_to_camel_case(self.swift_code_generator.lexicon_id)
+            if context_struct_name == swift_base:
+                # Main def: union name is just base.UnionName
+                qualified_union_name = unique_union_name
+            elif not context_struct_name.startswith(swift_base):
+                # Nested def: need to add base and dot
+                qualified_union_name = f"{swift_base}.{unique_union_name}"
+            else:
+                # Already has base in the name
+                qualified_union_name = unique_union_name
+
+            is_recursive = cycle_detector.should_be_indirect(qualified_union_name)
+        else:
+            # Fallback to old detection if no cycle detector
+            is_recursive = self.is_enum_recursive(unique_union_name, processed_variants)
 
         enum_template = self.swift_code_generator.template_manager.env.get_template('unionEnum.jinja')
 

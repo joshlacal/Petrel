@@ -912,6 +912,7 @@ actor NetworkService: NetworkServiceProtocol {
 
         // Validate URL for security
         if !validateURL(finalURL) {
+            LogManager.logError("Security validation failed for URL: \(finalURL). This may be due to DNS resolution to private IP ranges or network configuration issues.")
             throw NetworkError.securityViolation
         }
 

@@ -69,7 +69,7 @@ extension NetworkError: LocalizedError {
         case .unauthorized:
             return "Unauthorized access."
         case .securityViolation:
-            return "Security violation detected."
+            return "Network configuration issue detected. Please check your internet connection and try again."
         }
     }
 
@@ -94,7 +94,7 @@ extension NetworkError: LocalizedError {
         case .oauthManagerNotSet:
             return "Application configuration is incomplete."
         case .securityViolation:
-            return "Potential security threat detected in request."
+            return "Your network configuration may be blocking the connection to the AT Protocol server."
         default:
             return nil
         }
@@ -119,7 +119,7 @@ extension NetworkError: LocalizedError {
         case .oauthManagerNotSet:
             return "Please restart the app. If the problem persists, contact support."
         case .securityViolation:
-            return "Please ensure you're using the official app and try again."
+            return "Try switching to a different network or disabling VPN/proxy if enabled."
         default:
             return "Please try again or contact support if the problem persists."
         }

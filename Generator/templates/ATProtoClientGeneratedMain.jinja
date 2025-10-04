@@ -314,6 +314,19 @@ public actor ATProtoClient {
         await authService.setProgressDelegate(delegate)
     }
 
+    /// Sets the authentication failure delegate.
+    /// - Parameter delegate: The delegate to handle catastrophic failures.
+    public func setFailureDelegate(_ delegate: AuthFailureDelegate?) async {
+        await authService.setFailureDelegate(delegate)
+    }
+
+    /// Attempts to recover from catastrophic auth failures by resetting circuit breakers.
+    /// Should be called when network connectivity is restored.
+    /// - Parameter did: The DID to attempt recovery for, or nil for current account
+    public func attemptRecoveryFromServerFailures(for did: String? = nil) async throws {
+        try await authService.attemptRecoveryFromServerFailures(for: did)
+    }
+
     /// Starts the OAuth flow for authentication.
     /// - Parameter identifier: The user identifier (handle), optional for sign-up.
     /// - Returns: The authorization URL to present to the user.

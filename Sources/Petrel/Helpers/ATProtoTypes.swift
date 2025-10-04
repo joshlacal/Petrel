@@ -993,6 +993,8 @@ extension AppBskyFeedDefs.FeedViewPost: Identifiable {
             return blockedPost.uri.uriString()
         case let .unexpected(ATProtocolValueContainer):
             return ATProtocolValueContainer.hashValue.description
+        case let .pending(pendingData):
+            return "pending:\(pendingData.type)"
         }
     }
 
@@ -1006,6 +1008,8 @@ extension AppBskyFeedDefs.FeedViewPost: Identifiable {
             return blockedPost.uri.uriString()
         case let .unexpected(ATProtocolValueContainer):
             return ATProtocolValueContainer.hashValue.description
+        case let .pending(pendingData):
+            return "pending:\(pendingData.type)"
         }
     }
 }
