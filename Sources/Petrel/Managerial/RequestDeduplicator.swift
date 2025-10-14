@@ -6,6 +6,9 @@
 //
 
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// Actor responsible for deduplicating concurrent identical network requests
 /// to prevent multiple simultaneous calls to the same endpoint.

@@ -7,7 +7,11 @@
 
 #if os(iOS) || os(macOS)
 
+    #if canImport(CryptoKit)
     import CryptoKit
+    #else
+    @preconcurrency import Crypto
+    #endif
     import Foundation
     import Security
 
@@ -299,7 +303,7 @@
                     let updateStatus = SecItemUpdate(deleteQuery as CFDictionary, updateAttributes as CFDictionary)
                     guard updateStatus == errSecSuccess else {
                         LogManager.logError("AppleKeychainStore - iOS update failed: \(updateStatus)")
-                        throw KeychainError.itemStoreError(status: updateStatus)
+                        throw KeychainError.itemStoreError(status: Int(updateStatus))
                     }
                     LogManager.logDebug("AppleKeychainStore - iOS key updated for tag \(keyTag)")
                 } else if status != errSecSuccess {

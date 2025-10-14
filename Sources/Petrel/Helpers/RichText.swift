@@ -6,6 +6,8 @@
 //
 
 import Foundation
+
+#if canImport(SwiftUI)
 import SwiftUI
 
 public extension AppBskyFeedPost {
@@ -63,6 +65,7 @@ public extension AppBskyFeedPost {
         return attributedString
     }
 }
+#endif
 
 public extension String {
     func index(atUTF8Offset offset: Int) -> String.Index? {
@@ -74,6 +77,7 @@ public extension String {
     }
 }
 
+#if canImport(SwiftUI)
 public struct TagLink: CodableAttributedStringKey, MarkdownDecodableAttributedStringKey {
     public typealias Value = String
     public static let name: String = "tagLink"
@@ -144,3 +148,4 @@ public extension AttributedString {
         return facets.isEmpty ? nil : facets
     }
 }
+#endif

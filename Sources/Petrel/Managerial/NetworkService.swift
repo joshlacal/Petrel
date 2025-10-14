@@ -5,9 +5,13 @@
 //  Created by Josh LaCalamito on 4/22/2025.
 //
 
-import Darwin
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
+#if canImport(Network)
 import Network
+#endif
 
 /// Protocol for authentication providers
 struct AuthContext: Sendable {
@@ -1069,11 +1073,22 @@ actor NetworkService: NetworkServiceProtocol {
 
         // Quick check: if host is a literal IP, validate directly; otherwise resolve DNS
         let ips: [String]
+        #if canImport(Network)
         if IPv4Address(host) != nil || IPv6Address(host) != nil {
             ips = [host]
         } else {
             ips = resolveHostIPs(host: host)
         }
+        #else
+        // Linux: Simple regex check for IP literal
+        let isIPv4 = host.split(separator: ".").count == 4 && host.allSatisfy { $0.isNumber || $0 == "." }
+        let isIPv6 = host.contains(":")
+        if isIPv4 || isIPv6 {
+            ips = [host]
+        } else {
+            ips = resolveHostIPs(host: host)
+        }
+        #endif
 
         if ips.isEmpty {
             LogManager.logError("Failed to resolve host: \(host)")
@@ -1100,8 +1115,8 @@ actor NetworkService: NetworkServiceProtocol {
             ai_socktype: SOCK_STREAM,
             ai_protocol: 0,
             ai_addrlen: 0,
-            ai_canonname: nil,
             ai_addr: nil,
+            ai_canonname: nil,
             ai_next: nil
         )
         var res: UnsafeMutablePointer<addrinfo>? = nil
@@ -1132,6 +1147,7 @@ actor NetworkService: NetworkServiceProtocol {
     }
 
     private func isPrivateOrReserved(ip: String) -> Bool {
+        #if canImport(Network)
         // IPv4 checks
         if let v4 = IPv4Address(ip) {
             let octets = v4.rawValue
@@ -1162,6 +1178,33 @@ actor NetworkService: NetworkServiceProtocol {
             // fc00::/7 unique local
             if (bytes[0] & 0xFE) == 0xFC { return true }
         }
+        #else
+        // Linux fallback: regex-based IP validation
+        // IPv4 checks - parse manually
+        let components = ip.split(separator: ".").compactMap { Int($0) }
+        if components.count == 4 {
+            let a = components[0]
+            let b = components[1]
+            
+            // Private/reserved IPv4 ranges
+            if a == 10 { return true }
+            if a == 172 && (16 ... 31).contains(b) { return true }
+            if a == 192 && b == 168 { return true }
+            if a == 127 { return true }
+            if a == 169 && b == 254 { return true }
+            if a == 0 || a == 255 { return true }
+        }
+        
+        // IPv6 checks - simplified for Linux
+        if ip.contains(":") {
+            // Loopback ::1
+            if ip == "::1" || ip == "0:0:0:0:0:0:0:1" { return true }
+            // Link-local fe80::/10
+            if ip.lowercased().hasPrefix("fe80:") { return true }
+            // Unique local fc00::/7
+            if ip.lowercased().hasPrefix("fc") || ip.lowercased().hasPrefix("fd") { return true }
+        }
+        #endif
 
         return false
     }
