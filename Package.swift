@@ -37,7 +37,7 @@ let package = Package(
                 .yum(["libsecret-devel", "glib2-devel", "pkg-config"]),
             ]
         ),
-        
+
         .target(
             name: "Petrel",
             dependencies: [

@@ -35,4 +35,3 @@
 
 // Implementation moved to ATProtoClientGeneratedMain.swift
 extension ATProtoClient {}
-

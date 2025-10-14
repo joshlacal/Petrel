@@ -3223,7 +3223,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
             type: .tokenRequest,
             did: nil,
             ephemeralKey: key,
-            nonce: nonce,
+            nonce: nonce
         )
 
         request.setValue(dpopProof, forHTTPHeaderField: "DPoP")

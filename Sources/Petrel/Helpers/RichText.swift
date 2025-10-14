@@ -95,8 +95,8 @@ public extension AttributeScopes {
 
 // MARK: AttributedString to facets (not tested):
 
-extension AttributedString {
-    public func toFacets() throws -> [AppBskyRichtextFacet]? {
+public extension AttributedString {
+    func toFacets() throws -> [AppBskyRichtextFacet]? {
         var facets: [AppBskyRichtextFacet] = []
         let fullString = String(characters[...]) // Convert entire AttributedString to String once for efficiency
 
@@ -112,7 +112,7 @@ extension AttributedString {
 
             // Derive UTF-8 offsets directly from the source string to avoid character/byte mismatches
             let byteStart = fullString[..<lowerBound].utf8.count
-            let byteEnd = byteStart + fullString[lowerBound..<upperBound].utf8.count
+            let byteEnd = byteStart + fullString[lowerBound ..< upperBound].utf8.count
 
             var features: [AppBskyRichtextFacet.AppBskyRichtextFacetFeaturesUnion] = []
 
@@ -143,5 +143,4 @@ extension AttributedString {
         // Return nil if no facets were detected
         return facets.isEmpty ? nil : facets
     }
-
 }
