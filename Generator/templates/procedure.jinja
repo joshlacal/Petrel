@@ -63,16 +63,13 @@ extension ATProtoClient.{{ template_namespace_name }} {
             queryItems: nil
         )
 
-        {% if output_type %}
-        {% if endpoint.startswith('chat.bsky') %}
-        // Chat endpoint - use proxy header
-        let proxyHeaders = ["atproto-proxy": "did:web:api.bsky.chat#bsky_chat"]
-        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        {% else %}
-        let (responseData, response) = try await networkService.performRequest(urlRequest)
-        {% endif %}
+        // Determine service DID for this endpoint
+        let serviceDID = await networkService.getServiceDID(for: "{{ endpoint }}")
+        let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
+        let ({% if output_type %}responseData, {% else %}_, {% endif %}response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
+        {% if output_type %}
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "{{ output_encoding }}", actual: "nil")
         }
@@ -103,14 +100,6 @@ extension ATProtoClient.{{ template_namespace_name }} {
             return (responseCode, nil)
         }
         {% else %}
-        {% if endpoint.startswith('chat.bsky') %}
-        // Chat endpoint - use proxy header
-        let proxyHeaders = ["atproto-proxy": "did:web:api.bsky.chat#bsky_chat"]
-        let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        {% else %}
-        let (_, response) = try await networkService.performRequest(urlRequest)
-        {% endif %}
-        let responseCode = response.statusCode
         return responseCode
         {% endif %}
     }

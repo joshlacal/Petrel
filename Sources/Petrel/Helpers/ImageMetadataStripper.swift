@@ -6,7 +6,10 @@
 //
 
 import Foundation
+
+#if os(iOS) || os(macOS)
 import ImageIO
+#endif
 
 #if os(iOS)
     import MobileCoreServices
@@ -16,6 +19,7 @@ import ImageIO
 
 public class ImageMetadataStripper {
     public static func stripMetadata(from imageData: Data) -> Data? {
+        #if os(iOS) || os(macOS)
         guard let source = CGImageSourceCreateWithData(imageData as CFData, nil) else {
             print("Failed to create image source")
             return nil
@@ -65,5 +69,11 @@ public class ImageMetadataStripper {
         }
 
         return mutableData as Data
+        #else
+        // On Linux, metadata stripping is not available
+        // Return the original data unchanged
+        LogManager.logDebug("ImageMetadataStripper - Metadata stripping not available on this platform, returning original data")
+        return imageData
+        #endif
     }
 }

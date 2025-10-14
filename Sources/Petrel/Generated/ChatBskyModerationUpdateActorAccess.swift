@@ -117,13 +117,13 @@ extension ATProtoClient.Chat.Bsky.Moderation {
             queryItems: nil
         )
 
-        
-        
-        // Chat endpoint - use proxy header
-        let proxyHeaders = ["atproto-proxy": "did:web:api.bsky.chat#bsky_chat"]
+        // Determine service DID for this endpoint
+        let serviceDID = await networkService.getServiceDID(for: "chat.bsky.moderation.updateActorAccess")
+        let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
         let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        
         let responseCode = response.statusCode
+
+        
         return responseCode
         
     }

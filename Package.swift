@@ -28,12 +28,23 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.4.5"),
     ],
     targets: [
+        // System library for libsecret (Linux only, ignored on other platforms)
+        .systemLibrary(
+            name: "CLibSecretShim",
+            pkgConfig: "libsecret-1",
+            providers: [
+                .apt(["libsecret-1-dev", "libglib2.0-dev", "pkg-config"]),
+                .yum(["libsecret-devel", "glib2-devel", "pkg-config"]),
+            ]
+        ),
+        
         .target(
             name: "Petrel",
             dependencies: [
                 "jose-swift",
                 "SwiftCBOR",
                 .product(name: "AsyncDNSResolver", package: "swift-async-dns-resolver"),
+                .target(name: "CLibSecretShim", condition: .when(platforms: [.linux])),
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v6),

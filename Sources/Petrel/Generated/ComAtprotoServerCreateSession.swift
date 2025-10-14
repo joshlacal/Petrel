@@ -127,6 +127,7 @@ public struct Output: ATProtocolCodable {
         // Standard public initializer
         public init(
             
+            
             accessJwt: String,
             
             refreshJwt: String,
@@ -149,6 +150,7 @@ public struct Output: ATProtocolCodable {
             
             
         ) {
+            
             
             self.accessJwt = accessJwt
             
@@ -174,8 +176,8 @@ public struct Output: ATProtocolCodable {
         }
         
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
             
+            let container = try decoder.container(keyedBy: CodingKeys.self)
             
             self.accessJwt = try container.decode(String.self, forKey: .accessJwt)
             
@@ -210,8 +212,8 @@ public struct Output: ATProtocolCodable {
         }
         
         public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
             
+            var container = encoder.container(keyedBy: CodingKeys.self)
             
             try container.encode(accessJwt, forKey: .accessJwt)
             
@@ -329,8 +331,8 @@ public struct Output: ATProtocolCodable {
             
         }
         
+        
         private enum CodingKeys: String, CodingKey {
-            
             case accessJwt
             case refreshJwt
             case handle
@@ -341,8 +343,8 @@ public struct Output: ATProtocolCodable {
             case emailAuthFactor
             case active
             case status
-            
         }
+        
     }
         
 public enum Error: String, Swift.Error, CustomStringConvertible {
@@ -391,12 +393,13 @@ extension ATProtoClient.Com.Atproto.Server {
             queryItems: nil
         )
 
-        
-        
-        let (responseData, response) = try await networkService.performRequest(urlRequest)
-        
+        // Determine service DID for this endpoint
+        let serviceDID = await networkService.getServiceDID(for: "com.atproto.server.createSession")
+        let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
+        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
+        
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }

@@ -29,10 +29,12 @@ public struct Output: ATProtocolCodable {
         // Standard public initializer
         public init(
             
+            
             didDoc: DIDDocument
             
             
         ) {
+            
             
             self.didDoc = didDoc
             
@@ -40,8 +42,8 @@ public struct Output: ATProtocolCodable {
         }
         
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
             
+            let container = try decoder.container(keyedBy: CodingKeys.self)
             
             self.didDoc = try container.decode(DIDDocument.self, forKey: .didDoc)
             
@@ -49,8 +51,8 @@ public struct Output: ATProtocolCodable {
         }
         
         public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
             
+            var container = encoder.container(keyedBy: CodingKeys.self)
             
             try container.encode(didDoc, forKey: .didDoc)
             
@@ -72,11 +74,11 @@ public struct Output: ATProtocolCodable {
             
         }
         
+        
         private enum CodingKeys: String, CodingKey {
-            
             case didDoc
-            
         }
+        
     }
         
 public enum Error: String, Swift.Error, CustomStringConvertible {
@@ -115,9 +117,10 @@ extension ATProtoClient.Com.Atproto.Identity {
             queryItems: queryItems
         )
 
-        
-        let (responseData, response) = try await networkService.performRequest(urlRequest)
-        
+        // Determine service DID for this endpoint
+        let serviceDID = await networkService.getServiceDID(for: "com.atproto.identity.resolveDid")
+        let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
+        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {

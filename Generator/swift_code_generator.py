@@ -132,6 +132,13 @@ class SwiftCodeGenerator:
             context['type_alias_target'] = convert_ref(output_schema['ref'])
         elif encoding == "*/*":
             context['properties'] = [{"name": "data", "type": "Data", "optional": False}]
+        elif not output_schema or (not output_schema.get('properties') and output_schema.get('type') != 'object'):
+            # No schema or schema without properties (binary data case)
+            # For encodings like application/vnd.ipld.car, application/jsonl without schema
+            if encoding and encoding != 'application/json':
+                context['properties'] = [{"name": "data", "type": "Data", "optional": False}]
+            else:
+                context['properties'] = []
         else:
             context['properties'] = self.generate_properties(output_schema.get('properties', {}), output_schema.get('required', []), "Output")
 

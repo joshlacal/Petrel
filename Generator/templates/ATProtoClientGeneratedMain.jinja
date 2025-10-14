@@ -108,12 +108,16 @@ public actor ATProtoClient {
     ///   - namespace: The namespace for storage.
     ///   - userAgent: Optional user agent string for requests.
     ///   - didResolver: Optional custom DID resolver implementation.
+    ///   - bskyAppViewDID: Optional custom Bluesky AppView service DID (default: did:web:api.bsky.app#bsky_appview).
+    ///   - bskyChatDID: Optional custom Bluesky Chat service DID (default: did:web:api.bsky.chat#bsky_chat).
     public init(
         baseURL: URL = URL(string: "https://bsky.social")!,
         oauthConfig: OAuthConfig,
         namespace: String,
         userAgent: String? = nil,
-        didResolver: DIDResolving? = nil
+        didResolver: DIDResolving? = nil,
+        bskyAppViewDID: String = "did:web:api.bsky.app#bsky_appview",
+        bskyChatDID: String = "did:web:api.bsky.chat#bsky_chat"
     ) async {
         // Initialize storage first
         storage = KeychainStorage(namespace: namespace)
@@ -123,6 +127,10 @@ public actor ATProtoClient {
 
         // Initialize network service first with nil authService
         networkService = NetworkService(baseURL: baseURL)
+        
+        // Configure service DIDs
+        await networkService.setServiceDID(bskyAppViewDID, for: "app.bsky")
+        await networkService.setServiceDID(bskyChatDID, for: "chat.bsky")
 
         if let userAgent = userAgent {
             await networkService.setUserAgent(userAgent)
@@ -447,6 +455,12 @@ public actor ATProtoClient {
     ///   - value: The header value.
     public func setHeader(name: String, value: String) async {
         await networkService.setHeader(name: name, value: value)
+    }
+    
+    /// Removes a custom header.
+    /// - Parameter name: The header name to remove.
+    public func removeHeader(name: String) async {
+        await networkService.removeHeader(name: name)
     }
 
     /// Sets the user agent for all requests.

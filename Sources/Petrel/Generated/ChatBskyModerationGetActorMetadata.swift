@@ -229,6 +229,7 @@ public struct Output: ATProtocolCodable {
         // Standard public initializer
         public init(
             
+            
             day: Metadata,
             
             month: Metadata,
@@ -237,6 +238,7 @@ public struct Output: ATProtocolCodable {
             
             
         ) {
+            
             
             self.day = day
             
@@ -248,8 +250,8 @@ public struct Output: ATProtocolCodable {
         }
         
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
             
+            let container = try decoder.container(keyedBy: CodingKeys.self)
             
             self.day = try container.decode(Metadata.self, forKey: .day)
             
@@ -263,8 +265,8 @@ public struct Output: ATProtocolCodable {
         }
         
         public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
             
+            var container = encoder.container(keyedBy: CodingKeys.self)
             
             try container.encode(day, forKey: .day)
             
@@ -302,13 +304,13 @@ public struct Output: ATProtocolCodable {
             
         }
         
+        
         private enum CodingKeys: String, CodingKey {
-            
             case day
             case month
             case all
-            
         }
+        
     }
 
 
@@ -340,11 +342,10 @@ extension ATProtoClient.Chat.Bsky.Moderation {
             queryItems: queryItems
         )
 
-        
-        // Chat endpoint - use proxy header
-        let proxyHeaders = ["atproto-proxy": "did:web:api.bsky.chat#bsky_chat"]
+        // Determine service DID for this endpoint
+        let serviceDID = await networkService.getServiceDID(for: "chat.bsky.moderation.getActorMetadata")
+        let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        
         let responseCode = response.statusCode
 
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {

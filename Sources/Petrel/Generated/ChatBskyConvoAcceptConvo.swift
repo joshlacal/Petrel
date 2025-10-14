@@ -59,10 +59,12 @@ public struct Output: ATProtocolCodable {
         // Standard public initializer
         public init(
             
+            
             rev: String? = nil
             
             
         ) {
+            
             
             self.rev = rev
             
@@ -70,8 +72,8 @@ public struct Output: ATProtocolCodable {
         }
         
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
             
+            let container = try decoder.container(keyedBy: CodingKeys.self)
             
             self.rev = try container.decodeIfPresent(String.self, forKey: .rev)
             
@@ -79,8 +81,8 @@ public struct Output: ATProtocolCodable {
         }
         
         public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
             
+            var container = encoder.container(keyedBy: CodingKeys.self)
             
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(rev, forKey: .rev)
@@ -106,11 +108,11 @@ public struct Output: ATProtocolCodable {
             
         }
         
+        
         private enum CodingKeys: String, CodingKey {
-            
             case rev
-            
         }
+        
     }
 
 
@@ -152,14 +154,13 @@ extension ATProtoClient.Chat.Bsky.Convo {
             queryItems: nil
         )
 
-        
-        
-        // Chat endpoint - use proxy header
-        let proxyHeaders = ["atproto-proxy": "did:web:api.bsky.chat#bsky_chat"]
+        // Determine service DID for this endpoint
+        let serviceDID = await networkService.getServiceDID(for: "chat.bsky.convo.acceptConvo")
+        let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        
         let responseCode = response.statusCode
 
+        
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
