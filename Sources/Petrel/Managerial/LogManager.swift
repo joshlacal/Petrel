@@ -6,7 +6,10 @@
 //
 
 import Foundation
-import os.log
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
+import Logging
 
 public struct PetrelLogEvent: Sendable {
     public enum Level: Sendable { case debug, info, warning, error }
@@ -17,17 +20,9 @@ public struct PetrelLogEvent: Sendable {
 
 /// Internal logger that also broadcasts events to optional observers.
 class LogManager {
-    private static let networkLogger = os.Logger(
-        subsystem: Bundle.main.bundleIdentifier ?? "Petrel", category: "Network"
-    )
-
-    private static let authLogger = os.Logger(
-        subsystem: Bundle.main.bundleIdentifier ?? "Petrel", category: "Authentication"
-    )
-
-    private static let generalLogger = os.Logger(
-        subsystem: Bundle.main.bundleIdentifier ?? "Petrel", category: "General"
-    )
+    private static let networkLogger = Logger(label: "com.joshlacalamito.Petrel.Network")
+    private static let authLogger = Logger(label: "com.joshlacalamito.Petrel.Authentication")
+    private static let generalLogger = Logger(label: "com.joshlacalamito.Petrel.General")
 
     private static let sensitiveHeaders = [
         "authorization", "dpop", "x-dpop", "dpop-nonce", "cookie", "set-cookie",
@@ -66,26 +61,25 @@ class LogManager {
     }
 
     static func logInfo(_ message: String, category: LogCategory = .general) {
-        getLogger(for: category).info("\(message, privacy: .public)")
+        getLogger(for: category).info("\(message)")
         notifyObservers(.init(level: .info, category: category, message: message))
     }
 
     static func logDebug(_ message: String, category: LogCategory = .general) {
         #if DEBUG
-            getLogger(for: category).debug("\(message, privacy: .public)")
+            getLogger(for: category).debug("\(message)")
         #endif
         notifyObservers(.init(level: .debug, category: category, message: message))
     }
 
     /// Warning-level logging for noteworthy but non-fatal issues
     static func logWarning(_ message: String, category: LogCategory = .general) {
-        // Use info channel to ensure widest platform compatibility
-        getLogger(for: category).info("\(message, privacy: .public)")
+        getLogger(for: category).warning("\(message)")
         notifyObservers(.init(level: .warning, category: category, message: message))
     }
 
     static func logError(_ message: String, category: LogCategory = .general) {
-        getLogger(for: category).error("\(message, privacy: .public)")
+        getLogger(for: category).error("\(message)")
         notifyObservers(.init(level: .error, category: category, message: message))
     }
 
@@ -207,7 +201,7 @@ class LogManager {
         logWarning(line, category: category)
     }
 
-    private static func getLogger(for category: LogCategory) -> os.Logger {
+    private static func getLogger(for category: LogCategory) -> Logger {
         switch category {
         case .network:
             return networkLogger

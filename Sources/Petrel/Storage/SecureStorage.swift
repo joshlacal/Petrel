@@ -5,7 +5,11 @@
 //  Cross-platform secure storage protocol
 //
 
+#if canImport(CryptoKit)
 import CryptoKit
+#else
+@preconcurrency import Crypto
+#endif
 import Foundation
 
 /// Protocol for secure storage backends across different platforms

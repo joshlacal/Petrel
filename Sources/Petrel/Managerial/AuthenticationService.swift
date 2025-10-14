@@ -5,8 +5,15 @@
 //  Created by Josh LaCalamito on 4/22/2025.
 //
 
+#if canImport(CryptoKit)
 import CryptoKit
+#else
+@preconcurrency import Crypto
+#endif
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 import JSONWebAlgorithms
 import JSONWebKey
 import JSONWebSignature

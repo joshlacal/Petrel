@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 // lexicon: 1, id: com.atproto.admin.updateAccountHandle
 

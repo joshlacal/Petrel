@@ -7,7 +7,10 @@
 
 import AsyncDNSResolver
 import Foundation
-import os
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
+import Logging
 
 // MARK: - DIDResolving Protocol
 
@@ -137,7 +140,7 @@ actor DIDResolutionService: DIDResolving {
     }
 
     private func resolveHandleToDIDviaWellKnown(handle: String) async throws -> String? {
-        let logger = Logger(subsystem: "com.joshlacalamito.Petrel", category: "DIDResolution")
+        let logger = Logger(label: "com.joshlacalamito.Petrel.DIDResolution")
 
         // Check for cancellation before network operation
         try Task.checkCancellation()
@@ -239,7 +242,7 @@ actor DIDResolutionService: DIDResolving {
     }
 
     private func resolveHandleToDIDviaDNS(handle: String) async throws -> String? {
-        let logger = Logger(subsystem: "com.joshlacalamito.Petrel", category: "DIDResolution")
+        let logger = Logger(label: "com.joshlacalamito.Petrel.DIDResolution")
 
         // Check for cancellation before DNS operation
         try Task.checkCancellation()

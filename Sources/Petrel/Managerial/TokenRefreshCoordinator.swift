@@ -7,6 +7,9 @@
 //
 
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// Actor responsible for coordinating and serializing token refresh operations
 /// to prevent race conditions with single-use refresh tokens.
