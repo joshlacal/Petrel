@@ -6,13 +6,13 @@
 //
 
 #if canImport(CryptoKit)
-import CryptoKit
+    import CryptoKit
 #else
-@preconcurrency import Crypto
+    @preconcurrency import Crypto
 #endif
 import Foundation
 #if canImport(FoundationNetworking)
-import FoundationNetworking
+    import FoundationNetworking
 #endif
 import JSONWebAlgorithms
 import JSONWebKey

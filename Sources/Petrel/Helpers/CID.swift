@@ -3,9 +3,9 @@
 //              according to AT Protocol specifications.
 
 #if canImport(CryptoKit)
-import CryptoKit
+    import CryptoKit
 #else
-@preconcurrency import Crypto
+    @preconcurrency import Crypto
 #endif
 import Foundation
 import SwiftCBOR

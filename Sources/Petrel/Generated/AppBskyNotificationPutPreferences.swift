@@ -1,7 +1,4 @@
 import Foundation
-#if canImport(FoundationNetworking)
-import FoundationNetworking
-#endif
 
 // lexicon: 1, id: app.bsky.notification.putPreferences
 
