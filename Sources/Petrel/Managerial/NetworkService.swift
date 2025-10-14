@@ -1115,8 +1115,8 @@ actor NetworkService: NetworkServiceProtocol {
             ai_socktype: SOCK_STREAM,
             ai_protocol: 0,
             ai_addrlen: 0,
-            ai_addr: nil,
             ai_canonname: nil,
+            ai_addr: nil,
             ai_next: nil
         )
         var res: UnsafeMutablePointer<addrinfo>? = nil
