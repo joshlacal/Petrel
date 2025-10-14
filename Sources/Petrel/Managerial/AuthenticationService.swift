@@ -630,8 +630,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
 
                 // Update AccountManager's internal state to reflect the saved account
                 try await accountManager.updateAccountFromStorage(did: did)
-                // For now, just log the error. Consider throwing AuthError.dpopKeyError here.
-                throw AuthError.dpopKeyError
+                // Binding verified; no error thrown.
             }
         }
 
