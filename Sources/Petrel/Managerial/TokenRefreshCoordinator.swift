@@ -8,7 +8,7 @@
 
 import Foundation
 #if canImport(FoundationNetworking)
-import FoundationNetworking
+    import FoundationNetworking
 #endif
 
 /// Actor responsible for coordinating and serializing token refresh operations
