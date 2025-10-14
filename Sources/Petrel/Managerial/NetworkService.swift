@@ -125,13 +125,13 @@ protocol NetworkServiceProtocol: Sendable {
     /// - Parameter response: The HTTP response
     /// - Returns: Array of tuples containing labeler DIDs and redaction flags
     func extractContentLabelers(from response: HTTPURLResponse) async -> [(did: String, redact: Bool)]
-    
+
     /// Sets the service DID for a given lexicon namespace prefix
     /// - Parameters:
     ///   - serviceDID: The service DID (e.g., "did:web:api.bsky.app#bsky_appview")
     ///   - namespace: The lexicon namespace prefix (e.g., "app.bsky", "chat.bsky")
     func setServiceDID(_ serviceDID: String, for namespace: String) async
-    
+
     /// Gets the service DID for a given endpoint, if configured
     /// - Parameter endpoint: The full endpoint (e.g., "app.bsky.feed.getTimeline")
     /// - Returns: The service DID if one is configured for this endpoint's namespace, nil otherwise
@@ -187,16 +187,16 @@ actor NetworkService: NetworkServiceProtocol {
     private(set) var protectedResourceMetadata: ProtectedResourceMetadata?
     private(set) var authorizationServerMetadata: AuthorizationServerMetadata?
     private let requestDeduplicator = RequestDeduplicator()
-    
+
     /// Maps lexicon namespace prefixes to their service DIDs
     /// Example: "app.bsky" -> "did:web:api.bsky.app#bsky_appview"
     ///          "chat.bsky" -> "did:web:api.bsky.chat#bsky_chat"
     private var serviceDIDMapping: [String: String] = [:]
-    
+
     /// Endpoints that should always use the default AppView DID (for preferences stored on PDS)
     private let alwaysDefaultAppViewEndpoints: Set<String> = [
         "app.bsky.actor.getPreferences",
-        "app.bsky.actor.putPreferences"
+        "app.bsky.actor.putPreferences",
     ]
 
     // MARK: - Initialization
@@ -323,7 +323,7 @@ actor NetworkService: NetworkServiceProtocol {
             await removeHeader(name: "atproto-accept-labelers")
         }
     }
-    
+
     /// Sets the service DID for a given lexicon namespace prefix
     /// - Parameters:
     ///   - serviceDID: The service DID (e.g., "did:web:api.bsky.app#bsky_appview")
@@ -332,7 +332,7 @@ actor NetworkService: NetworkServiceProtocol {
         serviceDIDMapping[namespace] = serviceDID
         LogManager.logDebug("Network Service - Set service DID '\(serviceDID)' for namespace '\(namespace)'")
     }
-    
+
     /// Gets the service DID for a given endpoint, if configured
     /// - Parameter endpoint: The full endpoint (e.g., "app.bsky.feed.getTimeline")
     /// - Returns: The service DID if one is configured for this endpoint's namespace, nil otherwise
@@ -342,7 +342,7 @@ actor NetworkService: NetworkServiceProtocol {
             // Return the app.bsky service DID (default AppView)
             return serviceDIDMapping["app.bsky"]
         }
-        
+
         // Find the matching namespace prefix
         // Try longest match first (e.g., "chat.bsky" before "chat")
         let sortedPrefixes = serviceDIDMapping.keys.sorted { $0.count > $1.count }
@@ -351,7 +351,7 @@ actor NetworkService: NetworkServiceProtocol {
                 return serviceDIDMapping[prefix]
             }
         }
-        
+
         return nil
     }
 

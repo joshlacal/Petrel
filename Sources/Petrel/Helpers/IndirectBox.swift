@@ -10,7 +10,7 @@ public indirect enum IndirectBox<T>: Sendable where T: Sendable {
     }
 
     public var value: T {
-        guard case .value(let v) = self else {
+        guard case let .value(v) = self else {
             fatalError("IndirectBox accessed with invalid state")
         }
         return v
@@ -18,6 +18,7 @@ public indirect enum IndirectBox<T>: Sendable where T: Sendable {
 }
 
 // MARK: - Codable
+
 extension IndirectBox: Codable where T: Codable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
@@ -32,6 +33,7 @@ extension IndirectBox: Codable where T: Codable {
 }
 
 // MARK: - Hashable
+
 extension IndirectBox: Hashable where T: Hashable {
     public func hash(into hasher: inout Hasher) {
         hasher.combine(value)
@@ -39,6 +41,7 @@ extension IndirectBox: Hashable where T: Hashable {
 }
 
 // MARK: - Equatable
+
 extension IndirectBox: Equatable where T: Equatable {
     public static func == (lhs: IndirectBox<T>, rhs: IndirectBox<T>) -> Bool {
         return lhs.value == rhs.value

@@ -8,7 +8,7 @@
 import CryptoKit
 import Foundation
 #if os(iOS) || os(macOS)
-import Security
+    import Security
 #endif
 
 enum KeychainError: Error, LocalizedError {
@@ -35,92 +35,92 @@ enum KeychainError: Error, LocalizedError {
 
     var failureReason: String? {
         #if os(iOS) || os(macOS)
-        switch self {
-        case let .itemStoreError(status) where status == Int(errSecDuplicateItem):
-            return "An item with this key already exists in the keychain."
-        case let .itemStoreError(status) where status == Int(errSecAuthFailed):
-            return "Authentication failed while accessing keychain."
-        case let .itemRetrievalError(status) where status == Int(errSecItemNotFound):
-            return "The requested item was not found in the keychain."
-        case let .itemRetrievalError(status) where status == Int(errSecAuthFailed):
-            return "Authentication failed while accessing keychain."
-        case .dataFormatError:
-            return "The stored keychain data cannot be decoded or is missing required fields."
-        case .unableToCreateKey:
-            return "The cryptographic key data from keychain is invalid or corrupted."
-        case let .deletionError(status) where status == Int(errSecAuthFailed):
-            return "Authentication failed while accessing keychain."
-        default:
-            return "Keychain operation failed due to system restrictions or device state."
-        }
+            switch self {
+            case let .itemStoreError(status) where status == Int(errSecDuplicateItem):
+                return "An item with this key already exists in the keychain."
+            case let .itemStoreError(status) where status == Int(errSecAuthFailed):
+                return "Authentication failed while accessing keychain."
+            case let .itemRetrievalError(status) where status == Int(errSecItemNotFound):
+                return "The requested item was not found in the keychain."
+            case let .itemRetrievalError(status) where status == Int(errSecAuthFailed):
+                return "Authentication failed while accessing keychain."
+            case .dataFormatError:
+                return "The stored keychain data cannot be decoded or is missing required fields."
+            case .unableToCreateKey:
+                return "The cryptographic key data from keychain is invalid or corrupted."
+            case let .deletionError(status) where status == Int(errSecAuthFailed):
+                return "Authentication failed while accessing keychain."
+            default:
+                return "Keychain operation failed due to system restrictions or device state."
+            }
         #else
-        switch self {
-        case .itemRetrievalError:
-            return "The requested item was not found."
-        case .dataFormatError:
-            return "The stored data cannot be decoded or is missing required fields."
-        case .unableToCreateKey:
-            return "The cryptographic key data is invalid or corrupted."
-        default:
-            return "Storage operation failed."
-        }
+            switch self {
+            case .itemRetrievalError:
+                return "The requested item was not found."
+            case .dataFormatError:
+                return "The stored data cannot be decoded or is missing required fields."
+            case .unableToCreateKey:
+                return "The cryptographic key data is invalid or corrupted."
+            default:
+                return "Storage operation failed."
+            }
         #endif
     }
 
     var recoverySuggestion: String? {
         #if os(iOS) || os(macOS)
-        switch self {
-        case let .itemStoreError(status) where status == Int(errSecAuthFailed),
-             .itemRetrievalError(let status) where status == Int(errSecAuthFailed),
-             .deletionError(let status) where status == Int(errSecAuthFailed):
-            return "Please unlock your device and ensure the app has keychain access."
-        case let .itemRetrievalError(status) where status == Int(errSecItemNotFound):
-            return "You may need to log in again to restore your credentials."
-        case .dataFormatError, .unableToCreateKey:
-            return "Please log out and log back in to reset your stored credentials."
-        case let .itemStoreError(status) where status == Int(errSecDuplicateItem):
-            return "Please restart the app or log out and log back in."
-        default:
-            return "Try restarting the app. If the problem persists, you may need to log out and log back in."
-        }
+            switch self {
+            case let .itemStoreError(status) where status == Int(errSecAuthFailed),
+                 .itemRetrievalError(let status) where status == Int(errSecAuthFailed),
+                 .deletionError(let status) where status == Int(errSecAuthFailed):
+                return "Please unlock your device and ensure the app has keychain access."
+            case let .itemRetrievalError(status) where status == Int(errSecItemNotFound):
+                return "You may need to log in again to restore your credentials."
+            case .dataFormatError, .unableToCreateKey:
+                return "Please log out and log back in to reset your stored credentials."
+            case let .itemStoreError(status) where status == Int(errSecDuplicateItem):
+                return "Please restart the app or log out and log back in."
+            default:
+                return "Try restarting the app. If the problem persists, you may need to log out and log back in."
+            }
         #else
-        return "Try restarting the app. If the problem persists, you may need to log out and log back in."
+            return "Try restarting the app. If the problem persists, you may need to log out and log back in."
         #endif
     }
 }
 
 enum KeychainManager {
     // MARK: - Storage Backend
-    
+
     /// The secure storage backend used by this manager
     private static let storage: SecureStorage = {
         #if os(iOS) || os(macOS)
-        return AppleKeychainStore()
+            return AppleKeychainStore()
         #elseif os(Linux)
-        return createLinuxStorage()
+            return createLinuxStorage()
         #else
-        #error("Unsupported platform")
+            #error("Unsupported platform")
         #endif
     }()
-    
+
     #if os(Linux)
-    /// Create appropriate storage backend for Linux
-    private static func createLinuxStorage() -> SecureStorage {
-        // Try libsecret first (desktop environment)
-        if LibSecretStore.isAvailable() {
-            LogManager.logInfo("KeychainManager - Using libsecret for secure storage (desktop Linux)")
-            return LibSecretStore()
+        /// Create appropriate storage backend for Linux
+        private static func createLinuxStorage() -> SecureStorage {
+            // Try libsecret first (desktop environment)
+            if LibSecretStore.isAvailable() {
+                LogManager.logInfo("KeychainManager - Using libsecret for secure storage (desktop Linux)")
+                return LibSecretStore()
+            }
+
+            // Fallback to encrypted file storage (server/headless)
+            LogManager.logInfo("KeychainManager - Using file-encrypted storage (libsecret not available)")
+            do {
+                return try FileEncryptedStore()
+            } catch {
+                LogManager.logError("KeychainManager - Failed to initialize FileEncryptedStore: \(error)")
+                fatalError("Unable to initialize secure storage on Linux: \(error)")
+            }
         }
-        
-        // Fallback to encrypted file storage (server/headless)
-        LogManager.logInfo("KeychainManager - Using file-encrypted storage (libsecret not available)")
-        do {
-            return try FileEncryptedStore()
-        } catch {
-            LogManager.logError("KeychainManager - Failed to initialize FileEncryptedStore: \(error)")
-            fatalError("Unable to initialize secure storage on Linux: \(error)")
-        }
-    }
     #endif
 
     // MARK: - Cache
@@ -223,7 +223,7 @@ enum KeychainManager {
         } else {
             try storage.delete(key: exactKey, namespace: "")
         }
-        
+
         // Remove from cache
         dataCache.removeObject(forKey: exactKey as NSString)
     }
@@ -236,29 +236,29 @@ enum KeychainManager {
         accessibility: CFString? = nil
     ) throws {
         try storage.store(key: key, value: value, namespace: namespace)
-        
+
         // Update cache
         let namespacedKey = "\(namespace).\(key)"
         dataCache.setObject(value as NSData, forKey: namespacedKey as NSString)
-        
+
         LogManager.logDebug("KeychainManager - Successfully stored item for key \(namespace).\(key).")
     }
 
     /// Retrieves data from the keychain for a specified key and namespace.
     static func retrieve(key: String, namespace: String) throws -> Data {
         let namespacedKey = "\(namespace).\(key)"
-        
+
         // Check cache first
         if let cachedData = dataCache.object(forKey: namespacedKey as NSString) {
             LogManager.logDebug("KeychainManager - Retrieved item from cache for key \(namespacedKey).")
             return cachedData as Data
         }
-        
+
         let data = try storage.retrieve(key: key, namespace: namespace)
-        
+
         // Store in cache
         dataCache.setObject(data as NSData, forKey: namespacedKey as NSString)
-        
+
         LogManager.logDebug("KeychainManager - Successfully retrieved item for key \(namespacedKey).")
         return data
     }
@@ -276,21 +276,21 @@ enum KeychainManager {
     /// Deletes data from the keychain for a specified key and namespace.
     static func delete(key: String, namespace: String) throws {
         try storage.delete(key: key, namespace: namespace)
-        
+
         // Remove from cache
         let namespacedKey = "\(namespace).\(key)"
         dataCache.removeObject(forKey: namespacedKey as NSString)
-        
+
         LogManager.logDebug("KeychainManager: Successfully deleted item for key \(namespacedKey).")
     }
 
     static func nukeAllKeychainItems(forNamespace namespace: String) -> Bool {
         do {
             try storage.deleteAll(namespace: namespace)
-            
+
             // Clear cache for this namespace
             clearCache(forNamespace: namespace)
-            
+
             LogManager.logInfo("KeychainManager - Successfully nuked all items for namespace: \(namespace)")
             return true
         } catch {
@@ -304,7 +304,7 @@ enum KeychainManager {
     /// Stores a DPoP private key in the keychain with a specified key tag.
     static func storeDPoPKey(_ key: P256.Signing.PrivateKey, keyTag: String) throws {
         try storage.storeDPoPKey(key, keyTag: keyTag)
-        
+
         // Update cache
         dpopKeyCache.setObject(CachedDPoPKey(key: key), forKey: keyTag as NSString)
     }
@@ -316,9 +316,9 @@ enum KeychainManager {
             LogManager.logDebug("KeychainManager - Retrieved DPoP key from cache for tag \(keyTag).")
             return cachedKey.key
         }
-        
+
         let key = try storage.retrieveDPoPKey(keyTag: keyTag)
-        
+
         // Update cache
         dpopKeyCache.setObject(CachedDPoPKey(key: key), forKey: keyTag as NSString)
         return key
@@ -327,7 +327,7 @@ enum KeychainManager {
     /// Deletes a DPoP private key from the keychain with a specified key tag.
     static func deleteDPoPKey(keyTag: String) throws {
         try storage.deleteDPoPKey(keyTag: keyTag)
-        
+
         // Remove from cache
         dpopKeyCache.removeObject(forKey: keyTag as NSString)
     }
