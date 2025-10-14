@@ -103,14 +103,13 @@ extension ATProtoClient.Chat.Bsky.Convo {
             queryItems: nil
         )
 
-        
-        
-        // Chat endpoint - use proxy header
-        let proxyHeaders = ["atproto-proxy": "did:web:api.bsky.chat#bsky_chat"]
+        // Determine service DID for this endpoint
+        let serviceDID = await networkService.getServiceDID(for: "chat.bsky.convo.sendMessage")
+        let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        
         let responseCode = response.statusCode
 
+        
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }

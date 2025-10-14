@@ -66,10 +66,12 @@ public struct Output: ATProtocolCodable {
         // Standard public initializer
         public init(
             
+            
             blob: Blob
             
             
         ) {
+            
             
             self.blob = blob
             
@@ -77,8 +79,8 @@ public struct Output: ATProtocolCodable {
         }
         
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
             
+            let container = try decoder.container(keyedBy: CodingKeys.self)
             
             self.blob = try container.decode(Blob.self, forKey: .blob)
             
@@ -86,8 +88,8 @@ public struct Output: ATProtocolCodable {
         }
         
         public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
             
+            var container = encoder.container(keyedBy: CodingKeys.self)
             
             try container.encode(blob, forKey: .blob)
             
@@ -109,11 +111,11 @@ public struct Output: ATProtocolCodable {
             
         }
         
+        
         private enum CodingKeys: String, CodingKey {
-            
             case blob
-            
         }
+        
     }
 
 
@@ -167,12 +169,13 @@ extension ATProtoClient.Com.Atproto.Repo {
             queryItems: nil
         )
 
-        
-        
-        let (responseData, response) = try await networkService.performRequest(urlRequest)
-        
+        // Determine service DID for this endpoint
+        let serviceDID = await networkService.getServiceDID(for: "com.atproto.repo.uploadBlob")
+        let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
+        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
+        
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
@@ -229,7 +232,7 @@ extension ATProtoClient.Com.Atproto.Repo {
         } while (compressedData?.count ?? 0) > maxSizeInBytes && compression > 0.1
         return compressedData
         #else
-        LogManager.logError("Image compression not supported on this platform")
+        LogManager.logDebug("Image compression not available on this platform")
         return nil
         #endif
     }

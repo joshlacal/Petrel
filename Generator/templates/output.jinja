@@ -2,34 +2,38 @@
     public typealias Output = {{ type_alias_target }}
     {% else %}
     public struct Output: ATProtocolCodable {
-        {% if properties %}
+        {% if properties and properties|length > 0 %}
         {% for prop in properties %}
         public let {{ prop.name }}: {{ prop.type }}{% if prop.optional %}?{% endif %}
         {% endfor %}
+        {% elif properties is defined and properties|length == 0 %}
+        // Empty output - no properties (response is {})
         {% else %}
         public let data: Data
         {% endif %}
         
         // Standard public initializer
         public init(
+            {% if properties and properties|length > 0 %}
             {% for prop in properties %}
             {{ prop.name }}: {{ prop.type }}{% if prop.optional %}? = nil{% endif %}{% if not loop.last %},{% endif %}
             {% endfor %}
-            {% if not properties %}
+            {% elif not (properties is defined and properties|length == 0) %}
             data: Data
             {% endif %}
         ) {
+            {% if properties and properties|length > 0 %}
             {% for prop in properties %}
             self.{{ prop.name }} = {{ prop.name }}
             {% endfor %}
-            {% if not properties %}
+            {% elif not (properties is defined and properties|length == 0) %}
             self.data = data
             {% endif %}
         }
         
         public init(from decoder: Decoder) throws {
+            {% if properties and properties|length > 0 %}
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            {% if properties %}
             {%- for prop in properties %}
             {% if prop.optional %}
             self.{{ prop.name }} = try container.decodeIfPresent({{ prop.type }}.self, forKey: .{{ prop.name }})
@@ -37,15 +41,19 @@
             self.{{ prop.name }} = try container.decode({{ prop.type }}.self, forKey: .{{ prop.name }})
             {% endif %}
             {%- endfor %}
+            {% elif properties is defined and properties|length == 0 %}
+            // Empty output - just validate it's an object by trying to get any container
+            _ = try decoder.singleValueContainer()
             {% else %}
+            let container = try decoder.container(keyedBy: CodingKeys.self)
             let data = try container.decode(Data.self, forKey: .data)
             self.data = data
             {% endif %}
         }
         
         public func encode(to encoder: Encoder) throws {
+            {% if properties and properties|length > 0 %}
             var container = encoder.container(keyedBy: CodingKeys.self)
-            {% if properties %}
             {%- for prop in properties %}
             {% if prop.optional %}
             // Encode optional property even if it's an empty array
@@ -54,13 +62,17 @@
             try container.encode({{ prop.name }}, forKey: .{{ prop.name }})
             {% endif %}
             {%- endfor %}
+            {% elif properties is defined and properties|length == 0 %}
+            // Empty output - encode empty object
+            _ = encoder.singleValueContainer()
             {% else %}
+            var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(data, forKey: .data)
             {% endif %}
         }
 
         public func toCBORValue() throws -> Any {
-            {% if properties %}
+            {% if properties and properties|length > 0 %}
             var map = OrderedCBORMap()
 
             {% for prop in properties %}
@@ -77,19 +89,20 @@
             {% endfor %}
 
             return map
+            {% elif properties is defined and properties|length == 0 %}
+            // Empty output - return empty CBOR map
+            return OrderedCBORMap()
             {% else %}
             return data
             {% endif %}
         }
         
+        {% if properties and properties|length > 0 %}
         private enum CodingKeys: String, CodingKey {
-            {% if properties %}
             {%- for prop in properties %}
             case {{ prop.name }}
             {%- endfor %}
-            {% else %}
-            case data
-            {% endif %}
         }
+        {% endif %}
     }
 {% endif %}

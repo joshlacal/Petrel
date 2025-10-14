@@ -147,6 +147,7 @@ public struct Output: ATProtocolCodable {
         // Standard public initializer
         public init(
             
+            
             uri: ATProtocolURI,
             
             cid: CID,
@@ -157,6 +158,7 @@ public struct Output: ATProtocolCodable {
             
             
         ) {
+            
             
             self.uri = uri
             
@@ -170,8 +172,8 @@ public struct Output: ATProtocolCodable {
         }
         
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
             
+            let container = try decoder.container(keyedBy: CodingKeys.self)
             
             self.uri = try container.decode(ATProtocolURI.self, forKey: .uri)
             
@@ -188,8 +190,8 @@ public struct Output: ATProtocolCodable {
         }
         
         public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
             
+            var container = encoder.container(keyedBy: CodingKeys.self)
             
             try container.encode(uri, forKey: .uri)
             
@@ -243,14 +245,14 @@ public struct Output: ATProtocolCodable {
             
         }
         
+        
         private enum CodingKeys: String, CodingKey {
-            
             case uri
             case cid
             case commit
             case validationStatus
-            
         }
+        
     }
         
 public enum Error: String, Swift.Error, CustomStringConvertible {
@@ -298,12 +300,13 @@ extension ATProtoClient.Com.Atproto.Repo {
             queryItems: nil
         )
 
-        
-        
-        let (responseData, response) = try await networkService.performRequest(urlRequest)
-        
+        // Determine service DID for this endpoint
+        let serviceDID = await networkService.getServiceDID(for: "com.atproto.repo.createRecord")
+        let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
+        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
+        
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }

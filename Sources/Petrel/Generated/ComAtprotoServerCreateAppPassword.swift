@@ -317,12 +317,13 @@ extension ATProtoClient.Com.Atproto.Server {
             queryItems: nil
         )
 
-        
-        
-        let (responseData, response) = try await networkService.performRequest(urlRequest)
-        
+        // Determine service DID for this endpoint
+        let serviceDID = await networkService.getServiceDID(for: "com.atproto.server.createAppPassword")
+        let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
+        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
+        
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }

@@ -24,7 +24,9 @@ public struct Parameters: Parametrizable {
     
 public struct Output: ATProtocolCodable {
         
+        
         public let data: Data
+        
         
         
         // Standard public initializer
@@ -33,39 +35,53 @@ public struct Output: ATProtocolCodable {
             
             data: Data
             
+            
         ) {
             
             
             self.data = data
             
+            
         }
         
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             
-            let data = try container.decode(Data.self, forKey: .data)
-            self.data = data
+            self.data = try container.decode(Data.self, forKey: .data)
+            
             
         }
         
         public func encode(to encoder: Encoder) throws {
+            
             var container = encoder.container(keyedBy: CodingKeys.self)
             
             try container.encode(data, forKey: .data)
+            
             
         }
 
         public func toCBORValue() throws -> Any {
             
-            return data
+            var map = OrderedCBORMap()
+
+            
+            
+            let dataValue = try data.toCBORValue()
+            map = map.adding(key: "data", value: dataValue)
+            
+            
+
+            return map
             
         }
         
+        
         private enum CodingKeys: String, CodingKey {
-            
             case data
-            
         }
+        
     }
         
 public enum Error: String, Swift.Error, CustomStringConvertible {
@@ -106,9 +122,10 @@ extension ATProtoClient.Com.Atproto.Sync {
             queryItems: queryItems
         )
 
-        
-        let (responseData, response) = try await networkService.performRequest(urlRequest)
-        
+        // Determine service DID for this endpoint
+        let serviceDID = await networkService.getServiceDID(for: "com.atproto.sync.getRepo")
+        let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
+        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {

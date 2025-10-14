@@ -37,9 +37,10 @@ extension ATProtoClient.App.Bsky.Unspecced {
             queryItems: queryItems
         )
 
-        
-        let (responseData, response) = try await networkService.performRequest(urlRequest)
-        
+        // Determine service DID for this endpoint
+        let serviceDID = await networkService.getServiceDID(for: "app.bsky.unspecced.getAgeAssuranceState")
+        let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
+        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {

@@ -125,6 +125,17 @@ protocol NetworkServiceProtocol: Sendable {
     /// - Parameter response: The HTTP response
     /// - Returns: Array of tuples containing labeler DIDs and redaction flags
     func extractContentLabelers(from response: HTTPURLResponse) async -> [(did: String, redact: Bool)]
+    
+    /// Sets the service DID for a given lexicon namespace prefix
+    /// - Parameters:
+    ///   - serviceDID: The service DID (e.g., "did:web:api.bsky.app#bsky_appview")
+    ///   - namespace: The lexicon namespace prefix (e.g., "app.bsky", "chat.bsky")
+    func setServiceDID(_ serviceDID: String, for namespace: String) async
+    
+    /// Gets the service DID for a given endpoint, if configured
+    /// - Parameter endpoint: The full endpoint (e.g., "app.bsky.feed.getTimeline")
+    /// - Returns: The service DID if one is configured for this endpoint's namespace, nil otherwise
+    func getServiceDID(for endpoint: String) async -> String?
 
     /// Sets the authentication provider for authenticated requests
     /// - Parameter provider: The authentication provider
@@ -176,6 +187,17 @@ actor NetworkService: NetworkServiceProtocol {
     private(set) var protectedResourceMetadata: ProtectedResourceMetadata?
     private(set) var authorizationServerMetadata: AuthorizationServerMetadata?
     private let requestDeduplicator = RequestDeduplicator()
+    
+    /// Maps lexicon namespace prefixes to their service DIDs
+    /// Example: "app.bsky" -> "did:web:api.bsky.app#bsky_appview"
+    ///          "chat.bsky" -> "did:web:api.bsky.chat#bsky_chat"
+    private var serviceDIDMapping: [String: String] = [:]
+    
+    /// Endpoints that should always use the default AppView DID (for preferences stored on PDS)
+    private let alwaysDefaultAppViewEndpoints: Set<String> = [
+        "app.bsky.actor.getPreferences",
+        "app.bsky.actor.putPreferences"
+    ]
 
     // MARK: - Initialization
 
@@ -300,6 +322,37 @@ actor NetworkService: NetworkServiceProtocol {
             // If empty, remove the header
             await removeHeader(name: "atproto-accept-labelers")
         }
+    }
+    
+    /// Sets the service DID for a given lexicon namespace prefix
+    /// - Parameters:
+    ///   - serviceDID: The service DID (e.g., "did:web:api.bsky.app#bsky_appview")
+    ///   - namespace: The lexicon namespace prefix (e.g., "app.bsky", "chat.bsky")
+    func setServiceDID(_ serviceDID: String, for namespace: String) async {
+        serviceDIDMapping[namespace] = serviceDID
+        LogManager.logDebug("Network Service - Set service DID '\(serviceDID)' for namespace '\(namespace)'")
+    }
+    
+    /// Gets the service DID for a given endpoint, if configured
+    /// - Parameter endpoint: The full endpoint (e.g., "app.bsky.feed.getTimeline")
+    /// - Returns: The service DID if one is configured for this endpoint's namespace, nil otherwise
+    func getServiceDID(for endpoint: String) async -> String? {
+        // Special case: preferences endpoints always use default AppView DID
+        if alwaysDefaultAppViewEndpoints.contains(endpoint) {
+            // Return the app.bsky service DID (default AppView)
+            return serviceDIDMapping["app.bsky"]
+        }
+        
+        // Find the matching namespace prefix
+        // Try longest match first (e.g., "chat.bsky" before "chat")
+        let sortedPrefixes = serviceDIDMapping.keys.sorted { $0.count > $1.count }
+        for prefix in sortedPrefixes {
+            if endpoint.hasPrefix(prefix + ".") || endpoint == prefix {
+                return serviceDIDMapping[prefix]
+            }
+        }
+        
+        return nil
     }
 
     /// Extracts the content labelers from a response header

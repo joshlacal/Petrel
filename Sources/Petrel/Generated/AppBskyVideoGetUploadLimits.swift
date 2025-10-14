@@ -27,6 +27,7 @@ public struct Output: ATProtocolCodable {
         // Standard public initializer
         public init(
             
+            
             canUpload: Bool,
             
             remainingDailyVideos: Int? = nil,
@@ -39,6 +40,7 @@ public struct Output: ATProtocolCodable {
             
             
         ) {
+            
             
             self.canUpload = canUpload
             
@@ -54,8 +56,8 @@ public struct Output: ATProtocolCodable {
         }
         
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
             
+            let container = try decoder.container(keyedBy: CodingKeys.self)
             
             self.canUpload = try container.decode(Bool.self, forKey: .canUpload)
             
@@ -75,8 +77,8 @@ public struct Output: ATProtocolCodable {
         }
         
         public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
             
+            var container = encoder.container(keyedBy: CodingKeys.self)
             
             try container.encode(canUpload, forKey: .canUpload)
             
@@ -146,15 +148,15 @@ public struct Output: ATProtocolCodable {
             
         }
         
+        
         private enum CodingKeys: String, CodingKey {
-            
             case canUpload
             case remainingDailyVideos
             case remainingDailyBytes
             case message
             case error
-            
         }
+        
     }
 
 
@@ -184,9 +186,10 @@ extension ATProtoClient.App.Bsky.Video {
             queryItems: queryItems
         )
 
-        
-        let (responseData, response) = try await networkService.performRequest(urlRequest)
-        
+        // Determine service DID for this endpoint
+        let serviceDID = await networkService.getServiceDID(for: "app.bsky.video.getUploadLimits")
+        let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
+        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {

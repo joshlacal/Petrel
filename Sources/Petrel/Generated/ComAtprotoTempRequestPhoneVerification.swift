@@ -85,11 +85,13 @@ extension ATProtoClient.Com.Atproto.Temp {
             queryItems: nil
         )
 
-        
-        
-        let (_, response) = try await networkService.performRequest(urlRequest)
-        
+        // Determine service DID for this endpoint
+        let serviceDID = await networkService.getServiceDID(for: "com.atproto.temp.requestPhoneVerification")
+        let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
+        let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
+
+        
         return responseCode
         
     }

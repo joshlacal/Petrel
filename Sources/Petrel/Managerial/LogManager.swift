@@ -93,8 +93,8 @@ class LogManager {
     static func logSensitiveValue(_ value: String?, label: String, category: LogCategory = .authentication) {
         #if DEBUG
             if let value = value, !value.isEmpty {
-                let truncated = String(value.prefix(4)) + "...[REDACTED]"
-                logDebug("\(label): \(truncated)", category: category)
+                // TEMPORARY: Truncation disabled for debugging
+                logDebug("\(label): \(value)", category: category)
             } else {
                 logDebug("\(label): nil", category: category)
             }
@@ -164,11 +164,8 @@ class LogManager {
                !tokenEndpointPaths.contains(where: { url.path.contains($0) })
             {
                 if let responseString = String(data: data, encoding: .utf8) {
-                    // Truncate very long responses
-                    let truncated = responseString.count > 1000 ?
-                        String(responseString.prefix(1000)) + "...[TRUNCATED]" :
-                        responseString
-                    debugMessage += "\nBody: \(truncated)"
+                    // TEMPORARY: Truncation disabled for debugging
+                    debugMessage += "\nBody: \(responseString)"
                 }
             } else {
                 debugMessage += "\nBody: [TOKEN_ENDPOINT_RESPONSE]"
