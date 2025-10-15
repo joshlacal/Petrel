@@ -1,9 +1,9 @@
 import Foundation
 
 /// Key for accessing original data in a decoder's userInfo
-extension CodingUserInfoKey {
-    public static let originalData = CodingUserInfoKey(rawValue: "originalData")!
-    public static let debugEnabled = CodingUserInfoKey(rawValue: "debugEnabled")!
+public extension CodingUserInfoKey {
+    static let originalData = CodingUserInfoKey(rawValue: "originalData")!
+    static let debugEnabled = CodingUserInfoKey(rawValue: "debugEnabled")!
 }
 
 /// Thread-safe configuration for controlling recursive decoding behavior
