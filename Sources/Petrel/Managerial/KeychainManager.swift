@@ -103,7 +103,7 @@ enum KeychainManager {
         #elseif os(Linux)
             return createLinuxStorage()
         #else
-            #error("Unsupported platform")
+                #error("Unsupported platform")
         #endif
     }()
 

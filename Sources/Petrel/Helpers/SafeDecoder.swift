@@ -42,8 +42,6 @@ public actor DecodingConfigurationManager {
     }
 }
 
-
-
 /// Utility for decoding JSON safely without stack overflow
 public enum SafeDecoder {
     /// Log messages when debug mode is enabled
@@ -243,8 +241,6 @@ public enum SafeDecoder {
 
         return try JSONSerialization.data(withJSONObject: currentObject)
     }
-
-
 
     /// Check if a JSON object has deeply nested structures that might cause stack overflow
     public static func hasDeepNesting(in data: Data, maxDepth: Int = 20) -> Bool {
