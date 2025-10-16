@@ -10,7 +10,7 @@ import SwiftCBOR
 
 public protocol ATProtocolCodable: Codable, DAGCBORCodable, Sendable {}
 
-public protocol ATProtocolValue: ATProtocolCodable, Equatable, Hashable, PendingDataLoadable {
+public protocol ATProtocolValue: ATProtocolCodable, Equatable, Hashable {
     func isEqual(to other: any ATProtocolValue) -> Bool
 }
 
@@ -508,10 +508,6 @@ public struct DID: ATProtocolValue, CustomStringConvertible, QueryParameterConve
         return URLQueryItem(name: name, value: didString())
     }
 
-    public var hasPendingData: Bool { return false }
-
-    public mutating func loadPendingData() async {}
-
     public func hash(into hasher: inout Hasher) {
         hasher.combine(method)
         hasher.combine(authority)
@@ -580,10 +576,6 @@ public struct Handle: ATProtocolValue, CustomStringConvertible, QueryParameterCo
     public func asQueryItem(name: String) -> URLQueryItem? {
         return URLQueryItem(name: name, value: value)
     }
-
-    public var hasPendingData: Bool { return false }
-
-    public mutating func loadPendingData() async {}
 
     public func hash(into hasher: inout Hasher) {
         hasher.combine(value.lowercased())
@@ -740,10 +732,6 @@ public struct NSID: ATProtocolValue, CustomStringConvertible, QueryParameterConv
         return URLQueryItem(name: name, value: nsidString())
     }
 
-    public var hasPendingData: Bool { return false }
-
-    public mutating func loadPendingData() async {}
-
     public func hash(into hasher: inout Hasher) {
         hasher.combine(authority.lowercased())
         hasher.combine(name.lowercased())
@@ -813,10 +801,6 @@ public struct RecordKey: ATProtocolValue, CustomStringConvertible, QueryParamete
     public func asQueryItem(name: String) -> URLQueryItem? {
         return URLQueryItem(name: name, value: value)
     }
-
-    public var hasPendingData: Bool { return false }
-
-    public mutating func loadPendingData() async {}
 
     public func hash(into hasher: inout Hasher) {
         hasher.combine(value)
@@ -925,10 +909,6 @@ public struct TID: ATProtocolValue, CustomStringConvertible, QueryParameterConve
         return Date(timeIntervalSince1970: TimeInterval(timestamp) / 1_000_000.0)
     }
 
-    public var hasPendingData: Bool { return false }
-
-    public mutating func loadPendingData() async {}
-
     public func hash(into hasher: inout Hasher) {
         hasher.combine(timestamp)
         hasher.combine(clockId)
@@ -993,8 +973,6 @@ extension AppBskyFeedDefs.FeedViewPost: Identifiable {
             return blockedPost.uri.uriString()
         case let .unexpected(ATProtocolValueContainer):
             return ATProtocolValueContainer.hashValue.description
-        case let .pending(pendingData):
-            return "pending:\(pendingData.type)"
         }
     }
 
@@ -1008,8 +986,6 @@ extension AppBskyFeedDefs.FeedViewPost: Identifiable {
             return blockedPost.uri.uriString()
         case let .unexpected(ATProtocolValueContainer):
             return ATProtocolValueContainer.hashValue.description
-        case let .pending(pendingData):
-            return "pending:\(pendingData.type)"
         }
     }
 }
