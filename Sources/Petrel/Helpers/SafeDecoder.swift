@@ -42,26 +42,7 @@ public actor DecodingConfigurationManager {
     }
 }
 
-/// Protocol for types that can defer loading of nested content
-// public protocol PendingDataLoadable: Sendable {
-//    var hasPendingData: Bool { get }
-//    mutating func loadPendingData() async
-// }
 
-/// Wrapper for deferred decoding of deeply nested data
-public struct PendingDecodeData: Codable, Sendable, Equatable {
-    public let rawData: Data
-    public let type: String
-
-    public init(rawData: Data, type: String) {
-        self.rawData = rawData
-        self.type = type
-    }
-
-    public static func == (lhs: PendingDecodeData, rhs: PendingDecodeData) -> Bool {
-        return lhs.type == rhs.type
-    }
-}
 
 /// Utility for decoding JSON safely without stack overflow
 public enum SafeDecoder {
@@ -263,26 +244,7 @@ public enum SafeDecoder {
         return try JSONSerialization.data(withJSONObject: currentObject)
     }
 
-    /// Load nested data from a pending object
-    public static func loadPendingObject<T: Decodable & Sendable>(
-        pendingData: PendingDecodeData, expectedType: String
-    ) async -> T? {
-        await debugLog("Loading pending object, expected type: \(expectedType)")
 
-        // Ensure we have the correct type
-        guard pendingData.type == expectedType else {
-            print("❌ Type mismatch: expected \(expectedType) but found \(pendingData.type)")
-            return nil
-        }
-
-        do {
-            await debugLog("Decoding pending data", data: pendingData.rawData)
-            return try await decode(T.self, from: pendingData.rawData)
-        } catch {
-            print("❌ Failed to decode pending data: \(error)")
-            return nil
-        }
-    }
 
     /// Check if a JSON object has deeply nested structures that might cause stack overflow
     public static func hasDeepNesting(in data: Data, maxDepth: Int = 20) -> Bool {

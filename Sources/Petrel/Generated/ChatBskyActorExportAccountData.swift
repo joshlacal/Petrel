@@ -1,60 +1,95 @@
 import Foundation
 
+
+
 // lexicon: 1, id: chat.bsky.actor.exportAccountData
 
-public enum ChatBskyActorExportAccountData {
+
+public struct ChatBskyActorExportAccountData { 
+
     public static let typeIdentifier = "chat.bsky.actor.exportAccountData"
-
-    public struct Output: ATProtocolCodable {
+    
+public struct Output: ATProtocolCodable {
+        
+        
         public let data: Data
-
+        
+        
+        
         // Standard public initializer
         public init(
+            
+            
             data: Data
-
+            
+            
         ) {
+            
+            
             self.data = data
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
-            data = try container.decode(Data.self, forKey: .data)
+            
+            self.data = try container.decode(Data.self, forKey: .data)
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
+            
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
             try container.encode(data, forKey: .data)
+            
+            
         }
 
         public func toCBORValue() throws -> Any {
+            
             var map = OrderedCBORMap()
 
+            
+            
             let dataValue = try data.toCBORValue()
             map = map.adding(key: "data", value: dataValue)
+            
+            
 
             return map
+            
         }
-
+        
+        
         private enum CodingKeys: String, CodingKey {
             case data
         }
+        
     }
+
+
+
+
 }
 
-public extension ATProtoClient.Chat.Bsky.Actor {
+
+extension ATProtoClient.Chat.Bsky.Actor {
     // MARK: - exportAccountData
 
-    ///
-    ///
+    /// 
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    func exportAccountData() async throws -> (responseCode: Int, data: ChatBskyActorExportAccountData.Output?) {
+    public func exportAccountData() async throws -> (responseCode: Int, data: ChatBskyActorExportAccountData.Output?) {
         let endpoint = "chat.bsky.actor.exportAccountData"
 
+        
         let queryItems: [URLQueryItem]? = nil
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -78,10 +113,11 @@ public extension ATProtoClient.Chat.Bsky.Actor {
         }
 
         // Only decode response data if request was successful
-        if (200 ... 299).contains(responseCode) {
+        if (200...299).contains(responseCode) {
             do {
+                
                 let decodedData = ChatBskyActorExportAccountData.Output(data: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -93,4 +129,4 @@ public extension ATProtoClient.Chat.Bsky.Actor {
             return (responseCode, nil)
         }
     }
-}
+}                           
