@@ -1,34 +1,23 @@
 import Foundation
 
-
-
 // lexicon: 1, id: com.atproto.server.deleteSession
 
-
-public struct ComAtprotoServerDeleteSession { 
-
+public enum ComAtprotoServerDeleteSession {
     public static let typeIdentifier = "com.atproto.server.deleteSession"
-
-
-
 }
 
-extension ATProtoClient.Com.Atproto.Server {
+public extension ATProtoClient.Com.Atproto.Server {
     // MARK: - deleteSession
 
     /// Delete the current session. Requires auth.
-    /// 
+    ///
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func deleteSession(
-        
+    func deleteSession(
     ) async throws -> Int {
         let endpoint = "com.atproto.server.deleteSession"
-        
+
         var headers: [String: String] = [:]
-        
-        
-        
 
         let requestData: Data? = nil
         let urlRequest = try await networkService.createURLRequest(
@@ -45,10 +34,6 @@ extension ATProtoClient.Com.Atproto.Server {
         let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        
         return responseCode
-        
     }
-    
 }
-                           
