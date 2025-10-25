@@ -102,6 +102,8 @@ public struct Account: Codable, Equatable, Sendable {
         lhs.did == rhs.did && lhs.handle == rhs.handle && lhs.pdsURL == rhs.pdsURL
             && lhs.protectedResourceMetadata == rhs.protectedResourceMetadata
             && lhs.authorizationServerMetadata == rhs.authorizationServerMetadata
+            && lhs.bskyAppViewDID == rhs.bskyAppViewDID
+            && lhs.bskyChatDID == rhs.bskyChatDID
     }
 
     /// The decentralized identifier for the account
@@ -118,19 +120,29 @@ public struct Account: Codable, Equatable, Sendable {
 
     /// Metadata about the authorization server
     var authorizationServerMetadata: AuthorizationServerMetadata?
+    
+    /// Custom AppView service DID for app.bsky namespace (defaults to official Bluesky AppView)
+    public var bskyAppViewDID: String
+    
+    /// Custom Chat service DID for chat.bsky namespace (defaults to official Bluesky Chat)
+    public var bskyChatDID: String
 
     public init(
         did: String,
         handle: String? = nil,
         pdsURL: URL,
         protectedResourceMetadata: ProtectedResourceMetadata? = nil,
-        authorizationServerMetadata: AuthorizationServerMetadata? = nil
+        authorizationServerMetadata: AuthorizationServerMetadata? = nil,
+        bskyAppViewDID: String = "did:web:api.bsky.app#bsky_appview",
+        bskyChatDID: String = "did:web:api.bsky.chat#bsky_chat"
     ) {
         self.did = did
         self.handle = handle
         self.pdsURL = pdsURL
         self.protectedResourceMetadata = protectedResourceMetadata
         self.authorizationServerMetadata = authorizationServerMetadata
+        self.bskyAppViewDID = bskyAppViewDID
+        self.bskyChatDID = bskyChatDID
     }
 }
 
@@ -216,6 +228,12 @@ public struct OAuthState: Codable, Equatable, Sendable {
     /// The DPoP nonce received from the PAR response
     /// Used for the subsequent token exchange request
     public var parResponseNonce: String?
+    
+    /// Custom AppView service DID to use for this account
+    public let bskyAppViewDID: String?
+    
+    /// Custom Chat service DID to use for this account
+    public let bskyChatDID: String?
 
     public init(
         stateToken: String,
@@ -224,7 +242,9 @@ public struct OAuthState: Codable, Equatable, Sendable {
         initialIdentifier: String? = nil,
         targetPDSURL: URL? = nil,
         ephemeralDPoPKey: Data? = nil,
-        parResponseNonce: String? = nil
+        parResponseNonce: String? = nil,
+        bskyAppViewDID: String? = nil,
+        bskyChatDID: String? = nil
     ) {
         self.stateToken = stateToken
         self.codeVerifier = codeVerifier
@@ -233,6 +253,8 @@ public struct OAuthState: Codable, Equatable, Sendable {
         self.targetPDSURL = targetPDSURL
         self.ephemeralDPoPKey = ephemeralDPoPKey
         self.parResponseNonce = parResponseNonce
+        self.bskyAppViewDID = bskyAppViewDID
+        self.bskyChatDID = bskyChatDID
     }
 }
 

@@ -41,6 +41,12 @@ protocol AccountManaging: Actor {
 
     /// Clears the current active account without removing any stored accounts.
     func clearCurrentAccount() async
+    
+    /// Updates the service DIDs for the current account.
+    /// - Parameters:
+    ///   - bskyAppViewDID: The new AppView DID
+    ///   - bskyChatDID: The new Chat DID
+    func updateServiceDIDs(bskyAppViewDID: String, bskyChatDID: String) async throws
 }
 
 /// Actor responsible for managing user accounts.
@@ -451,6 +457,31 @@ actor AccountManager: AccountManaging {
 
     /// Clears the current active account without removing any stored accounts.
     /// Useful when a logout should not implicitly switch to another account.
+    /// Updates the service DIDs for the current account.
+    /// - Parameters:
+    ///   - bskyAppViewDID: The new AppView DID
+    ///   - bskyChatDID: The new Chat DID
+    func updateServiceDIDs(bskyAppViewDID: String, bskyChatDID: String) async throws {
+        guard let did = currentDID else {
+            LogManager.logError("AccountManager - Cannot update service DIDs: No active account")
+            throw AccountError.noActiveAccount
+        }
+        
+        guard var account = try await storage.getAccount(for: did) else {
+            LogManager.logError("AccountManager - Cannot update service DIDs: Account not found for DID \(did)")
+            throw AccountError.accountNotFound
+        }
+        
+        // Update the DIDs
+        account.bskyAppViewDID = bskyAppViewDID
+        account.bskyChatDID = bskyChatDID
+        
+        // Save back to storage
+        try await storage.saveAccount(account, for: did)
+        
+        LogManager.logInfo("AccountManager - Updated service DIDs for account \(LogManager.logDID(did)): bskyAppViewDID=\(bskyAppViewDID), bskyChatDID=\(bskyChatDID)")
+    }
+    
     func clearCurrentAccount() async {
         let previous = currentDID
         currentDID = nil
@@ -478,6 +509,7 @@ enum AccountError: Error, LocalizedError {
     case accountExists
     case invalidAccount
     case storageError
+    case noActiveAccount
 
     var errorDescription: String? {
         switch self {
@@ -489,6 +521,8 @@ enum AccountError: Error, LocalizedError {
             return "Invalid account data."
         case .storageError:
             return "Failed to store account information."
+        case .noActiveAccount:
+            return "No active account."
         }
     }
 
@@ -502,6 +536,8 @@ enum AccountError: Error, LocalizedError {
             return "The account data is missing required fields or contains invalid values."
         case .storageError:
             return "Unable to save account data to secure storage."
+        case .noActiveAccount:
+            return "No active account is currently selected."
         }
     }
 
@@ -515,6 +551,8 @@ enum AccountError: Error, LocalizedError {
             return "Please check your login credentials and try again."
         case .storageError:
             return "Check that you have sufficient storage space and try again. If the problem persists, restart the app."
+        case .noActiveAccount:
+            return "Please log in to an account first."
         }
     }
 }
