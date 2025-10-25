@@ -120,10 +120,10 @@ public struct Account: Codable, Equatable, Sendable {
 
     /// Metadata about the authorization server
     var authorizationServerMetadata: AuthorizationServerMetadata?
-    
+
     /// Custom AppView service DID for app.bsky namespace (defaults to official Bluesky AppView)
     public var bskyAppViewDID: String
-    
+
     /// Custom Chat service DID for chat.bsky namespace (defaults to official Bluesky Chat)
     public var bskyChatDID: String
 
@@ -228,10 +228,10 @@ public struct OAuthState: Codable, Equatable, Sendable {
     /// The DPoP nonce received from the PAR response
     /// Used for the subsequent token exchange request
     public var parResponseNonce: String?
-    
+
     /// Custom AppView service DID to use for this account
     public let bskyAppViewDID: String?
-    
+
     /// Custom Chat service DID to use for this account
     public let bskyChatDID: String?
 
