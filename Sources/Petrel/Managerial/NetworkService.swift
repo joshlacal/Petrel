@@ -197,8 +197,8 @@ actor NetworkService: NetworkServiceProtocol {
     ///          "chat.bsky" -> "did:web:api.bsky.chat#bsky_chat"
     private var serviceDIDMapping: [String: String] = [:]
 
-    /// Endpoints that should always use the default AppView DID (for preferences stored on PDS)
-    private let alwaysDefaultAppViewEndpoints: Set<String> = [
+    /// Endpoints that go directly to PDS and should never be proxied
+    private let neverProxyEndpoints: Set<String> = [
         "app.bsky.actor.getPreferences",
         "app.bsky.actor.putPreferences",
     ]
@@ -334,17 +334,18 @@ actor NetworkService: NetworkServiceProtocol {
     ///   - namespace: The lexicon namespace prefix (e.g., "app.bsky", "chat.bsky")
     func setServiceDID(_ serviceDID: String, for namespace: String) async {
         serviceDIDMapping[namespace] = serviceDID
-        LogManager.logDebug("Network Service - Set service DID '\(serviceDID)' for namespace '\(namespace)'")
+        LogManager.logInfo("Network Service - Set service DID '\(serviceDID)' for namespace '\(namespace)'")
+        LogManager.logDebug("Network Service - Current service DID mappings: \(serviceDIDMapping)")
     }
 
     /// Gets the service DID for a given endpoint, if configured
     /// - Parameter endpoint: The full endpoint (e.g., "app.bsky.feed.getTimeline")
     /// - Returns: The service DID if one is configured for this endpoint's namespace, nil otherwise
     func getServiceDID(for endpoint: String) async -> String? {
-        // Special case: preferences endpoints always use default AppView DID
-        if alwaysDefaultAppViewEndpoints.contains(endpoint) {
-            // Return the app.bsky service DID (default AppView)
-            return serviceDIDMapping["app.bsky"]
+        // Special case: preferences endpoints go directly to PDS, never proxied
+        if neverProxyEndpoints.contains(endpoint) {
+            LogManager.logDebug("Network Service - getServiceDID for preferences endpoint '\(endpoint)': nil (PDS direct)")
+            return nil
         }
 
         // Find the matching namespace prefix
@@ -352,10 +353,13 @@ actor NetworkService: NetworkServiceProtocol {
         let sortedPrefixes = serviceDIDMapping.keys.sorted { $0.count > $1.count }
         for prefix in sortedPrefixes {
             if endpoint.hasPrefix(prefix + ".") || endpoint == prefix {
-                return serviceDIDMapping[prefix]
+                let did = serviceDIDMapping[prefix]
+                LogManager.logDebug("Network Service - getServiceDID for '\(endpoint)' matched prefix '\(prefix)': \(did ?? "nil")")
+                return did
             }
         }
 
+        LogManager.logDebug("Network Service - getServiceDID for '\(endpoint)': No matching prefix found")
         return nil
     }
 
@@ -561,6 +565,9 @@ actor NetworkService: NetworkServiceProtocol {
             if let additionalHeaders = additionalHeaders {
                 for (name, value) in additionalHeaders {
                     requestToSend.setValue(value, forHTTPHeaderField: name)
+                    if name == "atproto-proxy" {
+                        LogManager.logInfo("Network Service - Setting atproto-proxy header: \(value) for endpoint: \(requestToSend.url?.path ?? "unknown")")
+                    }
                 }
             }
             if let userAgent = userAgent {

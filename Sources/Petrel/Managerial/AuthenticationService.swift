@@ -52,9 +52,12 @@ public protocol AuthFailureDelegate: AnyObject, Sendable {
 /// Protocol defining the interface for authentication services.
 protocol AuthServiceProtocol: Actor {
     /// Starts the OAuth flow for an existing user.
-    /// - Parameter identifier: The user identifier (handle).
+    /// - Parameters:
+    ///   - identifier: The user identifier (handle).
+    ///   - bskyAppViewDID: Optional custom AppView DID to use for this account
+    ///   - bskyChatDID: Optional custom Chat DID to use for this account
     /// - Returns: The authorization URL to present to the user.
-    func startOAuthFlow(identifier: String?) async throws -> URL
+    func startOAuthFlow(identifier: String?, bskyAppViewDID: String?, bskyChatDID: String?) async throws -> URL
 
     /// Handles the OAuth callback URL after user authentication.
     /// - Parameter url: The callback URL received from the authorization server.
@@ -553,7 +556,9 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
                 handle: resolvedHandle ?? oauthState.initialIdentifier, // Use resolved handle, fallback to state
                 pdsURL: actualPDSURL, // Use the resolved actual PDS URL, not the signup PDS
                 protectedResourceMetadata: protectedResourceMetadata, // Store fetched metadata (may be nil)
-                authorizationServerMetadata: authServerMetadata // Store fetched metadata
+                authorizationServerMetadata: authServerMetadata, // Store fetched metadata
+                bskyAppViewDID: oauthState.bskyAppViewDID ?? "did:web:api.bsky.app#bsky_appview",
+                bskyChatDID: oauthState.bskyChatDID ?? "did:web:api.bsky.chat#bsky_chat"
             )
         } else {
             LogManager.logDebug("Updating existing account for DID: \(did)")
@@ -563,6 +568,13 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
             account?.handle = resolvedHandle ?? oauthState.initialIdentifier ?? existingHandle // Update handle if provided
             account?.protectedResourceMetadata = protectedResourceMetadata // Update metadata
             account?.authorizationServerMetadata = authServerMetadata // Update metadata
+            // Update service DIDs if provided in OAuth state
+            if let appViewDID = oauthState.bskyAppViewDID {
+                account?.bskyAppViewDID = appViewDID
+            }
+            if let chatDID = oauthState.bskyChatDID {
+                account?.bskyChatDID = chatDID
+            }
         }
 
         guard let finalAccount = account else {
@@ -1073,7 +1085,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
     /// Starts the OAuth flow for an existing user.
     /// - Parameter identifier: The user identifier (handle), optional if signing up.
     /// - Returns: The authorization URL to present to the user.
-    func startOAuthFlow(identifier: String? = nil) async throws -> URL {
+    func startOAuthFlow(identifier: String? = nil, bskyAppViewDID: String? = nil, bskyChatDID: String? = nil) async throws -> URL {
         // Coalesce concurrent calls per-identifier and decouple from caller cancellation
         let key = flowKey(for: identifier)
 
@@ -1089,7 +1101,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
         // does not cancel underlying URLSession tasks (prevents -999 cancellations).
         let task = Task.detached(priority: .userInitiated) { [weak self] () throws -> URL in
             guard let self else { throw AuthError.invalidOAuthConfiguration }
-            return try await self._startOAuthFlowImpl(identifier: identifier)
+            return try await self._startOAuthFlowImpl(identifier: identifier, bskyAppViewDID: bskyAppViewDID, bskyChatDID: bskyChatDID)
         }
         oauthStartTasks[key] = task
         defer { oauthStartTasks.removeValue(forKey: key) }
@@ -1115,7 +1127,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
 
     /// Internal implementation of the OAuth start flow. Kept actor-isolated; invoked from a detached task
     /// to shield underlying URLSession operations from parent Task cancellation.
-    private func _startOAuthFlowImpl(identifier: String?) async throws -> URL {
+    private func _startOAuthFlowImpl(identifier: String?, bskyAppViewDID: String?, bskyChatDID: String?) async throws -> URL {
         // Gate concurrent starts globally to keep legacy protection too
         if oauthStartInProgress {
             LogManager.logInfo(
@@ -1225,7 +1237,9 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
             initialIdentifier: identifier,
             targetPDSURL: pdsURL,
             ephemeralDPoPKey: ephemeralKey.rawRepresentation,
-            parResponseNonce: parNonce
+            parResponseNonce: parNonce,
+            bskyAppViewDID: bskyAppViewDID,
+            bskyChatDID: bskyChatDID
         )
         try await storage.saveOAuthState(oauthState)
         LogManager.logDebug(
@@ -1251,9 +1265,12 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
     }
 
     /// Starts the OAuth flow for a new account signup (without requiring a handle)
-    /// - Parameter pdsURL: The PDS URL to use for sign-up
+    /// - Parameters:
+    ///   - pdsURL: The PDS URL to use for sign-up
+    ///   - bskyAppViewDID: Optional custom AppView DID to use for this account
+    ///   - bskyChatDID: Optional custom Chat DID to use for this account
     /// - Returns: The authorization URL to present to the user
-    func startOAuthFlowForSignUp(pdsURL: URL? = nil)
+    func startOAuthFlowForSignUp(pdsURL: URL? = nil, bskyAppViewDID: String? = nil, bskyChatDID: String? = nil)
         async throws -> URL
     {
         // Use provided URL or default to bsky.social
@@ -1285,7 +1302,9 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
             initialIdentifier: nil,
             targetPDSURL: finalPDSURL,
             ephemeralDPoPKey: ephemeralKey.rawRepresentation,
-            parResponseNonce: nil // Initialize explicitly as nil, will update after PAR
+            parResponseNonce: nil, // Initialize explicitly as nil, will update after PAR
+            bskyAppViewDID: bskyAppViewDID,
+            bskyChatDID: bskyChatDID
         )
         // Save the initial state (optional, but good practice if PAR fails before nonce is known)
         // try await storage.saveOAuthState(oauthState) // Consider if needed
