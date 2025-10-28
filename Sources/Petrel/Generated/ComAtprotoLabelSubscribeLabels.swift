@@ -1,72 +1,51 @@
 import Foundation
 
-
-
 // lexicon: 1, id: com.atproto.label.subscribeLabels
 
-
-public struct ComAtprotoLabelSubscribeLabels { 
-
+public enum ComAtprotoLabelSubscribeLabels {
     public static let typeIdentifier = "com.atproto.label.subscribeLabels"
-        
-public struct Labels: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "com.atproto.label.subscribeLabels#labels"
-            public let seq: Int
-            public let labels: [ComAtprotoLabelDefs.Label]
+
+    public struct Labels: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "com.atproto.label.subscribeLabels#labels"
+        public let seq: Int
+        public let labels: [ComAtprotoLabelDefs.Label]
 
         // Standard initializer
         public init(
             seq: Int, labels: [ComAtprotoLabelDefs.Label]
         ) {
-            
             self.seq = seq
             self.labels = labels
         }
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
-            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                
-                
-                self.seq = try container.decode(Int.self, forKey: .seq)
-                
-                
+                seq = try container.decode(Int.self, forKey: .seq)
+
             } catch {
-                
                 LogManager.logError("Decoding error for required property 'seq': \(error)")
-                
+
                 throw error
             }
             do {
-                
-                
-                self.labels = try container.decode([ComAtprotoLabelDefs.Label].self, forKey: .labels)
-                
-                
+                labels = try container.decode([ComAtprotoLabelDefs.Label].self, forKey: .labels)
+
             } catch {
-                
                 LogManager.logError("Decoding error for required property 'labels': \(error)")
-                
+
                 throw error
             }
-            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            
-            
+
             try container.encode(seq, forKey: .seq)
-            
-            
-            
-            
+
             try container.encode(labels, forKey: .labels)
-            
-            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -75,24 +54,17 @@ public struct Labels: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            
             guard let other = other as? Self else { return false }
-            
-            
-            if self.seq != other.seq {
+
+            if seq != other.seq {
                 return false
             }
-            
-            
-            
-            
-            if self.labels != other.labels {
+
+            if labels != other.labels {
                 return false
             }
-            
-            
+
             return true
-            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -105,23 +77,11 @@ public struct Labels: ATProtocolCodable, ATProtocolValue {
 
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            
-            
-            
-            
             let seqValue = try seq.toCBORValue()
             map = map.adding(key: "seq", value: seqValue)
-            
-            
-            
-            
-            
-            
+
             let labelsValue = try labels.toCBORValue()
             map = map.adding(key: "labels", value: labelsValue)
-            
-            
-            
 
             return map
         }
@@ -132,66 +92,49 @@ public struct Labels: ATProtocolCodable, ATProtocolValue {
             case labels
         }
     }
-        
-public struct Info: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "com.atproto.label.subscribeLabels#info"
-            public let name: String
-            public let message: String?
+
+    public struct Info: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "com.atproto.label.subscribeLabels#info"
+        public let name: String
+        public let message: String?
 
         // Standard initializer
         public init(
             name: String, message: String?
         ) {
-            
             self.name = name
             self.message = message
         }
 
         // Codable initializer
         public init(from decoder: Decoder) throws {
-            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                
-                
-                self.name = try container.decode(String.self, forKey: .name)
-                
-                
+                name = try container.decode(String.self, forKey: .name)
+
             } catch {
-                
                 LogManager.logError("Decoding error for required property 'name': \(error)")
-                
+
                 throw error
             }
             do {
-                
-                
-                self.message = try container.decodeIfPresent(String.self, forKey: .message)
-                
-                
+                message = try container.decodeIfPresent(String.self, forKey: .message)
+
             } catch {
-                
                 LogManager.logDebug("Decoding error for optional property 'message': \(error)")
-                
+
                 throw error
             }
-            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            
-            
+
             try container.encode(name, forKey: .name)
-            
-            
-            
-            
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(message, forKey: .message)
-            
-            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -204,24 +147,17 @@ public struct Info: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            
             guard let other = other as? Self else { return false }
-            
-            
-            if self.name != other.name {
+
+            if name != other.name {
                 return false
             }
-            
-            
-            
-            
+
             if message != other.message {
                 return false
             }
-            
-            
+
             return true
-            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -234,26 +170,15 @@ public struct Info: ATProtocolCodable, ATProtocolValue {
 
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            
-            
-            
-            
             let nameValue = try name.toCBORValue()
             map = map.adding(key: "name", value: nameValue)
-            
-            
-            
-            
-            
+
             if let value = message {
                 // Encode optional property even if it's an empty array for CBOR
-                
+
                 let messageValue = try value.toCBORValue()
                 map = map.adding(key: "message", value: messageValue)
             }
-            
-            
-            
 
             return map
         }
@@ -263,89 +188,78 @@ public struct Info: ATProtocolCodable, ATProtocolValue {
             case name
             case message
         }
-    }    
-public struct Parameters: Parametrizable {
+    }
+
+    public struct Parameters: Parametrizable {
         public let cursor: Int?
-        
+
         public init(
             cursor: Int? = nil
-            ) {
+        ) {
             self.cursor = cursor
-            
-        }
-    }
-public enum Message: Codable, Sendable {
-
-    case labels(Labels)
-
-    case info(Info)
-
-
-    enum CodingKeys: String, CodingKey {
-        case type = "$type"
-    }
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        let type = try container.decode(String.self, forKey: .type)
-        
-        switch type {
-
-        case "com.atproto.label.subscribeLabels#labels":
-            let value = try Labels(from: decoder)
-            self = .labels(value)
-
-        case "com.atproto.label.subscribeLabels#info":
-            let value = try Info(from: decoder)
-            self = .info(value)
-
-        default:
-            throw DecodingError.dataCorruptedError(
-                forKey: .type,
-                in: container,
-                debugDescription: "Unknown message type: \(type)"
-            )
         }
     }
 
-    public func encode(to encoder: Encoder) throws {
-        switch self {
+    public enum Message: Codable, Sendable {
+        case labels(Labels)
 
-        case .labels(let value):
-            try value.encode(to: encoder)
+        case info(Info)
 
-        case .info(let value):
-            try value.encode(to: encoder)
-
+        enum CodingKeys: String, CodingKey {
+            case type = "$type"
         }
-    }
-}        
-public enum Error: String, Swift.Error, CustomStringConvertible {
-                case futureCursor = "FutureCursor."
-            public var description: String {
-                return self.rawValue
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let type = try container.decode(String.self, forKey: .type)
+
+            switch type {
+            case "com.atproto.label.subscribeLabels#labels":
+                let value = try Labels(from: decoder)
+                self = .labels(value)
+
+            case "com.atproto.label.subscribeLabels#info":
+                let value = try Info(from: decoder)
+                self = .info(value)
+
+            default:
+                throw DecodingError.dataCorruptedError(
+                    forKey: .type,
+                    in: container,
+                    debugDescription: "Unknown message type: \(type)"
+                )
             }
         }
 
+        public func encode(to encoder: Encoder) throws {
+            switch self {
+            case let .labels(value):
+                try value.encode(to: encoder)
 
+            case let .info(value):
+                try value.encode(to: encoder)
+            }
+        }
+    }
 
+    public enum Error: String, Swift.Error, CustomStringConvertible {
+        case futureCursor = "FutureCursor."
+        public var description: String {
+            return rawValue
+        }
+    }
 }
-
-
-                           
 
 /// Subscribe to stream of labels (and negations). Public endpoint implemented by mod services. Uses same sequencing scheme as repo event stream.
 
-extension ATProtoClient.Com.Atproto.Label {
-    
-    public func subscribeLabels(
+public extension ATProtoClient.Com.Atproto.Label {
+    func subscribeLabels(
         cursor: Int? = nil
     ) async throws -> AsyncThrowingStream<ComAtprotoLabelSubscribeLabels.Message, Error> {
         let params = ComAtprotoLabelSubscribeLabels.Parameters(cursor: cursor)
-        return try await self.networkService.subscribe(
+        return try await networkService.subscribe(
             endpoint: "com.atproto.label.subscribeLabels",
             parameters: params
         )
     }
-    
 }
