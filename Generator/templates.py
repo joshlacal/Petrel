@@ -22,6 +22,8 @@ class TemplateManager:
         self.record_template = self.env.get_template('record.jinja')
         self.query_template = self.env.get_template('query.jinja')
         self.procedure_template = self.env.get_template('procedure.jinja')
+        self.subscription_template = self.env.get_template('subscription.jinja')
+        self.message_union_template = self.env.get_template('messageUnion.jinja')
 
     @staticmethod
     def lowerCamelCase(s):

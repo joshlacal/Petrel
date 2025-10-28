@@ -35,7 +35,7 @@ public struct AuthorizationServerMetadata: Codable, Sendable, Hashable {
     let tokenEndpointAuthMethodsSupported: [String]
     let tokenEndpointAuthSigningAlgValuesSupported: [String]
     let revocationEndpoint: String
-    let introspectionEndpoint: String
+    let introspectionEndpoint: String?
     let pushedAuthorizationRequestEndpoint: String
     let requirePushedAuthorizationRequests: Bool
     let dpopSigningAlgValuesSupported: [String]

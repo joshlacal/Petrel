@@ -213,7 +213,7 @@ actor DIDResolutionService: DIDResolving {
         let (responseData, response) = try await networkService.performRequest(urlRequest)
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw NetworkError.invalidResponse
+            throw NetworkError.invalidResponse(description: "Response is not HTTPURLResponse")
         }
 
         let responseCode = httpResponse.statusCode

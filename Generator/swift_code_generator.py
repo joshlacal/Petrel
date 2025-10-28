@@ -44,6 +44,8 @@ class SwiftCodeGenerator:
             return self.handle_object_type(main_def)
         elif main_def_type == 'procedure':
             return self.handle_procedure_type(main_def)
+        elif main_def_type == 'subscription':
+            return self.handle_subscription_type(main_def)
         else:
             return main_def
 
@@ -51,6 +53,9 @@ class SwiftCodeGenerator:
         return main_def
 
     def handle_procedure_type(self, main_def):
+        return main_def
+
+    def handle_subscription_type(self, main_def):
         return main_def
 
     def generate_properties(self, properties, required_fields, current_struct_name):
@@ -149,6 +154,41 @@ class SwiftCodeGenerator:
             return ""
         return self.template_manager.errors_enum_template.render(errors=errors)
 
+    def generate_message_union(self, message_obj: Optional[Dict[str, Any]]) -> str:
+        if not message_obj:
+            return ""
+        
+        schema = message_obj.get('schema', {})
+        if schema.get('type') != 'union':
+            return ""
+        
+        refs = schema.get('refs', [])
+        variants = []
+        
+        for ref in refs:
+            # Convert ref to Swift type and case name
+            if ref.startswith('#'):
+                # Local reference
+                ref_name = ref[1:]
+                type_name = convert_to_camel_case(ref_name)
+                type_id = f"{self.lexicon_id}#{ref_name}"
+            else:
+                # External reference
+                type_name = convert_ref(ref)
+                type_id = ref
+            
+            # Create a case name from the type
+            case_name = type_name.split('.')[-1]
+            case_name = case_name[0].lower() + case_name[1:] if case_name else case_name
+            
+            variants.append({
+                'case_name': case_name,
+                'type': type_name,
+                'type_id': type_id
+            })
+        
+        return self.template_manager.message_union_template.render(variants=variants)
+
     def is_union_array(self, def_schema):
         return def_schema.get('type') == 'array' and 'refs' in def_schema.get('items', {})
 
@@ -167,13 +207,15 @@ class SwiftCodeGenerator:
                 
                 sub_structs = {}
                 for key, value in def_schema.items():
-                    if key not in ['properties', 'required', 'type', 'description']:
-                        sub_conformance = ": ATProtocolCodable, ATProtocolValue"
-                        sub_properties = self.generate_properties(value.get('properties', {}), value.get('required', []))
-                        sub_structs[convert_to_camel_case(key)] = {
-                            'properties': sub_properties, 
-                            'conformance': sub_conformance
-                        }
+                    if key not in ['properties', 'required', 'type', 'description', 'nullable']:
+                        # Only process if value is a dictionary (sub-object schema)
+                        if isinstance(value, dict) and 'properties' in value:
+                            sub_conformance = ": ATProtocolCodable, ATProtocolValue"
+                            sub_properties = self.generate_properties(value.get('properties', {}), value.get('required', []), convert_to_camel_case(key))
+                            sub_structs[convert_to_camel_case(key)] = {
+                                'properties': sub_properties, 
+                                'conformance': sub_conformance
+                            }
                 
                 lex_definitions[convert_to_camel_case(name)] = {
                     'properties': properties, 
@@ -241,6 +283,8 @@ class SwiftCodeGenerator:
             main_properties = ""
             procedure = ""
             query = ""
+            subscription = ""
+            message_union = ""
             conformance = ""
 
             if 'main' not in self.defs:
@@ -267,6 +311,12 @@ class SwiftCodeGenerator:
                     errors_enum = self.generate_errors_enum(self.main_def.get('errors'))
                     lex_definitions = self.generate_lex_definitions()
                     procedure = self.generate_procedure_function(lexicon_id=self.lexicon_id, main_def=self.main_def)
+                elif main_def_type == 'subscription':
+                    query_parameters = self.generate_query_parameters(self.main_def.get('parameters'))
+                    message_union = self.generate_message_union(self.main_def.get('message'))
+                    errors_enum = self.generate_errors_enum(self.main_def.get('errors'))
+                    lex_definitions = self.generate_lex_definitions()
+                    subscription = self.generate_subscription_function(lexicon_id=self.lexicon_id, main_def=self.main_def)
             self.generate_all_enums()
             
             swift_code = self.template_manager.main_template.render(
@@ -285,6 +335,8 @@ class SwiftCodeGenerator:
                 main_properties=main_properties,  
                 procedure=procedure,
                 query=query,
+                subscription=subscription,
+                message_union=message_union,
                 conformance=conformance
             )
             
@@ -391,6 +443,63 @@ class SwiftCodeGenerator:
             is_binary_data=is_binary_data,
             input_encoding=input_encoding,    # Pass the input encoding to the template
             output_encoding=output_encoding   # Pass the output encoding to the template
+        )
+
+    def generate_subscription_function(self, lexicon_id, main_def):
+        # Split the lexicon ID to determine the namespace
+        template_namespace_parts = lexicon_id.split('.')[:-1]
+        template_namespace_name = '.'.join(convert_to_camel_case(part) for part in template_namespace_parts)
+        
+        # Determine the subscription name by converting the last part of the lexicon ID to camelCase
+        subscription_name = convert_to_camel_case(lexicon_id.split('.')[-1])
+        # Make first letter lowercase for method name
+        subscription_name = subscription_name[0].lower() + subscription_name[1:] if subscription_name else subscription_name
+        
+        # Determine if the subscription has input parameters
+        has_parameters = 'parameters' in main_def
+        input_struct_name = convert_to_camel_case(lexicon_id) + ".Parameters" if has_parameters else None
+        
+        # Get the message type
+        message_type = convert_to_camel_case(lexicon_id) + ".Message"
+        
+        input_parameters = ''
+        input_values = ''
+        
+        if has_parameters:
+            input_params = main_def.get('parameters', {}).get('properties', {})
+            required_params = main_def.get('parameters', {}).get('required', [])
+            
+            # Build parameter list with proper optionality and defaults
+            param_list = []
+            value_list = []
+            for param, details in input_params.items():
+                swift_type = self.type_converter.determine_swift_type(param, details, required_params, param)
+                is_optional = param not in required_params
+                
+                # Add default value for optional parameters
+                if is_optional:
+                    param_list.append(f"{param}: {swift_type}? = nil")
+                else:
+                    param_list.append(f"{param}: {swift_type}")
+                value_list.append(f"{param}: {param}")
+            
+            input_parameters = ', '.join(param_list)
+            input_values = ', '.join(value_list)
+        
+        # Define the API endpoint
+        endpoint = f"{lexicon_id}"
+        
+        # Render the subscription template
+        return self.template_manager.subscription_template.render(
+            template_namespace_name=template_namespace_name,
+            subscription_name=subscription_name,
+            has_parameters=has_parameters,
+            input_parameters=input_parameters,
+            input_struct_name=input_struct_name,
+            input_values=input_values,
+            message_type=message_type,
+            endpoint=endpoint,
+            description=self.description
         )
 
 def convert_json_to_swift(json_content: str) -> str:

@@ -515,6 +515,12 @@ public actor ATProtoClient {
         await networkService.setHeader(name: "User-Agent", value: userAgent)
     }
 
+    /// Sets the connection policy adapter for controlling connection routing.
+    /// - Parameter adapter: The connection policy adapter.
+    public func setConnectionPolicyAdapter(_ adapter: (any ConnectionPolicyAdapter)?) async {
+        await networkService.setConnectionPolicyAdapter(adapter)
+    }
+
     // MARK: - Generated API Namespaced Classes
 
   
