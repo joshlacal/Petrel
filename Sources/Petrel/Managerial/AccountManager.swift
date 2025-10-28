@@ -41,7 +41,7 @@ protocol AccountManaging: Actor {
 
     /// Clears the current active account without removing any stored accounts.
     func clearCurrentAccount() async
-    
+
     /// Updates the service DIDs for the current account.
     /// - Parameters:
     ///   - bskyAppViewDID: The new AppView DID
@@ -466,22 +466,22 @@ actor AccountManager: AccountManaging {
             LogManager.logError("AccountManager - Cannot update service DIDs: No active account")
             throw AccountError.noActiveAccount
         }
-        
+
         guard var account = try await storage.getAccount(for: did) else {
             LogManager.logError("AccountManager - Cannot update service DIDs: Account not found for DID \(did)")
             throw AccountError.accountNotFound
         }
-        
+
         // Update the DIDs
         account.bskyAppViewDID = bskyAppViewDID
         account.bskyChatDID = bskyChatDID
-        
+
         // Save back to storage
         try await storage.saveAccount(account, for: did)
-        
+
         LogManager.logInfo("AccountManager - Updated service DIDs for account \(LogManager.logDID(did)): bskyAppViewDID=\(bskyAppViewDID), bskyChatDID=\(bskyChatDID)")
     }
-    
+
     func clearCurrentAccount() async {
         let previous = currentDID
         currentDID = nil
