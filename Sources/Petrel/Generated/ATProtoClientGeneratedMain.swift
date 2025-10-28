@@ -189,7 +189,7 @@ public actor ATProtoClient {
         if let account = await accountManager.getCurrentAccount() {
             // Update the network service base URL
             await networkService.setBaseURL(account.pdsURL)
-            
+
             // Load and apply service DIDs from stored account
             LogManager.logInfo("ATProtoClient - Loading service DIDs from stored account: bskyAppViewDID=\(account.bskyAppViewDID), bskyChatDID=\(account.bskyChatDID)")
             await networkService.setServiceDID(account.bskyAppViewDID, for: "app.bsky")
@@ -461,7 +461,7 @@ public actor ATProtoClient {
         // Update network service base URL and service DIDs
         if let account = await accountManager.getAccount(did: did) {
             await networkService.setBaseURL(account.pdsURL)
-            
+
             // Load and apply service DIDs from account
             LogManager.logInfo("ATProtoClient - Loading service DIDs from account: bskyAppViewDID=\(account.bskyAppViewDID), bskyChatDID=\(account.bskyChatDID)")
             await networkService.setServiceDID(account.bskyAppViewDID, for: "app.bsky")
@@ -474,7 +474,7 @@ public actor ATProtoClient {
     public func removeAccount(did: String) async throws {
         try await accountManager.removeAccount(did: did)
     }
-    
+
     /// Updates the service DID mappings for app.bsky and chat.bsky namespaces.
     /// Use this to change the AppView or Chat service after client initialization.
     /// - Parameters:
@@ -485,7 +485,7 @@ public actor ATProtoClient {
         await networkService.setServiceDID(bskyAppViewDID, for: "app.bsky")
         await networkService.setServiceDID(bskyChatDID, for: "chat.bsky")
     }
-    
+
     /// Updates the service DIDs for the current account and persists them.
     /// This is the primary method for changing service DIDs after login.
     /// - Parameters:
@@ -494,13 +494,13 @@ public actor ATProtoClient {
     public func updateAndPersistServiceDIDs(bskyAppViewDID: String, bskyChatDID: String) async throws {
         // Update NetworkService mappings
         await updateServiceDIDs(bskyAppViewDID: bskyAppViewDID, bskyChatDID: bskyChatDID)
-        
+
         // Persist to account storage
         try await accountManager.updateServiceDIDs(bskyAppViewDID: bskyAppViewDID, bskyChatDID: bskyChatDID)
-        
+
         LogManager.logInfo("ATProtoClient - Service DIDs updated and persisted for current account")
     }
-    
+
     /// Gets the current account information including service DIDs.
     /// - Returns: The current account if available, or nil if not authenticated.
     public func getCurrentAccount() async -> Account? {
