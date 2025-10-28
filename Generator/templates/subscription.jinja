@@ -1,0 +1,22 @@
+{% if description %}
+/// {{ description }}
+{% endif %}
+extension ATProtoClient.{{ template_namespace_name }} {
+    {% if has_parameters %}
+    public func {{ subscription_name }}(
+        {{ input_parameters }}
+    ) async throws -> AsyncThrowingStream<{{ message_type }}, Error> {
+        let params = {{ input_struct_name }}({{ input_values }})
+        return try await self.networkService.subscribe(
+            endpoint: "{{ endpoint }}",
+            parameters: params
+        )
+    }
+    {% else %}
+    public func {{ subscription_name }}() async throws -> AsyncThrowingStream<{{ message_type }}, Error> {
+        return try await self.networkService.subscribe(
+            endpoint: "{{ endpoint }}"
+        )
+    }
+    {% endif %}
+}

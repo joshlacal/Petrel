@@ -21,6 +21,7 @@ public struct {{ struct_name }}{{ conformance }} {
     {{- query_parameters }}
     {{- input_struct }}
     {{- output_struct }}
+    {{- message_union }}
     {{- errors_enum }}
 
 
@@ -29,4 +30,5 @@ public struct {{ struct_name }}{{ conformance }} {
 
 {{ procedure }}
 {{ query }}                           
+{{ subscription }}
 

@@ -44,6 +44,12 @@ class TypeConverter:
             swift_type = "Double" 
         elif prop_type == 'boolean':
             swift_type = "Bool" 
+        elif prop_type == 'cid-link':
+            swift_type = "CID"
+        elif prop_type == 'bytes':
+            swift_type = "Bytes"
+        elif prop_type == 'blob':
+            swift_type = "Blob"
         elif prop_type == 'object':
             swift_type = "[String: ATProtocolValueContainer]" 
         elif prop_type == 'unknown':

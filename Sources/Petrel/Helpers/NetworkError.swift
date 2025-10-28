@@ -23,8 +23,8 @@ public enum NetworkError: Error {
     case invalidContentType(expected: String, actual: String)
     case authenticationFailed
     case badRequest(description: String)
-    case serverError
-    case invalidResponse
+    case serverError(code: Int, message: String)
+    case invalidResponse(description: String)
     case unauthorized
     case securityViolation
 }
@@ -62,10 +62,10 @@ extension NetworkError: LocalizedError {
             return "Received bad request. \(description)."
         case .invalidRequest:
             return "The request was invalid."
-        case .serverError:
-            return "The server encountered an error."
-        case .invalidResponse:
-            return "Received an invalid response from the server."
+        case let .serverError(code, message):
+            return "Server error (\(code)): \(message)"
+        case let .invalidResponse(description):
+            return "Invalid response: \(description)"
         case .unauthorized:
             return "Unauthorized access."
         case .securityViolation:
@@ -95,6 +95,10 @@ extension NetworkError: LocalizedError {
             return "Application configuration is incomplete."
         case .securityViolation:
             return "Your network configuration may be blocking the connection to the AT Protocol server."
+        case .serverError:
+            return "The server encountered an error."
+        case .invalidResponse:
+            return "The server sent a response in an unexpected format."
         default:
             return nil
         }

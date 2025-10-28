@@ -1,0 +1,37 @@
+public enum Message: Codable, Sendable {
+{% for variant in variants %}
+    case {{ variant.case_name }}({{ variant.type }})
+{% endfor %}
+
+    enum CodingKeys: String, CodingKey {
+        case type = "$type"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let type = try container.decode(String.self, forKey: .type)
+        
+        switch type {
+{% for variant in variants %}
+        case "{{ variant.type_id }}":
+            let value = try {{ variant.type }}(from: decoder)
+            self = .{{ variant.case_name }}(value)
+{% endfor %}
+        default:
+            throw DecodingError.dataCorruptedError(
+                forKey: .type,
+                in: container,
+                debugDescription: "Unknown message type: \(type)"
+            )
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        switch self {
+{% for variant in variants %}
+        case .{{ variant.case_name }}(let value):
+            try value.encode(to: encoder)
+{% endfor %}
+        }
+    }
+}

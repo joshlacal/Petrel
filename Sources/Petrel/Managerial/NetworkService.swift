@@ -6,12 +6,23 @@
 //
 
 import Foundation
+import SwiftCBOR
 #if canImport(FoundationNetworking)
     import FoundationNetworking
 #endif
 #if canImport(Network)
     import Network
 #endif
+
+/// Allows client apps to control connection routing (e.g., bypassing proxy for WebSockets)
+public protocol ConnectionPolicyAdapter: Sendable {
+    /// Resolves the actual URL to connect to
+    /// - Parameters:
+    ///   - url: The original target URL
+    ///   - endpoint: The API endpoint being called (e.g., "com.atproto.sync.subscribeRepos")
+    /// - Returns: The URL to actually connect to (may be same, or modified to bypass proxy)
+    func resolveConnectionURL(_ url: URL, endpoint: String?) async -> URL
+}
 
 /// Protocol for authentication providers
 struct AuthContext: Sendable {
@@ -145,6 +156,10 @@ protocol NetworkServiceProtocol: Sendable {
     /// - Parameter provider: The authentication provider
     func setAuthenticationProvider(_ provider: any AuthenticationProvider) async
 
+    /// Sets the connection policy adapter for controlling connection routing
+    /// - Parameter adapter: The connection policy adapter
+    func setConnectionPolicyAdapter(_ adapter: (any ConnectionPolicyAdapter)?) async
+
     /// Creates a URLRequest with the specified parameters (compatibility method)
     /// - Parameters:
     ///   - endpoint: The API endpoint path.
@@ -174,6 +189,16 @@ protocol NetworkServiceProtocol: Sendable {
     /// - Parameter request: The URLRequest to perform.
     /// - Returns: A tuple containing the response data and HTTPURLResponse.
     func performRequest(_ request: URLRequest) async throws -> (Data, HTTPURLResponse)
+    
+    /// Subscribe to a WebSocket event stream
+    /// - Parameters:
+    ///   - endpoint: The subscription endpoint
+    ///   - parameters: Optional query parameters
+    /// - Returns: An async throwing stream of decoded messages
+    func subscribe<Message: Codable & Sendable>(
+        endpoint: String,
+        parameters: (any Parametrizable)?
+    ) async throws -> AsyncThrowingStream<Message, Error>
 }
 
 /// Class responsible for handling network operations.
@@ -196,6 +221,9 @@ actor NetworkService: NetworkServiceProtocol {
     /// Example: "app.bsky" -> "did:web:api.bsky.app#bsky_appview"
     ///          "chat.bsky" -> "did:web:api.bsky.chat#bsky_chat"
     private var serviceDIDMapping: [String: String] = [:]
+
+    /// Optional adapter for controlling connection routing (e.g., bypassing proxy for WebSockets)
+    private var connectionPolicyAdapter: (any ConnectionPolicyAdapter)?
 
     /// Endpoints that go directly to PDS and should never be proxied
     private let neverProxyEndpoints: Set<String> = [
@@ -383,6 +411,13 @@ actor NetworkService: NetworkServiceProtocol {
         authProvider = provider
     }
 
+    /// Sets the connection policy adapter for controlling connection routing
+    /// - Parameter adapter: The connection policy adapter
+    func setConnectionPolicyAdapter(_ adapter: (any ConnectionPolicyAdapter)?) {
+        connectionPolicyAdapter = adapter
+        LogManager.logInfo("Network Service - Connection policy adapter \(adapter == nil ? "removed" : "set")")
+    }
+
     enum EndpointType {
         case authorizationServer
         case protectedResource
@@ -564,6 +599,13 @@ actor NetworkService: NetworkServiceProtocol {
             // Add additional headers for this specific request
             if let additionalHeaders = additionalHeaders {
                 for (name, value) in additionalHeaders {
+                    // If we're not targeting the PDS host, do not attach atproto-proxy
+                    if name.lowercased() == "atproto-proxy",
+                       let h = requestToSend.url?.host,
+                       h != self.baseURL.host {
+                        // Skip proxy header for direct-to-service requests
+                        continue
+                    }
                     requestToSend.setValue(value, forHTTPHeaderField: name)
                     if name == "atproto-proxy" {
                         LogManager.logInfo("Network Service - Setting atproto-proxy header: \(value) for endpoint: \(requestToSend.url?.path ?? "unknown")")
@@ -596,7 +638,7 @@ actor NetworkService: NetworkServiceProtocol {
                     LogManager.logError(
                         "Network Service - Received non-HTTP response for \(requestToSend.url?.absoluteString ?? "Unknown URL")"
                     )
-                    throw NetworkError.invalidResponse
+                    throw NetworkError.invalidResponse(description: "Received non-HTTP response")
                 }
 
                 // Log the response
@@ -952,20 +994,27 @@ actor NetworkService: NetworkServiceProtocol {
     ) async throws -> URLRequest {
         // Construct the URL
         let url: URL
+        var components: URLComponents?
         if endpoint.lowercased().starts(with: "http") {
             // Absolute URL
             guard let absoluteURL = URL(string: endpoint) else {
                 throw NetworkError.invalidURL
             }
             url = absoluteURL
+            components = URLComponents(url: url, resolvingAgainstBaseURL: true)
         } else {
             // Relative endpoint to base URL
             let xrpcPath = endpoint.starts(with: "/") ? "xrpc\(endpoint)" : "xrpc/\(endpoint)"
             url = baseURL.appendingPathComponent(xrpcPath)
+            components = URLComponents(url: url, resolvingAgainstBaseURL: true)
+
+            // NOTE: Service DIDs (e.g., app.bsky -> did:web:api.bsky.app#bsky_appview) are 
+            // used for the atproto-proxy header, NOT for changing the request host.
+            // Requests should always go to the user's PDS with the service DID in the header.
+            // The PDS will proxy the request to the appropriate service.
         }
 
         // Add query items if provided
-        var components = URLComponents(url: url, resolvingAgainstBaseURL: true)
         if let queryItems = queryItems, !queryItems.isEmpty {
             components?.queryItems = queryItems
         }
@@ -974,14 +1023,25 @@ actor NetworkService: NetworkServiceProtocol {
             throw NetworkError.invalidURL
         }
 
+        // Apply connection policy adapter if set (e.g., for bypassing proxy for WebSockets)
+        let resolvedURL: URL
+        if let adapter = connectionPolicyAdapter {
+            resolvedURL = await adapter.resolveConnectionURL(finalURL, endpoint: endpoint)
+            if resolvedURL != finalURL {
+                LogManager.logInfo("Network Service - Connection policy adapter resolved URL: \(finalURL) -> \(resolvedURL)")
+            }
+        } else {
+            resolvedURL = finalURL
+        }
+
         // Validate URL for security
-        if !validateURL(finalURL) {
-            LogManager.logError("Security validation failed for URL: \(finalURL). This may be due to DNS resolution to private IP ranges or network configuration issues.")
+        if !validateURL(resolvedURL) {
+            LogManager.logError("Security validation failed for URL: \(resolvedURL). This may be due to DNS resolution to private IP ranges or network configuration issues.")
             throw NetworkError.securityViolation
         }
 
         // Create the request
-        var request = URLRequest(url: finalURL)
+        var request = URLRequest(url: resolvedURL)
         request.httpMethod = method
 
         // Add custom headers
@@ -989,7 +1049,7 @@ actor NetworkService: NetworkServiceProtocol {
             request.setValue(value, forHTTPHeaderField: key)
         }
 
-        // Add request-specific headers
+        // Add request-specific headers (will be filtered later based on host)
         for (key, value) in headers {
             request.setValue(value, forHTTPHeaderField: key)
         }
@@ -1021,7 +1081,7 @@ actor NetworkService: NetworkServiceProtocol {
     ) {
         let (data, response) = try await self.request(request, skipTokenRefresh: skipTokenRefresh, additionalHeaders: additionalHeaders)
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw NetworkError.invalidResponse
+            throw NetworkError.invalidResponse(description: "Response is not an HTTP response")
         }
         return (data, httpResponse)
     }
@@ -1046,6 +1106,269 @@ actor NetworkService: NetworkServiceProtocol {
         try await performRequest(request, skipTokenRefresh: false)
     }
 
+    // MARK: - WebSocket Subscription Support
+    
+    /// Subscribe to a WebSocket event stream
+    /// - Parameters:
+    ///   - endpoint: The subscription endpoint
+    ///   - parameters: Optional query parameters
+    /// - Returns: An async throwing stream of decoded messages
+    func subscribe<Message: Codable & Sendable>(
+        endpoint: String,
+        parameters: (any Parametrizable)?
+    ) async throws -> AsyncThrowingStream<Message, Error> {
+
+        // Build WebSocket URL
+        var urlComponents = URLComponents()
+        urlComponents.scheme = "wss"
+
+        // Resolve service DID with strongest signal first (full endpoint),
+        // then fall back to the three-part namespace (e.g., blue.catbird.mls)
+        let fullEndpoint = endpoint
+        let threePartNamespace = endpoint.split(separator: ".").prefix(3).joined(separator: ".")
+
+        var resolvedDID = await getServiceDID(for: fullEndpoint)
+        if resolvedDID == nil {
+            resolvedDID = await getServiceDID(for: String(threePartNamespace))
+        }
+
+        if let did = resolvedDID, let serviceHost = extractHostFromDID(did) {
+            // Prefer connecting directly to the service host for WS
+            urlComponents.host = serviceHost
+        } else {
+            // Fallback to the PDS host (baseURL)
+            urlComponents.host = self.baseURL.host
+        }
+
+        urlComponents.path = "/xrpc/\(endpoint)"
+
+        // Add query parameters if provided
+        if let params = parameters {
+            urlComponents.queryItems = params.asQueryItems()
+        }
+
+        guard let url = urlComponents.url else {
+            throw NetworkError.invalidURL
+        }
+
+        // Apply connection policy adapter if set (e.g., for direct WebSocket connections bypassing proxy)
+        let resolvedURL: URL
+        if let adapter = connectionPolicyAdapter {
+            resolvedURL = await adapter.resolveConnectionURL(url, endpoint: endpoint)
+            if resolvedURL != url {
+                LogManager.logInfo("Network Service - Connection policy adapter resolved WebSocket URL: \(url) -> \(resolvedURL)")
+            }
+        } else {
+            resolvedURL = url
+        }
+
+        // Create URLRequest to add auth headers and optional proxy header
+        var request = URLRequest(url: resolvedURL)
+
+        // If we are connecting via the PDS host, attach atproto-proxy so the PDS can forward
+        if resolvedURL.host == self.baseURL.host, let did = resolvedDID {
+            request.setValue(did, forHTTPHeaderField: "atproto-proxy")
+            LogManager.logInfo("Network Service - Setting atproto-proxy header: \(did) for endpoint: \(resolvedURL.path)")
+        }
+
+        // Add authentication for WebSocket
+        if let authProvider = self.authProvider {
+            do {
+                request = try await authProvider.prepareAuthenticatedRequest(request)
+            } catch {
+                LogManager.logWarning("Failed to add auth to WebSocket: \(error)")
+            }
+        }
+
+        // Create WebSocket task with authenticated request
+        let webSocketTask = session.webSocketTask(with: request)
+        webSocketTask.resume()
+
+        LogManager.logInfo("WebSocket connection opened to \(resolvedURL.absoluteString)")
+
+        // Create async stream
+        return AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    while !Task.isCancelled {
+                        let message = try await webSocketTask.receive()
+
+                        switch message {
+                        case .data(let data):
+                            do {
+                                let decodedMessage = try self.decodeSubscriptionFrame(data, as: Message.self)
+                                continuation.yield(decodedMessage)
+                            } catch {
+                                LogManager.logError("Failed to decode WebSocket frame: \(error)")
+                                continuation.finish(throwing: error)
+                                return
+                            }
+
+                        case .string(_):
+                            LogManager.logWarning("Received unexpected text frame on subscription")
+
+                        @unknown default:
+                            break
+                        }
+                    }
+                } catch {
+                    if let urlError = error as? URLError, urlError.code == .cancelled {
+                        LogManager.logInfo("WebSocket connection closed")
+                        continuation.finish()
+                    } else {
+                        LogManager.logError("WebSocket error: \(error)")
+                        continuation.finish(throwing: error)
+                    }
+                }
+            }
+
+            continuation.onTermination = { @Sendable _ in
+                webSocketTask.cancel(with: .goingAway, reason: nil)
+                LogManager.logDebug("WebSocket task cancelled")
+            }
+        }
+    }
+    
+    /// Decode a subscription WebSocket frame containing two DAG-CBOR objects
+    private func decodeSubscriptionFrame<Message: Codable & Sendable>(
+        _ data: Data,
+        as messageType: Message.Type
+    ) throws -> Message {
+        
+        // Parse the frame: it contains two concatenated CBOR objects (header + payload)
+        var offset = 0
+        
+        // 1. Decode header
+        guard offset < data.count else {
+            throw NetworkError.invalidResponse(description: "Empty WebSocket frame")
+        }
+        
+        let headerCBOR = try CBOR.decode([UInt8](data[offset...]))
+        guard case .map(let headerMap) = headerCBOR else {
+            throw NetworkError.invalidResponse(description: "Invalid header format")
+        }
+        
+        // Extract header fields
+        let opKey = CBOR.utf8String("op")
+        let tKey = CBOR.utf8String("t")
+        
+        guard let opValue = headerMap[opKey],
+              case .unsignedInt(let op) = opValue else {
+            throw NetworkError.invalidResponse(description: "Missing or invalid 'op' in header")
+        }
+        
+        // Check for error frame (op = -1)
+        if op == UInt64(bitPattern: -1) {
+            let headerData = try headerCBOR.encode()
+            offset += headerData.count
+            
+            let payloadData = data[offset...]
+            let errorPayload = try CBOR.decode([UInt8](payloadData))
+            
+            if case .map(let errorMap) = errorPayload,
+               let errorNameCBOR = errorMap[CBOR.utf8String("error")],
+               case .utf8String(let errorName) = errorNameCBOR {
+                throw NetworkError.serverError(code: 400, message: errorName)
+            }
+            throw NetworkError.invalidResponse(description: "Unknown error frame")
+        }
+        
+        guard op == 1 else {
+            throw NetworkError.invalidResponse(description: "Unknown operation code: \(op)")
+        }
+        
+        // Get message type from header
+        guard let tValue = headerMap[tKey],
+              case .utf8String(let messageTypeName) = tValue else {
+            throw NetworkError.invalidResponse(description: "Missing message type in header")
+        }
+        
+        // 2. Decode payload (second CBOR object)
+        let headerData = try headerCBOR.encode()
+        offset += headerData.count
+        
+        guard offset < data.count else {
+            throw NetworkError.invalidResponse(description: "Missing payload in WebSocket frame")
+        }
+        
+        let payloadData = data[offset...]
+        guard let payloadCBOR = try? CBOR.decode([UInt8](payloadData)) else {
+            throw NetworkError.invalidResponse(description: "Failed to decode CBOR payload")
+        }
+        
+        // Convert CBOR to JSON for Codable compatibility
+        let jsonValue = try cborToJSONValue(payloadCBOR)
+        guard var jsonObject = jsonValue as? [String: Any] else {
+            throw NetworkError.invalidResponse(description: "Payload is not a JSON object")
+        }
+        
+        // Add $type field for Message enum decoding
+        jsonObject["$type"] = messageTypeName
+        
+        let finalJSONData = try JSONSerialization.data(withJSONObject: jsonObject)
+        
+        // Decode using standard JSONDecoder
+        return try jsonDecoder.decode(Message.self, from: finalJSONData)
+    }
+    
+    /// Recursively convert CBOR values to JSON-compatible values
+    private func cborToJSONValue(_ cbor: CBOR) throws -> Any {
+        switch cbor {
+        case .unsignedInt(let value):
+            return Int(value)
+        case .negativeInt(let value):
+            return -1 - Int(value)
+        case .byteString(let bytes):
+            return ["$bytes": Data(bytes).base64EncodedString()]
+        case .utf8String(let string):
+            return string
+        case .array(let items):
+            return try items.map { try cborToJSONValue($0) }
+        case .map(let map):
+            var result: [String: Any] = [:]
+            for (key, value) in map {
+                guard case .utf8String(let keyString) = key else {
+                    throw NetworkError.invalidResponse(description: "Non-string map key in CBOR")
+                }
+                result[keyString] = try cborToJSONValue(value)
+            }
+            return result
+        case .tagged(let tag, let value):
+            if tag.rawValue == 42 {
+                // CID link (Tag 42)
+                guard case .byteString(let bytes) = value else {
+                    throw NetworkError.invalidResponse(description: "Invalid CID encoding")
+                }
+                let cid = try CID(bytes: Data(bytes))
+                return ["$link": cid.string]
+            }
+            // Other tags - decode the inner value
+            return try cborToJSONValue(value)
+        case .simple(let value):
+            // Simple values in CBOR are raw UInt8 values
+            // 20-21: false/true, 22: null, 23: undefined
+            switch value {
+            case 20: return false
+            case 21: return true
+            case 22: return NSNull()
+            default:
+                throw NetworkError.invalidResponse(description: "Unsupported CBOR simple value: \(value)")
+            }
+        case .boolean(let bool):
+            return bool
+        case .null:
+            return NSNull()
+        case .undefined:
+            return NSNull()
+        case .half(_), .float(_), .double(_):
+            throw NetworkError.invalidResponse(description: "Floating point not allowed in DAG-CBOR")
+        case .break:
+            throw NetworkError.invalidResponse(description: "Unexpected CBOR break")
+        case .date(_):
+            throw NetworkError.invalidResponse(description: "CBOR date type not supported")
+        }
+    }
+    
     // MARK: - Helper Methods
 
     /// Helper to parse a labeler header value according to RFC-8941
@@ -1063,6 +1386,20 @@ actor NetworkService: NetworkServiceProtocol {
 
             return (did: String(did), redact: redact)
         }
+    }
+
+    /// Extract hostname from a DID (e.g., "did:web:mls.catbird.blue#atproto_mls" -> "mls.catbird.blue")
+    /// - Parameter did: The DID string
+    /// - Returns: The hostname if extractable, nil otherwise
+    private func extractHostFromDID(_ did: String) -> String? {
+        // Handle did:web format: did:web:hostname or did:web:hostname#fragment
+        if did.hasPrefix("did:web:") {
+            let withoutPrefix = did.dropFirst("did:web:".count)
+            let withoutFragment = withoutPrefix.split(separator: "#").first ?? withoutPrefix[...]
+            let host = String(withoutFragment)
+            return host.isEmpty ? nil : host
+        }
+        return nil
     }
 
     /// Validates the URL for security.

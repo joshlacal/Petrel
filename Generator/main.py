@@ -26,7 +26,7 @@ async def generate_swift_from_lexicons_recursive(folder_path: str, output_folder
                     lexicon = orjson.loads(content)
                     lexicon_id = lexicon.get('id', '')
 
-                    if 'subscribe' in lexicon_id or 'ozone' in lexicon_id:
+                    if 'ozone' in lexicon_id:
                         continue
 
                     lexicons.append((filepath, lexicon))
