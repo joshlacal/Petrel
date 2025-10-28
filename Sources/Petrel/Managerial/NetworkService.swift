@@ -189,7 +189,7 @@ protocol NetworkServiceProtocol: Sendable {
     /// - Parameter request: The URLRequest to perform.
     /// - Returns: A tuple containing the response data and HTTPURLResponse.
     func performRequest(_ request: URLRequest) async throws -> (Data, HTTPURLResponse)
-    
+
     /// Subscribe to a WebSocket event stream
     /// - Parameters:
     ///   - endpoint: The subscription endpoint
@@ -602,7 +602,8 @@ actor NetworkService: NetworkServiceProtocol {
                     // If we're not targeting the PDS host, do not attach atproto-proxy
                     if name.lowercased() == "atproto-proxy",
                        let h = requestToSend.url?.host,
-                       h != self.baseURL.host {
+                       h != baseURL.host
+                    {
                         // Skip proxy header for direct-to-service requests
                         continue
                     }
@@ -1008,7 +1009,7 @@ actor NetworkService: NetworkServiceProtocol {
             url = baseURL.appendingPathComponent(xrpcPath)
             components = URLComponents(url: url, resolvingAgainstBaseURL: true)
 
-            // NOTE: Service DIDs (e.g., app.bsky -> did:web:api.bsky.app#bsky_appview) are 
+            // NOTE: Service DIDs (e.g., app.bsky -> did:web:api.bsky.app#bsky_appview) are
             // used for the atproto-proxy header, NOT for changing the request host.
             // Requests should always go to the user's PDS with the service DID in the header.
             // The PDS will proxy the request to the appropriate service.
@@ -1107,7 +1108,7 @@ actor NetworkService: NetworkServiceProtocol {
     }
 
     // MARK: - WebSocket Subscription Support
-    
+
     /// Subscribe to a WebSocket event stream
     /// - Parameters:
     ///   - endpoint: The subscription endpoint
@@ -1117,7 +1118,6 @@ actor NetworkService: NetworkServiceProtocol {
         endpoint: String,
         parameters: (any Parametrizable)?
     ) async throws -> AsyncThrowingStream<Message, Error> {
-
         // Build WebSocket URL
         var urlComponents = URLComponents()
         urlComponents.scheme = "wss"
@@ -1137,7 +1137,7 @@ actor NetworkService: NetworkServiceProtocol {
             urlComponents.host = serviceHost
         } else {
             // Fallback to the PDS host (baseURL)
-            urlComponents.host = self.baseURL.host
+            urlComponents.host = baseURL.host
         }
 
         urlComponents.path = "/xrpc/\(endpoint)"
@@ -1166,13 +1166,13 @@ actor NetworkService: NetworkServiceProtocol {
         var request = URLRequest(url: resolvedURL)
 
         // If we are connecting via the PDS host, attach atproto-proxy so the PDS can forward
-        if resolvedURL.host == self.baseURL.host, let did = resolvedDID {
+        if resolvedURL.host == baseURL.host, let did = resolvedDID {
             request.setValue(did, forHTTPHeaderField: "atproto-proxy")
             LogManager.logInfo("Network Service - Setting atproto-proxy header: \(did) for endpoint: \(resolvedURL.path)")
         }
 
         // Add authentication for WebSocket
-        if let authProvider = self.authProvider {
+        if let authProvider = authProvider {
             do {
                 request = try await authProvider.prepareAuthenticatedRequest(request)
             } catch {
@@ -1194,7 +1194,7 @@ actor NetworkService: NetworkServiceProtocol {
                         let message = try await webSocketTask.receive()
 
                         switch message {
-                        case .data(let data):
+                        case let .data(data):
                             do {
                                 let decodedMessage = try self.decodeSubscriptionFrame(data, as: Message.self)
                                 continuation.yield(decodedMessage)
@@ -1204,7 +1204,7 @@ actor NetworkService: NetworkServiceProtocol {
                                 return
                             }
 
-                        case .string(_):
+                        case .string:
                             LogManager.logWarning("Received unexpected text frame on subscription")
 
                         @unknown default:
@@ -1228,115 +1228,117 @@ actor NetworkService: NetworkServiceProtocol {
             }
         }
     }
-    
+
     /// Decode a subscription WebSocket frame containing two DAG-CBOR objects
     private func decodeSubscriptionFrame<Message: Codable & Sendable>(
         _ data: Data,
         as messageType: Message.Type
     ) throws -> Message {
-        
         // Parse the frame: it contains two concatenated CBOR objects (header + payload)
         var offset = 0
-        
+
         // 1. Decode header
         guard offset < data.count else {
             throw NetworkError.invalidResponse(description: "Empty WebSocket frame")
         }
-        
+
         let headerCBOR = try CBOR.decode([UInt8](data[offset...]))
-        guard case .map(let headerMap) = headerCBOR else {
+        guard case let .map(headerMap) = headerCBOR else {
             throw NetworkError.invalidResponse(description: "Invalid header format")
         }
-        
+
         // Extract header fields
         let opKey = CBOR.utf8String("op")
         let tKey = CBOR.utf8String("t")
-        
+
         guard let opValue = headerMap[opKey],
-              case .unsignedInt(let op) = opValue else {
+              case let .unsignedInt(op) = opValue
+        else {
             throw NetworkError.invalidResponse(description: "Missing or invalid 'op' in header")
         }
-        
+
         // Check for error frame (op = -1)
         if op == UInt64(bitPattern: -1) {
             let headerData = try headerCBOR.encode()
             offset += headerData.count
-            
+
             let payloadData = data[offset...]
             let errorPayload = try CBOR.decode([UInt8](payloadData))
-            
-            if case .map(let errorMap) = errorPayload,
+
+            if case let .map(errorMap) = errorPayload,
                let errorNameCBOR = errorMap[CBOR.utf8String("error")],
-               case .utf8String(let errorName) = errorNameCBOR {
+               case let .utf8String(errorName) = errorNameCBOR
+            {
                 throw NetworkError.serverError(code: 400, message: errorName)
             }
             throw NetworkError.invalidResponse(description: "Unknown error frame")
         }
-        
+
         guard op == 1 else {
             throw NetworkError.invalidResponse(description: "Unknown operation code: \(op)")
         }
-        
+
         // Get message type from header
         guard let tValue = headerMap[tKey],
-              case .utf8String(let messageTypeName) = tValue else {
+              case let .utf8String(messageTypeName) = tValue
+        else {
             throw NetworkError.invalidResponse(description: "Missing message type in header")
         }
-        
+
         // 2. Decode payload (second CBOR object)
         let headerData = try headerCBOR.encode()
         offset += headerData.count
-        
+
         guard offset < data.count else {
             throw NetworkError.invalidResponse(description: "Missing payload in WebSocket frame")
         }
-        
+
         let payloadData = data[offset...]
         guard let payloadCBOR = try? CBOR.decode([UInt8](payloadData)) else {
             throw NetworkError.invalidResponse(description: "Failed to decode CBOR payload")
         }
-        
+
         // Convert CBOR to JSON for Codable compatibility
         let jsonValue = try cborToJSONValue(payloadCBOR)
         guard var jsonObject = jsonValue as? [String: Any] else {
             throw NetworkError.invalidResponse(description: "Payload is not a JSON object")
         }
-        
+
         // Add $type field for Message enum decoding
         jsonObject["$type"] = messageTypeName
-        
+
         let finalJSONData = try JSONSerialization.data(withJSONObject: jsonObject)
-        
+
         // Decode using standard JSONDecoder
         return try jsonDecoder.decode(Message.self, from: finalJSONData)
     }
-    
+
     /// Recursively convert CBOR values to JSON-compatible values
     private func cborToJSONValue(_ cbor: CBOR) throws -> Any {
         switch cbor {
-        case .unsignedInt(let value):
+        case let .unsignedInt(value):
             return Int(value)
-        case .negativeInt(let value):
+        case let .negativeInt(value):
             return -1 - Int(value)
-        case .byteString(let bytes):
+        case let .byteString(bytes):
             return ["$bytes": Data(bytes).base64EncodedString()]
-        case .utf8String(let string):
+        case let .utf8String(string):
             return string
-        case .array(let items):
+        case let .array(items):
             return try items.map { try cborToJSONValue($0) }
-        case .map(let map):
+        case let .map(map):
             var result: [String: Any] = [:]
             for (key, value) in map {
-                guard case .utf8String(let keyString) = key else {
+                guard case let .utf8String(keyString) = key else {
                     throw NetworkError.invalidResponse(description: "Non-string map key in CBOR")
                 }
                 result[keyString] = try cborToJSONValue(value)
             }
             return result
-        case .tagged(let tag, let value):
+        case let .tagged(tag, value):
             if tag.rawValue == 42 {
                 // CID link (Tag 42)
-                guard case .byteString(let bytes) = value else {
+                guard case let .byteString(bytes) = value else {
                     throw NetworkError.invalidResponse(description: "Invalid CID encoding")
                 }
                 let cid = try CID(bytes: Data(bytes))
@@ -1344,7 +1346,7 @@ actor NetworkService: NetworkServiceProtocol {
             }
             // Other tags - decode the inner value
             return try cborToJSONValue(value)
-        case .simple(let value):
+        case let .simple(value):
             // Simple values in CBOR are raw UInt8 values
             // 20-21: false/true, 22: null, 23: undefined
             switch value {
@@ -1354,21 +1356,21 @@ actor NetworkService: NetworkServiceProtocol {
             default:
                 throw NetworkError.invalidResponse(description: "Unsupported CBOR simple value: \(value)")
             }
-        case .boolean(let bool):
+        case let .boolean(bool):
             return bool
         case .null:
             return NSNull()
         case .undefined:
             return NSNull()
-        case .half(_), .float(_), .double(_):
+        case .half(_), .float(_), .double:
             throw NetworkError.invalidResponse(description: "Floating point not allowed in DAG-CBOR")
         case .break:
             throw NetworkError.invalidResponse(description: "Unexpected CBOR break")
-        case .date(_):
+        case .date:
             throw NetworkError.invalidResponse(description: "CBOR date type not supported")
         }
     }
-    
+
     // MARK: - Helper Methods
 
     /// Helper to parse a labeler header value according to RFC-8941

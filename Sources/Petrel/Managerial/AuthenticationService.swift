@@ -673,42 +673,42 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
         bskyChatDID: String? = nil
     ) async throws -> (did: String, handle: String?, pdsURL: URL) {
         LogManager.logInfo("Starting legacy password authentication for identifier: \(identifier)", category: .authentication)
-        
+
         // Resolve handle to DID and PDS URL
         await emitProgress(.resolvingHandle(identifier))
-        
+
         let did = try await didResolver.resolveHandleToDID(handle: identifier)
         let pdsURL = try await didResolver.resolveDIDToPDSURL(did: did)
-        
+
         LogManager.logInfo("Resolved identifier to DID: \(LogManager.logDID(did)), PDS: \(pdsURL.absoluteString)", category: .authentication)
-        
+
         // Create session using com.atproto.server.createSession
         await emitProgress(.creatingSession)
-        
+
         let sessionInput = ComAtprotoServerCreateSession.Input(
             identifier: identifier,
             password: password
         )
-        
+
         // Temporarily update network service to point to the user's PDS
         let originalBaseURL = await networkService.baseURL
         await networkService.setBaseURL(pdsURL)
-        
+
         // Create a temporary client to call createSession
         let tempClient = ATProtoClient.Com.Atproto.Server(networkService: networkService)
-        
+
         let (responseCode, sessionOutput) = try await tempClient.createSession(input: sessionInput)
-        
+
         // Restore original base URL
         await networkService.setBaseURL(originalBaseURL)
-        
+
         guard responseCode == 200, let output = sessionOutput else {
             LogManager.logError("Failed to create session: HTTP \(responseCode)", category: .authentication)
             throw AuthError.invalidCredentials
         }
-        
+
         LogManager.logInfo("Successfully created legacy session for DID: \(LogManager.logDID(output.did.description))", category: .authentication)
-        
+
         // Create session object with legacy tokens (JWT-based, not DPoP)
         let newSession = Session(
             accessToken: output.accessJwt,
@@ -718,11 +718,11 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
             tokenType: .bearer, // Legacy auth uses Bearer tokens, not DPoP
             did: output.did.description
         )
-        
+
         // Create or update account
         var account = await accountManager.getAccount(did: output.did.description)
         let isNewAccount = account == nil
-        
+
         if isNewAccount {
             account = Account(
                 did: output.did.description,
@@ -743,24 +743,24 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
                 account?.bskyChatDID = chatDID
             }
         }
-        
+
         guard let finalAccount = account else {
             LogManager.logError("Failed to create account for legacy auth")
             throw AuthError.invalidResponse
         }
-        
+
         // Save session and account
         try await storage.saveAccountAndSession(finalAccount, session: newSession, for: output.did.description)
-        
+
         // Update account manager
         try await accountManager.updateAccountFromStorage(did: output.did.description)
         try await accountManager.setCurrentAccount(did: output.did.description)
-        
+
         // Update network service
         await networkService.setBaseURL(finalAccount.pdsURL)
-        
+
         LogManager.logInfo("Legacy authentication completed successfully for DID: \(LogManager.logDID(output.did.description))", category: .authentication)
-        
+
         return (did: output.did.description, handle: finalAccount.handle, pdsURL: finalAccount.pdsURL)
     }
 
@@ -2004,14 +2004,14 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
                 )
             // Decode the refresh result from the data
             let decoder = JSONDecoder()
-            
+
             // Check if this is a legacy session by token type
             let isLegacy = session.tokenType == .bearer
-            
+
             if isLegacy {
                 // Decode legacy refresh response
                 let legacyResponse = try decoder.decode(ComAtprotoServerRefreshSession.Output.self, from: refreshData)
-                
+
                 // Create new session from legacy response
                 let adjustedExpiresIn = applyClockSkewProtection(to: 3600) // Legacy tokens typically 1 hour
                 let newSession = Session(
@@ -2022,24 +2022,24 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
                     tokenType: .bearer,
                     did: account.did
                 )
-                
+
                 // Save session with enhanced validation
                 guard try await saveAndVerifySession(newSession, for: account.did) else {
                     LogManager.logError("Token storage and verification failed for DID: \(account.did)")
                     throw AuthError.tokenRefreshFailed
                 }
-                
+
                 // Clear the in-progress flag only after successful save and verification
                 try await markRefreshInProgress(for: account.did, inProgress: false)
-                
+
                 // Record success with circuit breaker
                 await refreshCircuitBreaker.recordSuccess(for: account.did)
-                
+
                 // Record successful refresh time AND attempt time
                 let now = Date()
                 lastSuccessfulRefresh[account.did] = now
                 lastRefreshAttempt[account.did] = now
-                
+
                 // Log successful token lifecycle event
                 LogManager.logInfo(
                     "✅ TOKEN_LIFECYCLE: Legacy refresh completed successfully for DID \(LogManager.logDID(account.did)) "
@@ -2051,7 +2051,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
             } else {
                 // Decode OAuth token response
                 let tokenResponse = try decoder.decode(TokenResponse.self, from: refreshData)
-                
+
                 // Save the new session details from the successful refresh with clock skew protection
                 let adjustedExpiresIn = applyClockSkewProtection(to: tokenResponse.expiresIn)
                 let newSession = Session(
@@ -2062,24 +2062,24 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
                     tokenType: session.tokenType, // Assume token type doesn't change on refresh
                     did: account.did
                 )
-                
+
                 // Save session with enhanced validation
                 guard try await saveAndVerifySession(newSession, for: account.did) else {
                     LogManager.logError("Token storage and verification failed for DID: \(account.did)")
                     throw AuthError.tokenRefreshFailed
                 }
-                
+
                 // Clear the in-progress flag only after successful save and verification
                 try await markRefreshInProgress(for: account.did, inProgress: false)
-                
+
                 // Record success with circuit breaker
                 await refreshCircuitBreaker.recordSuccess(for: account.did)
-                
+
                 // Record successful refresh time AND attempt time
                 let now = Date()
                 lastSuccessfulRefresh[account.did] = now
                 lastRefreshAttempt[account.did] = now
-                
+
                 // Log successful token lifecycle event
                 LogManager.logInfo(
                     "✅ TOKEN_LIFECYCLE: Refresh completed successfully for DID \(LogManager.logDID(account.did)) "
@@ -2335,7 +2335,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
         guard let session = try? await storage.getSession(for: did) else {
             throw AuthError.tokenRefreshFailed
         }
-        
+
         // Use legacy refresh for bearer tokens, OAuth refresh for DPoP tokens
         if session.tokenType == .bearer {
             return try await performLegacyTokenRefresh(for: did)
@@ -2343,49 +2343,50 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
             return try await performTokenRefreshWithRetry(for: did, retryCount: 0)
         }
     }
-    
+
     /// Performs legacy token refresh using com.atproto.server.refreshSession
     /// - Parameter did: The DID to refresh tokens for
     /// - Returns: The response data and HTTP response
     private func performLegacyTokenRefresh(for did: String) async throws -> (Data, HTTPURLResponse) {
         // Get the session and account
         guard let session = try? await storage.getSession(for: did),
-              let refreshToken = session.refreshToken else {
+              let refreshToken = session.refreshToken
+        else {
             LogManager.logError("performLegacyTokenRefresh: No session or refresh token found")
             throw AuthError.tokenRefreshFailed
         }
-        
+
         guard let account = await accountManager.getAccount(did: did) else {
             LogManager.logError("performLegacyTokenRefresh: Could not retrieve account")
             throw AuthError.tokenRefreshFailed
         }
-        
+
         // Temporarily update network service to point to the user's PDS
         let originalBaseURL = await networkService.baseURL
         await networkService.setBaseURL(account.pdsURL)
-        
+
         // Create a temporary URLRequest for the refresh endpoint
         let endpoint = "\(account.pdsURL.absoluteString)/xrpc/com.atproto.server.refreshSession"
         guard let url = URL(string: endpoint) else {
             await networkService.setBaseURL(originalBaseURL)
             throw AuthError.invalidOAuthConfiguration
         }
-        
+
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("Bearer \(refreshToken)", forHTTPHeaderField: "Authorization")
-        
+
         do {
             let (data, response) = try await networkService.request(request, skipTokenRefresh: true)
-            
+
             // Restore original base URL
             await networkService.setBaseURL(originalBaseURL)
-            
+
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw AuthError.invalidResponse
             }
-            
+
             return (data, httpResponse)
         } catch {
             // Restore original base URL on error
@@ -3084,15 +3085,15 @@ actor AuthenticationService: AuthServiceProtocol, AuthenticationProvider {
                 details: [
                     "did": did,
                     "tokenType": "dpop",
-                    "action": "force_logout"
+                    "action": "force_logout",
                 ]
             )
-            
+
             // Force logout to clear corrupted state
             try? await logout()
             throw AuthError.dpopKeyError
         }
-        
+
         // No existing key found — generate a new one (expected only on first auth or after explicit delete)
         LogManager.logInfo(
             "Generating new DPoP key for DID \(LogManager.logDID(did))", category: .authentication

@@ -4,18 +4,18 @@ import PackageDescription
 let package = Package(
     name: "PostCLIDemo",
     platforms: [
-        .macOS(.v13)
+        .macOS(.v13),
     ],
     dependencies: [
-        .package(path: "../..")  // Petrel library
+        .package(path: "../.."), // Petrel library
     ],
     targets: [
         .executableTarget(
             name: "PostCLIDemo",
             dependencies: [
-                .product(name: "Petrel", package: "Petrel")
+                .product(name: "Petrel", package: "Petrel"),
             ],
             path: "Sources"
-        )
+        ),
     ]
 )
