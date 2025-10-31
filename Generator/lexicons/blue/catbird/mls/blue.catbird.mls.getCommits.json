@@ -1,0 +1,92 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mls.getCommits",
+  "defs": {
+    "main": {
+      "type": "query",
+      "description": "Retrieve MLS commit messages for a conversation within an epoch range",
+      "parameters": {
+        "type": "params",
+        "required": ["convoId", "fromEpoch"],
+        "properties": {
+          "convoId": {
+            "type": "string",
+            "description": "Conversation identifier"
+          },
+          "fromEpoch": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Starting epoch number (inclusive)"
+          },
+          "toEpoch": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Ending epoch number (inclusive, optional - defaults to current epoch)"
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["convoId", "commits"],
+          "properties": {
+            "convoId": {
+              "type": "string",
+              "description": "Conversation identifier"
+            },
+            "commits": {
+              "type": "array",
+              "items": {
+                "type": "ref",
+                "ref": "#commitMessage"
+              },
+              "description": "List of commit messages in the epoch range"
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "name": "ConvoNotFound",
+          "description": "Conversation not found"
+        },
+        {
+          "name": "NotMember",
+          "description": "Caller is not a member of the conversation"
+        },
+        {
+          "name": "InvalidEpochRange",
+          "description": "Invalid epoch range specified"
+        }
+      ]
+    },
+    "commitMessage": {
+      "type": "object",
+      "description": "An MLS commit message with metadata",
+      "required": ["epoch", "sender", "commitData", "createdAt"],
+      "properties": {
+        "epoch": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "MLS epoch number for this commit"
+        },
+        "sender": {
+          "type": "string",
+          "format": "did",
+          "description": "DID of the member who created the commit"
+        },
+        "commitData": {
+          "type": "bytes",
+          "description": "MLS commit message bytes",
+          "maxLength": 10485760
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "datetime",
+          "description": "Timestamp when commit was created"
+        }
+      }
+    }
+  }
+}

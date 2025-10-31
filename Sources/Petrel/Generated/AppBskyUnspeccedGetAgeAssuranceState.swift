@@ -1,24 +1,34 @@
 import Foundation
 
+
+
 // lexicon: 1, id: app.bsky.unspecced.getAgeAssuranceState
 
-public enum AppBskyUnspeccedGetAgeAssuranceState {
+
+public struct AppBskyUnspeccedGetAgeAssuranceState { 
+
     public static let typeIdentifier = "app.bsky.unspecced.getAgeAssuranceState"
     public typealias Output = AppBskyUnspeccedDefs.AgeAssuranceState
+    
+
+
+
 }
 
-public extension ATProtoClient.App.Bsky.Unspecced {
+
+extension ATProtoClient.App.Bsky.Unspecced {
     // MARK: - getAgeAssuranceState
 
     /// Returns the current state of the age assurance process for an account. This is used to check if the user has completed age assurance or if further action is required.
-    ///
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    func getAgeAssuranceState() async throws -> (responseCode: Int, data: AppBskyUnspeccedGetAgeAssuranceState.Output?) {
+    public func getAgeAssuranceState() async throws -> (responseCode: Int, data: AppBskyUnspeccedGetAgeAssuranceState.Output?) {
         let endpoint = "app.bsky.unspecced.getAgeAssuranceState"
 
+        
         let queryItems: [URLQueryItem]? = nil
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -42,11 +52,12 @@ public extension ATProtoClient.App.Bsky.Unspecced {
         }
 
         // Only decode response data if request was successful
-        if (200 ... 299).contains(responseCode) {
+        if (200...299).contains(responseCode) {
             do {
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(AppBskyUnspeccedGetAgeAssuranceState.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -58,4 +69,5 @@ public extension ATProtoClient.App.Bsky.Unspecced {
             return (responseCode, nil)
         }
     }
-}
+}                           
+

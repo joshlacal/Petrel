@@ -1,0 +1,74 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mls.streamConvoEvents",
+  "description": "Server-Sent Events stream for conversation updates (messages, reactions, typing indicators)",
+  "defs": {
+    "main": {
+      "type": "query",
+      "description": "Subscribe to live events (new messages, reactions, etc.) via Server-Sent Events in conversations involving the authenticated user",
+      "parameters": {
+        "type": "params",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "description": "Opaque resume cursor. If provided, resume after this position."
+          },
+          "convoId": {
+            "type": "string",
+            "description": "Optional conversation filter (only receive events for this conversation)."
+          }
+        }
+      },
+      "output": {
+        "encoding": "text/event-stream",
+        "description": "Server-Sent Events stream",
+        "schema": {
+          "type": "union",
+          "refs": ["#messageEvent", "#reactionEvent", "#typingEvent", "#infoEvent"]
+        }
+      }
+    },
+    "messageEvent": {
+      "type": "object",
+      "description": "Event for a newly sent message",
+      "required": ["cursor", "message"],
+      "properties": {
+        "cursor": { "type": "string", "description": "Resume cursor for this event position" },
+        "message": { "type": "ref", "ref": "blue.catbird.mls.defs#messageView" }
+      }
+    },
+    "reactionEvent": {
+      "type": "object",
+      "description": "Event for a reaction added or removed",
+      "required": ["cursor", "convoId", "messageId", "did", "reaction", "action"],
+      "properties": {
+        "cursor": { "type": "string", "description": "Resume cursor for this event position" },
+        "convoId": { "type": "string", "description": "Conversation identifier" },
+        "messageId": { "type": "string", "description": "ID of the message that was reacted to" },
+        "did": { "type": "string", "format": "did", "description": "DID of the user who performed the reaction" },
+        "reaction": { "type": "string", "description": "Reaction content (emoji or short code)" },
+        "action": { "type": "string", "description": "Action performed: 'add' or 'remove'", "knownValues": ["add", "remove"] }
+      }
+    },
+    "typingEvent": {
+      "type": "object",
+      "description": "Event indicating a user is typing",
+      "required": ["cursor", "convoId", "did", "isTyping"],
+      "properties": {
+        "cursor": { "type": "string", "description": "Resume cursor for this event position" },
+        "convoId": { "type": "string", "description": "Conversation identifier" },
+        "did": { "type": "string", "format": "did", "description": "DID of the user typing" },
+        "isTyping": { "type": "boolean", "description": "True if the user started typing, false if they stopped" }
+      }
+    },
+    "infoEvent": {
+      "type": "object",
+      "description": "Event carrying informational messages (heartbeat or notices)",
+      "required": ["cursor", "info"],
+      "properties": {
+        "cursor": { "type": "string", "description": "Resume cursor for this event position" },
+        "info": { "type": "string", "description": "Human-readable info or keep-alive message" }
+      }
+    }
+  }
+}
