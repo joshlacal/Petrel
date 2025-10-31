@@ -1,0 +1,82 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mls.addMembers",
+  "description": "Add new members to an existing MLS conversation",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Add members to an existing MLS conversation",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["convoId", "didList"],
+          "properties": {
+            "convoId": {
+              "type": "string",
+              "description": "Conversation identifier"
+            },
+            "didList": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "did"
+              },
+              "description": "DIDs of members to add",
+              "minLength": 1,
+              "maxLength": 50
+            },
+            "commit": {
+              "type": "string",
+              "description": "Optional base64url-encoded MLS Commit message"
+            },
+            "welcomeMessage": {
+              "type": "string",
+              "description": "Base64url-encoded MLS Welcome message containing encrypted secrets for ALL new members"
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["success", "newEpoch"],
+          "properties": {
+            "success": {
+              "type": "boolean",
+              "description": "Whether the operation succeeded"
+            },
+            "newEpoch": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "New epoch number after adding members"
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "name": "ConvoNotFound",
+          "description": "Conversation not found"
+        },
+        {
+          "name": "NotMember",
+          "description": "Caller is not a member of the conversation"
+        },
+        {
+          "name": "KeyPackageNotFound",
+          "description": "Key package not found for one or more members"
+        },
+        {
+          "name": "AlreadyMember",
+          "description": "One or more DIDs are already members"
+        },
+        {
+          "name": "TooManyMembers",
+          "description": "Would exceed maximum member count"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mls.getWelcome",
+  "description": "Get Welcome message for joining an MLS conversation",
+  "defs": {
+    "main": {
+      "type": "query",
+      "description": "Retrieve the Welcome message for a conversation the user is a member of",
+      "parameters": {
+        "type": "params",
+        "required": ["convoId"],
+        "properties": {
+          "convoId": {
+            "type": "string",
+            "description": "Conversation identifier"
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["convoId", "welcome"],
+          "properties": {
+            "convoId": {
+              "type": "string",
+              "description": "Conversation identifier"
+            },
+            "welcome": {
+              "type": "string",
+              "description": "Base64url-encoded MLS Welcome message data"
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "name": "ConvoNotFound",
+          "description": "Conversation not found"
+        },
+        {
+          "name": "NotMember",
+          "description": "Caller is not a member of the conversation"
+        },
+        {
+          "name": "WelcomeNotFound",
+          "description": "No Welcome message available for this user"
+        }
+      ]
+    }
+  }
+}
