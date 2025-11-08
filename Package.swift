@@ -17,6 +17,10 @@ let package = Package(
             name: "PetrelLoad",
             targets: ["PetrelLoad"]
         ),
+        .executable(
+            name: "FirehoseMonitor",
+            targets: ["FirehoseMonitor"]
+        ),
     ],
     dependencies: [
         .package(url: "https://github.com/beatt83/jose-swift.git", .upToNextMajor(from: "6.0.0")),
@@ -57,6 +61,13 @@ let package = Package(
         .executableTarget(
             name: "PetrelLoad",
             dependencies: ["Petrel"]
+        ),
+        .executableTarget(
+            name: "FirehoseMonitor",
+            dependencies: ["Petrel"],
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+            ]
         ),
         .testTarget(
             name: "PetrelTests",

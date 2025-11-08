@@ -104,7 +104,7 @@ public actor ATProtoClient {
     /// Initializes a new ATProtoClient with the specified configuration.
     /// - Parameters:
     ///   - baseURL: The base URL for API requests (default: bsky.social).
-    ///   - oauthConfig: The OAuth configuration.
+    ///   - oauthConfig: The OAuth configuration. Optional - if nil, client will only support unauthenticated endpoints.
     ///   - namespace: The namespace for storage.
     ///   - userAgent: Optional user agent string for requests.
     ///   - didResolver: Optional custom DID resolver implementation.
@@ -112,7 +112,7 @@ public actor ATProtoClient {
     ///   - bskyChatDID: Optional custom Bluesky Chat service DID (default: did:web:api.bsky.chat#bsky_chat).
     public init(
         baseURL: URL = URL(string: "https://bsky.social")!,
-        oauthConfig: OAuthConfig,
+        oauthConfig: OAuthConfig? = nil,
         namespace: String,
         userAgent: String? = nil,
         didResolver: DIDResolving? = nil,
@@ -144,26 +144,40 @@ public actor ATProtoClient {
         }
 
         // Initialize auth service after networkService and didResolver
-        authService = AuthenticationService(
-            storage: storage,
-            accountManager: accountManager,
-            networkService: networkService,
-            oauthConfig: oauthConfig,
-            didResolver: self.didResolver
-        )
+        // If no OAuth config is provided, skip auth setup (for unauthenticated endpoints like firehose)
+        if let config = oauthConfig {
+            authService = AuthenticationService(
+                storage: storage,
+                accountManager: accountManager,
+                networkService: networkService,
+                oauthConfig: config,
+                didResolver: self.didResolver
+            )
 
-        // Disable silent auto-switch on logout to avoid confusing UX in multi-account scenarios.
-        // Catbird handles prompting and account selection explicitly.
-        await authService.setAutoSwitchOnLogout(false)
+            // Disable silent auto-switch on logout to avoid confusing UX in multi-account scenarios.
+            // Catbird handles prompting and account selection explicitly.
+            await authService.setAutoSwitchOnLogout(false)
 
-        // Now set the authentication provider on the network service
-        await networkService.setAuthenticationProvider(authService)
+            // Now set the authentication provider on the network service
+            await networkService.setAuthenticationProvider(authService)
 
-        // Validate and repair authentication state before initialization
-        await validateAuthenticationState()
+            // Validate and repair authentication state before initialization
+            await validateAuthenticationState()
 
-        // Try to initialize from stored account
-        await initializeFromStoredAccount()
+            // Try to initialize from stored account
+            await initializeFromStoredAccount()
+        } else {
+            // For unauthenticated mode, create a minimal auth service but don't set it as provider
+            // This allows the client to initialize without errors but won't support authenticated endpoints
+            authService = AuthenticationService(
+                storage: storage,
+                accountManager: accountManager,
+                networkService: networkService,
+                oauthConfig: OAuthConfig(clientId: "", redirectUri: "", scope: ""),
+                didResolver: self.didResolver
+            )
+            LogManager.logInfo("ATProtoClient initialized in unauthenticated mode - only public endpoints will work")
+        }
     }
 
     // MARK: - Initialization Helpers
