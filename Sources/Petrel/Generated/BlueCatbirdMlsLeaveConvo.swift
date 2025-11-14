@@ -165,10 +165,13 @@ public struct Output: ATProtocolCodable {
         
     }
         
-public enum Error: String, Swift.Error, CustomStringConvertible {
-                case convoNotFound = "ConvoNotFound.Conversation not found"
-                case notMember = "NotMember.Caller is not a member of the conversation"
-                case lastMember = "LastMember.Cannot leave as the last member (delete the conversation instead)"
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                /// Conversation not found
+                case convoNotFound = "ConvoNotFound"
+                /// Caller is not a member of the conversation
+                case notMember = "NotMember"
+                /// Cannot leave as the last member (delete the conversation instead)
+                case lastMember = "LastMember"
             public var description: String {
                 return self.rawValue
             }
@@ -241,7 +244,17 @@ extension ATProtoClient.Blue.Catbird.Mls {
                 return (responseCode, nil)
             }
         } else {
-            // Don't try to decode error responses as success types
+            // Try to parse structured error response
+            if let atprotoError = ATProtoErrorParser.parse(
+                data: responseData,
+                statusCode: responseCode,
+                errorType: BlueCatbirdMlsLeaveConvo.Error.self
+            ) {
+                throw atprotoError
+            }
+            
+            // If we can't parse a structured error, return the response code
+            // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
         

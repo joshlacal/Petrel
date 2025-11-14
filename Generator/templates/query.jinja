@@ -1,3 +1,108 @@
+{% if output_encoding == "text/event-stream" %}
+extension ATProtoClient.{{ template_namespace_name }} {
+    // MARK: - {{ query_name | lowerCamelCase }}
+
+    /// {{ description }}
+    /// {% if input_struct_name %}
+    /// - Parameter input: The input parameters for the request
+    /// {% endif %}
+    /// - Returns: AsyncThrowingStream of events from the Server-Sent Events stream
+    /// - Throws: NetworkError if the request fails or the connection cannot be established
+    public func {{ query_name | lowerCamelCase }}({% if input_struct_name %}input: {{ input_struct_name }}{% endif %}) async throws -> AsyncThrowingStream<{{ output_type }}, Error> {
+        let endpoint = "{{ endpoint }}"
+
+        {% if input_struct_name %}
+        let queryItems = input.asQueryItems()
+        {% else %}
+        let queryItems: [URLQueryItem]? = nil
+        {% endif %}
+        let urlRequest = try await networkService.createURLRequest(
+            endpoint: endpoint,
+            method: "GET",
+            headers: ["Accept": "{{ output_encoding }}"],
+            body: nil,
+            queryItems: queryItems
+        )
+
+        // Determine service DID for this endpoint
+        let serviceDID = await networkService.getServiceDID(for: "{{ endpoint }}")
+        let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
+
+        return AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    // Use networkService to prepare authenticated streaming request with OAuth/DPoP
+                    let authenticatedRequest = try await networkService.prepareStreamingRequest(
+                        urlRequest,
+                        additionalHeaders: proxyHeaders
+                    )
+
+                    // Stream with the authenticated request
+                    let (bytes, response) = try await URLSession.shared.bytes(for: authenticatedRequest)
+
+                    guard let httpResponse = response as? HTTPURLResponse else {
+                        continuation.finish(throwing: NetworkError.invalidResponse(description: "Non-HTTP response"))
+                        return
+                    }
+
+                    guard httpResponse.statusCode == 200 else {
+                        continuation.finish(throwing: NetworkError.serverError(code: httpResponse.statusCode, message: "SSE connection failed"))
+                        return
+                    }
+
+                    guard let contentType = httpResponse.allHeaderFields["Content-Type"] as? String,
+                          contentType.lowercased().contains("text/event-stream") else {
+                        continuation.finish(throwing: NetworkError.invalidContentType(expected: "text/event-stream", actual: httpResponse.allHeaderFields["Content-Type"] as? String ?? "nil"))
+                        return
+                    }
+
+                    // Parse SSE stream
+                    var buffer = ""
+                    let decoder = JSONDecoder()
+
+                    for try await byte in bytes {
+                        let char = Character(UnicodeScalar(byte))
+                        buffer.append(char)
+
+                        // SSE events are delimited by double newline
+                        if buffer.hasSuffix("\n\n") {
+                            // Parse the event
+                            let lines = buffer.split(separator: "\n", omittingEmptySubsequences: false)
+
+                            for line in lines {
+                                let lineStr = String(line)
+
+                                // SSE data lines start with "data: "
+                                if lineStr.hasPrefix("data: ") {
+                                    let jsonString = String(lineStr.dropFirst(6))
+
+                                    if let jsonData = jsonString.data(using: .utf8) {
+                                        do {
+                                            let event = try decoder.decode({{ output_type }}.self, from: jsonData)
+                                            continuation.yield(event)
+                                        } catch {
+                                            LogManager.logError("Failed to decode SSE event for {{ endpoint }}: \(error)")
+                                            // Continue processing other events
+                                        }
+                                    }
+                                }
+                                // Ignore comment lines (start with ":") and other SSE fields
+                            }
+
+                            buffer = ""
+                        }
+                    }
+
+                    // Stream ended normally
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
+    }
+}
+{% else %}
 extension ATProtoClient.{{ template_namespace_name }} {
     // MARK: - {{ query_name | lowerCamelCase }}
 
@@ -55,8 +160,19 @@ extension ATProtoClient.{{ template_namespace_name }} {
                 return (responseCode, nil)
             }
         } else {
-            // Don't try to decode error responses as success types
+            {% if has_errors %}// Try to parse structured error response
+            if let atprotoError = ATProtoErrorParser.parse(
+                data: responseData,
+                statusCode: responseCode,
+                errorType: {{ struct_name }}.Error.self
+            ) {
+                throw atprotoError
+            }
+            {% endif %}
+            // If we can't parse a structured error, return the response code
+            // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
+{% endif %}

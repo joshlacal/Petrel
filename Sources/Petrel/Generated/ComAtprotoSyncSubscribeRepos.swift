@@ -1595,9 +1595,11 @@ public enum Message: Codable, Sendable {
         }
     }
 }        
-public enum Error: String, Swift.Error, CustomStringConvertible {
-                case futureCursor = "FutureCursor."
-                case consumerTooSlow = "ConsumerTooSlow.If the consumer of the stream can not keep up with events, and a backlog gets too large, the server will drop the connection."
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                
+                case futureCursor = "FutureCursor"
+                /// If the consumer of the stream can not keep up with events, and a backlog gets too large, the server will drop the connection.
+                case consumerTooSlow = "ConsumerTooSlow"
             public var description: String {
                 return self.rawValue
             }

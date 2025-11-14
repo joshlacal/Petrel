@@ -1,6 +1,7 @@
-        public enum Error: String, Swift.Error, CustomStringConvertible { 
+        public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
             {%- for error in errors %}
-                case {{ error.name | lowerCamelCase }} = "{{error.name}}.{{ error.description }}"
+                {% if error.description %}/// {{ error.description }}{% endif %}
+                case {{ error.name | lowerCamelCase }} = "{{error.name}}"
             {%- endfor %}
             public var description: String {
                 return self.rawValue

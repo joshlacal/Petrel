@@ -23,7 +23,19 @@
         "encoding": "text/event-stream",
         "description": "Server-Sent Events stream",
         "schema": {
+          "type": "ref",
+          "ref": "#eventWrapper"
+        }
+      }
+    },
+    "eventWrapper": {
+      "type": "object",
+      "description": "Wrapper for stream events",
+      "required": ["event"],
+      "properties": {
+        "event": {
           "type": "union",
+          "description": "The actual event (message, reaction, typing, or info)",
           "refs": ["#messageEvent", "#reactionEvent", "#typingEvent", "#infoEvent"]
         }
       }

@@ -10,20 +10,20 @@ public struct BlueCatbirdMlsSendMessage {
     public static let typeIdentifier = "blue.catbird.mls.sendMessage"
 public struct Input: ATProtocolCodable {
             public let convoId: String
+            public let msgId: String
+            public let idempotencyKey: String?
             public let ciphertext: Bytes
             public let epoch: Int
-            public let senderDid: DID
-            public let embedType: String?
-            public let embedUri: URI?
+            public let paddedSize: Int
 
             // Standard public initializer
-            public init(convoId: String, ciphertext: Bytes, epoch: Int, senderDid: DID, embedType: String? = nil, embedUri: URI? = nil) {
+            public init(convoId: String, msgId: String, idempotencyKey: String? = nil, ciphertext: Bytes, epoch: Int, paddedSize: Int) {
                 self.convoId = convoId
+                self.msgId = msgId
+                self.idempotencyKey = idempotencyKey
                 self.ciphertext = ciphertext
                 self.epoch = epoch
-                self.senderDid = senderDid
-                self.embedType = embedType
-                self.embedUri = embedUri
+                self.paddedSize = paddedSize
                 
             }
             
@@ -33,19 +33,19 @@ public struct Input: ATProtocolCodable {
                 self.convoId = try container.decode(String.self, forKey: .convoId)
                 
                 
+                self.msgId = try container.decode(String.self, forKey: .msgId)
+                
+                
+                self.idempotencyKey = try container.decodeIfPresent(String.self, forKey: .idempotencyKey)
+                
+                
                 self.ciphertext = try container.decode(Bytes.self, forKey: .ciphertext)
                 
                 
                 self.epoch = try container.decode(Int.self, forKey: .epoch)
                 
                 
-                self.senderDid = try container.decode(DID.self, forKey: .senderDid)
-                
-                
-                self.embedType = try container.decodeIfPresent(String.self, forKey: .embedType)
-                
-                
-                self.embedUri = try container.decodeIfPresent(URI.self, forKey: .embedUri)
+                self.paddedSize = try container.decode(Int.self, forKey: .paddedSize)
                 
             }
             
@@ -55,31 +55,30 @@ public struct Input: ATProtocolCodable {
                 try container.encode(convoId, forKey: .convoId)
                 
                 
+                try container.encode(msgId, forKey: .msgId)
+                
+                
+                // Encode optional property even if it's an empty array
+                try container.encodeIfPresent(idempotencyKey, forKey: .idempotencyKey)
+                
+                
                 try container.encode(ciphertext, forKey: .ciphertext)
                 
                 
                 try container.encode(epoch, forKey: .epoch)
                 
                 
-                try container.encode(senderDid, forKey: .senderDid)
-                
-                
-                // Encode optional property even if it's an empty array
-                try container.encodeIfPresent(embedType, forKey: .embedType)
-                
-                
-                // Encode optional property even if it's an empty array
-                try container.encodeIfPresent(embedUri, forKey: .embedUri)
+                try container.encode(paddedSize, forKey: .paddedSize)
                 
             }
             
             private enum CodingKeys: String, CodingKey {
                 case convoId
+                case msgId
+                case idempotencyKey
                 case ciphertext
                 case epoch
-                case senderDid
-                case embedType
-                case embedUri
+                case paddedSize
             }
             
             public func toCBORValue() throws -> Any {
@@ -89,6 +88,19 @@ public struct Input: ATProtocolCodable {
                 
                 let convoIdValue = try convoId.toCBORValue()
                 map = map.adding(key: "convoId", value: convoIdValue)
+                
+                
+                
+                let msgIdValue = try msgId.toCBORValue()
+                map = map.adding(key: "msgId", value: msgIdValue)
+                
+                
+                
+                if let value = idempotencyKey {
+                    // Encode optional property even if it's an empty array for CBOR
+                    let idempotencyKeyValue = try value.toCBORValue()
+                    map = map.adding(key: "idempotencyKey", value: idempotencyKeyValue)
+                }
                 
                 
                 
@@ -102,24 +114,8 @@ public struct Input: ATProtocolCodable {
                 
                 
                 
-                let senderDidValue = try senderDid.toCBORValue()
-                map = map.adding(key: "senderDid", value: senderDidValue)
-                
-                
-                
-                if let value = embedType {
-                    // Encode optional property even if it's an empty array for CBOR
-                    let embedTypeValue = try value.toCBORValue()
-                    map = map.adding(key: "embedType", value: embedTypeValue)
-                }
-                
-                
-                
-                if let value = embedUri {
-                    // Encode optional property even if it's an empty array for CBOR
-                    let embedUriValue = try value.toCBORValue()
-                    map = map.adding(key: "embedUri", value: embedUriValue)
-                }
+                let paddedSizeValue = try paddedSize.toCBORValue()
+                map = map.adding(key: "paddedSize", value: paddedSizeValue)
                 
                 
 
@@ -134,6 +130,10 @@ public struct Output: ATProtocolCodable {
         
         public let receivedAt: ATProtocolDate
         
+        public let seq: Int
+        
+        public let epoch: Int
+        
         
         
         // Standard public initializer
@@ -142,7 +142,11 @@ public struct Output: ATProtocolCodable {
             
             messageId: String,
             
-            receivedAt: ATProtocolDate
+            receivedAt: ATProtocolDate,
+            
+            seq: Int,
+            
+            epoch: Int
             
             
         ) {
@@ -151,6 +155,10 @@ public struct Output: ATProtocolCodable {
             self.messageId = messageId
             
             self.receivedAt = receivedAt
+            
+            self.seq = seq
+            
+            self.epoch = epoch
             
             
         }
@@ -165,6 +173,12 @@ public struct Output: ATProtocolCodable {
             self.receivedAt = try container.decode(ATProtocolDate.self, forKey: .receivedAt)
             
             
+            self.seq = try container.decode(Int.self, forKey: .seq)
+            
+            
+            self.epoch = try container.decode(Int.self, forKey: .epoch)
+            
+            
         }
         
         public func encode(to encoder: Encoder) throws {
@@ -175,6 +189,12 @@ public struct Output: ATProtocolCodable {
             
             
             try container.encode(receivedAt, forKey: .receivedAt)
+            
+            
+            try container.encode(seq, forKey: .seq)
+            
+            
+            try container.encode(epoch, forKey: .epoch)
             
             
         }
@@ -194,6 +214,16 @@ public struct Output: ATProtocolCodable {
             map = map.adding(key: "receivedAt", value: receivedAtValue)
             
             
+            
+            let seqValue = try seq.toCBORValue()
+            map = map.adding(key: "seq", value: seqValue)
+            
+            
+            
+            let epochValue = try epoch.toCBORValue()
+            map = map.adding(key: "epoch", value: epochValue)
+            
+            
 
             return map
             
@@ -203,16 +233,23 @@ public struct Output: ATProtocolCodable {
         private enum CodingKeys: String, CodingKey {
             case messageId
             case receivedAt
+            case seq
+            case epoch
         }
         
     }
         
-public enum Error: String, Swift.Error, CustomStringConvertible {
-                case convoNotFound = "ConvoNotFound.Conversation not found"
-                case notMember = "NotMember.Caller is not a member of the conversation"
-                case invalidAsset = "InvalidAsset.Payload or attachment pointer is invalid"
-                case epochMismatch = "EpochMismatch.Message epoch does not match current conversation epoch"
-                case messageTooLarge = "MessageTooLarge.Message exceeds maximum size policy"
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                /// Conversation not found
+                case convoNotFound = "ConvoNotFound"
+                /// Caller is not a member of the conversation
+                case notMember = "NotMember"
+                /// Payload or attachment pointer is invalid
+                case invalidAsset = "InvalidAsset"
+                /// Message epoch does not match current conversation epoch
+                case epochMismatch = "EpochMismatch"
+                /// Message exceeds maximum size policy
+                case messageTooLarge = "MessageTooLarge"
             public var description: String {
                 return self.rawValue
             }
@@ -285,7 +322,17 @@ extension ATProtoClient.Blue.Catbird.Mls {
                 return (responseCode, nil)
             }
         } else {
-            // Don't try to decode error responses as success types
+            // Try to parse structured error response
+            if let atprotoError = ATProtoErrorParser.parse(
+                data: responseData,
+                statusCode: responseCode,
+                errorType: BlueCatbirdMlsSendMessage.Error.self
+            ) {
+                throw atprotoError
+            }
+            
+            // If we can't parse a structured error, return the response code
+            // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
         

@@ -137,8 +137,9 @@ public struct Output: ATProtocolCodable {
         
     }
         
-public enum Error: String, Swift.Error, CustomStringConvertible {
-                case badQueryString = "BadQueryString."
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                
+                case badQueryString = "BadQueryString"
             public var description: String {
                 return self.rawValue
             }
@@ -147,6 +148,7 @@ public enum Error: String, Swift.Error, CustomStringConvertible {
 
 
 }
+
 
 
 extension ATProtoClient.App.Bsky.Unspecced {
@@ -200,9 +202,20 @@ extension ATProtoClient.App.Bsky.Unspecced {
                 return (responseCode, nil)
             }
         } else {
-            // Don't try to decode error responses as success types
+            // Try to parse structured error response
+            if let atprotoError = ATProtoErrorParser.parse(
+                data: responseData,
+                statusCode: responseCode,
+                errorType: AppBskyUnspeccedSearchActorsSkeleton.Error.self
+            ) {
+                throw atprotoError
+            }
+            
+            // If we can't parse a structured error, return the response code
+            // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
-}                           
+}
+                           
 

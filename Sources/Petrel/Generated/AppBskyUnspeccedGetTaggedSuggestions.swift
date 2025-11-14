@@ -244,6 +244,7 @@ public struct Output: ATProtocolCodable {
 }
 
 
+
 extension ATProtoClient.App.Bsky.Unspecced {
     // MARK: - getTaggedSuggestions
 
@@ -295,9 +296,12 @@ extension ATProtoClient.App.Bsky.Unspecced {
                 return (responseCode, nil)
             }
         } else {
-            // Don't try to decode error responses as success types
+            
+            // If we can't parse a structured error, return the response code
+            // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
-}                           
+}
+                           
 

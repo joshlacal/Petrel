@@ -106,8 +106,9 @@ public struct Output: ATProtocolCodable {
         
     }
         
-public enum Error: String, Swift.Error, CustomStringConvertible {
-                case actorNotFound = "ActorNotFound.the primary actor at-identifier could not be resolved"
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                /// the primary actor at-identifier could not be resolved
+                case actorNotFound = "ActorNotFound"
             public var description: String {
                 return self.rawValue
             }
@@ -248,6 +249,7 @@ public enum OutputRelationshipsUnion: Codable, ATProtocolCodable, ATProtocolValu
 }
 
 
+
 extension ATProtoClient.App.Bsky.Graph {
     // MARK: - getRelationships
 
@@ -299,9 +301,20 @@ extension ATProtoClient.App.Bsky.Graph {
                 return (responseCode, nil)
             }
         } else {
-            // Don't try to decode error responses as success types
+            // Try to parse structured error response
+            if let atprotoError = ATProtoErrorParser.parse(
+                data: responseData,
+                statusCode: responseCode,
+                errorType: AppBskyGraphGetRelationships.Error.self
+            ) {
+                throw atprotoError
+            }
+            
+            // If we can't parse a structured error, return the response code
+            // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
-}                           
+}
+                           
 

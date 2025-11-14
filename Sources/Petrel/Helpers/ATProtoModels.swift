@@ -83,7 +83,7 @@ public struct ProtectedResourceMetadata: Codable, Sendable, Hashable {
     let authorizationServers: [URL]
     let scopesSupported: [String]
     let bearerMethodsSupported: [String]
-    let resourceDocumentation: URL
+    let resourceDocumentation: URL?
 
     enum CodingKeys: String, CodingKey {
         case resource

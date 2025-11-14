@@ -10,12 +10,14 @@ public struct BlueCatbirdMlsPublishKeyPackage {
     public static let typeIdentifier = "blue.catbird.mls.publishKeyPackage"
 public struct Input: ATProtocolCodable {
             public let keyPackage: String
+            public let idempotencyKey: String?
             public let cipherSuite: String
             public let expires: ATProtocolDate?
 
             // Standard public initializer
-            public init(keyPackage: String, cipherSuite: String, expires: ATProtocolDate? = nil) {
+            public init(keyPackage: String, idempotencyKey: String? = nil, cipherSuite: String, expires: ATProtocolDate? = nil) {
                 self.keyPackage = keyPackage
+                self.idempotencyKey = idempotencyKey
                 self.cipherSuite = cipherSuite
                 self.expires = expires
                 
@@ -25,6 +27,9 @@ public struct Input: ATProtocolCodable {
                 let container = try decoder.container(keyedBy: CodingKeys.self)
                 
                 self.keyPackage = try container.decode(String.self, forKey: .keyPackage)
+                
+                
+                self.idempotencyKey = try container.decodeIfPresent(String.self, forKey: .idempotencyKey)
                 
                 
                 self.cipherSuite = try container.decode(String.self, forKey: .cipherSuite)
@@ -40,6 +45,10 @@ public struct Input: ATProtocolCodable {
                 try container.encode(keyPackage, forKey: .keyPackage)
                 
                 
+                // Encode optional property even if it's an empty array
+                try container.encodeIfPresent(idempotencyKey, forKey: .idempotencyKey)
+                
+                
                 try container.encode(cipherSuite, forKey: .cipherSuite)
                 
                 
@@ -50,6 +59,7 @@ public struct Input: ATProtocolCodable {
             
             private enum CodingKeys: String, CodingKey {
                 case keyPackage
+                case idempotencyKey
                 case cipherSuite
                 case expires
             }
@@ -61,6 +71,14 @@ public struct Input: ATProtocolCodable {
                 
                 let keyPackageValue = try keyPackage.toCBORValue()
                 map = map.adding(key: "keyPackage", value: keyPackageValue)
+                
+                
+                
+                if let value = idempotencyKey {
+                    // Encode optional property even if it's an empty array for CBOR
+                    let idempotencyKeyValue = try value.toCBORValue()
+                    map = map.adding(key: "idempotencyKey", value: idempotencyKeyValue)
+                }
                 
                 
                 
@@ -117,11 +135,15 @@ public struct Output: ATProtocolCodable {
         
     }
         
-public enum Error: String, Swift.Error, CustomStringConvertible {
-                case invalidKeyPackage = "InvalidKeyPackage.Key package is malformed or invalid"
-                case invalidCipherSuite = "InvalidCipherSuite.Cipher suite is not supported"
-                case expirationTooFar = "ExpirationTooFar.Expiration date is too far in the future (max 90 days)"
-                case tooManyKeyPackages = "TooManyKeyPackages.Maximum number of key packages per user exceeded"
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                /// Key package is malformed or invalid
+                case invalidKeyPackage = "InvalidKeyPackage"
+                /// Cipher suite is not supported
+                case invalidCipherSuite = "InvalidCipherSuite"
+                /// Expiration date is too far in the future (max 90 days)
+                case expirationTooFar = "ExpirationTooFar"
+                /// Maximum number of key packages per user exceeded
+                case tooManyKeyPackages = "TooManyKeyPackages"
             public var description: String {
                 return self.rawValue
             }
@@ -194,7 +216,17 @@ extension ATProtoClient.Blue.Catbird.Mls {
                 return (responseCode, nil)
             }
         } else {
-            // Don't try to decode error responses as success types
+            // Try to parse structured error response
+            if let atprotoError = ATProtoErrorParser.parse(
+                data: responseData,
+                statusCode: responseCode,
+                errorType: BlueCatbirdMlsPublishKeyPackage.Error.self
+            ) {
+                throw atprotoError
+            }
+            
+            // If we can't parse a structured error, return the response code
+            // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
         

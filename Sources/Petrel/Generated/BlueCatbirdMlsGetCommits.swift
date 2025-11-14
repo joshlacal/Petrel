@@ -301,10 +301,13 @@ public struct Output: ATProtocolCodable {
         
     }
         
-public enum Error: String, Swift.Error, CustomStringConvertible {
-                case convoNotFound = "ConvoNotFound.Conversation not found"
-                case notMember = "NotMember.Caller is not a member of the conversation"
-                case invalidEpochRange = "InvalidEpochRange.Invalid epoch range specified"
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                /// Conversation not found
+                case convoNotFound = "ConvoNotFound"
+                /// Caller is not a member of the conversation
+                case notMember = "NotMember"
+                /// Invalid epoch range specified
+                case invalidEpochRange = "InvalidEpochRange"
             public var description: String {
                 return self.rawValue
             }
@@ -313,6 +316,7 @@ public enum Error: String, Swift.Error, CustomStringConvertible {
 
 
 }
+
 
 
 extension ATProtoClient.Blue.Catbird.Mls {
@@ -366,9 +370,20 @@ extension ATProtoClient.Blue.Catbird.Mls {
                 return (responseCode, nil)
             }
         } else {
-            // Don't try to decode error responses as success types
+            // Try to parse structured error response
+            if let atprotoError = ATProtoErrorParser.parse(
+                data: responseData,
+                statusCode: responseCode,
+                errorType: BlueCatbirdMlsGetCommits.Error.self
+            ) {
+                throw atprotoError
+            }
+            
+            // If we can't parse a structured error, return the response code
+            // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
-}                           
+}
+                           
 

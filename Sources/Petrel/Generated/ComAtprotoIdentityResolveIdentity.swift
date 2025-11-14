@@ -20,10 +20,13 @@ public struct Parameters: Parametrizable {
     }
     public typealias Output = ComAtprotoIdentityDefs.IdentityInfo
             
-public enum Error: String, Swift.Error, CustomStringConvertible {
-                case handleNotFound = "HandleNotFound.The resolution process confirmed that the handle does not resolve to any DID."
-                case didNotFound = "DidNotFound.The DID resolution process confirmed that there is no current DID."
-                case didDeactivated = "DidDeactivated.The DID previously existed, but has been deactivated."
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                /// The resolution process confirmed that the handle does not resolve to any DID.
+                case handleNotFound = "HandleNotFound"
+                /// The DID resolution process confirmed that there is no current DID.
+                case didNotFound = "DidNotFound"
+                /// The DID previously existed, but has been deactivated.
+                case didDeactivated = "DidDeactivated"
             public var description: String {
                 return self.rawValue
             }
@@ -32,6 +35,7 @@ public enum Error: String, Swift.Error, CustomStringConvertible {
 
 
 }
+
 
 
 extension ATProtoClient.Com.Atproto.Identity {
@@ -85,9 +89,20 @@ extension ATProtoClient.Com.Atproto.Identity {
                 return (responseCode, nil)
             }
         } else {
-            // Don't try to decode error responses as success types
+            // Try to parse structured error response
+            if let atprotoError = ATProtoErrorParser.parse(
+                data: responseData,
+                statusCode: responseCode,
+                errorType: ComAtprotoIdentityResolveIdentity.Error.self
+            ) {
+                throw atprotoError
+            }
+            
+            // If we can't parse a structured error, return the response code
+            // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
-}                           
+}
+                           
 

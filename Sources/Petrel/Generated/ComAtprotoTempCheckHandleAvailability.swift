@@ -368,8 +368,9 @@ public struct Output: ATProtocolCodable {
         
     }
         
-public enum Error: String, Swift.Error, CustomStringConvertible {
-                case invalidEmail = "InvalidEmail.An invalid email was provided."
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                /// An invalid email was provided.
+                case invalidEmail = "InvalidEmail"
             public var description: String {
                 return self.rawValue
             }
@@ -510,6 +511,7 @@ public enum OutputResultUnion: Codable, ATProtocolCodable, ATProtocolValue, Send
 }
 
 
+
 extension ATProtoClient.Com.Atproto.Temp {
     // MARK: - checkHandleAvailability
 
@@ -561,9 +563,20 @@ extension ATProtoClient.Com.Atproto.Temp {
                 return (responseCode, nil)
             }
         } else {
-            // Don't try to decode error responses as success types
+            // Try to parse structured error response
+            if let atprotoError = ATProtoErrorParser.parse(
+                data: responseData,
+                statusCode: responseCode,
+                errorType: ComAtprotoTempCheckHandleAvailability.Error.self
+            ) {
+                throw atprotoError
+            }
+            
+            // If we can't parse a structured error, return the response code
+            // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
-}                           
+}
+                           
 

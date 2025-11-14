@@ -391,7 +391,9 @@ class SwiftCodeGenerator:
             output_type=output_type,
             endpoint=endpoint,
             description=self.description,
-            output_encoding=output_encoding  # Pass the output encoding to the template
+            output_encoding=output_encoding,  # Pass the output encoding to the template
+            has_errors='errors' in main_def and main_def['errors'],  # Check if errors are defined
+            struct_name=convert_to_camel_case(lexicon_id)  # Pass struct name for error type reference
         )
 
     def generate_procedure_function(self, lexicon_id, main_def):
@@ -442,7 +444,9 @@ class SwiftCodeGenerator:
             is_blob_upload=is_blob_upload,
             is_binary_data=is_binary_data,
             input_encoding=input_encoding,    # Pass the input encoding to the template
-            output_encoding=output_encoding   # Pass the output encoding to the template
+            output_encoding=output_encoding,   # Pass the output encoding to the template
+            has_errors='errors' in main_def and main_def['errors'],  # Check if errors are defined
+            struct_name=convert_to_camel_case(lexicon_id)  # Pass struct name for error type reference
         )
 
     def generate_subscription_function(self, lexicon_id, main_def):

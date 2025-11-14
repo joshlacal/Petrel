@@ -1,0 +1,202 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mls.message.defs",
+  "description": "Definitions for encrypted MLS message payload structure. The ciphertext bytes in messageView decrypt to the payloadView structure defined here. NOTE: Since payloads are end-to-end encrypted, client implementations may use simplified JSON encodings (e.g., without $type fields) as the server never sees the plaintext.",
+  "defs": {
+    "payloadView": {
+      "type": "object",
+      "description": "Decrypted message payload structure (what's inside the encrypted ciphertext). This is what clients decrypt from the ciphertext bytes.",
+      "required": ["version"],
+      "properties": {
+        "version": {
+          "type": "integer",
+          "const": 1,
+          "description": "Payload format version for future compatibility. Current version is 1."
+        },
+        "messageType": {
+          "type": "string",
+          "description": "Message type discriminator: text (default), adminRoster, adminAction",
+          "knownValues": ["text", "adminRoster", "adminAction"]
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 10000,
+          "description": "Message text content (for messageType: text)"
+        },
+        "embed": {
+          "type": "union",
+          "description": "Optional rich media embed (record, link, or GIF). Clients can add new types in future versions.",
+          "refs": [
+            "#recordEmbed",
+            "#linkEmbed",
+            "#gifEmbed"
+          ]
+        },
+        "adminRoster": {
+          "type": "ref",
+          "ref": "#adminRoster",
+          "description": "Admin roster update (for messageType: adminRoster)"
+        },
+        "adminAction": {
+          "type": "ref",
+          "ref": "#adminAction",
+          "description": "Admin action notification (for messageType: adminAction)"
+        }
+      }
+    },
+
+    "recordEmbed": {
+      "type": "object",
+      "description": "Bluesky record embed (quote post). References an AT Protocol record by URI.",
+      "required": ["uri", "authorDid"],
+      "properties": {
+        "uri": {
+          "type": "string",
+          "format": "at-uri",
+          "description": "AT-URI of the referenced record (e.g., at://did:plc:xyz/app.bsky.feed.post/abc123)"
+        },
+        "cid": {
+          "type": "string",
+          "format": "cid",
+          "description": "CID of the record for verification"
+        },
+        "authorDid": {
+          "type": "string",
+          "format": "did",
+          "description": "DID of the record author"
+        },
+        "previewText": {
+          "type": "string",
+          "maxLength": 300,
+          "description": "Preview text (first line or excerpt) from the record"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "datetime",
+          "description": "Timestamp when the record was created"
+        }
+      }
+    },
+
+    "linkEmbed": {
+      "type": "object",
+      "description": "External link preview with metadata",
+      "required": ["url"],
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Full URL of the external link"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 300,
+          "description": "Page title from Open Graph or meta tags"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "Page description from Open Graph or meta tags"
+        },
+        "thumbnailURL": {
+          "type": "string",
+          "format": "uri",
+          "description": "Thumbnail/preview image URL"
+        },
+        "domain": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Canonical domain (e.g., 'bsky.app', 'github.com')"
+        }
+      }
+    },
+
+    "gifEmbed": {
+      "type": "object",
+      "description": "Tenor GIF embed (converted to MP4 for efficient playback)",
+      "required": ["tenorURL", "mp4URL"],
+      "properties": {
+        "tenorURL": {
+          "type": "string",
+          "format": "uri",
+          "description": "Original Tenor GIF URL (e.g., https://tenor.com/view/...)"
+        },
+        "mp4URL": {
+          "type": "string",
+          "format": "uri",
+          "description": "MP4 video URL for efficient playback"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 300,
+          "description": "GIF title or description from Tenor"
+        },
+        "thumbnailURL": {
+          "type": "string",
+          "format": "uri",
+          "description": "Thumbnail image URL for preview"
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "GIF/video width in pixels"
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "GIF/video height in pixels"
+        }
+      }
+    },
+
+    "adminRoster": {
+      "type": "object",
+      "required": ["version", "admins"],
+      "description": "Encrypted admin roster distributed via MLS application messages. Clients verify admin actions against this roster.",
+      "properties": {
+        "version": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Monotonic roster version number (increments on each change)"
+        },
+        "admins": {
+          "type": "array",
+          "items": { "type": "string", "format": "did" },
+          "description": "List of admin DIDs for this conversation"
+        },
+        "hash": {
+          "type": "string",
+          "description": "SHA-256 hash of (version || admins) for integrity verification"
+        }
+      }
+    },
+
+    "adminAction": {
+      "type": "object",
+      "required": ["action", "targetDid", "timestamp"],
+      "description": "Admin action notification (E2EE). Sent alongside server API calls to inform all clients.",
+      "properties": {
+        "action": {
+          "type": "string",
+          "description": "Type of admin action performed",
+          "knownValues": ["promote", "demote", "remove"]
+        },
+        "targetDid": {
+          "type": "string",
+          "format": "did",
+          "description": "DID of member being acted upon"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "datetime",
+          "description": "When the action was performed"
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Optional reason for the action"
+        }
+      }
+    }
+  }
+}

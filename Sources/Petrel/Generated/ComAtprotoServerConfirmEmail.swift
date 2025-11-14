@@ -62,11 +62,15 @@ public struct Input: ATProtocolCodable {
                 return map
             }
         }        
-public enum Error: String, Swift.Error, CustomStringConvertible {
-                case accountNotFound = "AccountNotFound."
-                case expiredToken = "ExpiredToken."
-                case invalidToken = "InvalidToken."
-                case invalidEmail = "InvalidEmail."
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                
+                case accountNotFound = "AccountNotFound"
+                
+                case expiredToken = "ExpiredToken"
+                
+                case invalidToken = "InvalidToken"
+                
+                case invalidEmail = "InvalidEmail"
             public var description: String {
                 return self.rawValue
             }

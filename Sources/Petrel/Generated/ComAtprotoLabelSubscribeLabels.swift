@@ -320,8 +320,9 @@ public enum Message: Codable, Sendable {
         }
     }
 }        
-public enum Error: String, Swift.Error, CustomStringConvertible {
-                case futureCursor = "FutureCursor."
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                
+                case futureCursor = "FutureCursor"
             public var description: String {
                 return self.rawValue
             }
