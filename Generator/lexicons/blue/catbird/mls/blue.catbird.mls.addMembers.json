@@ -16,6 +16,10 @@
               "type": "string",
               "description": "Conversation identifier"
             },
+            "idempotencyKey": {
+              "type": "string",
+              "description": "Client-generated UUID for idempotent request retries. Optional but recommended."
+            },
             "didList": {
               "type": "array",
               "items": {
@@ -33,6 +37,14 @@
             "welcomeMessage": {
               "type": "string",
               "description": "Base64url-encoded MLS Welcome message containing encrypted secrets for ALL new members"
+            },
+            "keyPackageHashes": {
+              "type": "array",
+              "items": {
+                "type": "ref",
+                "ref": "#keyPackageHashEntry"
+              },
+              "description": "Array of {did, hash} objects mapping each new member to their key package hash. Required for multi-device support."
             }
           }
         }
@@ -75,8 +87,28 @@
         {
           "name": "TooManyMembers",
           "description": "Would exceed maximum member count"
+        },
+        {
+          "name": "BlockedByMember",
+          "description": "Cannot add user who has blocked or been blocked by an existing member (Bluesky social graph enforcement)"
         }
       ]
+    },
+    "keyPackageHashEntry": {
+      "type": "object",
+      "description": "Maps a DID to the key package hash used for their Welcome message",
+      "required": ["did", "hash"],
+      "properties": {
+        "did": {
+          "type": "string",
+          "format": "did",
+          "description": "DID of the member"
+        },
+        "hash": {
+          "type": "string",
+          "description": "Hex-encoded SHA-256 hash of the key package used"
+        }
+      }
     }
   }
 }

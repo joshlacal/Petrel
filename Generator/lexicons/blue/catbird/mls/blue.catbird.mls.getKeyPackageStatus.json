@@ -1,0 +1,99 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mls.getKeyPackageStatus",
+  "defs": {
+    "main": {
+      "type": "query",
+      "description": "Get key package statistics and consumption history for the authenticated user. Helps clients detect missing bundles before processing Welcome messages.",
+      "parameters": {
+        "type": "params",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 20,
+            "description": "Maximum number of consumed packages to return in history"
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Pagination cursor from previous response. Returns consumed packages after this cursor."
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["totalUploaded", "available", "consumed"],
+          "properties": {
+            "totalUploaded": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Total number of key packages ever uploaded by this user"
+            },
+            "available": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of available (unconsumed, unreserved) key packages"
+            },
+            "consumed": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of consumed key packages"
+            },
+            "reserved": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of temporarily reserved key packages (during welcome validation)"
+            },
+            "consumedPackages": {
+              "type": "array",
+              "items": {
+                "type": "ref",
+                "ref": "#consumedPackageView"
+              },
+              "description": "Paginated list of consumed key package history"
+            },
+            "cursor": {
+              "type": "string",
+              "description": "Cursor for fetching next page of consumed packages. Omitted if no more results."
+            }
+          }
+        }
+      }
+    },
+    "consumedPackageView": {
+      "type": "object",
+      "description": "View of a consumed key package with usage metadata",
+      "required": ["keyPackageHash", "consumedAt"],
+      "properties": {
+        "keyPackageHash": {
+          "type": "string",
+          "description": "SHA256 hex hash of the key package bytes"
+        },
+        "usedInGroup": {
+          "type": "string",
+          "description": "Group ID (hex-encoded) where this key package was consumed. May be null for historical data."
+        },
+        "consumedAt": {
+          "type": "string",
+          "format": "datetime",
+          "description": "When the key package was consumed"
+        },
+        "cipherSuite": {
+          "type": "string",
+          "description": "Cipher suite of the consumed key package",
+          "knownValues": [
+            "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
+            "MLS_128_DHKEMP256_AES128GCM_SHA256_P256",
+            "MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519",
+            "MLS_256_DHKEMX448_AES256GCM_SHA512_Ed448",
+            "MLS_256_DHKEMP521_AES256GCM_SHA512_P521",
+            "MLS_256_DHKEMX448_CHACHA20POLY1305_SHA512_Ed448"
+          ]
+        }
+      }
+    }
+  }
+}

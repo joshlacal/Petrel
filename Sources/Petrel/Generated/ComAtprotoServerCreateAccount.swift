@@ -331,14 +331,21 @@ public struct Output: ATProtocolCodable {
         
     }
         
-public enum Error: String, Swift.Error, CustomStringConvertible {
-                case invalidHandle = "InvalidHandle."
-                case invalidPassword = "InvalidPassword."
-                case invalidInviteCode = "InvalidInviteCode."
-                case handleNotAvailable = "HandleNotAvailable."
-                case unsupportedDomain = "UnsupportedDomain."
-                case unresolvableDid = "UnresolvableDid."
-                case incompatibleDidDoc = "IncompatibleDidDoc."
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                
+                case invalidHandle = "InvalidHandle"
+                
+                case invalidPassword = "InvalidPassword"
+                
+                case invalidInviteCode = "InvalidInviteCode"
+                
+                case handleNotAvailable = "HandleNotAvailable"
+                
+                case unsupportedDomain = "UnsupportedDomain"
+                
+                case unresolvableDid = "UnresolvableDid"
+                
+                case incompatibleDidDoc = "IncompatibleDidDoc"
             public var description: String {
                 return self.rawValue
             }
@@ -411,7 +418,17 @@ extension ATProtoClient.Com.Atproto.Server {
                 return (responseCode, nil)
             }
         } else {
-            // Don't try to decode error responses as success types
+            // Try to parse structured error response
+            if let atprotoError = ATProtoErrorParser.parse(
+                data: responseData,
+                statusCode: responseCode,
+                errorType: ComAtprotoServerCreateAccount.Error.self
+            ) {
+                throw atprotoError
+            }
+            
+            // If we can't parse a structured error, return the response code
+            // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
         

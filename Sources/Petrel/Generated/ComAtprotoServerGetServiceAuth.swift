@@ -87,8 +87,9 @@ public struct Output: ATProtocolCodable {
         
     }
         
-public enum Error: String, Swift.Error, CustomStringConvertible {
-                case badExpiration = "BadExpiration.Indicates that the requested expiration date is not a valid. May be in the past or may be reliant on the requested scopes."
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                /// Indicates that the requested expiration date is not a valid. May be in the past or may be reliant on the requested scopes.
+                case badExpiration = "BadExpiration"
             public var description: String {
                 return self.rawValue
             }
@@ -97,6 +98,7 @@ public enum Error: String, Swift.Error, CustomStringConvertible {
 
 
 }
+
 
 
 extension ATProtoClient.Com.Atproto.Server {
@@ -150,9 +152,20 @@ extension ATProtoClient.Com.Atproto.Server {
                 return (responseCode, nil)
             }
         } else {
-            // Don't try to decode error responses as success types
+            // Try to parse structured error response
+            if let atprotoError = ATProtoErrorParser.parse(
+                data: responseData,
+                statusCode: responseCode,
+                errorType: ComAtprotoServerGetServiceAuth.Error.self
+            ) {
+                throw atprotoError
+            }
+            
+            // If we can't parse a structured error, return the response code
+            // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
-}                           
+}
+                           
 

@@ -1,0 +1,55 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mls.confirmWelcome",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Confirm successful or failed processing of Welcome message",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["convoId", "success"],
+          "properties": {
+            "convoId": {
+              "type": "string",
+              "description": "Conversation identifier"
+            },
+            "success": {
+              "type": "boolean",
+              "description": "Whether the Welcome message was successfully processed"
+            },
+            "errorDetails": {
+              "type": "string",
+              "description": "Optional error details if processing failed",
+              "maxLength": 1024
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["confirmed"],
+          "properties": {
+            "confirmed": {
+              "type": "boolean",
+              "description": "Whether the confirmation was accepted"
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "name": "ConvoNotFound",
+          "description": "Conversation not found"
+        },
+        {
+          "name": "NotMember",
+          "description": "Caller is not a member of the conversation"
+        }
+      ]
+    }
+  }
+}

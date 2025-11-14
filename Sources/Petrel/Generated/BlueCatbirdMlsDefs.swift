@@ -11,7 +11,6 @@ public struct BlueCatbirdMlsDefs {
         
 public struct ConvoView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mls.defs#convoView"
-            public let id: String
             public let groupId: String
             public let creator: DID
             public let members: [MemberView]
@@ -23,10 +22,9 @@ public struct ConvoView: ATProtocolCodable, ATProtocolValue {
 
         // Standard initializer
         public init(
-            id: String, groupId: String, creator: DID, members: [MemberView], epoch: Int, cipherSuite: String, createdAt: ATProtocolDate, lastMessageAt: ATProtocolDate?, metadata: ConvoMetadata?
+            groupId: String, creator: DID, members: [MemberView], epoch: Int, cipherSuite: String, createdAt: ATProtocolDate, lastMessageAt: ATProtocolDate?, metadata: ConvoMetadata?
         ) {
             
-            self.id = id
             self.groupId = groupId
             self.creator = creator
             self.members = members
@@ -41,18 +39,6 @@ public struct ConvoView: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                
-                
-                self.id = try container.decode(String.self, forKey: .id)
-                
-                
-            } catch {
-                
-                LogManager.logError("Decoding error for required property 'id': \(error)")
-                
-                throw error
-            }
             do {
                 
                 
@@ -157,11 +143,6 @@ public struct ConvoView: ATProtocolCodable, ATProtocolValue {
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             
             
-            try container.encode(id, forKey: .id)
-            
-            
-            
-            
             try container.encode(groupId, forKey: .groupId)
             
             
@@ -205,7 +186,6 @@ public struct ConvoView: ATProtocolCodable, ATProtocolValue {
         }
 
         public func hash(into hasher: inout Hasher) {
-            hasher.combine(id)
             hasher.combine(groupId)
             hasher.combine(creator)
             hasher.combine(members)
@@ -227,13 +207,6 @@ public struct ConvoView: ATProtocolCodable, ATProtocolValue {
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             
             guard let other = other as? Self else { return false }
-            
-            
-            if self.id != other.id {
-                return false
-            }
-            
-            
             
             
             if self.groupId != other.groupId {
@@ -304,14 +277,6 @@ public struct ConvoView: ATProtocolCodable, ATProtocolValue {
 
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            
-            
-            
-            
-            let idValue = try id.toCBORValue()
-            map = map.adding(key: "id", value: idValue)
-            
-            
             
             
             
@@ -389,7 +354,6 @@ public struct ConvoView: ATProtocolCodable, ATProtocolValue {
 
         private enum CodingKeys: String, CodingKey {
             case typeIdentifier = "$type"
-            case id
             case groupId
             case creator
             case members
@@ -544,17 +508,29 @@ public struct ConvoMetadata: ATProtocolCodable, ATProtocolValue {
 public struct MemberView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mls.defs#memberView"
             public let did: DID
+            public let userDid: DID
+            public let deviceId: String?
+            public let deviceName: String?
             public let joinedAt: ATProtocolDate
+            public let isAdmin: Bool
+            public let promotedAt: ATProtocolDate?
+            public let promotedBy: DID?
             public let leafIndex: Int?
             public let credential: Bytes?
 
         // Standard initializer
         public init(
-            did: DID, joinedAt: ATProtocolDate, leafIndex: Int?, credential: Bytes?
+            did: DID, userDid: DID, deviceId: String?, deviceName: String?, joinedAt: ATProtocolDate, isAdmin: Bool, promotedAt: ATProtocolDate?, promotedBy: DID?, leafIndex: Int?, credential: Bytes?
         ) {
             
             self.did = did
+            self.userDid = userDid
+            self.deviceId = deviceId
+            self.deviceName = deviceName
             self.joinedAt = joinedAt
+            self.isAdmin = isAdmin
+            self.promotedAt = promotedAt
+            self.promotedBy = promotedBy
             self.leafIndex = leafIndex
             self.credential = credential
         }
@@ -578,12 +554,84 @@ public struct MemberView: ATProtocolCodable, ATProtocolValue {
             do {
                 
                 
+                self.userDid = try container.decode(DID.self, forKey: .userDid)
+                
+                
+            } catch {
+                
+                LogManager.logError("Decoding error for required property 'userDid': \(error)")
+                
+                throw error
+            }
+            do {
+                
+                
+                self.deviceId = try container.decodeIfPresent(String.self, forKey: .deviceId)
+                
+                
+            } catch {
+                
+                LogManager.logDebug("Decoding error for optional property 'deviceId': \(error)")
+                
+                throw error
+            }
+            do {
+                
+                
+                self.deviceName = try container.decodeIfPresent(String.self, forKey: .deviceName)
+                
+                
+            } catch {
+                
+                LogManager.logDebug("Decoding error for optional property 'deviceName': \(error)")
+                
+                throw error
+            }
+            do {
+                
+                
                 self.joinedAt = try container.decode(ATProtocolDate.self, forKey: .joinedAt)
                 
                 
             } catch {
                 
                 LogManager.logError("Decoding error for required property 'joinedAt': \(error)")
+                
+                throw error
+            }
+            do {
+                
+                
+                self.isAdmin = try container.decode(Bool.self, forKey: .isAdmin)
+                
+                
+            } catch {
+                
+                LogManager.logError("Decoding error for required property 'isAdmin': \(error)")
+                
+                throw error
+            }
+            do {
+                
+                
+                self.promotedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .promotedAt)
+                
+                
+            } catch {
+                
+                LogManager.logDebug("Decoding error for optional property 'promotedAt': \(error)")
+                
+                throw error
+            }
+            do {
+                
+                
+                self.promotedBy = try container.decodeIfPresent(DID.self, forKey: .promotedBy)
+                
+                
+            } catch {
+                
+                LogManager.logDebug("Decoding error for optional property 'promotedBy': \(error)")
                 
                 throw error
             }
@@ -624,7 +672,41 @@ public struct MemberView: ATProtocolCodable, ATProtocolValue {
             
             
             
+            try container.encode(userDid, forKey: .userDid)
+            
+            
+            
+            
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(deviceId, forKey: .deviceId)
+            
+            
+            
+            
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(deviceName, forKey: .deviceName)
+            
+            
+            
+            
             try container.encode(joinedAt, forKey: .joinedAt)
+            
+            
+            
+            
+            try container.encode(isAdmin, forKey: .isAdmin)
+            
+            
+            
+            
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(promotedAt, forKey: .promotedAt)
+            
+            
+            
+            
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(promotedBy, forKey: .promotedBy)
             
             
             
@@ -643,7 +725,29 @@ public struct MemberView: ATProtocolCodable, ATProtocolValue {
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(did)
+            hasher.combine(userDid)
+            if let value = deviceId {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = deviceName {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
             hasher.combine(joinedAt)
+            hasher.combine(isAdmin)
+            if let value = promotedAt {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = promotedBy {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
             if let value = leafIndex {
                 hasher.combine(value)
             } else {
@@ -668,7 +772,49 @@ public struct MemberView: ATProtocolCodable, ATProtocolValue {
             
             
             
+            if self.userDid != other.userDid {
+                return false
+            }
+            
+            
+            
+            
+            if deviceId != other.deviceId {
+                return false
+            }
+            
+            
+            
+            
+            if deviceName != other.deviceName {
+                return false
+            }
+            
+            
+            
+            
             if self.joinedAt != other.joinedAt {
+                return false
+            }
+            
+            
+            
+            
+            if self.isAdmin != other.isAdmin {
+                return false
+            }
+            
+            
+            
+            
+            if promotedAt != other.promotedAt {
+                return false
+            }
+            
+            
+            
+            
+            if promotedBy != other.promotedBy {
                 return false
             }
             
@@ -713,8 +859,68 @@ public struct MemberView: ATProtocolCodable, ATProtocolValue {
             
             
             
+            let userDidValue = try userDid.toCBORValue()
+            map = map.adding(key: "userDid", value: userDidValue)
+            
+            
+            
+            
+            
+            if let value = deviceId {
+                // Encode optional property even if it's an empty array for CBOR
+                
+                let deviceIdValue = try value.toCBORValue()
+                map = map.adding(key: "deviceId", value: deviceIdValue)
+            }
+            
+            
+            
+            
+            
+            if let value = deviceName {
+                // Encode optional property even if it's an empty array for CBOR
+                
+                let deviceNameValue = try value.toCBORValue()
+                map = map.adding(key: "deviceName", value: deviceNameValue)
+            }
+            
+            
+            
+            
+            
+            
             let joinedAtValue = try joinedAt.toCBORValue()
             map = map.adding(key: "joinedAt", value: joinedAtValue)
+            
+            
+            
+            
+            
+            
+            let isAdminValue = try isAdmin.toCBORValue()
+            map = map.adding(key: "isAdmin", value: isAdminValue)
+            
+            
+            
+            
+            
+            if let value = promotedAt {
+                // Encode optional property even if it's an empty array for CBOR
+                
+                let promotedAtValue = try value.toCBORValue()
+                map = map.adding(key: "promotedAt", value: promotedAtValue)
+            }
+            
+            
+            
+            
+            
+            if let value = promotedBy {
+                // Encode optional property even if it's an empty array for CBOR
+                
+                let promotedByValue = try value.toCBORValue()
+                map = map.adding(key: "promotedBy", value: promotedByValue)
+            }
             
             
             
@@ -747,7 +953,13 @@ public struct MemberView: ATProtocolCodable, ATProtocolValue {
         private enum CodingKeys: String, CodingKey {
             case typeIdentifier = "$type"
             case did
+            case userDid
+            case deviceId
+            case deviceName
             case joinedAt
+            case isAdmin
+            case promotedAt
+            case promotedBy
             case leafIndex
             case credential
         }
@@ -757,28 +969,22 @@ public struct MessageView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mls.defs#messageView"
             public let id: String
             public let convoId: String
-            public let sender: DID
             public let ciphertext: Bytes
             public let epoch: Int
             public let seq: Int
             public let createdAt: ATProtocolDate
-            public let embedType: String?
-            public let embedUri: URI?
 
         // Standard initializer
         public init(
-            id: String, convoId: String, sender: DID, ciphertext: Bytes, epoch: Int, seq: Int, createdAt: ATProtocolDate, embedType: String?, embedUri: URI?
+            id: String, convoId: String, ciphertext: Bytes, epoch: Int, seq: Int, createdAt: ATProtocolDate
         ) {
             
             self.id = id
             self.convoId = convoId
-            self.sender = sender
             self.ciphertext = ciphertext
             self.epoch = epoch
             self.seq = seq
             self.createdAt = createdAt
-            self.embedType = embedType
-            self.embedUri = embedUri
         }
 
         // Codable initializer
@@ -806,18 +1012,6 @@ public struct MessageView: ATProtocolCodable, ATProtocolValue {
             } catch {
                 
                 LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                
-                throw error
-            }
-            do {
-                
-                
-                self.sender = try container.decode(DID.self, forKey: .sender)
-                
-                
-            } catch {
-                
-                LogManager.logError("Decoding error for required property 'sender': \(error)")
                 
                 throw error
             }
@@ -869,30 +1063,6 @@ public struct MessageView: ATProtocolCodable, ATProtocolValue {
                 
                 throw error
             }
-            do {
-                
-                
-                self.embedType = try container.decodeIfPresent(String.self, forKey: .embedType)
-                
-                
-            } catch {
-                
-                LogManager.logDebug("Decoding error for optional property 'embedType': \(error)")
-                
-                throw error
-            }
-            do {
-                
-                
-                self.embedUri = try container.decodeIfPresent(URI.self, forKey: .embedUri)
-                
-                
-            } catch {
-                
-                LogManager.logDebug("Decoding error for optional property 'embedUri': \(error)")
-                
-                throw error
-            }
             
         }
 
@@ -907,11 +1077,6 @@ public struct MessageView: ATProtocolCodable, ATProtocolValue {
             
             
             try container.encode(convoId, forKey: .convoId)
-            
-            
-            
-            
-            try container.encode(sender, forKey: .sender)
             
             
             
@@ -934,38 +1099,15 @@ public struct MessageView: ATProtocolCodable, ATProtocolValue {
             try container.encode(createdAt, forKey: .createdAt)
             
             
-            
-            
-            // Encode optional property even if it's an empty array
-            try container.encodeIfPresent(embedType, forKey: .embedType)
-            
-            
-            
-            
-            // Encode optional property even if it's an empty array
-            try container.encodeIfPresent(embedUri, forKey: .embedUri)
-            
-            
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(id)
             hasher.combine(convoId)
-            hasher.combine(sender)
             hasher.combine(ciphertext)
             hasher.combine(epoch)
             hasher.combine(seq)
             hasher.combine(createdAt)
-            if let value = embedType {
-                hasher.combine(value)
-            } else {
-                hasher.combine(nil as Int?)
-            }
-            if let value = embedUri {
-                hasher.combine(value)
-            } else {
-                hasher.combine(nil as Int?)
-            }
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -981,13 +1123,6 @@ public struct MessageView: ATProtocolCodable, ATProtocolValue {
             
             
             if self.convoId != other.convoId {
-                return false
-            }
-            
-            
-            
-            
-            if self.sender != other.sender {
                 return false
             }
             
@@ -1016,20 +1151,6 @@ public struct MessageView: ATProtocolCodable, ATProtocolValue {
             
             
             if self.createdAt != other.createdAt {
-                return false
-            }
-            
-            
-            
-            
-            if embedType != other.embedType {
-                return false
-            }
-            
-            
-            
-            
-            if embedUri != other.embedUri {
                 return false
             }
             
@@ -1068,14 +1189,6 @@ public struct MessageView: ATProtocolCodable, ATProtocolValue {
             
             
             
-            let senderValue = try sender.toCBORValue()
-            map = map.adding(key: "sender", value: senderValue)
-            
-            
-            
-            
-            
-            
             let ciphertextValue = try ciphertext.toCBORValue()
             map = map.adding(key: "ciphertext", value: ciphertextValue)
             
@@ -1105,28 +1218,6 @@ public struct MessageView: ATProtocolCodable, ATProtocolValue {
             
             
             
-            
-            
-            if let value = embedType {
-                // Encode optional property even if it's an empty array for CBOR
-                
-                let embedTypeValue = try value.toCBORValue()
-                map = map.adding(key: "embedType", value: embedTypeValue)
-            }
-            
-            
-            
-            
-            
-            if let value = embedUri {
-                // Encode optional property even if it's an empty array for CBOR
-                
-                let embedUriValue = try value.toCBORValue()
-                map = map.adding(key: "embedUri", value: embedUriValue)
-            }
-            
-            
-            
 
             return map
         }
@@ -1135,13 +1226,10 @@ public struct MessageView: ATProtocolCodable, ATProtocolValue {
             case typeIdentifier = "$type"
             case id
             case convoId
-            case sender
             case ciphertext
             case epoch
             case seq
             case createdAt
-            case embedType
-            case embedUri
         }
     }
         
@@ -1149,15 +1237,17 @@ public struct KeyPackageRef: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mls.defs#keyPackageRef"
             public let did: DID
             public let keyPackage: String
+            public let keyPackageHash: String?
             public let cipherSuite: String
 
         // Standard initializer
         public init(
-            did: DID, keyPackage: String, cipherSuite: String
+            did: DID, keyPackage: String, keyPackageHash: String?, cipherSuite: String
         ) {
             
             self.did = did
             self.keyPackage = keyPackage
+            self.keyPackageHash = keyPackageHash
             self.cipherSuite = cipherSuite
         }
 
@@ -1192,6 +1282,18 @@ public struct KeyPackageRef: ATProtocolCodable, ATProtocolValue {
             do {
                 
                 
+                self.keyPackageHash = try container.decodeIfPresent(String.self, forKey: .keyPackageHash)
+                
+                
+            } catch {
+                
+                LogManager.logDebug("Decoding error for optional property 'keyPackageHash': \(error)")
+                
+                throw error
+            }
+            do {
+                
+                
                 self.cipherSuite = try container.decode(String.self, forKey: .cipherSuite)
                 
                 
@@ -1219,6 +1321,12 @@ public struct KeyPackageRef: ATProtocolCodable, ATProtocolValue {
             
             
             
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(keyPackageHash, forKey: .keyPackageHash)
+            
+            
+            
+            
             try container.encode(cipherSuite, forKey: .cipherSuite)
             
             
@@ -1227,6 +1335,11 @@ public struct KeyPackageRef: ATProtocolCodable, ATProtocolValue {
         public func hash(into hasher: inout Hasher) {
             hasher.combine(did)
             hasher.combine(keyPackage)
+            if let value = keyPackageHash {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
             hasher.combine(cipherSuite)
         }
 
@@ -1243,6 +1356,13 @@ public struct KeyPackageRef: ATProtocolCodable, ATProtocolValue {
             
             
             if self.keyPackage != other.keyPackage {
+                return false
+            }
+            
+            
+            
+            
+            if keyPackageHash != other.keyPackageHash {
                 return false
             }
             
@@ -1287,6 +1407,17 @@ public struct KeyPackageRef: ATProtocolCodable, ATProtocolValue {
             
             
             
+            if let value = keyPackageHash {
+                // Encode optional property even if it's an empty array for CBOR
+                
+                let keyPackageHashValue = try value.toCBORValue()
+                map = map.adding(key: "keyPackageHash", value: keyPackageHashValue)
+            }
+            
+            
+            
+            
+            
             
             let cipherSuiteValue = try cipherSuite.toCBORValue()
             map = map.adding(key: "cipherSuite", value: cipherSuiteValue)
@@ -1301,6 +1432,7 @@ public struct KeyPackageRef: ATProtocolCodable, ATProtocolValue {
             case typeIdentifier = "$type"
             case did
             case keyPackage
+            case keyPackageHash
             case cipherSuite
         }
     }

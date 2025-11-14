@@ -106,9 +106,11 @@ public struct Output: ATProtocolCodable {
         
     }
         
-public enum Error: String, Swift.Error, CustomStringConvertible {
-                case tooManyDids = "TooManyDids.Too many DIDs requested"
-                case invalidDid = "InvalidDid.One or more DIDs are invalid"
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                /// Too many DIDs requested
+                case tooManyDids = "TooManyDids"
+                /// One or more DIDs are invalid
+                case invalidDid = "InvalidDid"
             public var description: String {
                 return self.rawValue
             }
@@ -117,6 +119,7 @@ public enum Error: String, Swift.Error, CustomStringConvertible {
 
 
 }
+
 
 
 extension ATProtoClient.Blue.Catbird.Mls {
@@ -170,9 +173,20 @@ extension ATProtoClient.Blue.Catbird.Mls {
                 return (responseCode, nil)
             }
         } else {
-            // Don't try to decode error responses as success types
+            // Try to parse structured error response
+            if let atprotoError = ATProtoErrorParser.parse(
+                data: responseData,
+                statusCode: responseCode,
+                errorType: BlueCatbirdMlsGetKeyPackages.Error.self
+            ) {
+                throw atprotoError
+            }
+            
+            // If we can't parse a structured error, return the response code
+            // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
-}                           
+}
+                           
 

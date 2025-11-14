@@ -78,10 +78,13 @@ public struct Input: ATProtocolCodable {
         }
     public typealias Output = AppBskyUnspeccedDefs.AgeAssuranceState
             
-public enum Error: String, Swift.Error, CustomStringConvertible {
-                case invalidEmail = "InvalidEmail."
-                case didTooLong = "DidTooLong."
-                case invalidInitiation = "InvalidInitiation."
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                
+                case invalidEmail = "InvalidEmail"
+                
+                case didTooLong = "DidTooLong"
+                
+                case invalidInitiation = "InvalidInitiation"
             public var description: String {
                 return self.rawValue
             }
@@ -154,7 +157,17 @@ extension ATProtoClient.App.Bsky.Unspecced {
                 return (responseCode, nil)
             }
         } else {
-            // Don't try to decode error responses as success types
+            // Try to parse structured error response
+            if let atprotoError = ATProtoErrorParser.parse(
+                data: responseData,
+                statusCode: responseCode,
+                errorType: AppBskyUnspeccedInitAgeAssurance.Error.self
+            ) {
+                throw atprotoError
+            }
+            
+            // If we can't parse a structured error, return the response code
+            // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
         

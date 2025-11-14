@@ -1,0 +1,115 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mls.publishKeyPackages",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Publish multiple MLS key packages in a single batch request (up to 100 packages). More efficient than individual uploads for replenishing key package pools.",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["keyPackages"],
+          "properties": {
+            "keyPackages": {
+              "type": "array",
+              "description": "Array of key packages to upload (max 100)",
+              "minItems": 1,
+              "maxItems": 100,
+              "items": {
+                "type": "ref",
+                "ref": "#keyPackageItem"
+              }
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["succeeded", "failed"],
+          "properties": {
+            "succeeded": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of key packages successfully uploaded"
+            },
+            "failed": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of key packages that failed to upload"
+            },
+            "errors": {
+              "type": "array",
+              "description": "Detailed error information for failed uploads (omitted if all succeeded)",
+              "items": {
+                "type": "ref",
+                "ref": "#batchError"
+              }
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "name": "BatchTooLarge",
+          "description": "Batch size exceeds maximum of 100 key packages"
+        },
+        {
+          "name": "InvalidBatch",
+          "description": "Batch validation failed (see errors array in response)"
+        }
+      ]
+    },
+    "keyPackageItem": {
+      "type": "object",
+      "description": "A single key package in a batch upload",
+      "required": ["keyPackage", "cipherSuite", "expires"],
+      "properties": {
+        "keyPackage": {
+          "type": "string",
+          "description": "Base64-encoded MLS key package",
+          "maxLength": 65536
+        },
+        "cipherSuite": {
+          "type": "string",
+          "description": "Cipher suite of the key package",
+          "knownValues": [
+            "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
+            "MLS_128_DHKEMP256_AES128GCM_SHA256_P256",
+            "MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519",
+            "MLS_256_DHKEMX448_AES256GCM_SHA512_Ed448",
+            "MLS_256_DHKEMP521_AES256GCM_SHA512_P521",
+            "MLS_256_DHKEMX448_CHACHA20POLY1305_SHA512_Ed448"
+          ]
+        },
+        "expires": {
+          "type": "string",
+          "format": "datetime",
+          "description": "Expiration timestamp (required, max 90 days from now)"
+        },
+        "idempotencyKey": {
+          "type": "string",
+          "description": "Client-generated UUID for deduplication within batch. Optional but recommended for reliability."
+        }
+      }
+    },
+    "batchError": {
+      "type": "object",
+      "description": "Error information for a failed key package upload",
+      "required": ["index", "error"],
+      "properties": {
+        "index": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Zero-based index of the key package that failed"
+        },
+        "error": {
+          "type": "string",
+          "description": "Human-readable error message describing why the upload failed"
+        }
+      }
+    }
+  }
+}

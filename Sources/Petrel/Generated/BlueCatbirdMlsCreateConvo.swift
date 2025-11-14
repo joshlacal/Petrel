@@ -148,19 +148,147 @@ public struct MetadataInput: ATProtocolCodable, ATProtocolValue {
             case description
         }
     }
+        
+public struct KeyPackageHashEntry: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "blue.catbird.mls.createConvo#keyPackageHashEntry"
+            public let did: DID
+            public let hash: String
+
+        // Standard initializer
+        public init(
+            did: DID, hash: String
+        ) {
+            
+            self.did = did
+            self.hash = hash
+        }
+
+        // Codable initializer
+        public init(from decoder: Decoder) throws {
+            
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                
+                
+                self.did = try container.decode(DID.self, forKey: .did)
+                
+                
+            } catch {
+                
+                LogManager.logError("Decoding error for required property 'did': \(error)")
+                
+                throw error
+            }
+            do {
+                
+                
+                self.hash = try container.decode(String.self, forKey: .hash)
+                
+                
+            } catch {
+                
+                LogManager.logError("Decoding error for required property 'hash': \(error)")
+                
+                throw error
+            }
+            
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            
+            
+            try container.encode(did, forKey: .did)
+            
+            
+            
+            
+            try container.encode(hash, forKey: .hash)
+            
+            
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(did)
+            hasher.combine(hash)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
+            guard let other = other as? Self else { return false }
+            
+            
+            if self.did != other.did {
+                return false
+            }
+            
+            
+            
+            
+            if self.hash != other.hash {
+                return false
+            }
+            
+            
+            return true
+            
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        // DAGCBOR encoding with field ordering
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+
+            
+            
+            
+            
+            let didValue = try did.toCBORValue()
+            map = map.adding(key: "did", value: didValue)
+            
+            
+            
+            
+            
+            
+            let hashValue = try hash.toCBORValue()
+            map = map.adding(key: "hash", value: hashValue)
+            
+            
+            
+
+            return map
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case did
+            case hash
+        }
+    }
 public struct Input: ATProtocolCodable {
             public let groupId: String
+            public let idempotencyKey: String?
             public let cipherSuite: String
             public let initialMembers: [DID]?
             public let welcomeMessage: String?
+            public let keyPackageHashes: [KeyPackageHashEntry]?
             public let metadata: MetadataInput?
 
             // Standard public initializer
-            public init(groupId: String, cipherSuite: String, initialMembers: [DID]? = nil, welcomeMessage: String? = nil, metadata: MetadataInput? = nil) {
+            public init(groupId: String, idempotencyKey: String? = nil, cipherSuite: String, initialMembers: [DID]? = nil, welcomeMessage: String? = nil, keyPackageHashes: [KeyPackageHashEntry]? = nil, metadata: MetadataInput? = nil) {
                 self.groupId = groupId
+                self.idempotencyKey = idempotencyKey
                 self.cipherSuite = cipherSuite
                 self.initialMembers = initialMembers
                 self.welcomeMessage = welcomeMessage
+                self.keyPackageHashes = keyPackageHashes
                 self.metadata = metadata
                 
             }
@@ -169,6 +297,9 @@ public struct Input: ATProtocolCodable {
                 let container = try decoder.container(keyedBy: CodingKeys.self)
                 
                 self.groupId = try container.decode(String.self, forKey: .groupId)
+                
+                
+                self.idempotencyKey = try container.decodeIfPresent(String.self, forKey: .idempotencyKey)
                 
                 
                 self.cipherSuite = try container.decode(String.self, forKey: .cipherSuite)
@@ -180,6 +311,9 @@ public struct Input: ATProtocolCodable {
                 self.welcomeMessage = try container.decodeIfPresent(String.self, forKey: .welcomeMessage)
                 
                 
+                self.keyPackageHashes = try container.decodeIfPresent([KeyPackageHashEntry].self, forKey: .keyPackageHashes)
+                
+                
                 self.metadata = try container.decodeIfPresent(MetadataInput.self, forKey: .metadata)
                 
             }
@@ -188,6 +322,10 @@ public struct Input: ATProtocolCodable {
                 var container = encoder.container(keyedBy: CodingKeys.self)
                 
                 try container.encode(groupId, forKey: .groupId)
+                
+                
+                // Encode optional property even if it's an empty array
+                try container.encodeIfPresent(idempotencyKey, forKey: .idempotencyKey)
                 
                 
                 try container.encode(cipherSuite, forKey: .cipherSuite)
@@ -202,15 +340,21 @@ public struct Input: ATProtocolCodable {
                 
                 
                 // Encode optional property even if it's an empty array
+                try container.encodeIfPresent(keyPackageHashes, forKey: .keyPackageHashes)
+                
+                
+                // Encode optional property even if it's an empty array
                 try container.encodeIfPresent(metadata, forKey: .metadata)
                 
             }
             
             private enum CodingKeys: String, CodingKey {
                 case groupId
+                case idempotencyKey
                 case cipherSuite
                 case initialMembers
                 case welcomeMessage
+                case keyPackageHashes
                 case metadata
             }
             
@@ -221,6 +365,14 @@ public struct Input: ATProtocolCodable {
                 
                 let groupIdValue = try groupId.toCBORValue()
                 map = map.adding(key: "groupId", value: groupIdValue)
+                
+                
+                
+                if let value = idempotencyKey {
+                    // Encode optional property even if it's an empty array for CBOR
+                    let idempotencyKeyValue = try value.toCBORValue()
+                    map = map.adding(key: "idempotencyKey", value: idempotencyKeyValue)
+                }
                 
                 
                 
@@ -245,6 +397,14 @@ public struct Input: ATProtocolCodable {
                 
                 
                 
+                if let value = keyPackageHashes {
+                    // Encode optional property even if it's an empty array for CBOR
+                    let keyPackageHashesValue = try value.toCBORValue()
+                    map = map.adding(key: "keyPackageHashes", value: keyPackageHashesValue)
+                }
+                
+                
+                
                 if let value = metadata {
                     // Encode optional property even if it's an empty array for CBOR
                     let metadataValue = try value.toCBORValue()
@@ -258,10 +418,15 @@ public struct Input: ATProtocolCodable {
         }
     public typealias Output = BlueCatbirdMlsDefs.ConvoView
             
-public enum Error: String, Swift.Error, CustomStringConvertible {
-                case invalidCipherSuite = "InvalidCipherSuite.The specified cipher suite is not supported"
-                case keyPackageNotFound = "KeyPackageNotFound.Key package not found for one or more initial members"
-                case tooManyMembers = "TooManyMembers.Too many initial members specified (max 100)"
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                /// The specified cipher suite is not supported
+                case invalidCipherSuite = "InvalidCipherSuite"
+                /// Key package not found for one or more initial members
+                case keyPackageNotFound = "KeyPackageNotFound"
+                /// Too many initial members specified (max 100)
+                case tooManyMembers = "TooManyMembers"
+                /// Cannot create conversation with users who have blocked each other on Bluesky
+                case mutualBlockDetected = "MutualBlockDetected"
             public var description: String {
                 return self.rawValue
             }
@@ -334,7 +499,17 @@ extension ATProtoClient.Blue.Catbird.Mls {
                 return (responseCode, nil)
             }
         } else {
-            // Don't try to decode error responses as success types
+            // Try to parse structured error response
+            if let atprotoError = ATProtoErrorParser.parse(
+                data: responseData,
+                statusCode: responseCode,
+                errorType: BlueCatbirdMlsCreateConvo.Error.self
+            ) {
+                throw atprotoError
+            }
+            
+            // If we can't parse a structured error, return the response code
+            // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
         

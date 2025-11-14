@@ -81,8 +81,9 @@ public struct Output: ATProtocolCodable {
         
     }
         
-public enum Error: String, Swift.Error, CustomStringConvertible {
-                case handleNotFound = "HandleNotFound.The resolution process confirmed that the handle does not resolve to any DID."
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                /// The resolution process confirmed that the handle does not resolve to any DID.
+                case handleNotFound = "HandleNotFound"
             public var description: String {
                 return self.rawValue
             }
@@ -91,6 +92,7 @@ public enum Error: String, Swift.Error, CustomStringConvertible {
 
 
 }
+
 
 
 extension ATProtoClient.Com.Atproto.Identity {
@@ -144,9 +146,20 @@ extension ATProtoClient.Com.Atproto.Identity {
                 return (responseCode, nil)
             }
         } else {
-            // Don't try to decode error responses as success types
+            // Try to parse structured error response
+            if let atprotoError = ATProtoErrorParser.parse(
+                data: responseData,
+                statusCode: responseCode,
+                errorType: ComAtprotoIdentityResolveHandle.Error.self
+            ) {
+                throw atprotoError
+            }
+            
+            // If we can't parse a structured error, return the response code
+            // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
-}                           
+}
+                           
 

@@ -1,0 +1,97 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mls.getReports",
+  "description": "Get reports for a conversation (admin-only)",
+  "defs": {
+    "main": {
+      "type": "query",
+      "description": "Retrieve reports for a conversation. Admin-only endpoint. Returns encrypted report blobs that admins must decrypt locally using MLS group key.",
+      "parameters": {
+        "type": "params",
+        "required": ["convoId"],
+        "properties": {
+          "convoId": { 
+            "type": "string",
+            "description": "Conversation identifier"
+          },
+          "status": {
+            "type": "string",
+            "description": "Filter by report status",
+            "knownValues": ["pending", "resolved", "dismissed"]
+          },
+          "limit": { 
+            "type": "integer", 
+            "minimum": 1, 
+            "maximum": 100, 
+            "default": 50,
+            "description": "Maximum number of reports to return"
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["reports"],
+          "properties": {
+            "reports": {
+              "type": "array",
+              "items": { "type": "ref", "ref": "#reportView" },
+              "description": "List of reports (encrypted content)"
+            }
+          }
+        }
+      },
+      "errors": [
+        { "name": "NotAdmin", "description": "Caller is not an admin" },
+        { "name": "ConvoNotFound", "description": "Conversation not found" }
+      ]
+    },
+    
+    "reportView": {
+      "type": "object",
+      "required": ["id", "reporterDid", "reportedDid", "encryptedContent", "createdAt", "status"],
+      "description": "Report metadata and encrypted content blob",
+      "properties": {
+        "id": { 
+          "type": "string",
+          "description": "Report identifier"
+        },
+        "reporterDid": { 
+          "type": "string", 
+          "format": "did",
+          "description": "DID of member who submitted report"
+        },
+        "reportedDid": { 
+          "type": "string", 
+          "format": "did",
+          "description": "DID of reported member"
+        },
+        "encryptedContent": { 
+          "type": "bytes",
+          "description": "Encrypted report content (admin must decrypt locally)"
+        },
+        "createdAt": { 
+          "type": "string", 
+          "format": "datetime",
+          "description": "When report was submitted"
+        },
+        "status": { 
+          "type": "string",
+          "description": "Report status",
+          "knownValues": ["pending", "resolved", "dismissed"]
+        },
+        "resolvedBy": { 
+          "type": "string", 
+          "format": "did",
+          "description": "DID of admin who resolved report"
+        },
+        "resolvedAt": { 
+          "type": "string", 
+          "format": "datetime",
+          "description": "When report was resolved"
+        }
+      }
+    }
+  }
+}

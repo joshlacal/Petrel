@@ -112,11 +112,15 @@ public struct Output: ATProtocolCodable {
         
     }
         
-public enum Error: String, Swift.Error, CustomStringConvertible {
-                case repoNotFound = "RepoNotFound."
-                case repoTakendown = "RepoTakendown."
-                case repoSuspended = "RepoSuspended."
-                case repoDeactivated = "RepoDeactivated."
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                
+                case repoNotFound = "RepoNotFound"
+                
+                case repoTakendown = "RepoTakendown"
+                
+                case repoSuspended = "RepoSuspended"
+                
+                case repoDeactivated = "RepoDeactivated"
             public var description: String {
                 return self.rawValue
             }
@@ -125,6 +129,7 @@ public enum Error: String, Swift.Error, CustomStringConvertible {
 
 
 }
+
 
 
 extension ATProtoClient.Com.Atproto.Sync {
@@ -178,9 +183,20 @@ extension ATProtoClient.Com.Atproto.Sync {
                 return (responseCode, nil)
             }
         } else {
-            // Don't try to decode error responses as success types
+            // Try to parse structured error response
+            if let atprotoError = ATProtoErrorParser.parse(
+                data: responseData,
+                statusCode: responseCode,
+                errorType: ComAtprotoSyncListBlobs.Error.self
+            ) {
+                throw atprotoError
+            }
+            
+            // If we can't parse a structured error, return the response code
+            // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
-}                           
+}
+                           
 

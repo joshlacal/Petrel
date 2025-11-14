@@ -6,12 +6,11 @@
     "convoView": {
       "type": "object",
       "description": "View of an MLS conversation with member and epoch information",
-      "required": ["id", "groupId", "creator", "members", "epoch", "cipherSuite", "createdAt"],
+      "required": ["groupId", "creator", "members", "epoch", "cipherSuite", "createdAt"],
       "properties": {
-        "id": { "type": "string", "description": "Conversation identifier (TID)" },
         "groupId": {
           "type": "string",
-          "description": "MLS group identifier (hex-encoded)",
+          "description": "MLS group identifier (hex-encoded) - canonical conversation ID",
           "maxLength": 128
         },
         "creator": { "type": "string", "format": "did", "description": "DID of the conversation creator" },
@@ -46,30 +45,63 @@
 
     "memberView": {
       "type": "object",
-      "description": "View of a conversation member with MLS credentials",
-      "required": ["did", "joinedAt"],
+      "description": "View of a conversation member representing a single device. Multiple devices per user appear as separate members in MLS layer, but UI should group by userDid.",
+      "required": ["did", "userDid", "joinedAt", "isAdmin"],
       "properties": {
-        "did": { "type": "string", "format": "did", "description": "Member DID" },
-        "joinedAt": { "type": "string", "format": "datetime", "description": "When member joined the conversation" },
-        "leafIndex": { "type": "integer", "minimum": 0, "description": "MLS leaf index in tree structure" },
+        "did": {
+          "type": "string",
+          "format": "did",
+          "description": "Device-specific MLS DID (format: did:plc:user#device-uuid). Used in MLS operations."
+        },
+        "userDid": {
+          "type": "string",
+          "format": "did",
+          "description": "User DID without device suffix (format: did:plc:user). Used for UI grouping and admin status sync."
+        },
+        "deviceId": {
+          "type": "string",
+          "description": "Device identifier (UUID). Unique per device."
+        },
+        "deviceName": {
+          "type": "string",
+          "maxLength": 128,
+          "description": "Human-readable device name (e.g., 'Josh's iPhone'). Optional, may be null for legacy members."
+        },
+        "joinedAt": { "type": "string", "format": "datetime", "description": "When this device joined the conversation" },
+        "isAdmin": {
+          "type": "boolean",
+          "description": "Whether this member (device) has admin privileges. Admin status is synced across all devices of the same user."
+        },
+        "promotedAt": {
+          "type": "string",
+          "format": "datetime",
+          "description": "When member was promoted to admin (if applicable)"
+        },
+        "promotedBy": {
+          "type": "string",
+          "format": "did",
+          "description": "DID of admin who promoted this member (if applicable)"
+        },
+        "leafIndex": { "type": "integer", "minimum": 0, "description": "MLS leaf index in ratchet tree structure" },
         "credential": { "type": "bytes", "description": "MLS credential bytes" }
       }
     },
 
     "messageView": {
       "type": "object",
-      "description": "View of an encrypted MLS message",
-      "required": ["id", "convoId", "sender", "ciphertext", "epoch", "seq", "createdAt"],
+      "description": "View of an encrypted MLS message. Server follows 'dumb delivery service' model - sender identity must be derived by clients from decrypted MLS content for metadata privacy. Server GUARANTEES: (1) Sequential (epoch, seq) assignment per conversation, (2) Monotonic seq increment, (3) No seq reuse. Clients MUST process messages in (epoch ASC, seq ASC) order for correct MLS decryption.",
+      "required": ["id", "convoId", "ciphertext", "epoch", "seq", "createdAt"],
       "properties": {
-        "id": { "type": "string", "description": "Message identifier" },
+        "id": { "type": "string", "description": "Message identifier (ULID for deduplication)" },
         "convoId": { "type": "string", "description": "Conversation identifier" },
-        "sender": { "type": "string", "format": "did", "description": "DID of message sender" },
         "ciphertext": { "type": "bytes", "description": "MLS encrypted message ciphertext bytes", "maxLength": 10485760 },
         "epoch": { "type": "integer", "minimum": 0, "description": "MLS epoch when message was sent" },
-        "seq": { "type": "integer", "minimum": 0, "description": "Sequence number within conversation" },
-        "createdAt": { "type": "string", "format": "datetime", "description": "Message creation timestamp" },
-        "embedType": { "type": "string", "description": "Optional embed type (e.g., 'tenor', 'bsky_post', 'link')", "maxLength": 256 },
-        "embedUri": { "type": "string", "format": "uri", "description": "Optional embed URI reference (Tenor URL, AT-URI for Bluesky posts, etc.)" }
+        "seq": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Monotonically increasing sequence number within conversation. Server assigns sequentially starting from 1. Gaps may occur when members are removed from the conversation, but seq values are never reused."
+        },
+        "createdAt": { "type": "string", "format": "datetime", "description": "Message creation timestamp (bucketed to 2-second intervals for traffic analysis protection)" }
       }
     },
 
@@ -80,6 +112,11 @@
       "properties": {
         "did": { "type": "string", "format": "did", "description": "Owner DID" },
         "keyPackage": { "type": "string", "description": "Base64url-encoded MLS key package bytes" },
+        "keyPackageHash": {
+          "type": "string",
+          "description": "Hex-encoded SHA-256 hash of the key package bytes. Clients should use this server-computed hash when creating conversations to ensure hash consistency.",
+          "maxLength": 64
+        },
         "cipherSuite": {
           "type": "string",
           "description": "Supported cipher suite for this key package",

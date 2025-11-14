@@ -4,7 +4,7 @@
   "defs": {
     "main": {
       "type": "query",
-      "description": "Retrieve messages from an MLS conversation",
+      "description": "Retrieve messages from an MLS conversation. Messages are GUARANTEED to be returned in MLS sequential order (epoch ASC, seq ASC). Clients MUST process messages in this order for proper MLS decryption.",
       "parameters": {
         "type": "params",
         "required": ["convoId"],
@@ -20,9 +20,10 @@
             "default": 50,
             "description": "Maximum number of messages to return"
           },
-          "sinceMessage": {
-            "type": "string",
-            "description": "Message ID to fetch messages after (pagination cursor)"
+          "sinceSeq": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Fetch messages with seq > sinceSeq (pagination cursor). Use lastSeq from previous response."
           }
         }
       },
@@ -38,11 +39,16 @@
                 "type": "ref",
                 "ref": "blue.catbird.mls.defs#messageView"
               },
-              "description": "List of messages"
+              "description": "Messages in MLS sequential order (epoch ASC, seq ASC). Clients MUST process in this order."
             },
-            "cursor": {
-              "type": "string",
-              "description": "Cursor for next page of messages (if more available)"
+            "lastSeq": {
+              "type": "integer",
+              "description": "Sequence number of the last message in this response. Use as sinceSeq for next page. Omitted if no messages returned."
+            },
+            "gapInfo": {
+              "type": "ref",
+              "ref": "#gapInfo",
+              "description": "Gap detection metadata for missing messages. Omitted if no gaps detected or conversation is empty."
             }
           }
         }
@@ -58,9 +64,32 @@
         },
         {
           "name": "InvalidCursor",
-          "description": "Pagination cursor is invalid"
+          "description": "sinceSeq parameter is invalid or exceeds available messages"
         }
       ]
+    },
+    "gapInfo": {
+      "type": "object",
+      "description": "Metadata about missing sequence numbers in a conversation. Gaps can occur when members are removed from the conversation.",
+      "required": ["hasGaps", "missingSeqs", "totalMessages"],
+      "properties": {
+        "hasGaps": {
+          "type": "boolean",
+          "description": "Whether there are gaps in the sequence number range"
+        },
+        "missingSeqs": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "description": "Array of missing sequence numbers within the conversation's min-max seq range. Empty if hasGaps is false."
+        },
+        "totalMessages": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total number of messages in the conversation (including gaps)"
+        }
+      }
     }
   }
 }

@@ -1,0 +1,76 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mls.registerDevice",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Register a device for multi-device MLS support. Each device gets a unique device ID and credential (did:plc:user#device-uuid). Required for proper multi-device group conversations.",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["deviceId", "deviceName"],
+          "properties": {
+            "deviceId": {
+              "type": "string",
+              "description": "Unique device identifier (UUID). Client-generated and persisted across app launches.",
+              "minLength": 36,
+              "maxLength": 36
+            },
+            "deviceName": {
+              "type": "string",
+              "description": "Human-readable device name (e.g., 'Josh's iPhone', 'MacBook Pro')",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "platform": {
+              "type": "string",
+              "description": "Device platform",
+              "enum": ["ios", "android", "web", "desktop"]
+            },
+            "appVersion": {
+              "type": "string",
+              "description": "App version string",
+              "maxLength": 50
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["deviceId", "credentialDid", "userDid", "registeredAt"],
+          "properties": {
+            "deviceId": {
+              "type": "string",
+              "description": "Confirmed device ID"
+            },
+            "credentialDid": {
+              "type": "string",
+              "description": "Full device credential DID (did:plc:user#device-uuid). Use this as the MLS credential identity."
+            },
+            "userDid": {
+              "type": "string",
+              "description": "Base user DID without device suffix"
+            },
+            "registeredAt": {
+              "type": "string",
+              "format": "datetime",
+              "description": "When the device was registered"
+            },
+            "isNewDevice": {
+              "type": "boolean",
+              "description": "True if this is a new registration, false if updating existing device"
+            }
+          }
+        }
+      },
+      "errors": [
+        {"name": "InvalidDeviceId"},
+        {"name": "InvalidDeviceName"},
+        {"name": "DeviceAlreadyRegistered"}
+      ]
+    }
+  }
+}

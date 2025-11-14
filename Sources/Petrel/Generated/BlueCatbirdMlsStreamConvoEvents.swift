@@ -9,6 +9,94 @@ public struct BlueCatbirdMlsStreamConvoEvents {
 
     public static let typeIdentifier = "blue.catbird.mls.streamConvoEvents"
         
+public struct EventWrapper: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "blue.catbird.mls.streamConvoEvents#eventWrapper"
+            public let event: EventWrapperEventUnion
+
+        // Standard initializer
+        public init(
+            event: EventWrapperEventUnion
+        ) {
+            
+            self.event = event
+        }
+
+        // Codable initializer
+        public init(from decoder: Decoder) throws {
+            
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                
+                
+                self.event = try container.decode(EventWrapperEventUnion.self, forKey: .event)
+                
+                
+            } catch {
+                
+                LogManager.logError("Decoding error for required property 'event': \(error)")
+                
+                throw error
+            }
+            
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            
+            
+            try container.encode(event, forKey: .event)
+            
+            
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(event)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
+            guard let other = other as? Self else { return false }
+            
+            
+            if self.event != other.event {
+                return false
+            }
+            
+            
+            return true
+            
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        // DAGCBOR encoding with field ordering
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+
+            
+            
+            
+            
+            let eventValue = try event.toCBORValue()
+            map = map.adding(key: "event", value: eventValue)
+            
+            
+            
+
+            return map
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case event
+        }
+    }
+        
 public struct MessageEvent: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mls.streamConvoEvents#messageEvent"
             public let cursor: String
@@ -733,73 +821,209 @@ public struct Parameters: Parametrizable {
             
         }
     }
+    public typealias Output = EventWrapper
     
-public struct Output: ATProtocolCodable {
-        
-        
-        public let data: Data
-        
-        
-        
-        // Standard public initializer
-        public init(
-            
-            
-            data: Data
-            
-            
-        ) {
-            
-            
-            self.data = data
-            
-            
-        }
-        
-        public init(from decoder: Decoder) throws {
-            
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            
-            self.data = try container.decode(Data.self, forKey: .data)
-            
-            
-        }
-        
-        public func encode(to encoder: Encoder) throws {
-            
-            var container = encoder.container(keyedBy: CodingKeys.self)
-            
-            try container.encode(data, forKey: .data)
-            
-            
-        }
 
-        public func toCBORValue() throws -> Any {
-            
-            var map = OrderedCBORMap()
 
-            
-            
-            let dataValue = try data.toCBORValue()
-            map = map.adding(key: "data", value: dataValue)
-            
-            
 
-            return map
-            
-        }
-        
-        
-        private enum CodingKeys: String, CodingKey {
-            case data
-        }
-        
+
+
+public enum EventWrapperEventUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
+    case blueCatbirdMlsStreamConvoEventsMessageEvent(BlueCatbirdMlsStreamConvoEvents.MessageEvent)
+    case blueCatbirdMlsStreamConvoEventsReactionEvent(BlueCatbirdMlsStreamConvoEvents.ReactionEvent)
+    case blueCatbirdMlsStreamConvoEventsTypingEvent(BlueCatbirdMlsStreamConvoEvents.TypingEvent)
+    case blueCatbirdMlsStreamConvoEventsInfoEvent(BlueCatbirdMlsStreamConvoEvents.InfoEvent)
+    case unexpected(ATProtocolValueContainer)
+    public init(_ value: BlueCatbirdMlsStreamConvoEvents.MessageEvent) {
+        self = .blueCatbirdMlsStreamConvoEventsMessageEvent(value)
+    }
+    public init(_ value: BlueCatbirdMlsStreamConvoEvents.ReactionEvent) {
+        self = .blueCatbirdMlsStreamConvoEventsReactionEvent(value)
+    }
+    public init(_ value: BlueCatbirdMlsStreamConvoEvents.TypingEvent) {
+        self = .blueCatbirdMlsStreamConvoEventsTypingEvent(value)
+    }
+    public init(_ value: BlueCatbirdMlsStreamConvoEvents.InfoEvent) {
+        self = .blueCatbirdMlsStreamConvoEventsInfoEvent(value)
     }
 
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let typeValue = try container.decode(String.self, forKey: .type)
 
+        switch typeValue {
+        case "blue.catbird.mls.streamConvoEvents#messageEvent":
+            let value = try BlueCatbirdMlsStreamConvoEvents.MessageEvent(from: decoder)
+            self = .blueCatbirdMlsStreamConvoEventsMessageEvent(value)
+        case "blue.catbird.mls.streamConvoEvents#reactionEvent":
+            let value = try BlueCatbirdMlsStreamConvoEvents.ReactionEvent(from: decoder)
+            self = .blueCatbirdMlsStreamConvoEventsReactionEvent(value)
+        case "blue.catbird.mls.streamConvoEvents#typingEvent":
+            let value = try BlueCatbirdMlsStreamConvoEvents.TypingEvent(from: decoder)
+            self = .blueCatbirdMlsStreamConvoEventsTypingEvent(value)
+        case "blue.catbird.mls.streamConvoEvents#infoEvent":
+            let value = try BlueCatbirdMlsStreamConvoEvents.InfoEvent(from: decoder)
+            self = .blueCatbirdMlsStreamConvoEventsInfoEvent(value)
+        default:
+            let unknownValue = try ATProtocolValueContainer(from: decoder)
+            self = .unexpected(unknownValue)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+
+        switch self {
+        case .blueCatbirdMlsStreamConvoEventsMessageEvent(let value):
+            try container.encode("blue.catbird.mls.streamConvoEvents#messageEvent", forKey: .type)
+            try value.encode(to: encoder)
+        case .blueCatbirdMlsStreamConvoEventsReactionEvent(let value):
+            try container.encode("blue.catbird.mls.streamConvoEvents#reactionEvent", forKey: .type)
+            try value.encode(to: encoder)
+        case .blueCatbirdMlsStreamConvoEventsTypingEvent(let value):
+            try container.encode("blue.catbird.mls.streamConvoEvents#typingEvent", forKey: .type)
+            try value.encode(to: encoder)
+        case .blueCatbirdMlsStreamConvoEventsInfoEvent(let value):
+            try container.encode("blue.catbird.mls.streamConvoEvents#infoEvent", forKey: .type)
+            try value.encode(to: encoder)
+        case .unexpected(let container):
+            try container.encode(to: encoder)
+        }
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        switch self {
+        case .blueCatbirdMlsStreamConvoEventsMessageEvent(let value):
+            hasher.combine("blue.catbird.mls.streamConvoEvents#messageEvent")
+            hasher.combine(value)
+        case .blueCatbirdMlsStreamConvoEventsReactionEvent(let value):
+            hasher.combine("blue.catbird.mls.streamConvoEvents#reactionEvent")
+            hasher.combine(value)
+        case .blueCatbirdMlsStreamConvoEventsTypingEvent(let value):
+            hasher.combine("blue.catbird.mls.streamConvoEvents#typingEvent")
+            hasher.combine(value)
+        case .blueCatbirdMlsStreamConvoEventsInfoEvent(let value):
+            hasher.combine("blue.catbird.mls.streamConvoEvents#infoEvent")
+            hasher.combine(value)
+        case .unexpected(let container):
+            hasher.combine("unexpected")
+            hasher.combine(container)
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case type = "$type"
+    }
+    
+    public static func == (lhs: EventWrapperEventUnion, rhs: EventWrapperEventUnion) -> Bool {
+        switch (lhs, rhs) {
+        case (.blueCatbirdMlsStreamConvoEventsMessageEvent(let lhsValue),
+              .blueCatbirdMlsStreamConvoEventsMessageEvent(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.blueCatbirdMlsStreamConvoEventsReactionEvent(let lhsValue),
+              .blueCatbirdMlsStreamConvoEventsReactionEvent(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.blueCatbirdMlsStreamConvoEventsTypingEvent(let lhsValue),
+              .blueCatbirdMlsStreamConvoEventsTypingEvent(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.blueCatbirdMlsStreamConvoEventsInfoEvent(let lhsValue),
+              .blueCatbirdMlsStreamConvoEventsInfoEvent(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.unexpected(let lhsValue), .unexpected(let rhsValue)):
+            return lhsValue.isEqual(to: rhsValue)
+        default:
+            return false
+        }
+    }
+    
+    public func isEqual(to other: any ATProtocolValue) -> Bool {
+        guard let other = other as? EventWrapperEventUnion else { return false }
+        return self == other
+    }
+    
+    // DAGCBOR encoding with field ordering
+    public func toCBORValue() throws -> Any {
+        // Create an ordered map to maintain field order
+        var map = OrderedCBORMap()
+        
+        switch self {
+        case .blueCatbirdMlsStreamConvoEventsMessageEvent(let value):
+            map = map.adding(key: "$type", value: "blue.catbird.mls.streamConvoEvents#messageEvent")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .blueCatbirdMlsStreamConvoEventsReactionEvent(let value):
+            map = map.adding(key: "$type", value: "blue.catbird.mls.streamConvoEvents#reactionEvent")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .blueCatbirdMlsStreamConvoEventsTypingEvent(let value):
+            map = map.adding(key: "$type", value: "blue.catbird.mls.streamConvoEvents#typingEvent")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .blueCatbirdMlsStreamConvoEventsInfoEvent(let value):
+            map = map.adding(key: "$type", value: "blue.catbird.mls.streamConvoEvents#infoEvent")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .unexpected(let container):
+            return try container.toCBORValue()
+        }
+    }
+}
 
 
 }
+
 
 
 extension ATProtoClient.Blue.Catbird.Mls {
@@ -809,9 +1033,9 @@ extension ATProtoClient.Blue.Catbird.Mls {
     /// 
     /// - Parameter input: The input parameters for the request
     /// 
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func streamConvoEvents(input: BlueCatbirdMlsStreamConvoEvents.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsStreamConvoEvents.Output?) {
+    /// - Returns: AsyncThrowingStream of events from the Server-Sent Events stream
+    /// - Throws: NetworkError if the request fails or the connection cannot be established
+    public func streamConvoEvents(input: BlueCatbirdMlsStreamConvoEvents.Parameters) async throws -> AsyncThrowingStream<BlueCatbirdMlsStreamConvoEvents.Output, Error> {
         let endpoint = "blue.catbird.mls.streamConvoEvents"
 
         
@@ -828,33 +1052,80 @@ extension ATProtoClient.Blue.Catbird.Mls {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "blue.catbird.mls.streamConvoEvents")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        let responseCode = response.statusCode
 
-        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-            throw NetworkError.invalidContentType(expected: "text/event-stream", actual: "nil")
-        }
+        return AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    // Use networkService to prepare authenticated streaming request with OAuth/DPoP
+                    let authenticatedRequest = try await networkService.prepareStreamingRequest(
+                        urlRequest,
+                        additionalHeaders: proxyHeaders
+                    )
 
-        if !contentType.lowercased().contains("text/event-stream") {
-            throw NetworkError.invalidContentType(expected: "text/event-stream", actual: contentType)
-        }
+                    // Stream with the authenticated request
+                    let (bytes, response) = try await URLSession.shared.bytes(for: authenticatedRequest)
 
-        // Only decode response data if request was successful
-        if (200...299).contains(responseCode) {
-            do {
-                
-                let decodedData = BlueCatbirdMlsStreamConvoEvents.Output(data: responseData)
-                
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for blue.catbird.mls.streamConvoEvents: \(error)")
-                return (responseCode, nil)
+                    guard let httpResponse = response as? HTTPURLResponse else {
+                        continuation.finish(throwing: NetworkError.invalidResponse(description: "Non-HTTP response"))
+                        return
+                    }
+
+                    guard httpResponse.statusCode == 200 else {
+                        continuation.finish(throwing: NetworkError.serverError(code: httpResponse.statusCode, message: "SSE connection failed"))
+                        return
+                    }
+
+                    guard let contentType = httpResponse.allHeaderFields["Content-Type"] as? String,
+                          contentType.lowercased().contains("text/event-stream") else {
+                        continuation.finish(throwing: NetworkError.invalidContentType(expected: "text/event-stream", actual: httpResponse.allHeaderFields["Content-Type"] as? String ?? "nil"))
+                        return
+                    }
+
+                    // Parse SSE stream
+                    var buffer = ""
+                    let decoder = JSONDecoder()
+
+                    for try await byte in bytes {
+                        let char = Character(UnicodeScalar(byte))
+                        buffer.append(char)
+
+                        // SSE events are delimited by double newline
+                        if buffer.hasSuffix("\n\n") {
+                            // Parse the event
+                            let lines = buffer.split(separator: "\n", omittingEmptySubsequences: false)
+
+                            for line in lines {
+                                let lineStr = String(line)
+
+                                // SSE data lines start with "data: "
+                                if lineStr.hasPrefix("data: ") {
+                                    let jsonString = String(lineStr.dropFirst(6))
+
+                                    if let jsonData = jsonString.data(using: .utf8) {
+                                        do {
+                                            let event = try decoder.decode(BlueCatbirdMlsStreamConvoEvents.Output.self, from: jsonData)
+                                            continuation.yield(event)
+                                        } catch {
+                                            LogManager.logError("Failed to decode SSE event for blue.catbird.mls.streamConvoEvents: \(error)")
+                                            // Continue processing other events
+                                        }
+                                    }
+                                }
+                                // Ignore comment lines (start with ":") and other SSE fields
+                            }
+
+                            buffer = ""
+                        }
+                    }
+
+                    // Stream ended normally
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
             }
-        } else {
-            // Don't try to decode error responses as success types
-            return (responseCode, nil)
         }
     }
-}                           
+}
+                           
 

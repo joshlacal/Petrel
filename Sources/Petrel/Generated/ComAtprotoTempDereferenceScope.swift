@@ -81,8 +81,9 @@ public struct Output: ATProtocolCodable {
         
     }
         
-public enum Error: String, Swift.Error, CustomStringConvertible {
-                case invalidScopeReference = "InvalidScopeReference.An invalid scope reference was provided."
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                /// An invalid scope reference was provided.
+                case invalidScopeReference = "InvalidScopeReference"
             public var description: String {
                 return self.rawValue
             }
@@ -91,6 +92,7 @@ public enum Error: String, Swift.Error, CustomStringConvertible {
 
 
 }
+
 
 
 extension ATProtoClient.Com.Atproto.Temp {
@@ -144,9 +146,20 @@ extension ATProtoClient.Com.Atproto.Temp {
                 return (responseCode, nil)
             }
         } else {
-            // Don't try to decode error responses as success types
+            // Try to parse structured error response
+            if let atprotoError = ATProtoErrorParser.parse(
+                data: responseData,
+                statusCode: responseCode,
+                errorType: ComAtprotoTempDereferenceScope.Error.self
+            ) {
+                throw atprotoError
+            }
+            
+            // If we can't parse a structured error, return the response code
+            // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
-}                           
+}
+                           
 

@@ -109,8 +109,9 @@ public struct Output: ATProtocolCodable {
         
     }
         
-public enum Error: String, Swift.Error, CustomStringConvertible {
-                case notFound = "NotFound."
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                
+                case notFound = "NotFound"
             public var description: String {
                 return self.rawValue
             }
@@ -283,6 +284,7 @@ public indirect enum OutputThreadUnion: Codable, ATProtocolCodable, ATProtocolVa
 }
 
 
+
 extension ATProtoClient.App.Bsky.Feed {
     // MARK: - getPostThread
 
@@ -334,9 +336,20 @@ extension ATProtoClient.App.Bsky.Feed {
                 return (responseCode, nil)
             }
         } else {
-            // Don't try to decode error responses as success types
+            // Try to parse structured error response
+            if let atprotoError = ATProtoErrorParser.parse(
+                data: responseData,
+                statusCode: responseCode,
+                errorType: AppBskyFeedGetPostThread.Error.self
+            ) {
+                throw atprotoError
+            }
+            
+            // If we can't parse a structured error, return the response code
+            // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
-}                           
+}
+                           
 

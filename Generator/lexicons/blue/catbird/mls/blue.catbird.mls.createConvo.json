@@ -17,6 +17,10 @@
               "description": "Hex-encoded MLS group identifier",
               "maxLength": 128
             },
+            "idempotencyKey": {
+              "type": "string",
+              "description": "Client-generated UUID for idempotent request retries. Optional but recommended."
+            },
             "cipherSuite": {
               "type": "string",
               "description": "MLS cipher suite to use for this conversation",
@@ -42,6 +46,14 @@
             "welcomeMessage": {
               "type": "string",
               "description": "Base64url-encoded MLS Welcome message containing encrypted secrets for ALL initial members"
+            },
+            "keyPackageHashes": {
+              "type": "array",
+              "items": {
+                "type": "ref",
+                "ref": "#keyPackageHashEntry"
+              },
+              "description": "Array of {did, hash} objects mapping each initial member to their key package hash. Required for multi-device support."
             },
             "metadata": {
               "type": "ref",
@@ -70,6 +82,10 @@
         {
           "name": "TooManyMembers",
           "description": "Too many initial members specified (max 100)"
+        },
+        {
+          "name": "MutualBlockDetected",
+          "description": "Cannot create conversation with users who have blocked each other on Bluesky"
         }
       ]
     },
@@ -86,6 +102,22 @@
           "type": "string",
           "maxLength": 512,
           "description": "Conversation description"
+        }
+      }
+    },
+    "keyPackageHashEntry": {
+      "type": "object",
+      "description": "Maps a DID to the key package hash used for their Welcome message",
+      "required": ["did", "hash"],
+      "properties": {
+        "did": {
+          "type": "string",
+          "format": "did",
+          "description": "DID of the member"
+        },
+        "hash": {
+          "type": "string",
+          "description": "Hex-encoded SHA-256 hash of the key package used"
         }
       }
     }

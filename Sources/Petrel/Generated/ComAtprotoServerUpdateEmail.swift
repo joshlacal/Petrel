@@ -84,10 +84,13 @@ public struct Input: ATProtocolCodable {
                 return map
             }
         }        
-public enum Error: String, Swift.Error, CustomStringConvertible {
-                case expiredToken = "ExpiredToken."
-                case invalidToken = "InvalidToken."
-                case tokenRequired = "TokenRequired."
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                
+                case expiredToken = "ExpiredToken"
+                
+                case invalidToken = "InvalidToken"
+                
+                case tokenRequired = "TokenRequired"
             public var description: String {
                 return self.rawValue
             }

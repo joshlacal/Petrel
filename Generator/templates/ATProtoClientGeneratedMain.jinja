@@ -477,6 +477,16 @@ public actor ATProtoClient {
         return await accountManager.getCurrentAccount()
     }
 
+    /// Sets a custom service DID for a specific lexicon namespace.
+    /// This allows routing requests for custom namespaces (e.g., "blue.catbird.mls") to specific services.
+    /// - Parameters:
+    ///   - serviceDID: The service DID (e.g., "did:web:mls.catbird.blue#atproto_mls")
+    ///   - namespace: The lexicon namespace prefix (e.g., "blue.catbird.mls")
+    public func setServiceDID(_ serviceDID: String, for namespace: String) async {
+        LogManager.logInfo("ATProtoClient - Setting service DID for namespace '\(namespace)': \(serviceDID)")
+        await networkService.setServiceDID(serviceDID, for: namespace)
+    }
+
     // MARK: - DID Resolution
 
     /// Resolves a handle to a DID.

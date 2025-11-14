@@ -1,0 +1,79 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mls.requestRejoin",
+  "description": "Request to rejoin an MLS conversation after local state loss",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Submit rejoin request with fresh KeyPackage after state loss (e.g., app reinstall, device change)",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["convoId", "keyPackage"],
+          "properties": {
+            "convoId": {
+              "type": "string",
+              "description": "Conversation identifier to rejoin"
+            },
+            "keyPackage": {
+              "type": "string",
+              "description": "Base64url-encoded fresh MLS KeyPackage for re-adding to the group"
+            },
+            "reason": {
+              "type": "string",
+              "description": "Optional reason for rejoin request",
+              "maxLength": 128,
+              "knownValues": [
+                "device_reinstall",
+                "state_loss",
+                "credential_recovery",
+                "device_change"
+              ]
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["requestId", "pending"],
+          "properties": {
+            "requestId": {
+              "type": "string",
+              "description": "Rejoin request identifier for tracking"
+            },
+            "pending": {
+              "type": "boolean",
+              "description": "Whether request is pending approval (true) or auto-approved (false)"
+            },
+            "approvedAt": {
+              "type": "string",
+              "format": "datetime",
+              "description": "Timestamp if request was auto-approved"
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "name": "ConvoNotFound",
+          "description": "Conversation not found or user was never a member"
+        },
+        {
+          "name": "AlreadyMember",
+          "description": "User is already an active member with valid group state"
+        },
+        {
+          "name": "InvalidKeyPackage",
+          "description": "KeyPackage is malformed, expired, or invalid"
+        },
+        {
+          "name": "RateLimitExceeded",
+          "description": "Too many rejoin requests in short period"
+        }
+      ]
+    }
+  }
+}

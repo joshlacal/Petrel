@@ -62,8 +62,9 @@ public struct Input: ATProtocolCodable {
                 return map
             }
         }        
-public enum Error: String, Swift.Error, CustomStringConvertible {
-                case unsupportedCollection = "UnsupportedCollection.The URI to be bookmarked is for an unsupported collection."
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                /// The URI to be bookmarked is for an unsupported collection.
+                case unsupportedCollection = "UnsupportedCollection"
             public var description: String {
                 return self.rawValue
             }

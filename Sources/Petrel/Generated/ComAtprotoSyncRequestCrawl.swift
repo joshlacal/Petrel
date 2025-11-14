@@ -48,8 +48,9 @@ public struct Input: ATProtocolCodable {
                 return map
             }
         }        
-public enum Error: String, Swift.Error, CustomStringConvertible {
-                case hostBanned = "HostBanned."
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                
+                case hostBanned = "HostBanned"
             public var description: String {
                 return self.rawValue
             }

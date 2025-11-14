@@ -16,6 +16,10 @@
               "description": "Base64-encoded MLS key package",
               "maxLength": 65536
             },
+            "idempotencyKey": {
+              "type": "string",
+              "description": "Client-generated UUID for idempotent request retries. Optional but recommended."
+            },
             "cipherSuite": {
               "type": "string",
               "description": "Cipher suite of the key package",

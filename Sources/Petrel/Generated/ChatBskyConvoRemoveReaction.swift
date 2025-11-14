@@ -139,9 +139,11 @@ public struct Output: ATProtocolCodable {
         
     }
         
-public enum Error: String, Swift.Error, CustomStringConvertible {
-                case reactionMessageDeleted = "ReactionMessageDeleted.Indicates that the message has been deleted and reactions can no longer be added/removed."
-                case reactionInvalidValue = "ReactionInvalidValue.Indicates the value for the reaction is not acceptable. In general, this means it is not an emoji."
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                /// Indicates that the message has been deleted and reactions can no longer be added/removed.
+                case reactionMessageDeleted = "ReactionMessageDeleted"
+                /// Indicates the value for the reaction is not acceptable. In general, this means it is not an emoji.
+                case reactionInvalidValue = "ReactionInvalidValue"
             public var description: String {
                 return self.rawValue
             }
@@ -214,7 +216,17 @@ extension ATProtoClient.Chat.Bsky.Convo {
                 return (responseCode, nil)
             }
         } else {
-            // Don't try to decode error responses as success types
+            // Try to parse structured error response
+            if let atprotoError = ATProtoErrorParser.parse(
+                data: responseData,
+                statusCode: responseCode,
+                errorType: ChatBskyConvoRemoveReaction.Error.self
+            ) {
+                throw atprotoError
+            }
+            
+            // If we can't parse a structured error, return the response code
+            // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
         

@@ -1107,6 +1107,77 @@ actor NetworkService: NetworkServiceProtocol {
         try await performRequest(request, skipTokenRefresh: false)
     }
 
+    // MARK: - Server-Sent Events (SSE) Support
+
+    /// Prepares an authenticated URLRequest for streaming (SSE, WebSocket, etc.)
+    /// - Parameters:
+    ///   - request: The original URLRequest
+    ///   - additionalHeaders: Optional additional headers (e.g., atproto-proxy)
+    /// - Returns: URLRequest with OAuth/DPoP authentication headers
+    func prepareStreamingRequest(_ request: URLRequest, additionalHeaders: [String: String]? = nil) async throws -> URLRequest {
+        var finalRequest = request
+        var requiresAuth = false
+
+        // Determine if authentication is needed (same logic as regular requests)
+        if let url = request.url,
+           !url.absoluteString.contains("/.well-known/"),
+           !url.absoluteString.contains("plc.directory"),
+           !url.absoluteString.contains("/oauth/") {
+            requiresAuth = true
+        }
+
+        // Add Authentication if required and provider exists
+        if requiresAuth, let authProvider = authProvider {
+            do {
+                // Refresh token if needed
+                _ = try await authProvider.refreshTokenIfNeeded()
+
+                // Get authenticated request with OAuth/DPoP headers
+                let (authed, _) = try await authProvider.prepareAuthenticatedRequestWithContext(finalRequest)
+                finalRequest = authed
+
+                LogManager.logDebug("Prepared authenticated streaming request for: \(finalRequest.url?.absoluteString ?? "Unknown URL")")
+            } catch AuthError.noActiveAccount {
+                LogManager.logError("No active account for streaming request: \(finalRequest.url?.absoluteString ?? "Unknown URL"). Proceeding without authentication.")
+                // Allow request to proceed without auth headers if no account exists
+            } catch {
+                LogManager.logError("Failed to prepare authenticated streaming request: \(error)")
+                throw NetworkError.authenticationFailed
+            }
+        } else if requiresAuth {
+            LogManager.logError("Authentication required but no provider set for streaming: \(finalRequest.url?.absoluteString ?? "Unknown URL")")
+        }
+
+        // Add custom headers
+        for (name, value) in headers {
+            finalRequest.setValue(value, forHTTPHeaderField: name)
+        }
+
+        // Add additional headers for this specific request
+        if let additionalHeaders = additionalHeaders {
+            for (name, value) in additionalHeaders {
+                // If we're not targeting the PDS host, do not attach atproto-proxy
+                if name.lowercased() == "atproto-proxy",
+                   let h = finalRequest.url?.host,
+                   h != baseURL.host {
+                    // Skip proxy header for direct-to-service requests
+                    continue
+                }
+                finalRequest.setValue(value, forHTTPHeaderField: name)
+                if name == "atproto-proxy" {
+                    LogManager.logInfo("Setting atproto-proxy header for streaming: \(value)")
+                }
+            }
+        }
+
+        // Add user agent
+        if let userAgent = userAgent {
+            finalRequest.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+        }
+
+        return finalRequest
+    }
+
     // MARK: - WebSocket Subscription Support
 
     /// Subscribe to a WebSocket event stream
