@@ -8,60 +8,343 @@ import Foundation
 public struct BlueCatbirdMlsRegisterDevice { 
 
     public static let typeIdentifier = "blue.catbird.mls.registerDevice"
+        
+public struct KeyPackageItem: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "blue.catbird.mls.registerDevice#keyPackageItem"
+            public let keyPackage: String
+            public let cipherSuite: String
+            public let expires: ATProtocolDate
+
+        // Standard initializer
+        public init(
+            keyPackage: String, cipherSuite: String, expires: ATProtocolDate
+        ) {
+            
+            self.keyPackage = keyPackage
+            self.cipherSuite = cipherSuite
+            self.expires = expires
+        }
+
+        // Codable initializer
+        public init(from decoder: Decoder) throws {
+            
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                
+                
+                self.keyPackage = try container.decode(String.self, forKey: .keyPackage)
+                
+                
+            } catch {
+                
+                LogManager.logError("Decoding error for required property 'keyPackage': \(error)")
+                
+                throw error
+            }
+            do {
+                
+                
+                self.cipherSuite = try container.decode(String.self, forKey: .cipherSuite)
+                
+                
+            } catch {
+                
+                LogManager.logError("Decoding error for required property 'cipherSuite': \(error)")
+                
+                throw error
+            }
+            do {
+                
+                
+                self.expires = try container.decode(ATProtocolDate.self, forKey: .expires)
+                
+                
+            } catch {
+                
+                LogManager.logError("Decoding error for required property 'expires': \(error)")
+                
+                throw error
+            }
+            
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            
+            
+            try container.encode(keyPackage, forKey: .keyPackage)
+            
+            
+            
+            
+            try container.encode(cipherSuite, forKey: .cipherSuite)
+            
+            
+            
+            
+            try container.encode(expires, forKey: .expires)
+            
+            
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(keyPackage)
+            hasher.combine(cipherSuite)
+            hasher.combine(expires)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
+            guard let other = other as? Self else { return false }
+            
+            
+            if self.keyPackage != other.keyPackage {
+                return false
+            }
+            
+            
+            
+            
+            if self.cipherSuite != other.cipherSuite {
+                return false
+            }
+            
+            
+            
+            
+            if self.expires != other.expires {
+                return false
+            }
+            
+            
+            return true
+            
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        // DAGCBOR encoding with field ordering
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+
+            
+            
+            
+            
+            let keyPackageValue = try keyPackage.toCBORValue()
+            map = map.adding(key: "keyPackage", value: keyPackageValue)
+            
+            
+            
+            
+            
+            
+            let cipherSuiteValue = try cipherSuite.toCBORValue()
+            map = map.adding(key: "cipherSuite", value: cipherSuiteValue)
+            
+            
+            
+            
+            
+            
+            let expiresValue = try expires.toCBORValue()
+            map = map.adding(key: "expires", value: expiresValue)
+            
+            
+            
+
+            return map
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case keyPackage
+            case cipherSuite
+            case expires
+        }
+    }
+        
+public struct WelcomeMessage: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "blue.catbird.mls.registerDevice#welcomeMessage"
+            public let convoId: String
+            public let welcome: String
+
+        // Standard initializer
+        public init(
+            convoId: String, welcome: String
+        ) {
+            
+            self.convoId = convoId
+            self.welcome = welcome
+        }
+
+        // Codable initializer
+        public init(from decoder: Decoder) throws {
+            
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                
+                
+                self.convoId = try container.decode(String.self, forKey: .convoId)
+                
+                
+            } catch {
+                
+                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                
+                throw error
+            }
+            do {
+                
+                
+                self.welcome = try container.decode(String.self, forKey: .welcome)
+                
+                
+            } catch {
+                
+                LogManager.logError("Decoding error for required property 'welcome': \(error)")
+                
+                throw error
+            }
+            
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            
+            
+            try container.encode(convoId, forKey: .convoId)
+            
+            
+            
+            
+            try container.encode(welcome, forKey: .welcome)
+            
+            
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(convoId)
+            hasher.combine(welcome)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
+            guard let other = other as? Self else { return false }
+            
+            
+            if self.convoId != other.convoId {
+                return false
+            }
+            
+            
+            
+            
+            if self.welcome != other.welcome {
+                return false
+            }
+            
+            
+            return true
+            
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        // DAGCBOR encoding with field ordering
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+
+            
+            
+            
+            
+            let convoIdValue = try convoId.toCBORValue()
+            map = map.adding(key: "convoId", value: convoIdValue)
+            
+            
+            
+            
+            
+            
+            let welcomeValue = try welcome.toCBORValue()
+            map = map.adding(key: "welcome", value: welcomeValue)
+            
+            
+            
+
+            return map
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case convoId
+            case welcome
+        }
+    }
 public struct Input: ATProtocolCodable {
-            public let deviceId: String
             public let deviceName: String
-            public let platform: String?
-            public let appVersion: String?
+            public let deviceUUID: String?
+            public let keyPackages: [KeyPackageItem]
+            public let signaturePublicKey: Bytes
 
             // Standard public initializer
-            public init(deviceId: String, deviceName: String, platform: String? = nil, appVersion: String? = nil) {
-                self.deviceId = deviceId
+            public init(deviceName: String, deviceUUID: String? = nil, keyPackages: [KeyPackageItem], signaturePublicKey: Bytes) {
                 self.deviceName = deviceName
-                self.platform = platform
-                self.appVersion = appVersion
+                self.deviceUUID = deviceUUID
+                self.keyPackages = keyPackages
+                self.signaturePublicKey = signaturePublicKey
                 
             }
             
             public init(from decoder: Decoder) throws {
                 let container = try decoder.container(keyedBy: CodingKeys.self)
                 
-                self.deviceId = try container.decode(String.self, forKey: .deviceId)
-                
-                
                 self.deviceName = try container.decode(String.self, forKey: .deviceName)
                 
                 
-                self.platform = try container.decodeIfPresent(String.self, forKey: .platform)
+                self.deviceUUID = try container.decodeIfPresent(String.self, forKey: .deviceUUID)
                 
                 
-                self.appVersion = try container.decodeIfPresent(String.self, forKey: .appVersion)
+                self.keyPackages = try container.decode([KeyPackageItem].self, forKey: .keyPackages)
+                
+                
+                self.signaturePublicKey = try container.decode(Bytes.self, forKey: .signaturePublicKey)
                 
             }
             
             public func encode(to encoder: Encoder) throws {
                 var container = encoder.container(keyedBy: CodingKeys.self)
                 
-                try container.encode(deviceId, forKey: .deviceId)
-                
-                
                 try container.encode(deviceName, forKey: .deviceName)
                 
                 
                 // Encode optional property even if it's an empty array
-                try container.encodeIfPresent(platform, forKey: .platform)
+                try container.encodeIfPresent(deviceUUID, forKey: .deviceUUID)
                 
                 
-                // Encode optional property even if it's an empty array
-                try container.encodeIfPresent(appVersion, forKey: .appVersion)
+                try container.encode(keyPackages, forKey: .keyPackages)
+                
+                
+                try container.encode(signaturePublicKey, forKey: .signaturePublicKey)
                 
             }
             
             private enum CodingKeys: String, CodingKey {
-                case deviceId
                 case deviceName
-                case platform
-                case appVersion
+                case deviceUUID
+                case keyPackages
+                case signaturePublicKey
             }
             
             public func toCBORValue() throws -> Any {
@@ -69,29 +352,26 @@ public struct Input: ATProtocolCodable {
 
                 
                 
-                let deviceIdValue = try deviceId.toCBORValue()
-                map = map.adding(key: "deviceId", value: deviceIdValue)
-                
-                
-                
                 let deviceNameValue = try deviceName.toCBORValue()
                 map = map.adding(key: "deviceName", value: deviceNameValue)
                 
                 
                 
-                if let value = platform {
+                if let value = deviceUUID {
                     // Encode optional property even if it's an empty array for CBOR
-                    let platformValue = try value.toCBORValue()
-                    map = map.adding(key: "platform", value: platformValue)
+                    let deviceUUIDValue = try value.toCBORValue()
+                    map = map.adding(key: "deviceUUID", value: deviceUUIDValue)
                 }
                 
                 
                 
-                if let value = appVersion {
-                    // Encode optional property even if it's an empty array for CBOR
-                    let appVersionValue = try value.toCBORValue()
-                    map = map.adding(key: "appVersion", value: appVersionValue)
-                }
+                let keyPackagesValue = try keyPackages.toCBORValue()
+                map = map.adding(key: "keyPackages", value: keyPackagesValue)
+                
+                
+                
+                let signaturePublicKeyValue = try signaturePublicKey.toCBORValue()
+                map = map.adding(key: "signaturePublicKey", value: signaturePublicKeyValue)
                 
                 
 
@@ -104,13 +384,11 @@ public struct Output: ATProtocolCodable {
         
         public let deviceId: String
         
-        public let credentialDid: String
+        public let mlsDid: String
         
-        public let userDid: String
+        public let autoJoinedConvos: [String]
         
-        public let registeredAt: ATProtocolDate
-        
-        public let isNewDevice: Bool?
+        public let welcomeMessages: [WelcomeMessage]?
         
         
         
@@ -120,13 +398,11 @@ public struct Output: ATProtocolCodable {
             
             deviceId: String,
             
-            credentialDid: String,
+            mlsDid: String,
             
-            userDid: String,
+            autoJoinedConvos: [String],
             
-            registeredAt: ATProtocolDate,
-            
-            isNewDevice: Bool? = nil
+            welcomeMessages: [WelcomeMessage]? = nil
             
             
         ) {
@@ -134,13 +410,11 @@ public struct Output: ATProtocolCodable {
             
             self.deviceId = deviceId
             
-            self.credentialDid = credentialDid
+            self.mlsDid = mlsDid
             
-            self.userDid = userDid
+            self.autoJoinedConvos = autoJoinedConvos
             
-            self.registeredAt = registeredAt
-            
-            self.isNewDevice = isNewDevice
+            self.welcomeMessages = welcomeMessages
             
             
         }
@@ -152,16 +426,13 @@ public struct Output: ATProtocolCodable {
             self.deviceId = try container.decode(String.self, forKey: .deviceId)
             
             
-            self.credentialDid = try container.decode(String.self, forKey: .credentialDid)
+            self.mlsDid = try container.decode(String.self, forKey: .mlsDid)
             
             
-            self.userDid = try container.decode(String.self, forKey: .userDid)
+            self.autoJoinedConvos = try container.decode([String].self, forKey: .autoJoinedConvos)
             
             
-            self.registeredAt = try container.decode(ATProtocolDate.self, forKey: .registeredAt)
-            
-            
-            self.isNewDevice = try container.decodeIfPresent(Bool.self, forKey: .isNewDevice)
+            self.welcomeMessages = try container.decodeIfPresent([WelcomeMessage].self, forKey: .welcomeMessages)
             
             
         }
@@ -173,17 +444,14 @@ public struct Output: ATProtocolCodable {
             try container.encode(deviceId, forKey: .deviceId)
             
             
-            try container.encode(credentialDid, forKey: .credentialDid)
+            try container.encode(mlsDid, forKey: .mlsDid)
             
             
-            try container.encode(userDid, forKey: .userDid)
-            
-            
-            try container.encode(registeredAt, forKey: .registeredAt)
+            try container.encode(autoJoinedConvos, forKey: .autoJoinedConvos)
             
             
             // Encode optional property even if it's an empty array
-            try container.encodeIfPresent(isNewDevice, forKey: .isNewDevice)
+            try container.encodeIfPresent(welcomeMessages, forKey: .welcomeMessages)
             
             
         }
@@ -199,25 +467,20 @@ public struct Output: ATProtocolCodable {
             
             
             
-            let credentialDidValue = try credentialDid.toCBORValue()
-            map = map.adding(key: "credentialDid", value: credentialDidValue)
+            let mlsDidValue = try mlsDid.toCBORValue()
+            map = map.adding(key: "mlsDid", value: mlsDidValue)
             
             
             
-            let userDidValue = try userDid.toCBORValue()
-            map = map.adding(key: "userDid", value: userDidValue)
+            let autoJoinedConvosValue = try autoJoinedConvos.toCBORValue()
+            map = map.adding(key: "autoJoinedConvos", value: autoJoinedConvosValue)
             
             
             
-            let registeredAtValue = try registeredAt.toCBORValue()
-            map = map.adding(key: "registeredAt", value: registeredAtValue)
-            
-            
-            
-            if let value = isNewDevice {
+            if let value = welcomeMessages {
                 // Encode optional property even if it's an empty array for CBOR
-                let isNewDeviceValue = try value.toCBORValue()
-                map = map.adding(key: "isNewDevice", value: isNewDeviceValue)
+                let welcomeMessagesValue = try value.toCBORValue()
+                map = map.adding(key: "welcomeMessages", value: welcomeMessagesValue)
             }
             
             
@@ -229,21 +492,24 @@ public struct Output: ATProtocolCodable {
         
         private enum CodingKeys: String, CodingKey {
             case deviceId
-            case credentialDid
-            case userDid
-            case registeredAt
-            case isNewDevice
+            case mlsDid
+            case autoJoinedConvos
+            case welcomeMessages
         }
         
     }
         
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 
-                case invalidDeviceId = "InvalidDeviceId"
-                
                 case invalidDeviceName = "InvalidDeviceName"
                 
+                case invalidKeyPackages = "InvalidKeyPackages"
+                
+                case invalidSignatureKey = "InvalidSignatureKey"
+                
                 case deviceAlreadyRegistered = "DeviceAlreadyRegistered"
+                
+                case tooManyDevices = "TooManyDevices"
             public var description: String {
                 return self.rawValue
             }

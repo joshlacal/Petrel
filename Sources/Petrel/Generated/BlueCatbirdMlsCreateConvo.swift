@@ -280,9 +280,10 @@ public struct Input: ATProtocolCodable {
             public let welcomeMessage: String?
             public let keyPackageHashes: [KeyPackageHashEntry]?
             public let metadata: MetadataInput?
+            public let currentEpoch: Int?
 
             // Standard public initializer
-            public init(groupId: String, idempotencyKey: String? = nil, cipherSuite: String, initialMembers: [DID]? = nil, welcomeMessage: String? = nil, keyPackageHashes: [KeyPackageHashEntry]? = nil, metadata: MetadataInput? = nil) {
+            public init(groupId: String, idempotencyKey: String? = nil, cipherSuite: String, initialMembers: [DID]? = nil, welcomeMessage: String? = nil, keyPackageHashes: [KeyPackageHashEntry]? = nil, metadata: MetadataInput? = nil, currentEpoch: Int? = nil) {
                 self.groupId = groupId
                 self.idempotencyKey = idempotencyKey
                 self.cipherSuite = cipherSuite
@@ -290,6 +291,7 @@ public struct Input: ATProtocolCodable {
                 self.welcomeMessage = welcomeMessage
                 self.keyPackageHashes = keyPackageHashes
                 self.metadata = metadata
+                self.currentEpoch = currentEpoch
                 
             }
             
@@ -315,6 +317,9 @@ public struct Input: ATProtocolCodable {
                 
                 
                 self.metadata = try container.decodeIfPresent(MetadataInput.self, forKey: .metadata)
+                
+                
+                self.currentEpoch = try container.decodeIfPresent(Int.self, forKey: .currentEpoch)
                 
             }
             
@@ -346,6 +351,10 @@ public struct Input: ATProtocolCodable {
                 // Encode optional property even if it's an empty array
                 try container.encodeIfPresent(metadata, forKey: .metadata)
                 
+                
+                // Encode optional property even if it's an empty array
+                try container.encodeIfPresent(currentEpoch, forKey: .currentEpoch)
+                
             }
             
             private enum CodingKeys: String, CodingKey {
@@ -356,6 +365,7 @@ public struct Input: ATProtocolCodable {
                 case welcomeMessage
                 case keyPackageHashes
                 case metadata
+                case currentEpoch
             }
             
             public func toCBORValue() throws -> Any {
@@ -409,6 +419,14 @@ public struct Input: ATProtocolCodable {
                     // Encode optional property even if it's an empty array for CBOR
                     let metadataValue = try value.toCBORValue()
                     map = map.adding(key: "metadata", value: metadataValue)
+                }
+                
+                
+                
+                if let value = currentEpoch {
+                    // Encode optional property even if it's an empty array for CBOR
+                    let currentEpochValue = try value.toCBORValue()
+                    map = map.adding(key: "currentEpoch", value: currentEpochValue)
                 }
                 
                 

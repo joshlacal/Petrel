@@ -59,6 +59,12 @@
               "type": "ref",
               "ref": "#metadataInput",
               "description": "Optional conversation metadata (name, description, avatar)"
+            },
+            "currentEpoch": {
+              "type": "integer",
+              "description": "Client's current MLS epoch after group creation and adding initial members. Used for server telemetry only (server is not authoritative for MLS state). Defaults to 0 if not provided.",
+              "minimum": 0,
+              "default": 0
             }
           }
         }
