@@ -1701,6 +1701,16 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
             
+            decoders["blue.catbird.mls.listDevices#deviceInfo"] = { decoder in
+                do {
+                    let decodedObject = try BlueCatbirdMlsListDevices.DeviceInfo(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding BlueCatbirdMlsListDevices.DeviceInfo: \(error)")
+                    return .decodeError("Error decoding BlueCatbirdMlsListDevices.DeviceInfo: \(error)")
+                }
+            }
+            
             decoders["blue.catbird.mls.streamConvoEvents#eventWrapper"] = { decoder in
                 do {
                     let decodedObject = try BlueCatbirdMlsStreamConvoEvents.EventWrapper(from: decoder)
@@ -1751,6 +1761,26 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
             
+            decoders["blue.catbird.mls.registerDevice#keyPackageItem"] = { decoder in
+                do {
+                    let decodedObject = try BlueCatbirdMlsRegisterDevice.KeyPackageItem(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding BlueCatbirdMlsRegisterDevice.KeyPackageItem: \(error)")
+                    return .decodeError("Error decoding BlueCatbirdMlsRegisterDevice.KeyPackageItem: \(error)")
+                }
+            }
+            
+            decoders["blue.catbird.mls.registerDevice#welcomeMessage"] = { decoder in
+                do {
+                    let decodedObject = try BlueCatbirdMlsRegisterDevice.WelcomeMessage(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding BlueCatbirdMlsRegisterDevice.WelcomeMessage: \(error)")
+                    return .decodeError("Error decoding BlueCatbirdMlsRegisterDevice.WelcomeMessage: \(error)")
+                }
+            }
+            
             decoders["blue.catbird.mls.createConvo#metadataInput"] = { decoder in
                 do {
                     let decodedObject = try BlueCatbirdMlsCreateConvo.MetadataInput(from: decoder)
@@ -1778,6 +1808,16 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 } catch {
                     LogManager.logDebug("Error decoding BlueCatbirdMlsGetMessages.GapInfo: \(error)")
                     return .decodeError("Error decoding BlueCatbirdMlsGetMessages.GapInfo: \(error)")
+                }
+            }
+            
+            decoders["blue.catbird.mls.validateDeviceState#keyPackageInventory"] = { decoder in
+                do {
+                    let decodedObject = try BlueCatbirdMlsValidateDeviceState.KeyPackageInventory(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding BlueCatbirdMlsValidateDeviceState.KeyPackageInventory: \(error)")
+                    return .decodeError("Error decoding BlueCatbirdMlsValidateDeviceState.KeyPackageInventory: \(error)")
                 }
             }
             
@@ -1868,6 +1908,26 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 } catch {
                     LogManager.logDebug("Error decoding BlueCatbirdMlsGetReports.ReportView: \(error)")
                     return .decodeError("Error decoding BlueCatbirdMlsGetReports.ReportView: \(error)")
+                }
+            }
+            
+            decoders["blue.catbird.mls.getKeyPackageHistory#keyPackageHistoryEntry"] = { decoder in
+                do {
+                    let decodedObject = try BlueCatbirdMlsGetKeyPackageHistory.KeyPackageHistoryEntry(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding BlueCatbirdMlsGetKeyPackageHistory.KeyPackageHistoryEntry: \(error)")
+                    return .decodeError("Error decoding BlueCatbirdMlsGetKeyPackageHistory.KeyPackageHistoryEntry: \(error)")
+                }
+            }
+            
+            decoders["blue.catbird.mls.getExpectedConversations#expectedConversation"] = { decoder in
+                do {
+                    let decodedObject = try BlueCatbirdMlsGetExpectedConversations.ExpectedConversation(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding BlueCatbirdMlsGetExpectedConversations.ExpectedConversation: \(error)")
+                    return .decodeError("Error decoding BlueCatbirdMlsGetExpectedConversations.ExpectedConversation: \(error)")
                 }
             }
             

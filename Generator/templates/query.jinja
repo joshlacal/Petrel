@@ -37,8 +37,15 @@ extension ATProtoClient.{{ template_namespace_name }} {
                         additionalHeaders: proxyHeaders
                     )
 
-                    // Stream with the authenticated request
-                    let (bytes, response) = try await URLSession.shared.bytes(for: authenticatedRequest)
+                    // Create URLSession with infinite timeouts for SSE long-lived connections
+                    let configuration = URLSessionConfiguration.default
+                    configuration.timeoutIntervalForRequest = .infinity  // No request timeout for SSE
+                    configuration.timeoutIntervalForResource = .infinity // No resource timeout for SSE
+                    configuration.waitsForConnectivity = true            // Wait for network
+                    let sseSession = URLSession(configuration: configuration)
+
+                    // Stream with the authenticated request using SSE-configured session
+                    let (bytes, response) = try await sseSession.bytes(for: authenticatedRequest)
 
                     guard let httpResponse = response as? HTTPURLResponse else {
                         continuation.finish(throwing: NetworkError.invalidResponse(description: "Non-HTTP response"))

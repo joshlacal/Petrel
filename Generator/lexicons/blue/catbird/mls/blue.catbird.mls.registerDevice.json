@@ -9,29 +9,33 @@
         "encoding": "application/json",
         "schema": {
           "type": "object",
-          "required": ["deviceId", "deviceName"],
+          "required": ["deviceName", "keyPackages", "signaturePublicKey"],
           "properties": {
-            "deviceId": {
-              "type": "string",
-              "description": "Unique device identifier (UUID). Client-generated and persisted across app launches.",
-              "minLength": 36,
-              "maxLength": 36
-            },
             "deviceName": {
               "type": "string",
               "description": "Human-readable device name (e.g., 'Josh's iPhone', 'MacBook Pro')",
               "minLength": 1,
               "maxLength": 100
             },
-            "platform": {
+            "deviceUUID": {
               "type": "string",
-              "description": "Device platform",
-              "enum": ["ios", "android", "web", "desktop"]
+              "description": "Persistent device UUID (stored in iCloud Keychain). Allows server to detect device re-registration and cleanup old key packages. Optional for backward compatibility.",
+              "format": "uuid"
             },
-            "appVersion": {
-              "type": "string",
-              "description": "App version string",
-              "maxLength": 50
+            "keyPackages": {
+              "type": "array",
+              "description": "MLS key packages for this device (1-200 packages)",
+              "minItems": 1,
+              "maxItems": 200,
+              "items": {
+                "type": "ref",
+                "ref": "#keyPackageItem"
+              }
+            },
+            "signaturePublicKey": {
+              "type": "bytes",
+              "description": "Device Ed25519 signature public key (32 bytes)",
+              "maxLength": 32
             }
           }
         }
@@ -40,37 +44,74 @@
         "encoding": "application/json",
         "schema": {
           "type": "object",
-          "required": ["deviceId", "credentialDid", "userDid", "registeredAt"],
+          "required": ["deviceId", "mlsDid", "autoJoinedConvos"],
           "properties": {
             "deviceId": {
               "type": "string",
-              "description": "Confirmed device ID"
+              "description": "Server-generated device ID (UUID)"
             },
-            "credentialDid": {
+            "mlsDid": {
               "type": "string",
               "description": "Full device credential DID (did:plc:user#device-uuid). Use this as the MLS credential identity."
             },
-            "userDid": {
-              "type": "string",
-              "description": "Base user DID without device suffix"
+            "autoJoinedConvos": {
+              "type": "array",
+              "description": "Conversation IDs that this device can auto-join",
+              "items": {
+                "type": "string"
+              }
             },
-            "registeredAt": {
-              "type": "string",
-              "format": "datetime",
-              "description": "When the device was registered"
-            },
-            "isNewDevice": {
-              "type": "boolean",
-              "description": "True if this is a new registration, false if updating existing device"
+            "welcomeMessages": {
+              "type": "array",
+              "description": "Welcome messages for auto-joining conversations (may be null)",
+              "items": {
+                "type": "ref",
+                "ref": "#welcomeMessage"
+              }
             }
           }
         }
       },
       "errors": [
-        {"name": "InvalidDeviceId"},
         {"name": "InvalidDeviceName"},
-        {"name": "DeviceAlreadyRegistered"}
+        {"name": "InvalidKeyPackages"},
+        {"name": "InvalidSignatureKey"},
+        {"name": "DeviceAlreadyRegistered"},
+        {"name": "TooManyDevices"}
       ]
+    },
+    "keyPackageItem": {
+      "type": "object",
+      "required": ["keyPackage", "cipherSuite", "expires"],
+      "properties": {
+        "keyPackage": {
+          "type": "string",
+          "description": "Base64-encoded MLS key package"
+        },
+        "cipherSuite": {
+          "type": "string",
+          "description": "MLS cipher suite (e.g., 'MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519')"
+        },
+        "expires": {
+          "type": "string",
+          "format": "datetime",
+          "description": "Key package expiration time"
+        }
+      }
+    },
+    "welcomeMessage": {
+      "type": "object",
+      "required": ["convoId", "welcome"],
+      "properties": {
+        "convoId": {
+          "type": "string",
+          "description": "Conversation ID"
+        },
+        "welcome": {
+          "type": "string",
+          "description": "Base64-encoded MLS Welcome message"
+        }
+      }
     }
   }
 }
