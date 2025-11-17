@@ -3,7 +3,7 @@ package com.atproto.core
 import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.encoding.*
-import java.time.Instant
+import kotlinx.datetime.Instant
 
 // MARK: - AT Protocol Date
 
