@@ -4,7 +4,6 @@ import kotlinx.serialization.*
 import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.encoding.*
 import java.time.Instant
-import java.util.Base64
 
 // MARK: - AT Protocol Date
 
