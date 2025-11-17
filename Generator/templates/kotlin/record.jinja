@@ -1,0 +1,17 @@
+{% if description %}
+    /**
+     * {{ description }}
+     */
+{% endif %}
+    @Serializable
+    data class Record(
+        {% for prop in properties %}
+        {% if prop.description %}/** {{ prop.description }} */{% endif %}
+        @SerialName("{{ prop.name }}")
+        val {{ prop.name | sanitizeKeyword }}: {{ prop.type }}{% if prop.optional %} = null{% endif %}{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "{{ lexicon_id }}"
+        }
+    }

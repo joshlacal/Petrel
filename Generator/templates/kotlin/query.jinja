@@ -1,0 +1,27 @@
+/**
+ * {{ description }}
+ *
+ * Endpoint: {{ endpoint }}
+ */
+suspend fun ATProtoClient.{{ namespace_path }}.{{ function_name }}(
+    {% if has_parameters %}parameters: {{ parameters_type }}{% endif %}
+): ATProtoResponse<{% if output_type %}{{ output_type }}{% else %}Unit{% endif %}> {
+    val endpoint = "{{ endpoint }}"
+
+    {% if has_parameters %}
+    val queryParams = buildMap<String, String> {
+        // Convert parameters to query string
+        // This would use reflection or a custom serializer
+    }
+    {% else %}
+    val queryParams: Map<String, String>? = null
+    {% endif %}
+
+    return networkService.performRequest(
+        method = "GET",
+        endpoint = endpoint,
+        queryParams = queryParams,
+        headers = mapOf("Accept" to "{{ output_encoding }}"),
+        body = null
+    )
+}

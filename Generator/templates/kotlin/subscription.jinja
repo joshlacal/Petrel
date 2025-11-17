@@ -1,0 +1,21 @@
+/**
+ * {{ description }}
+ *
+ * Endpoint: {{ endpoint }}
+ */
+fun ATProtoClient.{{ namespace_path }}.{{ function_name }}(
+    {% if has_parameters %}parameters: {{ parameters_type }}{% endif %}
+): Flow<{{ message_type }}> = flow {
+    val endpoint = "{{ endpoint }}"
+
+    {% if has_parameters %}
+    val queryParams = buildMap<String, String> {
+        // Convert parameters to query string
+    }
+    {% else %}
+    val queryParams: Map<String, String>? = null
+    {% endif %}
+
+    // WebSocket connection - implementation depends on WebSocket library
+    // This would emit message_type items as they arrive
+}
