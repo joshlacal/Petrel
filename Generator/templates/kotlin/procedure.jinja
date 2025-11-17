@@ -1,0 +1,40 @@
+/**
+ * {{ description }}
+ *
+ * Endpoint: {{ endpoint }}
+ */
+suspend fun ATProtoClient.{{ namespace_path }}.{{ function_name }}(
+    {% if has_input %}input: {{ input_type }}{% endif %}
+): ATProtoResponse<{% if output_type %}{{ output_type }}{% else %}Unit{% endif %}> {
+    val endpoint = "{{ endpoint }}"
+
+    {% if has_input %}
+    {% if is_blob_upload %}
+    // Blob upload - input.data is ByteArray
+    val body = input.data
+    val contentType = "*/*"
+    {% elif is_binary_data %}
+    // Binary data
+    val body = input.data
+    val contentType = "{{ input_encoding }}"
+    {% else %}
+    // JSON serialization
+    val body = Json.encodeToString(input)
+    val contentType = "{{ input_encoding }}"
+    {% endif %}
+    {% else %}
+    val body: String? = null
+    val contentType = "application/json"
+    {% endif %}
+
+    return networkService.performRequest(
+        method = "POST",
+        endpoint = endpoint,
+        queryParams = null,
+        headers = mapOf(
+            "Content-Type" to contentType,
+            "Accept" to "{{ output_encoding }}"
+        ),
+        body = body
+    )
+}

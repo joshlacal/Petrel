@@ -1,0 +1,12 @@
+@Serializable
+sealed interface {{ union_name }} {
+    {% for variant in variants %}
+    @Serializable
+    @SerialName("{{ variant.lexicon_ref }}")
+    data class {{ variant.name }}(val value: {{ variant.type }}) : {{ union_name }}
+
+    {% endfor %}
+    @Serializable
+    @SerialName("unknown")
+    data class Unexpected(val value: JsonElement) : {{ union_name }}
+}

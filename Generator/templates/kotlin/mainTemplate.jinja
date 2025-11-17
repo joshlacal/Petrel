@@ -1,0 +1,59 @@
+// Lexicon: {{ lexicon_version }}, ID: {{ lexicon_id }}
+{% if description %}// {{ description }}{% endif %}
+
+package com.atproto.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+
+{% if sealed_interfaces %}
+{{ sealed_interfaces }}
+{% endif %}
+
+{% if enum_classes %}
+{{ enum_classes }}
+{% endif %}
+
+object {{ class_name }} {
+    const val TYPE_IDENTIFIER = "{{ lexicon_id }}"
+
+    {% if parameters %}
+    {{ parameters }}
+    {% endif %}
+
+    {% if input %}
+    {{ input }}
+    {% endif %}
+
+    {% if output %}
+    {{ output }}
+    {% endif %}
+
+    {% if errors %}
+    {{ errors }}
+    {% endif %}
+
+    {% if record %}
+    {{ record }}
+    {% endif %}
+
+    {% if lex_definitions %}
+    {{ lex_definitions }}
+    {% endif %}
+
+    {% if main_properties %}
+    {{ main_properties }}
+    {% endif %}
+}
+
+{% if query %}
+{{ query }}
+{% endif %}
+
+{% if procedure %}
+{{ procedure }}
+{% endif %}
+
+{% if subscription %}
+{{ subscription }}
+{% endif %}
