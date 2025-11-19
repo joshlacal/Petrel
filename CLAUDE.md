@@ -19,6 +19,14 @@ swift test
 ```
 
 ### Regenerating Code from Lexicons
+
+**Option 1: Swift Generator (Recommended)**
+```bash
+cd SwiftGenerator
+./generate.sh
+```
+
+**Option 2: Python Generator (Legacy)**
 ```bash
 python run.py Generator/lexicons Sources/Petrel/Generated
 ```
@@ -26,7 +34,16 @@ python run.py Generator/lexicons Sources/Petrel/Generated
 ## High-Level Architecture
 
 ### Code Generation Pipeline
-The project uses a Python-based generator that reads Lexicon JSON files and produces Swift code:
+The project includes two code generators that read Lexicon JSON files and produce Swift code:
+
+**Swift Generator (New)** - `SwiftGenerator/`:
+- Entry point: `swift-generator` CLI tool
+- Built with SwiftSyntax and SwiftFormat
+- Faster and more maintainable
+- Same output as Python generator
+- See `SwiftGenerator/README.md` for details
+
+**Python Generator (Legacy)** - `Generator/`:
 - Entry point: `run.py` → `Generator/main.py`
 - Templates: `Generator/templates/` (Jinja2)
 - Input: `Generator/lexicons/` (JSON files from Bluesky)
