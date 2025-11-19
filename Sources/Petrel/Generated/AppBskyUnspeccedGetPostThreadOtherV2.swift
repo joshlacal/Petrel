@@ -116,14 +116,11 @@ public enum AppBskyUnspeccedGetPostThreadOtherV2 {
 
     public struct Parameters: Parametrizable {
         public let anchor: ATProtocolURI
-        public let prioritizeFollowedUsers: Bool?
 
         public init(
-            anchor: ATProtocolURI,
-            prioritizeFollowedUsers: Bool? = nil
+            anchor: ATProtocolURI
         ) {
             self.anchor = anchor
-            self.prioritizeFollowedUsers = prioritizeFollowedUsers
         }
     }
 

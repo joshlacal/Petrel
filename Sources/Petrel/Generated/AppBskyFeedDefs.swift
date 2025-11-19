@@ -21,10 +21,11 @@ public enum AppBskyFeedDefs {
         public let viewer: ViewerState?
         public let labels: [ComAtprotoLabelDefs.Label]?
         public let threadgate: ThreadgateView?
+        public let debug: ATProtocolValueContainer?
 
         // Standard initializer
         public init(
-            uri: ATProtocolURI, cid: CID, author: AppBskyActorDefs.ProfileViewBasic, record: ATProtocolValueContainer, embed: PostViewEmbedUnion?, bookmarkCount: Int?, replyCount: Int?, repostCount: Int?, likeCount: Int?, quoteCount: Int?, indexedAt: ATProtocolDate, viewer: ViewerState?, labels: [ComAtprotoLabelDefs.Label]?, threadgate: ThreadgateView?
+            uri: ATProtocolURI, cid: CID, author: AppBskyActorDefs.ProfileViewBasic, record: ATProtocolValueContainer, embed: PostViewEmbedUnion?, bookmarkCount: Int?, replyCount: Int?, repostCount: Int?, likeCount: Int?, quoteCount: Int?, indexedAt: ATProtocolDate, viewer: ViewerState?, labels: [ComAtprotoLabelDefs.Label]?, threadgate: ThreadgateView?, debug: ATProtocolValueContainer?
         ) {
             self.uri = uri
             self.cid = cid
@@ -40,6 +41,7 @@ public enum AppBskyFeedDefs {
             self.viewer = viewer
             self.labels = labels
             self.threadgate = threadgate
+            self.debug = debug
         }
 
         // Codable initializer
@@ -157,6 +159,14 @@ public enum AppBskyFeedDefs {
 
                 throw error
             }
+            do {
+                debug = try container.decodeIfPresent(ATProtocolValueContainer.self, forKey: .debug)
+
+            } catch {
+                LogManager.logDebug("Decoding error for optional property 'debug': \(error)")
+
+                throw error
+            }
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -199,6 +209,9 @@ public enum AppBskyFeedDefs {
 
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(threadgate, forKey: .threadgate)
+
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(debug, forKey: .debug)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -248,6 +261,11 @@ public enum AppBskyFeedDefs {
                 hasher.combine(nil as Int?)
             }
             if let value = threadgate {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = debug {
                 hasher.combine(value)
             } else {
                 hasher.combine(nil as Int?)
@@ -310,6 +328,10 @@ public enum AppBskyFeedDefs {
             }
 
             if threadgate != other.threadgate {
+                return false
+            }
+
+            if debug != other.debug {
                 return false
             }
 
@@ -404,6 +426,13 @@ public enum AppBskyFeedDefs {
                 map = map.adding(key: "threadgate", value: threadgateValue)
             }
 
+            if let value = debug {
+                // Encode optional property even if it's an empty array for CBOR
+
+                let debugValue = try value.toCBORValue()
+                map = map.adding(key: "debug", value: debugValue)
+            }
+
             return map
         }
 
@@ -423,6 +452,7 @@ public enum AppBskyFeedDefs {
             case viewer
             case labels
             case threadgate
+            case debug
         }
     }
 
