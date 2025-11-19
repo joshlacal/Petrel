@@ -119,7 +119,6 @@ public enum AppBskyUnspeccedGetPostThreadV2 {
         public let above: Bool?
         public let below: Int?
         public let branchingFactor: Int?
-        public let prioritizeFollowedUsers: Bool?
         public let sort: String?
 
         public init(
@@ -127,14 +126,12 @@ public enum AppBskyUnspeccedGetPostThreadV2 {
             above: Bool? = nil,
             below: Int? = nil,
             branchingFactor: Int? = nil,
-            prioritizeFollowedUsers: Bool? = nil,
             sort: String? = nil
         ) {
             self.anchor = anchor
             self.above = above
             self.below = below
             self.branchingFactor = branchingFactor
-            self.prioritizeFollowedUsers = prioritizeFollowedUsers
             self.sort = sort
         }
     }

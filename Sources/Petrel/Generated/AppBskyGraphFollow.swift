@@ -6,12 +6,15 @@ public struct AppBskyGraphFollow: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "app.bsky.graph.follow"
     public let subject: DID
     public let createdAt: ATProtocolDate
+    public let via: ComAtprotoRepoStrongRef?
 
     // Standard initializer
-    public init(subject: DID, createdAt: ATProtocolDate) {
+    public init(subject: DID, createdAt: ATProtocolDate, via: ComAtprotoRepoStrongRef?) {
         self.subject = subject
 
         self.createdAt = createdAt
+
+        self.via = via
     }
 
     // Codable initializer
@@ -21,6 +24,8 @@ public struct AppBskyGraphFollow: ATProtocolCodable, ATProtocolValue {
         subject = try container.decode(DID.self, forKey: .subject)
 
         createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+
+        via = try container.decodeIfPresent(ComAtprotoRepoStrongRef.self, forKey: .via)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -31,6 +36,9 @@ public struct AppBskyGraphFollow: ATProtocolCodable, ATProtocolValue {
         try container.encode(subject, forKey: .subject)
 
         try container.encode(createdAt, forKey: .createdAt)
+
+        // Encode optional property even if it's an empty array
+        try container.encodeIfPresent(via, forKey: .via)
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -48,12 +56,21 @@ public struct AppBskyGraphFollow: ATProtocolCodable, ATProtocolValue {
             return false
         }
 
+        if via != other.via {
+            return false
+        }
+
         return true
     }
 
     public func hash(into hasher: inout Hasher) {
         hasher.combine(subject)
         hasher.combine(createdAt)
+        if let value = via {
+            hasher.combine(value)
+        } else {
+            hasher.combine(nil as Int?) // Placeholder for nil
+        }
     }
 
     // DAGCBOR encoding with field ordering
@@ -68,6 +85,12 @@ public struct AppBskyGraphFollow: ATProtocolCodable, ATProtocolValue {
         let createdAtValue = try createdAt.toCBORValue()
         map = map.adding(key: "createdAt", value: createdAtValue)
 
+        if let value = via {
+            // Encode optional property even if it's an empty array for CBOR
+            let viaValue = try value.toCBORValue()
+            map = map.adding(key: "via", value: viaValue)
+        }
+
         return map
     }
 
@@ -75,5 +98,6 @@ public struct AppBskyGraphFollow: ATProtocolCodable, ATProtocolValue {
         case typeIdentifier = "$type"
         case subject
         case createdAt
+        case via
     }
 }

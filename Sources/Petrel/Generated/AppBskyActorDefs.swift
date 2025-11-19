@@ -18,10 +18,11 @@ public struct AppBskyActorDefs {
         public let createdAt: ATProtocolDate?
         public let verification: VerificationState?
         public let status: StatusView?
+        public let debug: ATProtocolValueContainer?
 
         // Standard initializer
         public init(
-            did: DID, handle: Handle, displayName: String?, pronouns: String?, avatar: URI?, associated: ProfileAssociated?, viewer: ViewerState?, labels: [ComAtprotoLabelDefs.Label]?, createdAt: ATProtocolDate?, verification: VerificationState?, status: StatusView?
+            did: DID, handle: Handle, displayName: String?, pronouns: String?, avatar: URI?, associated: ProfileAssociated?, viewer: ViewerState?, labels: [ComAtprotoLabelDefs.Label]?, createdAt: ATProtocolDate?, verification: VerificationState?, status: StatusView?, debug: ATProtocolValueContainer?
         ) {
             self.did = did
             self.handle = handle
@@ -34,6 +35,7 @@ public struct AppBskyActorDefs {
             self.createdAt = createdAt
             self.verification = verification
             self.status = status
+            self.debug = debug
         }
 
         // Codable initializer
@@ -127,6 +129,14 @@ public struct AppBskyActorDefs {
 
                 throw error
             }
+            do {
+                debug = try container.decodeIfPresent(ATProtocolValueContainer.self, forKey: .debug)
+
+            } catch {
+                LogManager.logDebug("Decoding error for optional property 'debug': \(error)")
+
+                throw error
+            }
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -163,6 +173,9 @@ public struct AppBskyActorDefs {
 
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(status, forKey: .status)
+
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(debug, forKey: .debug)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -213,6 +226,11 @@ public struct AppBskyActorDefs {
             } else {
                 hasher.combine(nil as Int?)
             }
+            if let value = debug {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -259,6 +277,10 @@ public struct AppBskyActorDefs {
             }
 
             if status != other.status {
+                return false
+            }
+
+            if debug != other.debug {
                 return false
             }
 
@@ -344,6 +366,13 @@ public struct AppBskyActorDefs {
                 map = map.adding(key: "status", value: statusValue)
             }
 
+            if let value = debug {
+                // Encode optional property even if it's an empty array for CBOR
+
+                let debugValue = try value.toCBORValue()
+                map = map.adding(key: "debug", value: debugValue)
+            }
+
             return map
         }
 
@@ -360,6 +389,7 @@ public struct AppBskyActorDefs {
             case createdAt
             case verification
             case status
+            case debug
         }
     }
 
@@ -378,10 +408,11 @@ public struct AppBskyActorDefs {
         public let labels: [ComAtprotoLabelDefs.Label]?
         public let verification: VerificationState?
         public let status: StatusView?
+        public let debug: ATProtocolValueContainer?
 
         // Standard initializer
         public init(
-            did: DID, handle: Handle, displayName: String?, pronouns: String?, description: String?, avatar: URI?, associated: ProfileAssociated?, indexedAt: ATProtocolDate?, createdAt: ATProtocolDate?, viewer: ViewerState?, labels: [ComAtprotoLabelDefs.Label]?, verification: VerificationState?, status: StatusView?
+            did: DID, handle: Handle, displayName: String?, pronouns: String?, description: String?, avatar: URI?, associated: ProfileAssociated?, indexedAt: ATProtocolDate?, createdAt: ATProtocolDate?, viewer: ViewerState?, labels: [ComAtprotoLabelDefs.Label]?, verification: VerificationState?, status: StatusView?, debug: ATProtocolValueContainer?
         ) {
             self.did = did
             self.handle = handle
@@ -396,6 +427,7 @@ public struct AppBskyActorDefs {
             self.labels = labels
             self.verification = verification
             self.status = status
+            self.debug = debug
         }
 
         // Codable initializer
@@ -505,6 +537,14 @@ public struct AppBskyActorDefs {
 
                 throw error
             }
+            do {
+                debug = try container.decodeIfPresent(ATProtocolValueContainer.self, forKey: .debug)
+
+            } catch {
+                LogManager.logDebug("Decoding error for optional property 'debug': \(error)")
+
+                throw error
+            }
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -547,6 +587,9 @@ public struct AppBskyActorDefs {
 
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(status, forKey: .status)
+
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(debug, forKey: .debug)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -607,6 +650,11 @@ public struct AppBskyActorDefs {
             } else {
                 hasher.combine(nil as Int?)
             }
+            if let value = debug {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -661,6 +709,10 @@ public struct AppBskyActorDefs {
             }
 
             if status != other.status {
+                return false
+            }
+
+            if debug != other.debug {
                 return false
             }
 
@@ -760,6 +812,13 @@ public struct AppBskyActorDefs {
                 map = map.adding(key: "status", value: statusValue)
             }
 
+            if let value = debug {
+                // Encode optional property even if it's an empty array for CBOR
+
+                let debugValue = try value.toCBORValue()
+                map = map.adding(key: "debug", value: debugValue)
+            }
+
             return map
         }
 
@@ -778,6 +837,7 @@ public struct AppBskyActorDefs {
             case labels
             case verification
             case status
+            case debug
         }
     }
 
@@ -803,10 +863,11 @@ public struct AppBskyActorDefs {
         public let pinnedPost: ComAtprotoRepoStrongRef?
         public let verification: VerificationState?
         public let status: StatusView?
+        public let debug: ATProtocolValueContainer?
 
         // Standard initializer
         public init(
-            did: DID, handle: Handle, displayName: String?, description: String?, pronouns: String?, website: URI?, avatar: URI?, banner: URI?, followersCount: Int?, followsCount: Int?, postsCount: Int?, associated: ProfileAssociated?, joinedViaStarterPack: AppBskyGraphDefs.StarterPackViewBasic?, indexedAt: ATProtocolDate?, createdAt: ATProtocolDate?, viewer: ViewerState?, labels: [ComAtprotoLabelDefs.Label]?, pinnedPost: ComAtprotoRepoStrongRef?, verification: VerificationState?, status: StatusView?
+            did: DID, handle: Handle, displayName: String?, description: String?, pronouns: String?, website: URI?, avatar: URI?, banner: URI?, followersCount: Int?, followsCount: Int?, postsCount: Int?, associated: ProfileAssociated?, joinedViaStarterPack: AppBskyGraphDefs.StarterPackViewBasic?, indexedAt: ATProtocolDate?, createdAt: ATProtocolDate?, viewer: ViewerState?, labels: [ComAtprotoLabelDefs.Label]?, pinnedPost: ComAtprotoRepoStrongRef?, verification: VerificationState?, status: StatusView?, debug: ATProtocolValueContainer?
         ) {
             self.did = did
             self.handle = handle
@@ -828,6 +889,7 @@ public struct AppBskyActorDefs {
             self.pinnedPost = pinnedPost
             self.verification = verification
             self.status = status
+            self.debug = debug
         }
 
         // Codable initializer
@@ -993,6 +1055,14 @@ public struct AppBskyActorDefs {
 
                 throw error
             }
+            do {
+                debug = try container.decodeIfPresent(ATProtocolValueContainer.self, forKey: .debug)
+
+            } catch {
+                LogManager.logDebug("Decoding error for optional property 'debug': \(error)")
+
+                throw error
+            }
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -1056,6 +1126,9 @@ public struct AppBskyActorDefs {
 
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(status, forKey: .status)
+
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(debug, forKey: .debug)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1151,6 +1224,11 @@ public struct AppBskyActorDefs {
             } else {
                 hasher.combine(nil as Int?)
             }
+            if let value = debug {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -1233,6 +1311,10 @@ public struct AppBskyActorDefs {
             }
 
             if status != other.status {
+                return false
+            }
+
+            if debug != other.debug {
                 return false
             }
 
@@ -1381,6 +1463,13 @@ public struct AppBskyActorDefs {
                 map = map.adding(key: "status", value: statusValue)
             }
 
+            if let value = debug {
+                // Encode optional property even if it's an empty array for CBOR
+
+                let debugValue = try value.toCBORValue()
+                map = map.adding(key: "debug", value: debugValue)
+            }
+
             return map
         }
 
@@ -1406,6 +1495,7 @@ public struct AppBskyActorDefs {
             case pinnedPost
             case verification
             case status
+            case debug
         }
     }
 
@@ -3217,14 +3307,12 @@ public struct AppBskyActorDefs {
     public struct ThreadViewPref: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.actor.defs#threadViewPref"
         public let sort: String?
-        public let prioritizeFollowedUsers: Bool?
 
         // Standard initializer
         public init(
-            sort: String?, prioritizeFollowedUsers: Bool?
+            sort: String?
         ) {
             self.sort = sort
-            self.prioritizeFollowedUsers = prioritizeFollowedUsers
         }
 
         // Codable initializer
@@ -3238,14 +3326,6 @@ public struct AppBskyActorDefs {
 
                 throw error
             }
-            do {
-                prioritizeFollowedUsers = try container.decodeIfPresent(Bool.self, forKey: .prioritizeFollowedUsers)
-
-            } catch {
-                LogManager.logDebug("Decoding error for optional property 'prioritizeFollowedUsers': \(error)")
-
-                throw error
-            }
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -3254,18 +3334,10 @@ public struct AppBskyActorDefs {
 
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(sort, forKey: .sort)
-
-            // Encode optional property even if it's an empty array
-            try container.encodeIfPresent(prioritizeFollowedUsers, forKey: .prioritizeFollowedUsers)
         }
 
         public func hash(into hasher: inout Hasher) {
             if let value = sort {
-                hasher.combine(value)
-            } else {
-                hasher.combine(nil as Int?)
-            }
-            if let value = prioritizeFollowedUsers {
                 hasher.combine(value)
             } else {
                 hasher.combine(nil as Int?)
@@ -3276,10 +3348,6 @@ public struct AppBskyActorDefs {
             guard let other = other as? Self else { return false }
 
             if sort != other.sort {
-                return false
-            }
-
-            if prioritizeFollowedUsers != other.prioritizeFollowedUsers {
                 return false
             }
 
@@ -3303,20 +3371,12 @@ public struct AppBskyActorDefs {
                 map = map.adding(key: "sort", value: sortValue)
             }
 
-            if let value = prioritizeFollowedUsers {
-                // Encode optional property even if it's an empty array for CBOR
-
-                let prioritizeFollowedUsersValue = try value.toCBORValue()
-                map = map.adding(key: "prioritizeFollowedUsers", value: prioritizeFollowedUsersValue)
-            }
-
             return map
         }
 
         private enum CodingKeys: String, CodingKey {
             case typeIdentifier = "$type"
             case sort
-            case prioritizeFollowedUsers
         }
     }
 
