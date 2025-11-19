@@ -4,6 +4,8 @@ import os
 import asyncio
 import aiofiles
 from swift_code_generator import SwiftCodeGenerator, convert_json_to_swift
+from kotlin_code_generator import KotlinCodeGenerator
+from kotlin_type_converter import convert_to_pascal_case
 from utils import convert_to_camel_case
 from cycle_detector import CycleDetector
 
@@ -158,14 +160,138 @@ def generate_swift_namespace_classes(namespace_hierarchy, network_manager="Netwo
 
     return swift_code
 
-async def main(input_dir, output_dir):
-    await generate_swift_from_lexicons_recursive(input_dir, output_dir)
+async def generate_kotlin_from_lexicons_recursive(folder_path: str, output_folder: str):
+    """Generate Kotlin code from lexicons."""
+    namespace_hierarchy = {}
+    cycle_detector = CycleDetector()
+    lexicons = []
+
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
+
+    print("Generating Kotlin code...")
+
+    # First pass: Load all lexicons and build dependency graph
+    for root, dirs, files in os.walk(folder_path):
+        for filename in files:
+            if filename.endswith('.json'):
+                filepath = os.path.join(root, filename)
+                async with aiofiles.open(filepath, 'rb') as f:
+                    content = await f.read()
+                    lexicon = orjson.loads(content)
+                    lexicon_id = lexicon.get('id', '')
+
+                    if 'ozone' in lexicon_id:
+                        continue
+
+                    lexicons.append((filepath, lexicon))
+
+                    # Register types with cycle detector
+                    defs = lexicon.get('defs', {})
+                    for def_name, def_schema in defs.items():
+                        cycle_detector.add_type(lexicon_id, def_name, def_schema)
+
+                    # Also register query/procedure output unions
+                    main_def = defs.get('main', {})
+                    if main_def.get('type') in ['query', 'procedure']:
+                        output_schema = main_def.get('output', {}).get('schema', {})
+                        if output_schema.get('type') == 'object':
+                            cycle_detector.add_output_type(lexicon_id, output_schema)
+
+    # Detect circular dependencies (less critical for Kotlin but still useful)
+    cycle_detector.detect_cycles()
+
+    print(f"Loaded {len(lexicons)} lexicons for Kotlin generation")
+
+    async def process_kotlin_lexicon(filepath, lexicon):
+        lexicon_id = lexicon.get('id', '')
+        defs = lexicon.get('defs', {})
+
+        # Build namespace hierarchy
+        namespace_parts = lexicon_id.split('.')[:3]
+        current_level = namespace_hierarchy
+        for part in namespace_parts:
+            if part not in current_level:
+                current_level[part] = {}
+            current_level = current_level[part]
+
+        # Generate Kotlin code
+        kotlin_code = KotlinCodeGenerator(lexicon, cycle_detector).convert()
+
+        output_filename = f"{convert_to_pascal_case(lexicon_id)}.kt"
+        output_file_path = os.path.join(output_folder, output_filename)
+        async with aiofiles.open(output_file_path, 'w') as kotlin_file:
+            await kotlin_file.write(kotlin_code)
+
+    # Second pass: Generate code
+    tasks = []
+    for filepath, lexicon in lexicons:
+        tasks.append(asyncio.create_task(process_kotlin_lexicon(filepath, lexicon)))
+
+    await asyncio.gather(*tasks)
+
+    # Generate namespace classes for Kotlin
+    kotlin_namespace_classes = generate_kotlin_namespace_classes(namespace_hierarchy)
+    client_main_file_path = os.path.join(output_folder, 'ATProtoClient.kt')
+    async with aiofiles.open(client_main_file_path, 'w') as client_file:
+        await client_file.write(kotlin_namespace_classes)
+
+    print(f"Kotlin generation complete: {len(lexicons)} files generated")
+
+
+def generate_kotlin_namespace_classes(namespace_hierarchy, depth=0):
+    """Generate Kotlin namespace object hierarchy."""
+    kotlin_code = ""
+    indent = "    " * depth
+
+    if depth == 0:
+        kotlin_code += "package com.atproto.client\n\n"
+        kotlin_code += "class ATProtoClient(private val networkService: NetworkService) {\n"
+
+        for namespace, sub_hierarchy in namespace_hierarchy.items():
+            namespace_class = convert_to_pascal_case(namespace)
+            kotlin_code += f"    val {namespace.lower()}: {namespace_class} = {namespace_class}()\n\n"
+            kotlin_code += f"    inner class {namespace_class} {{\n"
+            kotlin_code += generate_kotlin_namespace_classes(sub_hierarchy, depth + 2)
+            kotlin_code += "    }\n\n"
+
+        kotlin_code += "}\n"
+    else:
+        for namespace, sub_namespaces in namespace_hierarchy.items():
+            class_name = convert_to_pascal_case(namespace)
+            kotlin_code += f"{indent}val {namespace.lower()}: {class_name} = {class_name}()\n\n"
+            kotlin_code += f"{indent}inner class {class_name} {{\n"
+            if sub_namespaces:
+                kotlin_code += generate_kotlin_namespace_classes(sub_namespaces, depth + 1)
+            kotlin_code += f"{indent}}}\n\n"
+
+    return kotlin_code
+
+
+async def main(input_dir, output_dir, language='swift'):
+    """Main entry point supporting multiple languages."""
+    if language == 'swift':
+        await generate_swift_from_lexicons_recursive(input_dir, output_dir)
+    elif language == 'kotlin':
+        await generate_kotlin_from_lexicons_recursive(input_dir, output_dir)
+    elif language == 'both':
+        # Generate both Swift and Kotlin
+        swift_output = os.path.join(output_dir, 'swift')
+        kotlin_output = os.path.join(output_dir, 'kotlin')
+
+        await asyncio.gather(
+            generate_swift_from_lexicons_recursive(input_dir, swift_output),
+            generate_kotlin_from_lexicons_recursive(input_dir, kotlin_output)
+        )
+
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print("Usage: python main.py <input_dir> <output_dir>")
+    if len(sys.argv) < 3:
+        print("Usage: python main.py <input_dir> <output_dir> [language]")
         sys.exit(1)
 
     input_dir = sys.argv[1]
     output_dir = sys.argv[2]
-    asyncio.run(main(input_dir, output_dir))
+    language = sys.argv[3] if len(sys.argv) > 3 else 'swift'
+
+    asyncio.run(main(input_dir, output_dir, language))
