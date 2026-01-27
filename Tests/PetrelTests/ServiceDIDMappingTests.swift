@@ -4,7 +4,7 @@ import XCTest
 final class ServiceDIDMappingTests: XCTestCase {
     func testServiceDIDMapping() async throws {
         // Create a network service
-        let baseURL = URL(string: "https://bsky.social")!
+        let baseURL = try XCTUnwrap(URL(string: "https://bsky.social"))
         let networkService = NetworkService(baseURL: baseURL)
 
         // Set service DIDs
@@ -33,7 +33,7 @@ final class ServiceDIDMappingTests: XCTestCase {
 
     func testCustomServiceDID() async throws {
         // Create a network service
-        let baseURL = URL(string: "https://bsky.social")!
+        let baseURL = try XCTUnwrap(URL(string: "https://bsky.social"))
         let networkService = NetworkService(baseURL: baseURL)
 
         // Set a custom service DID for app.bsky

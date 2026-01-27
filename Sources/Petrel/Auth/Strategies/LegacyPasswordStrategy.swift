@@ -82,7 +82,7 @@ actor LegacyPasswordStrategy: AuthStrategy {
 
         // Resolve handle to DID and PDS URL
         await emitProgress(.resolvingHandle(identifier))
-        
+
         LogManager.logError("[E2E-TRACE] Resolving handle to DID: \(identifier)", category: .authentication)
         let did: String
         do {
@@ -92,7 +92,7 @@ actor LegacyPasswordStrategy: AuthStrategy {
             LogManager.logError("[E2E-TRACE] DID resolution FAILED: \(error)", category: .authentication)
             throw error
         }
-        
+
         let pdsURL: URL
         do {
             pdsURL = try await didResolver.resolveDIDToPDSURL(did: did)
@@ -131,13 +131,13 @@ actor LegacyPasswordStrategy: AuthStrategy {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.setValue("application/json", forHTTPHeaderField: "Accept")
             request.httpBody = try JSONEncoder().encode(sessionInput)
-            
+
             let (data, response) = try await URLSession.shared.data(for: request)
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw AuthError.invalidResponse
             }
             responseCode = httpResponse.statusCode
-            
+
             if responseCode == 200 {
                 sessionOutput = try JSONDecoder().decode(ComAtprotoServerCreateSession.Output.self, from: data)
             } else {
@@ -171,7 +171,7 @@ actor LegacyPasswordStrategy: AuthStrategy {
         // Parse actual expiration from the JWT token
         let actualExpiresIn = parseJWTExpiration(output.accessJwt) ?? 3600 // Fallback to 1 hour
         LogManager.logError("[E2E-TRACE] JWT parsed expiresIn: \(actualExpiresIn) seconds", category: .authentication)
-        
+
         let newSession = Session(
             accessToken: output.accessJwt,
             refreshToken: output.refreshJwt,
@@ -456,7 +456,7 @@ actor LegacyPasswordStrategy: AuthStrategy {
                 // Parse actual expiration from the refreshed JWT
                 let actualExpiresIn = parseJWTExpiration(refreshResponse.accessJwt) ?? 3600
                 LogManager.logError("[E2E-TRACE] Refreshed JWT expiresIn: \(actualExpiresIn) seconds", category: .authentication)
-                
+
                 // Create new session with updated tokens
                 let newSession = Session(
                     accessToken: refreshResponse.accessJwt,
@@ -509,13 +509,13 @@ actor LegacyPasswordStrategy: AuthStrategy {
     private func emitProgress(_ event: AuthProgressEvent) async {
         await progressDelegate?.authenticationProgress(event)
     }
-    
+
     /// Parse expiration time from a JWT access token
     /// Returns the number of seconds until expiration, or nil if parsing fails
     private func parseJWTExpiration(_ jwt: String) -> TimeInterval? {
         let parts = jwt.split(separator: ".")
         guard parts.count >= 2 else { return nil }
-        
+
         var base64 = String(parts[1])
         // Add padding if needed
         while base64.count % 4 != 0 {
@@ -524,13 +524,14 @@ actor LegacyPasswordStrategy: AuthStrategy {
         // Replace URL-safe characters
         base64 = base64.replacingOccurrences(of: "-", with: "+")
         base64 = base64.replacingOccurrences(of: "_", with: "/")
-        
+
         guard let data = Data(base64Encoded: base64) else { return nil }
-        
+
         do {
             if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                let exp = json["exp"] as? TimeInterval,
-               let iat = json["iat"] as? TimeInterval {
+               let iat = json["iat"] as? TimeInterval
+            {
                 let expiresIn = exp - iat
                 return expiresIn > 0 ? expiresIn : nil
             }

@@ -5,7 +5,7 @@ import Testing
 @Suite("Petrel Integration Tests")
 struct PetrelTests {
     @Test("ATProtoClient can be created without authentication")
-    func clientCreation() async throws {
+    func clientCreation() {
         let oauthConfig = OAuthConfig(
             clientId: "test",
             redirectUri: "test://callback",
@@ -16,7 +16,7 @@ struct PetrelTests {
     }
 
     @Test("ATProtoClient has expected API namespaces")
-    func aPINamespaces() async throws {
+    func aPINamespaces() {
         let oauthConfig = OAuthConfig(
             clientId: "test",
             redirectUri: "test://callback",
@@ -31,7 +31,7 @@ struct PetrelTests {
     }
 
     @Test("ATProtocolValueContainer basic functionality")
-    func valueContainer() throws {
+    func valueContainer() {
         // Skip this test for now as it requires complex setup
         // This would need a proper Decoder implementation
     }

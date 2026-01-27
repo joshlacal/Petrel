@@ -94,7 +94,9 @@ public extension String {
             public let mentionLink: MentionLink
         }
 
-        var richText: RichTextAttributes.Type { RichTextAttributes.self }
+        var richText: RichTextAttributes.Type {
+            RichTextAttributes.self
+        }
     }
 
     // MARK: AttributedString to facets
@@ -130,7 +132,8 @@ public extension String {
             for run in rawRuns {
                 if let last = mergedRuns.last,
                    last.urlString == run.urlString,
-                   last.byteEnd == run.byteStart {
+                   last.byteEnd == run.byteStart
+                {
                     // Extend the previous run
                     mergedRuns[mergedRuns.count - 1].byteEnd = run.byteEnd
                 } else {
@@ -153,7 +156,8 @@ public extension String {
                     features.append(.appBskyRichtextFacetTag(AppBskyRichtextFacet.Tag(tag: tag)))
                 } else {
                     features.append(
-                        .appBskyRichtextFacetLink(AppBskyRichtextFacet.Link(uri: URI(uriString: urlString))))
+                        .appBskyRichtextFacetLink(AppBskyRichtextFacet.Link(uri: URI(uriString: urlString)))
+                    )
                 }
 
                 let byteSlice = AppBskyRichtextFacet.ByteSlice(byteStart: run.byteStart, byteEnd: run.byteEnd)

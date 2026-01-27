@@ -29,7 +29,7 @@ struct ATProtoClientTests {
     // MARK: - Client Initialization Tests
 
     @Test("ATProtoClient initializes with correct configuration")
-    func clientInitialization() async throws {
+    func clientInitialization() {
         let oauthConfig = OAuthConfig(
             clientId: "test-client",
             redirectUri: "catbird://callback",
@@ -47,7 +47,7 @@ struct ATProtoClientTests {
     }
 
     @Test("Client configuration validation")
-    func clientConfigValidation() throws {
+    func clientConfigValidation() {
         // Test valid configuration
         let validConfig = OAuthConfig(
             clientId: "valid-client-id",
@@ -81,7 +81,7 @@ struct ATProtoClientTests {
         #expect(authURL?.host != nil, "Auth URL should have valid host")
 
         // Verify OAuth parameters
-        let components = URLComponents(url: authURL!, resolvingAgainstBaseURL: false)
+        let components = try URLComponents(url: #require(authURL), resolvingAgainstBaseURL: false)
         let queryItems = components?.queryItems ?? []
 
         let hasClientId = queryItems.contains { $0.name == "client_id" }
@@ -110,7 +110,7 @@ struct ATProtoClientTests {
             did: "did:plc:test123"
         )
 
-        let callbackURL = URL(string: "test://callback?code=auth-code-123&state=oauth-state")!
+        let callbackURL = try #require(URL(string: "test://callback?code=auth-code-123&state=oauth-state"))
         let result = await client.handleOAuthCallback(callbackURL)
 
         #expect(result == true, "OAuth callback should succeed")
@@ -127,14 +127,14 @@ struct ATProtoClientTests {
         _ = await client.beginOAuthFlow()
 
         // Test error callback
-        let errorURL = URL(string: "test://callback?error=access_denied&state=oauth-state")!
+        let errorURL = try #require(URL(string: "test://callback?error=access_denied&state=oauth-state"))
         let result = await client.handleOAuthCallback(errorURL)
 
         #expect(result == false, "OAuth error callback should fail")
         #expect(!client.isAuthenticated, "Client should not be authenticated after error")
 
         // Test invalid state
-        let invalidStateURL = URL(string: "test://callback?code=auth-code&state=wrong-state")!
+        let invalidStateURL = try #require(URL(string: "test://callback?code=auth-code&state=wrong-state"))
         let invalidResult = await client.handleOAuthCallback(invalidStateURL)
 
         #expect(invalidResult == false, "Invalid state should fail callback")
@@ -143,7 +143,7 @@ struct ATProtoClientTests {
     // MARK: - Token Management Tests
 
     @Test("Access token refresh works correctly")
-    func tokenRefresh() async throws {
+    func tokenRefresh() async {
         let client = await createAuthenticatedTestClient()
 
         // Mock token refresh response
@@ -163,7 +163,7 @@ struct ATProtoClientTests {
     }
 
     @Test("Token refresh failure handling")
-    func tokenRefreshFailure() async throws {
+    func tokenRefreshFailure() async {
         let client = await createAuthenticatedTestClient()
 
         // Mock refresh failure
@@ -396,7 +396,7 @@ struct ATProtoClientTests {
     // MARK: - Session Management Tests
 
     @Test("Session persistence works correctly")
-    func sessionPersistence() async throws {
+    func sessionPersistence() async {
         let client = await createAuthenticatedTestClient()
 
         // Save session
@@ -460,9 +460,9 @@ struct ATProtoClientTests {
         var client: ATProtoClient? = await createAuthenticatedTestClient()
 
         // Make some API calls to populate internal state
-        await client!.setMockAPIResponse(path: "app.bsky.feed.getTimeline", response: ["feed": Array(repeating: ["uri": "test"], count: 100)])
+        await client?.setMockAPIResponse(path: "app.bsky.feed.getTimeline", response: ["feed": Array(repeating: ["uri": "test"], count: 100)])
         let timelineParams = AppBskyFeedGetTimeline.Parameters(limit: 100)
-        _ = try await client!.app.bsky.feed.getTimeline(input: timelineParams)
+        _ = try try #require(await client?.app.bsky.feed.getTimeline(input: timelineParams))
 
         weak var weakClient = client
         client = nil

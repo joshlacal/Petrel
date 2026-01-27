@@ -494,7 +494,7 @@ struct ATProtoInteropTests {
         }
 
         @Test("TID Generator")
-        func tidGenerator() async throws {
+        func tidGenerator() async {
             let tid1 = await TIDGenerator.next()
             let tid2 = await TIDGenerator.next()
 
@@ -521,7 +521,7 @@ struct ATProtoInteropTests {
     @Suite("DateTime Validation")
     struct DateTimeTests {
         @Test("Valid DateTime Formats")
-        func validDateTimes() throws {
+        func validDateTimes() {
             let validDateTimes = [
                 "1985-04-12T23:20:50.123Z",
                 "1985-04-12T23:20:50.000Z",
@@ -575,7 +575,7 @@ struct ATProtoInteropTests {
             #expect(parsedDate != nil)
 
             // Should be very close (within millisecond precision)
-            let timeDifference = abs(parsedDate!.date.timeIntervalSince1970 - testDate.timeIntervalSince1970)
+            let timeDifference = try abs(#require(parsedDate?.date.timeIntervalSince1970) - testDate.timeIntervalSince1970)
             #expect(timeDifference < 0.001) // Within 1ms
         }
     }

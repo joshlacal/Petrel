@@ -129,7 +129,7 @@ enum KeychainManager {
 
     // MARK: - Cache
 
-    // Thread-safe caches with automatic memory management
+    /// Thread-safe caches with automatic memory management
     private nonisolated(unsafe) static let dataCache: NSCache<NSString, NSData> = {
         let cache = NSCache<NSString, NSData>()
         cache.countLimit = 100
@@ -150,7 +150,8 @@ enum KeychainManager {
         }
         defaultAccessGroup = accessGroup
         LogManager.logDebug(
-            "KeychainManager - Default access group set to \(accessGroup ?? "nil")")
+            "KeychainManager - Default access group set to \(accessGroup ?? "nil")"
+        )
     }
 
     private static let itemNotFoundStatus: Int = {
@@ -172,11 +173,11 @@ enum KeychainManager {
     }
 
     private static func isItemNotFound(_ error: Error) -> Bool {
-        guard case KeychainError.itemRetrievalError(let status) = error else { return false }
+        guard case let KeychainError.itemRetrievalError(status) = error else { return false }
         return status == itemNotFoundStatus
     }
 
-    // Wrapper class for P256.Signing.PrivateKey to make it cacheable
+    /// Wrapper class for P256.Signing.PrivateKey to make it cacheable
     private final class CachedDPoPKey: NSObject, @unchecked Sendable {
         let key: P256.Signing.PrivateKey
 
@@ -186,7 +187,7 @@ enum KeychainManager {
         }
     }
 
-    // Configure cache limits
+    /// Configure cache limits
     static func configureCaches(countLimit: Int = 100) {
         dataCache.countLimit = countLimit
         dpopKeyCache.countLimit = countLimit
@@ -347,10 +348,12 @@ enum KeychainManager {
                     accessGroup: nil
                 )
                 LogManager.logInfo(
-                    "KeychainManager - Migrated item to access group \(resolvedAccessGroup) for key \(namespacedKey).")
+                    "KeychainManager - Migrated item to access group \(resolvedAccessGroup) for key \(namespacedKey)."
+                )
             } catch {
                 LogManager.logWarning(
-                    "KeychainManager - Failed to migrate item to access group \(resolvedAccessGroup) for key \(namespacedKey): \(error)")
+                    "KeychainManager - Failed to migrate item to access group \(resolvedAccessGroup) for key \(namespacedKey): \(error)"
+                )
             }
 
             LogManager.logDebug("KeychainManager - Successfully retrieved item for key \(namespacedKey).")
@@ -483,7 +486,8 @@ enum KeychainManager {
                 )
                 try? storage.deleteDPoPKey(keyTag: keyTag, accessGroup: nil)
                 LogManager.logInfo(
-                    "KeychainManager - Migrated DPoP key to access group \(resolvedAccessGroup) for tag \(keyTag).")
+                    "KeychainManager - Migrated DPoP key to access group \(resolvedAccessGroup) for tag \(keyTag)."
+                )
             } catch {
                 LogManager.logWarning(
                     "KeychainManager - Failed to migrate DPoP key to access group \(resolvedAccessGroup) for tag \(keyTag): \(error)"
@@ -562,7 +566,8 @@ enum KeychainManager {
         dataCache.removeObject(forKey: bindingsKey as NSString)
 
         LogManager.logDebug(
-            "KeychainManager - Successfully deleted DPoP key bindings for namespace \(namespace).")
+            "KeychainManager - Successfully deleted DPoP key bindings for namespace \(namespace)."
+        )
     }
 
     /// Deletes DPoP key bindings for a specific DID
@@ -582,7 +587,8 @@ enum KeychainManager {
         let status = SecItemDelete(query as CFDictionary)
         if status != errSecSuccess, status != errSecItemNotFound {
             LogManager.logError(
-                "KeychainManager - Failed to delete DPoP key bindings for DID \(did). Status: \(status)")
+                "KeychainManager - Failed to delete DPoP key bindings for DID \(did). Status: \(status)"
+            )
             throw KeychainError.itemStoreError(status: Int(status))
         }
 
@@ -594,7 +600,7 @@ enum KeychainManager {
 
     // MARK: - Initialization
 
-    // Call this at app startup
+    /// Call this at app startup
     static func initialize() {
         configureCaches()
     }
@@ -738,5 +744,3 @@ enum KeychainManager {
         try delete(key: "gatewaySession", namespace: "catbird.gateway")
     }
 }
-
-

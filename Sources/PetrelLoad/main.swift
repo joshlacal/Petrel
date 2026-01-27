@@ -381,7 +381,7 @@ enum PetrelLoadCLI {
     }
 }
 
-// Helper function for basic stress testing with ATProtoClient
+/// Helper function for basic stress testing with ATProtoClient
 func runBasicStressTest(client: ATProtoClient, endpoint: String, iterations: Int, concurrency: Int) async {
     print("=== ATProtoClient Stress Test ===")
     print("Endpoint: \(endpoint)")

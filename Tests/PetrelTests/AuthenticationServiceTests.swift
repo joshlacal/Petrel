@@ -18,7 +18,7 @@ struct AuthenticationServiceTests {
     // MARK: - Service Initialization Tests
 
     @Test("Authentication service initializes with correct configuration")
-    func serviceInitialization() throws {
+    func serviceInitialization() {
         let config = OAuthConfig(
             clientId: "test-client",
             redirectUri: "catbird://auth/callback",
@@ -33,7 +33,7 @@ struct AuthenticationServiceTests {
     }
 
     @Test("Service starts in unauthenticated state")
-    func initialAuthenticationState() throws {
+    func initialAuthenticationState() {
         let service = createTestAuthService()
 
         #expect(!service.isAuthenticated, "Should start unauthenticated")
@@ -54,7 +54,7 @@ struct AuthenticationServiceTests {
         #expect(authURL?.scheme == "https", "Should use HTTPS scheme")
         #expect(authURL?.host != nil, "Should have valid host")
 
-        let components = URLComponents(url: authURL!, resolvingAgainstBaseURL: false)
+        let components = try URLComponents(url: #require(authURL), resolvingAgainstBaseURL: false)
         let queryItems = components?.queryItems ?? []
 
         // Verify required OAuth parameters
@@ -82,8 +82,8 @@ struct AuthenticationServiceTests {
         let url1 = await service.buildAuthorizationURL()
         let url2 = await service.buildAuthorizationURL()
 
-        let state1 = extractQueryParameter(from: url1!, parameter: "state")
-        let state2 = extractQueryParameter(from: url2!, parameter: "state")
+        let state1 = try extractQueryParameter(from: #require(url1), parameter: "state")
+        let state2 = try extractQueryParameter(from: #require(url2), parameter: "state")
 
         #expect(state1 != nil, "First URL should have state")
         #expect(state2 != nil, "Second URL should have state")
@@ -95,17 +95,17 @@ struct AuthenticationServiceTests {
         let service = createTestAuthService()
 
         let authURL = await service.buildAuthorizationURL()
-        let codeChallenge = extractQueryParameter(from: authURL!, parameter: "code_challenge")
-        let codeChallengeMethod = extractQueryParameter(from: authURL!, parameter: "code_challenge_method")
+        let codeChallenge = try extractQueryParameter(from: #require(authURL), parameter: "code_challenge")
+        let codeChallengeMethod = try extractQueryParameter(from: #require(authURL), parameter: "code_challenge_method")
 
         #expect(codeChallenge != nil, "Should generate code challenge")
-        #expect(codeChallenge!.count >= 43, "Code challenge should be at least 43 characters")
+        #expect(try #require(codeChallenge?.count) >= 43, "Code challenge should be at least 43 characters")
         #expect(codeChallengeMethod == "S256", "Should use SHA256 challenge method")
 
         // Verify code challenge is base64url encoded
-        let isBase64URL = codeChallenge!.allSatisfy { char in
+        let isBase64URL = try #require(codeChallenge?.allSatisfy { char in
             char.isLetter || char.isNumber || char == "-" || char == "_"
-        }
+        })
         #expect(isBase64URL, "Code challenge should be base64url encoded")
     }
 
@@ -127,7 +127,7 @@ struct AuthenticationServiceTests {
             tokenType: "Bearer"
         )
 
-        let callbackURL = URL(string: "test://callback?code=auth-code-123&state=\(service.currentOAuthState ?? "test-state")")!
+        let callbackURL = try #require(URL(string: "test://callback?code=auth-code-123&state=\(service.currentOAuthState ?? "test-state")"))
         let success = await service.handleOAuthCallback(callbackURL)
 
         #expect(success, "Authorization code exchange should succeed")
@@ -144,7 +144,7 @@ struct AuthenticationServiceTests {
         _ = await service.buildAuthorizationURL()
 
         // Create callback with invalid state
-        let callbackURL = URL(string: "test://callback?code=auth-code-123&state=invalid-state")!
+        let callbackURL = try #require(URL(string: "test://callback?code=auth-code-123&state=invalid-state"))
         let success = await service.handleOAuthCallback(callbackURL)
 
         #expect(!success, "Should fail with invalid state")
@@ -160,7 +160,7 @@ struct AuthenticationServiceTests {
         _ = await service.buildAuthorizationURL()
 
         // Create callback with error
-        let callbackURL = URL(string: "test://callback?error=access_denied&state=\(service.currentOAuthState ?? "test-state")&error_description=User%20denied%20access")!
+        let callbackURL = try #require(URL(string: "test://callback?error=access_denied&state=\(service.currentOAuthState ?? "test-state")&error_description=User%20denied%20access"))
         let success = await service.handleOAuthCallback(callbackURL)
 
         #expect(!success, "Should fail with OAuth error")
@@ -176,7 +176,7 @@ struct AuthenticationServiceTests {
     // MARK: - Token Refresh Tests
 
     @Test("Successful access token refresh")
-    func accessTokenRefresh() async throws {
+    func accessTokenRefresh() async {
         let service = createTestAuthService()
 
         // Set initial authenticated state
@@ -201,7 +201,7 @@ struct AuthenticationServiceTests {
     }
 
     @Test("Token refresh with invalid refresh token")
-    func tokenRefreshInvalidRefreshToken() async throws {
+    func tokenRefreshInvalidRefreshToken() async {
         let service = createTestAuthService()
 
         // Set authenticated state with invalid refresh token
@@ -221,7 +221,7 @@ struct AuthenticationServiceTests {
     }
 
     @Test("Automatic token refresh when expired")
-    func automaticTokenRefresh() async throws {
+    func automaticTokenRefresh() async {
         let service = createTestAuthService()
 
         // Set authenticated state with expired token
@@ -268,7 +268,7 @@ struct AuthenticationServiceTests {
         )
 
         _ = await service.buildAuthorizationURL()
-        let callbackURL = URL(string: "test://callback?code=auth-code&state=\(service.currentOAuthState ?? "test-state")")!
+        let callbackURL = try #require(URL(string: "test://callback?code=auth-code&state=\(service.currentOAuthState ?? "test-state")"))
         _ = await service.handleOAuthCallback(callbackURL)
 
         let session = service.currentSession
@@ -281,7 +281,7 @@ struct AuthenticationServiceTests {
     }
 
     @Test("Session persistence and restoration")
-    func sessionPersistence() async throws {
+    func sessionPersistence() async {
         let service = createTestAuthService()
 
         // Create authenticated session
@@ -309,7 +309,7 @@ struct AuthenticationServiceTests {
     }
 
     @Test("Session cleanup on logout")
-    func sessionCleanup() async throws {
+    func sessionCleanup() async {
         let service = createTestAuthService()
 
         // Set authenticated state
@@ -353,15 +353,15 @@ struct AuthenticationServiceTests {
         )
 
         #expect(proof != nil, "Should create DPoP proof")
-        #expect(proof!.hasPrefix("eyJ"), "DPoP proof should be a JWT")
+        #expect(try #require(proof?.hasPrefix("eyJ")), "DPoP proof should be a JWT")
 
         // Verify proof contains required claims
-        let isValidProof = await service.validateDPoPProof(proof!)
+        let isValidProof = try await service.validateDPoPProof(#require(proof))
         #expect(isValidProof, "Should generate valid DPoP proof")
     }
 
     @Test("DPoP key persistence")
-    func dPoPKeyPersistence() async throws {
+    func dPoPKeyPersistence() async {
         let service = createTestAuthService()
 
         // Generate and save key pair
@@ -392,7 +392,7 @@ struct AuthenticationServiceTests {
         // Mock network error
         await service.setMockNetworkError(.connectionFailed)
 
-        let callbackURL = URL(string: "test://callback?code=auth-code&state=\(service.currentOAuthState ?? "test-state")")!
+        let callbackURL = try #require(URL(string: "test://callback?code=auth-code&state=\(service.currentOAuthState ?? "test-state")"))
         let success = await service.handleOAuthCallback(callbackURL)
 
         #expect(!success, "Should fail with network error")
@@ -401,7 +401,7 @@ struct AuthenticationServiceTests {
     }
 
     @Test("Server error handling during token refresh")
-    func tokenRefreshServerError() async throws {
+    func tokenRefreshServerError() async {
         let service = createTestAuthService()
 
         await service.setMockAuthenticatedState(
@@ -425,7 +425,7 @@ struct AuthenticationServiceTests {
     // MARK: - Security Tests
 
     @Test("Sensitive data is properly cleared on logout")
-    func sensitiveDataClearing() async throws {
+    func sensitiveDataClearing() async {
         let service = createTestAuthService()
 
         await service.setMockAuthenticatedState(
@@ -450,7 +450,7 @@ struct AuthenticationServiceTests {
     }
 
     @Test("Token validation prevents tampering")
-    func tokenValidation() async throws {
+    func tokenValidation() async {
         let service = createTestAuthService()
 
         // Test with invalid token format

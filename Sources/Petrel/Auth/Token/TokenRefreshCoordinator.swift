@@ -82,7 +82,7 @@ actor TokenRefreshCoordinator {
         let refreshToken: String
         let expiresIn: TimeInterval
         let refreshedAt: Date
-        // Store the original network response to enable returning it to callers expecting the raw tuple
+        /// Store the original network response to enable returning it to callers expecting the raw tuple
         let originalResponse: (Data, HTTPURLResponse)
 
         // Note: Custom Decodable initializer is removed as we will decode manually
@@ -188,7 +188,7 @@ actor TokenRefreshCoordinator {
                             // Success: Decode the raw data as our internal `RefreshResult`
                             // Try OAuth format first, then fall back to legacy AT Proto format
                             let decoder = JSONDecoder()
-                            
+
                             // Try OAuth format (access_token, refresh_token, expires_in)
                             if let tokenResponse = try? decoder.decode(TokenResponse.self, from: data) {
                                 let result = RefreshResult(
@@ -202,10 +202,10 @@ actor TokenRefreshCoordinator {
                                 LogManager.logDebug("TokenRefreshCoordinator: Refresh successful (OAuth format).")
                                 return result
                             }
-                            
+
                             // Try legacy AT Proto format (accessJwt, refreshJwt)
                             if let legacyResponse = try? decoder.decode(LegacyRefreshResponse.self, from: data) {
-                                // Legacy tokens typically expire in 2 hours (7200s) for access, 
+                                // Legacy tokens typically expire in 2 hours (7200s) for access,
                                 // but we use 1 hour as a safe default since it's not in the response
                                 let result = RefreshResult(
                                     accessToken: legacyResponse.accessJwt,
@@ -218,7 +218,7 @@ actor TokenRefreshCoordinator {
                                 LogManager.logDebug("TokenRefreshCoordinator: Refresh successful (legacy AT Proto format).")
                                 return result
                             }
-                            
+
                             // Neither format worked - log the raw response for debugging
                             let responsePreview = String(data: data.prefix(500), encoding: .utf8) ?? "<non-utf8>"
                             LogManager.logError(
@@ -227,7 +227,7 @@ actor TokenRefreshCoordinator {
                             )
                             throw RefreshError.decodingError(
                                 NSError(domain: "TokenRefreshCoordinator", code: -1, userInfo: [
-                                    NSLocalizedDescriptionKey: "Response format unrecognized"
+                                    NSLocalizedDescriptionKey: "Response format unrecognized",
                                 ]),
                                 "Decoding 2xx response - tried OAuth and legacy formats"
                             )
@@ -340,14 +340,14 @@ actor TokenRefreshCoordinator {
                 )
             }
         }
-        
+
         // Try decoding as legacy AT Proto error format (used by com.atproto.server.refreshSession)
         // Legacy format: { "error": "AuthenticationRequired", "message": "..." }
         if let legacyError = try? JSONDecoder().decode(LegacyATProtoError.self, from: data) {
             LogManager.logError(
                 "TokenRefreshCoordinator: Decoded legacy AT Proto error: \(legacyError.error) - \(legacyError.message ?? "no message")"
             )
-            
+
             // Map common legacy errors to RefreshError types
             switch legacyError.error.lowercased() {
             case "authenticationrequired", "invalidtoken", "expiredsession":
@@ -365,14 +365,14 @@ actor TokenRefreshCoordinator {
                 return .networkError(statusCode, "Legacy error: \(legacyError.error) - \(legacyError.message ?? "")")
             }
         }
-        
+
         // Log raw response body for debugging unrecognized error formats
         let responsePreview = String(data: data.prefix(500), encoding: .utf8) ?? "<non-utf8 data>"
         LogManager.logError(
             "TokenRefreshCoordinator: Unrecognized error format (status \(statusCode)). Response preview: \(responsePreview)",
             category: .authentication
         )
-        
+
         // If not a standard OAuth error or legacy error, return a generic network error
         return .networkError(statusCode, "HTTP Error: \(statusCode)")
     }

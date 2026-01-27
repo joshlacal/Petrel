@@ -40,7 +40,7 @@ struct ATProtoCryptoInteropTests {
     @Suite("Signature Validation")
     struct SignatureValidationTests {
         @Test("Valid Signature Fixtures")
-        func validSignatureFixtures() async throws {
+        func validSignatureFixtures() throws {
             let signatureFixtures: [SignatureFixture] = [
                 SignatureFixture(
                     comment: "valid P-256 key and signature, with low-S signature",
@@ -90,7 +90,7 @@ struct ATProtoCryptoInteropTests {
         }
 
         @Test("Invalid Signature Fixtures - High-S")
-        func invalidSignatureFixturesHighS() async throws {
+        func invalidSignatureFixturesHighS() throws {
             let invalidFixtures: [SignatureFixture] = [
                 SignatureFixture(
                     comment: "P-256 key and signature, with non-low-S signature which is invalid in atproto",
@@ -129,7 +129,7 @@ struct ATProtoCryptoInteropTests {
         }
 
         @Test("Invalid Signature Fixtures - DER Encoded")
-        func invalidSignatureFixturesDER() async throws {
+        func invalidSignatureFixturesDER() throws {
             let invalidFixtures: [SignatureFixture] = [
                 SignatureFixture(
                     comment: "P-256 key and signature, with DER-encoded signature which is invalid in atproto",
@@ -303,7 +303,7 @@ struct ATProtoCryptoInteropTests {
         }
 
         @Test("DER Encoded Signatures Are Different")
-        func derEncodedSignaturesAreDifferent() {
+        func derEncodedSignaturesAreDifferent() throws {
             let derSignatures = [
                 "MEQCIFxYelWJ9lNcAVt+jK0y/T+DC/X4ohFZ+m8f9SEItkY1AiACX7eXz5sgtaRrz/SdPR8kprnbHMQVde0T2R8yOTBweA",
                 "MEUCIQCWumUqJqOCqInXF7AzhIRg2MhwRz2rWZcOEsOjPmNItgIgXJH7RnqfYY6M0eg33wU0sFYDlprwdOcpRn78Sz5ePgk",
@@ -313,8 +313,8 @@ struct ATProtoCryptoInteropTests {
                 let decoded = Data(base64Encoded: signature)
                 #expect(decoded != nil, "Should be valid base64: \(signature)")
                 // DER signatures are variable length, not fixed 64 bytes
-                #expect(decoded!.count != 64, "DER signatures should not be 64 bytes")
-                #expect(decoded!.count > 64, "DER signatures are typically longer than raw signatures")
+                #expect(try #require(decoded?.count) != 64, "DER signatures should not be 64 bytes")
+                #expect(try #require(decoded?.count) > 64, "DER signatures are typically longer than raw signatures")
             }
         }
     }

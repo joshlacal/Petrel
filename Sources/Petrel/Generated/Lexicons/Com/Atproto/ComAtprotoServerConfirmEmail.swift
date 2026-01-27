@@ -1,109 +1,88 @@
 import Foundation
 
-
-
 // lexicon: 1, id: com.atproto.server.confirmEmail
 
-
-public struct ComAtprotoServerConfirmEmail { 
-
+public enum ComAtprotoServerConfirmEmail {
     public static let typeIdentifier = "com.atproto.server.confirmEmail"
-public struct Input: ATProtocolCodable {
-            public let email: String
-            public let token: String
+    public struct Input: ATProtocolCodable {
+        public let email: String
+        public let token: String
 
-            // Standard public initializer
-            public init(email: String, token: String) {
-                self.email = email
-                self.token = token
-                
-            }
-            
-            public init(from decoder: Decoder) throws {
-                let container = try decoder.container(keyedBy: CodingKeys.self)
-                
-                self.email = try container.decode(String.self, forKey: .email)
-                
-                
-                self.token = try container.decode(String.self, forKey: .token)
-                
-            }
-            
-            public func encode(to encoder: Encoder) throws {
-                var container = encoder.container(keyedBy: CodingKeys.self)
-                
-                try container.encode(email, forKey: .email)
-                
-                
-                try container.encode(token, forKey: .token)
-                
-            }
-            
-            private enum CodingKeys: String, CodingKey {
-                case email
-                case token
-            }
-            
-            public func toCBORValue() throws -> Any {
-                var map = OrderedCBORMap()
-
-                
-                
-                let emailValue = try email.toCBORValue()
-                map = map.adding(key: "email", value: emailValue)
-                
-                
-                
-                let tokenValue = try token.toCBORValue()
-                map = map.adding(key: "token", value: tokenValue)
-                
-                
-
-                return map
-            }
-        }        
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case accountNotFound = "AccountNotFound."
-                case expiredToken = "ExpiredToken."
-                case invalidToken = "InvalidToken."
-                case invalidEmail = "InvalidEmail."
-            public var description: String {
-                return self.rawValue
-            }
-
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+        /// Standard public initializer
+        public init(email: String, token: String) {
+            self.email = email
+            self.token = token
         }
 
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
 
+            email = try container.decode(String.self, forKey: .email)
 
+            token = try container.decode(String.self, forKey: .token)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(email, forKey: .email)
+
+            try container.encode(token, forKey: .token)
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case email
+            case token
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+
+            let emailValue = try email.toCBORValue()
+            map = map.adding(key: "email", value: emailValue)
+
+            let tokenValue = try token.toCBORValue()
+            map = map.adding(key: "token", value: tokenValue)
+
+            return map
+        }
+    }
+
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case accountNotFound = "AccountNotFound."
+        case expiredToken = "ExpiredToken."
+        case invalidToken = "InvalidToken."
+        case invalidEmail = "InvalidEmail."
+        public var description: String {
+            return rawValue
+        }
+
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-extension ATProtoClient.Com.Atproto.Server {
+public extension ATProtoClient.Com.Atproto.Server {
     // MARK: - confirmEmail
 
     /// Confirm an email using a token from com.atproto.server.requestEmailConfirmation.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func confirmEmail(
-        
+    func confirmEmail(
         input: ComAtprotoServerConfirmEmail.Input
-        
+
     ) async throws -> Int {
         let endpoint = "com.atproto.server.confirmEmail"
-        
+
         var headers: [String: String] = [:]
-        
+
         headers["Content-Type"] = "application/json"
-        
-        
-        
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -118,13 +97,6 @@ extension ATProtoClient.Com.Atproto.Server {
         let serviceDID = await networkService.getServiceDID(for: "com.atproto.server.confirmEmail")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
         let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        let responseCode = response.statusCode
-
-        
-        return responseCode
-        
+        return response.statusCode
     }
-    
 }
-                           
-

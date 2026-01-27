@@ -32,7 +32,7 @@ actor PublicOAuthStrategy: AuthStrategy {
     private let didResolver: DIDResolving
     private var refreshCoordinators: [String: TokenRefreshCoordinator] = [:]
     private let refreshCircuitBreaker = RefreshCircuitBreaker()
-    
+
     // Delegates
     private weak var progressDelegate: AuthProgressDelegate?
     private weak var failureDelegate: AuthFailureDelegate?
@@ -45,8 +45,8 @@ actor PublicOAuthStrategy: AuthStrategy {
     private var ambiguousRefreshUntil: [String: Date] = [:]
     private var usedRefreshTokens: Set<String> = []
     private var activeRefreshTasks: [String: Task<TokenRefreshResult, Error>] = [:]
-    
-    // One-shot override for refresh
+
+    /// One-shot override for refresh
     private var nextRefreshResourceOverride: String?
 
     // MARK: - Initialization
@@ -97,7 +97,7 @@ actor PublicOAuthStrategy: AuthStrategy {
         bskyChatDID: String?
     ) async throws -> URL {
         let finalPDSURL = pdsURL ?? URL(string: "https://bsky.social")!
-        
+
         let stateToken = UUID().uuidString
         let codeVerifier = generateCodeVerifier()
         let codeChallenge = generateCodeChallenge(from: codeVerifier)
@@ -178,7 +178,7 @@ actor PublicOAuthStrategy: AuthStrategy {
 
         // Resolve real PDS
         let (handle, actualPDS) = try await didResolver.resolveDIDToHandleAndPDSURL(did: did)
-        
+
         // Persist DPoP Key
         try await storage.saveDPoPKey(ephemeralKey, for: did)
 
@@ -222,19 +222,20 @@ actor PublicOAuthStrategy: AuthStrategy {
 
     func logout() async throws {
         guard let did = await accountManager.getCurrentAccount()?.did else { return }
-        
+
         // Revoke token if possible
         if let session = try? await storage.getSession(for: did),
            let refreshToken = session.refreshToken,
            let account = await accountManager.getAccount(did: did),
-           let endpoint = account.authorizationServerMetadata?.revocationEndpoint {
+           let endpoint = account.authorizationServerMetadata?.revocationEndpoint
+        {
             await revokeToken(refreshToken: refreshToken, endpoint: endpoint, did: did)
         }
 
         try await storage.deleteSession(for: did)
         try await storage.deleteDPoPKey(for: did)
         try await storage.saveDPoPNonces([:], for: did)
-        
+
         await accountManager.clearCurrentAccount()
     }
 
@@ -275,7 +276,8 @@ actor PublicOAuthStrategy: AuthStrategy {
 
     func prepareAuthenticatedRequestWithContext(_ request: URLRequest) async throws -> (URLRequest, AuthContext) {
         guard let account = await accountManager.getCurrentAccount(),
-              let session = try? await storage.getSession(for: account.did) else {
+              let session = try? await storage.getSession(for: account.did)
+        else {
             throw AuthError.noActiveAccount
         }
 
@@ -308,34 +310,35 @@ actor PublicOAuthStrategy: AuthStrategy {
     func refreshTokenIfNeeded() async throws -> TokenRefreshResult {
         try await refreshTokenIfNeeded(forceRefresh: false)
     }
-    
+
     func refreshTokenIfNeeded(forceRefresh: Bool) async throws -> TokenRefreshResult {
         guard let account = await accountManager.getCurrentAccount(),
-              let session = try? await storage.getSession(for: account.did) else {
+              let session = try? await storage.getSession(for: account.did)
+        else {
             throw AuthError.noActiveAccount
         }
-        
+
         let did = account.did
-        
+
         if let task = activeRefreshTasks[did] { return try await task.value }
-        
+
         guard let refreshToken = session.refreshToken else { throw AuthError.tokenRefreshFailed }
         if usedRefreshTokens.contains(refreshToken) { throw AuthError.tokenRefreshFailed }
-        
+
         // Circuit breaker check
         guard await refreshCircuitBreaker.canAttemptRefresh(for: did) else { throw AuthError.tokenRefreshFailed }
-        
+
         // Check expiry
         if !forceRefresh && !session.isExpiringSoon { return .stillValid }
-        
+
         usedRefreshTokens.insert(refreshToken)
-        
+
         let task = Task<TokenRefreshResult, Error> {
             try await performActualRefresh(for: account, session: session)
         }
         activeRefreshTasks[did] = task
         defer { activeRefreshTasks.removeValue(forKey: did) }
-        
+
         return try await task.value
     }
 
@@ -345,9 +348,9 @@ actor PublicOAuthStrategy: AuthStrategy {
         for request: URLRequest
     ) async throws -> (Data, HTTPURLResponse) {
         guard response.statusCode == 401 else { return (data, response) }
-        
+
         let result = try await refreshTokenIfNeeded(forceRefresh: true)
-        
+
         switch result {
         case .refreshedSuccessfully:
             let (newReq, _) = try await prepareAuthenticatedRequestWithContext(request)
@@ -361,7 +364,7 @@ actor PublicOAuthStrategy: AuthStrategy {
 
     func updateDPoPNonce(for url: URL, from headers: [String: String], did: String?, jkt: String?) async {
         guard let domain = url.host?.lowercased() else { return }
-        
+
         // Extract nonce case-insensitively
         var nonce: String?
         for (key, value) in headers {
@@ -371,25 +374,25 @@ actor PublicOAuthStrategy: AuthStrategy {
             }
         }
         guard let nonce else { return }
-        
+
         var targetDID = did
         if targetDID == nil {
             targetDID = await accountManager.getCurrentAccount()?.did
         }
         guard let resolvedDID = targetDID else { return }
-        
+
         // Update persistent store
         var nonces = (try? await storage.getDPoPNonces(for: resolvedDID)) ?? [:]
         nonces[domain] = nonce
         try? await storage.saveDPoPNonces(nonces, for: resolvedDID)
-        
+
         if let jkt {
             var jktNonces = (try? await storage.getDPoPNoncesByJKT(for: resolvedDID)) ?? [:]
             var domainMap = jktNonces[jkt] ?? [:]
             domainMap[domain] = nonce
             jktNonces[jkt] = domainMap
             try? await storage.saveDPoPNoncesByJKT(jktNonces, for: resolvedDID)
-            
+
             // Update memory
             var memMap = noncesByThumbprint[jkt] ?? [:]
             memMap[domain] = nonce
@@ -455,7 +458,7 @@ actor PublicOAuthStrategy: AuthStrategy {
             URLQueryItem(name: "client_id", value: oauthConfig.clientId),
             URLQueryItem(name: "redirect_uri", value: oauthConfig.redirectUri),
         ]
-        
+
         guard let url = components.url else { throw AuthError.authorizationFailed }
         return url
     }
@@ -524,7 +527,7 @@ actor PublicOAuthStrategy: AuthStrategy {
 
         guard let httpResponse = response as? HTTPURLResponse else { throw AuthError.invalidResponse }
 
-        if (200...299).contains(httpResponse.statusCode) {
+        if (200 ... 299).contains(httpResponse.statusCode) {
             guard let parResponse = try? JSONDecoder().decode(PARResponse.self, from: data) else {
                 throw AuthError.invalidResponse
             }
@@ -535,7 +538,8 @@ actor PublicOAuthStrategy: AuthStrategy {
             let dpopNonceHeader = extractNonceFromHeaders(httpResponse.allHeaderFields)
             var isNonceError = false
             if let errorResponse = try? JSONDecoder().decode(OAuthErrorResponse.self, from: data),
-               errorResponse.error == "use_dpop_nonce" {
+               errorResponse.error == "use_dpop_nonce"
+            {
                 isNonceError = true
             }
 
@@ -552,7 +556,7 @@ actor PublicOAuthStrategy: AuthStrategy {
                     throw AuthError.invalidResponse
                 }
 
-                if (200...299).contains(retryHttpResponse.statusCode) {
+                if (200 ... 299).contains(retryHttpResponse.statusCode) {
                     guard let parResponse = try? JSONDecoder().decode(PARResponse.self, from: retryData) else {
                         throw AuthError.invalidResponse
                     }
@@ -614,7 +618,8 @@ actor PublicOAuthStrategy: AuthStrategy {
             // Fallback without DPoP (shouldn't happen in normal flow)
             let (data, urlResponse) = try await networkService.request(request, skipTokenRefresh: true)
             guard let httpResponse = urlResponse as? HTTPURLResponse,
-                  (200..<300).contains(httpResponse.statusCode) else {
+                  (200 ..< 300).contains(httpResponse.statusCode)
+            else {
                 throw AuthError.tokenRefreshFailed
             }
             return try JSONDecoder().decode(TokenResponse.self, from: data)
@@ -649,14 +654,15 @@ actor PublicOAuthStrategy: AuthStrategy {
                 throw AuthError.invalidResponse
             }
 
-            if (200..<300).contains(httpResponse.statusCode) {
+            if (200 ..< 300).contains(httpResponse.statusCode) {
                 return try JSONDecoder().decode(TokenResponse.self, from: data)
             } else if httpResponse.statusCode == 400 && nonce == nil {
                 // Handle use_dpop_nonce error
                 let dpopNonceHeader = extractNonceFromHeaders(httpResponse.allHeaderFields)
                 var isNonceError = false
                 if let errorResponse = try? JSONDecoder().decode(OAuthErrorResponse.self, from: data),
-                   errorResponse.error == "use_dpop_nonce" {
+                   errorResponse.error == "use_dpop_nonce"
+                {
                     isNonceError = true
                 }
 
@@ -675,7 +681,8 @@ actor PublicOAuthStrategy: AuthStrategy {
 
                     let (retryData, retryResponse) = try await networkService.request(retryRequest, skipTokenRefresh: true)
                     guard let retryHttpResponse = retryResponse as? HTTPURLResponse,
-                          (200..<300).contains(retryHttpResponse.statusCode) else {
+                          (200 ..< 300).contains(retryHttpResponse.statusCode)
+                    else {
                         throw AuthError.tokenRefreshFailed
                     }
                     return try JSONDecoder().decode(TokenResponse.self, from: retryData)
@@ -705,7 +712,7 @@ actor PublicOAuthStrategy: AuthStrategy {
 
         let maxRetries = 3
         var lastError: Error?
-        for attempt in 1...maxRetries {
+        for attempt in 1 ... maxRetries {
             do {
                 let (data, _) = try await networkService.request(request)
                 return try JSONDecoder().decode(ProtectedResourceMetadata.self, from: data)
@@ -729,7 +736,7 @@ actor PublicOAuthStrategy: AuthStrategy {
 
         let maxRetries = 3
         var lastError: Error?
-        for attempt in 1...maxRetries {
+        for attempt in 1 ... maxRetries {
             do {
                 let (data, _) = try await networkService.request(request)
                 return try JSONDecoder().decode(AuthorizationServerMetadata.self, from: data)
@@ -748,8 +755,8 @@ actor PublicOAuthStrategy: AuthStrategy {
 
     private func performActualRefresh(for account: Account, session: Session) async throws -> TokenRefreshResult {
         let (data, response) = try await performTokenRefresh(for: account.did, session: session)
-        
-        if (200..<300).contains(response.statusCode) {
+
+        if (200 ..< 300).contains(response.statusCode) {
             let tokenResponse = try JSONDecoder().decode(TokenResponse.self, from: data)
             let newSession = Session(
                 accessToken: tokenResponse.accessToken,
@@ -770,53 +777,54 @@ actor PublicOAuthStrategy: AuthStrategy {
     private func performTokenRefresh(for did: String, session: Session) async throws -> (Data, HTTPURLResponse) {
         guard let account = await accountManager.getAccount(did: did),
               let metadata = account.authorizationServerMetadata,
-              let refreshToken = session.refreshToken else {
+              let refreshToken = session.refreshToken
+        else {
             throw AuthError.tokenRefreshFailed
         }
-        
+
         guard let endpointURL = URL(string: metadata.tokenEndpoint) else {
             throw AuthError.tokenRefreshFailed
         }
-        
+
         var request = URLRequest(url: endpointURL)
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         request.timeoutInterval = 30.0
-        
+
         let params = [
             "grant_type": "refresh_token",
             "refresh_token": refreshToken,
-            "client_id": oauthConfig.clientId
+            "client_id": oauthConfig.clientId,
         ]
         request.httpBody = encodeFormData(params)
-        
+
         let proof = try await createDPoPProof(
             for: "POST", url: metadata.tokenEndpoint, type: .tokenRefresh, did: did
         )
         request.setValue(proof, forHTTPHeaderField: "DPoP")
-        
+
         let (data, response) = try await networkService.request(request, skipTokenRefresh: true)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw AuthError.invalidResponse
         }
-        
+
         // Handle nonce mismatch with retry
         if httpResponse.statusCode == 400 {
             if let errorResponse = try? JSONDecoder().decode(OAuthErrorResponse.self, from: data),
                errorResponse.error == "use_dpop_nonce",
-               let receivedNonce = extractNonceFromHeaders(httpResponse.allHeaderFields) {
-                
+               let receivedNonce = extractNonceFromHeaders(httpResponse.allHeaderFields)
+            {
                 // Update nonce and retry
                 if let domain = endpointURL.host?.lowercased() {
                     await updateDPoPNonceInternal(domain: domain, nonce: receivedNonce, for: did)
                 }
-                
+
                 let retryProof = try await createDPoPProof(
                     for: "POST", url: metadata.tokenEndpoint, type: .tokenRefresh, did: did
                 )
                 var retryRequest = request
                 retryRequest.setValue(retryProof, forHTTPHeaderField: "DPoP")
-                
+
                 let (retryData, retryResponse) = try await networkService.request(retryRequest, skipTokenRefresh: true)
                 guard let retryHttpResponse = retryResponse as? HTTPURLResponse else {
                     throw AuthError.invalidResponse
@@ -824,7 +832,7 @@ actor PublicOAuthStrategy: AuthStrategy {
                 return (retryData, retryHttpResponse)
             }
         }
-        
+
         return (data, httpResponse)
     }
 
@@ -835,11 +843,11 @@ actor PublicOAuthStrategy: AuthStrategy {
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         let params = ["token": refreshToken, "client_id": oauthConfig.clientId]
         request.httpBody = encodeFormData(params)
-        
+
         if let proof = try? await createDPoPProof(for: "POST", url: endpoint, type: .tokenRequest, did: did) {
             request.setValue(proof, forHTTPHeaderField: "DPoP")
         }
-        
+
         _ = try? await networkService.request(request)
     }
 
@@ -887,10 +895,12 @@ actor PublicOAuthStrategy: AuthStrategy {
             if let jktNonce = noncesByThumbprint[keyThumbprint]?[domain] {
                 finalNonce = jktNonce
             } else if let persistedJktNonces = try? await storage.getDPoPNoncesByJKT(for: targetDID),
-                      let jktPersistentNonce = persistedJktNonces[keyThumbprint]?[domain] {
+                      let jktPersistentNonce = persistedJktNonces[keyThumbprint]?[domain]
+            {
                 finalNonce = jktPersistentNonce
             } else if let storedNonces = try? await storage.getDPoPNonces(for: targetDID),
-                      let didNonce = storedNonces[domain] {
+                      let didNonce = storedNonces[domain]
+            {
                 finalNonce = didNonce
             } else {
                 finalNonce = nil
@@ -908,7 +918,7 @@ actor PublicOAuthStrategy: AuthStrategy {
         }
 
         let payload = DPoPPayload(
-            jti: "\(UUID().uuidString)-\(UInt64.random(in: 0...UInt64.max))",
+            jti: "\(UUID().uuidString)-\(UInt64.random(in: 0 ... UInt64.max))",
             htm: method,
             htu: htuValue,
             iat: Int(Date().timeIntervalSince1970),
@@ -1006,7 +1016,7 @@ actor PublicOAuthStrategy: AuthStrategy {
     // MARK: - PKCE Helpers
 
     private func generateCodeVerifier() -> String {
-        let data = Data((0..<32).map { _ in UInt8.random(in: 0...255) })
+        let data = Data((0 ..< 32).map { _ in UInt8.random(in: 0 ... 255) })
         return base64URLEncode(data)
     }
 
@@ -1042,7 +1052,7 @@ actor PublicOAuthStrategy: AuthStrategy {
             .first(where: { $0.name == "code" })?
             .value
     }
-    
+
     private func extractState(from url: URL) -> String? {
         URLComponents(url: url, resolvingAgainstBaseURL: false)?
             .queryItems?
@@ -1053,7 +1063,8 @@ actor PublicOAuthStrategy: AuthStrategy {
     private func extractNonceFromHeaders(_ headers: [AnyHashable: Any]) -> String? {
         for (key, value) in headers {
             if let keyString = key as? String,
-               keyString.caseInsensitiveCompare("DPoP-Nonce") == .orderedSame {
+               keyString.caseInsensitiveCompare("DPoP-Nonce") == .orderedSame
+            {
                 return value as? String
             }
         }
@@ -1098,5 +1109,3 @@ private struct OAuthErrorResponse: Decodable {
         case errorDescription = "error_description"
     }
 }
-
-
