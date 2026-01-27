@@ -2,6 +2,7 @@
 enum class {{ enum_name }} {
     {% for constant in constants %}
     @SerialName("{{ constant.value }}")
-    {{ constant.name }}{% if not loop.last %},{% endif %}
+    {{ constant.name }}{% if not loop.last %},
+    {% endif %}
     {% endfor %}
 }

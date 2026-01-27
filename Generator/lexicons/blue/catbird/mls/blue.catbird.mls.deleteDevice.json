@@ -1,0 +1,50 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mls.deleteDevice",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Delete a registered device and all its associated key packages. Users can only delete their own devices.",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["deviceId"],
+          "properties": {
+            "deviceId": {
+              "type": "string",
+              "description": "Device ID to delete (must be owned by authenticated user)"
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["deleted", "keyPackagesDeleted"],
+          "properties": {
+            "deleted": {
+              "type": "boolean",
+              "description": "True if device was successfully deleted"
+            },
+            "keyPackagesDeleted": {
+              "type": "integer",
+              "description": "Number of key packages deleted with the device"
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "name": "DeviceNotFound",
+          "description": "The specified device does not exist"
+        },
+        {
+          "name": "Unauthorized",
+          "description": "User does not own this device or is not authenticated"
+        }
+      ]
+    }
+  }
+}

@@ -39,7 +39,7 @@ class SwiftCodeGenerator:
     def handle_main_def(self):
         main_def = self.defs.get('main', {})
         main_def_type = main_def.get('type')
-        
+
         if main_def_type == 'object':
             return self.handle_object_type(main_def)
         elif main_def_type == 'procedure':
@@ -458,9 +458,14 @@ class SwiftCodeGenerator:
         # Determine if the subscription has input parameters
         has_parameters = 'parameters' in main_def
         input_struct_name = convert_to_camel_case(lexicon_id) + ".Parameters" if has_parameters else None
-        
-        # Get the message type
-        message_type = convert_to_camel_case(lexicon_id) + ".Message"
+
+        # Get the message type - for SSE streams, use Output instead of Message
+        if 'output' in main_def:
+            # SSE stream (query with text/event-stream encoding)
+            message_type = convert_to_camel_case(lexicon_id) + ".Output"
+        else:
+            # Traditional subscription (WebSocket)
+            message_type = convert_to_camel_case(lexicon_id) + ".Message"
         
         input_parameters = ''
         input_values = ''

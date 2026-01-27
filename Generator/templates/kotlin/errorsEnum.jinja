@@ -1,5 +1,5 @@
-sealed class Error(val name: String, val description: String?) {
+sealed class {{ class_name }}Error(val name: String, val description: String?) {
         {% for error in errors %}
-        object {{ error.name | sanitizeKeyword | camelCase | capitalize }}: Error("{{ error.name }}", "{{ error.description }}")
+        object {{ error.name | sanitizeKeyword }}: {{ class_name }}Error("{{ error.name }}", "{{ error.description }}")
         {% endfor %}
     }

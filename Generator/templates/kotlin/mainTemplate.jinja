@@ -5,6 +5,15 @@ package com.atproto.generated
 
 import kotlinx.serialization.*
 import kotlinx.serialization.json.*
+import com.atproto.core.types.*
+import com.atproto.core.*
+import com.atproto.client.*
+import com.atproto.network.*
+import kotlinx.coroutines.flow.*
+
+object {{ object_name }} {
+    const val TYPE_IDENTIFIER = "{{ lexicon_id }}"
+}
 
 {% if sealed_interfaces %}
 {{ sealed_interfaces }}
@@ -14,37 +23,37 @@ import kotlinx.serialization.json.*
 {{ enum_classes }}
 {% endif %}
 
-object {{ class_name }} {
-    const val TYPE_IDENTIFIER = "{{ lexicon_id }}"
+{% if lex_definitions %}
+{{ lex_definitions }}
+{% endif %}
 
-    {% if parameters %}
-    {{ parameters }}
-    {% endif %}
+{% if parameters %}
+{{ parameters }}
+{% endif %}
 
-    {% if input %}
-    {{ input }}
-    {% endif %}
+{% if input %}
+{{ input }}
+{% endif %}
 
-    {% if output %}
-    {{ output }}
-    {% endif %}
+{% if output %}
+{{ output }}
+{% endif %}
 
-    {% if errors %}
-    {{ errors }}
-    {% endif %}
+{% if message %}
+{{ message }}
+{% endif %}
 
-    {% if record %}
-    {{ record }}
-    {% endif %}
+{% if errors %}
+{{ errors }}
+{% endif %}
 
-    {% if lex_definitions %}
-    {{ lex_definitions }}
-    {% endif %}
+{% if record %}
+{{ record }}
+{% endif %}
 
-    {% if main_properties %}
-    {{ main_properties }}
-    {% endif %}
-}
+{% if main_properties %}
+{{ main_properties }}
+{% endif %}
 
 {% if query %}
 {{ query }}

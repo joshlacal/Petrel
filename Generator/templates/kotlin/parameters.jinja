@@ -1,8 +1,12 @@
 @Serializable
-    data class Parameters(
+{% if properties %}
+    data class {{ class_name }}Parameters(
         {% for prop in properties %}
         {% if prop.description %}// {{ prop.description }}{% endif %}
         @SerialName("{{ prop.name }}")
         val {{ prop.name | sanitizeKeyword }}: {{ prop.type }}{% if prop.optional %} = null{% endif %}{% if not loop.last %},{% endif %}
         {% endfor %}
     )
+{% else %}
+    class {{ class_name }}Parameters
+{% endif %}

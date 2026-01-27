@@ -1,0 +1,48 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mls.blockChatSender",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Block a sender and decline all their pending requests",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["senderDid"],
+          "properties": {
+            "senderDid": {
+              "type": "string",
+              "description": "DID of sender to block"
+            },
+            "requestId": {
+              "type": "string",
+              "description": "Optional specific request ID that prompted block"
+            },
+            "reason": {
+              "type": "string",
+              "enum": ["spam", "harassment", "inappropriate", "other"],
+              "description": "Reason for blocking"
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["success", "blockedCount"],
+          "properties": {
+            "success": {
+              "type": "boolean"
+            },
+            "blockedCount": {
+              "type": "integer",
+              "description": "Number of requests declined"
+            }
+          }
+        }
+      }
+    }
+  }
+}

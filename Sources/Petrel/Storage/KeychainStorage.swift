@@ -238,6 +238,9 @@ public actor KeychainStorage {
             LogManager.logDebug("KeychainStorage - Retrieved gateway session for DID: \(did.prefix(20))...")
             return String(data: data, encoding: .utf8)
         } catch {
+            if let migratedSession = await migrateLegacyGatewaySessionIfNeeded(for: did) {
+                return migratedSession
+            }
             return nil
         }
     }
@@ -247,6 +250,50 @@ public actor KeychainStorage {
         let key = makeKey("gatewaySession", did: did)
         try await KeychainManager.deleteAsync(key: key, namespace: namespace)
         LogManager.logDebug("KeychainStorage - Deleted gateway session for DID: \(did.prefix(20))...")
+    }
+
+    private func shouldMigrateLegacyGatewaySession(for did: String) async -> Bool {
+        guard !did.isEmpty else { return false }
+
+        if let currentDID = try? await getCurrentDID(), !currentDID.isEmpty {
+            return currentDID == did
+        }
+
+        if let dids = try? await listAccountDIDs(), dids.count == 1, dids.first == did {
+            return true
+        }
+
+        return false
+    }
+
+    private func migrateLegacyGatewaySessionIfNeeded(for did: String) async -> String? {
+        guard await shouldMigrateLegacyGatewaySession(for: did) else { return nil }
+
+        if let legacySession = try? await getGatewaySession(), !legacySession.isEmpty {
+            LogManager.logInfo(
+                "KeychainStorage - Migrating legacy gateway session to per-DID storage for DID: \(did.prefix(20))..."
+            )
+            try? await saveGatewaySession(legacySession, for: did)
+            try? await deleteGatewaySession()
+            return legacySession
+        }
+
+        if let data = try? await KeychainManager.retrieveAsync(
+            key: "gatewaySession",
+            namespace: "catbird.gateway"
+        ),
+           let session = String(data: data, encoding: .utf8),
+           !session.isEmpty
+        {
+            LogManager.logInfo(
+                "KeychainStorage - Migrating global gateway session to per-DID storage for DID: \(did.prefix(20))..."
+            )
+            try? await saveGatewaySession(session, for: did)
+            try? await KeychainManager.deleteAsync(key: "gatewaySession", namespace: "catbird.gateway")
+            return session
+        }
+
+        return nil
     }
 
     // Legacy single-session methods for backward compatibility during migration
@@ -678,8 +725,10 @@ public actor KeychainStorage {
             for did in accountDIDs {
                 let accountExists = try (await getAccount(for: did)) != nil
                 let sessionExists = try (await getSession(for: did)) != nil
+                let gatewaySessionExists = (try? await getGatewaySession(for: did)) != nil
+                let hasAuthSession = sessionExists || gatewaySessionExists
 
-                if accountExists && !sessionExists {
+                if accountExists && !hasAuthSession {
                     LogManager.logWarning(
                         "Inconsistent auth state detected for DID \(LogManager.logDID(did)): account exists but session missing"
                     )
@@ -705,6 +754,13 @@ public actor KeychainStorage {
                     try await deleteSession(for: did)
                     result.cleanedOrphanedSessions.append(did)
                     LogManager.logInfo("Removed orphaned session for DID \(LogManager.logDID(did))")
+                } else if !accountExists && gatewaySessionExists {
+                    LogManager.logWarning(
+                        "Orphaned gateway session detected for DID \(LogManager.logDID(did)): session exists but account missing"
+                    )
+                    try? await deleteGatewaySession(for: did)
+                    result.cleanedOrphanedSessions.append(did)
+                    LogManager.logInfo("Removed orphaned gateway session for DID \(LogManager.logDID(did))")
                 }
             }
 

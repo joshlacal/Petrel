@@ -1,0 +1,150 @@
+import Foundation
+
+
+
+// lexicon: 1, id: app.bsky.video.getJobStatus
+
+
+public struct AppBskyVideoGetJobStatus { 
+
+    public static let typeIdentifier = "app.bsky.video.getJobStatus"    
+public struct Parameters: Parametrizable {
+        public let jobId: String
+        
+        public init(
+            jobId: String
+            ) {
+            self.jobId = jobId
+            
+        }
+    }
+    
+public struct Output: ATProtocolCodable {
+        
+        
+        public let jobStatus: AppBskyVideoDefs.JobStatus
+        
+        
+        
+        // Standard public initializer
+        public init(
+            
+            
+            jobStatus: AppBskyVideoDefs.JobStatus
+            
+            
+        ) {
+            
+            
+            self.jobStatus = jobStatus
+            
+            
+        }
+        
+        public init(from decoder: Decoder) throws {
+            
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            
+            self.jobStatus = try container.decode(AppBskyVideoDefs.JobStatus.self, forKey: .jobStatus)
+            
+            
+        }
+        
+        public func encode(to encoder: Encoder) throws {
+            
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            
+            try container.encode(jobStatus, forKey: .jobStatus)
+            
+            
+        }
+
+        public func toCBORValue() throws -> Any {
+            
+            var map = OrderedCBORMap()
+
+            
+            
+            let jobStatusValue = try jobStatus.toCBORValue()
+            map = map.adding(key: "jobStatus", value: jobStatusValue)
+            
+            
+
+            return map
+            
+        }
+        
+        
+        private enum CodingKeys: String, CodingKey {
+            case jobStatus
+        }
+        
+    }
+
+
+
+
+}
+
+
+
+extension ATProtoClient.App.Bsky.Video {
+    // MARK: - getJobStatus
+
+    /// Get status details for a video processing job.
+    /// 
+    /// - Parameter input: The input parameters for the request
+    /// 
+    /// - Returns: A tuple containing the HTTP response code and the decoded response data
+    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    public func getJobStatus(input: AppBskyVideoGetJobStatus.Parameters) async throws -> (responseCode: Int, data: AppBskyVideoGetJobStatus.Output?) {
+        let endpoint = "app.bsky.video.getJobStatus"
+
+        
+        let queryItems = input.asQueryItems()
+        
+        let urlRequest = try await networkService.createURLRequest(
+            endpoint: endpoint,
+            method: "GET",
+            headers: ["Accept": "application/json"],
+            body: nil,
+            queryItems: queryItems
+        )
+
+        // Determine service DID for this endpoint
+        let serviceDID = await networkService.getServiceDID(for: "app.bsky.video.getJobStatus")
+        let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
+        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let responseCode = response.statusCode
+
+        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
+
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
+
+        // Only decode response data if request was successful
+        if (200...299).contains(responseCode) {
+            do {
+                
+                let decoder = JSONDecoder()
+                let decodedData = try decoder.decode(AppBskyVideoGetJobStatus.Output.self, from: responseData)
+                
+                return (responseCode, decodedData)
+            } catch {
+                // Log the decoding error for debugging but still return the response code
+                LogManager.logError("Failed to decode successful response for app.bsky.video.getJobStatus: \(error)")
+                return (responseCode, nil)
+            }
+        } else {
+            
+            // If we can't parse a structured error, return the response code
+            // (maintains backward compatibility for endpoints without defined errors)
+            return (responseCode, nil)
+        }
+    }
+}
+                           
+

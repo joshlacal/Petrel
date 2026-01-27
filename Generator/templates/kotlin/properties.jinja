@@ -1,4 +1,5 @@
 @Serializable
+{% if properties %}
 data class {{ class_name }}(
     {% for prop in properties %}
     {% if prop.description %}// {{ prop.description }}{% endif %}
@@ -6,3 +7,6 @@ data class {{ class_name }}(
     val {{ prop.name | sanitizeKeyword }}: {{ prop.type }}{% if not loop.last %},{% endif %}
     {% endfor %}
 )
+{% else %}
+class {{ class_name }}
+{% endif %}

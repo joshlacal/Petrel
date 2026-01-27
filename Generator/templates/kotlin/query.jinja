@@ -9,15 +9,12 @@ suspend fun ATProtoClient.{{ namespace_path }}.{{ function_name }}(
     val endpoint = "{{ endpoint }}"
 
     {% if has_parameters %}
-    val queryParams = buildMap<String, String> {
-        // Convert parameters to query string
-        // This would use reflection or a custom serializer
-    }
+    val queryParams = parameters.toQueryParams()
     {% else %}
     val queryParams: Map<String, String>? = null
     {% endif %}
 
-    return networkService.performRequest(
+    return client.networkService.performRequest(
         method = "GET",
         endpoint = endpoint,
         queryParams = queryParams,

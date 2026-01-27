@@ -20,7 +20,7 @@ def convert_kotlin_ref(ref: str) -> str:
         type_name = convert_to_pascal_case(base)
 
         if fragment:
-            type_name += '.' + convert_to_pascal_case(fragment)
+            type_name += convert_to_pascal_case(fragment)
 
         return type_name
 
@@ -30,7 +30,7 @@ def convert_to_pascal_case(s: str) -> str:
     # Handle both dots and hyphens
     s = s.replace('-', '.')
     parts = s.split('.')
-    return ''.join(word.capitalize() for word in parts if word)
+    return ''.join(word[0].upper() + word[1:] for word in parts if word)
 
 
 class KotlinTypeConverter(BaseTypeConverter):
@@ -154,4 +154,14 @@ class KotlinTypeConverter(BaseTypeConverter):
 
     def convert_ref(self, ref: str) -> str:
         """Convert a lexicon reference to a Kotlin type."""
+        if ref.startswith('#'):
+            # Local reference
+            if ref == '#main':
+                return self.code_generator.class_name
+            
+            # Use prefixed name
+            type_name = self.code_generator.class_name + convert_to_pascal_case(ref[1:])
+            # No object prefix as definitions are top-level
+            return type_name
+            
         return convert_kotlin_ref(ref)

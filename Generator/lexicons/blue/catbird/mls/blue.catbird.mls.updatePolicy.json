@@ -1,0 +1,133 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mls.updatePolicy",
+  "description": "Update conversation policy settings",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Update policy settings for a conversation. Only admins can update policies. At least one policy field must be provided.",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["convoId"],
+          "properties": {
+            "convoId": {
+              "type": "string",
+              "description": "Conversation identifier"
+            },
+            "allowInvites": {
+              "type": "boolean",
+              "description": "Whether invite links are enabled for this conversation"
+            },
+            "adminOnlyInvites": {
+              "type": "boolean",
+              "description": "Whether only admins can create invite links"
+            },
+            "allowMemberAdd": {
+              "type": "boolean",
+              "description": "Whether non-admin members can add other members"
+            },
+            "allowMemberRemove": {
+              "type": "boolean",
+              "description": "Whether non-admin members can remove other members"
+            },
+            "requireAdminApproval": {
+              "type": "boolean",
+              "description": "Whether new members require admin approval before joining"
+            },
+            "maxMembers": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 1000,
+              "description": "Maximum number of members allowed in this conversation"
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["policy"],
+          "properties": {
+            "policy": {
+              "type": "ref",
+              "ref": "#policyView",
+              "description": "Updated policy settings"
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "name": "Unauthorized",
+          "description": "Caller is not an admin of this conversation"
+        },
+        {
+          "name": "ConvoNotFound",
+          "description": "Conversation not found"
+        },
+        {
+          "name": "NotMember",
+          "description": "Caller is not a member of this conversation"
+        },
+        {
+          "name": "NoFieldsProvided",
+          "description": "At least one policy field must be provided"
+        },
+        {
+          "name": "InvalidMaxMembers",
+          "description": "maxMembers is less than current member count"
+        }
+      ]
+    },
+    "policyView": {
+      "type": "object",
+      "description": "View of conversation policy settings",
+      "required": ["convoId", "allowInvites", "adminOnlyInvites", "allowMemberAdd", "allowMemberRemove", "requireAdminApproval", "maxMembers", "updatedAt"],
+      "properties": {
+        "convoId": {
+          "type": "string",
+          "description": "Conversation identifier"
+        },
+        "allowInvites": {
+          "type": "boolean",
+          "description": "Whether invite links are enabled for this conversation"
+        },
+        "adminOnlyInvites": {
+          "type": "boolean",
+          "description": "Whether only admins can create invite links"
+        },
+        "allowMemberAdd": {
+          "type": "boolean",
+          "description": "Whether non-admin members can add other members"
+        },
+        "allowMemberRemove": {
+          "type": "boolean",
+          "description": "Whether non-admin members can remove other members"
+        },
+        "requireAdminApproval": {
+          "type": "boolean",
+          "description": "Whether new members require admin approval before joining"
+        },
+        "maxMembers": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 1000,
+          "description": "Maximum number of members allowed in this conversation"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "datetime",
+          "description": "Timestamp of last policy update"
+        },
+        "updatedBy": {
+          "type": "string",
+          "format": "did",
+          "description": "DID of admin who last updated the policy"
+        }
+      }
+    }
+  }
+}

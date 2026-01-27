@@ -1,0 +1,36 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mls.getRequestCount",
+  "description": "Get count of pending chat requests for badge display",
+  "defs": {
+    "main": {
+      "type": "query",
+      "description": "Returns the count of pending chat requests. Lightweight endpoint for badge updates.",
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["pendingCount"],
+          "properties": {
+            "pendingCount": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of pending requests"
+            },
+            "lastRequestAt": {
+              "type": "string",
+              "format": "datetime",
+              "description": "Timestamp of most recent pending request"
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "name": "Unauthorized",
+          "description": "Authentication required"
+        }
+      ]
+    }
+  }
+}

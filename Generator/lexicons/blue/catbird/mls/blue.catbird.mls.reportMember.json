@@ -1,0 +1,80 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mls.reportMember",
+  "description": "Report a member for moderation (end-to-end encrypted)",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Submit an encrypted report about a conversation member to admins. Report content is E2EE and only admins can decrypt. Server stores metadata and routes to admins. Any member can report; cannot report self.",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["convoId", "reportedDid", "category", "encryptedContent"],
+          "properties": {
+            "convoId": {
+              "type": "string",
+              "description": "Conversation identifier"
+            },
+            "reportedDid": {
+              "type": "string",
+              "format": "did",
+              "description": "DID of member being reported"
+            },
+            "category": {
+              "type": "string",
+              "description": "Report category (required for App Store compliance). Visible to server for statistics, but details are encrypted.",
+              "knownValues": [
+                "harassment",
+                "spam",
+                "hate_speech",
+                "violence",
+                "sexual_content",
+                "impersonation",
+                "privacy_violation",
+                "other"
+              ]
+            },
+            "encryptedContent": {
+              "type": "bytes",
+              "description": "Encrypted report blob containing detailed reason, context, and optional evidence (message IDs, screenshots). Only admins can decrypt using MLS group key or admin-specific encryption.",
+              "maxLength": 51200
+            },
+            "messageIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Optional list of message IDs being reported (for reference, not encrypted). Max 20 messages.",
+              "maxLength": 20
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["reportId", "submittedAt"],
+          "properties": {
+            "reportId": { 
+              "type": "string",
+              "description": "Unique report identifier"
+            },
+            "submittedAt": { 
+              "type": "string", 
+              "format": "datetime",
+              "description": "When report was submitted"
+            }
+          }
+        }
+      },
+      "errors": [
+        { "name": "NotMember", "description": "Caller is not a member" },
+        { "name": "TargetNotMember", "description": "Reported user is not a member" },
+        { "name": "CannotReportSelf", "description": "Cannot report yourself" },
+        { "name": "ConvoNotFound", "description": "Conversation not found" }
+      ]
+    }
+  }
+}

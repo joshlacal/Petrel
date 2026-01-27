@@ -25,7 +25,7 @@
             return secret_service_available()
         }
 
-        func store(key: String, value: Data, namespace: String) throws {
+        func store(key: String, value: Data, namespace: String, accessGroup: String?) throws {
             let namespacedKey = "\(namespace).\(key)"
             var errorMsg: UnsafeMutablePointer<CChar>?
 
@@ -56,7 +56,7 @@
             LogManager.logDebug("LibSecretStore - Successfully stored key \(namespacedKey)")
         }
 
-        func retrieve(key: String, namespace: String) throws -> Data {
+        func retrieve(key: String, namespace: String, accessGroup: String?) throws -> Data {
             let namespacedKey = "\(namespace).\(key)"
             var length = 0
             var errorMsg: UnsafeMutablePointer<CChar>?
@@ -84,7 +84,7 @@
             return data
         }
 
-        func delete(key: String, namespace: String) throws {
+        func delete(key: String, namespace: String, accessGroup: String?) throws {
             let namespacedKey = "\(namespace).\(key)"
             var errorMsg: UnsafeMutablePointer<CChar>?
 
@@ -108,24 +108,24 @@
             LogManager.logDebug("LibSecretStore - Deleted key \(namespacedKey)")
         }
 
-        func deleteAll(namespace: String) throws {
+        func deleteAll(namespace: String, accessGroup: String?) throws {
             // LibSecret doesn't have a bulk delete API
             // This would require enumerating all items, which is complex
             // For now, individual deletes are sufficient
             LogManager.logDebug("LibSecretStore - deleteAll not fully implemented for namespace: \(namespace)")
         }
 
-        func storeDPoPKey(_ key: P256.Signing.PrivateKey, keyTag: String) throws {
-            try store(key: keyTag, value: key.x963Representation, namespace: "dpopkeys")
+        func storeDPoPKey(_ key: P256.Signing.PrivateKey, keyTag: String, accessGroup: String?) throws {
+            try store(key: keyTag, value: key.x963Representation, namespace: "dpopkeys", accessGroup: accessGroup)
         }
 
-        func retrieveDPoPKey(keyTag: String) throws -> P256.Signing.PrivateKey {
-            let data = try retrieve(key: keyTag, namespace: "dpopkeys")
+        func retrieveDPoPKey(keyTag: String, accessGroup: String?) throws -> P256.Signing.PrivateKey {
+            let data = try retrieve(key: keyTag, namespace: "dpopkeys", accessGroup: accessGroup)
             return try P256.Signing.PrivateKey(x963Representation: data)
         }
 
-        func deleteDPoPKey(keyTag: String) throws {
-            try delete(key: keyTag, namespace: "dpopkeys")
+        func deleteDPoPKey(keyTag: String, accessGroup: String?) throws {
+            try delete(key: keyTag, namespace: "dpopkeys", accessGroup: accessGroup)
         }
     }
 

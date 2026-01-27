@@ -15,6 +15,7 @@ class KotlinCodeGenerator(BaseCodeGenerator):
         super().__init__(lexicon, cycle_detector)
 
         self.class_name = convert_to_pascal_case(self.lexicon_id)
+        self.object_name = self.class_name + "Defs"
         self.sealed_interfaces = ""
         self.enum_classes = ""
 
@@ -38,6 +39,7 @@ class KotlinCodeGenerator(BaseCodeGenerator):
             parameters_code = ""
             input_code = ""
             output_code = ""
+            message_code = ""
             errors_code = ""
             record_code = ""
             lex_definitions_code = ""
@@ -67,7 +69,7 @@ class KotlinCodeGenerator(BaseCodeGenerator):
                 procedure_code = self.generate_procedure_function()
             elif main_def_type == 'subscription':
                 parameters_code = self.generate_parameters(self.main_def.get('parameters'))
-                # message handled in lex definitions
+                message_code = self.generate_message(self.main_def.get('message'))
                 errors_code = self.generate_errors(self.main_def.get('errors'))
                 lex_definitions_code = self.generate_lex_definitions()
                 subscription_code = self.generate_subscription_function()
@@ -81,6 +83,7 @@ class KotlinCodeGenerator(BaseCodeGenerator):
                 lexicon_version=self.lexicon_version,
                 description=self.description,
                 class_name=self.class_name,
+                object_name=self.object_name,
                 sealed_interfaces=self.sealed_interfaces,
                 enum_classes=self.enum_classes,
                 lex_definitions=lex_definitions_code,
@@ -89,6 +92,7 @@ class KotlinCodeGenerator(BaseCodeGenerator):
                 parameters=parameters_code,
                 input=input_code,
                 output=output_code,
+                message=message_code,
                 errors=errors_code,
                 query=query_code,
                 procedure=procedure_code,
@@ -141,7 +145,8 @@ class KotlinCodeGenerator(BaseCodeGenerator):
                 continue
 
             def_type = def_schema.get('type', '')
-            class_name = convert_to_pascal_case(name)
+            class_name = self.class_name + convert_to_pascal_case(name)
+            print(f"Processing def: {name}, type: {def_type}")
 
             if def_type == 'object':
                 properties = self.generate_properties(
@@ -157,15 +162,30 @@ class KotlinCodeGenerator(BaseCodeGenerator):
                 })
 
             elif def_type == 'string' and 'knownValues' in def_schema:
+                print(f"Generating enum for {name}")
                 # Generate enum class
                 known_values = def_schema['knownValues']
                 self.enum_generator.generate_enum_class_from_known_values(class_name, known_values)
 
+            elif def_type == 'array':
+                # Generate type alias for array
+                item_type = self.type_converter._get_array_item_type(def_schema, name, class_name)
+                definitions.append({
+                    'name': class_name,
+                    'type': 'type_alias',
+                    'target': f"List<{item_type}>",
+                    'description': def_schema.get('description', '')
+                })
+                
+                # Also handle union items if present
+                if def_schema.get('items', {}).get('type') == 'union':
+                    refs = def_schema['items'].get('refs', [])
+                    converted_refs = [self.type_converter.convert_ref(r) for r in refs]
+                    self.enum_generator.generate_sealed_interface_for_union_array(self.class_name, name, converted_refs)
+
             elif def_type == 'array' and def_schema.get('items', {}).get('type') == 'union':
-                # Union array - generate sealed interface
-                refs = def_schema['items'].get('refs', [])
-                converted_refs = [self.type_converter.convert_ref(r) for r in refs]
-                self.enum_generator.generate_sealed_interface_for_union_array(self.class_name, name, converted_refs)
+                # This block is now redundant or covered above
+                pass
 
         return self.template_manager.lex_definitions_template.render(
             definitions=definitions
@@ -197,11 +217,12 @@ class KotlinCodeGenerator(BaseCodeGenerator):
         properties = self.generate_properties(
             parameters.get('properties', {}),
             parameters.get('required', []),
-            'Parameters'
+            self.class_name + "Parameters"
         )
 
         return self.template_manager.parameters_template.render(
-            properties=properties
+            properties=properties,
+            class_name=self.class_name
         )
 
     def generate_input(self, input_obj: Optional[Dict[str, Any]]) -> str:
@@ -215,7 +236,7 @@ class KotlinCodeGenerator(BaseCodeGenerator):
         if 'schema' not in input_obj:
             if encoding and encoding != 'application/json':
                 properties = [{'name': 'data', 'type': 'ByteArray', 'optional': False, 'description': ''}]
-                return self.template_manager.input_template.render(properties=properties)
+                return self.template_manager.input_template.render(properties=properties, class_name=self.class_name)
             return ""
 
         input_schema = input_obj['schema']
@@ -231,11 +252,12 @@ class KotlinCodeGenerator(BaseCodeGenerator):
             properties = self.generate_properties(
                 input_schema.get('properties', {}),
                 input_schema.get('required', []),
-                'Input'
+                self.class_name + "Input"
             )
 
         return self.template_manager.input_template.render(
-            properties=properties
+            properties=properties,
+            class_name=self.class_name
         )
 
     def generate_output(self, output_obj: Optional[Dict[str, Any]]) -> str:
@@ -252,7 +274,8 @@ class KotlinCodeGenerator(BaseCodeGenerator):
             return self.template_manager.output_template.render(
                 is_type_alias=True,
                 type_alias_target=ref_type,
-                properties=[]
+                properties=[],
+                class_name=self.class_name
             )
 
         # Handle binary output
@@ -262,7 +285,7 @@ class KotlinCodeGenerator(BaseCodeGenerator):
             properties = self.generate_properties(
                 output_schema.get('properties', {}),
                 output_schema.get('required', []),
-                'Output'
+                self.class_name + "Output"
             )
         else:
             properties = []
@@ -270,7 +293,25 @@ class KotlinCodeGenerator(BaseCodeGenerator):
         return self.template_manager.output_template.render(
             is_type_alias=False,
             type_alias_target=None,
-            properties=properties
+            properties=properties,
+            class_name=self.class_name
+        )
+
+    def generate_message(self, message_obj: Optional[Dict[str, Any]]) -> str:
+        """Generate message data class for subscriptions."""
+        if not message_obj:
+            return ""
+
+        schema = message_obj.get('schema', {})
+        properties = self.generate_properties(
+            schema.get('properties', {}),
+            schema.get('required', []),
+            self.class_name + "Message"
+        )
+
+        return self.template_manager.message_template.render(
+            properties=properties,
+            class_name=self.class_name
         )
 
     def generate_errors(self, errors: Optional[List[Dict[str, str]]]) -> str:
@@ -279,7 +320,8 @@ class KotlinCodeGenerator(BaseCodeGenerator):
             return ""
 
         return self.template_manager.errors_enum_template.render(
-            errors=errors
+            errors=errors,
+            class_name=self.class_name
         )
 
     def generate_query_function(self) -> str:
@@ -294,8 +336,8 @@ class KotlinCodeGenerator(BaseCodeGenerator):
 
         # Determine types
         has_parameters = 'parameters' in self.main_def
-        parameters_type = f"{self.class_name}.Parameters" if has_parameters else None
-        output_type = f"{self.class_name}.Output" if 'output' in self.main_def else None
+        parameters_type = f"{self.class_name}Parameters" if has_parameters else None
+        output_type = f"{self.class_name}Output" if 'output' in self.main_def else None
 
         # Get encoding
         output_encoding = self.main_def.get('output', {}).get('encoding', 'application/json')
@@ -320,8 +362,8 @@ class KotlinCodeGenerator(BaseCodeGenerator):
         namespace_path = '.'.join(convert_to_pascal_case(p) for p in namespace_parts)
 
         has_input = 'input' in self.main_def
-        input_type = f"{self.class_name}.Input" if has_input else None
-        output_type = f"{self.class_name}.Output" if 'output' in self.main_def else None
+        input_type = f"{self.class_name}Input" if has_input else None
+        output_type = f"{self.class_name}Output" if 'output' in self.main_def else None
 
         input_encoding = self.main_def.get('input', {}).get('encoding', 'application/json') if has_input else None
         output_encoding = self.main_def.get('output', {}).get('encoding', 'application/json') if 'output' in self.main_def else None
@@ -352,8 +394,8 @@ class KotlinCodeGenerator(BaseCodeGenerator):
         namespace_path = '.'.join(convert_to_pascal_case(p) for p in namespace_parts)
 
         has_parameters = 'parameters' in self.main_def
-        parameters_type = f"{self.class_name}.Parameters" if has_parameters else None
-        message_type = f"{self.class_name}.Message"
+        parameters_type = f"{self.class_name}Parameters" if has_parameters else None
+        message_type = f"{self.class_name}Message"
 
         return self.template_manager.subscription_template.render(
             namespace_path=namespace_path,

@@ -16,8 +16,10 @@ class KotlinEnumGenerator:
     def generate_sealed_interface_for_union(self, current_struct_name: str, prop_name: str, refs: List[str]):
         """Generate a sealed interface for a union type property."""
         union_name = f"{current_struct_name}{convert_to_pascal_case(prop_name)}Union"
+        print(f"Generating union: {union_name}", flush=True)
 
         if union_name in self.generated_sealed_interfaces:
+            print(f"Skipping union {union_name}, already generated", flush=True)
             return
 
         self.generated_sealed_interfaces.add(union_name)
@@ -25,11 +27,11 @@ class KotlinEnumGenerator:
         # Build variant cases
         variants = []
         for ref in refs:
-            # Extract the last part of the ref as the variant name
-            variant_name = ref.split('.')[-1]
+            # Use full name to avoid conflicts
+            variant_name = self._get_unique_variant_name(ref)
             variants.append({
                 'name': variant_name,
-                'type': ref,
+                'type': self.code_generator.type_converter.convert_ref(ref),
                 'lexicon_ref': self._get_lexicon_ref(ref)
             })
 
@@ -43,6 +45,14 @@ class KotlinEnumGenerator:
 
         self.code_generator.sealed_interfaces += sealed_code + '\n\n'
 
+    def _get_unique_variant_name(self, ref: str) -> str:
+        """Get a unique variant name from a reference."""
+        if '#' in ref:
+            base, fragment = ref.split('#')
+            return convert_to_pascal_case(base) + convert_to_pascal_case(fragment)
+        else:
+            return convert_to_pascal_case(ref)
+
     def generate_sealed_interface_for_union_array(self, current_struct_name: str, prop_name: str, refs: List[str]):
         """Generate a sealed interface for an array of unions."""
         # Same as regular union for Kotlin
@@ -50,14 +60,18 @@ class KotlinEnumGenerator:
 
     def generate_enum_class_from_known_values(self, enum_name: str, known_values: List[str], descriptions: dict = None):
         """Generate an enum class from known values."""
+        print(f"Generating enum class {enum_name} with values: {known_values}", flush=True)
         if enum_name in self.generated_enum_classes:
+            print(f"Skipping {enum_name}, already generated", flush=True)
             return
 
         self.generated_enum_classes.add(enum_name)
 
         # Sanitize enum constant names
         constants = []
+        print("Starting loop", flush=True)
         for value in known_values:
+            print(f"Looping value: {value}", flush=True)
             # Convert to valid Kotlin enum constant name
             constant_name = self._sanitize_enum_constant(value)
             constants.append({
@@ -77,18 +91,33 @@ class KotlinEnumGenerator:
 
     def _sanitize_enum_constant(self, value: str) -> str:
         """Convert a string value to a valid Kotlin enum constant name."""
+        print(f"Sanitizing enum value: {value}")
+        # Comprehensive set of Kotlin keywords
+        kotlin_keywords = {
+            'as', 'break', 'class', 'continue', 'do', 'else', 'false', 'for',
+            'fun', 'if', 'in', 'interface', 'is', 'null', 'object', 'package',
+            'return', 'super', 'this', 'throw', 'true', 'try', 'typealias',
+            'typeof', 'val', 'var', 'when', 'while', 'data', 'sealed', 'open',
+            'internal', 'private', 'protected', 'public', 'override', 'lateinit',
+            'by', 'where', 'init', 'companion', 'const', 'constructor', 'delegate',
+            'dynamic', 'field', 'file', 'finally', 'get', 'import', 'inner',
+            'operator', 'out', 'receiver', 'reified', 'set', 'setparam', 'suspend',
+            'tailrec', 'vararg', 'yield'
+        }
+
         # Replace special characters with underscores
-        sanitized = value.replace('-', '_').replace('.', '_').replace(':', '_')
+        sanitized = value.replace('-', '_').replace('.', '_').replace(':', '_').replace('#', '_').replace('!', '_')
 
         # Convert to uppercase
         sanitized = sanitized.upper()
+        print(f"Sanitized result: {sanitized}", flush=True)
 
         # If it starts with a digit, prefix with underscore
         if sanitized and sanitized[0].isdigit():
             sanitized = '_' + sanitized
 
-        # If empty or conflicts with Kotlin keywords, use a safe name
-        if not sanitized or sanitized in ['NULL', 'TRUE', 'FALSE']:
+        # If empty or conflicts with Kotlin keywords (case-insensitive check)
+        if not sanitized or sanitized.lower() in kotlin_keywords:
             sanitized = 'VALUE_' + sanitized
 
         return sanitized
