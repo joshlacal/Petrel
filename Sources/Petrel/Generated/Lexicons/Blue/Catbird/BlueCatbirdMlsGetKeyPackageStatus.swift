@@ -1,20 +1,16 @@
 import Foundation
 
-
-
 // lexicon: 1, id: blue.catbird.mls.getKeyPackageStatus
 
-
-public struct BlueCatbirdMlsGetKeyPackageStatus { 
-
+public enum BlueCatbirdMlsGetKeyPackageStatus {
     public static let typeIdentifier = "blue.catbird.mls.getKeyPackageStatus"
-        
-public struct ConsumedPackageView: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "blue.catbird.mls.getKeyPackageStatus#consumedPackageView"
-            public let keyPackageHash: String
-            public let usedInGroup: String?
-            public let consumedAt: ATProtocolDate
-            public let cipherSuite: String?
+
+    public struct ConsumedPackageView: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "blue.catbird.mls.getKeyPackageStatus#consumedPackageView"
+        public let keyPackageHash: String
+        public let usedInGroup: String?
+        public let consumedAt: ATProtocolDate
+        public let cipherSuite: String?
 
         public init(
             keyPackageHash: String, usedInGroup: String?, consumedAt: ATProtocolDate, cipherSuite: String?
@@ -28,25 +24,25 @@ public struct ConsumedPackageView: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.keyPackageHash = try container.decode(String.self, forKey: .keyPackageHash)
+                keyPackageHash = try container.decode(String.self, forKey: .keyPackageHash)
             } catch {
                 LogManager.logError("Decoding error for required property 'keyPackageHash': \(error)")
                 throw error
             }
             do {
-                self.usedInGroup = try container.decodeIfPresent(String.self, forKey: .usedInGroup)
+                usedInGroup = try container.decodeIfPresent(String.self, forKey: .usedInGroup)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'usedInGroup': \(error)")
                 throw error
             }
             do {
-                self.consumedAt = try container.decode(ATProtocolDate.self, forKey: .consumedAt)
+                consumedAt = try container.decode(ATProtocolDate.self, forKey: .consumedAt)
             } catch {
                 LogManager.logError("Decoding error for required property 'consumedAt': \(error)")
                 throw error
             }
             do {
-                self.cipherSuite = try container.decodeIfPresent(String.self, forKey: .cipherSuite)
+                cipherSuite = try container.decodeIfPresent(String.self, forKey: .cipherSuite)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'cipherSuite': \(error)")
                 throw error
@@ -123,174 +119,130 @@ public struct ConsumedPackageView: ATProtocolCodable, ATProtocolValue {
             case consumedAt
             case cipherSuite
         }
-    }    
-public struct Parameters: Parametrizable {
+    }
+
+    public struct Parameters: Parametrizable {
         public let limit: Int?
         public let cursor: String?
-        
+
         public init(
-            limit: Int? = nil, 
+            limit: Int? = nil,
             cursor: String? = nil
-            ) {
+        ) {
             self.limit = limit
             self.cursor = cursor
-            
         }
     }
-    
-public struct Output: ATProtocolCodable {
-        
-        
+
+    public struct Output: ATProtocolCodable {
         public let totalUploaded: Int
-        
+
         public let available: Int
-        
+
         public let consumed: Int
-        
+
         public let reserved: Int?
-        
+
         public let consumedPackages: [ConsumedPackageView]?
-        
+
         public let cursor: String?
-        
-        
-        
-        // Standard public initializer
+
+        /// Standard public initializer
         public init(
-            
-            
             totalUploaded: Int,
-            
+
             available: Int,
-            
+
             consumed: Int,
-            
+
             reserved: Int? = nil,
-            
+
             consumedPackages: [ConsumedPackageView]? = nil,
-            
+
             cursor: String? = nil
-            
-            
+
         ) {
-            
-            
             self.totalUploaded = totalUploaded
-            
+
             self.available = available
-            
+
             self.consumed = consumed
-            
+
             self.reserved = reserved
-            
+
             self.consumedPackages = consumedPackages
-            
+
             self.cursor = cursor
-            
-            
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
-            self.totalUploaded = try container.decode(Int.self, forKey: .totalUploaded)
-            
-            
-            self.available = try container.decode(Int.self, forKey: .available)
-            
-            
-            self.consumed = try container.decode(Int.self, forKey: .consumed)
-            
-            
-            self.reserved = try container.decodeIfPresent(Int.self, forKey: .reserved)
-            
-            
-            self.consumedPackages = try container.decodeIfPresent([ConsumedPackageView].self, forKey: .consumedPackages)
-            
-            
-            self.cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
-            
-            
+
+            totalUploaded = try container.decode(Int.self, forKey: .totalUploaded)
+
+            available = try container.decode(Int.self, forKey: .available)
+
+            consumed = try container.decode(Int.self, forKey: .consumed)
+
+            reserved = try container.decodeIfPresent(Int.self, forKey: .reserved)
+
+            consumedPackages = try container.decodeIfPresent([ConsumedPackageView].self, forKey: .consumedPackages)
+
+            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(totalUploaded, forKey: .totalUploaded)
-            
-            
+
             try container.encode(available, forKey: .available)
-            
-            
+
             try container.encode(consumed, forKey: .consumed)
-            
-            
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(reserved, forKey: .reserved)
-            
-            
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(consumedPackages, forKey: .consumedPackages)
-            
-            
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(cursor, forKey: .cursor)
-            
-            
         }
 
         public func toCBORValue() throws -> Any {
-            
             var map = OrderedCBORMap()
 
-            
-            
             let totalUploadedValue = try totalUploaded.toCBORValue()
             map = map.adding(key: "totalUploaded", value: totalUploadedValue)
-            
-            
-            
+
             let availableValue = try available.toCBORValue()
             map = map.adding(key: "available", value: availableValue)
-            
-            
-            
+
             let consumedValue = try consumed.toCBORValue()
             map = map.adding(key: "consumed", value: consumedValue)
-            
-            
-            
+
             if let value = reserved {
                 // Encode optional property even if it's an empty array for CBOR
                 let reservedValue = try value.toCBORValue()
                 map = map.adding(key: "reserved", value: reservedValue)
             }
-            
-            
-            
+
             if let value = consumedPackages {
                 // Encode optional property even if it's an empty array for CBOR
                 let consumedPackagesValue = try value.toCBORValue()
                 map = map.adding(key: "consumedPackages", value: consumedPackagesValue)
             }
-            
-            
-            
+
             if let value = cursor {
                 // Encode optional property even if it's an empty array for CBOR
                 let cursorValue = try value.toCBORValue()
                 map = map.adding(key: "cursor", value: cursorValue)
             }
-            
-            
 
             return map
-            
         }
-        
-        
+
         private enum CodingKeys: String, CodingKey {
             case totalUploaded
             case available
@@ -299,31 +251,23 @@ public struct Output: ATProtocolCodable {
             case consumedPackages
             case cursor
         }
-        
     }
-
-
-
-
 }
 
-
-
-extension ATProtoClient.Blue.Catbird.Mls {
+public extension ATProtoClient.Blue.Catbird.Mls {
     // MARK: - getKeyPackageStatus
 
     /// Get key package statistics and consumption history for the authenticated user. Helps clients detect missing bundles before processing Welcome messages.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func getKeyPackageStatus(input: BlueCatbirdMlsGetKeyPackageStatus.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsGetKeyPackageStatus.Output?) {
+    func getKeyPackageStatus(input: BlueCatbirdMlsGetKeyPackageStatus.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsGetKeyPackageStatus.Output?) {
         let endpoint = "blue.catbird.mls.getKeyPackageStatus"
 
-        
         let queryItems = input.asQueryItems()
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -347,12 +291,11 @@ extension ATProtoClient.Blue.Catbird.Mls {
         }
 
         // Only decode response data if request was successful
-        if (200...299).contains(responseCode) {
+        if (200 ... 299).contains(responseCode) {
             do {
-                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsGetKeyPackageStatus.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -360,12 +303,9 @@ extension ATProtoClient.Blue.Catbird.Mls {
                 return (responseCode, nil)
             }
         } else {
-            
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-                           
-

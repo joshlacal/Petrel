@@ -1,23 +1,19 @@
 import Foundation
 
-
-
 // lexicon: 1, id: app.bsky.labeler.defs
 
-
-public struct AppBskyLabelerDefs { 
-
+public enum AppBskyLabelerDefs {
     public static let typeIdentifier = "app.bsky.labeler.defs"
-        
-public struct LabelerView: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.labeler.defs#labelerView"
-            public let uri: ATProtocolURI
-            public let cid: CID
-            public let creator: AppBskyActorDefs.ProfileView
-            public let likeCount: Int?
-            public let viewer: LabelerViewerState?
-            public let indexedAt: ATProtocolDate
-            public let labels: [ComAtprotoLabelDefs.Label]?
+
+    public struct LabelerView: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.labeler.defs#labelerView"
+        public let uri: ATProtocolURI
+        public let cid: CID
+        public let creator: AppBskyActorDefs.ProfileView
+        public let likeCount: Int?
+        public let viewer: LabelerViewerState?
+        public let indexedAt: ATProtocolDate
+        public let labels: [ComAtprotoLabelDefs.Label]?
 
         public init(
             uri: ATProtocolURI, cid: CID, creator: AppBskyActorDefs.ProfileView, likeCount: Int?, viewer: LabelerViewerState?, indexedAt: ATProtocolDate, labels: [ComAtprotoLabelDefs.Label]?
@@ -34,43 +30,43 @@ public struct LabelerView: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
             } catch {
                 LogManager.logError("Decoding error for required property 'uri': \(error)")
                 throw error
             }
             do {
-                self.cid = try container.decode(CID.self, forKey: .cid)
+                cid = try container.decode(CID.self, forKey: .cid)
             } catch {
                 LogManager.logError("Decoding error for required property 'cid': \(error)")
                 throw error
             }
             do {
-                self.creator = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: .creator)
+                creator = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: .creator)
             } catch {
                 LogManager.logError("Decoding error for required property 'creator': \(error)")
                 throw error
             }
             do {
-                self.likeCount = try container.decodeIfPresent(Int.self, forKey: .likeCount)
+                likeCount = try container.decodeIfPresent(Int.self, forKey: .likeCount)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'likeCount': \(error)")
                 throw error
             }
             do {
-                self.viewer = try container.decodeIfPresent(LabelerViewerState.self, forKey: .viewer)
+                viewer = try container.decodeIfPresent(LabelerViewerState.self, forKey: .viewer)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'viewer': \(error)")
                 throw error
             }
             do {
-                self.indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
+                indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
             } catch {
                 LogManager.logError("Decoding error for required property 'indexedAt': \(error)")
                 throw error
             }
             do {
-                self.labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
+                labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'labels': \(error)")
                 throw error
@@ -178,20 +174,20 @@ public struct LabelerView: ATProtocolCodable, ATProtocolValue {
             case labels
         }
     }
-        
-public struct LabelerViewDetailed: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.labeler.defs#labelerViewDetailed"
-            public let uri: ATProtocolURI
-            public let cid: CID
-            public let creator: AppBskyActorDefs.ProfileView
-            public let policies: AppBskyLabelerDefs.LabelerPolicies
-            public let likeCount: Int?
-            public let viewer: LabelerViewerState?
-            public let indexedAt: ATProtocolDate
-            public let labels: [ComAtprotoLabelDefs.Label]?
-            public let reasonTypes: [ComAtprotoModerationDefs.ReasonType]?
-            public let subjectTypes: [ComAtprotoModerationDefs.SubjectType]?
-            public let subjectCollections: [NSID]?
+
+    public struct LabelerViewDetailed: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.labeler.defs#labelerViewDetailed"
+        public let uri: ATProtocolURI
+        public let cid: CID
+        public let creator: AppBskyActorDefs.ProfileView
+        public let policies: AppBskyLabelerDefs.LabelerPolicies
+        public let likeCount: Int?
+        public let viewer: LabelerViewerState?
+        public let indexedAt: ATProtocolDate
+        public let labels: [ComAtprotoLabelDefs.Label]?
+        public let reasonTypes: [ComAtprotoModerationDefs.ReasonType]?
+        public let subjectTypes: [ComAtprotoModerationDefs.SubjectType]?
+        public let subjectCollections: [NSID]?
 
         public init(
             uri: ATProtocolURI, cid: CID, creator: AppBskyActorDefs.ProfileView, policies: AppBskyLabelerDefs.LabelerPolicies, likeCount: Int?, viewer: LabelerViewerState?, indexedAt: ATProtocolDate, labels: [ComAtprotoLabelDefs.Label]?, reasonTypes: [ComAtprotoModerationDefs.ReasonType]?, subjectTypes: [ComAtprotoModerationDefs.SubjectType]?, subjectCollections: [NSID]?
@@ -212,67 +208,67 @@ public struct LabelerViewDetailed: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
             } catch {
                 LogManager.logError("Decoding error for required property 'uri': \(error)")
                 throw error
             }
             do {
-                self.cid = try container.decode(CID.self, forKey: .cid)
+                cid = try container.decode(CID.self, forKey: .cid)
             } catch {
                 LogManager.logError("Decoding error for required property 'cid': \(error)")
                 throw error
             }
             do {
-                self.creator = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: .creator)
+                creator = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: .creator)
             } catch {
                 LogManager.logError("Decoding error for required property 'creator': \(error)")
                 throw error
             }
             do {
-                self.policies = try container.decode(AppBskyLabelerDefs.LabelerPolicies.self, forKey: .policies)
+                policies = try container.decode(AppBskyLabelerDefs.LabelerPolicies.self, forKey: .policies)
             } catch {
                 LogManager.logError("Decoding error for required property 'policies': \(error)")
                 throw error
             }
             do {
-                self.likeCount = try container.decodeIfPresent(Int.self, forKey: .likeCount)
+                likeCount = try container.decodeIfPresent(Int.self, forKey: .likeCount)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'likeCount': \(error)")
                 throw error
             }
             do {
-                self.viewer = try container.decodeIfPresent(LabelerViewerState.self, forKey: .viewer)
+                viewer = try container.decodeIfPresent(LabelerViewerState.self, forKey: .viewer)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'viewer': \(error)")
                 throw error
             }
             do {
-                self.indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
+                indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
             } catch {
                 LogManager.logError("Decoding error for required property 'indexedAt': \(error)")
                 throw error
             }
             do {
-                self.labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
+                labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'labels': \(error)")
                 throw error
             }
             do {
-                self.reasonTypes = try container.decodeIfPresent([ComAtprotoModerationDefs.ReasonType].self, forKey: .reasonTypes)
+                reasonTypes = try container.decodeIfPresent([ComAtprotoModerationDefs.ReasonType].self, forKey: .reasonTypes)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'reasonTypes': \(error)")
                 throw error
             }
             do {
-                self.subjectTypes = try container.decodeIfPresent([ComAtprotoModerationDefs.SubjectType].self, forKey: .subjectTypes)
+                subjectTypes = try container.decodeIfPresent([ComAtprotoModerationDefs.SubjectType].self, forKey: .subjectTypes)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'subjectTypes': \(error)")
                 throw error
             }
             do {
-                self.subjectCollections = try container.decodeIfPresent([NSID].self, forKey: .subjectCollections)
+                subjectCollections = try container.decodeIfPresent([NSID].self, forKey: .subjectCollections)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'subjectCollections': \(error)")
                 throw error
@@ -430,10 +426,10 @@ public struct LabelerViewDetailed: ATProtocolCodable, ATProtocolValue {
             case subjectCollections
         }
     }
-        
-public struct LabelerViewerState: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.labeler.defs#labelerViewerState"
-            public let like: ATProtocolURI?
+
+    public struct LabelerViewerState: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.labeler.defs#labelerViewerState"
+        public let like: ATProtocolURI?
 
         public init(
             like: ATProtocolURI?
@@ -444,7 +440,7 @@ public struct LabelerViewerState: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.like = try container.decodeIfPresent(ATProtocolURI.self, forKey: .like)
+                like = try container.decodeIfPresent(ATProtocolURI.self, forKey: .like)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'like': \(error)")
                 throw error
@@ -492,11 +488,11 @@ public struct LabelerViewerState: ATProtocolCodable, ATProtocolValue {
             case like
         }
     }
-        
-public struct LabelerPolicies: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.labeler.defs#labelerPolicies"
-            public let labelValues: [ComAtprotoLabelDefs.LabelValue]
-            public let labelValueDefinitions: [ComAtprotoLabelDefs.LabelValueDefinition]?
+
+    public struct LabelerPolicies: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.labeler.defs#labelerPolicies"
+        public let labelValues: [ComAtprotoLabelDefs.LabelValue]
+        public let labelValueDefinitions: [ComAtprotoLabelDefs.LabelValueDefinition]?
 
         public init(
             labelValues: [ComAtprotoLabelDefs.LabelValue], labelValueDefinitions: [ComAtprotoLabelDefs.LabelValueDefinition]?
@@ -508,13 +504,13 @@ public struct LabelerPolicies: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.labelValues = try container.decode([ComAtprotoLabelDefs.LabelValue].self, forKey: .labelValues)
+                labelValues = try container.decode([ComAtprotoLabelDefs.LabelValue].self, forKey: .labelValues)
             } catch {
                 LogManager.logError("Decoding error for required property 'labelValues': \(error)")
                 throw error
             }
             do {
-                self.labelValueDefinitions = try container.decodeIfPresent([ComAtprotoLabelDefs.LabelValueDefinition].self, forKey: .labelValueDefinitions)
+                labelValueDefinitions = try container.decodeIfPresent([ComAtprotoLabelDefs.LabelValueDefinition].self, forKey: .labelValueDefinitions)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'labelValueDefinitions': \(error)")
                 throw error
@@ -570,11 +566,4 @@ public struct LabelerPolicies: ATProtocolCodable, ATProtocolValue {
             case labelValueDefinitions
         }
     }
-
-
-
 }
-
-
-                           
-

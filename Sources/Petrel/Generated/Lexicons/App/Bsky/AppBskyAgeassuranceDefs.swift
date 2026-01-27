@@ -1,19 +1,15 @@
 import Foundation
 
-
-
 // lexicon: 1, id: app.bsky.ageassurance.defs
 
-
-public struct AppBskyAgeassuranceDefs { 
-
+public enum AppBskyAgeassuranceDefs {
     public static let typeIdentifier = "app.bsky.ageassurance.defs"
-        
-public struct State: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.ageassurance.defs#state"
-            public let lastInitiatedAt: ATProtocolDate?
-            public let status: AppBskyAgeassuranceDefs.Status
-            public let access: AppBskyAgeassuranceDefs.Access
+
+    public struct State: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.ageassurance.defs#state"
+        public let lastInitiatedAt: ATProtocolDate?
+        public let status: AppBskyAgeassuranceDefs.Status
+        public let access: AppBskyAgeassuranceDefs.Access
 
         public init(
             lastInitiatedAt: ATProtocolDate?, status: AppBskyAgeassuranceDefs.Status, access: AppBskyAgeassuranceDefs.Access
@@ -26,19 +22,19 @@ public struct State: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.lastInitiatedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .lastInitiatedAt)
+                lastInitiatedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .lastInitiatedAt)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'lastInitiatedAt': \(error)")
                 throw error
             }
             do {
-                self.status = try container.decode(AppBskyAgeassuranceDefs.Status.self, forKey: .status)
+                status = try container.decode(AppBskyAgeassuranceDefs.Status.self, forKey: .status)
             } catch {
                 LogManager.logError("Decoding error for required property 'status': \(error)")
                 throw error
             }
             do {
-                self.access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
+                access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
             } catch {
                 LogManager.logError("Decoding error for required property 'access': \(error)")
                 throw error
@@ -102,10 +98,10 @@ public struct State: ATProtocolCodable, ATProtocolValue {
             case access
         }
     }
-        
-public struct StateMetadata: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.ageassurance.defs#stateMetadata"
-            public let accountCreatedAt: ATProtocolDate?
+
+    public struct StateMetadata: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.ageassurance.defs#stateMetadata"
+        public let accountCreatedAt: ATProtocolDate?
 
         public init(
             accountCreatedAt: ATProtocolDate?
@@ -116,7 +112,7 @@ public struct StateMetadata: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.accountCreatedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .accountCreatedAt)
+                accountCreatedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .accountCreatedAt)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'accountCreatedAt': \(error)")
                 throw error
@@ -164,10 +160,10 @@ public struct StateMetadata: ATProtocolCodable, ATProtocolValue {
             case accountCreatedAt
         }
     }
-        
-public struct Config: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.ageassurance.defs#config"
-            public let regions: [AppBskyAgeassuranceDefs.ConfigRegion]
+
+    public struct Config: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.ageassurance.defs#config"
+        public let regions: [AppBskyAgeassuranceDefs.ConfigRegion]
 
         public init(
             regions: [AppBskyAgeassuranceDefs.ConfigRegion]
@@ -178,7 +174,7 @@ public struct Config: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.regions = try container.decode([AppBskyAgeassuranceDefs.ConfigRegion].self, forKey: .regions)
+                regions = try container.decode([AppBskyAgeassuranceDefs.ConfigRegion].self, forKey: .regions)
             } catch {
                 LogManager.logError("Decoding error for required property 'regions': \(error)")
                 throw error
@@ -220,13 +216,13 @@ public struct Config: ATProtocolCodable, ATProtocolValue {
             case regions
         }
     }
-        
-public struct ConfigRegion: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.ageassurance.defs#configRegion"
-            public let countryCode: String
-            public let regionCode: String?
-            public let minAccessAge: Int
-            public let rules: [ConfigRegionRulesUnion]
+
+    public struct ConfigRegion: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.ageassurance.defs#configRegion"
+        public let countryCode: String
+        public let regionCode: String?
+        public let minAccessAge: Int
+        public let rules: [ConfigRegionRulesUnion]
 
         public init(
             countryCode: String, regionCode: String?, minAccessAge: Int, rules: [ConfigRegionRulesUnion]
@@ -240,25 +236,25 @@ public struct ConfigRegion: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.countryCode = try container.decode(String.self, forKey: .countryCode)
+                countryCode = try container.decode(String.self, forKey: .countryCode)
             } catch {
                 LogManager.logError("Decoding error for required property 'countryCode': \(error)")
                 throw error
             }
             do {
-                self.regionCode = try container.decodeIfPresent(String.self, forKey: .regionCode)
+                regionCode = try container.decodeIfPresent(String.self, forKey: .regionCode)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'regionCode': \(error)")
                 throw error
             }
             do {
-                self.minAccessAge = try container.decode(Int.self, forKey: .minAccessAge)
+                minAccessAge = try container.decode(Int.self, forKey: .minAccessAge)
             } catch {
                 LogManager.logError("Decoding error for required property 'minAccessAge': \(error)")
                 throw error
             }
             do {
-                self.rules = try container.decode([ConfigRegionRulesUnion].self, forKey: .rules)
+                rules = try container.decode([ConfigRegionRulesUnion].self, forKey: .rules)
             } catch {
                 LogManager.logError("Decoding error for required property 'rules': \(error)")
                 throw error
@@ -330,10 +326,10 @@ public struct ConfigRegion: ATProtocolCodable, ATProtocolValue {
             case rules
         }
     }
-        
-public struct ConfigRegionRuleDefault: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.ageassurance.defs#configRegionRuleDefault"
-            public let access: AppBskyAgeassuranceDefs.Access
+
+    public struct ConfigRegionRuleDefault: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.ageassurance.defs#configRegionRuleDefault"
+        public let access: AppBskyAgeassuranceDefs.Access
 
         public init(
             access: AppBskyAgeassuranceDefs.Access
@@ -344,7 +340,7 @@ public struct ConfigRegionRuleDefault: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
+                access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
             } catch {
                 LogManager.logError("Decoding error for required property 'access': \(error)")
                 throw error
@@ -386,11 +382,11 @@ public struct ConfigRegionRuleDefault: ATProtocolCodable, ATProtocolValue {
             case access
         }
     }
-        
-public struct ConfigRegionRuleIfDeclaredOverAge: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.ageassurance.defs#configRegionRuleIfDeclaredOverAge"
-            public let age: Int
-            public let access: AppBskyAgeassuranceDefs.Access
+
+    public struct ConfigRegionRuleIfDeclaredOverAge: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.ageassurance.defs#configRegionRuleIfDeclaredOverAge"
+        public let age: Int
+        public let access: AppBskyAgeassuranceDefs.Access
 
         public init(
             age: Int, access: AppBskyAgeassuranceDefs.Access
@@ -402,13 +398,13 @@ public struct ConfigRegionRuleIfDeclaredOverAge: ATProtocolCodable, ATProtocolVa
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.age = try container.decode(Int.self, forKey: .age)
+                age = try container.decode(Int.self, forKey: .age)
             } catch {
                 LogManager.logError("Decoding error for required property 'age': \(error)")
                 throw error
             }
             do {
-                self.access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
+                access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
             } catch {
                 LogManager.logError("Decoding error for required property 'access': \(error)")
                 throw error
@@ -458,11 +454,11 @@ public struct ConfigRegionRuleIfDeclaredOverAge: ATProtocolCodable, ATProtocolVa
             case access
         }
     }
-        
-public struct ConfigRegionRuleIfDeclaredUnderAge: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.ageassurance.defs#configRegionRuleIfDeclaredUnderAge"
-            public let age: Int
-            public let access: AppBskyAgeassuranceDefs.Access
+
+    public struct ConfigRegionRuleIfDeclaredUnderAge: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.ageassurance.defs#configRegionRuleIfDeclaredUnderAge"
+        public let age: Int
+        public let access: AppBskyAgeassuranceDefs.Access
 
         public init(
             age: Int, access: AppBskyAgeassuranceDefs.Access
@@ -474,13 +470,13 @@ public struct ConfigRegionRuleIfDeclaredUnderAge: ATProtocolCodable, ATProtocolV
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.age = try container.decode(Int.self, forKey: .age)
+                age = try container.decode(Int.self, forKey: .age)
             } catch {
                 LogManager.logError("Decoding error for required property 'age': \(error)")
                 throw error
             }
             do {
-                self.access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
+                access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
             } catch {
                 LogManager.logError("Decoding error for required property 'access': \(error)")
                 throw error
@@ -530,11 +526,11 @@ public struct ConfigRegionRuleIfDeclaredUnderAge: ATProtocolCodable, ATProtocolV
             case access
         }
     }
-        
-public struct ConfigRegionRuleIfAssuredOverAge: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.ageassurance.defs#configRegionRuleIfAssuredOverAge"
-            public let age: Int
-            public let access: AppBskyAgeassuranceDefs.Access
+
+    public struct ConfigRegionRuleIfAssuredOverAge: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.ageassurance.defs#configRegionRuleIfAssuredOverAge"
+        public let age: Int
+        public let access: AppBskyAgeassuranceDefs.Access
 
         public init(
             age: Int, access: AppBskyAgeassuranceDefs.Access
@@ -546,13 +542,13 @@ public struct ConfigRegionRuleIfAssuredOverAge: ATProtocolCodable, ATProtocolVal
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.age = try container.decode(Int.self, forKey: .age)
+                age = try container.decode(Int.self, forKey: .age)
             } catch {
                 LogManager.logError("Decoding error for required property 'age': \(error)")
                 throw error
             }
             do {
-                self.access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
+                access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
             } catch {
                 LogManager.logError("Decoding error for required property 'access': \(error)")
                 throw error
@@ -602,11 +598,11 @@ public struct ConfigRegionRuleIfAssuredOverAge: ATProtocolCodable, ATProtocolVal
             case access
         }
     }
-        
-public struct ConfigRegionRuleIfAssuredUnderAge: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.ageassurance.defs#configRegionRuleIfAssuredUnderAge"
-            public let age: Int
-            public let access: AppBskyAgeassuranceDefs.Access
+
+    public struct ConfigRegionRuleIfAssuredUnderAge: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.ageassurance.defs#configRegionRuleIfAssuredUnderAge"
+        public let age: Int
+        public let access: AppBskyAgeassuranceDefs.Access
 
         public init(
             age: Int, access: AppBskyAgeassuranceDefs.Access
@@ -618,13 +614,13 @@ public struct ConfigRegionRuleIfAssuredUnderAge: ATProtocolCodable, ATProtocolVa
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.age = try container.decode(Int.self, forKey: .age)
+                age = try container.decode(Int.self, forKey: .age)
             } catch {
                 LogManager.logError("Decoding error for required property 'age': \(error)")
                 throw error
             }
             do {
-                self.access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
+                access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
             } catch {
                 LogManager.logError("Decoding error for required property 'access': \(error)")
                 throw error
@@ -674,11 +670,11 @@ public struct ConfigRegionRuleIfAssuredUnderAge: ATProtocolCodable, ATProtocolVa
             case access
         }
     }
-        
-public struct ConfigRegionRuleIfAccountNewerThan: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.ageassurance.defs#configRegionRuleIfAccountNewerThan"
-            public let date: ATProtocolDate
-            public let access: AppBskyAgeassuranceDefs.Access
+
+    public struct ConfigRegionRuleIfAccountNewerThan: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.ageassurance.defs#configRegionRuleIfAccountNewerThan"
+        public let date: ATProtocolDate
+        public let access: AppBskyAgeassuranceDefs.Access
 
         public init(
             date: ATProtocolDate, access: AppBskyAgeassuranceDefs.Access
@@ -690,13 +686,13 @@ public struct ConfigRegionRuleIfAccountNewerThan: ATProtocolCodable, ATProtocolV
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.date = try container.decode(ATProtocolDate.self, forKey: .date)
+                date = try container.decode(ATProtocolDate.self, forKey: .date)
             } catch {
                 LogManager.logError("Decoding error for required property 'date': \(error)")
                 throw error
             }
             do {
-                self.access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
+                access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
             } catch {
                 LogManager.logError("Decoding error for required property 'access': \(error)")
                 throw error
@@ -746,11 +742,11 @@ public struct ConfigRegionRuleIfAccountNewerThan: ATProtocolCodable, ATProtocolV
             case access
         }
     }
-        
-public struct ConfigRegionRuleIfAccountOlderThan: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.ageassurance.defs#configRegionRuleIfAccountOlderThan"
-            public let date: ATProtocolDate
-            public let access: AppBskyAgeassuranceDefs.Access
+
+    public struct ConfigRegionRuleIfAccountOlderThan: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.ageassurance.defs#configRegionRuleIfAccountOlderThan"
+        public let date: ATProtocolDate
+        public let access: AppBskyAgeassuranceDefs.Access
 
         public init(
             date: ATProtocolDate, access: AppBskyAgeassuranceDefs.Access
@@ -762,13 +758,13 @@ public struct ConfigRegionRuleIfAccountOlderThan: ATProtocolCodable, ATProtocolV
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.date = try container.decode(ATProtocolDate.self, forKey: .date)
+                date = try container.decode(ATProtocolDate.self, forKey: .date)
             } catch {
                 LogManager.logError("Decoding error for required property 'date': \(error)")
                 throw error
             }
             do {
-                self.access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
+                access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
             } catch {
                 LogManager.logError("Decoding error for required property 'access': \(error)")
                 throw error
@@ -818,20 +814,20 @@ public struct ConfigRegionRuleIfAccountOlderThan: ATProtocolCodable, ATProtocolV
             case access
         }
     }
-        
-public struct Event: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.ageassurance.defs#event"
-            public let createdAt: ATProtocolDate
-            public let attemptId: String
-            public let status: String
-            public let access: String
-            public let countryCode: String
-            public let regionCode: String?
-            public let email: String?
-            public let initIp: String?
-            public let initUa: String?
-            public let completeIp: String?
-            public let completeUa: String?
+
+    public struct Event: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.ageassurance.defs#event"
+        public let createdAt: ATProtocolDate
+        public let attemptId: String
+        public let status: String
+        public let access: String
+        public let countryCode: String
+        public let regionCode: String?
+        public let email: String?
+        public let initIp: String?
+        public let initUa: String?
+        public let completeIp: String?
+        public let completeUa: String?
 
         public init(
             createdAt: ATProtocolDate, attemptId: String, status: String, access: String, countryCode: String, regionCode: String?, email: String?, initIp: String?, initUa: String?, completeIp: String?, completeUa: String?
@@ -852,67 +848,67 @@ public struct Event: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
             } catch {
                 LogManager.logError("Decoding error for required property 'createdAt': \(error)")
                 throw error
             }
             do {
-                self.attemptId = try container.decode(String.self, forKey: .attemptId)
+                attemptId = try container.decode(String.self, forKey: .attemptId)
             } catch {
                 LogManager.logError("Decoding error for required property 'attemptId': \(error)")
                 throw error
             }
             do {
-                self.status = try container.decode(String.self, forKey: .status)
+                status = try container.decode(String.self, forKey: .status)
             } catch {
                 LogManager.logError("Decoding error for required property 'status': \(error)")
                 throw error
             }
             do {
-                self.access = try container.decode(String.self, forKey: .access)
+                access = try container.decode(String.self, forKey: .access)
             } catch {
                 LogManager.logError("Decoding error for required property 'access': \(error)")
                 throw error
             }
             do {
-                self.countryCode = try container.decode(String.self, forKey: .countryCode)
+                countryCode = try container.decode(String.self, forKey: .countryCode)
             } catch {
                 LogManager.logError("Decoding error for required property 'countryCode': \(error)")
                 throw error
             }
             do {
-                self.regionCode = try container.decodeIfPresent(String.self, forKey: .regionCode)
+                regionCode = try container.decodeIfPresent(String.self, forKey: .regionCode)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'regionCode': \(error)")
                 throw error
             }
             do {
-                self.email = try container.decodeIfPresent(String.self, forKey: .email)
+                email = try container.decodeIfPresent(String.self, forKey: .email)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'email': \(error)")
                 throw error
             }
             do {
-                self.initIp = try container.decodeIfPresent(String.self, forKey: .initIp)
+                initIp = try container.decodeIfPresent(String.self, forKey: .initIp)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'initIp': \(error)")
                 throw error
             }
             do {
-                self.initUa = try container.decodeIfPresent(String.self, forKey: .initUa)
+                initUa = try container.decodeIfPresent(String.self, forKey: .initUa)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'initUa': \(error)")
                 throw error
             }
             do {
-                self.completeIp = try container.decodeIfPresent(String.self, forKey: .completeIp)
+                completeIp = try container.decodeIfPresent(String.self, forKey: .completeIp)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'completeIp': \(error)")
                 throw error
             }
             do {
-                self.completeUa = try container.decodeIfPresent(String.self, forKey: .completeUa)
+                completeUa = try container.decodeIfPresent(String.self, forKey: .completeUa)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'completeUa': \(error)")
                 throw error
@@ -1071,405 +1067,413 @@ public struct Event: ATProtocolCodable, ATProtocolValue {
         }
     }
 
+    public struct Access: Codable, ATProtocolCodable, ATProtocolValue {
+        public let rawValue: String
 
+        /// Predefined constants
+        ///
+        public static let unknown = Access(rawValue: "unknown")
+        ///
+        public static let none = Access(rawValue: "none")
+        ///
+        public static let safe = Access(rawValue: "safe")
+        ///
+        public static let full = Access(rawValue: "full")
 
-public struct Access: Codable, ATProtocolCodable, ATProtocolValue {
-            public let rawValue: String
-            
-            // Predefined constants
-            // 
-            public static let unknown = Access(rawValue: "unknown")
-            // 
-            public static let none = Access(rawValue: "none")
-            // 
-            public static let safe = Access(rawValue: "safe")
-            // 
-            public static let full = Access(rawValue: "full")
-            
-            public init(rawValue: String) {
-                self.rawValue = rawValue
-            }
-            
-            public init(from decoder: Decoder) throws {
-                let container = try decoder.singleValueContainer()
-                rawValue = try container.decode(String.self)
-            }
-            
-            public func encode(to encoder: Encoder) throws {
-                var container = encoder.singleValueContainer()
-                try container.encode(rawValue)
-            }
-            
-            public func isEqual(to other: any ATProtocolValue) -> Bool {
-                guard let otherValue = other as? Access else { return false }
-                return self.rawValue == otherValue.rawValue
-            }
-            
-            // DAGCBOR encoding with field ordering
-            public func toCBORValue() throws -> Any {
-                // For string-based enum types, we return the raw string value directly
-                return rawValue
-            }
-            
-            // Provide allCases-like functionality
-            public static var predefinedValues: [Access] {
-                return [
-                    .unknown,
-                    .none,
-                    .safe,
-                    .full,
-                ]
-            }
+        public init(rawValue: String) {
+            self.rawValue = rawValue
         }
 
-
-public struct Status: Codable, ATProtocolCodable, ATProtocolValue {
-            public let rawValue: String
-            
-            // Predefined constants
-            // 
-            public static let unknown = Status(rawValue: "unknown")
-            // 
-            public static let pending = Status(rawValue: "pending")
-            // 
-            public static let assured = Status(rawValue: "assured")
-            // 
-            public static let blocked = Status(rawValue: "blocked")
-            
-            public init(rawValue: String) {
-                self.rawValue = rawValue
-            }
-            
-            public init(from decoder: Decoder) throws {
-                let container = try decoder.singleValueContainer()
-                rawValue = try container.decode(String.self)
-            }
-            
-            public func encode(to encoder: Encoder) throws {
-                var container = encoder.singleValueContainer()
-                try container.encode(rawValue)
-            }
-            
-            public func isEqual(to other: any ATProtocolValue) -> Bool {
-                guard let otherValue = other as? Status else { return false }
-                return self.rawValue == otherValue.rawValue
-            }
-            
-            // DAGCBOR encoding with field ordering
-            public func toCBORValue() throws -> Any {
-                // For string-based enum types, we return the raw string value directly
-                return rawValue
-            }
-            
-            // Provide allCases-like functionality
-            public static var predefinedValues: [Status] {
-                return [
-                    .unknown,
-                    .pending,
-                    .assured,
-                    .blocked,
-                ]
-            }
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            rawValue = try container.decode(String.self)
         }
 
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.singleValueContainer()
+            try container.encode(rawValue)
+        }
 
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? Access else { return false }
+            return rawValue == otherValue.rawValue
+        }
 
+        /// DAGCBOR encoding with field ordering
+        public func toCBORValue() throws -> Any {
+            // For string-based enum types, we return the raw string value directly
+            return rawValue
+        }
 
-public enum ConfigRegionRulesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
-    case appBskyAgeassuranceDefsConfigRegionRuleDefault(AppBskyAgeassuranceDefs.ConfigRegionRuleDefault)
-    case appBskyAgeassuranceDefsConfigRegionRuleIfDeclaredOverAge(AppBskyAgeassuranceDefs.ConfigRegionRuleIfDeclaredOverAge)
-    case appBskyAgeassuranceDefsConfigRegionRuleIfDeclaredUnderAge(AppBskyAgeassuranceDefs.ConfigRegionRuleIfDeclaredUnderAge)
-    case appBskyAgeassuranceDefsConfigRegionRuleIfAssuredOverAge(AppBskyAgeassuranceDefs.ConfigRegionRuleIfAssuredOverAge)
-    case appBskyAgeassuranceDefsConfigRegionRuleIfAssuredUnderAge(AppBskyAgeassuranceDefs.ConfigRegionRuleIfAssuredUnderAge)
-    case appBskyAgeassuranceDefsConfigRegionRuleIfAccountNewerThan(AppBskyAgeassuranceDefs.ConfigRegionRuleIfAccountNewerThan)
-    case appBskyAgeassuranceDefsConfigRegionRuleIfAccountOlderThan(AppBskyAgeassuranceDefs.ConfigRegionRuleIfAccountOlderThan)
-    case unexpected(ATProtocolValueContainer)
-    public init(_ value: AppBskyAgeassuranceDefs.ConfigRegionRuleDefault) {
-        self = .appBskyAgeassuranceDefsConfigRegionRuleDefault(value)
-    }
-    public init(_ value: AppBskyAgeassuranceDefs.ConfigRegionRuleIfDeclaredOverAge) {
-        self = .appBskyAgeassuranceDefsConfigRegionRuleIfDeclaredOverAge(value)
-    }
-    public init(_ value: AppBskyAgeassuranceDefs.ConfigRegionRuleIfDeclaredUnderAge) {
-        self = .appBskyAgeassuranceDefsConfigRegionRuleIfDeclaredUnderAge(value)
-    }
-    public init(_ value: AppBskyAgeassuranceDefs.ConfigRegionRuleIfAssuredOverAge) {
-        self = .appBskyAgeassuranceDefsConfigRegionRuleIfAssuredOverAge(value)
-    }
-    public init(_ value: AppBskyAgeassuranceDefs.ConfigRegionRuleIfAssuredUnderAge) {
-        self = .appBskyAgeassuranceDefsConfigRegionRuleIfAssuredUnderAge(value)
-    }
-    public init(_ value: AppBskyAgeassuranceDefs.ConfigRegionRuleIfAccountNewerThan) {
-        self = .appBskyAgeassuranceDefsConfigRegionRuleIfAccountNewerThan(value)
-    }
-    public init(_ value: AppBskyAgeassuranceDefs.ConfigRegionRuleIfAccountOlderThan) {
-        self = .appBskyAgeassuranceDefsConfigRegionRuleIfAccountOlderThan(value)
+        /// Provide allCases-like functionality
+        public static var predefinedValues: [Access] {
+            return [
+                .unknown,
+                .none,
+                .safe,
+                .full,
+            ]
+        }
     }
 
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        let typeValue = try container.decode(String.self, forKey: .type)
+    public struct Status: Codable, ATProtocolCodable, ATProtocolValue {
+        public let rawValue: String
 
-        switch typeValue {
-        case "app.bsky.ageassurance.defs#configRegionRuleDefault":
-            let value = try AppBskyAgeassuranceDefs.ConfigRegionRuleDefault(from: decoder)
+        /// Predefined constants
+        ///
+        public static let unknown = Status(rawValue: "unknown")
+        ///
+        public static let pending = Status(rawValue: "pending")
+        ///
+        public static let assured = Status(rawValue: "assured")
+        ///
+        public static let blocked = Status(rawValue: "blocked")
+
+        public init(rawValue: String) {
+            self.rawValue = rawValue
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            rawValue = try container.decode(String.self)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.singleValueContainer()
+            try container.encode(rawValue)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? Status else { return false }
+            return rawValue == otherValue.rawValue
+        }
+
+        /// DAGCBOR encoding with field ordering
+        public func toCBORValue() throws -> Any {
+            // For string-based enum types, we return the raw string value directly
+            return rawValue
+        }
+
+        /// Provide allCases-like functionality
+        public static var predefinedValues: [Status] {
+            return [
+                .unknown,
+                .pending,
+                .assured,
+                .blocked,
+            ]
+        }
+    }
+
+    public enum ConfigRegionRulesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
+        case appBskyAgeassuranceDefsConfigRegionRuleDefault(AppBskyAgeassuranceDefs.ConfigRegionRuleDefault)
+        case appBskyAgeassuranceDefsConfigRegionRuleIfDeclaredOverAge(AppBskyAgeassuranceDefs.ConfigRegionRuleIfDeclaredOverAge)
+        case appBskyAgeassuranceDefsConfigRegionRuleIfDeclaredUnderAge(AppBskyAgeassuranceDefs.ConfigRegionRuleIfDeclaredUnderAge)
+        case appBskyAgeassuranceDefsConfigRegionRuleIfAssuredOverAge(AppBskyAgeassuranceDefs.ConfigRegionRuleIfAssuredOverAge)
+        case appBskyAgeassuranceDefsConfigRegionRuleIfAssuredUnderAge(AppBskyAgeassuranceDefs.ConfigRegionRuleIfAssuredUnderAge)
+        case appBskyAgeassuranceDefsConfigRegionRuleIfAccountNewerThan(AppBskyAgeassuranceDefs.ConfigRegionRuleIfAccountNewerThan)
+        case appBskyAgeassuranceDefsConfigRegionRuleIfAccountOlderThan(AppBskyAgeassuranceDefs.ConfigRegionRuleIfAccountOlderThan)
+        case unexpected(ATProtocolValueContainer)
+        public init(_ value: AppBskyAgeassuranceDefs.ConfigRegionRuleDefault) {
             self = .appBskyAgeassuranceDefsConfigRegionRuleDefault(value)
-        case "app.bsky.ageassurance.defs#configRegionRuleIfDeclaredOverAge":
-            let value = try AppBskyAgeassuranceDefs.ConfigRegionRuleIfDeclaredOverAge(from: decoder)
+        }
+
+        public init(_ value: AppBskyAgeassuranceDefs.ConfigRegionRuleIfDeclaredOverAge) {
             self = .appBskyAgeassuranceDefsConfigRegionRuleIfDeclaredOverAge(value)
-        case "app.bsky.ageassurance.defs#configRegionRuleIfDeclaredUnderAge":
-            let value = try AppBskyAgeassuranceDefs.ConfigRegionRuleIfDeclaredUnderAge(from: decoder)
+        }
+
+        public init(_ value: AppBskyAgeassuranceDefs.ConfigRegionRuleIfDeclaredUnderAge) {
             self = .appBskyAgeassuranceDefsConfigRegionRuleIfDeclaredUnderAge(value)
-        case "app.bsky.ageassurance.defs#configRegionRuleIfAssuredOverAge":
-            let value = try AppBskyAgeassuranceDefs.ConfigRegionRuleIfAssuredOverAge(from: decoder)
+        }
+
+        public init(_ value: AppBskyAgeassuranceDefs.ConfigRegionRuleIfAssuredOverAge) {
             self = .appBskyAgeassuranceDefsConfigRegionRuleIfAssuredOverAge(value)
-        case "app.bsky.ageassurance.defs#configRegionRuleIfAssuredUnderAge":
-            let value = try AppBskyAgeassuranceDefs.ConfigRegionRuleIfAssuredUnderAge(from: decoder)
+        }
+
+        public init(_ value: AppBskyAgeassuranceDefs.ConfigRegionRuleIfAssuredUnderAge) {
             self = .appBskyAgeassuranceDefsConfigRegionRuleIfAssuredUnderAge(value)
-        case "app.bsky.ageassurance.defs#configRegionRuleIfAccountNewerThan":
-            let value = try AppBskyAgeassuranceDefs.ConfigRegionRuleIfAccountNewerThan(from: decoder)
+        }
+
+        public init(_ value: AppBskyAgeassuranceDefs.ConfigRegionRuleIfAccountNewerThan) {
             self = .appBskyAgeassuranceDefsConfigRegionRuleIfAccountNewerThan(value)
-        case "app.bsky.ageassurance.defs#configRegionRuleIfAccountOlderThan":
-            let value = try AppBskyAgeassuranceDefs.ConfigRegionRuleIfAccountOlderThan(from: decoder)
+        }
+
+        public init(_ value: AppBskyAgeassuranceDefs.ConfigRegionRuleIfAccountOlderThan) {
             self = .appBskyAgeassuranceDefsConfigRegionRuleIfAccountOlderThan(value)
-        default:
-            let unknownValue = try ATProtocolValueContainer(from: decoder)
-            self = .unexpected(unknownValue)
         }
-    }
 
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let typeValue = try container.decode(String.self, forKey: .type)
 
-        switch self {
-        case .appBskyAgeassuranceDefsConfigRegionRuleDefault(let value):
-            try container.encode("app.bsky.ageassurance.defs#configRegionRuleDefault", forKey: .type)
-            try value.encode(to: encoder)
-        case .appBskyAgeassuranceDefsConfigRegionRuleIfDeclaredOverAge(let value):
-            try container.encode("app.bsky.ageassurance.defs#configRegionRuleIfDeclaredOverAge", forKey: .type)
-            try value.encode(to: encoder)
-        case .appBskyAgeassuranceDefsConfigRegionRuleIfDeclaredUnderAge(let value):
-            try container.encode("app.bsky.ageassurance.defs#configRegionRuleIfDeclaredUnderAge", forKey: .type)
-            try value.encode(to: encoder)
-        case .appBskyAgeassuranceDefsConfigRegionRuleIfAssuredOverAge(let value):
-            try container.encode("app.bsky.ageassurance.defs#configRegionRuleIfAssuredOverAge", forKey: .type)
-            try value.encode(to: encoder)
-        case .appBskyAgeassuranceDefsConfigRegionRuleIfAssuredUnderAge(let value):
-            try container.encode("app.bsky.ageassurance.defs#configRegionRuleIfAssuredUnderAge", forKey: .type)
-            try value.encode(to: encoder)
-        case .appBskyAgeassuranceDefsConfigRegionRuleIfAccountNewerThan(let value):
-            try container.encode("app.bsky.ageassurance.defs#configRegionRuleIfAccountNewerThan", forKey: .type)
-            try value.encode(to: encoder)
-        case .appBskyAgeassuranceDefsConfigRegionRuleIfAccountOlderThan(let value):
-            try container.encode("app.bsky.ageassurance.defs#configRegionRuleIfAccountOlderThan", forKey: .type)
-            try value.encode(to: encoder)
-        case .unexpected(let container):
-            try container.encode(to: encoder)
+            switch typeValue {
+            case "app.bsky.ageassurance.defs#configRegionRuleDefault":
+                let value = try AppBskyAgeassuranceDefs.ConfigRegionRuleDefault(from: decoder)
+                self = .appBskyAgeassuranceDefsConfigRegionRuleDefault(value)
+            case "app.bsky.ageassurance.defs#configRegionRuleIfDeclaredOverAge":
+                let value = try AppBskyAgeassuranceDefs.ConfigRegionRuleIfDeclaredOverAge(from: decoder)
+                self = .appBskyAgeassuranceDefsConfigRegionRuleIfDeclaredOverAge(value)
+            case "app.bsky.ageassurance.defs#configRegionRuleIfDeclaredUnderAge":
+                let value = try AppBskyAgeassuranceDefs.ConfigRegionRuleIfDeclaredUnderAge(from: decoder)
+                self = .appBskyAgeassuranceDefsConfigRegionRuleIfDeclaredUnderAge(value)
+            case "app.bsky.ageassurance.defs#configRegionRuleIfAssuredOverAge":
+                let value = try AppBskyAgeassuranceDefs.ConfigRegionRuleIfAssuredOverAge(from: decoder)
+                self = .appBskyAgeassuranceDefsConfigRegionRuleIfAssuredOverAge(value)
+            case "app.bsky.ageassurance.defs#configRegionRuleIfAssuredUnderAge":
+                let value = try AppBskyAgeassuranceDefs.ConfigRegionRuleIfAssuredUnderAge(from: decoder)
+                self = .appBskyAgeassuranceDefsConfigRegionRuleIfAssuredUnderAge(value)
+            case "app.bsky.ageassurance.defs#configRegionRuleIfAccountNewerThan":
+                let value = try AppBskyAgeassuranceDefs.ConfigRegionRuleIfAccountNewerThan(from: decoder)
+                self = .appBskyAgeassuranceDefsConfigRegionRuleIfAccountNewerThan(value)
+            case "app.bsky.ageassurance.defs#configRegionRuleIfAccountOlderThan":
+                let value = try AppBskyAgeassuranceDefs.ConfigRegionRuleIfAccountOlderThan(from: decoder)
+                self = .appBskyAgeassuranceDefsConfigRegionRuleIfAccountOlderThan(value)
+            default:
+                let unknownValue = try ATProtocolValueContainer(from: decoder)
+                self = .unexpected(unknownValue)
+            }
         }
-    }
 
-    public func hash(into hasher: inout Hasher) {
-        switch self {
-        case .appBskyAgeassuranceDefsConfigRegionRuleDefault(let value):
-            hasher.combine("app.bsky.ageassurance.defs#configRegionRuleDefault")
-            hasher.combine(value)
-        case .appBskyAgeassuranceDefsConfigRegionRuleIfDeclaredOverAge(let value):
-            hasher.combine("app.bsky.ageassurance.defs#configRegionRuleIfDeclaredOverAge")
-            hasher.combine(value)
-        case .appBskyAgeassuranceDefsConfigRegionRuleIfDeclaredUnderAge(let value):
-            hasher.combine("app.bsky.ageassurance.defs#configRegionRuleIfDeclaredUnderAge")
-            hasher.combine(value)
-        case .appBskyAgeassuranceDefsConfigRegionRuleIfAssuredOverAge(let value):
-            hasher.combine("app.bsky.ageassurance.defs#configRegionRuleIfAssuredOverAge")
-            hasher.combine(value)
-        case .appBskyAgeassuranceDefsConfigRegionRuleIfAssuredUnderAge(let value):
-            hasher.combine("app.bsky.ageassurance.defs#configRegionRuleIfAssuredUnderAge")
-            hasher.combine(value)
-        case .appBskyAgeassuranceDefsConfigRegionRuleIfAccountNewerThan(let value):
-            hasher.combine("app.bsky.ageassurance.defs#configRegionRuleIfAccountNewerThan")
-            hasher.combine(value)
-        case .appBskyAgeassuranceDefsConfigRegionRuleIfAccountOlderThan(let value):
-            hasher.combine("app.bsky.ageassurance.defs#configRegionRuleIfAccountOlderThan")
-            hasher.combine(value)
-        case .unexpected(let container):
-            hasher.combine("unexpected")
-            hasher.combine(container)
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            switch self {
+            case let .appBskyAgeassuranceDefsConfigRegionRuleDefault(value):
+                try container.encode("app.bsky.ageassurance.defs#configRegionRuleDefault", forKey: .type)
+                try value.encode(to: encoder)
+            case let .appBskyAgeassuranceDefsConfigRegionRuleIfDeclaredOverAge(value):
+                try container.encode("app.bsky.ageassurance.defs#configRegionRuleIfDeclaredOverAge", forKey: .type)
+                try value.encode(to: encoder)
+            case let .appBskyAgeassuranceDefsConfigRegionRuleIfDeclaredUnderAge(value):
+                try container.encode("app.bsky.ageassurance.defs#configRegionRuleIfDeclaredUnderAge", forKey: .type)
+                try value.encode(to: encoder)
+            case let .appBskyAgeassuranceDefsConfigRegionRuleIfAssuredOverAge(value):
+                try container.encode("app.bsky.ageassurance.defs#configRegionRuleIfAssuredOverAge", forKey: .type)
+                try value.encode(to: encoder)
+            case let .appBskyAgeassuranceDefsConfigRegionRuleIfAssuredUnderAge(value):
+                try container.encode("app.bsky.ageassurance.defs#configRegionRuleIfAssuredUnderAge", forKey: .type)
+                try value.encode(to: encoder)
+            case let .appBskyAgeassuranceDefsConfigRegionRuleIfAccountNewerThan(value):
+                try container.encode("app.bsky.ageassurance.defs#configRegionRuleIfAccountNewerThan", forKey: .type)
+                try value.encode(to: encoder)
+            case let .appBskyAgeassuranceDefsConfigRegionRuleIfAccountOlderThan(value):
+                try container.encode("app.bsky.ageassurance.defs#configRegionRuleIfAccountOlderThan", forKey: .type)
+                try value.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
+            }
         }
-    }
 
-    private enum CodingKeys: String, CodingKey {
-        case type = "$type"
-    }
-    
-    public static func == (lhs: ConfigRegionRulesUnion, rhs: ConfigRegionRulesUnion) -> Bool {
-        switch (lhs, rhs) {
-        case (.appBskyAgeassuranceDefsConfigRegionRuleDefault(let lhsValue),
-              .appBskyAgeassuranceDefsConfigRegionRuleDefault(let rhsValue)):
-            return lhsValue == rhsValue
-        case (.appBskyAgeassuranceDefsConfigRegionRuleIfDeclaredOverAge(let lhsValue),
-              .appBskyAgeassuranceDefsConfigRegionRuleIfDeclaredOverAge(let rhsValue)):
-            return lhsValue == rhsValue
-        case (.appBskyAgeassuranceDefsConfigRegionRuleIfDeclaredUnderAge(let lhsValue),
-              .appBskyAgeassuranceDefsConfigRegionRuleIfDeclaredUnderAge(let rhsValue)):
-            return lhsValue == rhsValue
-        case (.appBskyAgeassuranceDefsConfigRegionRuleIfAssuredOverAge(let lhsValue),
-              .appBskyAgeassuranceDefsConfigRegionRuleIfAssuredOverAge(let rhsValue)):
-            return lhsValue == rhsValue
-        case (.appBskyAgeassuranceDefsConfigRegionRuleIfAssuredUnderAge(let lhsValue),
-              .appBskyAgeassuranceDefsConfigRegionRuleIfAssuredUnderAge(let rhsValue)):
-            return lhsValue == rhsValue
-        case (.appBskyAgeassuranceDefsConfigRegionRuleIfAccountNewerThan(let lhsValue),
-              .appBskyAgeassuranceDefsConfigRegionRuleIfAccountNewerThan(let rhsValue)):
-            return lhsValue == rhsValue
-        case (.appBskyAgeassuranceDefsConfigRegionRuleIfAccountOlderThan(let lhsValue),
-              .appBskyAgeassuranceDefsConfigRegionRuleIfAccountOlderThan(let rhsValue)):
-            return lhsValue == rhsValue
-        case (.unexpected(let lhsValue), .unexpected(let rhsValue)):
-            return lhsValue.isEqual(to: rhsValue)
-        default:
-            return false
+        public func hash(into hasher: inout Hasher) {
+            switch self {
+            case let .appBskyAgeassuranceDefsConfigRegionRuleDefault(value):
+                hasher.combine("app.bsky.ageassurance.defs#configRegionRuleDefault")
+                hasher.combine(value)
+            case let .appBskyAgeassuranceDefsConfigRegionRuleIfDeclaredOverAge(value):
+                hasher.combine("app.bsky.ageassurance.defs#configRegionRuleIfDeclaredOverAge")
+                hasher.combine(value)
+            case let .appBskyAgeassuranceDefsConfigRegionRuleIfDeclaredUnderAge(value):
+                hasher.combine("app.bsky.ageassurance.defs#configRegionRuleIfDeclaredUnderAge")
+                hasher.combine(value)
+            case let .appBskyAgeassuranceDefsConfigRegionRuleIfAssuredOverAge(value):
+                hasher.combine("app.bsky.ageassurance.defs#configRegionRuleIfAssuredOverAge")
+                hasher.combine(value)
+            case let .appBskyAgeassuranceDefsConfigRegionRuleIfAssuredUnderAge(value):
+                hasher.combine("app.bsky.ageassurance.defs#configRegionRuleIfAssuredUnderAge")
+                hasher.combine(value)
+            case let .appBskyAgeassuranceDefsConfigRegionRuleIfAccountNewerThan(value):
+                hasher.combine("app.bsky.ageassurance.defs#configRegionRuleIfAccountNewerThan")
+                hasher.combine(value)
+            case let .appBskyAgeassuranceDefsConfigRegionRuleIfAccountOlderThan(value):
+                hasher.combine("app.bsky.ageassurance.defs#configRegionRuleIfAccountOlderThan")
+                hasher.combine(value)
+            case let .unexpected(container):
+                hasher.combine("unexpected")
+                hasher.combine(container)
+            }
         }
-    }
-    
-    public func isEqual(to other: any ATProtocolValue) -> Bool {
-        guard let other = other as? ConfigRegionRulesUnion else { return false }
-        return self == other
-    }
-    
-    // DAGCBOR encoding with field ordering
-    public func toCBORValue() throws -> Any {
-        // Create an ordered map to maintain field order
-        var map = OrderedCBORMap()
-        
-        switch self {
-        case .appBskyAgeassuranceDefsConfigRegionRuleDefault(let value):
-            map = map.adding(key: "$type", value: "app.bsky.ageassurance.defs#configRegionRuleDefault")
-            
-            let valueDict = try value.toCBORValue()
 
-            // If the value is already an OrderedCBORMap, merge its entries
-            if let orderedMap = valueDict as? OrderedCBORMap {
-                for (key, value) in orderedMap.entries where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
-            } else if let dict = valueDict as? [String: Any] {
-                // Otherwise add each key-value pair from the dictionary
-                for (key, value) in dict where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
-            }
-            return map
-        case .appBskyAgeassuranceDefsConfigRegionRuleIfDeclaredOverAge(let value):
-            map = map.adding(key: "$type", value: "app.bsky.ageassurance.defs#configRegionRuleIfDeclaredOverAge")
-            
-            let valueDict = try value.toCBORValue()
+        private enum CodingKeys: String, CodingKey {
+            case type = "$type"
+        }
 
-            // If the value is already an OrderedCBORMap, merge its entries
-            if let orderedMap = valueDict as? OrderedCBORMap {
-                for (key, value) in orderedMap.entries where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
-            } else if let dict = valueDict as? [String: Any] {
-                // Otherwise add each key-value pair from the dictionary
-                for (key, value) in dict where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
+        public static func == (lhs: ConfigRegionRulesUnion, rhs: ConfigRegionRulesUnion) -> Bool {
+            switch (lhs, rhs) {
+            case let (
+                .appBskyAgeassuranceDefsConfigRegionRuleDefault(lhsValue),
+                .appBskyAgeassuranceDefsConfigRegionRuleDefault(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .appBskyAgeassuranceDefsConfigRegionRuleIfDeclaredOverAge(lhsValue),
+                .appBskyAgeassuranceDefsConfigRegionRuleIfDeclaredOverAge(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .appBskyAgeassuranceDefsConfigRegionRuleIfDeclaredUnderAge(lhsValue),
+                .appBskyAgeassuranceDefsConfigRegionRuleIfDeclaredUnderAge(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .appBskyAgeassuranceDefsConfigRegionRuleIfAssuredOverAge(lhsValue),
+                .appBskyAgeassuranceDefsConfigRegionRuleIfAssuredOverAge(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .appBskyAgeassuranceDefsConfigRegionRuleIfAssuredUnderAge(lhsValue),
+                .appBskyAgeassuranceDefsConfigRegionRuleIfAssuredUnderAge(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .appBskyAgeassuranceDefsConfigRegionRuleIfAccountNewerThan(lhsValue),
+                .appBskyAgeassuranceDefsConfigRegionRuleIfAccountNewerThan(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .appBskyAgeassuranceDefsConfigRegionRuleIfAccountOlderThan(lhsValue),
+                .appBskyAgeassuranceDefsConfigRegionRuleIfAccountOlderThan(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
+            default:
+                return false
             }
-            return map
-        case .appBskyAgeassuranceDefsConfigRegionRuleIfDeclaredUnderAge(let value):
-            map = map.adding(key: "$type", value: "app.bsky.ageassurance.defs#configRegionRuleIfDeclaredUnderAge")
-            
-            let valueDict = try value.toCBORValue()
+        }
 
-            // If the value is already an OrderedCBORMap, merge its entries
-            if let orderedMap = valueDict as? OrderedCBORMap {
-                for (key, value) in orderedMap.entries where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
-            } else if let dict = valueDict as? [String: Any] {
-                // Otherwise add each key-value pair from the dictionary
-                for (key, value) in dict where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
-            }
-            return map
-        case .appBskyAgeassuranceDefsConfigRegionRuleIfAssuredOverAge(let value):
-            map = map.adding(key: "$type", value: "app.bsky.ageassurance.defs#configRegionRuleIfAssuredOverAge")
-            
-            let valueDict = try value.toCBORValue()
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? ConfigRegionRulesUnion else { return false }
+            return self == other
+        }
 
-            // If the value is already an OrderedCBORMap, merge its entries
-            if let orderedMap = valueDict as? OrderedCBORMap {
-                for (key, value) in orderedMap.entries where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
-            } else if let dict = valueDict as? [String: Any] {
-                // Otherwise add each key-value pair from the dictionary
-                for (key, value) in dict where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
-            }
-            return map
-        case .appBskyAgeassuranceDefsConfigRegionRuleIfAssuredUnderAge(let value):
-            map = map.adding(key: "$type", value: "app.bsky.ageassurance.defs#configRegionRuleIfAssuredUnderAge")
-            
-            let valueDict = try value.toCBORValue()
+        /// DAGCBOR encoding with field ordering
+        public func toCBORValue() throws -> Any {
+            // Create an ordered map to maintain field order
+            var map = OrderedCBORMap()
 
-            // If the value is already an OrderedCBORMap, merge its entries
-            if let orderedMap = valueDict as? OrderedCBORMap {
-                for (key, value) in orderedMap.entries where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
-            } else if let dict = valueDict as? [String: Any] {
-                // Otherwise add each key-value pair from the dictionary
-                for (key, value) in dict where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
-            }
-            return map
-        case .appBskyAgeassuranceDefsConfigRegionRuleIfAccountNewerThan(let value):
-            map = map.adding(key: "$type", value: "app.bsky.ageassurance.defs#configRegionRuleIfAccountNewerThan")
-            
-            let valueDict = try value.toCBORValue()
+            switch self {
+            case let .appBskyAgeassuranceDefsConfigRegionRuleDefault(value):
+                map = map.adding(key: "$type", value: "app.bsky.ageassurance.defs#configRegionRuleDefault")
 
-            // If the value is already an OrderedCBORMap, merge its entries
-            if let orderedMap = valueDict as? OrderedCBORMap {
-                for (key, value) in orderedMap.entries where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
-            } else if let dict = valueDict as? [String: Any] {
-                // Otherwise add each key-value pair from the dictionary
-                for (key, value) in dict where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
-            }
-            return map
-        case .appBskyAgeassuranceDefsConfigRegionRuleIfAccountOlderThan(let value):
-            map = map.adding(key: "$type", value: "app.bsky.ageassurance.defs#configRegionRuleIfAccountOlderThan")
-            
-            let valueDict = try value.toCBORValue()
+                let valueDict = try value.toCBORValue()
 
-            // If the value is already an OrderedCBORMap, merge its entries
-            if let orderedMap = valueDict as? OrderedCBORMap {
-                for (key, value) in orderedMap.entries where key != "$type" {
-                    map = map.adding(key: key, value: value)
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
                 }
-            } else if let dict = valueDict as? [String: Any] {
-                // Otherwise add each key-value pair from the dictionary
-                for (key, value) in dict where key != "$type" {
-                    map = map.adding(key: key, value: value)
+                return map
+            case let .appBskyAgeassuranceDefsConfigRegionRuleIfDeclaredOverAge(value):
+                map = map.adding(key: "$type", value: "app.bsky.ageassurance.defs#configRegionRuleIfDeclaredOverAge")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
                 }
+                return map
+            case let .appBskyAgeassuranceDefsConfigRegionRuleIfDeclaredUnderAge(value):
+                map = map.adding(key: "$type", value: "app.bsky.ageassurance.defs#configRegionRuleIfDeclaredUnderAge")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .appBskyAgeassuranceDefsConfigRegionRuleIfAssuredOverAge(value):
+                map = map.adding(key: "$type", value: "app.bsky.ageassurance.defs#configRegionRuleIfAssuredOverAge")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .appBskyAgeassuranceDefsConfigRegionRuleIfAssuredUnderAge(value):
+                map = map.adding(key: "$type", value: "app.bsky.ageassurance.defs#configRegionRuleIfAssuredUnderAge")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .appBskyAgeassuranceDefsConfigRegionRuleIfAccountNewerThan(value):
+                map = map.adding(key: "$type", value: "app.bsky.ageassurance.defs#configRegionRuleIfAccountNewerThan")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .appBskyAgeassuranceDefsConfigRegionRuleIfAccountOlderThan(value):
+                map = map.adding(key: "$type", value: "app.bsky.ageassurance.defs#configRegionRuleIfAccountOlderThan")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .unexpected(container):
+                return try container.toCBORValue()
             }
-            return map
-        case .unexpected(let container):
-            return try container.toCBORValue()
         }
     }
 }
-
-
-}
-
-
-                           
-

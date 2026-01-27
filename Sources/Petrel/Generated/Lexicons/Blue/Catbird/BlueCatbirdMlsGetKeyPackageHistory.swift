@@ -1,24 +1,20 @@
 import Foundation
 
-
-
 // lexicon: 1, id: blue.catbird.mls.getKeyPackageHistory
 
-
-public struct BlueCatbirdMlsGetKeyPackageHistory { 
-
+public enum BlueCatbirdMlsGetKeyPackageHistory {
     public static let typeIdentifier = "blue.catbird.mls.getKeyPackageHistory"
-        
-public struct KeyPackageHistoryEntry: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "blue.catbird.mls.getKeyPackageHistory#keyPackageHistoryEntry"
-            public let packageId: String
-            public let createdAt: ATProtocolDate
-            public let consumedAt: ATProtocolDate?
-            public let consumedForConvo: String?
-            public let consumedForConvoName: String?
-            public let consumedByDevice: String?
-            public let deviceId: String?
-            public let cipherSuite: String
+
+    public struct KeyPackageHistoryEntry: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "blue.catbird.mls.getKeyPackageHistory#keyPackageHistoryEntry"
+        public let packageId: String
+        public let createdAt: ATProtocolDate
+        public let consumedAt: ATProtocolDate?
+        public let consumedForConvo: String?
+        public let consumedForConvoName: String?
+        public let consumedByDevice: String?
+        public let deviceId: String?
+        public let cipherSuite: String
 
         public init(
             packageId: String, createdAt: ATProtocolDate, consumedAt: ATProtocolDate?, consumedForConvo: String?, consumedForConvoName: String?, consumedByDevice: String?, deviceId: String?, cipherSuite: String
@@ -36,49 +32,49 @@ public struct KeyPackageHistoryEntry: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.packageId = try container.decode(String.self, forKey: .packageId)
+                packageId = try container.decode(String.self, forKey: .packageId)
             } catch {
                 LogManager.logError("Decoding error for required property 'packageId': \(error)")
                 throw error
             }
             do {
-                self.createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
             } catch {
                 LogManager.logError("Decoding error for required property 'createdAt': \(error)")
                 throw error
             }
             do {
-                self.consumedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .consumedAt)
+                consumedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .consumedAt)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'consumedAt': \(error)")
                 throw error
             }
             do {
-                self.consumedForConvo = try container.decodeIfPresent(String.self, forKey: .consumedForConvo)
+                consumedForConvo = try container.decodeIfPresent(String.self, forKey: .consumedForConvo)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'consumedForConvo': \(error)")
                 throw error
             }
             do {
-                self.consumedForConvoName = try container.decodeIfPresent(String.self, forKey: .consumedForConvoName)
+                consumedForConvoName = try container.decodeIfPresent(String.self, forKey: .consumedForConvoName)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'consumedForConvoName': \(error)")
                 throw error
             }
             do {
-                self.consumedByDevice = try container.decodeIfPresent(String.self, forKey: .consumedByDevice)
+                consumedByDevice = try container.decodeIfPresent(String.self, forKey: .consumedByDevice)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'consumedByDevice': \(error)")
                 throw error
             }
             do {
-                self.deviceId = try container.decodeIfPresent(String.self, forKey: .deviceId)
+                deviceId = try container.decodeIfPresent(String.self, forKey: .deviceId)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'deviceId': \(error)")
                 throw error
             }
             do {
-                self.cipherSuite = try container.decode(String.self, forKey: .cipherSuite)
+                cipherSuite = try container.decode(String.self, forKey: .cipherSuite)
             } catch {
                 LogManager.logError("Decoding error for required property 'cipherSuite': \(error)")
                 throw error
@@ -205,127 +201,91 @@ public struct KeyPackageHistoryEntry: ATProtocolCodable, ATProtocolValue {
             case deviceId
             case cipherSuite
         }
-    }    
-public struct Parameters: Parametrizable {
+    }
+
+    public struct Parameters: Parametrizable {
         public let limit: Int?
         public let cursor: String?
-        
+
         public init(
-            limit: Int? = nil, 
+            limit: Int? = nil,
             cursor: String? = nil
-            ) {
+        ) {
             self.limit = limit
             self.cursor = cursor
-            
         }
     }
-    
-public struct Output: ATProtocolCodable {
-        
-        
+
+    public struct Output: ATProtocolCodable {
         public let history: [KeyPackageHistoryEntry]
-        
+
         public let cursor: String?
-        
-        
-        
-        // Standard public initializer
+
+        /// Standard public initializer
         public init(
-            
-            
             history: [KeyPackageHistoryEntry],
-            
+
             cursor: String? = nil
-            
-            
+
         ) {
-            
-            
             self.history = history
-            
+
             self.cursor = cursor
-            
-            
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
-            self.history = try container.decode([KeyPackageHistoryEntry].self, forKey: .history)
-            
-            
-            self.cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
-            
-            
+
+            history = try container.decode([KeyPackageHistoryEntry].self, forKey: .history)
+
+            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(history, forKey: .history)
-            
-            
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(cursor, forKey: .cursor)
-            
-            
         }
 
         public func toCBORValue() throws -> Any {
-            
             var map = OrderedCBORMap()
 
-            
-            
             let historyValue = try history.toCBORValue()
             map = map.adding(key: "history", value: historyValue)
-            
-            
-            
+
             if let value = cursor {
                 // Encode optional property even if it's an empty array for CBOR
                 let cursorValue = try value.toCBORValue()
                 map = map.adding(key: "cursor", value: cursorValue)
             }
-            
-            
 
             return map
-            
         }
-        
-        
+
         private enum CodingKeys: String, CodingKey {
             case history
             case cursor
         }
-        
     }
-
-
-
-
 }
 
-
-
-extension ATProtoClient.Blue.Catbird.Mls {
+public extension ATProtoClient.Blue.Catbird.Mls {
     // MARK: - getKeyPackageHistory
 
     /// Get key package consumption history for the authenticated user
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func getKeyPackageHistory(input: BlueCatbirdMlsGetKeyPackageHistory.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsGetKeyPackageHistory.Output?) {
+    func getKeyPackageHistory(input: BlueCatbirdMlsGetKeyPackageHistory.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsGetKeyPackageHistory.Output?) {
         let endpoint = "blue.catbird.mls.getKeyPackageHistory"
 
-        
         let queryItems = input.asQueryItems()
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -349,12 +309,11 @@ extension ATProtoClient.Blue.Catbird.Mls {
         }
 
         // Only decode response data if request was successful
-        if (200...299).contains(responseCode) {
+        if (200 ... 299).contains(responseCode) {
             do {
-                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsGetKeyPackageHistory.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -362,12 +321,9 @@ extension ATProtoClient.Blue.Catbird.Mls {
                 return (responseCode, nil)
             }
         } else {
-            
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-                           
-
