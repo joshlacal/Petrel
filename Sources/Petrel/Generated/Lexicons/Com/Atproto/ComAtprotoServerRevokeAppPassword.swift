@@ -1,25 +1,20 @@
 import Foundation
 
-
-
 // lexicon: 1, id: com.atproto.server.revokeAppPassword
 
-
-public struct ComAtprotoServerRevokeAppPassword { 
-
+public enum ComAtprotoServerRevokeAppPassword {
     public static let typeIdentifier = "com.atproto.server.revokeAppPassword"
-public struct Input: ATProtocolCodable {
+    public struct Input: ATProtocolCodable {
         public let name: String
 
         /// Standard public initializer
         public init(name: String) {
             self.name = name
         }
-        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.name = try container.decode(String.self, forKey: .name)
+            name = try container.decode(String.self, forKey: .name)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -38,33 +33,26 @@ public struct Input: ATProtocolCodable {
             case name
         }
     }
-
-
-
 }
 
-extension ATProtoClient.Com.Atproto.Server {
+public extension ATProtoClient.Com.Atproto.Server {
     // MARK: - revokeAppPassword
 
     /// Revoke an App Password by name.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func revokeAppPassword(
-        
+    func revokeAppPassword(
         input: ComAtprotoServerRevokeAppPassword.Input
-        
+
     ) async throws -> Int {
         let endpoint = "com.atproto.server.revokeAppPassword"
-        
+
         var headers: [String: String] = [:]
-        
+
         headers["Content-Type"] = "application/json"
-        
-        
-        
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -79,13 +67,6 @@ extension ATProtoClient.Com.Atproto.Server {
         let serviceDID = await networkService.getServiceDID(for: "com.atproto.server.revokeAppPassword")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
         let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        let responseCode = response.statusCode
-
-        
-        return responseCode
-        
+        return response.statusCode
     }
-    
 }
-                           
-

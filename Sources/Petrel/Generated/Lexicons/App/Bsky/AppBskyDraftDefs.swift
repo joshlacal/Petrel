@@ -1,18 +1,14 @@
 import Foundation
 
-
-
 // lexicon: 1, id: app.bsky.draft.defs
 
-
-public struct AppBskyDraftDefs { 
-
+public enum AppBskyDraftDefs {
     public static let typeIdentifier = "app.bsky.draft.defs"
-        
-public struct DraftWithId: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.draft.defs#draftWithId"
-            public let id: TID
-            public let draft: Draft
+
+    public struct DraftWithId: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.draft.defs#draftWithId"
+        public let id: TID
+        public let draft: Draft
 
         public init(
             id: TID, draft: Draft
@@ -24,13 +20,13 @@ public struct DraftWithId: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.id = try container.decode(TID.self, forKey: .id)
+                id = try container.decode(TID.self, forKey: .id)
             } catch {
                 LogManager.logError("Decoding error for required property 'id': \(error)")
                 throw error
             }
             do {
-                self.draft = try container.decode(Draft.self, forKey: .draft)
+                draft = try container.decode(Draft.self, forKey: .draft)
             } catch {
                 LogManager.logError("Decoding error for required property 'draft': \(error)")
                 throw error
@@ -80,13 +76,13 @@ public struct DraftWithId: ATProtocolCodable, ATProtocolValue {
             case draft
         }
     }
-        
-public struct Draft: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.draft.defs#draft"
-            public let posts: [DraftPost]
-            public let langs: [LanguageCodeContainer]?
-            public let postgateEmbeddingRules: [DraftPostgateEmbeddingRulesUnion]?
-            public let threadgateAllow: [DraftThreadgateAllowUnion]?
+
+    public struct Draft: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.draft.defs#draft"
+        public let posts: [DraftPost]
+        public let langs: [LanguageCodeContainer]?
+        public let postgateEmbeddingRules: [DraftPostgateEmbeddingRulesUnion]?
+        public let threadgateAllow: [DraftThreadgateAllowUnion]?
 
         public init(
             posts: [DraftPost], langs: [LanguageCodeContainer]?, postgateEmbeddingRules: [DraftPostgateEmbeddingRulesUnion]?, threadgateAllow: [DraftThreadgateAllowUnion]?
@@ -100,25 +96,25 @@ public struct Draft: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.posts = try container.decode([DraftPost].self, forKey: .posts)
+                posts = try container.decode([DraftPost].self, forKey: .posts)
             } catch {
                 LogManager.logError("Decoding error for required property 'posts': \(error)")
                 throw error
             }
             do {
-                self.langs = try container.decodeIfPresent([LanguageCodeContainer].self, forKey: .langs)
+                langs = try container.decodeIfPresent([LanguageCodeContainer].self, forKey: .langs)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'langs': \(error)")
                 throw error
             }
             do {
-                self.postgateEmbeddingRules = try container.decodeIfPresent([DraftPostgateEmbeddingRulesUnion].self, forKey: .postgateEmbeddingRules)
+                postgateEmbeddingRules = try container.decodeIfPresent([DraftPostgateEmbeddingRulesUnion].self, forKey: .postgateEmbeddingRules)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'postgateEmbeddingRules': \(error)")
                 throw error
             }
             do {
-                self.threadgateAllow = try container.decodeIfPresent([DraftThreadgateAllowUnion].self, forKey: .threadgateAllow)
+                threadgateAllow = try container.decodeIfPresent([DraftThreadgateAllowUnion].self, forKey: .threadgateAllow)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'threadgateAllow': \(error)")
                 throw error
@@ -202,15 +198,15 @@ public struct Draft: ATProtocolCodable, ATProtocolValue {
             case threadgateAllow
         }
     }
-        
-public struct DraftPost: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.draft.defs#draftPost"
-            public let text: String
-            public let labels: DraftPostLabelsUnion?
-            public let embedImages: [DraftEmbedImage]?
-            public let embedVideos: [DraftEmbedVideo]?
-            public let embedExternals: [DraftEmbedExternal]?
-            public let embedRecords: [DraftEmbedRecord]?
+
+    public struct DraftPost: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.draft.defs#draftPost"
+        public let text: String
+        public let labels: DraftPostLabelsUnion?
+        public let embedImages: [DraftEmbedImage]?
+        public let embedVideos: [DraftEmbedVideo]?
+        public let embedExternals: [DraftEmbedExternal]?
+        public let embedRecords: [DraftEmbedRecord]?
 
         public init(
             text: String, labels: DraftPostLabelsUnion?, embedImages: [DraftEmbedImage]?, embedVideos: [DraftEmbedVideo]?, embedExternals: [DraftEmbedExternal]?, embedRecords: [DraftEmbedRecord]?
@@ -226,37 +222,37 @@ public struct DraftPost: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.text = try container.decode(String.self, forKey: .text)
+                text = try container.decode(String.self, forKey: .text)
             } catch {
                 LogManager.logError("Decoding error for required property 'text': \(error)")
                 throw error
             }
             do {
-                self.labels = try container.decodeIfPresent(DraftPostLabelsUnion.self, forKey: .labels)
+                labels = try container.decodeIfPresent(DraftPostLabelsUnion.self, forKey: .labels)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'labels': \(error)")
                 throw error
             }
             do {
-                self.embedImages = try container.decodeIfPresent([DraftEmbedImage].self, forKey: .embedImages)
+                embedImages = try container.decodeIfPresent([DraftEmbedImage].self, forKey: .embedImages)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'embedImages': \(error)")
                 throw error
             }
             do {
-                self.embedVideos = try container.decodeIfPresent([DraftEmbedVideo].self, forKey: .embedVideos)
+                embedVideos = try container.decodeIfPresent([DraftEmbedVideo].self, forKey: .embedVideos)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'embedVideos': \(error)")
                 throw error
             }
             do {
-                self.embedExternals = try container.decodeIfPresent([DraftEmbedExternal].self, forKey: .embedExternals)
+                embedExternals = try container.decodeIfPresent([DraftEmbedExternal].self, forKey: .embedExternals)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'embedExternals': \(error)")
                 throw error
             }
             do {
-                self.embedRecords = try container.decodeIfPresent([DraftEmbedRecord].self, forKey: .embedRecords)
+                embedRecords = try container.decodeIfPresent([DraftEmbedRecord].self, forKey: .embedRecords)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'embedRecords': \(error)")
                 throw error
@@ -368,13 +364,13 @@ public struct DraftPost: ATProtocolCodable, ATProtocolValue {
             case embedRecords
         }
     }
-        
-public struct DraftView: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.draft.defs#draftView"
-            public let id: TID
-            public let draft: Draft
-            public let createdAt: ATProtocolDate
-            public let updatedAt: ATProtocolDate
+
+    public struct DraftView: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.draft.defs#draftView"
+        public let id: TID
+        public let draft: Draft
+        public let createdAt: ATProtocolDate
+        public let updatedAt: ATProtocolDate
 
         public init(
             id: TID, draft: Draft, createdAt: ATProtocolDate, updatedAt: ATProtocolDate
@@ -388,25 +384,25 @@ public struct DraftView: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.id = try container.decode(TID.self, forKey: .id)
+                id = try container.decode(TID.self, forKey: .id)
             } catch {
                 LogManager.logError("Decoding error for required property 'id': \(error)")
                 throw error
             }
             do {
-                self.draft = try container.decode(Draft.self, forKey: .draft)
+                draft = try container.decode(Draft.self, forKey: .draft)
             } catch {
                 LogManager.logError("Decoding error for required property 'draft': \(error)")
                 throw error
             }
             do {
-                self.createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
             } catch {
                 LogManager.logError("Decoding error for required property 'createdAt': \(error)")
                 throw error
             }
             do {
-                self.updatedAt = try container.decode(ATProtocolDate.self, forKey: .updatedAt)
+                updatedAt = try container.decode(ATProtocolDate.self, forKey: .updatedAt)
             } catch {
                 LogManager.logError("Decoding error for required property 'updatedAt': \(error)")
                 throw error
@@ -472,10 +468,10 @@ public struct DraftView: ATProtocolCodable, ATProtocolValue {
             case updatedAt
         }
     }
-        
-public struct DraftEmbedLocalRef: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.draft.defs#draftEmbedLocalRef"
-            public let path: String
+
+    public struct DraftEmbedLocalRef: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.draft.defs#draftEmbedLocalRef"
+        public let path: String
 
         public init(
             path: String
@@ -486,7 +482,7 @@ public struct DraftEmbedLocalRef: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.path = try container.decode(String.self, forKey: .path)
+                path = try container.decode(String.self, forKey: .path)
             } catch {
                 LogManager.logError("Decoding error for required property 'path': \(error)")
                 throw error
@@ -528,11 +524,11 @@ public struct DraftEmbedLocalRef: ATProtocolCodable, ATProtocolValue {
             case path
         }
     }
-        
-public struct DraftEmbedCaption: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.draft.defs#draftEmbedCaption"
-            public let lang: LanguageCodeContainer
-            public let content: String
+
+    public struct DraftEmbedCaption: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.draft.defs#draftEmbedCaption"
+        public let lang: LanguageCodeContainer
+        public let content: String
 
         public init(
             lang: LanguageCodeContainer, content: String
@@ -544,13 +540,13 @@ public struct DraftEmbedCaption: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.lang = try container.decode(LanguageCodeContainer.self, forKey: .lang)
+                lang = try container.decode(LanguageCodeContainer.self, forKey: .lang)
             } catch {
                 LogManager.logError("Decoding error for required property 'lang': \(error)")
                 throw error
             }
             do {
-                self.content = try container.decode(String.self, forKey: .content)
+                content = try container.decode(String.self, forKey: .content)
             } catch {
                 LogManager.logError("Decoding error for required property 'content': \(error)")
                 throw error
@@ -600,11 +596,11 @@ public struct DraftEmbedCaption: ATProtocolCodable, ATProtocolValue {
             case content
         }
     }
-        
-public struct DraftEmbedImage: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.draft.defs#draftEmbedImage"
-            public let localRef: DraftEmbedLocalRef
-            public let alt: String?
+
+    public struct DraftEmbedImage: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.draft.defs#draftEmbedImage"
+        public let localRef: DraftEmbedLocalRef
+        public let alt: String?
 
         public init(
             localRef: DraftEmbedLocalRef, alt: String?
@@ -616,13 +612,13 @@ public struct DraftEmbedImage: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.localRef = try container.decode(DraftEmbedLocalRef.self, forKey: .localRef)
+                localRef = try container.decode(DraftEmbedLocalRef.self, forKey: .localRef)
             } catch {
                 LogManager.logError("Decoding error for required property 'localRef': \(error)")
                 throw error
             }
             do {
-                self.alt = try container.decodeIfPresent(String.self, forKey: .alt)
+                alt = try container.decodeIfPresent(String.self, forKey: .alt)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'alt': \(error)")
                 throw error
@@ -678,12 +674,12 @@ public struct DraftEmbedImage: ATProtocolCodable, ATProtocolValue {
             case alt
         }
     }
-        
-public struct DraftEmbedVideo: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.draft.defs#draftEmbedVideo"
-            public let localRef: DraftEmbedLocalRef
-            public let alt: String?
-            public let captions: [DraftEmbedCaption]?
+
+    public struct DraftEmbedVideo: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.draft.defs#draftEmbedVideo"
+        public let localRef: DraftEmbedLocalRef
+        public let alt: String?
+        public let captions: [DraftEmbedCaption]?
 
         public init(
             localRef: DraftEmbedLocalRef, alt: String?, captions: [DraftEmbedCaption]?
@@ -696,19 +692,19 @@ public struct DraftEmbedVideo: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.localRef = try container.decode(DraftEmbedLocalRef.self, forKey: .localRef)
+                localRef = try container.decode(DraftEmbedLocalRef.self, forKey: .localRef)
             } catch {
                 LogManager.logError("Decoding error for required property 'localRef': \(error)")
                 throw error
             }
             do {
-                self.alt = try container.decodeIfPresent(String.self, forKey: .alt)
+                alt = try container.decodeIfPresent(String.self, forKey: .alt)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'alt': \(error)")
                 throw error
             }
             do {
-                self.captions = try container.decodeIfPresent([DraftEmbedCaption].self, forKey: .captions)
+                captions = try container.decodeIfPresent([DraftEmbedCaption].self, forKey: .captions)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'captions': \(error)")
                 throw error
@@ -778,10 +774,10 @@ public struct DraftEmbedVideo: ATProtocolCodable, ATProtocolValue {
             case captions
         }
     }
-        
-public struct DraftEmbedExternal: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.draft.defs#draftEmbedExternal"
-            public let uri: URI
+
+    public struct DraftEmbedExternal: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.draft.defs#draftEmbedExternal"
+        public let uri: URI
 
         public init(
             uri: URI
@@ -792,7 +788,7 @@ public struct DraftEmbedExternal: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.uri = try container.decode(URI.self, forKey: .uri)
+                uri = try container.decode(URI.self, forKey: .uri)
             } catch {
                 LogManager.logError("Decoding error for required property 'uri': \(error)")
                 throw error
@@ -834,10 +830,10 @@ public struct DraftEmbedExternal: ATProtocolCodable, ATProtocolValue {
             case uri
         }
     }
-        
-public struct DraftEmbedRecord: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.draft.defs#draftEmbedRecord"
-            public let record: ComAtprotoRepoStrongRef
+
+    public struct DraftEmbedRecord: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.draft.defs#draftEmbedRecord"
+        public let record: ComAtprotoRepoStrongRef
 
         public init(
             record: ComAtprotoRepoStrongRef
@@ -848,7 +844,7 @@ public struct DraftEmbedRecord: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.record = try container.decode(ComAtprotoRepoStrongRef.self, forKey: .record)
+                record = try container.decode(ComAtprotoRepoStrongRef.self, forKey: .record)
             } catch {
                 LogManager.logError("Decoding error for required property 'record': \(error)")
                 throw error
@@ -891,400 +887,399 @@ public struct DraftEmbedRecord: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-
-
-
-
-public enum DraftPostgateEmbeddingRulesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
-    case appBskyFeedPostgateDisableRule(AppBskyFeedPostgate.DisableRule)
-    case unexpected(ATProtocolValueContainer)
-    public init(_ value: AppBskyFeedPostgate.DisableRule) {
-        self = .appBskyFeedPostgateDisableRule(value)
-    }
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        let typeValue = try container.decode(String.self, forKey: .type)
-
-        switch typeValue {
-        case "app.bsky.feed.postgate#disableRule":
-            let value = try AppBskyFeedPostgate.DisableRule(from: decoder)
+    public enum DraftPostgateEmbeddingRulesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
+        case appBskyFeedPostgateDisableRule(AppBskyFeedPostgate.DisableRule)
+        case unexpected(ATProtocolValueContainer)
+        public init(_ value: AppBskyFeedPostgate.DisableRule) {
             self = .appBskyFeedPostgateDisableRule(value)
-        default:
-            let unknownValue = try ATProtocolValueContainer(from: decoder)
-            self = .unexpected(unknownValue)
         }
-    }
 
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let typeValue = try container.decode(String.self, forKey: .type)
 
-        switch self {
-        case .appBskyFeedPostgateDisableRule(let value):
-            try container.encode("app.bsky.feed.postgate#disableRule", forKey: .type)
-            try value.encode(to: encoder)
-        case .unexpected(let container):
-            try container.encode(to: encoder)
-        }
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        switch self {
-        case .appBskyFeedPostgateDisableRule(let value):
-            hasher.combine("app.bsky.feed.postgate#disableRule")
-            hasher.combine(value)
-        case .unexpected(let container):
-            hasher.combine("unexpected")
-            hasher.combine(container)
-        }
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case type = "$type"
-    }
-    
-    public static func == (lhs: DraftPostgateEmbeddingRulesUnion, rhs: DraftPostgateEmbeddingRulesUnion) -> Bool {
-        switch (lhs, rhs) {
-        case (.appBskyFeedPostgateDisableRule(let lhsValue),
-              .appBskyFeedPostgateDisableRule(let rhsValue)):
-            return lhsValue == rhsValue
-        case (.unexpected(let lhsValue), .unexpected(let rhsValue)):
-            return lhsValue.isEqual(to: rhsValue)
-        default:
-            return false
-        }
-    }
-    
-    public func isEqual(to other: any ATProtocolValue) -> Bool {
-        guard let other = other as? DraftPostgateEmbeddingRulesUnion else { return false }
-        return self == other
-    }
-    
-    // DAGCBOR encoding with field ordering
-    public func toCBORValue() throws -> Any {
-        // Create an ordered map to maintain field order
-        var map = OrderedCBORMap()
-        
-        switch self {
-        case .appBskyFeedPostgateDisableRule(let value):
-            map = map.adding(key: "$type", value: "app.bsky.feed.postgate#disableRule")
-            
-            let valueDict = try value.toCBORValue()
-
-            // If the value is already an OrderedCBORMap, merge its entries
-            if let orderedMap = valueDict as? OrderedCBORMap {
-                for (key, value) in orderedMap.entries where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
-            } else if let dict = valueDict as? [String: Any] {
-                // Otherwise add each key-value pair from the dictionary
-                for (key, value) in dict where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
+            switch typeValue {
+            case "app.bsky.feed.postgate#disableRule":
+                let value = try AppBskyFeedPostgate.DisableRule(from: decoder)
+                self = .appBskyFeedPostgateDisableRule(value)
+            default:
+                let unknownValue = try ATProtocolValueContainer(from: decoder)
+                self = .unexpected(unknownValue)
             }
-            return map
-        case .unexpected(let container):
-            return try container.toCBORValue()
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            switch self {
+            case let .appBskyFeedPostgateDisableRule(value):
+                try container.encode("app.bsky.feed.postgate#disableRule", forKey: .type)
+                try value.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
+            }
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            switch self {
+            case let .appBskyFeedPostgateDisableRule(value):
+                hasher.combine("app.bsky.feed.postgate#disableRule")
+                hasher.combine(value)
+            case let .unexpected(container):
+                hasher.combine("unexpected")
+                hasher.combine(container)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case type = "$type"
+        }
+
+        public static func == (lhs: DraftPostgateEmbeddingRulesUnion, rhs: DraftPostgateEmbeddingRulesUnion) -> Bool {
+            switch (lhs, rhs) {
+            case let (
+                .appBskyFeedPostgateDisableRule(lhsValue),
+                .appBskyFeedPostgateDisableRule(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
+            default:
+                return false
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? DraftPostgateEmbeddingRulesUnion else { return false }
+            return self == other
+        }
+
+        /// DAGCBOR encoding with field ordering
+        public func toCBORValue() throws -> Any {
+            // Create an ordered map to maintain field order
+            var map = OrderedCBORMap()
+
+            switch self {
+            case let .appBskyFeedPostgateDisableRule(value):
+                map = map.adding(key: "$type", value: "app.bsky.feed.postgate#disableRule")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .unexpected(container):
+                return try container.toCBORValue()
+            }
         }
     }
-}
 
-
-
-
-public enum DraftThreadgateAllowUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
-    case appBskyFeedThreadgateMentionRule(AppBskyFeedThreadgate.MentionRule)
-    case appBskyFeedThreadgateFollowerRule(AppBskyFeedThreadgate.FollowerRule)
-    case appBskyFeedThreadgateFollowingRule(AppBskyFeedThreadgate.FollowingRule)
-    case appBskyFeedThreadgateListRule(AppBskyFeedThreadgate.ListRule)
-    case unexpected(ATProtocolValueContainer)
-    public init(_ value: AppBskyFeedThreadgate.MentionRule) {
-        self = .appBskyFeedThreadgateMentionRule(value)
-    }
-    public init(_ value: AppBskyFeedThreadgate.FollowerRule) {
-        self = .appBskyFeedThreadgateFollowerRule(value)
-    }
-    public init(_ value: AppBskyFeedThreadgate.FollowingRule) {
-        self = .appBskyFeedThreadgateFollowingRule(value)
-    }
-    public init(_ value: AppBskyFeedThreadgate.ListRule) {
-        self = .appBskyFeedThreadgateListRule(value)
-    }
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        let typeValue = try container.decode(String.self, forKey: .type)
-
-        switch typeValue {
-        case "app.bsky.feed.threadgate#mentionRule":
-            let value = try AppBskyFeedThreadgate.MentionRule(from: decoder)
+    public enum DraftThreadgateAllowUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
+        case appBskyFeedThreadgateMentionRule(AppBskyFeedThreadgate.MentionRule)
+        case appBskyFeedThreadgateFollowerRule(AppBskyFeedThreadgate.FollowerRule)
+        case appBskyFeedThreadgateFollowingRule(AppBskyFeedThreadgate.FollowingRule)
+        case appBskyFeedThreadgateListRule(AppBskyFeedThreadgate.ListRule)
+        case unexpected(ATProtocolValueContainer)
+        public init(_ value: AppBskyFeedThreadgate.MentionRule) {
             self = .appBskyFeedThreadgateMentionRule(value)
-        case "app.bsky.feed.threadgate#followerRule":
-            let value = try AppBskyFeedThreadgate.FollowerRule(from: decoder)
+        }
+
+        public init(_ value: AppBskyFeedThreadgate.FollowerRule) {
             self = .appBskyFeedThreadgateFollowerRule(value)
-        case "app.bsky.feed.threadgate#followingRule":
-            let value = try AppBskyFeedThreadgate.FollowingRule(from: decoder)
+        }
+
+        public init(_ value: AppBskyFeedThreadgate.FollowingRule) {
             self = .appBskyFeedThreadgateFollowingRule(value)
-        case "app.bsky.feed.threadgate#listRule":
-            let value = try AppBskyFeedThreadgate.ListRule(from: decoder)
+        }
+
+        public init(_ value: AppBskyFeedThreadgate.ListRule) {
             self = .appBskyFeedThreadgateListRule(value)
-        default:
-            let unknownValue = try ATProtocolValueContainer(from: decoder)
-            self = .unexpected(unknownValue)
         }
-    }
 
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let typeValue = try container.decode(String.self, forKey: .type)
 
-        switch self {
-        case .appBskyFeedThreadgateMentionRule(let value):
-            try container.encode("app.bsky.feed.threadgate#mentionRule", forKey: .type)
-            try value.encode(to: encoder)
-        case .appBskyFeedThreadgateFollowerRule(let value):
-            try container.encode("app.bsky.feed.threadgate#followerRule", forKey: .type)
-            try value.encode(to: encoder)
-        case .appBskyFeedThreadgateFollowingRule(let value):
-            try container.encode("app.bsky.feed.threadgate#followingRule", forKey: .type)
-            try value.encode(to: encoder)
-        case .appBskyFeedThreadgateListRule(let value):
-            try container.encode("app.bsky.feed.threadgate#listRule", forKey: .type)
-            try value.encode(to: encoder)
-        case .unexpected(let container):
-            try container.encode(to: encoder)
-        }
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        switch self {
-        case .appBskyFeedThreadgateMentionRule(let value):
-            hasher.combine("app.bsky.feed.threadgate#mentionRule")
-            hasher.combine(value)
-        case .appBskyFeedThreadgateFollowerRule(let value):
-            hasher.combine("app.bsky.feed.threadgate#followerRule")
-            hasher.combine(value)
-        case .appBskyFeedThreadgateFollowingRule(let value):
-            hasher.combine("app.bsky.feed.threadgate#followingRule")
-            hasher.combine(value)
-        case .appBskyFeedThreadgateListRule(let value):
-            hasher.combine("app.bsky.feed.threadgate#listRule")
-            hasher.combine(value)
-        case .unexpected(let container):
-            hasher.combine("unexpected")
-            hasher.combine(container)
-        }
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case type = "$type"
-    }
-    
-    public static func == (lhs: DraftThreadgateAllowUnion, rhs: DraftThreadgateAllowUnion) -> Bool {
-        switch (lhs, rhs) {
-        case (.appBskyFeedThreadgateMentionRule(let lhsValue),
-              .appBskyFeedThreadgateMentionRule(let rhsValue)):
-            return lhsValue == rhsValue
-        case (.appBskyFeedThreadgateFollowerRule(let lhsValue),
-              .appBskyFeedThreadgateFollowerRule(let rhsValue)):
-            return lhsValue == rhsValue
-        case (.appBskyFeedThreadgateFollowingRule(let lhsValue),
-              .appBskyFeedThreadgateFollowingRule(let rhsValue)):
-            return lhsValue == rhsValue
-        case (.appBskyFeedThreadgateListRule(let lhsValue),
-              .appBskyFeedThreadgateListRule(let rhsValue)):
-            return lhsValue == rhsValue
-        case (.unexpected(let lhsValue), .unexpected(let rhsValue)):
-            return lhsValue.isEqual(to: rhsValue)
-        default:
-            return false
-        }
-    }
-    
-    public func isEqual(to other: any ATProtocolValue) -> Bool {
-        guard let other = other as? DraftThreadgateAllowUnion else { return false }
-        return self == other
-    }
-    
-    // DAGCBOR encoding with field ordering
-    public func toCBORValue() throws -> Any {
-        // Create an ordered map to maintain field order
-        var map = OrderedCBORMap()
-        
-        switch self {
-        case .appBskyFeedThreadgateMentionRule(let value):
-            map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#mentionRule")
-            
-            let valueDict = try value.toCBORValue()
-
-            // If the value is already an OrderedCBORMap, merge its entries
-            if let orderedMap = valueDict as? OrderedCBORMap {
-                for (key, value) in orderedMap.entries where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
-            } else if let dict = valueDict as? [String: Any] {
-                // Otherwise add each key-value pair from the dictionary
-                for (key, value) in dict where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
+            switch typeValue {
+            case "app.bsky.feed.threadgate#mentionRule":
+                let value = try AppBskyFeedThreadgate.MentionRule(from: decoder)
+                self = .appBskyFeedThreadgateMentionRule(value)
+            case "app.bsky.feed.threadgate#followerRule":
+                let value = try AppBskyFeedThreadgate.FollowerRule(from: decoder)
+                self = .appBskyFeedThreadgateFollowerRule(value)
+            case "app.bsky.feed.threadgate#followingRule":
+                let value = try AppBskyFeedThreadgate.FollowingRule(from: decoder)
+                self = .appBskyFeedThreadgateFollowingRule(value)
+            case "app.bsky.feed.threadgate#listRule":
+                let value = try AppBskyFeedThreadgate.ListRule(from: decoder)
+                self = .appBskyFeedThreadgateListRule(value)
+            default:
+                let unknownValue = try ATProtocolValueContainer(from: decoder)
+                self = .unexpected(unknownValue)
             }
-            return map
-        case .appBskyFeedThreadgateFollowerRule(let value):
-            map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#followerRule")
-            
-            let valueDict = try value.toCBORValue()
+        }
 
-            // If the value is already an OrderedCBORMap, merge its entries
-            if let orderedMap = valueDict as? OrderedCBORMap {
-                for (key, value) in orderedMap.entries where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
-            } else if let dict = valueDict as? [String: Any] {
-                // Otherwise add each key-value pair from the dictionary
-                for (key, value) in dict where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
-            }
-            return map
-        case .appBskyFeedThreadgateFollowingRule(let value):
-            map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#followingRule")
-            
-            let valueDict = try value.toCBORValue()
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
 
-            // If the value is already an OrderedCBORMap, merge its entries
-            if let orderedMap = valueDict as? OrderedCBORMap {
-                for (key, value) in orderedMap.entries where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
-            } else if let dict = valueDict as? [String: Any] {
-                // Otherwise add each key-value pair from the dictionary
-                for (key, value) in dict where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
+            switch self {
+            case let .appBskyFeedThreadgateMentionRule(value):
+                try container.encode("app.bsky.feed.threadgate#mentionRule", forKey: .type)
+                try value.encode(to: encoder)
+            case let .appBskyFeedThreadgateFollowerRule(value):
+                try container.encode("app.bsky.feed.threadgate#followerRule", forKey: .type)
+                try value.encode(to: encoder)
+            case let .appBskyFeedThreadgateFollowingRule(value):
+                try container.encode("app.bsky.feed.threadgate#followingRule", forKey: .type)
+                try value.encode(to: encoder)
+            case let .appBskyFeedThreadgateListRule(value):
+                try container.encode("app.bsky.feed.threadgate#listRule", forKey: .type)
+                try value.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
             }
-            return map
-        case .appBskyFeedThreadgateListRule(let value):
-            map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#listRule")
-            
-            let valueDict = try value.toCBORValue()
+        }
 
-            // If the value is already an OrderedCBORMap, merge its entries
-            if let orderedMap = valueDict as? OrderedCBORMap {
-                for (key, value) in orderedMap.entries where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
-            } else if let dict = valueDict as? [String: Any] {
-                // Otherwise add each key-value pair from the dictionary
-                for (key, value) in dict where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
+        public func hash(into hasher: inout Hasher) {
+            switch self {
+            case let .appBskyFeedThreadgateMentionRule(value):
+                hasher.combine("app.bsky.feed.threadgate#mentionRule")
+                hasher.combine(value)
+            case let .appBskyFeedThreadgateFollowerRule(value):
+                hasher.combine("app.bsky.feed.threadgate#followerRule")
+                hasher.combine(value)
+            case let .appBskyFeedThreadgateFollowingRule(value):
+                hasher.combine("app.bsky.feed.threadgate#followingRule")
+                hasher.combine(value)
+            case let .appBskyFeedThreadgateListRule(value):
+                hasher.combine("app.bsky.feed.threadgate#listRule")
+                hasher.combine(value)
+            case let .unexpected(container):
+                hasher.combine("unexpected")
+                hasher.combine(container)
             }
-            return map
-        case .unexpected(let container):
-            return try container.toCBORValue()
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case type = "$type"
+        }
+
+        public static func == (lhs: DraftThreadgateAllowUnion, rhs: DraftThreadgateAllowUnion) -> Bool {
+            switch (lhs, rhs) {
+            case let (
+                .appBskyFeedThreadgateMentionRule(lhsValue),
+                .appBskyFeedThreadgateMentionRule(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .appBskyFeedThreadgateFollowerRule(lhsValue),
+                .appBskyFeedThreadgateFollowerRule(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .appBskyFeedThreadgateFollowingRule(lhsValue),
+                .appBskyFeedThreadgateFollowingRule(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .appBskyFeedThreadgateListRule(lhsValue),
+                .appBskyFeedThreadgateListRule(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
+            default:
+                return false
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? DraftThreadgateAllowUnion else { return false }
+            return self == other
+        }
+
+        /// DAGCBOR encoding with field ordering
+        public func toCBORValue() throws -> Any {
+            // Create an ordered map to maintain field order
+            var map = OrderedCBORMap()
+
+            switch self {
+            case let .appBskyFeedThreadgateMentionRule(value):
+                map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#mentionRule")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .appBskyFeedThreadgateFollowerRule(value):
+                map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#followerRule")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .appBskyFeedThreadgateFollowingRule(value):
+                map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#followingRule")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .appBskyFeedThreadgateListRule(value):
+                map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#listRule")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .unexpected(container):
+                return try container.toCBORValue()
+            }
         }
     }
-}
 
-
-
-
-public enum DraftPostLabelsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
-    case comAtprotoLabelDefsSelfLabels(ComAtprotoLabelDefs.SelfLabels)
-    case unexpected(ATProtocolValueContainer)
-    public init(_ value: ComAtprotoLabelDefs.SelfLabels) {
-        self = .comAtprotoLabelDefsSelfLabels(value)
-    }
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        let typeValue = try container.decode(String.self, forKey: .type)
-
-        switch typeValue {
-        case "com.atproto.label.defs#selfLabels":
-            let value = try ComAtprotoLabelDefs.SelfLabels(from: decoder)
+    public enum DraftPostLabelsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
+        case comAtprotoLabelDefsSelfLabels(ComAtprotoLabelDefs.SelfLabels)
+        case unexpected(ATProtocolValueContainer)
+        public init(_ value: ComAtprotoLabelDefs.SelfLabels) {
             self = .comAtprotoLabelDefsSelfLabels(value)
-        default:
-            let unknownValue = try ATProtocolValueContainer(from: decoder)
-            self = .unexpected(unknownValue)
         }
-    }
 
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let typeValue = try container.decode(String.self, forKey: .type)
 
-        switch self {
-        case .comAtprotoLabelDefsSelfLabels(let value):
-            try container.encode("com.atproto.label.defs#selfLabels", forKey: .type)
-            try value.encode(to: encoder)
-        case .unexpected(let container):
-            try container.encode(to: encoder)
-        }
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        switch self {
-        case .comAtprotoLabelDefsSelfLabels(let value):
-            hasher.combine("com.atproto.label.defs#selfLabels")
-            hasher.combine(value)
-        case .unexpected(let container):
-            hasher.combine("unexpected")
-            hasher.combine(container)
-        }
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case type = "$type"
-    }
-    
-    public static func == (lhs: DraftPostLabelsUnion, rhs: DraftPostLabelsUnion) -> Bool {
-        switch (lhs, rhs) {
-        case (.comAtprotoLabelDefsSelfLabels(let lhsValue),
-              .comAtprotoLabelDefsSelfLabels(let rhsValue)):
-            return lhsValue == rhsValue
-        case (.unexpected(let lhsValue), .unexpected(let rhsValue)):
-            return lhsValue.isEqual(to: rhsValue)
-        default:
-            return false
-        }
-    }
-    
-    public func isEqual(to other: any ATProtocolValue) -> Bool {
-        guard let other = other as? DraftPostLabelsUnion else { return false }
-        return self == other
-    }
-    
-    // DAGCBOR encoding with field ordering
-    public func toCBORValue() throws -> Any {
-        // Create an ordered map to maintain field order
-        var map = OrderedCBORMap()
-        
-        switch self {
-        case .comAtprotoLabelDefsSelfLabels(let value):
-            map = map.adding(key: "$type", value: "com.atproto.label.defs#selfLabels")
-            
-            let valueDict = try value.toCBORValue()
-
-            // If the value is already an OrderedCBORMap, merge its entries
-            if let orderedMap = valueDict as? OrderedCBORMap {
-                for (key, value) in orderedMap.entries where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
-            } else if let dict = valueDict as? [String: Any] {
-                // Otherwise add each key-value pair from the dictionary
-                for (key, value) in dict where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
+            switch typeValue {
+            case "com.atproto.label.defs#selfLabels":
+                let value = try ComAtprotoLabelDefs.SelfLabels(from: decoder)
+                self = .comAtprotoLabelDefsSelfLabels(value)
+            default:
+                let unknownValue = try ATProtocolValueContainer(from: decoder)
+                self = .unexpected(unknownValue)
             }
-            return map
-        case .unexpected(let container):
-            return try container.toCBORValue()
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            switch self {
+            case let .comAtprotoLabelDefsSelfLabels(value):
+                try container.encode("com.atproto.label.defs#selfLabels", forKey: .type)
+                try value.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
+            }
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            switch self {
+            case let .comAtprotoLabelDefsSelfLabels(value):
+                hasher.combine("com.atproto.label.defs#selfLabels")
+                hasher.combine(value)
+            case let .unexpected(container):
+                hasher.combine("unexpected")
+                hasher.combine(container)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case type = "$type"
+        }
+
+        public static func == (lhs: DraftPostLabelsUnion, rhs: DraftPostLabelsUnion) -> Bool {
+            switch (lhs, rhs) {
+            case let (
+                .comAtprotoLabelDefsSelfLabels(lhsValue),
+                .comAtprotoLabelDefsSelfLabels(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
+            default:
+                return false
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? DraftPostLabelsUnion else { return false }
+            return self == other
+        }
+
+        /// DAGCBOR encoding with field ordering
+        public func toCBORValue() throws -> Any {
+            // Create an ordered map to maintain field order
+            var map = OrderedCBORMap()
+
+            switch self {
+            case let .comAtprotoLabelDefsSelfLabels(value):
+                map = map.adding(key: "$type", value: "com.atproto.label.defs#selfLabels")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .unexpected(container):
+                return try container.toCBORValue()
+            }
         }
     }
 }
-
-
-}
-
-
-                           
-

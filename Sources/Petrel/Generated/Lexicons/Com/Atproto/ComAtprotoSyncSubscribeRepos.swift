@@ -1,28 +1,24 @@
 import Foundation
 
-
-
 // lexicon: 1, id: com.atproto.sync.subscribeRepos
 
-
-public struct ComAtprotoSyncSubscribeRepos { 
-
+public enum ComAtprotoSyncSubscribeRepos {
     public static let typeIdentifier = "com.atproto.sync.subscribeRepos"
-        
-public struct Commit: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "com.atproto.sync.subscribeRepos#commit"
-            public let seq: Int
-            public let rebase: Bool
-            public let tooBig: Bool
-            public let repo: DID
-            public let commit: CID
-            public let rev: TID
-            public let since: TID
-            public let blocks: Bytes
-            public let ops: [RepoOp]
-            public let blobs: [CID]
-            public let prevData: CID?
-            public let time: ATProtocolDate
+
+    public struct Commit: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "com.atproto.sync.subscribeRepos#commit"
+        public let seq: Int
+        public let rebase: Bool
+        public let tooBig: Bool
+        public let repo: DID
+        public let commit: CID
+        public let rev: TID
+        public let since: TID
+        public let blocks: Bytes
+        public let ops: [RepoOp]
+        public let blobs: [CID]
+        public let prevData: CID?
+        public let time: ATProtocolDate
 
         public init(
             seq: Int, rebase: Bool, tooBig: Bool, repo: DID, commit: CID, rev: TID, since: TID, blocks: Bytes, ops: [RepoOp], blobs: [CID], prevData: CID?, time: ATProtocolDate
@@ -44,73 +40,73 @@ public struct Commit: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.seq = try container.decode(Int.self, forKey: .seq)
+                seq = try container.decode(Int.self, forKey: .seq)
             } catch {
                 LogManager.logError("Decoding error for required property 'seq': \(error)")
                 throw error
             }
             do {
-                self.rebase = try container.decode(Bool.self, forKey: .rebase)
+                rebase = try container.decode(Bool.self, forKey: .rebase)
             } catch {
                 LogManager.logError("Decoding error for required property 'rebase': \(error)")
                 throw error
             }
             do {
-                self.tooBig = try container.decode(Bool.self, forKey: .tooBig)
+                tooBig = try container.decode(Bool.self, forKey: .tooBig)
             } catch {
                 LogManager.logError("Decoding error for required property 'tooBig': \(error)")
                 throw error
             }
             do {
-                self.repo = try container.decode(DID.self, forKey: .repo)
+                repo = try container.decode(DID.self, forKey: .repo)
             } catch {
                 LogManager.logError("Decoding error for required property 'repo': \(error)")
                 throw error
             }
             do {
-                self.commit = try container.decode(CID.self, forKey: .commit)
+                commit = try container.decode(CID.self, forKey: .commit)
             } catch {
                 LogManager.logError("Decoding error for required property 'commit': \(error)")
                 throw error
             }
             do {
-                self.rev = try container.decode(TID.self, forKey: .rev)
+                rev = try container.decode(TID.self, forKey: .rev)
             } catch {
                 LogManager.logError("Decoding error for required property 'rev': \(error)")
                 throw error
             }
             do {
-                self.since = try container.decode(TID.self, forKey: .since)
+                since = try container.decode(TID.self, forKey: .since)
             } catch {
                 LogManager.logError("Decoding error for required property 'since': \(error)")
                 throw error
             }
             do {
-                self.blocks = try container.decode(Bytes.self, forKey: .blocks)
+                blocks = try container.decode(Bytes.self, forKey: .blocks)
             } catch {
                 LogManager.logError("Decoding error for required property 'blocks': \(error)")
                 throw error
             }
             do {
-                self.ops = try container.decode([RepoOp].self, forKey: .ops)
+                ops = try container.decode([RepoOp].self, forKey: .ops)
             } catch {
                 LogManager.logError("Decoding error for required property 'ops': \(error)")
                 throw error
             }
             do {
-                self.blobs = try container.decode([CID].self, forKey: .blobs)
+                blobs = try container.decode([CID].self, forKey: .blobs)
             } catch {
                 LogManager.logError("Decoding error for required property 'blobs': \(error)")
                 throw error
             }
             do {
-                self.prevData = try container.decodeIfPresent(CID.self, forKey: .prevData)
+                prevData = try container.decodeIfPresent(CID.self, forKey: .prevData)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'prevData': \(error)")
                 throw error
             }
             do {
-                self.time = try container.decode(ATProtocolDate.self, forKey: .time)
+                time = try container.decode(ATProtocolDate.self, forKey: .time)
             } catch {
                 LogManager.logError("Decoding error for required property 'time': \(error)")
                 throw error
@@ -246,14 +242,14 @@ public struct Commit: ATProtocolCodable, ATProtocolValue {
             case time
         }
     }
-        
-public struct Sync: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "com.atproto.sync.subscribeRepos#sync"
-            public let seq: Int
-            public let did: DID
-            public let blocks: Bytes
-            public let rev: String
-            public let time: ATProtocolDate
+
+    public struct Sync: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "com.atproto.sync.subscribeRepos#sync"
+        public let seq: Int
+        public let did: DID
+        public let blocks: Bytes
+        public let rev: String
+        public let time: ATProtocolDate
 
         public init(
             seq: Int, did: DID, blocks: Bytes, rev: String, time: ATProtocolDate
@@ -268,31 +264,31 @@ public struct Sync: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.seq = try container.decode(Int.self, forKey: .seq)
+                seq = try container.decode(Int.self, forKey: .seq)
             } catch {
                 LogManager.logError("Decoding error for required property 'seq': \(error)")
                 throw error
             }
             do {
-                self.did = try container.decode(DID.self, forKey: .did)
+                did = try container.decode(DID.self, forKey: .did)
             } catch {
                 LogManager.logError("Decoding error for required property 'did': \(error)")
                 throw error
             }
             do {
-                self.blocks = try container.decode(Bytes.self, forKey: .blocks)
+                blocks = try container.decode(Bytes.self, forKey: .blocks)
             } catch {
                 LogManager.logError("Decoding error for required property 'blocks': \(error)")
                 throw error
             }
             do {
-                self.rev = try container.decode(String.self, forKey: .rev)
+                rev = try container.decode(String.self, forKey: .rev)
             } catch {
                 LogManager.logError("Decoding error for required property 'rev': \(error)")
                 throw error
             }
             do {
-                self.time = try container.decode(ATProtocolDate.self, forKey: .time)
+                time = try container.decode(ATProtocolDate.self, forKey: .time)
             } catch {
                 LogManager.logError("Decoding error for required property 'time': \(error)")
                 throw error
@@ -366,13 +362,13 @@ public struct Sync: ATProtocolCodable, ATProtocolValue {
             case time
         }
     }
-        
-public struct Identity: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "com.atproto.sync.subscribeRepos#identity"
-            public let seq: Int
-            public let did: DID
-            public let time: ATProtocolDate
-            public let handle: Handle?
+
+    public struct Identity: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "com.atproto.sync.subscribeRepos#identity"
+        public let seq: Int
+        public let did: DID
+        public let time: ATProtocolDate
+        public let handle: Handle?
 
         public init(
             seq: Int, did: DID, time: ATProtocolDate, handle: Handle?
@@ -386,25 +382,25 @@ public struct Identity: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.seq = try container.decode(Int.self, forKey: .seq)
+                seq = try container.decode(Int.self, forKey: .seq)
             } catch {
                 LogManager.logError("Decoding error for required property 'seq': \(error)")
                 throw error
             }
             do {
-                self.did = try container.decode(DID.self, forKey: .did)
+                did = try container.decode(DID.self, forKey: .did)
             } catch {
                 LogManager.logError("Decoding error for required property 'did': \(error)")
                 throw error
             }
             do {
-                self.time = try container.decode(ATProtocolDate.self, forKey: .time)
+                time = try container.decode(ATProtocolDate.self, forKey: .time)
             } catch {
                 LogManager.logError("Decoding error for required property 'time': \(error)")
                 throw error
             }
             do {
-                self.handle = try container.decodeIfPresent(Handle.self, forKey: .handle)
+                handle = try container.decodeIfPresent(Handle.self, forKey: .handle)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'handle': \(error)")
                 throw error
@@ -476,14 +472,14 @@ public struct Identity: ATProtocolCodable, ATProtocolValue {
             case handle
         }
     }
-        
-public struct Account: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "com.atproto.sync.subscribeRepos#account"
-            public let seq: Int
-            public let did: DID
-            public let time: ATProtocolDate
-            public let active: Bool
-            public let status: String?
+
+    public struct Account: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "com.atproto.sync.subscribeRepos#account"
+        public let seq: Int
+        public let did: DID
+        public let time: ATProtocolDate
+        public let active: Bool
+        public let status: String?
 
         public init(
             seq: Int, did: DID, time: ATProtocolDate, active: Bool, status: String?
@@ -498,31 +494,31 @@ public struct Account: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.seq = try container.decode(Int.self, forKey: .seq)
+                seq = try container.decode(Int.self, forKey: .seq)
             } catch {
                 LogManager.logError("Decoding error for required property 'seq': \(error)")
                 throw error
             }
             do {
-                self.did = try container.decode(DID.self, forKey: .did)
+                did = try container.decode(DID.self, forKey: .did)
             } catch {
                 LogManager.logError("Decoding error for required property 'did': \(error)")
                 throw error
             }
             do {
-                self.time = try container.decode(ATProtocolDate.self, forKey: .time)
+                time = try container.decode(ATProtocolDate.self, forKey: .time)
             } catch {
                 LogManager.logError("Decoding error for required property 'time': \(error)")
                 throw error
             }
             do {
-                self.active = try container.decode(Bool.self, forKey: .active)
+                active = try container.decode(Bool.self, forKey: .active)
             } catch {
                 LogManager.logError("Decoding error for required property 'active': \(error)")
                 throw error
             }
             do {
-                self.status = try container.decodeIfPresent(String.self, forKey: .status)
+                status = try container.decodeIfPresent(String.self, forKey: .status)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'status': \(error)")
                 throw error
@@ -602,11 +598,11 @@ public struct Account: ATProtocolCodable, ATProtocolValue {
             case status
         }
     }
-        
-public struct Info: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "com.atproto.sync.subscribeRepos#info"
-            public let name: String
-            public let message: String?
+
+    public struct Info: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "com.atproto.sync.subscribeRepos#info"
+        public let name: String
+        public let message: String?
 
         public init(
             name: String, message: String?
@@ -618,13 +614,13 @@ public struct Info: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.name = try container.decode(String.self, forKey: .name)
+                name = try container.decode(String.self, forKey: .name)
             } catch {
                 LogManager.logError("Decoding error for required property 'name': \(error)")
                 throw error
             }
             do {
-                self.message = try container.decodeIfPresent(String.self, forKey: .message)
+                message = try container.decodeIfPresent(String.self, forKey: .message)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'message': \(error)")
                 throw error
@@ -680,13 +676,13 @@ public struct Info: ATProtocolCodable, ATProtocolValue {
             case message
         }
     }
-        
-public struct RepoOp: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "com.atproto.sync.subscribeRepos#repoOp"
-            public let action: String
-            public let path: String
-            public let cid: CID
-            public let prev: CID?
+
+    public struct RepoOp: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "com.atproto.sync.subscribeRepos#repoOp"
+        public let action: String
+        public let path: String
+        public let cid: CID
+        public let prev: CID?
 
         public init(
             action: String, path: String, cid: CID, prev: CID?
@@ -700,25 +696,25 @@ public struct RepoOp: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.action = try container.decode(String.self, forKey: .action)
+                action = try container.decode(String.self, forKey: .action)
             } catch {
                 LogManager.logError("Decoding error for required property 'action': \(error)")
                 throw error
             }
             do {
-                self.path = try container.decode(String.self, forKey: .path)
+                path = try container.decode(String.self, forKey: .path)
             } catch {
                 LogManager.logError("Decoding error for required property 'path': \(error)")
                 throw error
             }
             do {
-                self.cid = try container.decode(CID.self, forKey: .cid)
+                cid = try container.decode(CID.self, forKey: .cid)
             } catch {
                 LogManager.logError("Decoding error for required property 'cid': \(error)")
                 throw error
             }
             do {
-                self.prev = try container.decodeIfPresent(CID.self, forKey: .prev)
+                prev = try container.decodeIfPresent(CID.self, forKey: .prev)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'prev': \(error)")
                 throw error
@@ -789,131 +785,120 @@ public struct RepoOp: ATProtocolCodable, ATProtocolValue {
             case cid
             case prev
         }
-    }    
-public struct Parameters: Parametrizable {
+    }
+
+    public struct Parameters: Parametrizable {
         public let cursor: Int?
-        
+
         public init(
             cursor: Int? = nil
-            ) {
+        ) {
             self.cursor = cursor
-            
-        }
-    }
-public enum Message: Codable, Sendable {
-
-    case commit(Commit)
-
-    case sync(Sync)
-
-    case identity(Identity)
-
-    case account(Account)
-
-    case info(Info)
-
-
-    enum CodingKeys: String, CodingKey {
-        case type = "$type"
-    }
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        let type = try container.decode(String.self, forKey: .type)
-        
-        switch type {
-
-        case "com.atproto.sync.subscribeRepos#commit":
-            let value = try Commit(from: decoder)
-            self = .commit(value)
-
-        case "com.atproto.sync.subscribeRepos#sync":
-            let value = try Sync(from: decoder)
-            self = .sync(value)
-
-        case "com.atproto.sync.subscribeRepos#identity":
-            let value = try Identity(from: decoder)
-            self = .identity(value)
-
-        case "com.atproto.sync.subscribeRepos#account":
-            let value = try Account(from: decoder)
-            self = .account(value)
-
-        case "com.atproto.sync.subscribeRepos#info":
-            let value = try Info(from: decoder)
-            self = .info(value)
-
-        default:
-            throw DecodingError.dataCorruptedError(
-                forKey: .type,
-                in: container,
-                debugDescription: "Unknown message type: \(type)"
-            )
         }
     }
 
-    public func encode(to encoder: Encoder) throws {
-        switch self {
+    public enum Message: Codable, Sendable {
+        case commit(Commit)
 
-        case .commit(let value):
-            try value.encode(to: encoder)
+        case sync(Sync)
 
-        case .sync(let value):
-            try value.encode(to: encoder)
+        case identity(Identity)
 
-        case .identity(let value):
-            try value.encode(to: encoder)
+        case account(Account)
 
-        case .account(let value):
-            try value.encode(to: encoder)
+        case info(Info)
 
-        case .info(let value):
-            try value.encode(to: encoder)
-
+        enum CodingKeys: String, CodingKey {
+            case type = "$type"
         }
-    }
-}        
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case futureCursor = "FutureCursor."
-                case consumerTooSlow = "ConsumerTooSlow.If the consumer of the stream can not keep up with events, and a backlog gets too large, the server will drop the connection."
-            public var description: String {
-                return self.rawValue
-            }
 
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let type = try container.decode(String.self, forKey: .type)
+
+            switch type {
+            case "com.atproto.sync.subscribeRepos#commit":
+                let value = try Commit(from: decoder)
+                self = .commit(value)
+
+            case "com.atproto.sync.subscribeRepos#sync":
+                let value = try Sync(from: decoder)
+                self = .sync(value)
+
+            case "com.atproto.sync.subscribeRepos#identity":
+                let value = try Identity(from: decoder)
+                self = .identity(value)
+
+            case "com.atproto.sync.subscribeRepos#account":
+                let value = try Account(from: decoder)
+                self = .account(value)
+
+            case "com.atproto.sync.subscribeRepos#info":
+                let value = try Info(from: decoder)
+                self = .info(value)
+
+            default:
+                throw DecodingError.dataCorruptedError(
+                    forKey: .type,
+                    in: container,
+                    debugDescription: "Unknown message type: \(type)"
+                )
             }
         }
 
+        public func encode(to encoder: Encoder) throws {
+            switch self {
+            case let .commit(value):
+                try value.encode(to: encoder)
 
+            case let .sync(value):
+                try value.encode(to: encoder)
 
+            case let .identity(value):
+                try value.encode(to: encoder)
+
+            case let .account(value):
+                try value.encode(to: encoder)
+
+            case let .info(value):
+                try value.encode(to: encoder)
+            }
+        }
+    }
+
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case futureCursor = "FutureCursor."
+        case consumerTooSlow = "ConsumerTooSlow.If the consumer of the stream can not keep up with events, and a backlog gets too large, the server will drop the connection."
+        public var description: String {
+            return rawValue
+        }
+
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
+// Repository event stream, aka Firehose endpoint. Outputs repo commits with diff data, and identity update events, for all repositories on the current server. See the atproto specifications for details around stream sequencing, repo versioning, CAR diff format, and more. Public and does not require auth; implemented by PDS and Relay.
 
-                           
-
-/// Repository event stream, aka Firehose endpoint. Outputs repo commits with diff data, and identity update events, for all repositories on the current server. See the atproto specifications for details around stream sequencing, repo versioning, CAR diff format, and more. Public and does not require auth; implemented by PDS and Relay.
-
-extension ATProtoClient.Com.Atproto.Sync {
-    
-    public func subscribeRepos(
+public extension ATProtoClient.Com.Atproto.Sync {
+    func subscribeRepos(
         cursor: Int? = nil
     ) async throws -> AsyncThrowingStream<ComAtprotoSyncSubscribeRepos.Message, Error> {
         let params = ComAtprotoSyncSubscribeRepos.Parameters(cursor: cursor)
-        return try await self.networkService.subscribe(
+        return try await networkService.subscribe(
             endpoint: "com.atproto.sync.subscribeRepos",
             parameters: params
         )
     }
 
     /// Alternative signature accepting input struct
-    public func subscribeRepos(input: ComAtprotoSyncSubscribeRepos.Parameters) async throws -> AsyncThrowingStream<ComAtprotoSyncSubscribeRepos.Message, Error> {
-        return try await self.networkService.subscribe(
+    func subscribeRepos(input: ComAtprotoSyncSubscribeRepos.Parameters) async throws -> AsyncThrowingStream<ComAtprotoSyncSubscribeRepos.Message, Error> {
+        return try await networkService.subscribe(
             endpoint: "com.atproto.sync.subscribeRepos",
             parameters: input
         )
     }
-    
 }
