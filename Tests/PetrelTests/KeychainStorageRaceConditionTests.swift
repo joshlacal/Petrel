@@ -21,12 +21,14 @@ final class KeychainStorageRaceConditionTests: XCTestCase {
         // Clean up any existing test data
         try? await keychainStorage.deleteAccount(for: testDID)
         try? await keychainStorage.deleteSession(for: testDID)
+        try? await keychainStorage.deleteGatewaySession(for: testDID)
     }
 
     override func tearDown() async throws {
         // Clean up test data
         try? await keychainStorage.deleteAccount(for: testDID)
         try? await keychainStorage.deleteSession(for: testDID)
+        try? await keychainStorage.deleteGatewaySession(for: testDID)
         try await super.tearDown()
     }
 
@@ -163,6 +165,34 @@ final class KeychainStorageRaceConditionTests: XCTestCase {
         XCTAssertNil(retrievedSession)
     }
 
+    func testGatewaySessionPreventsAccountCleanup() async throws {
+        let account = createTestAccount()
+
+        // Save account without standard session, but with gateway session
+        try await keychainStorage.saveAccount(account, for: testDID)
+        try await keychainStorage.saveGatewaySession("gateway-session-123", for: testDID)
+
+        let result = await keychainStorage.validateAndRepairAuthenticationState()
+
+        // Gateway session should count as a valid auth session
+        XCTAssertFalse(result.cleanedOrphanedAccounts.contains(testDID))
+        let retrievedAccount = try await keychainStorage.getAccount(for: testDID)
+        XCTAssertNotNil(retrievedAccount)
+    }
+
+    func testLegacyGatewaySessionMigration() async throws {
+        let account = createTestAccount()
+
+        try await keychainStorage.saveAccount(account, for: testDID)
+        try await keychainStorage.saveGatewaySession("legacy-gateway-session")
+
+        let migrated = try await keychainStorage.getGatewaySession(for: testDID)
+        XCTAssertEqual(migrated, "legacy-gateway-session")
+
+        let legacy = try await keychainStorage.getGatewaySession()
+        XCTAssertNil(legacy)
+    }
+
     // MARK: - Concurrency Tests
 
     func testConcurrentAtomicSaves() async throws {
@@ -207,9 +237,7 @@ final class KeychainStorageRaceConditionTests: XCTestCase {
         return Account(
             did: testDID,
             handle: "test.example.com",
-            email: "test@example.com",
-            pdsURL: URL(string: "https://pds.example.com")!,
-            accessJWT: "test.jwt.token"
+            pdsURL: URL(string: "https://pds.example.com")!
         )
     }
 

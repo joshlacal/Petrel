@@ -1,12 +1,16 @@
 {% if is_type_alias %}
-    typealias Output = {{ type_alias_target }}
+    typealias {{ class_name }}Output = {{ type_alias_target }}
 {% else %}
     @Serializable
-    data class Output(
+    {% if properties %}
+    data class {{ class_name }}Output(
         {% for prop in properties %}
         {% if prop.description %}// {{ prop.description }}{% endif %}
         @SerialName("{{ prop.name }}")
         val {{ prop.name | sanitizeKeyword }}: {{ prop.type }}{% if prop.optional %} = null{% endif %}{% if not loop.last %},{% endif %}
         {% endfor %}
     )
+    {% else %}
+    class {{ class_name }}Output
+    {% endif %}
 {% endif %}

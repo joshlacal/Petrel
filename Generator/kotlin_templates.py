@@ -76,5 +76,6 @@ class KotlinTemplateManager:
         self.enum_class_template = self.env.get_template('enumClass.jinja')
         self.errors_enum_template = self.env.get_template('errorsEnum.jinja')
         self.record_template = self.env.get_template('record.jinja')
+        self.message_template = self.env.get_template('message.jinja')
         self.lex_definitions_template = self.env.get_template('lexiconDefinitions.jinja')
         self.client_main_template = self.env.get_template('KotlinClientMain.jinja')

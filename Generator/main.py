@@ -9,6 +9,16 @@ from kotlin_type_converter import convert_to_pascal_case
 from utils import convert_to_camel_case
 from cycle_detector import CycleDetector
 
+def get_namespace_path(lexicon_id: str) -> str:
+    """Convert lexicon ID to hierarchical path.
+    e.g., 'app.bsky.feed.post' -> 'App/Bsky'
+    """
+    parts = lexicon_id.split('.')
+    if len(parts) >= 2:
+        # Capitalize first two parts for directory names
+        return '/'.join(part.capitalize() for part in parts[:2])
+    return parts[0].capitalize()
+
 async def generate_swift_from_lexicons_recursive(folder_path: str, output_folder: str):
     type_dict = {}
     namespace_hierarchy = {}
@@ -88,8 +98,14 @@ async def generate_swift_from_lexicons_recursive(folder_path: str, output_folder
 
         swift_code = SwiftCodeGenerator(lexicon, cycle_detector).convert()
 
+        # Create hierarchical output path based on lexicon namespace
+        # e.g., "app.bsky.feed.post" -> "Lexicons/App/Bsky/"
+        namespace_path = get_namespace_path(lexicon_id)
+        lexicon_output_dir = os.path.join(output_folder, 'Lexicons', namespace_path)
+        os.makedirs(lexicon_output_dir, exist_ok=True)
+
         output_filename = f"{convert_to_camel_case(lexicon_id)}.swift"
-        output_file_path = os.path.join(output_folder, output_filename)
+        output_file_path = os.path.join(lexicon_output_dir, output_filename)
         async with aiofiles.open(output_file_path, 'w') as swift_file:
             await swift_file.write(swift_code)
 
@@ -104,11 +120,17 @@ async def generate_swift_from_lexicons_recursive(folder_path: str, output_folder
     swift_namespace_classes = generate_swift_namespace_classes(namespace_hierarchy)
     atproto_client = render_atproto_client(swift_namespace_classes)
 
-    type_factory_file_path = os.path.join(output_folder, 'ATProtocolValueContainer.swift')
+    # Output ATProtocolValueContainer to Core/Types within output folder
+    core_types_dir = os.path.join(output_folder, 'Core', 'Types')
+    os.makedirs(core_types_dir, exist_ok=True)
+    type_factory_file_path = os.path.join(core_types_dir, 'ATProtocolValueContainer.swift')
     async with aiofiles.open(type_factory_file_path, 'w') as type_factory_file:
         await type_factory_file.write(type_factory_code)
 
-    class_factory_file_path = os.path.join(output_folder, 'ATProtoClientGeneratedMain.swift')
+    # Output main client file to Client directory within output folder
+    client_dir = os.path.join(output_folder, 'Client')
+    os.makedirs(client_dir, exist_ok=True)
+    class_factory_file_path = os.path.join(client_dir, 'ATProtoClient+Generated.swift')
     async with aiofiles.open(class_factory_file_path, 'w') as class_factory_file:
         await class_factory_file.write(atproto_client)
 
@@ -218,8 +240,14 @@ async def generate_kotlin_from_lexicons_recursive(folder_path: str, output_folde
         # Generate Kotlin code
         kotlin_code = KotlinCodeGenerator(lexicon, cycle_detector).convert()
 
+        # Create hierarchical output path based on lexicon namespace
+        # e.g., "app.bsky.feed.post" -> "lexicons/app/bsky/"
+        namespace_path = get_namespace_path(lexicon_id).lower()
+        lexicon_output_dir = os.path.join(output_folder, 'lexicons', namespace_path)
+        os.makedirs(lexicon_output_dir, exist_ok=True)
+
         output_filename = f"{convert_to_pascal_case(lexicon_id)}.kt"
-        output_file_path = os.path.join(output_folder, output_filename)
+        output_file_path = os.path.join(lexicon_output_dir, output_filename)
         async with aiofiles.open(output_file_path, 'w') as kotlin_file:
             await kotlin_file.write(kotlin_code)
 
@@ -232,7 +260,11 @@ async def generate_kotlin_from_lexicons_recursive(folder_path: str, output_folde
 
     # Generate namespace classes for Kotlin
     kotlin_namespace_classes = generate_kotlin_namespace_classes(namespace_hierarchy)
-    client_main_file_path = os.path.join(output_folder, 'ATProtoClient.kt')
+
+    # Output main client file to client directory within output folder
+    client_dir = os.path.join(output_folder, 'client')
+    os.makedirs(client_dir, exist_ok=True)
+    client_main_file_path = os.path.join(client_dir, 'ATProtoClientGenerated.kt')
     async with aiofiles.open(client_main_file_path, 'w') as client_file:
         await client_file.write(kotlin_namespace_classes)
 
@@ -246,12 +278,16 @@ def generate_kotlin_namespace_classes(namespace_hierarchy, depth=0):
 
     if depth == 0:
         kotlin_code += "package com.atproto.client\n\n"
-        kotlin_code += "class ATProtoClient(private val networkService: NetworkService) {\n"
+        kotlin_code += "import com.atproto.network.NetworkService\n\n"
+        kotlin_code += "class ATProtoClient(internal val networkService: NetworkService) {\n"
+        kotlin_code += "    constructor(baseUrl: String = \"https://bsky.social\") : this(NetworkService(baseUrl))\n\n"
+        kotlin_code += "    fun close() {\n        networkService.close()\n    }\n\n"
 
         for namespace, sub_hierarchy in namespace_hierarchy.items():
             namespace_class = convert_to_pascal_case(namespace)
             kotlin_code += f"    val {namespace.lower()}: {namespace_class} = {namespace_class}()\n\n"
             kotlin_code += f"    inner class {namespace_class} {{\n"
+            kotlin_code += f"        val client: ATProtoClient get() = this@ATProtoClient\n"
             kotlin_code += generate_kotlin_namespace_classes(sub_hierarchy, depth + 2)
             kotlin_code += "    }\n\n"
 
@@ -261,6 +297,7 @@ def generate_kotlin_namespace_classes(namespace_hierarchy, depth=0):
             class_name = convert_to_pascal_case(namespace)
             kotlin_code += f"{indent}val {namespace.lower()}: {class_name} = {class_name}()\n\n"
             kotlin_code += f"{indent}inner class {class_name} {{\n"
+            kotlin_code += f"{indent}    val client: ATProtoClient get() = this@ATProtoClient\n"
             if sub_namespaces:
                 kotlin_code += generate_kotlin_namespace_classes(sub_namespaces, depth + 1)
             kotlin_code += f"{indent}}}\n\n"

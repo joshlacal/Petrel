@@ -121,7 +121,7 @@ enum PetrelLoadCLI {
         )
 
         // Initialize ATProtoClient with proper configuration
-        let client = await ATProtoClient(
+        let client = try! await ATProtoClient(
             baseURL: baseURL,
             oauthConfig: oauthConfig,
             namespace: namespace

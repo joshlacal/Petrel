@@ -5,6 +5,7 @@ import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
+import io.ktor.client.call.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
@@ -18,7 +19,18 @@ data class ATProtoResponse<T>(
 class NetworkService(
     private val baseUrl: String = "https://bsky.social"
 ) {
-    private val client = HttpClient(CIO) {
+    @PublishedApi
+    internal val serviceDIDs = mutableMapOf<String, String>()
+    var authenticatedDID: String? = null
+
+    fun setServiceDID(did: String, namespace: String) {
+        serviceDIDs[namespace] = did
+    }
+
+    fun getDid(): String? = authenticatedDID
+
+    @PublishedApi
+    internal val client = HttpClient(CIO) {
         install(ContentNegotiation) {
             json(Json {
                 prettyPrint = true
@@ -45,6 +57,13 @@ class NetworkService(
 
                 headers.forEach { (key, value) ->
                     header(key, value)
+                }
+
+                // Add atproto-proxy header if applicable
+                serviceDIDs.forEach { (namespace, did) ->
+                    if (endpoint.startsWith(namespace)) {
+                        header("atproto-proxy", did)
+                    }
                 }
 
                 body?.let {
@@ -79,7 +98,8 @@ class NetworkService(
         return null
     }
 
-    private fun buildUrl(endpoint: String, queryParams: Map<String, String>?): String {
+    @PublishedApi
+    internal fun buildUrl(endpoint: String, queryParams: Map<String, String>?): String {
         val url = URLBuilder(baseUrl).apply {
             path("xrpc", endpoint)
             queryParams?.forEach { (key, value) ->

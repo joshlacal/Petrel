@@ -9,13 +9,21 @@ fun ATProtoClient.{{ namespace_path }}.{{ function_name }}(
     val endpoint = "{{ endpoint }}"
 
     {% if has_parameters %}
-    val queryParams = buildMap<String, String> {
-        // Convert parameters to query string
-    }
+    val queryParams = parameters.toQueryParams()
     {% else %}
     val queryParams: Map<String, String>? = null
     {% endif %}
 
-    // WebSocket connection - implementation depends on WebSocket library
-    // This would emit message_type items as they arrive
+    // TODO: Implement WebSocket connection using a WebSocket library (e.g., Ktor WebSockets)
+    // The implementation should:
+    // 1. Establish WebSocket connection to endpoint with queryParams
+    // 2. Listen for incoming messages
+    // 3. Deserialize each message as {{ message_type }}
+    // 4. Emit each message to the Flow
+    // Example skeleton:
+    // webSocketClient.connect(endpoint, queryParams) { message ->
+    //     val decoded = Json.decodeFromString<{{ message_type }}>(message)
+    //     emit(decoded)
+    // }
+    throw NotImplementedError("WebSocket subscription support requires a WebSocket client implementation")
 }

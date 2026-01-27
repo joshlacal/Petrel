@@ -1,15 +1,11 @@
 plugins {
-    kotlin("jvm") version "1.9.22"
-    kotlin("plugin.serialization") version "1.9.22"
+    kotlin("jvm")
+    kotlin("plugin.serialization")
     `maven-publish`
 }
 
 group = "com.atproto"
 version = "0.1.0"
-
-repositories {
-    mavenCentral()
-}
 
 dependencies {
     // Kotlin standard library

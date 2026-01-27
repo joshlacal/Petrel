@@ -1,0 +1,49 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mls.demoteAdmin",
+  "description": "Demote an admin to regular member (admin-only, or self-demotion)",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Demote an admin to regular member. Caller must be an admin (unless demoting self). Cannot demote the last admin. Server enforces authorization, updates DB, and logs action.",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["convoId", "targetDid"],
+          "properties": {
+            "convoId": { 
+              "type": "string",
+              "description": "Conversation identifier"
+            },
+            "targetDid": { 
+              "type": "string", 
+              "format": "did",
+              "description": "DID of admin to demote (can be self)"
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["ok"],
+          "properties": {
+            "ok": { 
+              "type": "boolean",
+              "description": "Whether demotion succeeded"
+            }
+          }
+        }
+      },
+      "errors": [
+        { "name": "NotAdmin", "description": "Caller is not an admin (unless self-demotion)" },
+        { "name": "NotMember", "description": "Target is not a member" },
+        { "name": "NotAdminTarget", "description": "Target is not currently an admin" },
+        { "name": "LastAdmin", "description": "Cannot demote the last admin in the conversation" },
+        { "name": "ConvoNotFound", "description": "Conversation not found" }
+      ]
+    }
+  }
+}

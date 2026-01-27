@@ -27,7 +27,7 @@ suspend fun ATProtoClient.{{ namespace_path }}.{{ function_name }}(
     val contentType = "application/json"
     {% endif %}
 
-    return networkService.performRequest(
+    return client.networkService.performRequest(
         method = "POST",
         endpoint = endpoint,
         queryParams = null,

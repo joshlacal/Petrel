@@ -1,0 +1,71 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mls.rejoin",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Request to rejoin an MLS conversation after local state loss. When a device registers and gets auto_joined_convos, it needs to request rejoin to get Welcome messages for those conversations.",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["convoId", "keyPackage"],
+          "properties": {
+            "convoId": {
+              "type": "string",
+              "description": "Conversation identifier to rejoin"
+            },
+            "keyPackage": {
+              "type": "string",
+              "description": "Base64url-encoded fresh MLS KeyPackage for re-adding to the group"
+            },
+            "reason": {
+              "type": "string",
+              "description": "Optional reason for rejoin request"
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["requestId", "pending"],
+          "properties": {
+            "requestId": {
+              "type": "string",
+              "description": "Rejoin request identifier for tracking"
+            },
+            "pending": {
+              "type": "boolean",
+              "description": "Whether request is pending approval (true) or auto-approved (false)"
+            },
+            "approvedAt": {
+              "type": "string",
+              "format": "datetime",
+              "description": "Timestamp if request was auto-approved"
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "name": "ConvoNotFound",
+          "description": "Conversation not found or user was never a member"
+        },
+        {
+          "name": "AlreadyMember",
+          "description": "User is already an active member with valid group state"
+        },
+        {
+          "name": "InvalidKeyPackage",
+          "description": "KeyPackage is malformed, expired, or invalid"
+        },
+        {
+          "name": "RateLimitExceeded",
+          "description": "Too many rejoin requests in short period"
+        }
+      ]
+    }
+  }
+}

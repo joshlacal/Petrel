@@ -1,0 +1,75 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mls.warnMember",
+  "description": "Send warning to group member (admin action)",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Send a warning to a conversation member. Admin-only action. Warning is delivered as a system message and tracked server-side.",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["convoId", "memberDid", "reason"],
+          "properties": {
+            "convoId": {
+              "type": "string",
+              "description": "Conversation identifier"
+            },
+            "memberDid": {
+              "type": "string",
+              "format": "did",
+              "description": "DID of member to warn"
+            },
+            "reason": {
+              "type": "string",
+              "description": "Reason for warning",
+              "maxLength": 500
+            },
+            "expiresAt": {
+              "type": "string",
+              "format": "datetime",
+              "description": "Optional expiration time for warning"
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["warningId", "deliveredAt"],
+          "properties": {
+            "warningId": {
+              "type": "string",
+              "description": "Unique warning identifier"
+            },
+            "deliveredAt": {
+              "type": "string",
+              "format": "datetime",
+              "description": "When warning was delivered"
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "name": "ConvoNotFound",
+          "description": "Conversation not found"
+        },
+        {
+          "name": "NotAdmin",
+          "description": "Only admins can warn members"
+        },
+        {
+          "name": "TargetNotMember",
+          "description": "Target user is not a member"
+        },
+        {
+          "name": "CannotWarnAdmin",
+          "description": "Cannot warn other admins"
+        }
+      ]
+    }
+  }
+}

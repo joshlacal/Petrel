@@ -12,6 +12,14 @@ extension ATProtoClient.{{ template_namespace_name }} {
             parameters: params
         )
     }
+
+    /// Alternative signature accepting input struct
+    public func {{ subscription_name }}(input: {{ input_struct_name }}) async throws -> AsyncThrowingStream<{{ message_type }}, Error> {
+        return try await self.networkService.subscribe(
+            endpoint: "{{ endpoint }}",
+            parameters: input
+        )
+    }
     {% else %}
     public func {{ subscription_name }}() async throws -> AsyncThrowingStream<{{ message_type }}, Error> {
         return try await self.networkService.subscribe(

@@ -2,6 +2,15 @@
 
 This file provides guidance to AI coding agents (e.g., Claude Code, GitHub Copilot, OpenAI-based agents) when working with code in this repository.
 
+## Build & Test Workflow
+
+Agents SHOULD build and test autonomously:
+- Swift package builds are fast (~5-10 seconds)
+- Use `swift build` and `swift test` freely
+- Verify changes work before reporting completion
+
+See `~/Developer/.claude/AGENTS.md` for global agent guidelines.
+
 ## Overview
 
 Petrel is a Swift library providing a complete implementation of the ATProtocol and Bluesky APIs. The codebase uses automated code generation from Bluesky's Lexicon JSON files to create Swift types and networking code.

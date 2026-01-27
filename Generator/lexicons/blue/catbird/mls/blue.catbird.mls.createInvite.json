@@ -1,0 +1,142 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mls.createInvite",
+  "description": "Create a new invite link for a conversation",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Create an invite link with optional PSK hash, expiration, and usage limits. Only admins can create invites.",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["convoId", "pskHash"],
+          "properties": {
+            "convoId": {
+              "type": "string",
+              "description": "Conversation identifier"
+            },
+            "pskHash": {
+              "type": "string",
+              "description": "SHA-256 hash of the pre-shared key (hex-encoded). Used to verify invite link authenticity without exposing PSK."
+            },
+            "targetDid": {
+              "type": "string",
+              "format": "did",
+              "description": "Optional DID restriction - invite can only be used by this specific DID"
+            },
+            "expiresAt": {
+              "type": "string",
+              "format": "datetime",
+              "description": "Optional expiration timestamp. Invite becomes invalid after this time."
+            },
+            "maxUses": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Optional maximum number of times this invite can be used. Defaults to unlimited."
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["inviteId", "invite"],
+          "properties": {
+            "inviteId": {
+              "type": "string",
+              "description": "Unique identifier for this invite (ULID)"
+            },
+            "invite": {
+              "type": "ref",
+              "ref": "#inviteView",
+              "description": "Full invite details"
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "name": "Unauthorized",
+          "description": "Caller is not an admin of this conversation"
+        },
+        {
+          "name": "InvalidPSKHash",
+          "description": "PSK hash is invalid or malformed"
+        },
+        {
+          "name": "ConvoNotFound",
+          "description": "Conversation not found"
+        },
+        {
+          "name": "NotMember",
+          "description": "Caller is not a member of this conversation"
+        }
+      ]
+    },
+    "inviteView": {
+      "type": "object",
+      "description": "View of a conversation invite with usage tracking",
+      "required": ["inviteId", "convoId", "createdBy", "createdAt", "pskHash", "isRevoked", "useCount"],
+      "properties": {
+        "inviteId": {
+          "type": "string",
+          "description": "Unique identifier for this invite (ULID)"
+        },
+        "convoId": {
+          "type": "string",
+          "description": "Conversation identifier"
+        },
+        "createdBy": {
+          "type": "string",
+          "format": "did",
+          "description": "DID of admin who created this invite"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "datetime",
+          "description": "Invite creation timestamp"
+        },
+        "pskHash": {
+          "type": "string",
+          "description": "SHA-256 hash of the pre-shared key (hex-encoded)"
+        },
+        "targetDid": {
+          "type": "string",
+          "format": "did",
+          "description": "Optional DID restriction - invite can only be used by this specific DID"
+        },
+        "expiresAt": {
+          "type": "string",
+          "format": "datetime",
+          "description": "Optional expiration timestamp"
+        },
+        "maxUses": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Optional maximum number of uses"
+        },
+        "useCount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of times this invite has been used"
+        },
+        "isRevoked": {
+          "type": "boolean",
+          "description": "Whether this invite has been revoked"
+        },
+        "revokedAt": {
+          "type": "string",
+          "format": "datetime",
+          "description": "Timestamp when invite was revoked (if applicable)"
+        },
+        "revokedBy": {
+          "type": "string",
+          "format": "did",
+          "description": "DID of admin who revoked this invite (if applicable)"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mls.getExpectedConversations",
+  "description": "Get list of conversations the user should be a member of but may be missing locally",
+  "defs": {
+    "main": {
+      "type": "query",
+      "description": "Returns conversations where the user is a member on the server but may not have local MLS state",
+      "parameters": {
+        "type": "params",
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "description": "Optional device ID to check. Defaults to current device from auth token"
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["conversations"],
+          "properties": {
+            "conversations": {
+              "type": "array",
+              "items": {
+                "type": "ref",
+                "ref": "#expectedConversation"
+              },
+              "description": "List of conversations the user should be in"
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "name": "Unauthorized",
+          "description": "Authentication required"
+        }
+      ]
+    },
+    "expectedConversation": {
+      "type": "object",
+      "required": ["convoId", "name", "memberCount", "shouldBeInGroup"],
+      "properties": {
+        "convoId": {
+          "type": "string",
+          "description": "Conversation identifier"
+        },
+        "name": {
+          "type": "string",
+          "description": "Conversation name"
+        },
+        "memberCount": {
+          "type": "integer",
+          "description": "Number of active members in conversation"
+        },
+        "shouldBeInGroup": {
+          "type": "boolean",
+          "description": "Whether this device should be in the MLS group"
+        },
+        "lastActivity": {
+          "type": "string",
+          "format": "datetime",
+          "description": "Timestamp of last activity in conversation"
+        },
+        "needsRejoin": {
+          "type": "boolean",
+          "description": "Whether user has an active rejoin request for this conversation"
+        },
+        "deviceInGroup": {
+          "type": "boolean",
+          "description": "Whether the specific device is currently in the MLS group"
+        }
+      }
+    }
+  }
+}

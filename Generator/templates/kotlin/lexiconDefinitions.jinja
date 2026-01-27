@@ -6,6 +6,7 @@
      */
 {% endif %}
     @Serializable
+    {% if def.properties %}
     data class {{ def.name }}(
         {% for prop in def.properties %}
         {% if prop.description %}/** {{ prop.description }} */{% endif %}
@@ -17,6 +18,21 @@
             const val TYPE_IDENTIFIER = "{{ lexicon_id }}#{{ def.name | camelCase }}"
         }
     }
+    {% else %}
+    class {{ def.name }} {
+        companion object {
+            const val TYPE_IDENTIFIER = "{{ lexicon_id }}#{{ def.name | camelCase }}"
+        }
+    }
+    {% endif %}
+
+{% elif def.type == 'type_alias' %}
+{% if def.description %}
+    /**
+     * {{ def.description }}
+     */
+{% endif %}
+    typealias {{ def.name }} = {{ def.target }}
 
 {% endif %}
 {% endfor %}

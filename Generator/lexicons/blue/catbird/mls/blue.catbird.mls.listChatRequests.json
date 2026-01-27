@@ -1,0 +1,94 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mls.listChatRequests",
+  "defs": {
+    "main": {
+      "type": "query",
+      "description": "List pending chat requests received by the authenticated user",
+      "parameters": {
+        "type": "params",
+        "properties": {
+          "cursor": {
+            "type": "string",
+            "description": "Pagination cursor (request ID)"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 50,
+            "description": "Number of requests to return"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "accepted", "declined", "blocked", "expired"],
+            "description": "Filter by request status (default: pending only)"
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["requests"],
+          "properties": {
+            "requests": {
+              "type": "array",
+              "items": {
+                "type": "ref",
+                "ref": "#chatRequest"
+              }
+            },
+            "cursor": {
+              "type": "string",
+              "description": "Pagination cursor for next page"
+            }
+          }
+        }
+      }
+    },
+    "chatRequest": {
+      "type": "object",
+      "required": ["id", "senderDid", "status", "createdAt", "expiresAt"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Request ID (ULID)"
+        },
+        "senderDid": {
+          "type": "string",
+          "description": "DID of the sender"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "accepted", "declined", "blocked", "expired"],
+          "description": "Current request status"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "datetime"
+        },
+        "expiresAt": {
+          "type": "string",
+          "format": "datetime"
+        },
+        "previewText": {
+          "type": "string",
+          "description": "Optional preview text from sender"
+        },
+        "messageCount": {
+          "type": "integer",
+          "description": "Number of held messages"
+        },
+        "isGroupInvite": {
+          "type": "boolean",
+          "description": "If true, this is a group invite"
+        },
+        "groupId": {
+          "type": "string",
+          "description": "Group conversation ID if group invite"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,88 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mls.handleBlockChange",
+  "description": "Notify server of Bluesky block change affecting conversation membership",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Client notifies server when a Bluesky block is created or removed that affects MLS conversations. Server checks if both users are in any conversations together and notifies admins of conflicts. Enables reactive moderation when blocks occur after users have already joined conversations.",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["blockerDid", "blockedDid", "action"],
+          "properties": {
+            "blockerDid": {
+              "type": "string",
+              "format": "did",
+              "description": "User who created or removed the block"
+            },
+            "blockedDid": {
+              "type": "string",
+              "format": "did",
+              "description": "User who was blocked or unblocked"
+            },
+            "action": {
+              "type": "string",
+              "description": "Whether the block was created or removed",
+              "knownValues": ["created", "removed"]
+            },
+            "blockUri": {
+              "type": "string",
+              "format": "at-uri",
+              "description": "AT-URI of the block record on Bluesky (for verification)"
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["affectedConvos"],
+          "properties": {
+            "affectedConvos": {
+              "type": "array",
+              "items": {
+                "type": "ref",
+                "ref": "#affectedConvo"
+              },
+              "description": "Conversations where both users are members (block conflicts)"
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "name": "BlockNotVerified",
+          "description": "Could not verify block status with Bluesky"
+        }
+      ]
+    },
+    "affectedConvo": {
+      "type": "object",
+      "description": "A conversation affected by a block change",
+      "required": ["convoId", "action", "adminNotified"],
+      "properties": {
+        "convoId": {
+          "type": "string",
+          "description": "Conversation identifier"
+        },
+        "action": {
+          "type": "string",
+          "description": "Action taken or required by admins",
+          "knownValues": ["admin_notified", "auto_removed", "requires_resolution", "no_action"]
+        },
+        "adminNotified": {
+          "type": "boolean",
+          "description": "Whether conversation admins were notified via SSE"
+        },
+        "notificationSentAt": {
+          "type": "string",
+          "format": "datetime",
+          "description": "When admin notification was sent (if applicable)"
+        }
+      }
+    }
+  }
+}

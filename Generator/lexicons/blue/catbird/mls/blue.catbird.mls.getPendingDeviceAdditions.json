@@ -1,0 +1,95 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mls.getPendingDeviceAdditions",
+  "description": "Get pending device additions for conversations (polling fallback for SSE)",
+  "defs": {
+    "main": {
+      "type": "query",
+      "description": "Returns pending device additions for conversations where caller is a member. Used as fallback when SSE events are missed.",
+      "parameters": {
+        "type": "params",
+        "properties": {
+          "convoIds": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Optional filter for specific conversation IDs. If omitted, returns all pending additions."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 50,
+            "description": "Maximum number of pending additions to return"
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["pendingAdditions"],
+          "properties": {
+            "pendingAdditions": {
+              "type": "array",
+              "items": { "type": "ref", "ref": "#pendingDeviceAddition" },
+              "description": "List of pending device additions"
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "name": "Unauthorized",
+          "description": "Authentication required"
+        }
+      ]
+    },
+    "pendingDeviceAddition": {
+      "type": "object",
+      "description": "A pending device addition waiting to be processed",
+      "required": ["id", "convoId", "userDid", "deviceId", "deviceCredentialDid", "status", "createdAt"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for this pending addition"
+        },
+        "convoId": {
+          "type": "string",
+          "description": "Conversation identifier"
+        },
+        "userDid": {
+          "type": "string",
+          "format": "did",
+          "description": "Base user DID (without device suffix)"
+        },
+        "deviceId": {
+          "type": "string",
+          "description": "Device identifier"
+        },
+        "deviceName": {
+          "type": "string",
+          "description": "Human-readable device name"
+        },
+        "deviceCredentialDid": {
+          "type": "string",
+          "description": "Full device credential DID (format: did:plc:user#device-uuid)"
+        },
+        "status": {
+          "type": "string",
+          "description": "Current status of the pending addition",
+          "knownValues": ["pending", "in_progress"]
+        },
+        "claimedBy": {
+          "type": "string",
+          "format": "did",
+          "description": "DID of the member who claimed this addition (if in_progress)"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "datetime",
+          "description": "When this pending addition was created"
+        }
+      }
+    }
+  }
+}

@@ -88,7 +88,7 @@
             return storageDirectory.appendingPathComponent(filename)
         }
 
-        func store(key: String, value: Data, namespace: String) throws {
+        func store(key: String, value: Data, namespace: String, accessGroup: String?) throws {
             let sealed = try AES.GCM.seal(value, using: masterKey)
             guard let combined = sealed.combined else {
                 throw FileEncryptedStoreError.encryptionFailed
@@ -97,7 +97,7 @@
             LogManager.logDebug("FileEncryptedStore: Stored key \(namespace).\(key)")
         }
 
-        func retrieve(key: String, namespace: String) throws -> Data {
+        func retrieve(key: String, namespace: String, accessGroup: String?) throws -> Data {
             let url = fileURL(for: key, namespace: namespace)
             guard FileManager.default.fileExists(atPath: url.path) else {
                 throw KeychainError.itemRetrievalError(status: Int(errSecItemNotFound))
@@ -109,13 +109,13 @@
             return decrypted
         }
 
-        func delete(key: String, namespace: String) throws {
+        func delete(key: String, namespace: String, accessGroup: String?) throws {
             let url = fileURL(for: key, namespace: namespace)
             try? FileManager.default.removeItem(at: url)
             LogManager.logDebug("FileEncryptedStore: Deleted key \(namespace).\(key)")
         }
 
-        func deleteAll(namespace: String) throws {
+        func deleteAll(namespace: String, accessGroup: String?) throws {
             let files = try FileManager.default.contentsOfDirectory(
                 at: storageDirectory,
                 includingPropertiesForKeys: nil
@@ -137,17 +137,21 @@
             LogManager.logInfo("FileEncryptedStore: Deleted \(deletedCount) items for namespace: \(namespace)")
         }
 
-        func storeDPoPKey(_ key: P256.Signing.PrivateKey, keyTag: String) throws {
-            try store(key: keyTag, value: key.x963Representation, namespace: "dpopkeys")
+        func storeDPoPKey(
+            _ key: P256.Signing.PrivateKey,
+            keyTag: String,
+            accessGroup: String?
+        ) throws {
+            try store(key: keyTag, value: key.x963Representation, namespace: "dpopkeys", accessGroup: accessGroup)
         }
 
-        func retrieveDPoPKey(keyTag: String) throws -> P256.Signing.PrivateKey {
-            let data = try retrieve(key: keyTag, namespace: "dpopkeys")
+        func retrieveDPoPKey(keyTag: String, accessGroup: String?) throws -> P256.Signing.PrivateKey {
+            let data = try retrieve(key: keyTag, namespace: "dpopkeys", accessGroup: accessGroup)
             return try P256.Signing.PrivateKey(x963Representation: data)
         }
 
-        func deleteDPoPKey(keyTag: String) throws {
-            try delete(key: keyTag, namespace: "dpopkeys")
+        func deleteDPoPKey(keyTag: String, accessGroup: String?) throws {
+            try delete(key: keyTag, namespace: "dpopkeys", accessGroup: accessGroup)
         }
     }
 

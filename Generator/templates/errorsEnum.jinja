@@ -1,8 +1,14 @@
-        public enum Error: String, Swift.Error, CustomStringConvertible { 
+        public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
             {%- for error in errors %}
                 case {{ error.name | lowerCamelCase }} = "{{error.name}}.{{ error.description }}"
             {%- endfor %}
             public var description: String {
                 return self.rawValue
+            }
+
+            public var errorName: String {
+                // Extract just the error name from the raw value
+                let parts = self.rawValue.split(separator: ".")
+                return String(parts.first ?? "")
             }
         }
