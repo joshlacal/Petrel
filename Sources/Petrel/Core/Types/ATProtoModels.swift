@@ -98,14 +98,6 @@ public struct ProtectedResourceMetadata: Codable, Sendable, Hashable {
 
 /// Represents a user account in the AT Protocol
 public struct Account: Codable, Equatable, Sendable {
-    public static func == (lhs: Account, rhs: Account) -> Bool {
-        lhs.did == rhs.did && lhs.handle == rhs.handle && lhs.pdsURL == rhs.pdsURL
-            && lhs.protectedResourceMetadata == rhs.protectedResourceMetadata
-            && lhs.authorizationServerMetadata == rhs.authorizationServerMetadata
-            && lhs.bskyAppViewDID == rhs.bskyAppViewDID
-            && lhs.bskyChatDID == rhs.bskyChatDID
-    }
-
     /// The decentralized identifier for the account
     public let did: String
 

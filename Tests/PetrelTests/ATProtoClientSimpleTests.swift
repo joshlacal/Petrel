@@ -18,7 +18,7 @@ struct ATProtoClientSimpleTests {
     // MARK: - Client Initialization Tests
 
     @Test("ATProtoClient initializes with correct configuration")
-    func clientInitialization() async throws {
+    func clientInitialization() {
         let oauthConfig = OAuthConfig(
             clientId: "test-client",
             redirectUri: "catbird://callback",
@@ -35,7 +35,7 @@ struct ATProtoClientSimpleTests {
     }
 
     @Test("Client configuration validation")
-    func clientConfigValidation() throws {
+    func clientConfigValidation() {
         // Test valid configuration
         let validConfig = OAuthConfig(
             clientId: "valid-client-id",
@@ -58,7 +58,7 @@ struct ATProtoClientSimpleTests {
     // MARK: - API Namespace Tests
 
     @Test("API namespaces are properly structured")
-    func aPINamespaceStructure() async throws {
+    func aPINamespaceStructure() {
         let client = createTestClient()
 
         // Verify main namespaces exist and are properly typed
@@ -80,7 +80,7 @@ struct ATProtoClientSimpleTests {
     // MARK: - Basic API Call Structure Tests
 
     @Test("Timeline API accepts proper parameters")
-    func timelineAPIStructure() async throws {
+    func timelineAPIStructure() {
         let client = createTestClient()
 
         // Test parameter structure
@@ -104,7 +104,7 @@ struct ATProtoClientSimpleTests {
     }
 
     @Test("Actor profile API accepts proper parameters")
-    func actorProfileAPIStructure() async throws {
+    func actorProfileAPIStructure() {
         let client = createTestClient()
 
         // Test parameter structure
@@ -123,7 +123,7 @@ struct ATProtoClientSimpleTests {
     // MARK: - Configuration Tests
 
     @Test("OAuth configuration properties are accessible")
-    func oAuthConfigurationAccess() throws {
+    func oAuthConfigurationAccess() {
         let config = OAuthConfig(
             clientId: "test-client-123",
             redirectUri: "myapp://oauth/callback",
@@ -139,7 +139,7 @@ struct ATProtoClientSimpleTests {
     // MARK: - Memory Management Tests
 
     @Test("Client can be deallocated properly")
-    func clientDeallocation() async throws {
+    func clientDeallocation() async {
         var client: ATProtoClient? = createTestClient()
 
         weak var weakClient = client
@@ -154,7 +154,7 @@ struct ATProtoClientSimpleTests {
     // MARK: - Thread Safety Tests
 
     @Test("Client can be accessed from multiple tasks")
-    func basicThreadSafety() async throws {
+    func basicThreadSafety() async {
         let client = createTestClient()
 
         // Create multiple concurrent tasks that access the client
@@ -177,7 +177,7 @@ struct ATProtoClientSimpleTests {
     // MARK: - Parameter Validation Tests
 
     @Test("API parameters handle edge cases")
-    func aPIParameterEdgeCases() throws {
+    func aPIParameterEdgeCases() {
         // Test with nil optional parameters
         let emptyParams = AppBskyFeedGetTimeline.Parameters()
         #expect(emptyParams.algorithm == nil, "Optional algorithm should be nil")
@@ -204,7 +204,7 @@ struct ATProtoClientSimpleTests {
     // MARK: - URL Validation Tests
 
     @Test("OAuth redirect URI validation")
-    func redirectURIValidation() throws {
+    func redirectURIValidation() {
         // Test various URI formats
         let uriFormats = [
             "myapp://oauth/callback",
@@ -227,7 +227,7 @@ struct ATProtoClientSimpleTests {
     // MARK: - Scope Validation Tests
 
     @Test("OAuth scope combinations")
-    func oAuthScopeCombinations() throws {
+    func oAuthScopeCombinations() {
         let scopeCombinations = [
             "atproto",
             "atproto transition:generic",

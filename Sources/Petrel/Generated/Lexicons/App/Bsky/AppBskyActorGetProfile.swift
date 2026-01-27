@@ -1,47 +1,36 @@
 import Foundation
 
-
-
 // lexicon: 1, id: app.bsky.actor.getProfile
 
-
-public struct AppBskyActorGetProfile { 
-
-    public static let typeIdentifier = "app.bsky.actor.getProfile"    
-public struct Parameters: Parametrizable {
+public enum AppBskyActorGetProfile {
+    public static let typeIdentifier = "app.bsky.actor.getProfile"
+    public struct Parameters: Parametrizable {
         public let actor: ATIdentifier
-        
+
         public init(
             actor: ATIdentifier
-            ) {
+        ) {
             self.actor = actor
-            
         }
     }
+
     public typealias Output = AppBskyActorDefs.ProfileViewDetailed
-    
-
-
-
 }
 
-
-
-extension ATProtoClient.App.Bsky.Actor {
+public extension ATProtoClient.App.Bsky.Actor {
     // MARK: - getProfile
 
     /// Get detailed profile view of an actor. Does not require auth, but contains relevant metadata with auth.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func getProfile(input: AppBskyActorGetProfile.Parameters) async throws -> (responseCode: Int, data: AppBskyActorGetProfile.Output?) {
+    func getProfile(input: AppBskyActorGetProfile.Parameters) async throws -> (responseCode: Int, data: AppBskyActorGetProfile.Output?) {
         let endpoint = "app.bsky.actor.getProfile"
 
-        
         let queryItems = input.asQueryItems()
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -65,12 +54,11 @@ extension ATProtoClient.App.Bsky.Actor {
         }
 
         // Only decode response data if request was successful
-        if (200...299).contains(responseCode) {
+        if (200 ... 299).contains(responseCode) {
             do {
-                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(AppBskyActorGetProfile.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -78,12 +66,9 @@ extension ATProtoClient.App.Bsky.Actor {
                 return (responseCode, nil)
             }
         } else {
-            
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-                           
-

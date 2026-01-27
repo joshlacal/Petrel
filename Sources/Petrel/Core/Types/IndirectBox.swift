@@ -2,7 +2,7 @@ import Foundation
 
 /// A box type that breaks circular reference cycles by storing values indirectly on the heap.
 /// This allows recursive/circular type definitions without causing infinite metadata instantiation.
-public indirect enum IndirectBox<T>: Sendable where T: Sendable {
+public indirect enum IndirectBox<T: Sendable>: Sendable {
     case value(T)
 
     public init(_ value: T) {

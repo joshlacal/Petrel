@@ -1,29 +1,20 @@
 import Foundation
 
-
-
 // lexicon: 1, id: app.bsky.notification.defs
 
-
-public struct AppBskyNotificationDefs { 
-
+public enum AppBskyNotificationDefs {
     public static let typeIdentifier = "app.bsky.notification.defs"
-        
-public struct RecordDeleted: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.notification.defs#recordDeleted"
 
-        // Standard initializer
+    public struct RecordDeleted: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.notification.defs#recordDeleted"
+
+        /// Standard initializer
         public init(
-            
-        ) {
-            
-        }
+        ) {}
 
-        // Codable initializer
+        /// Codable initializer
         public init(from decoder: Decoder) throws {
-            
-            let _ = decoder  // Acknowledge parameter for empty struct
-            
+            _ = decoder // Acknowledge parameter for empty struct
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -31,26 +22,21 @@ public struct RecordDeleted: ATProtocolCodable, ATProtocolValue {
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
         }
 
-        public func hash(into hasher: inout Hasher) {
-        }
+        public func hash(into hasher: inout Hasher) {}
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            
-            return other is Self  // For empty structs, just check the type
-            
+            return other is Self // For empty structs, just check the type
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
             return lhs.isEqual(to: rhs)
         }
 
-        // DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-
-            
 
             return map
         }
@@ -59,65 +45,48 @@ public struct RecordDeleted: ATProtocolCodable, ATProtocolValue {
             case typeIdentifier = "$type"
         }
     }
-        
-public struct ChatPreference: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.notification.defs#chatPreference"
-            public let include: String
-            public let push: Bool
 
-        // Standard initializer
+    public struct ChatPreference: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.notification.defs#chatPreference"
+        public let include: String
+        public let push: Bool
+
+        /// Standard initializer
         public init(
             include: String, push: Bool
         ) {
-            
             self.include = include
             self.push = push
         }
 
-        // Codable initializer
+        /// Codable initializer
         public init(from decoder: Decoder) throws {
-            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                
-                
-                self.include = try container.decode(String.self, forKey: .include)
-                
-                
+                include = try container.decode(String.self, forKey: .include)
+
             } catch {
-                
                 LogManager.logError("Decoding error for required property 'include': \(error)")
-                
+
                 throw error
             }
             do {
-                
-                
-                self.push = try container.decode(Bool.self, forKey: .push)
-                
-                
+                push = try container.decode(Bool.self, forKey: .push)
+
             } catch {
-                
                 LogManager.logError("Decoding error for required property 'push': \(error)")
-                
+
                 throw error
             }
-            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            
-            
+
             try container.encode(include, forKey: .include)
-            
-            
-            
-            
+
             try container.encode(push, forKey: .push)
-            
-            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -126,53 +95,34 @@ public struct ChatPreference: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            
             guard let other = other as? Self else { return false }
-            
-            
-            if self.include != other.include {
+
+            if include != other.include {
                 return false
             }
-            
-            
-            
-            
-            if self.push != other.push {
+
+            if push != other.push {
                 return false
             }
-            
-            
+
             return true
-            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
             return lhs.isEqual(to: rhs)
         }
 
-        // DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            
-            
-            
-            
             let includeValue = try include.toCBORValue()
             map = map.adding(key: "include", value: includeValue)
-            
-            
-            
-            
-            
-            
+
             let pushValue = try push.toCBORValue()
             map = map.adding(key: "push", value: pushValue)
-            
-            
-            
 
             return map
         }
@@ -183,84 +133,60 @@ public struct ChatPreference: ATProtocolCodable, ATProtocolValue {
             case push
         }
     }
-        
-public struct FilterablePreference: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.notification.defs#filterablePreference"
-            public let include: String
-            public let list: Bool
-            public let push: Bool
 
-        // Standard initializer
+    public struct FilterablePreference: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.notification.defs#filterablePreference"
+        public let include: String
+        public let list: Bool
+        public let push: Bool
+
+        /// Standard initializer
         public init(
             include: String, list: Bool, push: Bool
         ) {
-            
             self.include = include
             self.list = list
             self.push = push
         }
 
-        // Codable initializer
+        /// Codable initializer
         public init(from decoder: Decoder) throws {
-            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                
-                
-                self.include = try container.decode(String.self, forKey: .include)
-                
-                
+                include = try container.decode(String.self, forKey: .include)
+
             } catch {
-                
                 LogManager.logError("Decoding error for required property 'include': \(error)")
-                
+
                 throw error
             }
             do {
-                
-                
-                self.list = try container.decode(Bool.self, forKey: .list)
-                
-                
+                list = try container.decode(Bool.self, forKey: .list)
+
             } catch {
-                
                 LogManager.logError("Decoding error for required property 'list': \(error)")
-                
+
                 throw error
             }
             do {
-                
-                
-                self.push = try container.decode(Bool.self, forKey: .push)
-                
-                
+                push = try container.decode(Bool.self, forKey: .push)
+
             } catch {
-                
                 LogManager.logError("Decoding error for required property 'push': \(error)")
-                
+
                 throw error
             }
-            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            
-            
+
             try container.encode(include, forKey: .include)
-            
-            
-            
-            
+
             try container.encode(list, forKey: .list)
-            
-            
-            
-            
+
             try container.encode(push, forKey: .push)
-            
-            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -270,68 +196,41 @@ public struct FilterablePreference: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            
             guard let other = other as? Self else { return false }
-            
-            
-            if self.include != other.include {
+
+            if include != other.include {
                 return false
             }
-            
-            
-            
-            
-            if self.list != other.list {
+
+            if list != other.list {
                 return false
             }
-            
-            
-            
-            
-            if self.push != other.push {
+
+            if push != other.push {
                 return false
             }
-            
-            
+
             return true
-            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
             return lhs.isEqual(to: rhs)
         }
 
-        // DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            
-            
-            
-            
             let includeValue = try include.toCBORValue()
             map = map.adding(key: "include", value: includeValue)
-            
-            
-            
-            
-            
-            
+
             let listValue = try list.toCBORValue()
             map = map.adding(key: "list", value: listValue)
-            
-            
-            
-            
-            
-            
+
             let pushValue = try push.toCBORValue()
             map = map.adding(key: "push", value: pushValue)
-            
-            
-            
 
             return map
         }
@@ -343,65 +242,48 @@ public struct FilterablePreference: ATProtocolCodable, ATProtocolValue {
             case push
         }
     }
-        
-public struct Preference: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.notification.defs#preference"
-            public let list: Bool
-            public let push: Bool
 
-        // Standard initializer
+    public struct Preference: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.notification.defs#preference"
+        public let list: Bool
+        public let push: Bool
+
+        /// Standard initializer
         public init(
             list: Bool, push: Bool
         ) {
-            
             self.list = list
             self.push = push
         }
 
-        // Codable initializer
+        /// Codable initializer
         public init(from decoder: Decoder) throws {
-            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                
-                
-                self.list = try container.decode(Bool.self, forKey: .list)
-                
-                
+                list = try container.decode(Bool.self, forKey: .list)
+
             } catch {
-                
                 LogManager.logError("Decoding error for required property 'list': \(error)")
-                
+
                 throw error
             }
             do {
-                
-                
-                self.push = try container.decode(Bool.self, forKey: .push)
-                
-                
+                push = try container.decode(Bool.self, forKey: .push)
+
             } catch {
-                
                 LogManager.logError("Decoding error for required property 'push': \(error)")
-                
+
                 throw error
             }
-            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            
-            
+
             try container.encode(list, forKey: .list)
-            
-            
-            
-            
+
             try container.encode(push, forKey: .push)
-            
-            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -410,53 +292,34 @@ public struct Preference: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            
             guard let other = other as? Self else { return false }
-            
-            
-            if self.list != other.list {
+
+            if list != other.list {
                 return false
             }
-            
-            
-            
-            
-            if self.push != other.push {
+
+            if push != other.push {
                 return false
             }
-            
-            
+
             return true
-            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
             return lhs.isEqual(to: rhs)
         }
 
-        // DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            
-            
-            
-            
             let listValue = try list.toCBORValue()
             map = map.adding(key: "list", value: listValue)
-            
-            
-            
-            
-            
-            
+
             let pushValue = try push.toCBORValue()
             map = map.adding(key: "push", value: pushValue)
-            
-            
-            
 
             return map
         }
@@ -467,28 +330,27 @@ public struct Preference: ATProtocolCodable, ATProtocolValue {
             case push
         }
     }
-        
-public struct Preferences: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.notification.defs#preferences"
-            public let chat: ChatPreference
-            public let follow: FilterablePreference
-            public let like: FilterablePreference
-            public let likeViaRepost: FilterablePreference
-            public let mention: FilterablePreference
-            public let quote: FilterablePreference
-            public let reply: FilterablePreference
-            public let repost: FilterablePreference
-            public let repostViaRepost: FilterablePreference
-            public let starterpackJoined: Preference
-            public let subscribedPost: Preference
-            public let unverified: Preference
-            public let verified: Preference
 
-        // Standard initializer
+    public struct Preferences: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.notification.defs#preferences"
+        public let chat: ChatPreference
+        public let follow: FilterablePreference
+        public let like: FilterablePreference
+        public let likeViaRepost: FilterablePreference
+        public let mention: FilterablePreference
+        public let quote: FilterablePreference
+        public let reply: FilterablePreference
+        public let repost: FilterablePreference
+        public let repostViaRepost: FilterablePreference
+        public let starterpackJoined: Preference
+        public let subscribedPost: Preference
+        public let unverified: Preference
+        public let verified: Preference
+
+        /// Standard initializer
         public init(
             chat: ChatPreference, follow: FilterablePreference, like: FilterablePreference, likeViaRepost: FilterablePreference, mention: FilterablePreference, quote: FilterablePreference, reply: FilterablePreference, repost: FilterablePreference, repostViaRepost: FilterablePreference, starterpackJoined: Preference, subscribedPost: Preference, unverified: Preference, verified: Preference
         ) {
-            
             self.chat = chat
             self.follow = follow
             self.like = like
@@ -504,237 +366,144 @@ public struct Preferences: ATProtocolCodable, ATProtocolValue {
             self.verified = verified
         }
 
-        // Codable initializer
+        /// Codable initializer
         public init(from decoder: Decoder) throws {
-            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                
-                
-                self.chat = try container.decode(ChatPreference.self, forKey: .chat)
-                
-                
+                chat = try container.decode(ChatPreference.self, forKey: .chat)
+
             } catch {
-                
                 LogManager.logError("Decoding error for required property 'chat': \(error)")
-                
+
                 throw error
             }
             do {
-                
-                
-                self.follow = try container.decode(FilterablePreference.self, forKey: .follow)
-                
-                
+                follow = try container.decode(FilterablePreference.self, forKey: .follow)
+
             } catch {
-                
                 LogManager.logError("Decoding error for required property 'follow': \(error)")
-                
+
                 throw error
             }
             do {
-                
-                
-                self.like = try container.decode(FilterablePreference.self, forKey: .like)
-                
-                
+                like = try container.decode(FilterablePreference.self, forKey: .like)
+
             } catch {
-                
                 LogManager.logError("Decoding error for required property 'like': \(error)")
-                
+
                 throw error
             }
             do {
-                
-                
-                self.likeViaRepost = try container.decode(FilterablePreference.self, forKey: .likeViaRepost)
-                
-                
+                likeViaRepost = try container.decode(FilterablePreference.self, forKey: .likeViaRepost)
+
             } catch {
-                
                 LogManager.logError("Decoding error for required property 'likeViaRepost': \(error)")
-                
+
                 throw error
             }
             do {
-                
-                
-                self.mention = try container.decode(FilterablePreference.self, forKey: .mention)
-                
-                
+                mention = try container.decode(FilterablePreference.self, forKey: .mention)
+
             } catch {
-                
                 LogManager.logError("Decoding error for required property 'mention': \(error)")
-                
+
                 throw error
             }
             do {
-                
-                
-                self.quote = try container.decode(FilterablePreference.self, forKey: .quote)
-                
-                
+                quote = try container.decode(FilterablePreference.self, forKey: .quote)
+
             } catch {
-                
                 LogManager.logError("Decoding error for required property 'quote': \(error)")
-                
+
                 throw error
             }
             do {
-                
-                
-                self.reply = try container.decode(FilterablePreference.self, forKey: .reply)
-                
-                
+                reply = try container.decode(FilterablePreference.self, forKey: .reply)
+
             } catch {
-                
                 LogManager.logError("Decoding error for required property 'reply': \(error)")
-                
+
                 throw error
             }
             do {
-                
-                
-                self.repost = try container.decode(FilterablePreference.self, forKey: .repost)
-                
-                
+                repost = try container.decode(FilterablePreference.self, forKey: .repost)
+
             } catch {
-                
                 LogManager.logError("Decoding error for required property 'repost': \(error)")
-                
+
                 throw error
             }
             do {
-                
-                
-                self.repostViaRepost = try container.decode(FilterablePreference.self, forKey: .repostViaRepost)
-                
-                
+                repostViaRepost = try container.decode(FilterablePreference.self, forKey: .repostViaRepost)
+
             } catch {
-                
                 LogManager.logError("Decoding error for required property 'repostViaRepost': \(error)")
-                
+
                 throw error
             }
             do {
-                
-                
-                self.starterpackJoined = try container.decode(Preference.self, forKey: .starterpackJoined)
-                
-                
+                starterpackJoined = try container.decode(Preference.self, forKey: .starterpackJoined)
+
             } catch {
-                
                 LogManager.logError("Decoding error for required property 'starterpackJoined': \(error)")
-                
+
                 throw error
             }
             do {
-                
-                
-                self.subscribedPost = try container.decode(Preference.self, forKey: .subscribedPost)
-                
-                
+                subscribedPost = try container.decode(Preference.self, forKey: .subscribedPost)
+
             } catch {
-                
                 LogManager.logError("Decoding error for required property 'subscribedPost': \(error)")
-                
+
                 throw error
             }
             do {
-                
-                
-                self.unverified = try container.decode(Preference.self, forKey: .unverified)
-                
-                
+                unverified = try container.decode(Preference.self, forKey: .unverified)
+
             } catch {
-                
                 LogManager.logError("Decoding error for required property 'unverified': \(error)")
-                
+
                 throw error
             }
             do {
-                
-                
-                self.verified = try container.decode(Preference.self, forKey: .verified)
-                
-                
+                verified = try container.decode(Preference.self, forKey: .verified)
+
             } catch {
-                
                 LogManager.logError("Decoding error for required property 'verified': \(error)")
-                
+
                 throw error
             }
-            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            
-            
+
             try container.encode(chat, forKey: .chat)
-            
-            
-            
-            
+
             try container.encode(follow, forKey: .follow)
-            
-            
-            
-            
+
             try container.encode(like, forKey: .like)
-            
-            
-            
-            
+
             try container.encode(likeViaRepost, forKey: .likeViaRepost)
-            
-            
-            
-            
+
             try container.encode(mention, forKey: .mention)
-            
-            
-            
-            
+
             try container.encode(quote, forKey: .quote)
-            
-            
-            
-            
+
             try container.encode(reply, forKey: .reply)
-            
-            
-            
-            
+
             try container.encode(repost, forKey: .repost)
-            
-            
-            
-            
+
             try container.encode(repostViaRepost, forKey: .repostViaRepost)
-            
-            
-            
-            
+
             try container.encode(starterpackJoined, forKey: .starterpackJoined)
-            
-            
-            
-            
+
             try container.encode(subscribedPost, forKey: .subscribedPost)
-            
-            
-            
-            
+
             try container.encode(unverified, forKey: .unverified)
-            
-            
-            
-            
+
             try container.encode(verified, forKey: .verified)
-            
-            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -754,218 +523,111 @@ public struct Preferences: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            
             guard let other = other as? Self else { return false }
-            
-            
-            if self.chat != other.chat {
+
+            if chat != other.chat {
                 return false
             }
-            
-            
-            
-            
-            if self.follow != other.follow {
+
+            if follow != other.follow {
                 return false
             }
-            
-            
-            
-            
-            if self.like != other.like {
+
+            if like != other.like {
                 return false
             }
-            
-            
-            
-            
-            if self.likeViaRepost != other.likeViaRepost {
+
+            if likeViaRepost != other.likeViaRepost {
                 return false
             }
-            
-            
-            
-            
-            if self.mention != other.mention {
+
+            if mention != other.mention {
                 return false
             }
-            
-            
-            
-            
-            if self.quote != other.quote {
+
+            if quote != other.quote {
                 return false
             }
-            
-            
-            
-            
-            if self.reply != other.reply {
+
+            if reply != other.reply {
                 return false
             }
-            
-            
-            
-            
-            if self.repost != other.repost {
+
+            if repost != other.repost {
                 return false
             }
-            
-            
-            
-            
-            if self.repostViaRepost != other.repostViaRepost {
+
+            if repostViaRepost != other.repostViaRepost {
                 return false
             }
-            
-            
-            
-            
-            if self.starterpackJoined != other.starterpackJoined {
+
+            if starterpackJoined != other.starterpackJoined {
                 return false
             }
-            
-            
-            
-            
-            if self.subscribedPost != other.subscribedPost {
+
+            if subscribedPost != other.subscribedPost {
                 return false
             }
-            
-            
-            
-            
-            if self.unverified != other.unverified {
+
+            if unverified != other.unverified {
                 return false
             }
-            
-            
-            
-            
-            if self.verified != other.verified {
+
+            if verified != other.verified {
                 return false
             }
-            
-            
+
             return true
-            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
             return lhs.isEqual(to: rhs)
         }
 
-        // DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            
-            
-            
-            
             let chatValue = try chat.toCBORValue()
             map = map.adding(key: "chat", value: chatValue)
-            
-            
-            
-            
-            
-            
+
             let followValue = try follow.toCBORValue()
             map = map.adding(key: "follow", value: followValue)
-            
-            
-            
-            
-            
-            
+
             let likeValue = try like.toCBORValue()
             map = map.adding(key: "like", value: likeValue)
-            
-            
-            
-            
-            
-            
+
             let likeViaRepostValue = try likeViaRepost.toCBORValue()
             map = map.adding(key: "likeViaRepost", value: likeViaRepostValue)
-            
-            
-            
-            
-            
-            
+
             let mentionValue = try mention.toCBORValue()
             map = map.adding(key: "mention", value: mentionValue)
-            
-            
-            
-            
-            
-            
+
             let quoteValue = try quote.toCBORValue()
             map = map.adding(key: "quote", value: quoteValue)
-            
-            
-            
-            
-            
-            
+
             let replyValue = try reply.toCBORValue()
             map = map.adding(key: "reply", value: replyValue)
-            
-            
-            
-            
-            
-            
+
             let repostValue = try repost.toCBORValue()
             map = map.adding(key: "repost", value: repostValue)
-            
-            
-            
-            
-            
-            
+
             let repostViaRepostValue = try repostViaRepost.toCBORValue()
             map = map.adding(key: "repostViaRepost", value: repostViaRepostValue)
-            
-            
-            
-            
-            
-            
+
             let starterpackJoinedValue = try starterpackJoined.toCBORValue()
             map = map.adding(key: "starterpackJoined", value: starterpackJoinedValue)
-            
-            
-            
-            
-            
-            
+
             let subscribedPostValue = try subscribedPost.toCBORValue()
             map = map.adding(key: "subscribedPost", value: subscribedPostValue)
-            
-            
-            
-            
-            
-            
+
             let unverifiedValue = try unverified.toCBORValue()
             map = map.adding(key: "unverified", value: unverifiedValue)
-            
-            
-            
-            
-            
-            
+
             let verifiedValue = try verified.toCBORValue()
             map = map.adding(key: "verified", value: verifiedValue)
-            
-            
-            
 
             return map
         }
@@ -987,65 +649,48 @@ public struct Preferences: ATProtocolCodable, ATProtocolValue {
             case verified
         }
     }
-        
-public struct ActivitySubscription: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.notification.defs#activitySubscription"
-            public let post: Bool
-            public let reply: Bool
 
-        // Standard initializer
+    public struct ActivitySubscription: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.notification.defs#activitySubscription"
+        public let post: Bool
+        public let reply: Bool
+
+        /// Standard initializer
         public init(
             post: Bool, reply: Bool
         ) {
-            
             self.post = post
             self.reply = reply
         }
 
-        // Codable initializer
+        /// Codable initializer
         public init(from decoder: Decoder) throws {
-            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                
-                
-                self.post = try container.decode(Bool.self, forKey: .post)
-                
-                
+                post = try container.decode(Bool.self, forKey: .post)
+
             } catch {
-                
                 LogManager.logError("Decoding error for required property 'post': \(error)")
-                
+
                 throw error
             }
             do {
-                
-                
-                self.reply = try container.decode(Bool.self, forKey: .reply)
-                
-                
+                reply = try container.decode(Bool.self, forKey: .reply)
+
             } catch {
-                
                 LogManager.logError("Decoding error for required property 'reply': \(error)")
-                
+
                 throw error
             }
-            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            
-            
+
             try container.encode(post, forKey: .post)
-            
-            
-            
-            
+
             try container.encode(reply, forKey: .reply)
-            
-            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1054,53 +699,34 @@ public struct ActivitySubscription: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            
             guard let other = other as? Self else { return false }
-            
-            
-            if self.post != other.post {
+
+            if post != other.post {
                 return false
             }
-            
-            
-            
-            
-            if self.reply != other.reply {
+
+            if reply != other.reply {
                 return false
             }
-            
-            
+
             return true
-            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
             return lhs.isEqual(to: rhs)
         }
 
-        // DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            
-            
-            
-            
             let postValue = try post.toCBORValue()
             map = map.adding(key: "post", value: postValue)
-            
-            
-            
-            
-            
-            
+
             let replyValue = try reply.toCBORValue()
             map = map.adding(key: "reply", value: replyValue)
-            
-            
-            
 
             return map
         }
@@ -1111,65 +737,48 @@ public struct ActivitySubscription: ATProtocolCodable, ATProtocolValue {
             case reply
         }
     }
-        
-public struct SubjectActivitySubscription: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.notification.defs#subjectActivitySubscription"
-            public let subject: DID
-            public let activitySubscription: ActivitySubscription
 
-        // Standard initializer
+    public struct SubjectActivitySubscription: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.notification.defs#subjectActivitySubscription"
+        public let subject: DID
+        public let activitySubscription: ActivitySubscription
+
+        /// Standard initializer
         public init(
             subject: DID, activitySubscription: ActivitySubscription
         ) {
-            
             self.subject = subject
             self.activitySubscription = activitySubscription
         }
 
-        // Codable initializer
+        /// Codable initializer
         public init(from decoder: Decoder) throws {
-            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                
-                
-                self.subject = try container.decode(DID.self, forKey: .subject)
-                
-                
+                subject = try container.decode(DID.self, forKey: .subject)
+
             } catch {
-                
                 LogManager.logError("Decoding error for required property 'subject': \(error)")
-                
+
                 throw error
             }
             do {
-                
-                
-                self.activitySubscription = try container.decode(ActivitySubscription.self, forKey: .activitySubscription)
-                
-                
+                activitySubscription = try container.decode(ActivitySubscription.self, forKey: .activitySubscription)
+
             } catch {
-                
                 LogManager.logError("Decoding error for required property 'activitySubscription': \(error)")
-                
+
                 throw error
             }
-            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            
-            
+
             try container.encode(subject, forKey: .subject)
-            
-            
-            
-            
+
             try container.encode(activitySubscription, forKey: .activitySubscription)
-            
-            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1178,53 +787,34 @@ public struct SubjectActivitySubscription: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            
             guard let other = other as? Self else { return false }
-            
-            
-            if self.subject != other.subject {
+
+            if subject != other.subject {
                 return false
             }
-            
-            
-            
-            
-            if self.activitySubscription != other.activitySubscription {
+
+            if activitySubscription != other.activitySubscription {
                 return false
             }
-            
-            
+
             return true
-            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
             return lhs.isEqual(to: rhs)
         }
 
-        // DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
-            
-            
-            
-            
             let subjectValue = try subject.toCBORValue()
             map = map.adding(key: "subject", value: subjectValue)
-            
-            
-            
-            
-            
-            
+
             let activitySubscriptionValue = try activitySubscription.toCBORValue()
             map = map.adding(key: "activitySubscription", value: activitySubscriptionValue)
-            
-            
-            
 
             return map
         }
@@ -1235,11 +825,4 @@ public struct SubjectActivitySubscription: ATProtocolCodable, ATProtocolValue {
             case activitySubscription
         }
     }
-
-
-
 }
-
-
-                           
-

@@ -50,8 +50,10 @@
                 }
             #else
                 directory = storageDirectory ??
-                    URL(fileURLWithPath: ProcessInfo.processInfo.environment["PETREL_SECRETS_DIR"] ??
-                        NSHomeDirectory() + "/.petrel-secrets")
+                    URL(
+                        fileURLWithPath: ProcessInfo.processInfo.environment["PETREL_SECRETS_DIR"] ??
+                            NSHomeDirectory() + "/.petrel-secrets"
+                    )
             #endif
 
             self.storageDirectory = directory

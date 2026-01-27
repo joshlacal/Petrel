@@ -40,7 +40,7 @@ struct LogManagerTests {
     @Test("LogManager should handle sensitive response logging")
     func sensitiveResponseLogging() throws {
         let url = try #require(URL(string: "https://example.com/oauth/token"))
-        let response = HTTPURLResponse(
+        let response = try #require(HTTPURLResponse(
             url: url,
             statusCode: 200,
             httpVersion: "1.1",
@@ -49,7 +49,7 @@ struct LogManagerTests {
                 "Set-Cookie": "sensitive-session-id=123456",
                 "X-Auth-Token": "secret-token",
             ]
-        )!
+        ))
 
         let responseData = """
         {
@@ -65,12 +65,12 @@ struct LogManagerTests {
     @Test("LogManager should handle non-token endpoint responses")
     func nonTokenEndpointLogging() throws {
         let url = try #require(URL(string: "https://example.com/api/posts"))
-        let response = HTTPURLResponse(
+        let response = try #require(HTTPURLResponse(
             url: url,
             statusCode: 200,
             httpVersion: "1.1",
             headerFields: ["Content-Type": "application/json"]
-        )!
+        ))
 
         let responseData = """
         {
@@ -85,15 +85,15 @@ struct LogManagerTests {
     @Test("LogManager should handle large responses")
     func largeResponseLogging() throws {
         let url = try #require(URL(string: "https://example.com/api/data"))
-        let response = HTTPURLResponse(
+        let response = try #require(HTTPURLResponse(
             url: url,
             statusCode: 200,
             httpVersion: "1.1",
             headerFields: ["Content-Type": "application/json"]
-        )!
+        ))
 
         // Create a large response (over 1000 characters)
-        let largeData = String(repeating: "x", count: 2000).data(using: .utf8)!
+        let largeData = try #require(String(repeating: "x", count: 2000).data(using: .utf8))
 
         // This should truncate the response
         LogManager.logResponse(response, data: largeData)

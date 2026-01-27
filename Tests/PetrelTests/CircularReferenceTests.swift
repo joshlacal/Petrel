@@ -27,7 +27,7 @@ final class CircularReferenceTests: XCTestCase {
         }
         """
 
-        let data = json.data(using: .utf8)!
+        let data = try XCTUnwrap(json.data(using: .utf8))
         let decoder = JSONDecoder()
 
         // This should not cause a stack overflow
@@ -68,7 +68,7 @@ final class CircularReferenceTests: XCTestCase {
 
         // This should not cause a stack overflow
         let data = try encoder.encode(knownFollowers)
-        let jsonString = String(data: data, encoding: .utf8)!
+        let jsonString = try XCTUnwrap(String(data: data, encoding: .utf8))
 
         XCTAssertTrue(jsonString.contains("\"count\" : 1"))
         XCTAssertTrue(jsonString.contains("did:plc:test123"))

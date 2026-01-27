@@ -12,21 +12,21 @@ import SwiftCBOR
 
 // MARK: - ================== Core Protocols ==================
 
-// Basic interface for DAG-CBOR encoding
+/// Basic interface for DAG-CBOR encoding
 public protocol DAGCBOREncodable {
     func toCBORValue() throws -> Any
     func encodedDAGCBOR() throws -> Data
 }
 
-// Basic interface for DAG-CBOR decoding
+/// Basic interface for DAG-CBOR decoding
 public protocol DAGCBORDecodable {
     static func decodedFromDAGCBOR(_ data: Data) throws -> Self
 }
 
-// Protocol for types that can be encoded to and decoded from DAG-CBOR
+/// Protocol for types that can be encoded to and decoded from DAG-CBOR
 public typealias DAGCBORCodable = DAGCBORDecodable & DAGCBOREncodable
 
-// Error types for DAG-CBOR operations
+/// Error types for DAG-CBOR operations
 public enum DAGCBORError: Error {
     case encodingFailed(String)
     case decodingFailed(String)
@@ -52,7 +52,9 @@ public enum CIDCodec: UInt8, ATProtocolValue {
         return self == other
     }
 
-    public func toCBORValue() throws -> Any { return rawValue }
+    public func toCBORValue() throws -> Any {
+        return rawValue
+    }
 
     case raw = 0x55
     case dagPB = 0x70
@@ -78,7 +80,9 @@ public struct Multihash: ATProtocolValue {
         return algorithm == other.algorithm && length == other.length && digest == other.digest
     }
 
-    public func toCBORValue() throws -> Any { return bytes }
+    public func toCBORValue() throws -> Any {
+        return bytes
+    }
 
     // Common hash algorithm codes (from multihash table)
     public static let sha1Code: UInt8 = 0x11
@@ -115,7 +119,9 @@ public struct Multihash: ATProtocolValue {
         self.digest = digest
     }
 
-    public var bytes: Data { Data([algorithm, length]) + digest }
+    public var bytes: Data {
+        Data([algorithm, length]) + digest
+    }
 
     public static func sha256(_ data: Data) -> Multihash {
         Multihash(
@@ -129,10 +135,10 @@ public struct Multihash: ATProtocolValue {
 // MARK: $link
 
 public struct ATProtoLink: Codable, ATProtocolCodable, Hashable, Equatable, Sendable {
-    // Store the actual CID object
+    /// Store the actual CID object
     public let cid: CID
 
-    // JSON Coding Keys
+    /// JSON Coding Keys
     enum CodingKeys: String, CodingKey {
         case cidString = "$link" // Map JSON "$link" to a temporary string property
     }
@@ -171,10 +177,6 @@ public struct ATProtoLink: Codable, ATProtocolCodable, Hashable, Equatable, Send
         return cid == otherLink.cid // Compare contained CIDs
     }
 
-    public static func == (lhs: ATProtoLink, rhs: ATProtoLink) -> Bool {
-        return lhs.cid == rhs.cid
-    }
-
     public func hash(into hasher: inout Hasher) {
         hasher.combine(cid)
     }
@@ -201,11 +203,18 @@ public struct CID: Equatable, Hashable, Codable, CustomStringConvertible, ATProt
     }
 
     /// Returns the full binary representation of the CID (version + codec + multihash)
-    public var bytes: Data { Data([CID.version, codec.rawValue]) + multihash.bytes }
+    public var bytes: Data {
+        Data([CID.version, codec.rawValue]) + multihash.bytes
+    }
 
     /// Returns the base32 string representation (e.g., "bafy...")
-    public var string: String { "b" + base32Encode(bytes).lowercased() }
-    public var description: String { string }
+    public var string: String {
+        "b" + base32Encode(bytes).lowercased()
+    }
+
+    public var description: String {
+        string
+    }
 
     /// Creates a CID by hashing DAG-CBOR encoded data
     public static func fromDAGCBOR(_ cborData: Data) -> CID {
@@ -217,7 +226,7 @@ public struct CID: Equatable, Hashable, Codable, CustomStringConvertible, ATProt
         CID(codec: .raw, multihash: Multihash.sha256(blobData))
     }
 
-    // --- Parsing ---
+    /// --- Parsing ---
     public enum CIDParseError: Error {
         case invalidPrefix(String)
         case invalidBase32Encoding, insufficientLength
@@ -315,7 +324,7 @@ public struct CID: Equatable, Hashable, Codable, CustomStringConvertible, ATProt
         // Allow parsing to continue for all hash algorithms
     }
 
-    // --- Codable Conformance ---
+    /// --- Codable Conformance ---
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
         let cidString = try container.decode(String.self)
@@ -327,13 +336,13 @@ public struct CID: Equatable, Hashable, Codable, CustomStringConvertible, ATProt
         try container.encode(string)
     }
 
-    // --- ATProtocolValue Conformance ---
+    /// --- ATProtocolValue Conformance ---
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? CID else { return false }
         return self == other
     }
 
-    // --- DAGCBOREncodable Conformance ---
+    /// --- DAGCBOREncodable Conformance ---
     /// **IMPORTANT:** For DAG-CBOR, a CID struct itself signals it should be encoded
     /// using Tag 42 *when it's the value being processed* (e.g., returned by ATProtoLink.toCBORValue).
     /// It should NOT be encoded this way when it's just a string value within another structure (like StrongRef).
@@ -376,7 +385,7 @@ public class DAGCBOR {
         }
     }
 
-    // --- Canonical Map Encoding ---
+    /// --- Canonical Map Encoding ---
     private static func encodeCanonicalMap(_ map: [CBOR: CBOR]) throws -> Data {
         // 1. Extract keys and sort (Length then Lexicographical)
         var keyPairs: [(key: CBOR, utf8Bytes: Data, value: CBOR)] = []
@@ -447,7 +456,7 @@ public class DAGCBOR {
         return result
     }
 
-    // --- Swift Value -> CBOR Enum Conversion ---
+    /// --- Swift Value -> CBOR Enum Conversion ---
     private static func convertToCBORItem(_ value: Any) throws -> CBOR {
         switch value {
         // Handle ATProtoLink by using its toCBORValue method
@@ -526,7 +535,7 @@ public class DAGCBOR {
         return .tagged(.init(rawValue: cidTagValue), .byteString(cidPayload.map { $0 }))
     }
 
-    // --- Decoding ---
+    /// --- Decoding ---
     public static func decode<T: DAGCBORDecodable>(_ data: Data) throws -> T {
         return try T.decodedFromDAGCBOR(data)
     }
@@ -566,14 +575,15 @@ public class DAGCBOR {
         // Handle unsupported types explicitly
         case .simple, .date, .half, .float, .double, .break, .undefined:
             throw DAGCBORError.unsupportedType(
-                "Unsupported CBOR type encountered during decoding: \(item)")
+                "Unsupported CBOR type encountered during decoding: \(item)"
+            )
         }
     }
 }
 
 // MARK: - ================== Default Protocol Implementations ==================
 
-// Default implementation of DAGCBOREncodable
+/// Default implementation of DAGCBOREncodable
 public extension DAGCBOREncodable {
     func encodedDAGCBOR() throws -> Data {
         let value = try toCBORValue()
@@ -581,9 +591,9 @@ public extension DAGCBOREncodable {
     }
 }
 
-// Default implementation for DAGCBORDecodable using standard Decodable
-// Assumes the CBOR decodes to a structure representable as JSON first.
-// Might need customization if direct CBOR -> Struct mapping is required.
+/// Default implementation for DAGCBORDecodable using standard Decodable
+/// Assumes the CBOR decodes to a structure representable as JSON first.
+/// Might need customization if direct CBOR -> Struct mapping is required.
 public extension DAGCBORDecodable where Self: Decodable {
     static func decodedFromDAGCBOR(_ data: Data) throws -> Self {
         // Ensure data is not empty
@@ -650,7 +660,8 @@ public func base32Encode(_ data: Data) -> String {
             bits -= 5
             let index = Int((value >> bits) & 0x1F)
             result.append(
-                base32Alphabet[base32Alphabet.index(base32Alphabet.startIndex, offsetBy: index)])
+                base32Alphabet[base32Alphabet.index(base32Alphabet.startIndex, offsetBy: index)]
+            )
         }
     }
 

@@ -180,7 +180,8 @@ public enum SafeDecoder {
                     DecodingError.Context(
                         codingPath: [],
                         debugDescription: "Decoding of \(T.self) timed out after \(timeout) seconds"
-                    ))
+                    )
+                )
             }
 
             // Return the first result (either decoded data or timeout)
@@ -316,7 +317,7 @@ public enum SafeDecoder {
     }
 }
 
-// Helper for creating coding keys from strings
+/// Helper for creating coding keys from strings
 private struct _CustomCodingKey: CodingKey {
     var stringValue: String
     var intValue: Int?

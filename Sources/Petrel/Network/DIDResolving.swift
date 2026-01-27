@@ -173,7 +173,8 @@ actor DIDResolutionService: DIDResolving {
             // Parse the plain text response
             guard
                 let didString = String(data: data, encoding: .utf8)?.trimmingCharacters(
-                    in: .whitespacesAndNewlines)
+                    in: .whitespacesAndNewlines
+                )
             else {
                 logger.error("Failed to decode response as UTF-8 text")
                 throw DIDResolutionError.decodingError("Failed to decode well-known DID response as UTF-8")
@@ -342,19 +343,22 @@ actor DIDResolutionService: DIDResolving {
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw DIDResolutionError.networkError(
-                NSError(domain: "DIDResolution", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response type"]))
+                NSError(domain: "DIDResolution", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response type"])
+            )
         }
 
         guard httpResponse.statusCode == 200 else {
             throw DIDResolutionError.networkError(
-                NSError(domain: "DIDResolution", code: httpResponse.statusCode))
+                NSError(domain: "DIDResolution", code: httpResponse.statusCode)
+            )
         }
 
         let decoder = JSONDecoder()
         let didDocument = try decoder.decode(DIDDocument.self, from: data)
 
         guard
-            let pdsEndpoint = didDocument.service.first(where: { $0.type == "AtprotoPersonalDataServer" }
+            let pdsEndpoint = didDocument.service.first(
+                where: { $0.type == "AtprotoPersonalDataServer" }
             )?.serviceEndpoint,
             let pdsURL = URL(string: pdsEndpoint),
             let handle = didDocument.alsoKnownAs.first.map({
@@ -389,19 +393,22 @@ actor DIDResolutionService: DIDResolving {
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw DIDResolutionError.networkError(
-                NSError(domain: "DIDResolution", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response type"]))
+                NSError(domain: "DIDResolution", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response type"])
+            )
         }
 
         guard httpResponse.statusCode == 200 else {
             throw DIDResolutionError.networkError(
-                NSError(domain: "DIDResolution", code: httpResponse.statusCode))
+                NSError(domain: "DIDResolution", code: httpResponse.statusCode)
+            )
         }
 
         let decoder = JSONDecoder()
         let didDocument = try decoder.decode(DIDDocument.self, from: data)
 
         guard
-            let pdsEndpoint = didDocument.service.first(where: { $0.type == "AtprotoPersonalDataServer" }
+            let pdsEndpoint = didDocument.service.first(
+                where: { $0.type == "AtprotoPersonalDataServer" }
             )?.serviceEndpoint,
             let pdsURL = URL(string: pdsEndpoint),
             let handle = didDocument.alsoKnownAs.first.map({
@@ -441,7 +448,7 @@ actor DIDResolutionService: DIDResolving {
     }
 }
 
-// Add an enum to track which methods have completed
+/// Add an enum to track which methods have completed
 private enum ResolutionMethod: Hashable {
     case dns
     case wellKnown
@@ -453,15 +460,21 @@ private class CacheEntry {}
 
 private class DIDCacheEntry: CacheEntry {
     let did: String
-    init(did: String) { self.did = did }
+    init(did: String) {
+        self.did = did
+    }
 }
 
 private class HandleCacheEntry: CacheEntry {
     let handle: String
-    init(handle: String) { self.handle = handle }
+    init(handle: String) {
+        self.handle = handle
+    }
 }
 
 private class PDSURLCacheEntry: CacheEntry {
     let url: URL
-    init(url: URL) { self.url = url }
+    init(url: URL) {
+        self.url = url
+    }
 }

@@ -26,7 +26,7 @@ public struct ATProtocolURI: ATProtocolValue, CustomStringConvertible, QueryPara
     public let collection: String?
     public let recordKey: String?
 
-    // Store the original string to avoid recomputing
+    /// Store the original string to avoid recomputing
     private let originalString: String
 
     public init(from decoder: Decoder) throws {
@@ -196,7 +196,7 @@ public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConve
         }
     }
 
-    // Detect a valid URI scheme prefix (e.g., https:, http:, ftp:, etc.)
+    /// Detect a valid URI scheme prefix (e.g., https:, http:, ftp:, etc.)
     private static func detectScheme(in s: String) -> String? {
         // scheme = ALPHA *( ALPHA / DIGIT / "+" / "-" / "." ) ':'
         // Use a lightweight regex
@@ -237,7 +237,7 @@ public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConve
         }
     }
 
-    // Initializer to create URI from URL
+    /// Initializer to create URI from URL
     public init(url: URL) {
         isDID = false
         scheme = url.scheme ?? "https"
@@ -247,7 +247,7 @@ public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConve
         fragment = url.fragment
     }
 
-    // Computed property to get URL from URI
+    /// Computed property to get URL from URI
     public var url: URL? {
         guard !isDID else { return nil }
         var components = URLComponents()
@@ -526,11 +526,9 @@ public struct Handle: ATProtocolValue, CustomStringConvertible, QueryParameterCo
 
     private static let handlePattern =
         "^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)(\\.([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?))+$"
-    
+
     /// Cached compiled regex - compiled once, reused forever
-    private static let handleRegex: NSRegularExpression? = {
-        try? NSRegularExpression(pattern: handlePattern, options: [])
-    }()
+    private static let handleRegex: NSRegularExpression? = try? NSRegularExpression(pattern: handlePattern, options: [])
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
@@ -659,7 +657,7 @@ public enum ATIdentifier: ATProtocolValue, CustomStringConvertible, QueryParamet
         }
     }
 
-    // Add support for DAG-CBOR encoding
+    /// Add support for DAG-CBOR encoding
     public func toCBORValue() throws -> Any {
         return stringValue()
     }
@@ -673,11 +671,9 @@ public struct NSID: ATProtocolValue, CustomStringConvertible, QueryParameterConv
 
     private static let nsidPattern =
         "^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)(\\.([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?))+\\.[a-zA-Z][a-zA-Z0-9]{0,62}$"
-    
+
     /// Cached compiled regex - compiled once, reused forever
-    private static let nsidRegex: NSRegularExpression? = {
-        try? NSRegularExpression(pattern: nsidPattern, options: [])
-    }()
+    private static let nsidRegex: NSRegularExpression? = try? NSRegularExpression(pattern: nsidPattern, options: [])
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
@@ -757,13 +753,11 @@ public struct NSID: ATProtocolValue, CustomStringConvertible, QueryParameterConv
 public struct RecordKey: ATProtocolValue, CustomStringConvertible, QueryParameterConvertible {
     public let value: String
 
-    // Pattern for "any" record key format
+    /// Pattern for "any" record key format
     private static let recordKeyPattern = "^[a-zA-Z0-9\\-_.:%]+$"
-    
+
     /// Cached compiled regex - compiled once, reused forever
-    private static let recordKeyRegex: NSRegularExpression? = {
-        try? NSRegularExpression(pattern: recordKeyPattern, options: [])
-    }()
+    private static let recordKeyRegex: NSRegularExpression? = try? NSRegularExpression(pattern: recordKeyPattern, options: [])
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
@@ -827,20 +821,20 @@ public struct RecordKey: ATProtocolValue, CustomStringConvertible, QueryParamete
 }
 
 public struct TID: ATProtocolValue, CustomStringConvertible, QueryParameterConvertible, Comparable {
-    // Timestamp in microseconds since epoch
+    /// Timestamp in microseconds since epoch
     private let timestamp: UInt64
-    // Clock ID plus counter
+    /// Clock ID plus counter
     private let clockId: UInt64
-    // Original string representation
+    /// Original string representation
     private let originalString: String
 
-    // Base32 sortable character set
+    /// Base32 sortable character set
     private static let base32Chars = "234567abcdefghijklmnopqrstuvwxyz"
 
-    // Fixed length of TID strings
+    /// Fixed length of TID strings
     private static let TID_LENGTH = 13
 
-    // Valid first characters (first half of base32 chars)
+    /// Valid first characters (first half of base32 chars)
     private static let validFirstChars = "234567abcdefghij"
 
     public init(from decoder: Decoder) throws {
@@ -868,7 +862,8 @@ public struct TID: ATProtocolValue, CustomStringConvertible, QueryParameterConve
               Self.validFirstChars.contains(firstChar)
         else {
             throw ATProtocolError.invalidURI(
-                "Invalid TID string format: first character must be in 234567abcdefghij")
+                "Invalid TID string format: first character must be in 234567abcdefghij"
+            )
         }
 
         // Decode TID value
@@ -881,7 +876,7 @@ public struct TID: ATProtocolValue, CustomStringConvertible, QueryParameterConve
         originalString = tidString
     }
 
-    // Decode a base32 string to a number
+    /// Decode a base32 string to a number
     private static func decode(_ str: String) -> UInt64 {
         var result: UInt64 = 0
 
@@ -929,7 +924,7 @@ public struct TID: ATProtocolValue, CustomStringConvertible, QueryParameterConve
         hasher.combine(clockId)
     }
 
-    // Comparable implementation for sorting
+    /// Comparable implementation for sorting
     public static func < (lhs: TID, rhs: TID) -> Bool {
         if lhs.timestamp != rhs.timestamp {
             return lhs.timestamp < rhs.timestamp
@@ -937,7 +932,7 @@ public struct TID: ATProtocolValue, CustomStringConvertible, QueryParameterConve
         return lhs.clockId < rhs.clockId
     }
 
-    // Static validation method
+    /// Static validation method
     public static func isValid(_ str: String) -> Bool {
         // Must be exactly 13 characters
         guard str.count == TID_LENGTH else { return false }

@@ -20,12 +20,12 @@ public struct LanguageCodeContainer: Codable, ATProtocolCodable, Hashable, Senda
 
     public var lang: Locale.Language
 
-    // Standard initializer
+    /// Standard initializer
     public init(lang: Locale.Language) {
         self.lang = lang
     }
 
-    // Convenience initializer with String
+    /// Convenience initializer with String
     public init(languageCode: String) {
         lang = Locale.Language(bcp47LanguageTag: languageCode)
     }

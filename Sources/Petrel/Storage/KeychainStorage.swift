@@ -112,7 +112,8 @@ public actor KeychainStorage {
             }
 
             LogManager.logDebug(
-                "Account+session save verification successful for DID: \(LogManager.logDID(did))")
+                "Account+session save verification successful for DID: \(LogManager.logDID(did))"
+            )
 
             // Step 5: Add to accounts list if not already present
             try await addToAccountsList(did)
@@ -124,11 +125,13 @@ public actor KeychainStorage {
             try? KeychainManager.delete(key: backupSessionKey, namespace: namespace)
 
             LogManager.logDebug(
-                "Account+session saved atomically and verified for DID: \(LogManager.logDID(did))")
+                "Account+session saved atomically and verified for DID: \(LogManager.logDID(did))"
+            )
 
         } catch {
             LogManager.logError(
-                "Atomic account+session save failed for DID: \(LogManager.logDID(did)), error: \(error)")
+                "Atomic account+session save failed for DID: \(LogManager.logDID(did)), error: \(error)"
+            )
 
             // Recovery: Attempt to restore from backups if final saves failed
             if let backupAccountData = try? KeychainManager.retrieve(
@@ -139,7 +142,8 @@ public actor KeychainStorage {
                     LogManager.logDebug("Account restored from backup for DID: \(LogManager.logDID(did))")
                 } catch {
                     LogManager.logError(
-                        "Failed to restore account backup for DID: \(LogManager.logDID(did)), error: \(error)")
+                        "Failed to restore account backup for DID: \(LogManager.logDID(did)), error: \(error)"
+                    )
                 }
             }
 
@@ -151,7 +155,8 @@ public actor KeychainStorage {
                     LogManager.logDebug("Session restored from backup for DID: \(LogManager.logDID(did))")
                 } catch {
                     LogManager.logError(
-                        "Failed to restore session backup for DID: \(LogManager.logDID(did)), error: \(error)")
+                        "Failed to restore session backup for DID: \(LogManager.logDID(did)), error: \(error)"
+                    )
                 }
             }
 
@@ -221,7 +226,7 @@ public actor KeychainStorage {
     }
 
     // MARK: - Gateway Session
-    
+
     /// Saves the gateway session for a specific account (per-DID storage for multi-account support)
     func saveGatewaySession(_ session: String, for did: String) async throws {
         let key = makeKey("gatewaySession", did: did)
@@ -229,7 +234,7 @@ public actor KeychainStorage {
         try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace)
         LogManager.logDebug("KeychainStorage - Saved gateway session for DID: \(did.prefix(20))...")
     }
-    
+
     /// Retrieves the gateway session for a specific account
     func getGatewaySession(for did: String) async throws -> String? {
         let key = makeKey("gatewaySession", did: did)
@@ -244,7 +249,7 @@ public actor KeychainStorage {
             return nil
         }
     }
-    
+
     /// Deletes the gateway session for a specific account
     func deleteGatewaySession(for did: String) async throws {
         let key = makeKey("gatewaySession", did: did)
@@ -282,8 +287,8 @@ public actor KeychainStorage {
             key: "gatewaySession",
             namespace: "catbird.gateway"
         ),
-           let session = String(data: data, encoding: .utf8),
-           !session.isEmpty
+            let session = String(data: data, encoding: .utf8),
+            !session.isEmpty
         {
             LogManager.logInfo(
                 "KeychainStorage - Migrating global gateway session to per-DID storage for DID: \(did.prefix(20))..."
@@ -296,7 +301,7 @@ public actor KeychainStorage {
         return nil
     }
 
-    // Legacy single-session methods for backward compatibility during migration
+    /// Legacy single-session methods for backward compatibility during migration
     @available(*, deprecated, message: "Use saveGatewaySession(_:for:) for multi-account support")
     func saveGatewaySession(_ session: String) async throws {
         let key = makeKey("gatewaySession")
@@ -345,7 +350,8 @@ public actor KeychainStorage {
             data = try JSONEncoder().encode(session)
         } catch {
             LogManager.logError(
-                "Failed to encode session for DID: \(LogManager.logDID(did)), error: \(error)")
+                "Failed to encode session for DID: \(LogManager.logDID(did)), error: \(error)"
+            )
             throw KeychainError.dataFormatError
         }
 
@@ -369,7 +375,8 @@ public actor KeychainStorage {
             do {
                 try KeychainManager.store(key: tempKey, value: data, namespace: namespace)
                 LogManager.logDebug(
-                    "Session saved to temporary location for DID: \(LogManager.logDID(did))")
+                    "Session saved to temporary location for DID: \(LogManager.logDID(did))"
+                )
             } catch {
                 LogManager.logError(
                     "Failed to save session to temporary location for DID: \(LogManager.logDID(did)): \(error)"
@@ -383,7 +390,8 @@ public actor KeychainStorage {
                 LogManager.logDebug("Session moved to final location for DID: \(LogManager.logDID(did))")
             } catch {
                 LogManager.logError(
-                    "Failed to save session to final location for DID: \(LogManager.logDID(did)): \(error)")
+                    "Failed to save session to final location for DID: \(LogManager.logDID(did)): \(error)"
+                )
                 throw SessionSaveError.finalSaveFailed(underlying: error)
             }
 
@@ -398,18 +406,22 @@ public actor KeychainStorage {
                       abs(verifiedSession.createdAt.timeIntervalSince(session.createdAt)) < 1.0
                 else {
                     throw SessionSaveError.verificationFailed(
-                        "Session verification failed: stored session doesn't match expected values")
+                        "Session verification failed: stored session doesn't match expected values"
+                    )
                 }
 
                 LogManager.logDebug(
-                    "Session save verification successful for DID: \(LogManager.logDID(did))")
+                    "Session save verification successful for DID: \(LogManager.logDID(did))"
+                )
             } catch let SessionSaveError.verificationFailed(message) {
                 LogManager.logError(
-                    "Session verification failed for DID: \(LogManager.logDID(did)): \(message)")
+                    "Session verification failed for DID: \(LogManager.logDID(did)): \(message)"
+                )
                 throw SessionSaveError.verificationFailed(message)
             } catch {
                 LogManager.logError(
-                    "Session verification error for DID: \(LogManager.logDID(did)): \(error)")
+                    "Session verification error for DID: \(LogManager.logDID(did)): \(error)"
+                )
                 throw SessionSaveError.verificationFailed("Could not verify saved session: \(error)")
             }
 
@@ -418,18 +430,21 @@ public actor KeychainStorage {
             try? KeychainManager.delete(key: backupKey, namespace: namespace)
 
             LogManager.logDebug(
-                "Session saved atomically and verified for DID: \(LogManager.logDID(did))")
+                "Session saved atomically and verified for DID: \(LogManager.logDID(did))"
+            )
 
         } catch let sessionSaveError as SessionSaveError {
             LogManager.logError(
-                "Session save failed for DID: \(LogManager.logDID(did)): \(sessionSaveError)")
+                "Session save failed for DID: \(LogManager.logDID(did)): \(sessionSaveError)"
+            )
             await handleSessionSaveFailure(
                 sessionSaveError, key: key, tempKey: tempKey, backupKey: backupKey, did: did
             )
             throw sessionSaveError
         } catch {
             LogManager.logError(
-                "Unexpected session save error for DID: \(LogManager.logDID(did)): \(error)")
+                "Unexpected session save error for DID: \(LogManager.logDID(did)): \(error)"
+            )
             await handleSessionSaveFailure(
                 SessionSaveError.unexpectedError(error), key: key, tempKey: tempKey, backupKey: backupKey,
                 did: did
@@ -454,10 +469,12 @@ public actor KeychainStorage {
                 do {
                     try KeychainManager.store(key: key, value: backupData, namespace: namespace)
                     LogManager.logInfo(
-                        "Session restored from backup after save failure for DID: \(LogManager.logDID(did))")
+                        "Session restored from backup after save failure for DID: \(LogManager.logDID(did))"
+                    )
                 } catch {
                     LogManager.logError(
-                        "Failed to restore session backup for DID: \(LogManager.logDID(did)): \(error)")
+                        "Failed to restore session backup for DID: \(LogManager.logDID(did)): \(error)"
+                    )
                 }
             }
 
@@ -535,7 +552,8 @@ public actor KeychainStorage {
                 do {
                     let session = try JSONDecoder().decode(Session.self, from: tempData)
                     LogManager.logDebug(
-                        "Session recovered from temporary location for DID: \(LogManager.logDID(did))")
+                        "Session recovered from temporary location for DID: \(LogManager.logDID(did))"
+                    )
 
                     // Try to restore to primary location
                     try? await KeychainManager.storeAsync(key: key, value: tempData, namespace: namespace)
@@ -544,7 +562,8 @@ public actor KeychainStorage {
                     return session
                 } catch {
                     LogManager.logError(
-                        "Failed to decode session from temporary location for DID: \(LogManager.logDID(did))")
+                        "Failed to decode session from temporary location for DID: \(LogManager.logDID(did))"
+                    )
                 }
             }
 
@@ -553,7 +572,8 @@ public actor KeychainStorage {
                 do {
                     let session = try JSONDecoder().decode(Session.self, from: backupData)
                     LogManager.logDebug(
-                        "Session recovered from backup location for DID: \(LogManager.logDID(did))")
+                        "Session recovered from backup location for DID: \(LogManager.logDID(did))"
+                    )
 
                     // Try to restore to primary location
                     try? await KeychainManager.storeAsync(key: key, value: backupData, namespace: namespace)
@@ -562,7 +582,8 @@ public actor KeychainStorage {
                     return session
                 } catch {
                     LogManager.logError(
-                        "Failed to decode session from backup location for DID: \(LogManager.logDID(did))")
+                        "Failed to decode session from backup location for DID: \(LogManager.logDID(did))"
+                    )
                 }
             }
 
@@ -588,7 +609,8 @@ public actor KeychainStorage {
         do {
             try KeychainManager.storeDPoPKey(key, keyTag: keyTag)
             LogManager.logDebug(
-                "Successfully saved DPoP key to Keychain for DID \(LogManager.logDID(did))")
+                "Successfully saved DPoP key to Keychain for DID \(LogManager.logDID(did))"
+            )
         } catch {
             LogManager.logError(
                 "Failed to save DPoP key to Keychain (error: \(error)). This will likely cause authentication issues."
@@ -606,7 +628,8 @@ public actor KeychainStorage {
             return try KeychainManager.retrieveDPoPKey(keyTag: keyTag)
         } catch let KeychainError.itemRetrievalError(status) where status == errSecItemNotFound {
             LogManager.logDebug(
-                "DPoP key not found in Keychain for DID: \(did). A new key will be generated if needed.")
+                "DPoP key not found in Keychain for DID: \(did). A new key will be generated if needed."
+            )
             return nil
         } catch let KeychainError.itemRetrievalError(status) {
             // For any other keychain retrieval error (e.g., errSecAuthFailed while device locked),
@@ -618,7 +641,8 @@ public actor KeychainStorage {
         } catch {
             // Unknown error — propagate so callers can avoid key rotation
             LogManager.logError(
-                "Failed to retrieve DPoP key from Keychain (error: \(error)). Will NOT rotate key.")
+                "Failed to retrieve DPoP key from Keychain (error: \(error)). Will NOT rotate key."
+            )
             throw error
         }
     }
@@ -738,7 +762,8 @@ public actor KeychainStorage {
                     if try await recoverSessionFromBackup(for: did) {
                         result.recoveredSessions.append(did)
                         LogManager.logInfo(
-                            "Successfully recovered session from backup for DID \(LogManager.logDID(did))")
+                            "Successfully recovered session from backup for DID \(LogManager.logDID(did))"
+                        )
                     } else {
                         // If recovery fails, remove the orphaned account to force re-authentication
                         try await deleteAccount(for: did)
@@ -795,7 +820,8 @@ public actor KeychainStorage {
                 try? KeychainManager.delete(key: tempSessionKey, namespace: namespace)
 
                 LogManager.logDebug(
-                    "Session recovered from temporary location for DID: \(LogManager.logDID(did))")
+                    "Session recovered from temporary location for DID: \(LogManager.logDID(did))"
+                )
                 return true
             } catch {
                 LogManager.logDebug("Failed to decode session from temporary location: \(error)")
@@ -812,7 +838,8 @@ public actor KeychainStorage {
                 try? KeychainManager.delete(key: backupSessionKey, namespace: namespace)
 
                 LogManager.logDebug(
-                    "Session recovered from backup location for DID: \(LogManager.logDID(did))")
+                    "Session recovered from backup location for DID: \(LogManager.logDID(did))"
+                )
                 return true
             } catch {
                 LogManager.logDebug("Failed to decode session from backup location: \(error)")

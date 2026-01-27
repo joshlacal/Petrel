@@ -20,15 +20,15 @@ public struct PetrelLogEvent: Sendable {
 
 /// Internal logger that also broadcasts events to optional observers.
 class LogManager {
-    // Bootstrap swift-log with OSLogHandler on Apple platforms (runs once before any logger is created)
+    /// Bootstrap swift-log with OSLogHandler on Apple platforms (runs once before any logger is created)
     private static let bootstrapOnce: Void = {
         #if canImport(os)
-        LoggingSystem.bootstrap { label in
-            OSLogHandler(label: label)
-        }
+            LoggingSystem.bootstrap { label in
+                OSLogHandler(label: label)
+            }
         #else
-        // On non-Apple platforms, use the default StreamLogHandler
-        LoggingSystem.bootstrap(StreamLogHandler.standardOutput)
+            // On non-Apple platforms, use the default StreamLogHandler
+            LoggingSystem.bootstrap(StreamLogHandler.standardOutput)
         #endif
     }()
 
@@ -59,6 +59,7 @@ class LogManager {
     ]
 
     // MARK: - Observer support (Swift Concurrency safe)
+
     // DEPRECATED: Use PetrelAuthEvents for authentication event observation instead
 
     private actor ObserverStore {
@@ -70,14 +71,16 @@ class LogManager {
             hasObservers = true
         }
 
-        func snapshot() -> [@Sendable (PetrelLogEvent) -> Void] { observers }
+        func snapshot() -> [@Sendable (PetrelLogEvent) -> Void] {
+            observers
+        }
     }
 
     private static let observerStore = ObserverStore()
 
-    // Cache for observer existence check (set once, read many times)
-    // This is safe because it's only ever changed from false -> true, never back
-    // nonisolated(unsafe) allows reading without actor isolation since write is one-way
+    /// Cache for observer existence check (set once, read many times)
+    /// This is safe because it's only ever changed from false -> true, never back
+    /// nonisolated(unsafe) allows reading without actor isolation since write is one-way
     private nonisolated(unsafe) static var cachedHasObservers = false
 
     /// Register a callback to receive Petrel log events.
@@ -158,7 +161,7 @@ class LogManager {
             var debugMessage = "Request URL: \(url)\n"
             debugMessage += "Method: \(request.httpMethod ?? "N/A")\n"
 
-            // Filter sensitive headers
+            /// Filter sensitive headers
             var filteredHeaders: [String: String] = [:]
             request.allHTTPHeaderFields?.forEach { key, value in
                 filteredHeaders[key] = sensitiveHeaders.contains(key.lowercased()) ? "[REDACTED]" : value
@@ -192,7 +195,7 @@ class LogManager {
             var debugMessage = "Response URL: \(url)\n"
             debugMessage += "Status Code: \(response.statusCode)\n"
 
-            // Filter sensitive headers
+            /// Filter sensitive headers
             var filteredHeaders: [String: Any] = [:]
             for (key, value) in response.allHeaderFields {
                 if let keyString = key as? String,
@@ -230,7 +233,7 @@ class LogManager {
     }
 
     private static func describeJSONShape(_ value: Any, depth: Int = 0) -> String {
-        guard depth < 3 else { return "..." }  // Limit recursion depth
+        guard depth < 3 else { return "..." } // Limit recursion depth
         if let dict = value as? [String: Any] {
             let keys = dict.keys.sorted().map { key -> String in
                 let childShape = describeJSONShape(dict[key]!, depth: depth + 1)
@@ -369,13 +372,11 @@ class LogManager {
             return .startupMissingDPoPKey(did: did, hasSession: hasSession)
         case "StartupRecovery_StateHealthy":
             return .startupStateHealthy(did: did)
-
         // Account Switching Events
         case "AccountAutoSwitchAfterRemoval", "AccountAutoSwitchedAfterLogout":
             return .accountAutoSwitched(previousDid: previousDid ?? did, newDid: newDid, reason: reason)
         case "CurrentAccountChanged":
             return .currentAccountChanged(previousDid: previousDid, newDid: did)
-
         // Session & Token Events
         case "SessionMissingForAccount":
             return .sessionMissing(did: did, context: context)
@@ -387,7 +388,6 @@ class LogManager {
             return .invalidClient(did: did, statusCode: statusCode, error: error)
         case "DPoPNonceMismatchRefresh":
             return .dpopNonceMismatch(did: did, retryAttempt: retryAttempt)
-
         // Logout Events
         case "LogoutStart":
             return .logoutStarted(did: did, reason: reason)
@@ -399,7 +399,6 @@ class LogManager {
             return .logoutClearedCurrentAccount(previousDid: previousDid ?? did)
         case "AutoLogoutTriggered":
             return .autoLogoutTriggered(did: did, reason: reason)
-
         // Error Events
         case "SetCurrentAccount_AccountNotFound":
             return .accountNotFound(did: did)
@@ -411,7 +410,6 @@ class LogManager {
             return .inconsistentStateMissingSession(did: did)
         case "InconsistentAuthState_MissingAccount":
             return .inconsistentStateMissingAccount(did: did)
-
         // Fallback for unknown types - use autoLogoutTriggered as catch-all
         default:
             return .autoLogoutTriggered(did: did, reason: "Unknown incident type: \(type)")

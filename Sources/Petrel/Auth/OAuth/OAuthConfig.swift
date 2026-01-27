@@ -53,5 +53,5 @@ public struct OAuthConfig: Sendable {
     }
 }
 
-// Alias for backward compatibility
+/// Alias for backward compatibility
 public typealias OAuthConfiguration = OAuthConfig

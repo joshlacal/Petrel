@@ -228,7 +228,7 @@ final class KeychainStorageRaceConditionTests: XCTestCase {
 
         // Session should be one of the ones we tried to save
         let sessionTokens = sessions.map { $0.accessToken }
-        XCTAssertTrue(sessionTokens.contains(retrievedSession!.accessToken))
+        XCTAssertTrue(try sessionTokens.contains(XCTUnwrap(retrievedSession?.accessToken)))
     }
 
     // MARK: - Helper Methods

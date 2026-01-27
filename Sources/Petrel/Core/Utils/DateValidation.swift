@@ -15,7 +15,9 @@ public struct ATProtocolDate: Codable, Hashable, Equatable, Sendable, ATProtocol
 
     public let date: Date
 
-    public var toDate: Date { date }
+    public var toDate: Date {
+        date
+    }
 
     public init(date: Date) {
         self.date = date

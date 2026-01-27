@@ -28,7 +28,7 @@ actor AuthManager: AuthStrategy {
         case gatewayURLRequired
         case strategyCreationFailed
 
-        public var errorDescription: String? {
+        var errorDescription: String? {
             switch self {
             case .gatewayURLRequired:
                 return "Gateway mode requires a gatewayBaseURL"
@@ -78,9 +78,9 @@ actor AuthManager: AuthStrategy {
         self.oauthConfig = oauthConfig
         self.didResolver = didResolver
         self.gatewayBaseURL = gatewayBaseURL
-        self.currentMode = mode
+        currentMode = mode
 
-        self.activeStrategy = try Self.createStrategy(
+        activeStrategy = try Self.createStrategy(
             mode: mode,
             storage: storage,
             accountManager: accountManager,

@@ -10,7 +10,7 @@ import Foundation
 /// Actor that coordinates account switching operations across multiple components
 /// to ensure atomicity and prevent race conditions during the switch process.
 actor AccountSwitchCoordinator {
-    // Singleton instance
+    /// Singleton instance
     static let shared = AccountSwitchCoordinator()
 
     // Switch state
@@ -38,7 +38,8 @@ actor AccountSwitchCoordinator {
 
         isSwitchingAccounts = true
         LogManager.logInfo(
-            "AccountSwitchCoordinator - Beginning account switch from \(fromDID ?? "nil") to \(toDID)")
+            "AccountSwitchCoordinator - Beginning account switch from \(fromDID ?? "nil") to \(toDID)"
+        )
     }
 
     /// Completes an account switching operation, releasing the lock.

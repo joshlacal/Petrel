@@ -130,7 +130,7 @@ struct CIDTests {
 
     @Test("StrongRef CBOR encoding")
     func strongRefCBOREncoding() throws {
-        let testCID = CID.fromDAGCBOR("test".data(using: .utf8)!)
+        let testCID = try CID.fromDAGCBOR(#require("test".data(using: .utf8)))
         let testURI = try ATProtocolURI(uriString: "at://did:plc:test/app.bsky.feed.post/123")
 
         let strongRef = ComAtprotoRepoStrongRef(uri: testURI, cid: testCID)
@@ -157,7 +157,7 @@ struct CIDTests {
     @Test("Post with reply CBOR encoding")
     func postWithReplyCBOREncoding() throws {
         // Create a parent post
-        let parentCID = CID.fromDAGCBOR("parent post".data(using: .utf8)!)
+        let parentCID = try CID.fromDAGCBOR(#require("parent post".data(using: .utf8)))
         let parentURI = try ATProtocolURI(uriString: "at://did:plc:parent/app.bsky.feed.post/parent123")
 
         // Create reply reference
@@ -203,7 +203,7 @@ struct CIDTests {
 
     @Test("ATProtoLink vs CID string encoding")
     func atProtoLinkVsCIDString() throws {
-        let testCID = CID.fromDAGCBOR("test".data(using: .utf8)!)
+        let testCID = try CID.fromDAGCBOR(#require("test".data(using: .utf8)))
 
         // Test ATProtoLink encoding (should use Tag 42)
         let atprotoLink = ATProtoLink(cid: testCID)
@@ -264,7 +264,7 @@ struct CIDTests {
     }
 
     @Test("CID format compliance")
-    func cidFormatCompliance() throws {
+    func cidFormatCompliance() {
         let testData = "Hello, AT Protocol!".data(using: .utf8)!
         let cid = CID.fromDAGCBOR(testData)
 

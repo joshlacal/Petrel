@@ -397,7 +397,8 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
             if let foundAuthServerURL = metadata.authorizationServers.first {
                 authServerURL = foundAuthServerURL
                 LogManager.logDebug(
-                    "Found authorization server from protected resource metadata: \(authServerURL)")
+                    "Found authorization server from protected resource metadata: \(authServerURL)"
+                )
             } else {
                 // Protected resource metadata exists but has no auth servers listed
                 LogManager.logError("Protected resource metadata has no authorization servers")
@@ -413,7 +414,8 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
         }
 
         let authServerMetadata = try await fetchAuthorizationServerMetadata(
-            authServerURL: authServerURL)
+            authServerURL: authServerURL
+        )
 
         // If the server supports the authorization response issuer parameter, verify it when present.
         // If the config requires it and it is missing/mismatched, fail the flow.
@@ -567,7 +569,8 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
             LogManager.logDebug("Successfully fetched protected resource metadata for account")
         } catch {
             LogManager.logDebug(
-                "Could not fetch protected resource metadata for account (will use nil): \(error)")
+                "Could not fetch protected resource metadata for account (will use nil): \(error)"
+            )
             protectedResourceMetadata = nil
         }
 
@@ -915,7 +918,8 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
             }
         } catch {
             LogManager.logError(
-                "Failed during account removal/switching after logout for DID \(did): \(error)")
+                "Failed during account removal/switching after logout for DID \(did): \(error)"
+            )
         }
 
         // Reset circuit breaker state for this DID
@@ -939,7 +943,8 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
     func setNextRefreshResourceOverride(_ resource: String) async {
         nextRefreshResourceOverride = resource
         LogManager.logInfo(
-            "AuthenticationService: Next refresh will use resource override: \(resource)")
+            "AuthenticationService: Next refresh will use resource override: \(resource)"
+        )
     }
 
     /// Attempts to revoke a refresh token at the authorization server.
@@ -1109,16 +1114,16 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
     var autoSwitchOnLogout: Bool = true
     /// Delegate for handling catastrophic auth failures that require app-level intervention
     weak var authFailureDelegate: AuthFailureDelegate?
-    // Simple in-memory store for OAuth flow nonces (independent of any account)
+    /// Simple in-memory store for OAuth flow nonces (independent of any account)
     private var oauthFlowNonces: [String: String] = [:]
-    // JKT-scoped nonces (key thumbprint -> domain -> nonce)
+    /// JKT-scoped nonces (key thumbprint -> domain -> nonce)
     private var noncesByThumbprint: [String: [String: String]] = [:]
     // Track last refresh attempt time per DID for rate limiting
     private var lastRefreshAttempt: [String: Date] = [:]
     private var lastSuccessfulRefresh: [String: Date] = [:]
     private let minimumRefreshInterval: TimeInterval = 0.5 // 500ms between attempts
     private let minimumRefreshIntervalAfterSuccess: TimeInterval = 30.0 // 30 seconds after successful refresh
-    // Track ambiguous refresh timeouts where server may have rotated tokens but client didn't receive them
+    /// Track ambiguous refresh timeouts where server may have rotated tokens but client didn't receive them
     private var ambiguousRefreshUntil: [String: Date] = [:]
 
     // 🚀 Modern Swift Concurrency: Track used refresh tokens to prevent replay attacks
@@ -1126,7 +1131,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
     private var usedRefreshTokens: Set<String> = []
     private var activeRefreshTasks: [String: Task<TokenRefreshResult, Error>] = [:]
 
-    // Test hook: mark ambiguous refresh state for a DID (internal)
+    /// Test hook: mark ambiguous refresh state for a DID (internal)
     func markAmbiguousRefresh(for did: String, durationSeconds: TimeInterval = 900) async {
         ambiguousRefreshUntil[did] = Date().addingTimeInterval(durationSeconds)
         LogManager.logInfo(
@@ -1313,7 +1318,8 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
             if let foundAuthServerURL = metadata.authorizationServers.first {
                 authServerURL = foundAuthServerURL
                 LogManager.logDebug(
-                    "Found authorization server from protected resource metadata: \(authServerURL)")
+                    "Found authorization server from protected resource metadata: \(authServerURL)"
+                )
             } else {
                 // Protected resource metadata exists but has no auth servers listed
                 LogManager.logError("Protected resource metadata has no authorization servers")
@@ -1330,7 +1336,8 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
 
         // Fetch Authorization Server Metadata
         let authServerMetadata = try await fetchAuthorizationServerMetadata(
-            authServerURL: authServerURL)
+            authServerURL: authServerURL
+        )
 
         // Generate PKCE code verifier and challenge
         await emitProgress(.generatingParameters)
@@ -1446,7 +1453,8 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
             if let foundAuthServerURL = protectedResourceMetadata.authorizationServers.first {
                 authServerURL = foundAuthServerURL
                 LogManager.logDebug(
-                    "Found authorization server from protected resource metadata: \(authServerURL)")
+                    "Found authorization server from protected resource metadata: \(authServerURL)"
+                )
             } else {
                 // Protected resource metadata exists but has no auth servers listed
                 LogManager.logError("Protected resource metadata has no authorization servers")
@@ -1462,7 +1470,8 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
         }
 
         let authServerMetadata = try await fetchAuthorizationServerMetadata(
-            authServerURL: authServerURL)
+            authServerURL: authServerURL
+        )
 
         // Create PAR request without login_hint (this is the key difference for signup)
         let parEndpoint = authServerMetadata.pushedAuthorizationRequestEndpoint
@@ -1610,10 +1619,12 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
                     let parNonce = retryHttpResponse.value(forHTTPHeaderField: "dpop-nonce") // Get nonce from retry response
                     if let nonce = parNonce {
                         LogManager.logDebug(
-                            "Captured DPoP Nonce from successful Sign-Up PAR retry response: \(nonce)")
+                            "Captured DPoP Nonce from successful Sign-Up PAR retry response: \(nonce)"
+                        )
                     } else {
                         LogManager.logDebug(
-                            "No DPoP Nonce found in successful Sign-Up PAR retry response header.")
+                            "No DPoP Nonce found in successful Sign-Up PAR retry response header."
+                        )
                     }
                     return (requestURI, parNonce) // Return URI and Nonce from retry
                 } else {
@@ -1628,7 +1639,8 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
                 // Non-retryable 400 error
                 let errorDetails = String(data: data, encoding: .utf8) ?? "No details"
                 LogManager.logError(
-                    "Sign-Up PAR failed with status code 400 (Non-retryable). Response: \(errorDetails)")
+                    "Sign-Up PAR failed with status code 400 (Non-retryable). Response: \(errorDetails)"
+                )
                 throw AuthError.authorizationFailed // Indicate PAR failure
             }
         }
@@ -1793,10 +1805,12 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
                     let parNonce = retryHttpResponse.value(forHTTPHeaderField: "dpop-nonce") // Get nonce from retry response
                     if let nonce = parNonce {
                         LogManager.logDebug(
-                            "Captured DPoP Nonce from successful Sign-Up PAR retry response: \(nonce)")
+                            "Captured DPoP Nonce from successful Sign-Up PAR retry response: \(nonce)"
+                        )
                     } else {
                         LogManager.logDebug(
-                            "No DPoP Nonce found in successful Sign-Up PAR retry response header.")
+                            "No DPoP Nonce found in successful Sign-Up PAR retry response header."
+                        )
                     }
                     return (requestURI, parNonce) // Return URI and Nonce from retry
                 } else {
@@ -1811,7 +1825,8 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
                 // Non-retryable 400 error
                 let errorDetails = String(data: data, encoding: .utf8) ?? "No details"
                 LogManager.logError(
-                    "Sign-Up PAR failed with status code 400 (Non-retryable). Response: \(errorDetails)")
+                    "Sign-Up PAR failed with status code 400 (Non-retryable). Response: \(errorDetails)"
+                )
                 throw AuthError.authorizationFailed // Indicate PAR failure
             }
         }
@@ -1866,7 +1881,8 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
 
         if usedRefreshTokens.contains(refreshToken) {
             LogManager.logError(
-                "🚨 REPLAY ATTACK PREVENTED: Refresh token already used for DID: \(LogManager.logDID(did))")
+                "🚨 REPLAY ATTACK PREVENTED: Refresh token already used for DID: \(LogManager.logDID(did))"
+            )
             // Clear the used token and force logout to be safe
             usedRefreshTokens.remove(refreshToken)
             throw AuthError.tokenRefreshFailed
@@ -2119,7 +2135,8 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
                     let stillValid = Date() < session.createdAt.addingTimeInterval(session.expiresIn)
                     if stillValid {
                         LogManager.logInfo(
-                            "METRIC invalid_grant_after_timeout_total did=\(LogManager.logDID(did))")
+                            "METRIC invalid_grant_after_timeout_total did=\(LogManager.logDID(did))"
+                        )
                         LogManager.logError(
                             "invalid_grant after ambiguous timeout for DID \(LogManager.logDID(account.did)); keeping current access token and deferring logout",
                             category: .authentication
@@ -2134,7 +2151,8 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
                     category: .authentication
                 )
                 LogManager.logInfo(
-                    "METRIC token_refresh_failures_total reason=invalid_grant did=\(LogManager.logDID(did))")
+                    "METRIC token_refresh_failures_total reason=invalid_grant did=\(LogManager.logDID(did))"
+                )
                 // Emit a structured incident before logout to make the cause crystal clear in aggregators
                 LogManager.logAuthIncident(
                     "AutoLogoutTriggered",
@@ -2186,7 +2204,8 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
                         await refreshCircuitBreaker.recordSuccess(for: account.did)
 
                         LogManager.logInfo(
-                            "Successfully recovered from DPoP error via immediate retry for DID: \(account.did)")
+                            "Successfully recovered from DPoP error via immediate retry for DID: \(account.did)"
+                        )
                         return .refreshedSuccessfully
                     }
                 } catch {
@@ -2196,7 +2215,8 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
                 // If we reach here, all attempts have failed. Treat as a refresh failure (not a key error),
                 // since the key is likely fine and the server required updated nonce.
                 LogManager.logInfo(
-                    "METRIC token_refresh_failures_total reason=dpop did=\(LogManager.logDID(did))")
+                    "METRIC token_refresh_failures_total reason=dpop did=\(LogManager.logDID(did))"
+                )
                 throw AuthError.tokenRefreshFailed
             case let .networkError(code, details):
                 // Classify network errors more specifically
@@ -2215,7 +2235,8 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
                     "Token refresh failed due to network error (\(code)) for DID \(account.did): \(details ?? "No details")"
                 )
                 LogManager.logInfo(
-                    "METRIC token_refresh_failures_total reason=\(failureKind == .metadataUnavailable ? "metadata_unavailable" : "network") did=\(LogManager.logDID(did))")
+                    "METRIC token_refresh_failures_total reason=\(failureKind == .metadataUnavailable ? "metadata_unavailable" : "network") did=\(LogManager.logDID(did))"
+                )
 
                 // Notify delegate about the failure if it's a metadata issue
                 if failureKind == .metadataUnavailable, let delegate = authFailureDelegate {
@@ -2231,7 +2252,8 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
                     "Token refresh failed due to decoding error for DID \(account.did): \(underlyingError), context: \(context ?? "none")"
                 )
                 LogManager.logInfo(
-                    "METRIC token_refresh_failures_total reason=decoding did=\(LogManager.logDID(did))")
+                    "METRIC token_refresh_failures_total reason=decoding did=\(LogManager.logDID(did))"
+                )
                 throw AuthError.invalidResponse // Map to invalid response
             case .alreadyInProgress, .invalidState, .refreshTooFrequent:
                 // These are coordinator internal states, shouldn't typically escape unless there's a logic error.
@@ -2246,10 +2268,12 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
             try? await markRefreshInProgress(for: account.did, inProgress: false)
             await refreshCircuitBreaker.recordFailure(for: did, kind: .other)
             LogManager.logInfo(
-                "METRIC token_refresh_failures_total reason=other did=\(LogManager.logDID(did))")
+                "METRIC token_refresh_failures_total reason=other did=\(LogManager.logDID(did))"
+            )
 
             LogManager.logError(
-                "Token refresh failed with unexpected error for DID \(account.did): \(error)")
+                "Token refresh failed with unexpected error for DID \(account.did): \(error)"
+            )
             throw AuthError.tokenRefreshFailed // General refresh failure
         }
     }
@@ -2284,13 +2308,15 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
                     LogManager.logDebug("Refresh in-progress flag was already cleared for DID: \(did)")
                 } catch {
                     LogManager.logError(
-                        "Non-critical: Failed to clear refresh progress flag for DID: \(did) - \(error)")
+                        "Non-critical: Failed to clear refresh progress flag for DID: \(did) - \(error)"
+                    )
                     // Don't throw - this is not critical for refresh operation
                 }
             }
         } catch let KeychainError.itemStoreError(status) where status == errSecAuthFailed {
             LogManager.logError(
-                "Keychain authentication failed for refresh progress tracking - device may be locked")
+                "Keychain authentication failed for refresh progress tracking - device may be locked"
+            )
             // Don't throw for auth failures - continue without progress tracking
         } catch {
             LogManager.logError("Non-critical keychain operation failed for refresh progress: \(error)")
@@ -2365,7 +2391,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
     /// - Returns: The response data and HTTP response
     private func performLegacyTokenRefresh(for did: String) async throws -> (Data, HTTPURLResponse) {
         LogManager.logInfo("🔄 performLegacyTokenRefresh: Starting legacy refresh for DID: \(LogManager.logDID(did))")
-        
+
         // Get the session and account
         guard let session = try? await storage.getSession(for: did),
               let refreshToken = session.refreshToken
@@ -2378,7 +2404,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
             LogManager.logError("performLegacyTokenRefresh: Could not retrieve account for DID: \(LogManager.logDID(did))")
             throw AuthError.tokenRefreshFailed
         }
-        
+
         LogManager.logDebug("performLegacyTokenRefresh: Using PDS: \(account.pdsURL.absoluteString)")
 
         // Temporarily update network service to point to the user's PDS
@@ -2409,9 +2435,9 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
                 LogManager.logError("performLegacyTokenRefresh: Response was not HTTPURLResponse")
                 throw AuthError.invalidResponse
             }
-            
+
             // Log response status for debugging
-            if (200..<300).contains(httpResponse.statusCode) {
+            if (200 ..< 300).contains(httpResponse.statusCode) {
                 LogManager.logInfo("✅ performLegacyTokenRefresh: Success (HTTP \(httpResponse.statusCode))")
             } else {
                 let responsePreview = String(data: data.prefix(500), encoding: .utf8) ?? "<non-utf8>"
@@ -2456,7 +2482,8 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
               let authServerMetadata = account.authorizationServerMetadata
         else {
             LogManager.logError(
-                "performTokenRefresh: Could not retrieve account or metadata for DID \(did)")
+                "performTokenRefresh: Could not retrieve account or metadata for DID \(did)"
+            )
             throw AuthError.tokenRefreshFailed // Indicate failure
         }
 
@@ -2522,7 +2549,8 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 LogManager.logError(
-                    "AuthenticationService - Token refresh response was not HTTPURLResponse")
+                    "AuthenticationService - Token refresh response was not HTTPURLResponse"
+                )
                 throw AuthError.invalidResponse
             }
 
@@ -2544,7 +2572,8 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
             {
                 await updateDPoPNonce(domain: responseDomain, nonce: newNonce, for: did)
                 LogManager.logDebug(
-                    "Updated DPoP nonce for domain \(responseDomain) after token refresh attempt")
+                    "Updated DPoP nonce for domain \(responseDomain) after token refresh attempt"
+                )
             }
 
             // Log status without exposing sensitive token data
@@ -2561,7 +2590,8 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
                     // Check specifically for DPoP nonce error
                     if errorResponse.error == "use_dpop_nonce", retryCount == 0 {
                         LogManager.logInfo(
-                            "Detected DPoP nonce mismatch during token refresh. Will retry with updated nonce.")
+                            "Detected DPoP nonce mismatch during token refresh. Will retry with updated nonce."
+                        )
                         LogManager.logAuthIncident(
                             "DPoPNonceMismatchRefresh",
                             details: [
@@ -2571,7 +2601,8 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
                             ]
                         )
                         LogManager.logInfo(
-                            "METRIC dpop_nonce_retry_total origin=auth did=\(LogManager.logDID(did))")
+                            "METRIC dpop_nonce_retry_total origin=auth did=\(LogManager.logDID(did))"
+                        )
 
                         // CRITICAL FIX: Ensure we use the most recent nonce for retry
                         // Atomically update and verify nonce synchronization before retry
@@ -2606,11 +2637,13 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
                                 )
                             } else {
                                 LogManager.logError(
-                                    "Failed to synchronize nonce for retry. Aborting retry attempt to prevent loop.")
+                                    "Failed to synchronize nonce for retry. Aborting retry attempt to prevent loop."
+                                )
                             }
                         } else {
                             LogManager.logError(
-                                "Missing DPoP-Nonce header in error response. Cannot retry safely.")
+                                "Missing DPoP-Nonce header in error response. Cannot retry safely."
+                            )
                         }
 
                         // Only retry if nonce synchronization was successful
@@ -2764,7 +2797,8 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
             session = try await storage.getSession(for: account.did)
         } catch {
             LogManager.logError(
-                "Failed to retrieve session for account \(LogManager.logDID(account.did)): \(error)")
+                "Failed to retrieve session for account \(LogManager.logDID(account.did)): \(error)"
+            )
             throw AuthError.noActiveAccount as Error
         }
 
@@ -2856,7 +2890,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
         return modifiedRequest
     }
 
-    // New API: prepare request and return auth context (DID + JKT) to prevent cross-account/key contamination
+    /// New API: prepare request and return auth context (DID + JKT) to prevent cross-account/key contamination
     func prepareAuthenticatedRequestWithContext(_ request: URLRequest) async throws -> (
         URLRequest, AuthContext
     ) {
@@ -2873,7 +2907,8 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
             session = try await storage.getSession(for: account.did)
         } catch {
             LogManager.logError(
-                "Failed to retrieve session for account \(LogManager.logDID(account.did)): \(error)")
+                "Failed to retrieve session for account \(LogManager.logDID(account.did)): \(error)"
+            )
             throw AuthError.noActiveAccount as Error
         }
 
@@ -3093,8 +3128,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
         let signatureBase64 = base64URLEncode(signatureData.rawRepresentation) // Convert signature to Data
 
         // Final compact serialization
-        let jws = "\(headerBase64).\(base64URLEncode(jwtPayloadData)).\(signatureBase64)"
-        return jws
+        return "\(headerBase64).\(base64URLEncode(jwtPayloadData)).\(signatureBase64)"
     }
 
     /// Gets or creates a DPoP key for the specified DID.
@@ -3156,7 +3190,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
         }
     }
 
-    // Canonicalize URL for DPoP htu claim: lowercase scheme/host, drop default ports, ensure path, DROP query, drop fragment
+    /// Canonicalize URL for DPoP htu claim: lowercase scheme/host, drop default ports, ensure path, DROP query, drop fragment
     private func canonicalHTU(_ url: URL) -> String {
         guard var comps = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
             return url.absoluteString
@@ -3303,7 +3337,8 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
         // Validate session before saving
         guard validateTokenState(newSession) else {
             LogManager.logError(
-                "Session validation failed before save for DID: \(LogManager.logDID(did))")
+                "Session validation failed before save for DID: \(LogManager.logDID(did))"
+            )
             return false
         }
 
@@ -3553,7 +3588,8 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
             LogManager.logDebug("Attempting token exchange using ephemeral key WITH nonce in DPoP proof.")
         } else {
             LogManager.logDebug(
-                "Attempting token exchange using ephemeral key WITHOUT nonce in DPoP proof.")
+                "Attempting token exchange using ephemeral key WITHOUT nonce in DPoP proof."
+            )
         }
 
         do {
@@ -3665,7 +3701,8 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
                     // Non-nonce 400 error
                     let errorDetails = String(data: data, encoding: .utf8) ?? "No details"
                     LogManager.logError(
-                        "Token exchange failed with status code 400 (not a nonce error): \(errorDetails)")
+                        "Token exchange failed with status code 400 (not a nonce error): \(errorDetails)"
+                    )
                     throw AuthError.invalidCredentials
                 }
             }
@@ -3674,11 +3711,13 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
                 let statusCode = httpResponse.statusCode
                 let errorDetails = String(data: data, encoding: .utf8) ?? "No details"
                 LogManager.logError(
-                    "Token exchange failed with status code \(statusCode). Response: \(errorDetails)")
+                    "Token exchange failed with status code \(statusCode). Response: \(errorDetails)"
+                )
 
                 if let oauthError = try? JSONDecoder().decode(OAuthErrorResponse.self, from: data) {
                     LogManager.logError(
-                        "OAuth Error: \(oauthError.error) - \(oauthError.errorDescription ?? "No description")")
+                        "OAuth Error: \(oauthError.error) - \(oauthError.errorDescription ?? "No description")"
+                    )
                 }
 
                 switch statusCode {
@@ -3739,7 +3778,8 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
         if let resourceURL {
             params["resource"] = resourceURL.absoluteString
             LogManager.logInfo(
-                "Including OAuth resource parameter for code exchange: \(resourceURL.absoluteString)")
+                "Including OAuth resource parameter for code exchange: \(resourceURL.absoluteString)"
+            )
         }
         request.httpBody = encodeFormData(params)
 
@@ -3871,8 +3911,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
         for attempt in 1 ... maxCancelledRetries {
             do {
                 let (data, _) = try await networkService.request(request)
-                let metadata = try JSONDecoder().decode(ProtectedResourceMetadata.self, from: data)
-                return metadata
+                return try JSONDecoder().decode(ProtectedResourceMetadata.self, from: data)
             } catch {
                 lastError = error
 
@@ -3927,8 +3966,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
         for attempt in 1 ... maxCancelledRetries {
             do {
                 let (data, _) = try await networkService.request(request)
-                let metadata = try JSONDecoder().decode(AuthorizationServerMetadata.self, from: data)
-                return metadata
+                return try JSONDecoder().decode(AuthorizationServerMetadata.self, from: data)
             } catch {
                 lastError = error
 

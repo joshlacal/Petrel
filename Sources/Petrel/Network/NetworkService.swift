@@ -215,7 +215,7 @@ actor NetworkService: NetworkServiceProtocol {
     private(set) var protectedResourceMetadata: ProtectedResourceMetadata?
     private(set) var authorizationServerMetadata: AuthorizationServerMetadata?
     private let requestDeduplicator = RequestDeduplicator()
-    
+
     /// When true, all xrpc requests require auth and go through the gateway
     /// Gateway handles OAuth/DPoP - client just sends Bearer token
     private(set) var gatewayMode: Bool = false
@@ -294,7 +294,7 @@ actor NetworkService: NetworkServiceProtocol {
         baseURL = url
         LogManager.logInfo("Network Service - Base URL updated to: \(url)")
     }
-    
+
     /// Enables gateway mode where all xrpc requests require auth
     /// and the gateway handles OAuth/DPoP complexity
     func setGatewayMode(_ enabled: Bool) async {
@@ -437,7 +437,7 @@ actor NetworkService: NetworkServiceProtocol {
     func determineEndpointTypeAndAuthRequirement(for url: URL) -> (EndpointType, Bool) {
         // DEBUG: Log every request with gateway mode status
         LogManager.logInfo("🔍 [GATEWAY DEBUG] determineEndpointTypeAndAuthRequirement - gatewayMode: \(gatewayMode), url: \(url.absoluteString)")
-        
+
         // In gateway mode, all xrpc requests need auth - gateway handles OAuth/DPoP
         if gatewayMode {
             if url.absoluteString.contains("/xrpc/") {
@@ -448,7 +448,7 @@ actor NetworkService: NetworkServiceProtocol {
             LogManager.logInfo("🔍 [GATEWAY DEBUG] Gateway mode non-xrpc request - no auth needed")
             return (.other, false)
         }
-        
+
         // Standard OAuth mode - use metadata to determine auth requirements
         if let authServerMetadata = authorizationServerMetadata,
            url.absoluteString.hasPrefix(authServerMetadata.issuer)
@@ -466,7 +466,7 @@ actor NetworkService: NetworkServiceProtocol {
                   url.absoluteString.hasPrefix(protectedResourceMetadata.resource.absoluteString)
         {
             return (.protectedResource, true) // Protected resources always need authentication
-        } else if url.host == baseURL.host && url.absoluteString.contains("/xrpc/") {
+        } else if url.host == baseURL.host, url.absoluteString.contains("/xrpc/") {
             // Requests to our configured baseURL need auth for xrpc endpoints
             LogManager.logDebug("Network Service - Requiring auth for baseURL xrpc request: \(url.absoluteString)")
             return (.protectedResource, true)
@@ -491,7 +491,8 @@ actor NetworkService: NetworkServiceProtocol {
         if requiresAuth {
             guard let authProvider = authProvider else {
                 LogManager.logDebug(
-                    "Authentication required for \(url.absoluteString) but no auth provider is set.")
+                    "Authentication required for \(url.absoluteString) but no auth provider is set."
+                )
                 throw NetworkError.authenticationRequired
             }
             do {
@@ -503,7 +504,8 @@ actor NetworkService: NetworkServiceProtocol {
                 LogManager.logDebug("Prepared authenticated request for: \(url.absoluteString)")
             } catch {
                 LogManager.logError(
-                    "Failed to prepare authenticated request for \(url.absoluteString): \(error)")
+                    "Failed to prepare authenticated request for \(url.absoluteString): \(error)"
+                )
                 // Propagate the specific authentication error or a generic one
                 if error is AuthError {
                     throw error
@@ -554,7 +556,8 @@ actor NetworkService: NetworkServiceProtocol {
                !(200 ..< 300).contains(httpResponse.statusCode)
             {
                 LogManager.logDebug(
-                    "Request to \(url.absoluteString) failed with status code: \(httpResponse.statusCode)")
+                    "Request to \(url.absoluteString) failed with status code: \(httpResponse.statusCode)"
+                )
                 // Consider throwing a more specific error based on status code if needed here
                 // For simplicity, just returning the response for now, letting caller handle.
             }
@@ -770,14 +773,15 @@ actor NetworkService: NetworkServiceProtocol {
                     LogManager.logInfo(
                         "Network Service - Received 401 for \(url.absoluteString). Analyzing response."
                     )
-                    
+
                     // In gateway mode, don't try to handle DPoP nonce errors - gateway should handle them
                     // Just delegate to the auth provider's handleUnauthorizedResponse
                     if gatewayMode {
                         LogManager.logInfo("Network Service - Gateway mode: delegating 401 to auth provider")
                         do {
                             let (retryData, retryResponse) = try await authProvider.handleUnauthorizedResponse(
-                                httpResponse, data: data, for: requestToSend)
+                                httpResponse, data: data, for: requestToSend
+                            )
                             return (retryData, retryResponse)
                         } catch {
                             LogManager.logError("Network Service - Gateway mode: auth provider failed to handle 401: \(error)")
@@ -813,7 +817,8 @@ actor NetworkService: NetworkServiceProtocol {
                         {
                             isNonceError = true
                             LogManager.logInfo(
-                                "Network Service - 401 error is 'use_dpop_nonce' (found in WWW-Authenticate).")
+                                "Network Service - 401 error is 'use_dpop_nonce' (found in WWW-Authenticate)."
+                            )
                         } else {
                             LogManager.logInfo(
                                 "Network Service - 401 error is NOT 'use_dpop_nonce'. Will attempt standard token refresh."
@@ -843,7 +848,8 @@ actor NetworkService: NetworkServiceProtocol {
                             )
 
                             LogManager.logInfo(
-                                "Network Service - Nonce storage completed, proceeding with retry.")
+                                "Network Service - Nonce storage completed, proceeding with retry."
+                            )
                         }
 
                         // Limit nonce-based retry strictly to one attempt
@@ -891,7 +897,8 @@ actor NetworkService: NetworkServiceProtocol {
                                 httpResponse, data: data, for: requestToSend
                             )
                             LogManager.logInfo(
-                                "Network Service - Successfully handled non-nonce 401 via authProvider.")
+                                "Network Service - Successfully handled non-nonce 401 via authProvider."
+                            )
                             return (retryData, retryResponse) // Return the result of the successful handling
                         } catch {
                             LogManager.logError(
@@ -917,20 +924,20 @@ actor NetworkService: NetworkServiceProtocol {
                     LogManager.logError(
                         "Network Service - 400 Response body: \(redactedBody)"
                     )
-                    
+
                     // Check if this is an ExpiredToken error that needs refresh
                     if responseBody.contains("ExpiredToken"), let authProvider = authProvider, !skipTokenRefresh {
                         LogManager.logError(
                             "Network Service - 400 ExpiredToken detected, attempting token refresh for \(requestToSend.url?.absoluteString ?? "Unknown URL")"
                         )
-                        
+
                         // Attempt token refresh
                         do {
                             let refreshResult = try await authProvider.refreshTokenIfNeeded()
                             LogManager.logError(
                                 "Network Service - Token refresh result after ExpiredToken: \(refreshResult)"
                             )
-                            
+
                             // Retry the request with the new token
                             retryCount += 1
                             if retryCount < maxRetries {
@@ -945,7 +952,7 @@ actor NetworkService: NetworkServiceProtocol {
                             )
                         }
                     }
-                    
+
                     // Log request headers (redact auth)
                     if let headers = requestToSend.allHTTPHeaderFields {
                         let redactedHeaders = headers.mapValues { value -> String in
@@ -1244,7 +1251,8 @@ actor NetworkService: NetworkServiceProtocol {
         if let url = request.url,
            !url.absoluteString.contains("/.well-known/"),
            !url.absoluteString.contains("plc.directory"),
-           !url.absoluteString.contains("/oauth/") {
+           !url.absoluteString.contains("/oauth/")
+        {
             requiresAuth = true
         }
 
@@ -1281,7 +1289,8 @@ actor NetworkService: NetworkServiceProtocol {
                 // If we're not targeting the PDS host, do not attach atproto-proxy
                 if name.lowercased() == "atproto-proxy",
                    let h = finalRequest.url?.host,
-                   h != baseURL.host {
+                   h != baseURL.host
+                {
                     // Skip proxy header for direct-to-service requests
                     continue
                 }
@@ -1585,8 +1594,8 @@ actor NetworkService: NetworkServiceProtocol {
                 if (bytes[0] & 0xFE) == 0xFC { return true }
             }
         #else
-            // Linux fallback: regex-based IP validation
-            // IPv4 checks - parse manually
+            /// Linux fallback: regex-based IP validation
+            /// IPv4 checks - parse manually
             let components = ip.split(separator: ".").compactMap { Int($0) }
             if components.count == 4 {
                 let a = components[0]
@@ -1616,9 +1625,9 @@ actor NetworkService: NetworkServiceProtocol {
     }
 }
 
-// Extension to help with task value extraction
+/// Extension to help with task value extraction
 extension Task where Success == Never, Failure == Never {
-    // Use sleep(0) instead of recursively calling Task.yield()
+    /// Use sleep(0) instead of recursively calling Task.yield()
     static func yield() async {
         try? await Task.sleep(nanoseconds: 0)
     }

@@ -106,7 +106,7 @@ public actor AuthEventBroadcaster {
 
     /// Broadcast an authentication event to all observers
     /// - Parameter event: The authentication event to broadcast
-    internal func broadcast(_ event: AuthEvent) {
+    func broadcast(_ event: AuthEvent) {
         let currentObservers = observers
         Task(priority: .high) {
             for observer in currentObservers {

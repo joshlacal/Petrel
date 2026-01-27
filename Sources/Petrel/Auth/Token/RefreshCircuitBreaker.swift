@@ -10,7 +10,7 @@ import Foundation
 /// Actor responsible for implementing circuit breaker pattern for token refresh operations
 /// to prevent cascade failures when refresh operations repeatedly fail.
 actor RefreshCircuitBreaker {
-    // Classify refresh failures for better breaker decisions
+    /// Classify refresh failures for better breaker decisions
     enum RefreshFailureKind {
         case nonceRecoverable // use_dpop_nonce: retried and typically succeeds
         case network // timeouts, connectivity
