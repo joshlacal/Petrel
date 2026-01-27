@@ -1,0 +1,56 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mls.getGroupInfo",
+  "defs": {
+    "main": {
+      "type": "query",
+      "description": "Fetch GroupInfo for external commit. Only available to current/past members.",
+      "parameters": {
+        "type": "params",
+        "required": ["convoId"],
+        "properties": {
+          "convoId": {
+            "type": "string",
+            "description": "Conversation ID"
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["groupInfo", "epoch"],
+          "properties": {
+            "groupInfo": {
+              "type": "string",
+              "description": "Base64-encoded TLS-serialized GroupInfo"
+            },
+            "epoch": {
+              "type": "integer",
+              "description": "Current epoch number"
+            },
+            "expiresAt": {
+              "type": "string",
+              "format": "datetime",
+              "description": "When GroupInfo becomes stale (5 minutes)"
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "name": "NotFound",
+          "description": "Conversation not found"
+        },
+        {
+          "name": "Unauthorized",
+          "description": "Not a current or past member"
+        },
+        {
+          "name": "GroupInfoUnavailable",
+          "description": "GroupInfo not yet generated for this conversation"
+        }
+      ]
+    }
+  }
+}

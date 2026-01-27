@@ -1,26 +1,31 @@
 import Foundation
 
+
+
 // lexicon: 1, id: blue.catbird.mls.message.defs
 
-public enum BlueCatbirdMlsMessageDefs {
+
+public struct BlueCatbirdMlsMessageDefs { 
+
     public static let typeIdentifier = "blue.catbird.mls.message.defs"
+        
+public struct PayloadView: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "blue.catbird.mls.message.defs#payloadView"
+            public let version: Int
+            public let messageType: String
+            public let text: String?
+            public let embed: PayloadViewEmbedUnion?
+            public let adminRoster: AdminRoster?
+            public let adminAction: AdminAction?
+            public let reaction: ReactionPayload?
+            public let readReceipt: ReadReceiptPayload?
+            public let typing: TypingPayload?
 
-    public struct PayloadView: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "blue.catbird.mls.message.defs#payloadView"
-        public let version: Int
-        public let messageType: String
-        public let text: String?
-        public let embed: PayloadViewEmbedUnion?
-        public let adminRoster: AdminRoster?
-        public let adminAction: AdminAction?
-        public let reaction: ReactionPayload?
-        public let readReceipt: ReadReceiptPayload?
-        public let typing: TypingPayload?
-
-        /// Standard initializer
+        // Standard initializer
         public init(
             version: Int, messageType: String, text: String?, embed: PayloadViewEmbedUnion?, adminRoster: AdminRoster?, adminAction: AdminAction?, reaction: ReactionPayload?, readReceipt: ReadReceiptPayload?, typing: TypingPayload?
         ) {
+            
             self.version = version
             self.messageType = messageType
             self.text = text
@@ -32,111 +37,176 @@ public enum BlueCatbirdMlsMessageDefs {
             self.typing = typing
         }
 
-        /// Codable initializer
+        // Codable initializer
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                version = try container.decode(Int.self, forKey: .version)
-
+                
+                
+                self.version = try container.decode(Int.self, forKey: .version)
+                
+                
             } catch {
+                
                 LogManager.logError("Decoding error for required property 'version': \(error)")
-
+                
                 throw error
             }
             do {
-                messageType = try container.decode(String.self, forKey: .messageType)
-
+                
+                
+                self.messageType = try container.decode(String.self, forKey: .messageType)
+                
+                
             } catch {
+                
                 LogManager.logError("Decoding error for required property 'messageType': \(error)")
-
+                
                 throw error
             }
             do {
-                text = try container.decodeIfPresent(String.self, forKey: .text)
-
+                
+                
+                self.text = try container.decodeIfPresent(String.self, forKey: .text)
+                
+                
             } catch {
+                
                 LogManager.logDebug("Decoding error for optional property 'text': \(error)")
-
+                
                 throw error
             }
             do {
-                embed = try container.decodeIfPresent(PayloadViewEmbedUnion.self, forKey: .embed)
-
+                
+                
+                self.embed = try container.decodeIfPresent(PayloadViewEmbedUnion.self, forKey: .embed)
+                
+                
             } catch {
+                
                 LogManager.logDebug("Decoding error for optional property 'embed': \(error)")
-
+                
                 throw error
             }
             do {
-                adminRoster = try container.decodeIfPresent(AdminRoster.self, forKey: .adminRoster)
-
+                
+                
+                self.adminRoster = try container.decodeIfPresent(AdminRoster.self, forKey: .adminRoster)
+                
+                
             } catch {
+                
                 LogManager.logDebug("Decoding error for optional property 'adminRoster': \(error)")
-
+                
                 throw error
             }
             do {
-                adminAction = try container.decodeIfPresent(AdminAction.self, forKey: .adminAction)
-
+                
+                
+                self.adminAction = try container.decodeIfPresent(AdminAction.self, forKey: .adminAction)
+                
+                
             } catch {
+                
                 LogManager.logDebug("Decoding error for optional property 'adminAction': \(error)")
-
+                
                 throw error
             }
             do {
-                reaction = try container.decodeIfPresent(ReactionPayload.self, forKey: .reaction)
-
+                
+                
+                self.reaction = try container.decodeIfPresent(ReactionPayload.self, forKey: .reaction)
+                
+                
             } catch {
+                
                 LogManager.logDebug("Decoding error for optional property 'reaction': \(error)")
-
+                
                 throw error
             }
             do {
-                readReceipt = try container.decodeIfPresent(ReadReceiptPayload.self, forKey: .readReceipt)
-
+                
+                
+                self.readReceipt = try container.decodeIfPresent(ReadReceiptPayload.self, forKey: .readReceipt)
+                
+                
             } catch {
+                
                 LogManager.logDebug("Decoding error for optional property 'readReceipt': \(error)")
-
+                
                 throw error
             }
             do {
-                typing = try container.decodeIfPresent(TypingPayload.self, forKey: .typing)
-
+                
+                
+                self.typing = try container.decodeIfPresent(TypingPayload.self, forKey: .typing)
+                
+                
             } catch {
+                
                 LogManager.logDebug("Decoding error for optional property 'typing': \(error)")
-
+                
                 throw error
             }
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
+            
             try container.encode(version, forKey: .version)
-
+            
+            
+            
+            
             try container.encode(messageType, forKey: .messageType)
-
+            
+            
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(text, forKey: .text)
-
+            
+            
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(embed, forKey: .embed)
-
+            
+            
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(adminRoster, forKey: .adminRoster)
-
+            
+            
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(adminAction, forKey: .adminAction)
-
+            
+            
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(reaction, forKey: .reaction)
-
+            
+            
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(readReceipt, forKey: .readReceipt)
-
+            
+            
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(typing, forKey: .typing)
+            
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -180,111 +250,179 @@ public enum BlueCatbirdMlsMessageDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
             guard let other = other as? Self else { return false }
-
-            if version != other.version {
+            
+            
+            if self.version != other.version {
                 return false
             }
-
-            if messageType != other.messageType {
+            
+            
+            
+            
+            if self.messageType != other.messageType {
                 return false
             }
-
+            
+            
+            
+            
             if text != other.text {
                 return false
             }
-
+            
+            
+            
+            
             if embed != other.embed {
                 return false
             }
-
+            
+            
+            
+            
             if adminRoster != other.adminRoster {
                 return false
             }
-
+            
+            
+            
+            
             if adminAction != other.adminAction {
                 return false
             }
-
+            
+            
+            
+            
             if reaction != other.reaction {
                 return false
             }
-
+            
+            
+            
+            
             if readReceipt != other.readReceipt {
                 return false
             }
-
+            
+            
+            
+            
             if typing != other.typing {
                 return false
             }
-
+            
+            
             return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
             return lhs.isEqual(to: rhs)
         }
 
-        /// DAGCBOR encoding with field ordering
+        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
+            
+            
+            
+            
             let versionValue = try version.toCBORValue()
             map = map.adding(key: "version", value: versionValue)
-
+            
+            
+            
+            
+            
+            
             let messageTypeValue = try messageType.toCBORValue()
             map = map.adding(key: "messageType", value: messageTypeValue)
-
+            
+            
+            
+            
+            
             if let value = text {
                 // Encode optional property even if it's an empty array for CBOR
-
+                
                 let textValue = try value.toCBORValue()
                 map = map.adding(key: "text", value: textValue)
             }
-
+            
+            
+            
+            
+            
             if let value = embed {
                 // Encode optional property even if it's an empty array for CBOR
-
+                
                 let embedValue = try value.toCBORValue()
                 map = map.adding(key: "embed", value: embedValue)
             }
-
+            
+            
+            
+            
+            
             if let value = adminRoster {
                 // Encode optional property even if it's an empty array for CBOR
-
+                
                 let adminRosterValue = try value.toCBORValue()
                 map = map.adding(key: "adminRoster", value: adminRosterValue)
             }
-
+            
+            
+            
+            
+            
             if let value = adminAction {
                 // Encode optional property even if it's an empty array for CBOR
-
+                
                 let adminActionValue = try value.toCBORValue()
                 map = map.adding(key: "adminAction", value: adminActionValue)
             }
-
+            
+            
+            
+            
+            
             if let value = reaction {
                 // Encode optional property even if it's an empty array for CBOR
-
+                
                 let reactionValue = try value.toCBORValue()
                 map = map.adding(key: "reaction", value: reactionValue)
             }
-
+            
+            
+            
+            
+            
             if let value = readReceipt {
                 // Encode optional property even if it's an empty array for CBOR
-
+                
                 let readReceiptValue = try value.toCBORValue()
                 map = map.adding(key: "readReceipt", value: readReceiptValue)
             }
-
+            
+            
+            
+            
+            
             if let value = typing {
                 // Encode optional property even if it's an empty array for CBOR
-
+                
                 let typingValue = try value.toCBORValue()
                 map = map.adding(key: "typing", value: typingValue)
             }
+            
+            
+            
 
             return map
         }
@@ -302,19 +440,20 @@ public enum BlueCatbirdMlsMessageDefs {
             case typing
         }
     }
+        
+public struct RecordEmbed: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "blue.catbird.mls.message.defs#recordEmbed"
+            public let uri: ATProtocolURI
+            public let cid: CID?
+            public let authorDid: DID
+            public let previewText: String?
+            public let createdAt: ATProtocolDate?
 
-    public struct RecordEmbed: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "blue.catbird.mls.message.defs#recordEmbed"
-        public let uri: ATProtocolURI
-        public let cid: CID?
-        public let authorDid: DID
-        public let previewText: String?
-        public let createdAt: ATProtocolDate?
-
-        /// Standard initializer
+        // Standard initializer
         public init(
             uri: ATProtocolURI, cid: CID?, authorDid: DID, previewText: String?, createdAt: ATProtocolDate?
         ) {
+            
             self.uri = uri
             self.cid = cid
             self.authorDid = authorDid
@@ -322,67 +461,104 @@ public enum BlueCatbirdMlsMessageDefs {
             self.createdAt = createdAt
         }
 
-        /// Codable initializer
+        // Codable initializer
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-
+                
+                
+                self.uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+                
+                
             } catch {
+                
                 LogManager.logError("Decoding error for required property 'uri': \(error)")
-
+                
                 throw error
             }
             do {
-                cid = try container.decodeIfPresent(CID.self, forKey: .cid)
-
+                
+                
+                self.cid = try container.decodeIfPresent(CID.self, forKey: .cid)
+                
+                
             } catch {
+                
                 LogManager.logDebug("Decoding error for optional property 'cid': \(error)")
-
+                
                 throw error
             }
             do {
-                authorDid = try container.decode(DID.self, forKey: .authorDid)
-
+                
+                
+                self.authorDid = try container.decode(DID.self, forKey: .authorDid)
+                
+                
             } catch {
+                
                 LogManager.logError("Decoding error for required property 'authorDid': \(error)")
-
+                
                 throw error
             }
             do {
-                previewText = try container.decodeIfPresent(String.self, forKey: .previewText)
-
+                
+                
+                self.previewText = try container.decodeIfPresent(String.self, forKey: .previewText)
+                
+                
             } catch {
+                
                 LogManager.logDebug("Decoding error for optional property 'previewText': \(error)")
-
+                
                 throw error
             }
             do {
-                createdAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .createdAt)
-
+                
+                
+                self.createdAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .createdAt)
+                
+                
             } catch {
+                
                 LogManager.logDebug("Decoding error for optional property 'createdAt': \(error)")
-
+                
                 throw error
             }
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
+            
             try container.encode(uri, forKey: .uri)
-
+            
+            
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(cid, forKey: .cid)
-
+            
+            
+            
+            
             try container.encode(authorDid, forKey: .authorDid)
-
+            
+            
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(previewText, forKey: .previewText)
-
+            
+            
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(createdAt, forKey: .createdAt)
+            
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -406,67 +582,107 @@ public enum BlueCatbirdMlsMessageDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
             guard let other = other as? Self else { return false }
-
-            if uri != other.uri {
+            
+            
+            if self.uri != other.uri {
                 return false
             }
-
+            
+            
+            
+            
             if cid != other.cid {
                 return false
             }
-
-            if authorDid != other.authorDid {
+            
+            
+            
+            
+            if self.authorDid != other.authorDid {
                 return false
             }
-
+            
+            
+            
+            
             if previewText != other.previewText {
                 return false
             }
-
+            
+            
+            
+            
             if createdAt != other.createdAt {
                 return false
             }
-
+            
+            
             return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
             return lhs.isEqual(to: rhs)
         }
 
-        /// DAGCBOR encoding with field ordering
+        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
+            
+            
+            
+            
             let uriValue = try uri.toCBORValue()
             map = map.adding(key: "uri", value: uriValue)
-
+            
+            
+            
+            
+            
             if let value = cid {
                 // Encode optional property even if it's an empty array for CBOR
-
+                
                 let cidValue = try value.toCBORValue()
                 map = map.adding(key: "cid", value: cidValue)
             }
-
+            
+            
+            
+            
+            
+            
             let authorDidValue = try authorDid.toCBORValue()
             map = map.adding(key: "authorDid", value: authorDidValue)
-
+            
+            
+            
+            
+            
             if let value = previewText {
                 // Encode optional property even if it's an empty array for CBOR
-
+                
                 let previewTextValue = try value.toCBORValue()
                 map = map.adding(key: "previewText", value: previewTextValue)
             }
-
+            
+            
+            
+            
+            
             if let value = createdAt {
                 // Encode optional property even if it's an empty array for CBOR
-
+                
                 let createdAtValue = try value.toCBORValue()
                 map = map.adding(key: "createdAt", value: createdAtValue)
             }
+            
+            
+            
 
             return map
         }
@@ -480,19 +696,20 @@ public enum BlueCatbirdMlsMessageDefs {
             case createdAt
         }
     }
+        
+public struct LinkEmbed: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "blue.catbird.mls.message.defs#linkEmbed"
+            public let url: URI
+            public let title: String?
+            public let description: String?
+            public let thumbnailURL: URI?
+            public let domain: String?
 
-    public struct LinkEmbed: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "blue.catbird.mls.message.defs#linkEmbed"
-        public let url: URI
-        public let title: String?
-        public let description: String?
-        public let thumbnailURL: URI?
-        public let domain: String?
-
-        /// Standard initializer
+        // Standard initializer
         public init(
             url: URI, title: String?, description: String?, thumbnailURL: URI?, domain: String?
         ) {
+            
             self.url = url
             self.title = title
             self.description = description
@@ -500,68 +717,105 @@ public enum BlueCatbirdMlsMessageDefs {
             self.domain = domain
         }
 
-        /// Codable initializer
+        // Codable initializer
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                url = try container.decode(URI.self, forKey: .url)
-
+                
+                
+                self.url = try container.decode(URI.self, forKey: .url)
+                
+                
             } catch {
+                
                 LogManager.logError("Decoding error for required property 'url': \(error)")
-
+                
                 throw error
             }
             do {
-                title = try container.decodeIfPresent(String.self, forKey: .title)
-
+                
+                
+                self.title = try container.decodeIfPresent(String.self, forKey: .title)
+                
+                
             } catch {
+                
                 LogManager.logDebug("Decoding error for optional property 'title': \(error)")
-
+                
                 throw error
             }
             do {
-                description = try container.decodeIfPresent(String.self, forKey: .description)
-
+                
+                
+                self.description = try container.decodeIfPresent(String.self, forKey: .description)
+                
+                
             } catch {
+                
                 LogManager.logDebug("Decoding error for optional property 'description': \(error)")
-
+                
                 throw error
             }
             do {
-                thumbnailURL = try container.decodeIfPresent(URI.self, forKey: .thumbnailURL)
-
+                
+                
+                self.thumbnailURL = try container.decodeIfPresent(URI.self, forKey: .thumbnailURL)
+                
+                
             } catch {
+                
                 LogManager.logDebug("Decoding error for optional property 'thumbnailURL': \(error)")
-
+                
                 throw error
             }
             do {
-                domain = try container.decodeIfPresent(String.self, forKey: .domain)
-
+                
+                
+                self.domain = try container.decodeIfPresent(String.self, forKey: .domain)
+                
+                
             } catch {
+                
                 LogManager.logDebug("Decoding error for optional property 'domain': \(error)")
-
+                
                 throw error
             }
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
+            
             try container.encode(url, forKey: .url)
-
+            
+            
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(title, forKey: .title)
-
+            
+            
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(description, forKey: .description)
-
+            
+            
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(thumbnailURL, forKey: .thumbnailURL)
-
+            
+            
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(domain, forKey: .domain)
+            
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -589,71 +843,110 @@ public enum BlueCatbirdMlsMessageDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
             guard let other = other as? Self else { return false }
-
-            if url != other.url {
+            
+            
+            if self.url != other.url {
                 return false
             }
-
+            
+            
+            
+            
             if title != other.title {
                 return false
             }
-
+            
+            
+            
+            
             if description != other.description {
                 return false
             }
-
+            
+            
+            
+            
             if thumbnailURL != other.thumbnailURL {
                 return false
             }
-
+            
+            
+            
+            
             if domain != other.domain {
                 return false
             }
-
+            
+            
             return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
             return lhs.isEqual(to: rhs)
         }
 
-        /// DAGCBOR encoding with field ordering
+        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
+            
+            
+            
+            
             let urlValue = try url.toCBORValue()
             map = map.adding(key: "url", value: urlValue)
-
+            
+            
+            
+            
+            
             if let value = title {
                 // Encode optional property even if it's an empty array for CBOR
-
+                
                 let titleValue = try value.toCBORValue()
                 map = map.adding(key: "title", value: titleValue)
             }
-
+            
+            
+            
+            
+            
             if let value = description {
                 // Encode optional property even if it's an empty array for CBOR
-
+                
                 let descriptionValue = try value.toCBORValue()
                 map = map.adding(key: "description", value: descriptionValue)
             }
-
+            
+            
+            
+            
+            
             if let value = thumbnailURL {
                 // Encode optional property even if it's an empty array for CBOR
-
+                
                 let thumbnailURLValue = try value.toCBORValue()
                 map = map.adding(key: "thumbnailURL", value: thumbnailURLValue)
             }
-
+            
+            
+            
+            
+            
             if let value = domain {
                 // Encode optional property even if it's an empty array for CBOR
-
+                
                 let domainValue = try value.toCBORValue()
                 map = map.adding(key: "domain", value: domainValue)
             }
+            
+            
+            
 
             return map
         }
@@ -667,20 +960,21 @@ public enum BlueCatbirdMlsMessageDefs {
             case domain
         }
     }
+        
+public struct GifEmbed: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "blue.catbird.mls.message.defs#gifEmbed"
+            public let tenorURL: URI
+            public let mp4URL: URI
+            public let title: String?
+            public let thumbnailURL: URI?
+            public let width: Int?
+            public let height: Int?
 
-    public struct GifEmbed: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "blue.catbird.mls.message.defs#gifEmbed"
-        public let tenorURL: URI
-        public let mp4URL: URI
-        public let title: String?
-        public let thumbnailURL: URI?
-        public let width: Int?
-        public let height: Int?
-
-        /// Standard initializer
+        // Standard initializer
         public init(
             tenorURL: URI, mp4URL: URI, title: String?, thumbnailURL: URI?, width: Int?, height: Int?
         ) {
+            
             self.tenorURL = tenorURL
             self.mp4URL = mp4URL
             self.title = title
@@ -689,78 +983,122 @@ public enum BlueCatbirdMlsMessageDefs {
             self.height = height
         }
 
-        /// Codable initializer
+        // Codable initializer
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                tenorURL = try container.decode(URI.self, forKey: .tenorURL)
-
+                
+                
+                self.tenorURL = try container.decode(URI.self, forKey: .tenorURL)
+                
+                
             } catch {
+                
                 LogManager.logError("Decoding error for required property 'tenorURL': \(error)")
-
+                
                 throw error
             }
             do {
-                mp4URL = try container.decode(URI.self, forKey: .mp4URL)
-
+                
+                
+                self.mp4URL = try container.decode(URI.self, forKey: .mp4URL)
+                
+                
             } catch {
+                
                 LogManager.logError("Decoding error for required property 'mp4URL': \(error)")
-
+                
                 throw error
             }
             do {
-                title = try container.decodeIfPresent(String.self, forKey: .title)
-
+                
+                
+                self.title = try container.decodeIfPresent(String.self, forKey: .title)
+                
+                
             } catch {
+                
                 LogManager.logDebug("Decoding error for optional property 'title': \(error)")
-
+                
                 throw error
             }
             do {
-                thumbnailURL = try container.decodeIfPresent(URI.self, forKey: .thumbnailURL)
-
+                
+                
+                self.thumbnailURL = try container.decodeIfPresent(URI.self, forKey: .thumbnailURL)
+                
+                
             } catch {
+                
                 LogManager.logDebug("Decoding error for optional property 'thumbnailURL': \(error)")
-
+                
                 throw error
             }
             do {
-                width = try container.decodeIfPresent(Int.self, forKey: .width)
-
+                
+                
+                self.width = try container.decodeIfPresent(Int.self, forKey: .width)
+                
+                
             } catch {
+                
                 LogManager.logDebug("Decoding error for optional property 'width': \(error)")
-
+                
                 throw error
             }
             do {
-                height = try container.decodeIfPresent(Int.self, forKey: .height)
-
+                
+                
+                self.height = try container.decodeIfPresent(Int.self, forKey: .height)
+                
+                
             } catch {
+                
                 LogManager.logDebug("Decoding error for optional property 'height': \(error)")
-
+                
                 throw error
             }
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
+            
             try container.encode(tenorURL, forKey: .tenorURL)
-
+            
+            
+            
+            
             try container.encode(mp4URL, forKey: .mp4URL)
-
+            
+            
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(title, forKey: .title)
-
+            
+            
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(thumbnailURL, forKey: .thumbnailURL)
-
+            
+            
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(width, forKey: .width)
-
+            
+            
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(height, forKey: .height)
+            
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -789,78 +1127,125 @@ public enum BlueCatbirdMlsMessageDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
             guard let other = other as? Self else { return false }
-
-            if tenorURL != other.tenorURL {
+            
+            
+            if self.tenorURL != other.tenorURL {
                 return false
             }
-
-            if mp4URL != other.mp4URL {
+            
+            
+            
+            
+            if self.mp4URL != other.mp4URL {
                 return false
             }
-
+            
+            
+            
+            
             if title != other.title {
                 return false
             }
-
+            
+            
+            
+            
             if thumbnailURL != other.thumbnailURL {
                 return false
             }
-
+            
+            
+            
+            
             if width != other.width {
                 return false
             }
-
+            
+            
+            
+            
             if height != other.height {
                 return false
             }
-
+            
+            
             return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
             return lhs.isEqual(to: rhs)
         }
 
-        /// DAGCBOR encoding with field ordering
+        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
+            
+            
+            
+            
             let tenorURLValue = try tenorURL.toCBORValue()
             map = map.adding(key: "tenorURL", value: tenorURLValue)
-
+            
+            
+            
+            
+            
+            
             let mp4URLValue = try mp4URL.toCBORValue()
             map = map.adding(key: "mp4URL", value: mp4URLValue)
-
+            
+            
+            
+            
+            
             if let value = title {
                 // Encode optional property even if it's an empty array for CBOR
-
+                
                 let titleValue = try value.toCBORValue()
                 map = map.adding(key: "title", value: titleValue)
             }
-
+            
+            
+            
+            
+            
             if let value = thumbnailURL {
                 // Encode optional property even if it's an empty array for CBOR
-
+                
                 let thumbnailURLValue = try value.toCBORValue()
                 map = map.adding(key: "thumbnailURL", value: thumbnailURLValue)
             }
-
+            
+            
+            
+            
+            
             if let value = width {
                 // Encode optional property even if it's an empty array for CBOR
-
+                
                 let widthValue = try value.toCBORValue()
                 map = map.adding(key: "width", value: widthValue)
             }
-
+            
+            
+            
+            
+            
             if let value = height {
                 // Encode optional property even if it's an empty array for CBOR
-
+                
                 let heightValue = try value.toCBORValue()
                 map = map.adding(key: "height", value: heightValue)
             }
+            
+            
+            
 
             return map
         }
@@ -875,61 +1260,85 @@ public enum BlueCatbirdMlsMessageDefs {
             case height
         }
     }
+        
+public struct AdminRoster: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "blue.catbird.mls.message.defs#adminRoster"
+            public let version: Int
+            public let admins: [DID]
+            public let hash: String?
 
-    public struct AdminRoster: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "blue.catbird.mls.message.defs#adminRoster"
-        public let version: Int
-        public let admins: [DID]
-        public let hash: String?
-
-        /// Standard initializer
+        // Standard initializer
         public init(
             version: Int, admins: [DID], hash: String?
         ) {
+            
             self.version = version
             self.admins = admins
             self.hash = hash
         }
 
-        /// Codable initializer
+        // Codable initializer
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                version = try container.decode(Int.self, forKey: .version)
-
+                
+                
+                self.version = try container.decode(Int.self, forKey: .version)
+                
+                
             } catch {
+                
                 LogManager.logError("Decoding error for required property 'version': \(error)")
-
+                
                 throw error
             }
             do {
-                admins = try container.decode([DID].self, forKey: .admins)
-
+                
+                
+                self.admins = try container.decode([DID].self, forKey: .admins)
+                
+                
             } catch {
+                
                 LogManager.logError("Decoding error for required property 'admins': \(error)")
-
+                
                 throw error
             }
             do {
-                hash = try container.decodeIfPresent(String.self, forKey: .hash)
-
+                
+                
+                self.hash = try container.decodeIfPresent(String.self, forKey: .hash)
+                
+                
             } catch {
+                
                 LogManager.logDebug("Decoding error for optional property 'hash': \(error)")
-
+                
                 throw error
             }
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
+            
             try container.encode(version, forKey: .version)
-
+            
+            
+            
+            
             try container.encode(admins, forKey: .admins)
-
+            
+            
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(hash, forKey: .hash)
+            
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -943,45 +1352,71 @@ public enum BlueCatbirdMlsMessageDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
             guard let other = other as? Self else { return false }
-
-            if version != other.version {
+            
+            
+            if self.version != other.version {
                 return false
             }
-
-            if admins != other.admins {
+            
+            
+            
+            
+            if self.admins != other.admins {
                 return false
             }
-
+            
+            
+            
+            
             if hash != other.hash {
                 return false
             }
-
+            
+            
             return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
             return lhs.isEqual(to: rhs)
         }
 
-        /// DAGCBOR encoding with field ordering
+        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
+            
+            
+            
+            
             let versionValue = try version.toCBORValue()
             map = map.adding(key: "version", value: versionValue)
-
+            
+            
+            
+            
+            
+            
             let adminsValue = try admins.toCBORValue()
             map = map.adding(key: "admins", value: adminsValue)
-
+            
+            
+            
+            
+            
             if let value = hash {
                 // Encode optional property even if it's an empty array for CBOR
-
+                
                 let hashValue = try value.toCBORValue()
                 map = map.adding(key: "hash", value: hashValue)
             }
+            
+            
+            
 
             return map
         }
@@ -993,73 +1428,104 @@ public enum BlueCatbirdMlsMessageDefs {
             case hash
         }
     }
+        
+public struct AdminAction: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "blue.catbird.mls.message.defs#adminAction"
+            public let action: String
+            public let targetDid: DID
+            public let timestamp: ATProtocolDate
+            public let reason: String?
 
-    public struct AdminAction: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "blue.catbird.mls.message.defs#adminAction"
-        public let action: String
-        public let targetDid: DID
-        public let timestamp: ATProtocolDate
-        public let reason: String?
-
-        /// Standard initializer
+        // Standard initializer
         public init(
             action: String, targetDid: DID, timestamp: ATProtocolDate, reason: String?
         ) {
+            
             self.action = action
             self.targetDid = targetDid
             self.timestamp = timestamp
             self.reason = reason
         }
 
-        /// Codable initializer
+        // Codable initializer
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                action = try container.decode(String.self, forKey: .action)
-
+                
+                
+                self.action = try container.decode(String.self, forKey: .action)
+                
+                
             } catch {
+                
                 LogManager.logError("Decoding error for required property 'action': \(error)")
-
+                
                 throw error
             }
             do {
-                targetDid = try container.decode(DID.self, forKey: .targetDid)
-
+                
+                
+                self.targetDid = try container.decode(DID.self, forKey: .targetDid)
+                
+                
             } catch {
+                
                 LogManager.logError("Decoding error for required property 'targetDid': \(error)")
-
+                
                 throw error
             }
             do {
-                timestamp = try container.decode(ATProtocolDate.self, forKey: .timestamp)
-
+                
+                
+                self.timestamp = try container.decode(ATProtocolDate.self, forKey: .timestamp)
+                
+                
             } catch {
+                
                 LogManager.logError("Decoding error for required property 'timestamp': \(error)")
-
+                
                 throw error
             }
             do {
-                reason = try container.decodeIfPresent(String.self, forKey: .reason)
-
+                
+                
+                self.reason = try container.decodeIfPresent(String.self, forKey: .reason)
+                
+                
             } catch {
+                
                 LogManager.logDebug("Decoding error for optional property 'reason': \(error)")
-
+                
                 throw error
             }
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
+            
             try container.encode(action, forKey: .action)
-
+            
+            
+            
+            
             try container.encode(targetDid, forKey: .targetDid)
-
+            
+            
+            
+            
             try container.encode(timestamp, forKey: .timestamp)
-
+            
+            
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(reason, forKey: .reason)
+            
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1074,52 +1540,86 @@ public enum BlueCatbirdMlsMessageDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
             guard let other = other as? Self else { return false }
-
-            if action != other.action {
+            
+            
+            if self.action != other.action {
                 return false
             }
-
-            if targetDid != other.targetDid {
+            
+            
+            
+            
+            if self.targetDid != other.targetDid {
                 return false
             }
-
-            if timestamp != other.timestamp {
+            
+            
+            
+            
+            if self.timestamp != other.timestamp {
                 return false
             }
-
+            
+            
+            
+            
             if reason != other.reason {
                 return false
             }
-
+            
+            
             return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
             return lhs.isEqual(to: rhs)
         }
 
-        /// DAGCBOR encoding with field ordering
+        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
+            
+            
+            
+            
             let actionValue = try action.toCBORValue()
             map = map.adding(key: "action", value: actionValue)
-
+            
+            
+            
+            
+            
+            
             let targetDidValue = try targetDid.toCBORValue()
             map = map.adding(key: "targetDid", value: targetDidValue)
-
+            
+            
+            
+            
+            
+            
             let timestampValue = try timestamp.toCBORValue()
             map = map.adding(key: "timestamp", value: timestampValue)
-
+            
+            
+            
+            
+            
             if let value = reason {
                 // Encode optional property even if it's an empty array for CBOR
-
+                
                 let reasonValue = try value.toCBORValue()
                 map = map.adding(key: "reason", value: reasonValue)
             }
+            
+            
+            
 
             return map
         }
@@ -1132,60 +1632,84 @@ public enum BlueCatbirdMlsMessageDefs {
             case reason
         }
     }
+        
+public struct ReactionPayload: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "blue.catbird.mls.message.defs#reactionPayload"
+            public let messageId: String
+            public let emoji: String
+            public let action: String
 
-    public struct ReactionPayload: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "blue.catbird.mls.message.defs#reactionPayload"
-        public let messageId: String
-        public let emoji: String
-        public let action: String
-
-        /// Standard initializer
+        // Standard initializer
         public init(
             messageId: String, emoji: String, action: String
         ) {
+            
             self.messageId = messageId
             self.emoji = emoji
             self.action = action
         }
 
-        /// Codable initializer
+        // Codable initializer
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                messageId = try container.decode(String.self, forKey: .messageId)
-
+                
+                
+                self.messageId = try container.decode(String.self, forKey: .messageId)
+                
+                
             } catch {
+                
                 LogManager.logError("Decoding error for required property 'messageId': \(error)")
-
+                
                 throw error
             }
             do {
-                emoji = try container.decode(String.self, forKey: .emoji)
-
+                
+                
+                self.emoji = try container.decode(String.self, forKey: .emoji)
+                
+                
             } catch {
+                
                 LogManager.logError("Decoding error for required property 'emoji': \(error)")
-
+                
                 throw error
             }
             do {
-                action = try container.decode(String.self, forKey: .action)
-
+                
+                
+                self.action = try container.decode(String.self, forKey: .action)
+                
+                
             } catch {
+                
                 LogManager.logError("Decoding error for required property 'action': \(error)")
-
+                
                 throw error
             }
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
+            
             try container.encode(messageId, forKey: .messageId)
-
+            
+            
+            
+            
             try container.encode(emoji, forKey: .emoji)
-
+            
+            
+            
+            
             try container.encode(action, forKey: .action)
+            
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1195,41 +1719,68 @@ public enum BlueCatbirdMlsMessageDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
             guard let other = other as? Self else { return false }
-
-            if messageId != other.messageId {
+            
+            
+            if self.messageId != other.messageId {
                 return false
             }
-
-            if emoji != other.emoji {
+            
+            
+            
+            
+            if self.emoji != other.emoji {
                 return false
             }
-
-            if action != other.action {
+            
+            
+            
+            
+            if self.action != other.action {
                 return false
             }
-
+            
+            
             return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
             return lhs.isEqual(to: rhs)
         }
 
-        /// DAGCBOR encoding with field ordering
+        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
+            
+            
+            
+            
             let messageIdValue = try messageId.toCBORValue()
             map = map.adding(key: "messageId", value: messageIdValue)
-
+            
+            
+            
+            
+            
+            
             let emojiValue = try emoji.toCBORValue()
             map = map.adding(key: "emoji", value: emojiValue)
-
+            
+            
+            
+            
+            
+            
             let actionValue = try action.toCBORValue()
             map = map.adding(key: "action", value: actionValue)
+            
+            
+            
 
             return map
         }
@@ -1241,36 +1792,46 @@ public enum BlueCatbirdMlsMessageDefs {
             case action
         }
     }
+        
+public struct ReadReceiptPayload: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "blue.catbird.mls.message.defs#readReceiptPayload"
+            public let messageId: String
 
-    public struct ReadReceiptPayload: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "blue.catbird.mls.message.defs#readReceiptPayload"
-        public let messageId: String
-
-        /// Standard initializer
+        // Standard initializer
         public init(
             messageId: String
         ) {
+            
             self.messageId = messageId
         }
 
-        /// Codable initializer
+        // Codable initializer
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                messageId = try container.decode(String.self, forKey: .messageId)
-
+                
+                
+                self.messageId = try container.decode(String.self, forKey: .messageId)
+                
+                
             } catch {
+                
                 LogManager.logError("Decoding error for required property 'messageId': \(error)")
-
+                
                 throw error
             }
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
+            
             try container.encode(messageId, forKey: .messageId)
+            
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1278,27 +1839,38 @@ public enum BlueCatbirdMlsMessageDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
             guard let other = other as? Self else { return false }
-
-            if messageId != other.messageId {
+            
+            
+            if self.messageId != other.messageId {
                 return false
             }
-
+            
+            
             return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
             return lhs.isEqual(to: rhs)
         }
 
-        /// DAGCBOR encoding with field ordering
+        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
+            
+            
+            
+            
             let messageIdValue = try messageId.toCBORValue()
             map = map.adding(key: "messageId", value: messageIdValue)
+            
+            
+            
 
             return map
         }
@@ -1308,49 +1880,66 @@ public enum BlueCatbirdMlsMessageDefs {
             case messageId
         }
     }
+        
+public struct TypingPayload: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "blue.catbird.mls.message.defs#typingPayload"
+            public let isTyping: Bool
+            public let ts: Int?
 
-    public struct TypingPayload: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "blue.catbird.mls.message.defs#typingPayload"
-        public let isTyping: Bool
-        public let ts: Int?
-
-        /// Standard initializer
+        // Standard initializer
         public init(
             isTyping: Bool, ts: Int?
         ) {
+            
             self.isTyping = isTyping
             self.ts = ts
         }
 
-        /// Codable initializer
+        // Codable initializer
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                isTyping = try container.decode(Bool.self, forKey: .isTyping)
-
+                
+                
+                self.isTyping = try container.decode(Bool.self, forKey: .isTyping)
+                
+                
             } catch {
+                
                 LogManager.logError("Decoding error for required property 'isTyping': \(error)")
-
+                
                 throw error
             }
             do {
-                ts = try container.decodeIfPresent(Int.self, forKey: .ts)
-
+                
+                
+                self.ts = try container.decodeIfPresent(Int.self, forKey: .ts)
+                
+                
             } catch {
+                
                 LogManager.logDebug("Decoding error for optional property 'ts': \(error)")
-
+                
                 throw error
             }
+            
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-
+            
+            
             try container.encode(isTyping, forKey: .isTyping)
-
+            
+            
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(ts, forKey: .ts)
+            
+            
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1363,38 +1952,56 @@ public enum BlueCatbirdMlsMessageDefs {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            
             guard let other = other as? Self else { return false }
-
-            if isTyping != other.isTyping {
+            
+            
+            if self.isTyping != other.isTyping {
                 return false
             }
-
+            
+            
+            
+            
             if ts != other.ts {
                 return false
             }
-
+            
+            
             return true
+            
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
             return lhs.isEqual(to: rhs)
         }
 
-        /// DAGCBOR encoding with field ordering
+        // DAGCBOR encoding with field ordering
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
             map = map.adding(key: "$type", value: Self.typeIdentifier)
 
+            
+            
+            
+            
             let isTypingValue = try isTyping.toCBORValue()
             map = map.adding(key: "isTyping", value: isTypingValue)
-
+            
+            
+            
+            
+            
             if let value = ts {
                 // Encode optional property even if it's an empty array for CBOR
-
+                
                 let tsValue = try value.toCBORValue()
                 map = map.adding(key: "ts", value: tsValue)
             }
+            
+            
+            
 
             return map
         }
@@ -1406,171 +2013,173 @@ public enum BlueCatbirdMlsMessageDefs {
         }
     }
 
-    public enum PayloadViewEmbedUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
-        case blueCatbirdMlsMessageDefsRecordEmbed(BlueCatbirdMlsMessageDefs.RecordEmbed)
-        case blueCatbirdMlsMessageDefsLinkEmbed(BlueCatbirdMlsMessageDefs.LinkEmbed)
-        case blueCatbirdMlsMessageDefsGifEmbed(BlueCatbirdMlsMessageDefs.GifEmbed)
-        case unexpected(ATProtocolValueContainer)
-        public init(_ value: BlueCatbirdMlsMessageDefs.RecordEmbed) {
+
+
+
+
+public enum PayloadViewEmbedUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
+    case blueCatbirdMlsMessageDefsRecordEmbed(BlueCatbirdMlsMessageDefs.RecordEmbed)
+    case blueCatbirdMlsMessageDefsLinkEmbed(BlueCatbirdMlsMessageDefs.LinkEmbed)
+    case blueCatbirdMlsMessageDefsGifEmbed(BlueCatbirdMlsMessageDefs.GifEmbed)
+    case unexpected(ATProtocolValueContainer)
+    public init(_ value: BlueCatbirdMlsMessageDefs.RecordEmbed) {
+        self = .blueCatbirdMlsMessageDefsRecordEmbed(value)
+    }
+    public init(_ value: BlueCatbirdMlsMessageDefs.LinkEmbed) {
+        self = .blueCatbirdMlsMessageDefsLinkEmbed(value)
+    }
+    public init(_ value: BlueCatbirdMlsMessageDefs.GifEmbed) {
+        self = .blueCatbirdMlsMessageDefsGifEmbed(value)
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let typeValue = try container.decode(String.self, forKey: .type)
+
+        switch typeValue {
+        case "blue.catbird.mls.message.defs#recordEmbed":
+            let value = try BlueCatbirdMlsMessageDefs.RecordEmbed(from: decoder)
             self = .blueCatbirdMlsMessageDefsRecordEmbed(value)
-        }
-
-        public init(_ value: BlueCatbirdMlsMessageDefs.LinkEmbed) {
+        case "blue.catbird.mls.message.defs#linkEmbed":
+            let value = try BlueCatbirdMlsMessageDefs.LinkEmbed(from: decoder)
             self = .blueCatbirdMlsMessageDefsLinkEmbed(value)
-        }
-
-        public init(_ value: BlueCatbirdMlsMessageDefs.GifEmbed) {
+        case "blue.catbird.mls.message.defs#gifEmbed":
+            let value = try BlueCatbirdMlsMessageDefs.GifEmbed(from: decoder)
             self = .blueCatbirdMlsMessageDefsGifEmbed(value)
+        default:
+            let unknownValue = try ATProtocolValueContainer(from: decoder)
+            self = .unexpected(unknownValue)
         }
+    }
 
-        public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
 
-            switch typeValue {
-            case "blue.catbird.mls.message.defs#recordEmbed":
-                let value = try BlueCatbirdMlsMessageDefs.RecordEmbed(from: decoder)
-                self = .blueCatbirdMlsMessageDefsRecordEmbed(value)
-            case "blue.catbird.mls.message.defs#linkEmbed":
-                let value = try BlueCatbirdMlsMessageDefs.LinkEmbed(from: decoder)
-                self = .blueCatbirdMlsMessageDefsLinkEmbed(value)
-            case "blue.catbird.mls.message.defs#gifEmbed":
-                let value = try BlueCatbirdMlsMessageDefs.GifEmbed(from: decoder)
-                self = .blueCatbirdMlsMessageDefsGifEmbed(value)
-            default:
-                let unknownValue = try ATProtocolValueContainer(from: decoder)
-                self = .unexpected(unknownValue)
-            }
+        switch self {
+        case .blueCatbirdMlsMessageDefsRecordEmbed(let value):
+            try container.encode("blue.catbird.mls.message.defs#recordEmbed", forKey: .type)
+            try value.encode(to: encoder)
+        case .blueCatbirdMlsMessageDefsLinkEmbed(let value):
+            try container.encode("blue.catbird.mls.message.defs#linkEmbed", forKey: .type)
+            try value.encode(to: encoder)
+        case .blueCatbirdMlsMessageDefsGifEmbed(let value):
+            try container.encode("blue.catbird.mls.message.defs#gifEmbed", forKey: .type)
+            try value.encode(to: encoder)
+        case .unexpected(let container):
+            try container.encode(to: encoder)
         }
+    }
 
-        public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-
-            switch self {
-            case let .blueCatbirdMlsMessageDefsRecordEmbed(value):
-                try container.encode("blue.catbird.mls.message.defs#recordEmbed", forKey: .type)
-                try value.encode(to: encoder)
-            case let .blueCatbirdMlsMessageDefsLinkEmbed(value):
-                try container.encode("blue.catbird.mls.message.defs#linkEmbed", forKey: .type)
-                try value.encode(to: encoder)
-            case let .blueCatbirdMlsMessageDefsGifEmbed(value):
-                try container.encode("blue.catbird.mls.message.defs#gifEmbed", forKey: .type)
-                try value.encode(to: encoder)
-            case let .unexpected(container):
-                try container.encode(to: encoder)
-            }
+    public func hash(into hasher: inout Hasher) {
+        switch self {
+        case .blueCatbirdMlsMessageDefsRecordEmbed(let value):
+            hasher.combine("blue.catbird.mls.message.defs#recordEmbed")
+            hasher.combine(value)
+        case .blueCatbirdMlsMessageDefsLinkEmbed(let value):
+            hasher.combine("blue.catbird.mls.message.defs#linkEmbed")
+            hasher.combine(value)
+        case .blueCatbirdMlsMessageDefsGifEmbed(let value):
+            hasher.combine("blue.catbird.mls.message.defs#gifEmbed")
+            hasher.combine(value)
+        case .unexpected(let container):
+            hasher.combine("unexpected")
+            hasher.combine(container)
         }
+    }
 
-        public func hash(into hasher: inout Hasher) {
-            switch self {
-            case let .blueCatbirdMlsMessageDefsRecordEmbed(value):
-                hasher.combine("blue.catbird.mls.message.defs#recordEmbed")
-                hasher.combine(value)
-            case let .blueCatbirdMlsMessageDefsLinkEmbed(value):
-                hasher.combine("blue.catbird.mls.message.defs#linkEmbed")
-                hasher.combine(value)
-            case let .blueCatbirdMlsMessageDefsGifEmbed(value):
-                hasher.combine("blue.catbird.mls.message.defs#gifEmbed")
-                hasher.combine(value)
-            case let .unexpected(container):
-                hasher.combine("unexpected")
-                hasher.combine(container)
-            }
+    private enum CodingKeys: String, CodingKey {
+        case type = "$type"
+    }
+    
+    public static func == (lhs: PayloadViewEmbedUnion, rhs: PayloadViewEmbedUnion) -> Bool {
+        switch (lhs, rhs) {
+        case (.blueCatbirdMlsMessageDefsRecordEmbed(let lhsValue),
+              .blueCatbirdMlsMessageDefsRecordEmbed(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.blueCatbirdMlsMessageDefsLinkEmbed(let lhsValue),
+              .blueCatbirdMlsMessageDefsLinkEmbed(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.blueCatbirdMlsMessageDefsGifEmbed(let lhsValue),
+              .blueCatbirdMlsMessageDefsGifEmbed(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.unexpected(let lhsValue), .unexpected(let rhsValue)):
+            return lhsValue.isEqual(to: rhsValue)
+        default:
+            return false
         }
+    }
+    
+    public func isEqual(to other: any ATProtocolValue) -> Bool {
+        guard let other = other as? PayloadViewEmbedUnion else { return false }
+        return self == other
+    }
+    
+    // DAGCBOR encoding with field ordering
+    public func toCBORValue() throws -> Any {
+        // Create an ordered map to maintain field order
+        var map = OrderedCBORMap()
+        
+        switch self {
+        case .blueCatbirdMlsMessageDefsRecordEmbed(let value):
+            map = map.adding(key: "$type", value: "blue.catbird.mls.message.defs#recordEmbed")
+            
+            let valueDict = try value.toCBORValue()
 
-        private enum CodingKeys: String, CodingKey {
-            case type = "$type"
-        }
-
-        public static func == (lhs: PayloadViewEmbedUnion, rhs: PayloadViewEmbedUnion) -> Bool {
-            switch (lhs, rhs) {
-            case let (
-                .blueCatbirdMlsMessageDefsRecordEmbed(lhsValue),
-                .blueCatbirdMlsMessageDefsRecordEmbed(rhsValue)
-            ):
-                return lhsValue == rhsValue
-            case let (
-                .blueCatbirdMlsMessageDefsLinkEmbed(lhsValue),
-                .blueCatbirdMlsMessageDefsLinkEmbed(rhsValue)
-            ):
-                return lhsValue == rhsValue
-            case let (
-                .blueCatbirdMlsMessageDefsGifEmbed(lhsValue),
-                .blueCatbirdMlsMessageDefsGifEmbed(rhsValue)
-            ):
-                return lhsValue == rhsValue
-            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
-            default:
-                return false
-            }
-        }
-
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let other = other as? PayloadViewEmbedUnion else { return false }
-            return self == other
-        }
-
-        /// DAGCBOR encoding with field ordering
-        public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
-            switch self {
-            case let .blueCatbirdMlsMessageDefsRecordEmbed(value):
-                map = map.adding(key: "$type", value: "blue.catbird.mls.message.defs#recordEmbed")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
                 }
-                return map
-            case let .blueCatbirdMlsMessageDefsLinkEmbed(value):
-                map = map.adding(key: "$type", value: "blue.catbird.mls.message.defs#linkEmbed")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
                 }
-                return map
-            case let .blueCatbirdMlsMessageDefsGifEmbed(value):
-                map = map.adding(key: "$type", value: "blue.catbird.mls.message.defs#gifEmbed")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
-            case let .unexpected(container):
-                return try container.toCBORValue()
             }
+            return map
+        case .blueCatbirdMlsMessageDefsLinkEmbed(let value):
+            map = map.adding(key: "$type", value: "blue.catbird.mls.message.defs#linkEmbed")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .blueCatbirdMlsMessageDefsGifEmbed(let value):
+            map = map.adding(key: "$type", value: "blue.catbird.mls.message.defs#gifEmbed")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .unexpected(let container):
+            return try container.toCBORValue()
         }
     }
 }
+
+
+}
+
+
+                           
+
