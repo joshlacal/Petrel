@@ -1,23 +1,19 @@
 import Foundation
 
-
-
 // lexicon: 1, id: blue.catbird.mls.getAdminStats
 
-
-public struct BlueCatbirdMlsGetAdminStats { 
-
+public enum BlueCatbirdMlsGetAdminStats {
     public static let typeIdentifier = "blue.catbird.mls.getAdminStats"
-        
-public struct ModerationStats: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "blue.catbird.mls.getAdminStats#moderationStats"
-            public let totalReports: Int
-            public let pendingReports: Int
-            public let resolvedReports: Int
-            public let totalRemovals: Int
-            public let blockConflictsResolved: Int
-            public let reportsByCategory: ReportCategoryCounts?
-            public let averageResolutionTimeHours: Int?
+
+    public struct ModerationStats: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "blue.catbird.mls.getAdminStats#moderationStats"
+        public let totalReports: Int
+        public let pendingReports: Int
+        public let resolvedReports: Int
+        public let totalRemovals: Int
+        public let blockConflictsResolved: Int
+        public let reportsByCategory: ReportCategoryCounts?
+        public let averageResolutionTimeHours: Int?
 
         public init(
             totalReports: Int, pendingReports: Int, resolvedReports: Int, totalRemovals: Int, blockConflictsResolved: Int, reportsByCategory: ReportCategoryCounts?, averageResolutionTimeHours: Int?
@@ -34,43 +30,43 @@ public struct ModerationStats: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.totalReports = try container.decode(Int.self, forKey: .totalReports)
+                totalReports = try container.decode(Int.self, forKey: .totalReports)
             } catch {
                 LogManager.logError("Decoding error for required property 'totalReports': \(error)")
                 throw error
             }
             do {
-                self.pendingReports = try container.decode(Int.self, forKey: .pendingReports)
+                pendingReports = try container.decode(Int.self, forKey: .pendingReports)
             } catch {
                 LogManager.logError("Decoding error for required property 'pendingReports': \(error)")
                 throw error
             }
             do {
-                self.resolvedReports = try container.decode(Int.self, forKey: .resolvedReports)
+                resolvedReports = try container.decode(Int.self, forKey: .resolvedReports)
             } catch {
                 LogManager.logError("Decoding error for required property 'resolvedReports': \(error)")
                 throw error
             }
             do {
-                self.totalRemovals = try container.decode(Int.self, forKey: .totalRemovals)
+                totalRemovals = try container.decode(Int.self, forKey: .totalRemovals)
             } catch {
                 LogManager.logError("Decoding error for required property 'totalRemovals': \(error)")
                 throw error
             }
             do {
-                self.blockConflictsResolved = try container.decode(Int.self, forKey: .blockConflictsResolved)
+                blockConflictsResolved = try container.decode(Int.self, forKey: .blockConflictsResolved)
             } catch {
                 LogManager.logError("Decoding error for required property 'blockConflictsResolved': \(error)")
                 throw error
             }
             do {
-                self.reportsByCategory = try container.decodeIfPresent(ReportCategoryCounts.self, forKey: .reportsByCategory)
+                reportsByCategory = try container.decodeIfPresent(ReportCategoryCounts.self, forKey: .reportsByCategory)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'reportsByCategory': \(error)")
                 throw error
             }
             do {
-                self.averageResolutionTimeHours = try container.decodeIfPresent(Int.self, forKey: .averageResolutionTimeHours)
+                averageResolutionTimeHours = try container.decodeIfPresent(Int.self, forKey: .averageResolutionTimeHours)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'averageResolutionTimeHours': \(error)")
                 throw error
@@ -172,17 +168,17 @@ public struct ModerationStats: ATProtocolCodable, ATProtocolValue {
             case averageResolutionTimeHours
         }
     }
-        
-public struct ReportCategoryCounts: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "blue.catbird.mls.getAdminStats#reportCategoryCounts"
-            public let harassment: Int?
-            public let spam: Int?
-            public let hateSpeech: Int?
-            public let violence: Int?
-            public let sexualContent: Int?
-            public let impersonation: Int?
-            public let privacyViolation: Int?
-            public let otherCategory: Int?
+
+    public struct ReportCategoryCounts: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "blue.catbird.mls.getAdminStats#reportCategoryCounts"
+        public let harassment: Int?
+        public let spam: Int?
+        public let hateSpeech: Int?
+        public let violence: Int?
+        public let sexualContent: Int?
+        public let impersonation: Int?
+        public let privacyViolation: Int?
+        public let otherCategory: Int?
 
         public init(
             harassment: Int?, spam: Int?, hateSpeech: Int?, violence: Int?, sexualContent: Int?, impersonation: Int?, privacyViolation: Int?, otherCategory: Int?
@@ -200,49 +196,49 @@ public struct ReportCategoryCounts: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.harassment = try container.decodeIfPresent(Int.self, forKey: .harassment)
+                harassment = try container.decodeIfPresent(Int.self, forKey: .harassment)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'harassment': \(error)")
                 throw error
             }
             do {
-                self.spam = try container.decodeIfPresent(Int.self, forKey: .spam)
+                spam = try container.decodeIfPresent(Int.self, forKey: .spam)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'spam': \(error)")
                 throw error
             }
             do {
-                self.hateSpeech = try container.decodeIfPresent(Int.self, forKey: .hateSpeech)
+                hateSpeech = try container.decodeIfPresent(Int.self, forKey: .hateSpeech)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'hateSpeech': \(error)")
                 throw error
             }
             do {
-                self.violence = try container.decodeIfPresent(Int.self, forKey: .violence)
+                violence = try container.decodeIfPresent(Int.self, forKey: .violence)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'violence': \(error)")
                 throw error
             }
             do {
-                self.sexualContent = try container.decodeIfPresent(Int.self, forKey: .sexualContent)
+                sexualContent = try container.decodeIfPresent(Int.self, forKey: .sexualContent)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'sexualContent': \(error)")
                 throw error
             }
             do {
-                self.impersonation = try container.decodeIfPresent(Int.self, forKey: .impersonation)
+                impersonation = try container.decodeIfPresent(Int.self, forKey: .impersonation)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'impersonation': \(error)")
                 throw error
             }
             do {
-                self.privacyViolation = try container.decodeIfPresent(Int.self, forKey: .privacyViolation)
+                privacyViolation = try container.decodeIfPresent(Int.self, forKey: .privacyViolation)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'privacyViolation': \(error)")
                 throw error
             }
             do {
-                self.otherCategory = try container.decodeIfPresent(Int.self, forKey: .otherCategory)
+                otherCategory = try container.decodeIfPresent(Int.self, forKey: .otherCategory)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'otherCategory': \(error)")
                 throw error
@@ -387,158 +383,119 @@ public struct ReportCategoryCounts: ATProtocolCodable, ATProtocolValue {
             case privacyViolation
             case otherCategory
         }
-    }    
-public struct Parameters: Parametrizable {
+    }
+
+    public struct Parameters: Parametrizable {
         public let convoId: String?
         public let since: ATProtocolDate?
-        
+
         public init(
-            convoId: String? = nil, 
+            convoId: String? = nil,
             since: ATProtocolDate? = nil
-            ) {
+        ) {
             self.convoId = convoId
             self.since = since
-            
         }
     }
-    
-public struct Output: ATProtocolCodable {
-        
-        
+
+    public struct Output: ATProtocolCodable {
         public let stats: ModerationStats
-        
+
         public let generatedAt: ATProtocolDate
-        
+
         public let convoId: String?
-        
-        
-        
-        // Standard public initializer
+
+        /// Standard public initializer
         public init(
-            
-            
             stats: ModerationStats,
-            
+
             generatedAt: ATProtocolDate,
-            
+
             convoId: String? = nil
-            
-            
+
         ) {
-            
-            
             self.stats = stats
-            
+
             self.generatedAt = generatedAt
-            
+
             self.convoId = convoId
-            
-            
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
-            self.stats = try container.decode(ModerationStats.self, forKey: .stats)
-            
-            
-            self.generatedAt = try container.decode(ATProtocolDate.self, forKey: .generatedAt)
-            
-            
-            self.convoId = try container.decodeIfPresent(String.self, forKey: .convoId)
-            
-            
+
+            stats = try container.decode(ModerationStats.self, forKey: .stats)
+
+            generatedAt = try container.decode(ATProtocolDate.self, forKey: .generatedAt)
+
+            convoId = try container.decodeIfPresent(String.self, forKey: .convoId)
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(stats, forKey: .stats)
-            
-            
+
             try container.encode(generatedAt, forKey: .generatedAt)
-            
-            
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(convoId, forKey: .convoId)
-            
-            
         }
 
         public func toCBORValue() throws -> Any {
-            
             var map = OrderedCBORMap()
 
-            
-            
             let statsValue = try stats.toCBORValue()
             map = map.adding(key: "stats", value: statsValue)
-            
-            
-            
+
             let generatedAtValue = try generatedAt.toCBORValue()
             map = map.adding(key: "generatedAt", value: generatedAtValue)
-            
-            
-            
+
             if let value = convoId {
                 // Encode optional property even if it's an empty array for CBOR
                 let convoIdValue = try value.toCBORValue()
                 map = map.adding(key: "convoId", value: convoIdValue)
             }
-            
-            
 
             return map
-            
         }
-        
-        
+
         private enum CodingKeys: String, CodingKey {
             case stats
             case generatedAt
             case convoId
         }
-        
     }
-        
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case notAuthorized = "NotAuthorized.User is not authorized to view moderation statistics"
-                case convoNotFound = "ConvoNotFound.Conversation not found (when convoId is specified)"
-            public var description: String {
-                return self.rawValue
-            }
 
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case notAuthorized = "NotAuthorized.User is not authorized to view moderation statistics"
+        case convoNotFound = "ConvoNotFound.Conversation not found (when convoId is specified)"
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-
-
-extension ATProtoClient.Blue.Catbird.Mls {
+public extension ATProtoClient.Blue.Catbird.Mls {
     // MARK: - getAdminStats
 
     /// Get moderation statistics for App Store compliance demonstration Query moderation and admin action statistics. Returns aggregate counts of reports, removals, and block conflicts resolved. Used for App Store review to demonstrate active moderation capabilities. Only accessible to conversation admins.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func getAdminStats(input: BlueCatbirdMlsGetAdminStats.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsGetAdminStats.Output?) {
+    func getAdminStats(input: BlueCatbirdMlsGetAdminStats.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsGetAdminStats.Output?) {
         let endpoint = "blue.catbird.mls.getAdminStats"
 
-        
         let queryItems = input.asQueryItems()
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -562,12 +519,11 @@ extension ATProtoClient.Blue.Catbird.Mls {
         }
 
         // Only decode response data if request was successful
-        if (200...299).contains(responseCode) {
+        if (200 ... 299).contains(responseCode) {
             do {
-                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsGetAdminStats.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -575,12 +531,9 @@ extension ATProtoClient.Blue.Catbird.Mls {
                 return (responseCode, nil)
             }
         } else {
-            
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-                           
-

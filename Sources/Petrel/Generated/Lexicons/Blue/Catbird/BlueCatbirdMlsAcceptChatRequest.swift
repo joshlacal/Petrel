@@ -1,21 +1,17 @@
 import Foundation
 
-
-
 // lexicon: 1, id: blue.catbird.mls.acceptChatRequest
 
-
-public struct BlueCatbirdMlsAcceptChatRequest { 
-
+public enum BlueCatbirdMlsAcceptChatRequest {
     public static let typeIdentifier = "blue.catbird.mls.acceptChatRequest"
-        
-public struct DeliveredMessage: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "blue.catbird.mls.acceptChatRequest#deliveredMessage"
-            public let id: String
-            public let ciphertext: Bytes
-            public let paddedSize: Int
-            public let sequence: Int
-            public let ephPubKey: Bytes?
+
+    public struct DeliveredMessage: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "blue.catbird.mls.acceptChatRequest#deliveredMessage"
+        public let id: String
+        public let ciphertext: Bytes
+        public let paddedSize: Int
+        public let sequence: Int
+        public let ephPubKey: Bytes?
 
         public init(
             id: String, ciphertext: Bytes, paddedSize: Int, sequence: Int, ephPubKey: Bytes?
@@ -30,31 +26,31 @@ public struct DeliveredMessage: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.id = try container.decode(String.self, forKey: .id)
+                id = try container.decode(String.self, forKey: .id)
             } catch {
                 LogManager.logError("Decoding error for required property 'id': \(error)")
                 throw error
             }
             do {
-                self.ciphertext = try container.decode(Bytes.self, forKey: .ciphertext)
+                ciphertext = try container.decode(Bytes.self, forKey: .ciphertext)
             } catch {
                 LogManager.logError("Decoding error for required property 'ciphertext': \(error)")
                 throw error
             }
             do {
-                self.paddedSize = try container.decode(Int.self, forKey: .paddedSize)
+                paddedSize = try container.decode(Int.self, forKey: .paddedSize)
             } catch {
                 LogManager.logError("Decoding error for required property 'paddedSize': \(error)")
                 throw error
             }
             do {
-                self.sequence = try container.decode(Int.self, forKey: .sequence)
+                sequence = try container.decode(Int.self, forKey: .sequence)
             } catch {
                 LogManager.logError("Decoding error for required property 'sequence': \(error)")
                 throw error
             }
             do {
-                self.ephPubKey = try container.decodeIfPresent(Bytes.self, forKey: .ephPubKey)
+                ephPubKey = try container.decodeIfPresent(Bytes.self, forKey: .ephPubKey)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'ephPubKey': \(error)")
                 throw error
@@ -134,7 +130,8 @@ public struct DeliveredMessage: ATProtocolCodable, ATProtocolValue {
             case ephPubKey
         }
     }
-public struct Input: ATProtocolCodable {
+
+    public struct Input: ATProtocolCodable {
         public let requestId: String
         public let welcomeData: Bytes?
 
@@ -143,12 +140,11 @@ public struct Input: ATProtocolCodable {
             self.requestId = requestId
             self.welcomeData = welcomeData
         }
-        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.requestId = try container.decode(String.self, forKey: .requestId)
-            self.welcomeData = try container.decodeIfPresent(Bytes.self, forKey: .welcomeData)
+            requestId = try container.decode(String.self, forKey: .requestId)
+            welcomeData = try container.decodeIfPresent(Bytes.self, forKey: .welcomeData)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -173,148 +169,108 @@ public struct Input: ATProtocolCodable {
             case welcomeData
         }
     }
-    
-public struct Output: ATProtocolCodable {
-        
-        
+
+    public struct Output: ATProtocolCodable {
         public let convoId: String
-        
+
         public let heldMessages: [DeliveredMessage]
-        
+
         public let acceptedAt: ATProtocolDate
-        
-        
-        
-        // Standard public initializer
+
+        /// Standard public initializer
         public init(
-            
-            
             convoId: String,
-            
+
             heldMessages: [DeliveredMessage],
-            
+
             acceptedAt: ATProtocolDate
-            
-            
+
         ) {
-            
-            
             self.convoId = convoId
-            
+
             self.heldMessages = heldMessages
-            
+
             self.acceptedAt = acceptedAt
-            
-            
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
-            self.convoId = try container.decode(String.self, forKey: .convoId)
-            
-            
-            self.heldMessages = try container.decode([DeliveredMessage].self, forKey: .heldMessages)
-            
-            
-            self.acceptedAt = try container.decode(ATProtocolDate.self, forKey: .acceptedAt)
-            
-            
+
+            convoId = try container.decode(String.self, forKey: .convoId)
+
+            heldMessages = try container.decode([DeliveredMessage].self, forKey: .heldMessages)
+
+            acceptedAt = try container.decode(ATProtocolDate.self, forKey: .acceptedAt)
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(convoId, forKey: .convoId)
-            
-            
+
             try container.encode(heldMessages, forKey: .heldMessages)
-            
-            
+
             try container.encode(acceptedAt, forKey: .acceptedAt)
-            
-            
         }
 
         public func toCBORValue() throws -> Any {
-            
             var map = OrderedCBORMap()
 
-            
-            
             let convoIdValue = try convoId.toCBORValue()
             map = map.adding(key: "convoId", value: convoIdValue)
-            
-            
-            
+
             let heldMessagesValue = try heldMessages.toCBORValue()
             map = map.adding(key: "heldMessages", value: heldMessagesValue)
-            
-            
-            
+
             let acceptedAtValue = try acceptedAt.toCBORValue()
             map = map.adding(key: "acceptedAt", value: acceptedAtValue)
-            
-            
 
             return map
-            
         }
-        
-        
+
         private enum CodingKeys: String, CodingKey {
             case convoId
             case heldMessages
             case acceptedAt
         }
-        
     }
-        
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case requestNotFound = "RequestNotFound."
-                case requestExpired = "RequestExpired."
-                case alreadyProcessed = "AlreadyProcessed."
-            public var description: String {
-                return self.rawValue
-            }
 
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case requestNotFound = "RequestNotFound."
+        case requestExpired = "RequestExpired."
+        case alreadyProcessed = "AlreadyProcessed."
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-extension ATProtoClient.Blue.Catbird.Mls {
+public extension ATProtoClient.Blue.Catbird.Mls {
     // MARK: - acceptChatRequest
 
     /// Accept a chat request, create MLS group, and deliver held messages
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func acceptChatRequest(
-        
+    func acceptChatRequest(
         input: BlueCatbirdMlsAcceptChatRequest.Input
-        
+
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsAcceptChatRequest.Output?) {
         let endpoint = "blue.catbird.mls.acceptChatRequest"
-        
+
         var headers: [String: String] = [:]
-        
+
         headers["Content-Type"] = "application/json"
-        
-        
-        
+
         headers["Accept"] = "application/json"
-        
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -331,7 +287,6 @@ extension ATProtoClient.Blue.Catbird.Mls {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
@@ -341,12 +296,11 @@ extension ATProtoClient.Blue.Catbird.Mls {
         }
 
         // Only decode response data if request was successful
-        if (200...299).contains(responseCode) {
+        if (200 ... 299).contains(responseCode) {
             do {
-                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsAcceptChatRequest.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -357,9 +311,5 @@ extension ATProtoClient.Blue.Catbird.Mls {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-        
     }
-    
 }
-                           
-

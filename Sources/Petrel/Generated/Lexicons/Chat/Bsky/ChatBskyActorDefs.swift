@@ -1,25 +1,21 @@
 import Foundation
 
-
-
 // lexicon: 1, id: chat.bsky.actor.defs
 
-
-public struct ChatBskyActorDefs { 
-
+public enum ChatBskyActorDefs {
     public static let typeIdentifier = "chat.bsky.actor.defs"
-        
-public struct ProfileViewBasic: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "chat.bsky.actor.defs#profileViewBasic"
-            public let did: DID
-            public let handle: Handle
-            public let displayName: String?
-            public let avatar: URI?
-            public let associated: AppBskyActorDefs.ProfileAssociated?
-            public let viewer: AppBskyActorDefs.ViewerState?
-            public let labels: [ComAtprotoLabelDefs.Label]?
-            public let chatDisabled: Bool?
-            public let verification: AppBskyActorDefs.VerificationState?
+
+    public struct ProfileViewBasic: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "chat.bsky.actor.defs#profileViewBasic"
+        public let did: DID
+        public let handle: Handle
+        public let displayName: String?
+        public let avatar: URI?
+        public let associated: AppBskyActorDefs.ProfileAssociated?
+        public let viewer: AppBskyActorDefs.ViewerState?
+        public let labels: [ComAtprotoLabelDefs.Label]?
+        public let chatDisabled: Bool?
+        public let verification: AppBskyActorDefs.VerificationState?
 
         public init(
             did: DID, handle: Handle, displayName: String?, avatar: URI?, associated: AppBskyActorDefs.ProfileAssociated?, viewer: AppBskyActorDefs.ViewerState?, labels: [ComAtprotoLabelDefs.Label]?, chatDisabled: Bool?, verification: AppBskyActorDefs.VerificationState?
@@ -38,55 +34,55 @@ public struct ProfileViewBasic: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.did = try container.decode(DID.self, forKey: .did)
+                did = try container.decode(DID.self, forKey: .did)
             } catch {
                 LogManager.logError("Decoding error for required property 'did': \(error)")
                 throw error
             }
             do {
-                self.handle = try container.decode(Handle.self, forKey: .handle)
+                handle = try container.decode(Handle.self, forKey: .handle)
             } catch {
                 LogManager.logError("Decoding error for required property 'handle': \(error)")
                 throw error
             }
             do {
-                self.displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
+                displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'displayName': \(error)")
                 throw error
             }
             do {
-                self.avatar = try container.decodeIfPresent(URI.self, forKey: .avatar)
+                avatar = try container.decodeIfPresent(URI.self, forKey: .avatar)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'avatar': \(error)")
                 throw error
             }
             do {
-                self.associated = try container.decodeIfPresent(AppBskyActorDefs.ProfileAssociated.self, forKey: .associated)
+                associated = try container.decodeIfPresent(AppBskyActorDefs.ProfileAssociated.self, forKey: .associated)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'associated': \(error)")
                 throw error
             }
             do {
-                self.viewer = try container.decodeIfPresent(AppBskyActorDefs.ViewerState.self, forKey: .viewer)
+                viewer = try container.decodeIfPresent(AppBskyActorDefs.ViewerState.self, forKey: .viewer)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'viewer': \(error)")
                 throw error
             }
             do {
-                self.labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
+                labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'labels': \(error)")
                 throw error
             }
             do {
-                self.chatDisabled = try container.decodeIfPresent(Bool.self, forKey: .chatDisabled)
+                chatDisabled = try container.decodeIfPresent(Bool.self, forKey: .chatDisabled)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'chatDisabled': \(error)")
                 throw error
             }
             do {
-                self.verification = try container.decodeIfPresent(AppBskyActorDefs.VerificationState.self, forKey: .verification)
+                verification = try container.decodeIfPresent(AppBskyActorDefs.VerificationState.self, forKey: .verification)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'verification': \(error)")
                 throw error
@@ -234,11 +230,4 @@ public struct ProfileViewBasic: ATProtocolCodable, ATProtocolValue {
             case verification
         }
     }
-
-
-
 }
-
-
-                           
-

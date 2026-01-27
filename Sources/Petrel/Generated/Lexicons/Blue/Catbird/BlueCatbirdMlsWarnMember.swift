@@ -1,14 +1,10 @@
 import Foundation
 
-
-
 // lexicon: 1, id: blue.catbird.mls.warnMember
 
-
-public struct BlueCatbirdMlsWarnMember { 
-
+public enum BlueCatbirdMlsWarnMember {
     public static let typeIdentifier = "blue.catbird.mls.warnMember"
-public struct Input: ATProtocolCodable {
+    public struct Input: ATProtocolCodable {
         public let convoId: String
         public let memberDid: DID
         public let reason: String
@@ -21,14 +17,13 @@ public struct Input: ATProtocolCodable {
             self.reason = reason
             self.expiresAt = expiresAt
         }
-        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.convoId = try container.decode(String.self, forKey: .convoId)
-            self.memberDid = try container.decode(DID.self, forKey: .memberDid)
-            self.reason = try container.decode(String.self, forKey: .reason)
-            self.expiresAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .expiresAt)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            memberDid = try container.decode(DID.self, forKey: .memberDid)
+            reason = try container.decode(String.self, forKey: .reason)
+            expiresAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .expiresAt)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -61,131 +56,95 @@ public struct Input: ATProtocolCodable {
             case expiresAt
         }
     }
-    
-public struct Output: ATProtocolCodable {
-        
-        
+
+    public struct Output: ATProtocolCodable {
         public let warningId: String
-        
+
         public let deliveredAt: ATProtocolDate
-        
-        
-        
-        // Standard public initializer
+
+        /// Standard public initializer
         public init(
-            
-            
             warningId: String,
-            
+
             deliveredAt: ATProtocolDate
-            
-            
+
         ) {
-            
-            
             self.warningId = warningId
-            
+
             self.deliveredAt = deliveredAt
-            
-            
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
-            self.warningId = try container.decode(String.self, forKey: .warningId)
-            
-            
-            self.deliveredAt = try container.decode(ATProtocolDate.self, forKey: .deliveredAt)
-            
-            
+
+            warningId = try container.decode(String.self, forKey: .warningId)
+
+            deliveredAt = try container.decode(ATProtocolDate.self, forKey: .deliveredAt)
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(warningId, forKey: .warningId)
-            
-            
+
             try container.encode(deliveredAt, forKey: .deliveredAt)
-            
-            
         }
 
         public func toCBORValue() throws -> Any {
-            
             var map = OrderedCBORMap()
 
-            
-            
             let warningIdValue = try warningId.toCBORValue()
             map = map.adding(key: "warningId", value: warningIdValue)
-            
-            
-            
+
             let deliveredAtValue = try deliveredAt.toCBORValue()
             map = map.adding(key: "deliveredAt", value: deliveredAtValue)
-            
-            
 
             return map
-            
         }
-        
-        
+
         private enum CodingKeys: String, CodingKey {
             case warningId
             case deliveredAt
         }
-        
     }
-        
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case convoNotFound = "ConvoNotFound.Conversation not found"
-                case notAdmin = "NotAdmin.Only admins can warn members"
-                case targetNotMember = "TargetNotMember.Target user is not a member"
-                case cannotWarnAdmin = "CannotWarnAdmin.Cannot warn other admins"
-            public var description: String {
-                return self.rawValue
-            }
 
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case convoNotFound = "ConvoNotFound.Conversation not found"
+        case notAdmin = "NotAdmin.Only admins can warn members"
+        case targetNotMember = "TargetNotMember.Target user is not a member"
+        case cannotWarnAdmin = "CannotWarnAdmin.Cannot warn other admins"
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-extension ATProtoClient.Blue.Catbird.Mls {
+public extension ATProtoClient.Blue.Catbird.Mls {
     // MARK: - warnMember
 
     /// Send warning to group member (admin action) Send a warning to a conversation member. Admin-only action. Warning is delivered as a system message and tracked server-side.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func warnMember(
-        
+    func warnMember(
         input: BlueCatbirdMlsWarnMember.Input
-        
+
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsWarnMember.Output?) {
         let endpoint = "blue.catbird.mls.warnMember"
-        
+
         var headers: [String: String] = [:]
-        
+
         headers["Content-Type"] = "application/json"
-        
-        
-        
+
         headers["Accept"] = "application/json"
-        
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -202,7 +161,6 @@ extension ATProtoClient.Blue.Catbird.Mls {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
@@ -212,12 +170,11 @@ extension ATProtoClient.Blue.Catbird.Mls {
         }
 
         // Only decode response data if request was successful
-        if (200...299).contains(responseCode) {
+        if (200 ... 299).contains(responseCode) {
             do {
-                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsWarnMember.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -228,9 +185,5 @@ extension ATProtoClient.Blue.Catbird.Mls {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-        
     }
-    
 }
-                           
-
