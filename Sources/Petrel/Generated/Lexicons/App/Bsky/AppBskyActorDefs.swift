@@ -1,24 +1,28 @@
 import Foundation
 
+
+
 // lexicon: 1, id: app.bsky.actor.defs
 
-public struct AppBskyActorDefs {
-    public static let typeIdentifier = "app.bsky.actor.defs"
 
-    public struct ProfileViewBasic: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.actor.defs#profileViewBasic"
-        public let did: DID
-        public let handle: Handle
-        public let displayName: String?
-        public let pronouns: String?
-        public let avatar: URI?
-        public let associated: ProfileAssociated?
-        public let viewer: ViewerState?
-        public let labels: [ComAtprotoLabelDefs.Label]?
-        public let createdAt: ATProtocolDate?
-        public let verification: VerificationState?
-        public let status: StatusView?
-        public let debug: ATProtocolValueContainer?
+public struct AppBskyActorDefs { 
+
+    public static let typeIdentifier = "app.bsky.actor.defs"
+        
+public struct ProfileViewBasic: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.actor.defs#profileViewBasic"
+            public let did: DID
+            public let handle: Handle
+            public let displayName: String?
+            public let pronouns: String?
+            public let avatar: URI?
+            public let associated: ProfileAssociated?
+            public let viewer: ViewerState?
+            public let labels: [ComAtprotoLabelDefs.Label]?
+            public let createdAt: ATProtocolDate?
+            public let verification: VerificationState?
+            public let status: StatusView?
+            public let debug: ATProtocolValueContainer?
 
         public init(
             did: DID, handle: Handle, displayName: String?, pronouns: String?, avatar: URI?, associated: ProfileAssociated?, viewer: ViewerState?, labels: [ComAtprotoLabelDefs.Label]?, createdAt: ATProtocolDate?, verification: VerificationState?, status: StatusView?, debug: ATProtocolValueContainer?
@@ -40,73 +44,73 @@ public struct AppBskyActorDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                did = try container.decode(DID.self, forKey: .did)
+                self.did = try container.decode(DID.self, forKey: .did)
             } catch {
                 LogManager.logError("Decoding error for required property 'did': \(error)")
                 throw error
             }
             do {
-                handle = try container.decode(Handle.self, forKey: .handle)
+                self.handle = try container.decode(Handle.self, forKey: .handle)
             } catch {
                 LogManager.logError("Decoding error for required property 'handle': \(error)")
                 throw error
             }
             do {
-                displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
+                self.displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'displayName': \(error)")
                 throw error
             }
             do {
-                pronouns = try container.decodeIfPresent(String.self, forKey: .pronouns)
+                self.pronouns = try container.decodeIfPresent(String.self, forKey: .pronouns)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'pronouns': \(error)")
                 throw error
             }
             do {
-                avatar = try container.decodeIfPresent(URI.self, forKey: .avatar)
+                self.avatar = try container.decodeIfPresent(URI.self, forKey: .avatar)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'avatar': \(error)")
                 throw error
             }
             do {
-                associated = try container.decodeIfPresent(ProfileAssociated.self, forKey: .associated)
+                self.associated = try container.decodeIfPresent(ProfileAssociated.self, forKey: .associated)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'associated': \(error)")
                 throw error
             }
             do {
-                viewer = try container.decodeIfPresent(ViewerState.self, forKey: .viewer)
+                self.viewer = try container.decodeIfPresent(ViewerState.self, forKey: .viewer)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'viewer': \(error)")
                 throw error
             }
             do {
-                labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
+                self.labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'labels': \(error)")
                 throw error
             }
             do {
-                createdAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .createdAt)
+                self.createdAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .createdAt)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'createdAt': \(error)")
                 throw error
             }
             do {
-                verification = try container.decodeIfPresent(VerificationState.self, forKey: .verification)
+                self.verification = try container.decodeIfPresent(VerificationState.self, forKey: .verification)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'verification': \(error)")
                 throw error
             }
             do {
-                status = try container.decodeIfPresent(StatusView.self, forKey: .status)
+                self.status = try container.decodeIfPresent(StatusView.self, forKey: .status)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'status': \(error)")
                 throw error
             }
             do {
-                debug = try container.decodeIfPresent(ATProtocolValueContainer.self, forKey: .debug)
+                self.debug = try container.decodeIfPresent(ATProtocolValueContainer.self, forKey: .debug)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'debug': \(error)")
                 throw error
@@ -296,23 +300,23 @@ public struct AppBskyActorDefs {
             case debug
         }
     }
-
-    public struct ProfileView: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.actor.defs#profileView"
-        public let did: DID
-        public let handle: Handle
-        public let displayName: String?
-        public let pronouns: String?
-        public let description: String?
-        public let avatar: URI?
-        public let associated: ProfileAssociated?
-        public let indexedAt: ATProtocolDate?
-        public let createdAt: ATProtocolDate?
-        public let viewer: ViewerState?
-        public let labels: [ComAtprotoLabelDefs.Label]?
-        public let verification: VerificationState?
-        public let status: StatusView?
-        public let debug: ATProtocolValueContainer?
+        
+public struct ProfileView: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.actor.defs#profileView"
+            public let did: DID
+            public let handle: Handle
+            public let displayName: String?
+            public let pronouns: String?
+            public let description: String?
+            public let avatar: URI?
+            public let associated: ProfileAssociated?
+            public let indexedAt: ATProtocolDate?
+            public let createdAt: ATProtocolDate?
+            public let viewer: ViewerState?
+            public let labels: [ComAtprotoLabelDefs.Label]?
+            public let verification: VerificationState?
+            public let status: StatusView?
+            public let debug: ATProtocolValueContainer?
 
         public init(
             did: DID, handle: Handle, displayName: String?, pronouns: String?, description: String?, avatar: URI?, associated: ProfileAssociated?, indexedAt: ATProtocolDate?, createdAt: ATProtocolDate?, viewer: ViewerState?, labels: [ComAtprotoLabelDefs.Label]?, verification: VerificationState?, status: StatusView?, debug: ATProtocolValueContainer?
@@ -336,85 +340,85 @@ public struct AppBskyActorDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                did = try container.decode(DID.self, forKey: .did)
+                self.did = try container.decode(DID.self, forKey: .did)
             } catch {
                 LogManager.logError("Decoding error for required property 'did': \(error)")
                 throw error
             }
             do {
-                handle = try container.decode(Handle.self, forKey: .handle)
+                self.handle = try container.decode(Handle.self, forKey: .handle)
             } catch {
                 LogManager.logError("Decoding error for required property 'handle': \(error)")
                 throw error
             }
             do {
-                displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
+                self.displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'displayName': \(error)")
                 throw error
             }
             do {
-                pronouns = try container.decodeIfPresent(String.self, forKey: .pronouns)
+                self.pronouns = try container.decodeIfPresent(String.self, forKey: .pronouns)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'pronouns': \(error)")
                 throw error
             }
             do {
-                description = try container.decodeIfPresent(String.self, forKey: .description)
+                self.description = try container.decodeIfPresent(String.self, forKey: .description)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'description': \(error)")
                 throw error
             }
             do {
-                avatar = try container.decodeIfPresent(URI.self, forKey: .avatar)
+                self.avatar = try container.decodeIfPresent(URI.self, forKey: .avatar)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'avatar': \(error)")
                 throw error
             }
             do {
-                associated = try container.decodeIfPresent(ProfileAssociated.self, forKey: .associated)
+                self.associated = try container.decodeIfPresent(ProfileAssociated.self, forKey: .associated)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'associated': \(error)")
                 throw error
             }
             do {
-                indexedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .indexedAt)
+                self.indexedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .indexedAt)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'indexedAt': \(error)")
                 throw error
             }
             do {
-                createdAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .createdAt)
+                self.createdAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .createdAt)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'createdAt': \(error)")
                 throw error
             }
             do {
-                viewer = try container.decodeIfPresent(ViewerState.self, forKey: .viewer)
+                self.viewer = try container.decodeIfPresent(ViewerState.self, forKey: .viewer)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'viewer': \(error)")
                 throw error
             }
             do {
-                labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
+                self.labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'labels': \(error)")
                 throw error
             }
             do {
-                verification = try container.decodeIfPresent(VerificationState.self, forKey: .verification)
+                self.verification = try container.decodeIfPresent(VerificationState.self, forKey: .verification)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'verification': \(error)")
                 throw error
             }
             do {
-                status = try container.decodeIfPresent(StatusView.self, forKey: .status)
+                self.status = try container.decodeIfPresent(StatusView.self, forKey: .status)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'status': \(error)")
                 throw error
             }
             do {
-                debug = try container.decodeIfPresent(ATProtocolValueContainer.self, forKey: .debug)
+                self.debug = try container.decodeIfPresent(ATProtocolValueContainer.self, forKey: .debug)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'debug': \(error)")
                 throw error
@@ -632,30 +636,30 @@ public struct AppBskyActorDefs {
             case debug
         }
     }
-
-    public struct ProfileViewDetailed: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.actor.defs#profileViewDetailed"
-        public let did: DID
-        public let handle: Handle
-        public let displayName: String?
-        public let description: String?
-        public let pronouns: String?
-        public let website: URI?
-        public let avatar: URI?
-        public let banner: URI?
-        public let followersCount: Int?
-        public let followsCount: Int?
-        public let postsCount: Int?
-        public let associated: ProfileAssociated?
-        public let joinedViaStarterPack: AppBskyGraphDefs.StarterPackViewBasic?
-        public let indexedAt: ATProtocolDate?
-        public let createdAt: ATProtocolDate?
-        public let viewer: ViewerState?
-        public let labels: [ComAtprotoLabelDefs.Label]?
-        public let pinnedPost: ComAtprotoRepoStrongRef?
-        public let verification: VerificationState?
-        public let status: StatusView?
-        public let debug: ATProtocolValueContainer?
+        
+public struct ProfileViewDetailed: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.actor.defs#profileViewDetailed"
+            public let did: DID
+            public let handle: Handle
+            public let displayName: String?
+            public let description: String?
+            public let pronouns: String?
+            public let website: URI?
+            public let avatar: URI?
+            public let banner: URI?
+            public let followersCount: Int?
+            public let followsCount: Int?
+            public let postsCount: Int?
+            public let associated: ProfileAssociated?
+            public let joinedViaStarterPack: AppBskyGraphDefs.StarterPackViewBasic?
+            public let indexedAt: ATProtocolDate?
+            public let createdAt: ATProtocolDate?
+            public let viewer: ViewerState?
+            public let labels: [ComAtprotoLabelDefs.Label]?
+            public let pinnedPost: ComAtprotoRepoStrongRef?
+            public let verification: VerificationState?
+            public let status: StatusView?
+            public let debug: ATProtocolValueContainer?
 
         public init(
             did: DID, handle: Handle, displayName: String?, description: String?, pronouns: String?, website: URI?, avatar: URI?, banner: URI?, followersCount: Int?, followsCount: Int?, postsCount: Int?, associated: ProfileAssociated?, joinedViaStarterPack: AppBskyGraphDefs.StarterPackViewBasic?, indexedAt: ATProtocolDate?, createdAt: ATProtocolDate?, viewer: ViewerState?, labels: [ComAtprotoLabelDefs.Label]?, pinnedPost: ComAtprotoRepoStrongRef?, verification: VerificationState?, status: StatusView?, debug: ATProtocolValueContainer?
@@ -686,127 +690,127 @@ public struct AppBskyActorDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                did = try container.decode(DID.self, forKey: .did)
+                self.did = try container.decode(DID.self, forKey: .did)
             } catch {
                 LogManager.logError("Decoding error for required property 'did': \(error)")
                 throw error
             }
             do {
-                handle = try container.decode(Handle.self, forKey: .handle)
+                self.handle = try container.decode(Handle.self, forKey: .handle)
             } catch {
                 LogManager.logError("Decoding error for required property 'handle': \(error)")
                 throw error
             }
             do {
-                displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
+                self.displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'displayName': \(error)")
                 throw error
             }
             do {
-                description = try container.decodeIfPresent(String.self, forKey: .description)
+                self.description = try container.decodeIfPresent(String.self, forKey: .description)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'description': \(error)")
                 throw error
             }
             do {
-                pronouns = try container.decodeIfPresent(String.self, forKey: .pronouns)
+                self.pronouns = try container.decodeIfPresent(String.self, forKey: .pronouns)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'pronouns': \(error)")
                 throw error
             }
             do {
-                website = try container.decodeIfPresent(URI.self, forKey: .website)
+                self.website = try container.decodeIfPresent(URI.self, forKey: .website)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'website': \(error)")
                 throw error
             }
             do {
-                avatar = try container.decodeIfPresent(URI.self, forKey: .avatar)
+                self.avatar = try container.decodeIfPresent(URI.self, forKey: .avatar)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'avatar': \(error)")
                 throw error
             }
             do {
-                banner = try container.decodeIfPresent(URI.self, forKey: .banner)
+                self.banner = try container.decodeIfPresent(URI.self, forKey: .banner)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'banner': \(error)")
                 throw error
             }
             do {
-                followersCount = try container.decodeIfPresent(Int.self, forKey: .followersCount)
+                self.followersCount = try container.decodeIfPresent(Int.self, forKey: .followersCount)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'followersCount': \(error)")
                 throw error
             }
             do {
-                followsCount = try container.decodeIfPresent(Int.self, forKey: .followsCount)
+                self.followsCount = try container.decodeIfPresent(Int.self, forKey: .followsCount)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'followsCount': \(error)")
                 throw error
             }
             do {
-                postsCount = try container.decodeIfPresent(Int.self, forKey: .postsCount)
+                self.postsCount = try container.decodeIfPresent(Int.self, forKey: .postsCount)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'postsCount': \(error)")
                 throw error
             }
             do {
-                associated = try container.decodeIfPresent(ProfileAssociated.self, forKey: .associated)
+                self.associated = try container.decodeIfPresent(ProfileAssociated.self, forKey: .associated)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'associated': \(error)")
                 throw error
             }
             do {
-                joinedViaStarterPack = try container.decodeIfPresent(AppBskyGraphDefs.StarterPackViewBasic.self, forKey: .joinedViaStarterPack)
+                self.joinedViaStarterPack = try container.decodeIfPresent(AppBskyGraphDefs.StarterPackViewBasic.self, forKey: .joinedViaStarterPack)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'joinedViaStarterPack': \(error)")
                 throw error
             }
             do {
-                indexedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .indexedAt)
+                self.indexedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .indexedAt)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'indexedAt': \(error)")
                 throw error
             }
             do {
-                createdAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .createdAt)
+                self.createdAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .createdAt)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'createdAt': \(error)")
                 throw error
             }
             do {
-                viewer = try container.decodeIfPresent(ViewerState.self, forKey: .viewer)
+                self.viewer = try container.decodeIfPresent(ViewerState.self, forKey: .viewer)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'viewer': \(error)")
                 throw error
             }
             do {
-                labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
+                self.labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'labels': \(error)")
                 throw error
             }
             do {
-                pinnedPost = try container.decodeIfPresent(ComAtprotoRepoStrongRef.self, forKey: .pinnedPost)
+                self.pinnedPost = try container.decodeIfPresent(ComAtprotoRepoStrongRef.self, forKey: .pinnedPost)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'pinnedPost': \(error)")
                 throw error
             }
             do {
-                verification = try container.decodeIfPresent(VerificationState.self, forKey: .verification)
+                self.verification = try container.decodeIfPresent(VerificationState.self, forKey: .verification)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'verification': \(error)")
                 throw error
             }
             do {
-                status = try container.decodeIfPresent(StatusView.self, forKey: .status)
+                self.status = try container.decodeIfPresent(StatusView.self, forKey: .status)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'status': \(error)")
                 throw error
             }
             do {
-                debug = try container.decodeIfPresent(ATProtocolValueContainer.self, forKey: .debug)
+                self.debug = try container.decodeIfPresent(ATProtocolValueContainer.self, forKey: .debug)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'debug': \(error)")
                 throw error
@@ -1122,16 +1126,16 @@ public struct AppBskyActorDefs {
             case debug
         }
     }
-
-    public struct ProfileAssociated: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.actor.defs#profileAssociated"
-        public let lists: Int?
-        public let feedgens: Int?
-        public let starterPacks: Int?
-        public let labeler: Bool?
-        public let chat: ProfileAssociatedChat?
-        public let activitySubscription: ProfileAssociatedActivitySubscription?
-        public let germ: ProfileAssociatedGerm?
+        
+public struct ProfileAssociated: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.actor.defs#profileAssociated"
+            public let lists: Int?
+            public let feedgens: Int?
+            public let starterPacks: Int?
+            public let labeler: Bool?
+            public let chat: ProfileAssociatedChat?
+            public let activitySubscription: ProfileAssociatedActivitySubscription?
+            public let germ: ProfileAssociatedGerm?
 
         public init(
             lists: Int?, feedgens: Int?, starterPacks: Int?, labeler: Bool?, chat: ProfileAssociatedChat?, activitySubscription: ProfileAssociatedActivitySubscription?, germ: ProfileAssociatedGerm?
@@ -1148,43 +1152,43 @@ public struct AppBskyActorDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                lists = try container.decodeIfPresent(Int.self, forKey: .lists)
+                self.lists = try container.decodeIfPresent(Int.self, forKey: .lists)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'lists': \(error)")
                 throw error
             }
             do {
-                feedgens = try container.decodeIfPresent(Int.self, forKey: .feedgens)
+                self.feedgens = try container.decodeIfPresent(Int.self, forKey: .feedgens)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'feedgens': \(error)")
                 throw error
             }
             do {
-                starterPacks = try container.decodeIfPresent(Int.self, forKey: .starterPacks)
+                self.starterPacks = try container.decodeIfPresent(Int.self, forKey: .starterPacks)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'starterPacks': \(error)")
                 throw error
             }
             do {
-                labeler = try container.decodeIfPresent(Bool.self, forKey: .labeler)
+                self.labeler = try container.decodeIfPresent(Bool.self, forKey: .labeler)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'labeler': \(error)")
                 throw error
             }
             do {
-                chat = try container.decodeIfPresent(ProfileAssociatedChat.self, forKey: .chat)
+                self.chat = try container.decodeIfPresent(ProfileAssociatedChat.self, forKey: .chat)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'chat': \(error)")
                 throw error
             }
             do {
-                activitySubscription = try container.decodeIfPresent(ProfileAssociatedActivitySubscription.self, forKey: .activitySubscription)
+                self.activitySubscription = try container.decodeIfPresent(ProfileAssociatedActivitySubscription.self, forKey: .activitySubscription)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'activitySubscription': \(error)")
                 throw error
             }
             do {
-                germ = try container.decodeIfPresent(ProfileAssociatedGerm.self, forKey: .germ)
+                self.germ = try container.decodeIfPresent(ProfileAssociatedGerm.self, forKey: .germ)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'germ': \(error)")
                 throw error
@@ -1316,10 +1320,10 @@ public struct AppBskyActorDefs {
             case germ
         }
     }
-
-    public struct ProfileAssociatedChat: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.actor.defs#profileAssociatedChat"
-        public let allowIncoming: String
+        
+public struct ProfileAssociatedChat: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.actor.defs#profileAssociatedChat"
+            public let allowIncoming: String
 
         public init(
             allowIncoming: String
@@ -1330,7 +1334,7 @@ public struct AppBskyActorDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                allowIncoming = try container.decode(String.self, forKey: .allowIncoming)
+                self.allowIncoming = try container.decode(String.self, forKey: .allowIncoming)
             } catch {
                 LogManager.logError("Decoding error for required property 'allowIncoming': \(error)")
                 throw error
@@ -1372,11 +1376,11 @@ public struct AppBskyActorDefs {
             case allowIncoming
         }
     }
-
-    public struct ProfileAssociatedGerm: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.actor.defs#profileAssociatedGerm"
-        public let messageMeUrl: URI
-        public let showButtonTo: String
+        
+public struct ProfileAssociatedGerm: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.actor.defs#profileAssociatedGerm"
+            public let messageMeUrl: URI
+            public let showButtonTo: String
 
         public init(
             messageMeUrl: URI, showButtonTo: String
@@ -1388,13 +1392,13 @@ public struct AppBskyActorDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                messageMeUrl = try container.decode(URI.self, forKey: .messageMeUrl)
+                self.messageMeUrl = try container.decode(URI.self, forKey: .messageMeUrl)
             } catch {
                 LogManager.logError("Decoding error for required property 'messageMeUrl': \(error)")
                 throw error
             }
             do {
-                showButtonTo = try container.decode(String.self, forKey: .showButtonTo)
+                self.showButtonTo = try container.decode(String.self, forKey: .showButtonTo)
             } catch {
                 LogManager.logError("Decoding error for required property 'showButtonTo': \(error)")
                 throw error
@@ -1444,10 +1448,10 @@ public struct AppBskyActorDefs {
             case showButtonTo
         }
     }
-
-    public struct ProfileAssociatedActivitySubscription: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.actor.defs#profileAssociatedActivitySubscription"
-        public let allowSubscriptions: String
+        
+public struct ProfileAssociatedActivitySubscription: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.actor.defs#profileAssociatedActivitySubscription"
+            public let allowSubscriptions: String
 
         public init(
             allowSubscriptions: String
@@ -1458,7 +1462,7 @@ public struct AppBskyActorDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                allowSubscriptions = try container.decode(String.self, forKey: .allowSubscriptions)
+                self.allowSubscriptions = try container.decode(String.self, forKey: .allowSubscriptions)
             } catch {
                 LogManager.logError("Decoding error for required property 'allowSubscriptions': \(error)")
                 throw error
@@ -1500,18 +1504,18 @@ public struct AppBskyActorDefs {
             case allowSubscriptions
         }
     }
-
-    public struct ViewerState: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.actor.defs#viewerState"
-        public let muted: Bool?
-        public let mutedByList: AppBskyGraphDefs.ListViewBasic?
-        public let blockedBy: Bool?
-        public let blocking: ATProtocolURI?
-        public let blockingByList: AppBskyGraphDefs.ListViewBasic?
-        public let following: ATProtocolURI?
-        public let followedBy: ATProtocolURI?
-        public let knownFollowers: KnownFollowers?
-        public let activitySubscription: AppBskyNotificationDefs.ActivitySubscription?
+        
+public struct ViewerState: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.actor.defs#viewerState"
+            public let muted: Bool?
+            public let mutedByList: AppBskyGraphDefs.ListViewBasic?
+            public let blockedBy: Bool?
+            public let blocking: ATProtocolURI?
+            public let blockingByList: AppBskyGraphDefs.ListViewBasic?
+            public let following: ATProtocolURI?
+            public let followedBy: ATProtocolURI?
+            public let knownFollowers: KnownFollowers?
+            public let activitySubscription: AppBskyNotificationDefs.ActivitySubscription?
 
         public init(
             muted: Bool?, mutedByList: AppBskyGraphDefs.ListViewBasic?, blockedBy: Bool?, blocking: ATProtocolURI?, blockingByList: AppBskyGraphDefs.ListViewBasic?, following: ATProtocolURI?, followedBy: ATProtocolURI?, knownFollowers: KnownFollowers?, activitySubscription: AppBskyNotificationDefs.ActivitySubscription?
@@ -1530,55 +1534,55 @@ public struct AppBskyActorDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                muted = try container.decodeIfPresent(Bool.self, forKey: .muted)
+                self.muted = try container.decodeIfPresent(Bool.self, forKey: .muted)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'muted': \(error)")
                 throw error
             }
             do {
-                mutedByList = try container.decodeIfPresent(AppBskyGraphDefs.ListViewBasic.self, forKey: .mutedByList)
+                self.mutedByList = try container.decodeIfPresent(AppBskyGraphDefs.ListViewBasic.self, forKey: .mutedByList)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'mutedByList': \(error)")
                 throw error
             }
             do {
-                blockedBy = try container.decodeIfPresent(Bool.self, forKey: .blockedBy)
+                self.blockedBy = try container.decodeIfPresent(Bool.self, forKey: .blockedBy)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'blockedBy': \(error)")
                 throw error
             }
             do {
-                blocking = try container.decodeIfPresent(ATProtocolURI.self, forKey: .blocking)
+                self.blocking = try container.decodeIfPresent(ATProtocolURI.self, forKey: .blocking)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'blocking': \(error)")
                 throw error
             }
             do {
-                blockingByList = try container.decodeIfPresent(AppBskyGraphDefs.ListViewBasic.self, forKey: .blockingByList)
+                self.blockingByList = try container.decodeIfPresent(AppBskyGraphDefs.ListViewBasic.self, forKey: .blockingByList)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'blockingByList': \(error)")
                 throw error
             }
             do {
-                following = try container.decodeIfPresent(ATProtocolURI.self, forKey: .following)
+                self.following = try container.decodeIfPresent(ATProtocolURI.self, forKey: .following)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'following': \(error)")
                 throw error
             }
             do {
-                followedBy = try container.decodeIfPresent(ATProtocolURI.self, forKey: .followedBy)
+                self.followedBy = try container.decodeIfPresent(ATProtocolURI.self, forKey: .followedBy)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'followedBy': \(error)")
                 throw error
             }
             do {
-                knownFollowers = try container.decodeIfPresent(KnownFollowers.self, forKey: .knownFollowers)
+                self.knownFollowers = try container.decodeIfPresent(KnownFollowers.self, forKey: .knownFollowers)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'knownFollowers': \(error)")
                 throw error
             }
             do {
-                activitySubscription = try container.decodeIfPresent(AppBskyNotificationDefs.ActivitySubscription.self, forKey: .activitySubscription)
+                self.activitySubscription = try container.decodeIfPresent(AppBskyNotificationDefs.ActivitySubscription.self, forKey: .activitySubscription)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'activitySubscription': \(error)")
                 throw error
@@ -1738,34 +1742,35 @@ public struct AppBskyActorDefs {
             case activitySubscription
         }
     }
-
-    public struct KnownFollowers: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.actor.defs#knownFollowers"
-        public let count: Int
-        private let _followers: IndirectBox<[ProfileViewBasic]>
-        public var followers: [ProfileViewBasic] {
-            _followers.value
-        }
+        
+public struct KnownFollowers: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.actor.defs#knownFollowers"
+            public let count: Int
+            private let _followers: IndirectBox<[ProfileViewBasic]>
+            public var followers: [ProfileViewBasic] {
+                
+                _followers.value
+            }
 
         public init(
             count: Int, followers: [ProfileViewBasic]
         ) {
             self.count = count
-
-            _followers = IndirectBox(followers)
+            
+            self._followers = IndirectBox(followers)
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                count = try container.decode(Int.self, forKey: .count)
+                self.count = try container.decode(Int.self, forKey: .count)
             } catch {
                 LogManager.logError("Decoding error for required property 'count': \(error)")
                 throw error
             }
             do {
                 let decoded = try container.decode([ProfileViewBasic].self, forKey: .followers)
-                _followers = IndirectBox(decoded)
+                self._followers = IndirectBox(decoded)
             } catch {
                 LogManager.logError("Decoding error for required property 'followers': \(error)")
                 throw error
@@ -1815,12 +1820,12 @@ public struct AppBskyActorDefs {
             case followers
         }
     }
-
-    public struct VerificationState: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.actor.defs#verificationState"
-        public let verifications: [VerificationView]
-        public let verifiedStatus: String
-        public let trustedVerifierStatus: String
+        
+public struct VerificationState: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.actor.defs#verificationState"
+            public let verifications: [VerificationView]
+            public let verifiedStatus: String
+            public let trustedVerifierStatus: String
 
         public init(
             verifications: [VerificationView], verifiedStatus: String, trustedVerifierStatus: String
@@ -1833,19 +1838,19 @@ public struct AppBskyActorDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                verifications = try container.decode([VerificationView].self, forKey: .verifications)
+                self.verifications = try container.decode([VerificationView].self, forKey: .verifications)
             } catch {
                 LogManager.logError("Decoding error for required property 'verifications': \(error)")
                 throw error
             }
             do {
-                verifiedStatus = try container.decode(String.self, forKey: .verifiedStatus)
+                self.verifiedStatus = try container.decode(String.self, forKey: .verifiedStatus)
             } catch {
                 LogManager.logError("Decoding error for required property 'verifiedStatus': \(error)")
                 throw error
             }
             do {
-                trustedVerifierStatus = try container.decode(String.self, forKey: .trustedVerifierStatus)
+                self.trustedVerifierStatus = try container.decode(String.self, forKey: .trustedVerifierStatus)
             } catch {
                 LogManager.logError("Decoding error for required property 'trustedVerifierStatus': \(error)")
                 throw error
@@ -1903,13 +1908,13 @@ public struct AppBskyActorDefs {
             case trustedVerifierStatus
         }
     }
-
-    public struct VerificationView: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.actor.defs#verificationView"
-        public let issuer: DID
-        public let uri: ATProtocolURI
-        public let isValid: Bool
-        public let createdAt: ATProtocolDate
+        
+public struct VerificationView: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.actor.defs#verificationView"
+            public let issuer: DID
+            public let uri: ATProtocolURI
+            public let isValid: Bool
+            public let createdAt: ATProtocolDate
 
         public init(
             issuer: DID, uri: ATProtocolURI, isValid: Bool, createdAt: ATProtocolDate
@@ -1923,25 +1928,25 @@ public struct AppBskyActorDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                issuer = try container.decode(DID.self, forKey: .issuer)
+                self.issuer = try container.decode(DID.self, forKey: .issuer)
             } catch {
                 LogManager.logError("Decoding error for required property 'issuer': \(error)")
                 throw error
             }
             do {
-                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+                self.uri = try container.decode(ATProtocolURI.self, forKey: .uri)
             } catch {
                 LogManager.logError("Decoding error for required property 'uri': \(error)")
                 throw error
             }
             do {
-                isValid = try container.decode(Bool.self, forKey: .isValid)
+                self.isValid = try container.decode(Bool.self, forKey: .isValid)
             } catch {
                 LogManager.logError("Decoding error for required property 'isValid': \(error)")
                 throw error
             }
             do {
-                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+                self.createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
             } catch {
                 LogManager.logError("Decoding error for required property 'createdAt': \(error)")
                 throw error
@@ -2007,10 +2012,10 @@ public struct AppBskyActorDefs {
             case createdAt
         }
     }
-
-    public struct AdultContentPref: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.actor.defs#adultContentPref"
-        public let enabled: Bool
+        
+public struct AdultContentPref: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.actor.defs#adultContentPref"
+            public let enabled: Bool
 
         public init(
             enabled: Bool
@@ -2021,7 +2026,7 @@ public struct AppBskyActorDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                enabled = try container.decode(Bool.self, forKey: .enabled)
+                self.enabled = try container.decode(Bool.self, forKey: .enabled)
             } catch {
                 LogManager.logError("Decoding error for required property 'enabled': \(error)")
                 throw error
@@ -2063,12 +2068,12 @@ public struct AppBskyActorDefs {
             case enabled
         }
     }
-
-    public struct ContentLabelPref: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.actor.defs#contentLabelPref"
-        public let labelerDid: DID?
-        public let label: String
-        public let visibility: String
+        
+public struct ContentLabelPref: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.actor.defs#contentLabelPref"
+            public let labelerDid: DID?
+            public let label: String
+            public let visibility: String
 
         public init(
             labelerDid: DID?, label: String, visibility: String
@@ -2081,19 +2086,19 @@ public struct AppBskyActorDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                labelerDid = try container.decodeIfPresent(DID.self, forKey: .labelerDid)
+                self.labelerDid = try container.decodeIfPresent(DID.self, forKey: .labelerDid)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'labelerDid': \(error)")
                 throw error
             }
             do {
-                label = try container.decode(String.self, forKey: .label)
+                self.label = try container.decode(String.self, forKey: .label)
             } catch {
                 LogManager.logError("Decoding error for required property 'label': \(error)")
                 throw error
             }
             do {
-                visibility = try container.decode(String.self, forKey: .visibility)
+                self.visibility = try container.decode(String.self, forKey: .visibility)
             } catch {
                 LogManager.logError("Decoding error for required property 'visibility': \(error)")
                 throw error
@@ -2157,13 +2162,13 @@ public struct AppBskyActorDefs {
             case visibility
         }
     }
-
-    public struct SavedFeed: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.actor.defs#savedFeed"
-        public let id: String
-        public let type: String
-        public let value: String
-        public let pinned: Bool
+        
+public struct SavedFeed: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.actor.defs#savedFeed"
+            public let id: String
+            public let type: String
+            public let value: String
+            public let pinned: Bool
 
         public init(
             id: String, type: String, value: String, pinned: Bool
@@ -2177,25 +2182,25 @@ public struct AppBskyActorDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                id = try container.decode(String.self, forKey: .id)
+                self.id = try container.decode(String.self, forKey: .id)
             } catch {
                 LogManager.logError("Decoding error for required property 'id': \(error)")
                 throw error
             }
             do {
-                type = try container.decode(String.self, forKey: .type)
+                self.type = try container.decode(String.self, forKey: .type)
             } catch {
                 LogManager.logError("Decoding error for required property 'type': \(error)")
                 throw error
             }
             do {
-                value = try container.decode(String.self, forKey: .value)
+                self.value = try container.decode(String.self, forKey: .value)
             } catch {
                 LogManager.logError("Decoding error for required property 'value': \(error)")
                 throw error
             }
             do {
-                pinned = try container.decode(Bool.self, forKey: .pinned)
+                self.pinned = try container.decode(Bool.self, forKey: .pinned)
             } catch {
                 LogManager.logError("Decoding error for required property 'pinned': \(error)")
                 throw error
@@ -2261,10 +2266,10 @@ public struct AppBskyActorDefs {
             case pinned
         }
     }
-
-    public struct SavedFeedsPrefV2: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.actor.defs#savedFeedsPrefV2"
-        public let items: [AppBskyActorDefs.SavedFeed]
+        
+public struct SavedFeedsPrefV2: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.actor.defs#savedFeedsPrefV2"
+            public let items: [AppBskyActorDefs.SavedFeed]
 
         public init(
             items: [AppBskyActorDefs.SavedFeed]
@@ -2275,7 +2280,7 @@ public struct AppBskyActorDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                items = try container.decode([AppBskyActorDefs.SavedFeed].self, forKey: .items)
+                self.items = try container.decode([AppBskyActorDefs.SavedFeed].self, forKey: .items)
             } catch {
                 LogManager.logError("Decoding error for required property 'items': \(error)")
                 throw error
@@ -2317,12 +2322,12 @@ public struct AppBskyActorDefs {
             case items
         }
     }
-
-    public struct SavedFeedsPref: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.actor.defs#savedFeedsPref"
-        public let pinned: [ATProtocolURI]
-        public let saved: [ATProtocolURI]
-        public let timelineIndex: Int?
+        
+public struct SavedFeedsPref: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.actor.defs#savedFeedsPref"
+            public let pinned: [ATProtocolURI]
+            public let saved: [ATProtocolURI]
+            public let timelineIndex: Int?
 
         public init(
             pinned: [ATProtocolURI], saved: [ATProtocolURI], timelineIndex: Int?
@@ -2335,19 +2340,19 @@ public struct AppBskyActorDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                pinned = try container.decode([ATProtocolURI].self, forKey: .pinned)
+                self.pinned = try container.decode([ATProtocolURI].self, forKey: .pinned)
             } catch {
                 LogManager.logError("Decoding error for required property 'pinned': \(error)")
                 throw error
             }
             do {
-                saved = try container.decode([ATProtocolURI].self, forKey: .saved)
+                self.saved = try container.decode([ATProtocolURI].self, forKey: .saved)
             } catch {
                 LogManager.logError("Decoding error for required property 'saved': \(error)")
                 throw error
             }
             do {
-                timelineIndex = try container.decodeIfPresent(Int.self, forKey: .timelineIndex)
+                self.timelineIndex = try container.decodeIfPresent(Int.self, forKey: .timelineIndex)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'timelineIndex': \(error)")
                 throw error
@@ -2411,10 +2416,10 @@ public struct AppBskyActorDefs {
             case timelineIndex
         }
     }
-
-    public struct PersonalDetailsPref: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.actor.defs#personalDetailsPref"
-        public let birthDate: ATProtocolDate?
+        
+public struct PersonalDetailsPref: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.actor.defs#personalDetailsPref"
+            public let birthDate: ATProtocolDate?
 
         public init(
             birthDate: ATProtocolDate?
@@ -2425,7 +2430,7 @@ public struct AppBskyActorDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                birthDate = try container.decodeIfPresent(ATProtocolDate.self, forKey: .birthDate)
+                self.birthDate = try container.decodeIfPresent(ATProtocolDate.self, forKey: .birthDate)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'birthDate': \(error)")
                 throw error
@@ -2473,12 +2478,12 @@ public struct AppBskyActorDefs {
             case birthDate
         }
     }
-
-    public struct DeclaredAgePref: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.actor.defs#declaredAgePref"
-        public let isOverAge13: Bool?
-        public let isOverAge16: Bool?
-        public let isOverAge18: Bool?
+        
+public struct DeclaredAgePref: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.actor.defs#declaredAgePref"
+            public let isOverAge13: Bool?
+            public let isOverAge16: Bool?
+            public let isOverAge18: Bool?
 
         public init(
             isOverAge13: Bool?, isOverAge16: Bool?, isOverAge18: Bool?
@@ -2491,19 +2496,19 @@ public struct AppBskyActorDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                isOverAge13 = try container.decodeIfPresent(Bool.self, forKey: .isOverAge13)
+                self.isOverAge13 = try container.decodeIfPresent(Bool.self, forKey: .isOverAge13)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'isOverAge13': \(error)")
                 throw error
             }
             do {
-                isOverAge16 = try container.decodeIfPresent(Bool.self, forKey: .isOverAge16)
+                self.isOverAge16 = try container.decodeIfPresent(Bool.self, forKey: .isOverAge16)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'isOverAge16': \(error)")
                 throw error
             }
             do {
-                isOverAge18 = try container.decodeIfPresent(Bool.self, forKey: .isOverAge18)
+                self.isOverAge18 = try container.decodeIfPresent(Bool.self, forKey: .isOverAge18)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'isOverAge18': \(error)")
                 throw error
@@ -2579,15 +2584,15 @@ public struct AppBskyActorDefs {
             case isOverAge18
         }
     }
-
-    public struct FeedViewPref: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.actor.defs#feedViewPref"
-        public let feed: String
-        public let hideReplies: Bool?
-        public let hideRepliesByUnfollowed: Bool?
-        public let hideRepliesByLikeCount: Int?
-        public let hideReposts: Bool?
-        public let hideQuotePosts: Bool?
+        
+public struct FeedViewPref: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.actor.defs#feedViewPref"
+            public let feed: String
+            public let hideReplies: Bool?
+            public let hideRepliesByUnfollowed: Bool?
+            public let hideRepliesByLikeCount: Int?
+            public let hideReposts: Bool?
+            public let hideQuotePosts: Bool?
 
         public init(
             feed: String, hideReplies: Bool?, hideRepliesByUnfollowed: Bool?, hideRepliesByLikeCount: Int?, hideReposts: Bool?, hideQuotePosts: Bool?
@@ -2603,37 +2608,37 @@ public struct AppBskyActorDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                feed = try container.decode(String.self, forKey: .feed)
+                self.feed = try container.decode(String.self, forKey: .feed)
             } catch {
                 LogManager.logError("Decoding error for required property 'feed': \(error)")
                 throw error
             }
             do {
-                hideReplies = try container.decodeIfPresent(Bool.self, forKey: .hideReplies)
+                self.hideReplies = try container.decodeIfPresent(Bool.self, forKey: .hideReplies)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'hideReplies': \(error)")
                 throw error
             }
             do {
-                hideRepliesByUnfollowed = try container.decodeIfPresent(Bool.self, forKey: .hideRepliesByUnfollowed)
+                self.hideRepliesByUnfollowed = try container.decodeIfPresent(Bool.self, forKey: .hideRepliesByUnfollowed)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'hideRepliesByUnfollowed': \(error)")
                 throw error
             }
             do {
-                hideRepliesByLikeCount = try container.decodeIfPresent(Int.self, forKey: .hideRepliesByLikeCount)
+                self.hideRepliesByLikeCount = try container.decodeIfPresent(Int.self, forKey: .hideRepliesByLikeCount)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'hideRepliesByLikeCount': \(error)")
                 throw error
             }
             do {
-                hideReposts = try container.decodeIfPresent(Bool.self, forKey: .hideReposts)
+                self.hideReposts = try container.decodeIfPresent(Bool.self, forKey: .hideReposts)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'hideReposts': \(error)")
                 throw error
             }
             do {
-                hideQuotePosts = try container.decodeIfPresent(Bool.self, forKey: .hideQuotePosts)
+                self.hideQuotePosts = try container.decodeIfPresent(Bool.self, forKey: .hideQuotePosts)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'hideQuotePosts': \(error)")
                 throw error
@@ -2745,10 +2750,10 @@ public struct AppBskyActorDefs {
             case hideQuotePosts
         }
     }
-
-    public struct ThreadViewPref: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.actor.defs#threadViewPref"
-        public let sort: String?
+        
+public struct ThreadViewPref: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.actor.defs#threadViewPref"
+            public let sort: String?
 
         public init(
             sort: String?
@@ -2759,7 +2764,7 @@ public struct AppBskyActorDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                sort = try container.decodeIfPresent(String.self, forKey: .sort)
+                self.sort = try container.decodeIfPresent(String.self, forKey: .sort)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'sort': \(error)")
                 throw error
@@ -2807,10 +2812,10 @@ public struct AppBskyActorDefs {
             case sort
         }
     }
-
-    public struct InterestsPref: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.actor.defs#interestsPref"
-        public let tags: [String]
+        
+public struct InterestsPref: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.actor.defs#interestsPref"
+            public let tags: [String]
 
         public init(
             tags: [String]
@@ -2821,7 +2826,7 @@ public struct AppBskyActorDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                tags = try container.decode([String].self, forKey: .tags)
+                self.tags = try container.decode([String].self, forKey: .tags)
             } catch {
                 LogManager.logError("Decoding error for required property 'tags': \(error)")
                 throw error
@@ -2863,14 +2868,14 @@ public struct AppBskyActorDefs {
             case tags
         }
     }
-
-    public struct MutedWord: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.actor.defs#mutedWord"
-        public let id: String?
-        public let value: String
-        public let targets: [AppBskyActorDefs.MutedWordTarget]
-        public let actorTarget: String?
-        public let expiresAt: ATProtocolDate?
+        
+public struct MutedWord: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.actor.defs#mutedWord"
+            public let id: String?
+            public let value: String
+            public let targets: [AppBskyActorDefs.MutedWordTarget]
+            public let actorTarget: String?
+            public let expiresAt: ATProtocolDate?
 
         public init(
             id: String?, value: String, targets: [AppBskyActorDefs.MutedWordTarget], actorTarget: String?, expiresAt: ATProtocolDate?
@@ -2885,31 +2890,31 @@ public struct AppBskyActorDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                id = try container.decodeIfPresent(String.self, forKey: .id)
+                self.id = try container.decodeIfPresent(String.self, forKey: .id)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'id': \(error)")
                 throw error
             }
             do {
-                value = try container.decode(String.self, forKey: .value)
+                self.value = try container.decode(String.self, forKey: .value)
             } catch {
                 LogManager.logError("Decoding error for required property 'value': \(error)")
                 throw error
             }
             do {
-                targets = try container.decode([AppBskyActorDefs.MutedWordTarget].self, forKey: .targets)
+                self.targets = try container.decode([AppBskyActorDefs.MutedWordTarget].self, forKey: .targets)
             } catch {
                 LogManager.logError("Decoding error for required property 'targets': \(error)")
                 throw error
             }
             do {
-                actorTarget = try container.decodeIfPresent(String.self, forKey: .actorTarget)
+                self.actorTarget = try container.decodeIfPresent(String.self, forKey: .actorTarget)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'actorTarget': \(error)")
                 throw error
             }
             do {
-                expiresAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .expiresAt)
+                self.expiresAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .expiresAt)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'expiresAt': \(error)")
                 throw error
@@ -3001,10 +3006,10 @@ public struct AppBskyActorDefs {
             case expiresAt
         }
     }
-
-    public struct MutedWordsPref: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.actor.defs#mutedWordsPref"
-        public let items: [AppBskyActorDefs.MutedWord]
+        
+public struct MutedWordsPref: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.actor.defs#mutedWordsPref"
+            public let items: [AppBskyActorDefs.MutedWord]
 
         public init(
             items: [AppBskyActorDefs.MutedWord]
@@ -3015,7 +3020,7 @@ public struct AppBskyActorDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                items = try container.decode([AppBskyActorDefs.MutedWord].self, forKey: .items)
+                self.items = try container.decode([AppBskyActorDefs.MutedWord].self, forKey: .items)
             } catch {
                 LogManager.logError("Decoding error for required property 'items': \(error)")
                 throw error
@@ -3057,10 +3062,10 @@ public struct AppBskyActorDefs {
             case items
         }
     }
-
-    public struct HiddenPostsPref: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.actor.defs#hiddenPostsPref"
-        public let items: [ATProtocolURI]
+        
+public struct HiddenPostsPref: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.actor.defs#hiddenPostsPref"
+            public let items: [ATProtocolURI]
 
         public init(
             items: [ATProtocolURI]
@@ -3071,7 +3076,7 @@ public struct AppBskyActorDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                items = try container.decode([ATProtocolURI].self, forKey: .items)
+                self.items = try container.decode([ATProtocolURI].self, forKey: .items)
             } catch {
                 LogManager.logError("Decoding error for required property 'items': \(error)")
                 throw error
@@ -3113,10 +3118,10 @@ public struct AppBskyActorDefs {
             case items
         }
     }
-
-    public struct LabelersPref: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.actor.defs#labelersPref"
-        public let labelers: [LabelerPrefItem]
+        
+public struct LabelersPref: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.actor.defs#labelersPref"
+            public let labelers: [LabelerPrefItem]
 
         public init(
             labelers: [LabelerPrefItem]
@@ -3127,7 +3132,7 @@ public struct AppBskyActorDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                labelers = try container.decode([LabelerPrefItem].self, forKey: .labelers)
+                self.labelers = try container.decode([LabelerPrefItem].self, forKey: .labelers)
             } catch {
                 LogManager.logError("Decoding error for required property 'labelers': \(error)")
                 throw error
@@ -3169,10 +3174,10 @@ public struct AppBskyActorDefs {
             case labelers
         }
     }
-
-    public struct LabelerPrefItem: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.actor.defs#labelerPrefItem"
-        public let did: DID
+        
+public struct LabelerPrefItem: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.actor.defs#labelerPrefItem"
+            public let did: DID
 
         public init(
             did: DID
@@ -3183,7 +3188,7 @@ public struct AppBskyActorDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                did = try container.decode(DID.self, forKey: .did)
+                self.did = try container.decode(DID.self, forKey: .did)
             } catch {
                 LogManager.logError("Decoding error for required property 'did': \(error)")
                 throw error
@@ -3225,12 +3230,12 @@ public struct AppBskyActorDefs {
             case did
         }
     }
-
-    public struct BskyAppStatePref: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.actor.defs#bskyAppStatePref"
-        public let activeProgressGuide: BskyAppProgressGuide?
-        public let queuedNudges: [String]?
-        public let nuxs: [AppBskyActorDefs.Nux]?
+        
+public struct BskyAppStatePref: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.actor.defs#bskyAppStatePref"
+            public let activeProgressGuide: BskyAppProgressGuide?
+            public let queuedNudges: [String]?
+            public let nuxs: [AppBskyActorDefs.Nux]?
 
         public init(
             activeProgressGuide: BskyAppProgressGuide?, queuedNudges: [String]?, nuxs: [AppBskyActorDefs.Nux]?
@@ -3243,19 +3248,19 @@ public struct AppBskyActorDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                activeProgressGuide = try container.decodeIfPresent(BskyAppProgressGuide.self, forKey: .activeProgressGuide)
+                self.activeProgressGuide = try container.decodeIfPresent(BskyAppProgressGuide.self, forKey: .activeProgressGuide)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'activeProgressGuide': \(error)")
                 throw error
             }
             do {
-                queuedNudges = try container.decodeIfPresent([String].self, forKey: .queuedNudges)
+                self.queuedNudges = try container.decodeIfPresent([String].self, forKey: .queuedNudges)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'queuedNudges': \(error)")
                 throw error
             }
             do {
-                nuxs = try container.decodeIfPresent([AppBskyActorDefs.Nux].self, forKey: .nuxs)
+                self.nuxs = try container.decodeIfPresent([AppBskyActorDefs.Nux].self, forKey: .nuxs)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'nuxs': \(error)")
                 throw error
@@ -3331,10 +3336,10 @@ public struct AppBskyActorDefs {
             case nuxs
         }
     }
-
-    public struct BskyAppProgressGuide: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.actor.defs#bskyAppProgressGuide"
-        public let guide: String
+        
+public struct BskyAppProgressGuide: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.actor.defs#bskyAppProgressGuide"
+            public let guide: String
 
         public init(
             guide: String
@@ -3345,7 +3350,7 @@ public struct AppBskyActorDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                guide = try container.decode(String.self, forKey: .guide)
+                self.guide = try container.decode(String.self, forKey: .guide)
             } catch {
                 LogManager.logError("Decoding error for required property 'guide': \(error)")
                 throw error
@@ -3387,13 +3392,13 @@ public struct AppBskyActorDefs {
             case guide
         }
     }
-
-    public struct Nux: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.actor.defs#nux"
-        public let id: String
-        public let completed: Bool
-        public let data: String?
-        public let expiresAt: ATProtocolDate?
+        
+public struct Nux: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.actor.defs#nux"
+            public let id: String
+            public let completed: Bool
+            public let data: String?
+            public let expiresAt: ATProtocolDate?
 
         public init(
             id: String, completed: Bool, data: String?, expiresAt: ATProtocolDate?
@@ -3407,25 +3412,25 @@ public struct AppBskyActorDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                id = try container.decode(String.self, forKey: .id)
+                self.id = try container.decode(String.self, forKey: .id)
             } catch {
                 LogManager.logError("Decoding error for required property 'id': \(error)")
                 throw error
             }
             do {
-                completed = try container.decode(Bool.self, forKey: .completed)
+                self.completed = try container.decode(Bool.self, forKey: .completed)
             } catch {
                 LogManager.logError("Decoding error for required property 'completed': \(error)")
                 throw error
             }
             do {
-                data = try container.decodeIfPresent(String.self, forKey: .data)
+                self.data = try container.decodeIfPresent(String.self, forKey: .data)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'data': \(error)")
                 throw error
             }
             do {
-                expiresAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .expiresAt)
+                self.expiresAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .expiresAt)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'expiresAt': \(error)")
                 throw error
@@ -3503,10 +3508,10 @@ public struct AppBskyActorDefs {
             case expiresAt
         }
     }
-
-    public struct VerificationPrefs: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.actor.defs#verificationPrefs"
-        public let hideBadges: Bool?
+        
+public struct VerificationPrefs: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.actor.defs#verificationPrefs"
+            public let hideBadges: Bool?
 
         public init(
             hideBadges: Bool?
@@ -3517,7 +3522,7 @@ public struct AppBskyActorDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                hideBadges = try container.decodeIfPresent(Bool.self, forKey: .hideBadges)
+                self.hideBadges = try container.decodeIfPresent(Bool.self, forKey: .hideBadges)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'hideBadges': \(error)")
                 throw error
@@ -3565,11 +3570,11 @@ public struct AppBskyActorDefs {
             case hideBadges
         }
     }
-
-    public struct LiveEventPreferences: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.actor.defs#liveEventPreferences"
-        public let hiddenFeedIds: [String]?
-        public let hideAllFeeds: Bool?
+        
+public struct LiveEventPreferences: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.actor.defs#liveEventPreferences"
+            public let hiddenFeedIds: [String]?
+            public let hideAllFeeds: Bool?
 
         public init(
             hiddenFeedIds: [String]?, hideAllFeeds: Bool?
@@ -3581,13 +3586,13 @@ public struct AppBskyActorDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                hiddenFeedIds = try container.decodeIfPresent([String].self, forKey: .hiddenFeedIds)
+                self.hiddenFeedIds = try container.decodeIfPresent([String].self, forKey: .hiddenFeedIds)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'hiddenFeedIds': \(error)")
                 throw error
             }
             do {
-                hideAllFeeds = try container.decodeIfPresent(Bool.self, forKey: .hideAllFeeds)
+                self.hideAllFeeds = try container.decodeIfPresent(Bool.self, forKey: .hideAllFeeds)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'hideAllFeeds': \(error)")
                 throw error
@@ -3649,11 +3654,11 @@ public struct AppBskyActorDefs {
             case hideAllFeeds
         }
     }
-
-    public struct PostInteractionSettingsPref: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.actor.defs#postInteractionSettingsPref"
-        public let threadgateAllowRules: [PostInteractionSettingsPrefThreadgateAllowRulesUnion]?
-        public let postgateEmbeddingRules: [PostInteractionSettingsPrefPostgateEmbeddingRulesUnion]?
+        
+public struct PostInteractionSettingsPref: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.actor.defs#postInteractionSettingsPref"
+            public let threadgateAllowRules: [PostInteractionSettingsPrefThreadgateAllowRulesUnion]?
+            public let postgateEmbeddingRules: [PostInteractionSettingsPrefPostgateEmbeddingRulesUnion]?
 
         public init(
             threadgateAllowRules: [PostInteractionSettingsPrefThreadgateAllowRulesUnion]?, postgateEmbeddingRules: [PostInteractionSettingsPrefPostgateEmbeddingRulesUnion]?
@@ -3665,13 +3670,13 @@ public struct AppBskyActorDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                threadgateAllowRules = try container.decodeIfPresent([PostInteractionSettingsPrefThreadgateAllowRulesUnion].self, forKey: .threadgateAllowRules)
+                self.threadgateAllowRules = try container.decodeIfPresent([PostInteractionSettingsPrefThreadgateAllowRulesUnion].self, forKey: .threadgateAllowRules)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'threadgateAllowRules': \(error)")
                 throw error
             }
             do {
-                postgateEmbeddingRules = try container.decodeIfPresent([PostInteractionSettingsPrefPostgateEmbeddingRulesUnion].self, forKey: .postgateEmbeddingRules)
+                self.postgateEmbeddingRules = try container.decodeIfPresent([PostInteractionSettingsPrefPostgateEmbeddingRulesUnion].self, forKey: .postgateEmbeddingRules)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'postgateEmbeddingRules': \(error)")
                 throw error
@@ -3733,17 +3738,17 @@ public struct AppBskyActorDefs {
             case postgateEmbeddingRules
         }
     }
-
-    public struct StatusView: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.actor.defs#statusView"
-        public let uri: ATProtocolURI?
-        public let cid: CID?
-        public let status: String
-        public let record: ATProtocolValueContainer
-        public let embed: StatusViewEmbedUnion?
-        public let expiresAt: ATProtocolDate?
-        public let isActive: Bool?
-        public let isDisabled: Bool?
+        
+public struct StatusView: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.actor.defs#statusView"
+            public let uri: ATProtocolURI?
+            public let cid: CID?
+            public let status: String
+            public let record: ATProtocolValueContainer
+            public let embed: StatusViewEmbedUnion?
+            public let expiresAt: ATProtocolDate?
+            public let isActive: Bool?
+            public let isDisabled: Bool?
 
         public init(
             uri: ATProtocolURI?, cid: CID?, status: String, record: ATProtocolValueContainer, embed: StatusViewEmbedUnion?, expiresAt: ATProtocolDate?, isActive: Bool?, isDisabled: Bool?
@@ -3761,49 +3766,49 @@ public struct AppBskyActorDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                uri = try container.decodeIfPresent(ATProtocolURI.self, forKey: .uri)
+                self.uri = try container.decodeIfPresent(ATProtocolURI.self, forKey: .uri)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'uri': \(error)")
                 throw error
             }
             do {
-                cid = try container.decodeIfPresent(CID.self, forKey: .cid)
+                self.cid = try container.decodeIfPresent(CID.self, forKey: .cid)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'cid': \(error)")
                 throw error
             }
             do {
-                status = try container.decode(String.self, forKey: .status)
+                self.status = try container.decode(String.self, forKey: .status)
             } catch {
                 LogManager.logError("Decoding error for required property 'status': \(error)")
                 throw error
             }
             do {
-                record = try container.decode(ATProtocolValueContainer.self, forKey: .record)
+                self.record = try container.decode(ATProtocolValueContainer.self, forKey: .record)
             } catch {
                 LogManager.logError("Decoding error for required property 'record': \(error)")
                 throw error
             }
             do {
-                embed = try container.decodeIfPresent(StatusViewEmbedUnion.self, forKey: .embed)
+                self.embed = try container.decodeIfPresent(StatusViewEmbedUnion.self, forKey: .embed)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'embed': \(error)")
                 throw error
             }
             do {
-                expiresAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .expiresAt)
+                self.expiresAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .expiresAt)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'expiresAt': \(error)")
                 throw error
             }
             do {
-                isActive = try container.decodeIfPresent(Bool.self, forKey: .isActive)
+                self.isActive = try container.decodeIfPresent(Bool.self, forKey: .isActive)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'isActive': \(error)")
                 throw error
             }
             do {
-                isDisabled = try container.decodeIfPresent(Bool.self, forKey: .isDisabled)
+                self.isDisabled = try container.decodeIfPresent(Bool.self, forKey: .isDisabled)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'isDisabled': \(error)")
                 throw error
@@ -3938,1125 +3943,1083 @@ public struct AppBskyActorDefs {
         }
     }
 
-    // Union Array Type
 
-    public struct Preferences: Codable, ATProtocolCodable, ATProtocolValue {
-        public let items: [PreferencesForUnionArray]
+// Union Array Type
 
-        public init(items: [PreferencesForUnionArray]) {
-            self.items = items
+
+public struct Preferences: Codable, ATProtocolCodable, ATProtocolValue {
+    public let items: [PreferencesForUnionArray]
+    
+    public init(items: [PreferencesForUnionArray]) {
+        self.items = items
+    }
+
+    public init(from decoder: Decoder) throws {
+        var container = try decoder.unkeyedContainer()
+        var items = [PreferencesForUnionArray]()
+        while !container.isAtEnd {
+            let item = try container.decode(PreferencesForUnionArray.self)
+            items.append(item)
         }
+        self.items = items
+    }
 
-        public init(from decoder: Decoder) throws {
-            var container = try decoder.unkeyedContainer()
-            var items = [PreferencesForUnionArray]()
-            while !container.isAtEnd {
-                let item = try container.decode(PreferencesForUnionArray.self)
-                items.append(item)
-            }
-            self.items = items
-        }
-
-        public func encode(to encoder: Encoder) throws {
-            // Encode the array regardless of whether it's empty
-            var container = encoder.unkeyedContainer()
-            for item in items {
-                try container.encode(item)
-            }
-        }
-
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let other = other as? Preferences else { return false }
-
-            if items != other.items {
-                return false
-            }
-
-            return true
-        }
-
-        /// DAGCBOR encoding with field ordering
-        public func toCBORValue() throws -> Any {
-            // For union arrays, we need to encode each item while preserving its order
-            var itemsArray = [Any]()
-
-            for item in items {
-                let itemValue = try item.toCBORValue()
-                itemsArray.append(itemValue)
-            }
-
-            return itemsArray
+    public func encode(to encoder: Encoder) throws {
+        // Encode the array regardless of whether it's empty
+        var container = encoder.unkeyedContainer()
+        for item in items {
+            try container.encode(item)
         }
     }
 
-    public enum PreferencesForUnionArray: Codable, ATProtocolCodable, ATProtocolValue {
-        case adultContentPref(AdultContentPref)
-        case contentLabelPref(ContentLabelPref)
-        case savedFeedsPref(SavedFeedsPref)
-        case savedFeedsPrefV2(SavedFeedsPrefV2)
-        case personalDetailsPref(PersonalDetailsPref)
-        case declaredAgePref(DeclaredAgePref)
-        case feedViewPref(FeedViewPref)
-        case threadViewPref(ThreadViewPref)
-        case interestsPref(InterestsPref)
-        case mutedWordsPref(MutedWordsPref)
-        case hiddenPostsPref(HiddenPostsPref)
-        case bskyAppStatePref(BskyAppStatePref)
-        case labelersPref(LabelersPref)
-        case postInteractionSettingsPref(PostInteractionSettingsPref)
-        case verificationPrefs(VerificationPrefs)
-        case liveEventPreferences(LiveEventPreferences)
-        case unexpected(ATProtocolValueContainer)
-        public init(_ value: AdultContentPref) {
+    public func isEqual(to other: any ATProtocolValue) -> Bool {
+        guard let other = other as? Preferences else { return false }
+        
+        if self.items != other.items {
+            return false
+        }
+
+        return true
+    }
+    
+    // DAGCBOR encoding with field ordering
+    public func toCBORValue() throws -> Any {
+        // For union arrays, we need to encode each item while preserving its order
+        var itemsArray = [Any]()
+        
+        for item in items {
+            let itemValue = try item.toCBORValue()
+            itemsArray.append(itemValue)
+        }
+        
+        return itemsArray
+    }
+
+}
+
+
+public enum PreferencesForUnionArray: Codable, ATProtocolCodable, ATProtocolValue {
+    case adultContentPref(AdultContentPref)
+    case contentLabelPref(ContentLabelPref)
+    case savedFeedsPref(SavedFeedsPref)
+    case savedFeedsPrefV2(SavedFeedsPrefV2)
+    case personalDetailsPref(PersonalDetailsPref)
+    case declaredAgePref(DeclaredAgePref)
+    case feedViewPref(FeedViewPref)
+    case threadViewPref(ThreadViewPref)
+    case interestsPref(InterestsPref)
+    case mutedWordsPref(MutedWordsPref)
+    case hiddenPostsPref(HiddenPostsPref)
+    case bskyAppStatePref(BskyAppStatePref)
+    case labelersPref(LabelersPref)
+    case postInteractionSettingsPref(PostInteractionSettingsPref)
+    case verificationPrefs(VerificationPrefs)
+    case liveEventPreferences(LiveEventPreferences)
+    case unexpected(ATProtocolValueContainer)
+    public init(_ value: AdultContentPref) {
+        self = .adultContentPref(value)
+    }
+    public init(_ value: ContentLabelPref) {
+        self = .contentLabelPref(value)
+    }
+    public init(_ value: SavedFeedsPref) {
+        self = .savedFeedsPref(value)
+    }
+    public init(_ value: SavedFeedsPrefV2) {
+        self = .savedFeedsPrefV2(value)
+    }
+    public init(_ value: PersonalDetailsPref) {
+        self = .personalDetailsPref(value)
+    }
+    public init(_ value: DeclaredAgePref) {
+        self = .declaredAgePref(value)
+    }
+    public init(_ value: FeedViewPref) {
+        self = .feedViewPref(value)
+    }
+    public init(_ value: ThreadViewPref) {
+        self = .threadViewPref(value)
+    }
+    public init(_ value: InterestsPref) {
+        self = .interestsPref(value)
+    }
+    public init(_ value: MutedWordsPref) {
+        self = .mutedWordsPref(value)
+    }
+    public init(_ value: HiddenPostsPref) {
+        self = .hiddenPostsPref(value)
+    }
+    public init(_ value: BskyAppStatePref) {
+        self = .bskyAppStatePref(value)
+    }
+    public init(_ value: LabelersPref) {
+        self = .labelersPref(value)
+    }
+    public init(_ value: PostInteractionSettingsPref) {
+        self = .postInteractionSettingsPref(value)
+    }
+    public init(_ value: VerificationPrefs) {
+        self = .verificationPrefs(value)
+    }
+    public init(_ value: LiveEventPreferences) {
+        self = .liveEventPreferences(value)
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let typeValue = try container.decode(String.self, forKey: .type)
+
+        switch typeValue {
+        case "app.bsky.actor.defs#adultContentPref":
+            let value = try AdultContentPref(from: decoder)
             self = .adultContentPref(value)
-        }
-
-        public init(_ value: ContentLabelPref) {
+        case "app.bsky.actor.defs#contentLabelPref":
+            let value = try ContentLabelPref(from: decoder)
             self = .contentLabelPref(value)
-        }
-
-        public init(_ value: SavedFeedsPref) {
+        case "app.bsky.actor.defs#savedFeedsPref":
+            let value = try SavedFeedsPref(from: decoder)
             self = .savedFeedsPref(value)
-        }
-
-        public init(_ value: SavedFeedsPrefV2) {
+        case "app.bsky.actor.defs#savedFeedsPrefV2":
+            let value = try SavedFeedsPrefV2(from: decoder)
             self = .savedFeedsPrefV2(value)
-        }
-
-        public init(_ value: PersonalDetailsPref) {
+        case "app.bsky.actor.defs#personalDetailsPref":
+            let value = try PersonalDetailsPref(from: decoder)
             self = .personalDetailsPref(value)
-        }
-
-        public init(_ value: DeclaredAgePref) {
+        case "app.bsky.actor.defs#declaredAgePref":
+            let value = try DeclaredAgePref(from: decoder)
             self = .declaredAgePref(value)
-        }
-
-        public init(_ value: FeedViewPref) {
+        case "app.bsky.actor.defs#feedViewPref":
+            let value = try FeedViewPref(from: decoder)
             self = .feedViewPref(value)
-        }
-
-        public init(_ value: ThreadViewPref) {
+        case "app.bsky.actor.defs#threadViewPref":
+            let value = try ThreadViewPref(from: decoder)
             self = .threadViewPref(value)
-        }
-
-        public init(_ value: InterestsPref) {
+        case "app.bsky.actor.defs#interestsPref":
+            let value = try InterestsPref(from: decoder)
             self = .interestsPref(value)
-        }
-
-        public init(_ value: MutedWordsPref) {
+        case "app.bsky.actor.defs#mutedWordsPref":
+            let value = try MutedWordsPref(from: decoder)
             self = .mutedWordsPref(value)
-        }
-
-        public init(_ value: HiddenPostsPref) {
+        case "app.bsky.actor.defs#hiddenPostsPref":
+            let value = try HiddenPostsPref(from: decoder)
             self = .hiddenPostsPref(value)
-        }
-
-        public init(_ value: BskyAppStatePref) {
+        case "app.bsky.actor.defs#bskyAppStatePref":
+            let value = try BskyAppStatePref(from: decoder)
             self = .bskyAppStatePref(value)
-        }
-
-        public init(_ value: LabelersPref) {
+        case "app.bsky.actor.defs#labelersPref":
+            let value = try LabelersPref(from: decoder)
             self = .labelersPref(value)
-        }
-
-        public init(_ value: PostInteractionSettingsPref) {
+        case "app.bsky.actor.defs#postInteractionSettingsPref":
+            let value = try PostInteractionSettingsPref(from: decoder)
             self = .postInteractionSettingsPref(value)
-        }
-
-        public init(_ value: VerificationPrefs) {
+        case "app.bsky.actor.defs#verificationPrefs":
+            let value = try VerificationPrefs(from: decoder)
             self = .verificationPrefs(value)
-        }
-
-        public init(_ value: LiveEventPreferences) {
+        case "app.bsky.actor.defs#liveEventPreferences":
+            let value = try LiveEventPreferences(from: decoder)
             self = .liveEventPreferences(value)
-        }
-
-        public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
-
-            switch typeValue {
-            case "app.bsky.actor.defs#adultContentPref":
-                let value = try AdultContentPref(from: decoder)
-                self = .adultContentPref(value)
-            case "app.bsky.actor.defs#contentLabelPref":
-                let value = try ContentLabelPref(from: decoder)
-                self = .contentLabelPref(value)
-            case "app.bsky.actor.defs#savedFeedsPref":
-                let value = try SavedFeedsPref(from: decoder)
-                self = .savedFeedsPref(value)
-            case "app.bsky.actor.defs#savedFeedsPrefV2":
-                let value = try SavedFeedsPrefV2(from: decoder)
-                self = .savedFeedsPrefV2(value)
-            case "app.bsky.actor.defs#personalDetailsPref":
-                let value = try PersonalDetailsPref(from: decoder)
-                self = .personalDetailsPref(value)
-            case "app.bsky.actor.defs#declaredAgePref":
-                let value = try DeclaredAgePref(from: decoder)
-                self = .declaredAgePref(value)
-            case "app.bsky.actor.defs#feedViewPref":
-                let value = try FeedViewPref(from: decoder)
-                self = .feedViewPref(value)
-            case "app.bsky.actor.defs#threadViewPref":
-                let value = try ThreadViewPref(from: decoder)
-                self = .threadViewPref(value)
-            case "app.bsky.actor.defs#interestsPref":
-                let value = try InterestsPref(from: decoder)
-                self = .interestsPref(value)
-            case "app.bsky.actor.defs#mutedWordsPref":
-                let value = try MutedWordsPref(from: decoder)
-                self = .mutedWordsPref(value)
-            case "app.bsky.actor.defs#hiddenPostsPref":
-                let value = try HiddenPostsPref(from: decoder)
-                self = .hiddenPostsPref(value)
-            case "app.bsky.actor.defs#bskyAppStatePref":
-                let value = try BskyAppStatePref(from: decoder)
-                self = .bskyAppStatePref(value)
-            case "app.bsky.actor.defs#labelersPref":
-                let value = try LabelersPref(from: decoder)
-                self = .labelersPref(value)
-            case "app.bsky.actor.defs#postInteractionSettingsPref":
-                let value = try PostInteractionSettingsPref(from: decoder)
-                self = .postInteractionSettingsPref(value)
-            case "app.bsky.actor.defs#verificationPrefs":
-                let value = try VerificationPrefs(from: decoder)
-                self = .verificationPrefs(value)
-            case "app.bsky.actor.defs#liveEventPreferences":
-                let value = try LiveEventPreferences(from: decoder)
-                self = .liveEventPreferences(value)
-            default:
-                let unknownValue = try ATProtocolValueContainer(from: decoder)
-                self = .unexpected(unknownValue)
-            }
-        }
-
-        public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-
-            switch self {
-            case let .adultContentPref(value):
-                try container.encode("app.bsky.actor.defs#adultContentPref", forKey: .type)
-                try value.encode(to: encoder)
-            case let .contentLabelPref(value):
-                try container.encode("app.bsky.actor.defs#contentLabelPref", forKey: .type)
-                try value.encode(to: encoder)
-            case let .savedFeedsPref(value):
-                try container.encode("app.bsky.actor.defs#savedFeedsPref", forKey: .type)
-                try value.encode(to: encoder)
-            case let .savedFeedsPrefV2(value):
-                try container.encode("app.bsky.actor.defs#savedFeedsPrefV2", forKey: .type)
-                try value.encode(to: encoder)
-            case let .personalDetailsPref(value):
-                try container.encode("app.bsky.actor.defs#personalDetailsPref", forKey: .type)
-                try value.encode(to: encoder)
-            case let .declaredAgePref(value):
-                try container.encode("app.bsky.actor.defs#declaredAgePref", forKey: .type)
-                try value.encode(to: encoder)
-            case let .feedViewPref(value):
-                try container.encode("app.bsky.actor.defs#feedViewPref", forKey: .type)
-                try value.encode(to: encoder)
-            case let .threadViewPref(value):
-                try container.encode("app.bsky.actor.defs#threadViewPref", forKey: .type)
-                try value.encode(to: encoder)
-            case let .interestsPref(value):
-                try container.encode("app.bsky.actor.defs#interestsPref", forKey: .type)
-                try value.encode(to: encoder)
-            case let .mutedWordsPref(value):
-                try container.encode("app.bsky.actor.defs#mutedWordsPref", forKey: .type)
-                try value.encode(to: encoder)
-            case let .hiddenPostsPref(value):
-                try container.encode("app.bsky.actor.defs#hiddenPostsPref", forKey: .type)
-                try value.encode(to: encoder)
-            case let .bskyAppStatePref(value):
-                try container.encode("app.bsky.actor.defs#bskyAppStatePref", forKey: .type)
-                try value.encode(to: encoder)
-            case let .labelersPref(value):
-                try container.encode("app.bsky.actor.defs#labelersPref", forKey: .type)
-                try value.encode(to: encoder)
-            case let .postInteractionSettingsPref(value):
-                try container.encode("app.bsky.actor.defs#postInteractionSettingsPref", forKey: .type)
-                try value.encode(to: encoder)
-            case let .verificationPrefs(value):
-                try container.encode("app.bsky.actor.defs#verificationPrefs", forKey: .type)
-                try value.encode(to: encoder)
-            case let .liveEventPreferences(value):
-                try container.encode("app.bsky.actor.defs#liveEventPreferences", forKey: .type)
-                try value.encode(to: encoder)
-            case let .unexpected(ATProtocolValueContainer):
-                try ATProtocolValueContainer.encode(to: encoder)
-            }
-        }
-
-        public func hash(into hasher: inout Hasher) {
-            switch self {
-            case let .adultContentPref(value):
-                hasher.combine("app.bsky.actor.defs#adultContentPref")
-                hasher.combine(value)
-            case let .contentLabelPref(value):
-                hasher.combine("app.bsky.actor.defs#contentLabelPref")
-                hasher.combine(value)
-            case let .savedFeedsPref(value):
-                hasher.combine("app.bsky.actor.defs#savedFeedsPref")
-                hasher.combine(value)
-            case let .savedFeedsPrefV2(value):
-                hasher.combine("app.bsky.actor.defs#savedFeedsPrefV2")
-                hasher.combine(value)
-            case let .personalDetailsPref(value):
-                hasher.combine("app.bsky.actor.defs#personalDetailsPref")
-                hasher.combine(value)
-            case let .declaredAgePref(value):
-                hasher.combine("app.bsky.actor.defs#declaredAgePref")
-                hasher.combine(value)
-            case let .feedViewPref(value):
-                hasher.combine("app.bsky.actor.defs#feedViewPref")
-                hasher.combine(value)
-            case let .threadViewPref(value):
-                hasher.combine("app.bsky.actor.defs#threadViewPref")
-                hasher.combine(value)
-            case let .interestsPref(value):
-                hasher.combine("app.bsky.actor.defs#interestsPref")
-                hasher.combine(value)
-            case let .mutedWordsPref(value):
-                hasher.combine("app.bsky.actor.defs#mutedWordsPref")
-                hasher.combine(value)
-            case let .hiddenPostsPref(value):
-                hasher.combine("app.bsky.actor.defs#hiddenPostsPref")
-                hasher.combine(value)
-            case let .bskyAppStatePref(value):
-                hasher.combine("app.bsky.actor.defs#bskyAppStatePref")
-                hasher.combine(value)
-            case let .labelersPref(value):
-                hasher.combine("app.bsky.actor.defs#labelersPref")
-                hasher.combine(value)
-            case let .postInteractionSettingsPref(value):
-                hasher.combine("app.bsky.actor.defs#postInteractionSettingsPref")
-                hasher.combine(value)
-            case let .verificationPrefs(value):
-                hasher.combine("app.bsky.actor.defs#verificationPrefs")
-                hasher.combine(value)
-            case let .liveEventPreferences(value):
-                hasher.combine("app.bsky.actor.defs#liveEventPreferences")
-                hasher.combine(value)
-            case let .unexpected(ATProtocolValueContainer):
-                hasher.combine("unexpected")
-                hasher.combine(ATProtocolValueContainer)
-            }
-        }
-
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? PreferencesForUnionArray else { return false }
-
-            switch (self, otherValue) {
-            case let (
-                .adultContentPref(selfValue),
-                .adultContentPref(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .contentLabelPref(selfValue),
-                .contentLabelPref(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .savedFeedsPref(selfValue),
-                .savedFeedsPref(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .savedFeedsPrefV2(selfValue),
-                .savedFeedsPrefV2(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .personalDetailsPref(selfValue),
-                .personalDetailsPref(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .declaredAgePref(selfValue),
-                .declaredAgePref(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .feedViewPref(selfValue),
-                .feedViewPref(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .threadViewPref(selfValue),
-                .threadViewPref(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .interestsPref(selfValue),
-                .interestsPref(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .mutedWordsPref(selfValue),
-                .mutedWordsPref(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .hiddenPostsPref(selfValue),
-                .hiddenPostsPref(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .bskyAppStatePref(selfValue),
-                .bskyAppStatePref(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .labelersPref(selfValue),
-                .labelersPref(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .postInteractionSettingsPref(selfValue),
-                .postInteractionSettingsPref(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .verificationPrefs(selfValue),
-                .verificationPrefs(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .liveEventPreferences(selfValue),
-                .liveEventPreferences(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (.unexpected(selfValue), .unexpected(otherValue)):
-                return selfValue.isEqual(to: otherValue)
-            default:
-                return false
-            }
-        }
-
-        private enum CodingKeys: String, CodingKey {
-            case type = "$type"
-        }
-
-        /// DAGCBOR encoding with field ordering
-        public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-
-            switch self {
-            case let .adultContentPref(value):
-                map = map.adding(key: "$type", value: "app.bsky.actor.defs#adultContentPref")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
-            case let .contentLabelPref(value):
-                map = map.adding(key: "$type", value: "app.bsky.actor.defs#contentLabelPref")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
-            case let .savedFeedsPref(value):
-                map = map.adding(key: "$type", value: "app.bsky.actor.defs#savedFeedsPref")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
-            case let .savedFeedsPrefV2(value):
-                map = map.adding(key: "$type", value: "app.bsky.actor.defs#savedFeedsPrefV2")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
-            case let .personalDetailsPref(value):
-                map = map.adding(key: "$type", value: "app.bsky.actor.defs#personalDetailsPref")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
-            case let .declaredAgePref(value):
-                map = map.adding(key: "$type", value: "app.bsky.actor.defs#declaredAgePref")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
-            case let .feedViewPref(value):
-                map = map.adding(key: "$type", value: "app.bsky.actor.defs#feedViewPref")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
-            case let .threadViewPref(value):
-                map = map.adding(key: "$type", value: "app.bsky.actor.defs#threadViewPref")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
-            case let .interestsPref(value):
-                map = map.adding(key: "$type", value: "app.bsky.actor.defs#interestsPref")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
-            case let .mutedWordsPref(value):
-                map = map.adding(key: "$type", value: "app.bsky.actor.defs#mutedWordsPref")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
-            case let .hiddenPostsPref(value):
-                map = map.adding(key: "$type", value: "app.bsky.actor.defs#hiddenPostsPref")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
-            case let .bskyAppStatePref(value):
-                map = map.adding(key: "$type", value: "app.bsky.actor.defs#bskyAppStatePref")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
-            case let .labelersPref(value):
-                map = map.adding(key: "$type", value: "app.bsky.actor.defs#labelersPref")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
-            case let .postInteractionSettingsPref(value):
-                map = map.adding(key: "$type", value: "app.bsky.actor.defs#postInteractionSettingsPref")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
-            case let .verificationPrefs(value):
-                map = map.adding(key: "$type", value: "app.bsky.actor.defs#verificationPrefs")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
-            case let .liveEventPreferences(value):
-                map = map.adding(key: "$type", value: "app.bsky.actor.defs#liveEventPreferences")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
-            case let .unexpected(container):
-                return try container.toCBORValue()
-            }
+        default:
+            let unknownValue = try ATProtocolValueContainer(from: decoder)
+            self = .unexpected(unknownValue)
         }
     }
 
-    public struct MutedWordTarget: Codable, ATProtocolCodable, ATProtocolValue {
-        public let rawValue: String
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
 
-        /// Predefined constants
-        ///
-        public static let content = MutedWordTarget(rawValue: "content")
-        ///
-        public static let tag = MutedWordTarget(rawValue: "tag")
-
-        public init(rawValue: String) {
-            self.rawValue = rawValue
-        }
-
-        public init(from decoder: Decoder) throws {
-            let container = try decoder.singleValueContainer()
-            rawValue = try container.decode(String.self)
-        }
-
-        public func encode(to encoder: Encoder) throws {
-            var container = encoder.singleValueContainer()
-            try container.encode(rawValue)
-        }
-
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? MutedWordTarget else { return false }
-            return rawValue == otherValue.rawValue
-        }
-
-        /// DAGCBOR encoding with field ordering
-        public func toCBORValue() throws -> Any {
-            // For string-based enum types, we return the raw string value directly
-            return rawValue
-        }
-
-        /// Provide allCases-like functionality
-        public static var predefinedValues: [MutedWordTarget] {
-            return [
-                .content,
-                .tag,
-            ]
-        }
-    }
-
-    public enum PostInteractionSettingsPrefThreadgateAllowRulesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
-        case appBskyFeedThreadgateMentionRule(AppBskyFeedThreadgate.MentionRule)
-        case appBskyFeedThreadgateFollowerRule(AppBskyFeedThreadgate.FollowerRule)
-        case appBskyFeedThreadgateFollowingRule(AppBskyFeedThreadgate.FollowingRule)
-        case appBskyFeedThreadgateListRule(AppBskyFeedThreadgate.ListRule)
-        case unexpected(ATProtocolValueContainer)
-        public init(_ value: AppBskyFeedThreadgate.MentionRule) {
-            self = .appBskyFeedThreadgateMentionRule(value)
-        }
-
-        public init(_ value: AppBskyFeedThreadgate.FollowerRule) {
-            self = .appBskyFeedThreadgateFollowerRule(value)
-        }
-
-        public init(_ value: AppBskyFeedThreadgate.FollowingRule) {
-            self = .appBskyFeedThreadgateFollowingRule(value)
-        }
-
-        public init(_ value: AppBskyFeedThreadgate.ListRule) {
-            self = .appBskyFeedThreadgateListRule(value)
-        }
-
-        public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
-
-            switch typeValue {
-            case "app.bsky.feed.threadgate#mentionRule":
-                let value = try AppBskyFeedThreadgate.MentionRule(from: decoder)
-                self = .appBskyFeedThreadgateMentionRule(value)
-            case "app.bsky.feed.threadgate#followerRule":
-                let value = try AppBskyFeedThreadgate.FollowerRule(from: decoder)
-                self = .appBskyFeedThreadgateFollowerRule(value)
-            case "app.bsky.feed.threadgate#followingRule":
-                let value = try AppBskyFeedThreadgate.FollowingRule(from: decoder)
-                self = .appBskyFeedThreadgateFollowingRule(value)
-            case "app.bsky.feed.threadgate#listRule":
-                let value = try AppBskyFeedThreadgate.ListRule(from: decoder)
-                self = .appBskyFeedThreadgateListRule(value)
-            default:
-                let unknownValue = try ATProtocolValueContainer(from: decoder)
-                self = .unexpected(unknownValue)
-            }
-        }
-
-        public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-
-            switch self {
-            case let .appBskyFeedThreadgateMentionRule(value):
-                try container.encode("app.bsky.feed.threadgate#mentionRule", forKey: .type)
-                try value.encode(to: encoder)
-            case let .appBskyFeedThreadgateFollowerRule(value):
-                try container.encode("app.bsky.feed.threadgate#followerRule", forKey: .type)
-                try value.encode(to: encoder)
-            case let .appBskyFeedThreadgateFollowingRule(value):
-                try container.encode("app.bsky.feed.threadgate#followingRule", forKey: .type)
-                try value.encode(to: encoder)
-            case let .appBskyFeedThreadgateListRule(value):
-                try container.encode("app.bsky.feed.threadgate#listRule", forKey: .type)
-                try value.encode(to: encoder)
-            case let .unexpected(container):
-                try container.encode(to: encoder)
-            }
-        }
-
-        public func hash(into hasher: inout Hasher) {
-            switch self {
-            case let .appBskyFeedThreadgateMentionRule(value):
-                hasher.combine("app.bsky.feed.threadgate#mentionRule")
-                hasher.combine(value)
-            case let .appBskyFeedThreadgateFollowerRule(value):
-                hasher.combine("app.bsky.feed.threadgate#followerRule")
-                hasher.combine(value)
-            case let .appBskyFeedThreadgateFollowingRule(value):
-                hasher.combine("app.bsky.feed.threadgate#followingRule")
-                hasher.combine(value)
-            case let .appBskyFeedThreadgateListRule(value):
-                hasher.combine("app.bsky.feed.threadgate#listRule")
-                hasher.combine(value)
-            case let .unexpected(container):
-                hasher.combine("unexpected")
-                hasher.combine(container)
-            }
-        }
-
-        private enum CodingKeys: String, CodingKey {
-            case type = "$type"
-        }
-
-        public static func == (lhs: PostInteractionSettingsPrefThreadgateAllowRulesUnion, rhs: PostInteractionSettingsPrefThreadgateAllowRulesUnion) -> Bool {
-            switch (lhs, rhs) {
-            case let (
-                .appBskyFeedThreadgateMentionRule(lhsValue),
-                .appBskyFeedThreadgateMentionRule(rhsValue)
-            ):
-                return lhsValue == rhsValue
-            case let (
-                .appBskyFeedThreadgateFollowerRule(lhsValue),
-                .appBskyFeedThreadgateFollowerRule(rhsValue)
-            ):
-                return lhsValue == rhsValue
-            case let (
-                .appBskyFeedThreadgateFollowingRule(lhsValue),
-                .appBskyFeedThreadgateFollowingRule(rhsValue)
-            ):
-                return lhsValue == rhsValue
-            case let (
-                .appBskyFeedThreadgateListRule(lhsValue),
-                .appBskyFeedThreadgateListRule(rhsValue)
-            ):
-                return lhsValue == rhsValue
-            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
-            default:
-                return false
-            }
-        }
-
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let other = other as? PostInteractionSettingsPrefThreadgateAllowRulesUnion else { return false }
-            return self == other
-        }
-
-        /// DAGCBOR encoding with field ordering
-        public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
-            switch self {
-            case let .appBskyFeedThreadgateMentionRule(value):
-                map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#mentionRule")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
-            case let .appBskyFeedThreadgateFollowerRule(value):
-                map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#followerRule")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
-            case let .appBskyFeedThreadgateFollowingRule(value):
-                map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#followingRule")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
-            case let .appBskyFeedThreadgateListRule(value):
-                map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#listRule")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
-            case let .unexpected(container):
-                return try container.toCBORValue()
-            }
+        switch self {
+        case .adultContentPref(let value):
+            try container.encode("app.bsky.actor.defs#adultContentPref", forKey: .type)
+            try value.encode(to: encoder)
+        case .contentLabelPref(let value):
+            try container.encode("app.bsky.actor.defs#contentLabelPref", forKey: .type)
+            try value.encode(to: encoder)
+        case .savedFeedsPref(let value):
+            try container.encode("app.bsky.actor.defs#savedFeedsPref", forKey: .type)
+            try value.encode(to: encoder)
+        case .savedFeedsPrefV2(let value):
+            try container.encode("app.bsky.actor.defs#savedFeedsPrefV2", forKey: .type)
+            try value.encode(to: encoder)
+        case .personalDetailsPref(let value):
+            try container.encode("app.bsky.actor.defs#personalDetailsPref", forKey: .type)
+            try value.encode(to: encoder)
+        case .declaredAgePref(let value):
+            try container.encode("app.bsky.actor.defs#declaredAgePref", forKey: .type)
+            try value.encode(to: encoder)
+        case .feedViewPref(let value):
+            try container.encode("app.bsky.actor.defs#feedViewPref", forKey: .type)
+            try value.encode(to: encoder)
+        case .threadViewPref(let value):
+            try container.encode("app.bsky.actor.defs#threadViewPref", forKey: .type)
+            try value.encode(to: encoder)
+        case .interestsPref(let value):
+            try container.encode("app.bsky.actor.defs#interestsPref", forKey: .type)
+            try value.encode(to: encoder)
+        case .mutedWordsPref(let value):
+            try container.encode("app.bsky.actor.defs#mutedWordsPref", forKey: .type)
+            try value.encode(to: encoder)
+        case .hiddenPostsPref(let value):
+            try container.encode("app.bsky.actor.defs#hiddenPostsPref", forKey: .type)
+            try value.encode(to: encoder)
+        case .bskyAppStatePref(let value):
+            try container.encode("app.bsky.actor.defs#bskyAppStatePref", forKey: .type)
+            try value.encode(to: encoder)
+        case .labelersPref(let value):
+            try container.encode("app.bsky.actor.defs#labelersPref", forKey: .type)
+            try value.encode(to: encoder)
+        case .postInteractionSettingsPref(let value):
+            try container.encode("app.bsky.actor.defs#postInteractionSettingsPref", forKey: .type)
+            try value.encode(to: encoder)
+        case .verificationPrefs(let value):
+            try container.encode("app.bsky.actor.defs#verificationPrefs", forKey: .type)
+            try value.encode(to: encoder)
+        case .liveEventPreferences(let value):
+            try container.encode("app.bsky.actor.defs#liveEventPreferences", forKey: .type)
+            try value.encode(to: encoder)
+        case .unexpected(let ATProtocolValueContainer):
+            try ATProtocolValueContainer.encode(to: encoder)
         }
     }
 
-    public enum PostInteractionSettingsPrefPostgateEmbeddingRulesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
-        case appBskyFeedPostgateDisableRule(AppBskyFeedPostgate.DisableRule)
-        case unexpected(ATProtocolValueContainer)
-        public init(_ value: AppBskyFeedPostgate.DisableRule) {
-            self = .appBskyFeedPostgateDisableRule(value)
-        }
-
-        public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
-
-            switch typeValue {
-            case "app.bsky.feed.postgate#disableRule":
-                let value = try AppBskyFeedPostgate.DisableRule(from: decoder)
-                self = .appBskyFeedPostgateDisableRule(value)
-            default:
-                let unknownValue = try ATProtocolValueContainer(from: decoder)
-                self = .unexpected(unknownValue)
-            }
-        }
-
-        public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-
-            switch self {
-            case let .appBskyFeedPostgateDisableRule(value):
-                try container.encode("app.bsky.feed.postgate#disableRule", forKey: .type)
-                try value.encode(to: encoder)
-            case let .unexpected(container):
-                try container.encode(to: encoder)
-            }
-        }
-
-        public func hash(into hasher: inout Hasher) {
-            switch self {
-            case let .appBskyFeedPostgateDisableRule(value):
-                hasher.combine("app.bsky.feed.postgate#disableRule")
-                hasher.combine(value)
-            case let .unexpected(container):
-                hasher.combine("unexpected")
-                hasher.combine(container)
-            }
-        }
-
-        private enum CodingKeys: String, CodingKey {
-            case type = "$type"
-        }
-
-        public static func == (lhs: PostInteractionSettingsPrefPostgateEmbeddingRulesUnion, rhs: PostInteractionSettingsPrefPostgateEmbeddingRulesUnion) -> Bool {
-            switch (lhs, rhs) {
-            case let (
-                .appBskyFeedPostgateDisableRule(lhsValue),
-                .appBskyFeedPostgateDisableRule(rhsValue)
-            ):
-                return lhsValue == rhsValue
-            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
-            default:
-                return false
-            }
-        }
-
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let other = other as? PostInteractionSettingsPrefPostgateEmbeddingRulesUnion else { return false }
-            return self == other
-        }
-
-        /// DAGCBOR encoding with field ordering
-        public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
-            switch self {
-            case let .appBskyFeedPostgateDisableRule(value):
-                map = map.adding(key: "$type", value: "app.bsky.feed.postgate#disableRule")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
-            case let .unexpected(container):
-                return try container.toCBORValue()
-            }
+    public func hash(into hasher: inout Hasher) {
+        switch self {
+        case .adultContentPref(let value):
+            hasher.combine("app.bsky.actor.defs#adultContentPref")
+            hasher.combine(value)
+        case .contentLabelPref(let value):
+            hasher.combine("app.bsky.actor.defs#contentLabelPref")
+            hasher.combine(value)
+        case .savedFeedsPref(let value):
+            hasher.combine("app.bsky.actor.defs#savedFeedsPref")
+            hasher.combine(value)
+        case .savedFeedsPrefV2(let value):
+            hasher.combine("app.bsky.actor.defs#savedFeedsPrefV2")
+            hasher.combine(value)
+        case .personalDetailsPref(let value):
+            hasher.combine("app.bsky.actor.defs#personalDetailsPref")
+            hasher.combine(value)
+        case .declaredAgePref(let value):
+            hasher.combine("app.bsky.actor.defs#declaredAgePref")
+            hasher.combine(value)
+        case .feedViewPref(let value):
+            hasher.combine("app.bsky.actor.defs#feedViewPref")
+            hasher.combine(value)
+        case .threadViewPref(let value):
+            hasher.combine("app.bsky.actor.defs#threadViewPref")
+            hasher.combine(value)
+        case .interestsPref(let value):
+            hasher.combine("app.bsky.actor.defs#interestsPref")
+            hasher.combine(value)
+        case .mutedWordsPref(let value):
+            hasher.combine("app.bsky.actor.defs#mutedWordsPref")
+            hasher.combine(value)
+        case .hiddenPostsPref(let value):
+            hasher.combine("app.bsky.actor.defs#hiddenPostsPref")
+            hasher.combine(value)
+        case .bskyAppStatePref(let value):
+            hasher.combine("app.bsky.actor.defs#bskyAppStatePref")
+            hasher.combine(value)
+        case .labelersPref(let value):
+            hasher.combine("app.bsky.actor.defs#labelersPref")
+            hasher.combine(value)
+        case .postInteractionSettingsPref(let value):
+            hasher.combine("app.bsky.actor.defs#postInteractionSettingsPref")
+            hasher.combine(value)
+        case .verificationPrefs(let value):
+            hasher.combine("app.bsky.actor.defs#verificationPrefs")
+            hasher.combine(value)
+        case .liveEventPreferences(let value):
+            hasher.combine("app.bsky.actor.defs#liveEventPreferences")
+            hasher.combine(value)
+        case .unexpected(let ATProtocolValueContainer):
+            hasher.combine("unexpected")
+            hasher.combine(ATProtocolValueContainer)
         }
     }
 
-    public enum StatusViewEmbedUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
-        case appBskyEmbedExternalView(AppBskyEmbedExternal.View)
-        case unexpected(ATProtocolValueContainer)
-        public init(_ value: AppBskyEmbedExternal.View) {
-            self = .appBskyEmbedExternalView(value)
+    public func isEqual(to other: any ATProtocolValue) -> Bool {
+        guard let otherValue = other as? PreferencesForUnionArray else { return false }
+
+        switch (self, otherValue) {
+        case (.adultContentPref(let selfValue), 
+              .adultContentPref(let otherValue)):
+            return selfValue == otherValue
+        case (.contentLabelPref(let selfValue), 
+              .contentLabelPref(let otherValue)):
+            return selfValue == otherValue
+        case (.savedFeedsPref(let selfValue), 
+              .savedFeedsPref(let otherValue)):
+            return selfValue == otherValue
+        case (.savedFeedsPrefV2(let selfValue), 
+              .savedFeedsPrefV2(let otherValue)):
+            return selfValue == otherValue
+        case (.personalDetailsPref(let selfValue), 
+              .personalDetailsPref(let otherValue)):
+            return selfValue == otherValue
+        case (.declaredAgePref(let selfValue), 
+              .declaredAgePref(let otherValue)):
+            return selfValue == otherValue
+        case (.feedViewPref(let selfValue), 
+              .feedViewPref(let otherValue)):
+            return selfValue == otherValue
+        case (.threadViewPref(let selfValue), 
+              .threadViewPref(let otherValue)):
+            return selfValue == otherValue
+        case (.interestsPref(let selfValue), 
+              .interestsPref(let otherValue)):
+            return selfValue == otherValue
+        case (.mutedWordsPref(let selfValue), 
+              .mutedWordsPref(let otherValue)):
+            return selfValue == otherValue
+        case (.hiddenPostsPref(let selfValue), 
+              .hiddenPostsPref(let otherValue)):
+            return selfValue == otherValue
+        case (.bskyAppStatePref(let selfValue), 
+              .bskyAppStatePref(let otherValue)):
+            return selfValue == otherValue
+        case (.labelersPref(let selfValue), 
+              .labelersPref(let otherValue)):
+            return selfValue == otherValue
+        case (.postInteractionSettingsPref(let selfValue), 
+              .postInteractionSettingsPref(let otherValue)):
+            return selfValue == otherValue
+        case (.verificationPrefs(let selfValue), 
+              .verificationPrefs(let otherValue)):
+            return selfValue == otherValue
+        case (.liveEventPreferences(let selfValue), 
+              .liveEventPreferences(let otherValue)):
+            return selfValue == otherValue
+        case (.unexpected(let selfValue), .unexpected(let otherValue)):
+            return selfValue.isEqual(to: otherValue)
+        default:
+            return false
         }
+    }
 
-        public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+    private enum CodingKeys: String, CodingKey {
+        case type = "$type"
+    }
+    
+    // DAGCBOR encoding with field ordering
+    public func toCBORValue() throws -> Any {
+        var map = OrderedCBORMap()
+        
+        switch self {
+        case .adultContentPref(let value):
+            map = map.adding(key: "$type", value: "app.bsky.actor.defs#adultContentPref")
+            
+            let valueDict = try value.toCBORValue()
 
-            switch typeValue {
-            case "app.bsky.embed.external#view":
-                let value = try AppBskyEmbedExternal.View(from: decoder)
-                self = .appBskyEmbedExternalView(value)
-            default:
-                let unknownValue = try ATProtocolValueContainer(from: decoder)
-                self = .unexpected(unknownValue)
-            }
-        }
-
-        public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-
-            switch self {
-            case let .appBskyEmbedExternalView(value):
-                try container.encode("app.bsky.embed.external#view", forKey: .type)
-                try value.encode(to: encoder)
-            case let .unexpected(container):
-                try container.encode(to: encoder)
-            }
-        }
-
-        public func hash(into hasher: inout Hasher) {
-            switch self {
-            case let .appBskyEmbedExternalView(value):
-                hasher.combine("app.bsky.embed.external#view")
-                hasher.combine(value)
-            case let .unexpected(container):
-                hasher.combine("unexpected")
-                hasher.combine(container)
-            }
-        }
-
-        private enum CodingKeys: String, CodingKey {
-            case type = "$type"
-        }
-
-        public static func == (lhs: StatusViewEmbedUnion, rhs: StatusViewEmbedUnion) -> Bool {
-            switch (lhs, rhs) {
-            case let (
-                .appBskyEmbedExternalView(lhsValue),
-                .appBskyEmbedExternalView(rhsValue)
-            ):
-                return lhsValue == rhsValue
-            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
-            default:
-                return false
-            }
-        }
-
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let other = other as? StatusViewEmbedUnion else { return false }
-            return self == other
-        }
-
-        /// DAGCBOR encoding with field ordering
-        public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
-            switch self {
-            case let .appBskyEmbedExternalView(value):
-                map = map.adding(key: "$type", value: "app.bsky.embed.external#view")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
                 }
-                return map
-            case let .unexpected(container):
-                return try container.toCBORValue()
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
             }
+            return map
+        case .contentLabelPref(let value):
+            map = map.adding(key: "$type", value: "app.bsky.actor.defs#contentLabelPref")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .savedFeedsPref(let value):
+            map = map.adding(key: "$type", value: "app.bsky.actor.defs#savedFeedsPref")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .savedFeedsPrefV2(let value):
+            map = map.adding(key: "$type", value: "app.bsky.actor.defs#savedFeedsPrefV2")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .personalDetailsPref(let value):
+            map = map.adding(key: "$type", value: "app.bsky.actor.defs#personalDetailsPref")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .declaredAgePref(let value):
+            map = map.adding(key: "$type", value: "app.bsky.actor.defs#declaredAgePref")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .feedViewPref(let value):
+            map = map.adding(key: "$type", value: "app.bsky.actor.defs#feedViewPref")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .threadViewPref(let value):
+            map = map.adding(key: "$type", value: "app.bsky.actor.defs#threadViewPref")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .interestsPref(let value):
+            map = map.adding(key: "$type", value: "app.bsky.actor.defs#interestsPref")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .mutedWordsPref(let value):
+            map = map.adding(key: "$type", value: "app.bsky.actor.defs#mutedWordsPref")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .hiddenPostsPref(let value):
+            map = map.adding(key: "$type", value: "app.bsky.actor.defs#hiddenPostsPref")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .bskyAppStatePref(let value):
+            map = map.adding(key: "$type", value: "app.bsky.actor.defs#bskyAppStatePref")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .labelersPref(let value):
+            map = map.adding(key: "$type", value: "app.bsky.actor.defs#labelersPref")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .postInteractionSettingsPref(let value):
+            map = map.adding(key: "$type", value: "app.bsky.actor.defs#postInteractionSettingsPref")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .verificationPrefs(let value):
+            map = map.adding(key: "$type", value: "app.bsky.actor.defs#verificationPrefs")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .liveEventPreferences(let value):
+            map = map.adding(key: "$type", value: "app.bsky.actor.defs#liveEventPreferences")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .unexpected(let container):
+            return try container.toCBORValue()
         }
     }
 }
+
+
+public struct MutedWordTarget: Codable, ATProtocolCodable, ATProtocolValue {
+            public let rawValue: String
+            
+            // Predefined constants
+            // 
+            public static let content = MutedWordTarget(rawValue: "content")
+            // 
+            public static let tag = MutedWordTarget(rawValue: "tag")
+            
+            public init(rawValue: String) {
+                self.rawValue = rawValue
+            }
+            
+            public init(from decoder: Decoder) throws {
+                let container = try decoder.singleValueContainer()
+                rawValue = try container.decode(String.self)
+            }
+            
+            public func encode(to encoder: Encoder) throws {
+                var container = encoder.singleValueContainer()
+                try container.encode(rawValue)
+            }
+            
+            public func isEqual(to other: any ATProtocolValue) -> Bool {
+                guard let otherValue = other as? MutedWordTarget else { return false }
+                return self.rawValue == otherValue.rawValue
+            }
+            
+            // DAGCBOR encoding with field ordering
+            public func toCBORValue() throws -> Any {
+                // For string-based enum types, we return the raw string value directly
+                return rawValue
+            }
+            
+            // Provide allCases-like functionality
+            public static var predefinedValues: [MutedWordTarget] {
+                return [
+                    .content,
+                    .tag,
+                ]
+            }
+        }
+
+
+
+
+public enum PostInteractionSettingsPrefThreadgateAllowRulesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
+    case appBskyFeedThreadgateMentionRule(AppBskyFeedThreadgate.MentionRule)
+    case appBskyFeedThreadgateFollowerRule(AppBskyFeedThreadgate.FollowerRule)
+    case appBskyFeedThreadgateFollowingRule(AppBskyFeedThreadgate.FollowingRule)
+    case appBskyFeedThreadgateListRule(AppBskyFeedThreadgate.ListRule)
+    case unexpected(ATProtocolValueContainer)
+    public init(_ value: AppBskyFeedThreadgate.MentionRule) {
+        self = .appBskyFeedThreadgateMentionRule(value)
+    }
+    public init(_ value: AppBskyFeedThreadgate.FollowerRule) {
+        self = .appBskyFeedThreadgateFollowerRule(value)
+    }
+    public init(_ value: AppBskyFeedThreadgate.FollowingRule) {
+        self = .appBskyFeedThreadgateFollowingRule(value)
+    }
+    public init(_ value: AppBskyFeedThreadgate.ListRule) {
+        self = .appBskyFeedThreadgateListRule(value)
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let typeValue = try container.decode(String.self, forKey: .type)
+
+        switch typeValue {
+        case "app.bsky.feed.threadgate#mentionRule":
+            let value = try AppBskyFeedThreadgate.MentionRule(from: decoder)
+            self = .appBskyFeedThreadgateMentionRule(value)
+        case "app.bsky.feed.threadgate#followerRule":
+            let value = try AppBskyFeedThreadgate.FollowerRule(from: decoder)
+            self = .appBskyFeedThreadgateFollowerRule(value)
+        case "app.bsky.feed.threadgate#followingRule":
+            let value = try AppBskyFeedThreadgate.FollowingRule(from: decoder)
+            self = .appBskyFeedThreadgateFollowingRule(value)
+        case "app.bsky.feed.threadgate#listRule":
+            let value = try AppBskyFeedThreadgate.ListRule(from: decoder)
+            self = .appBskyFeedThreadgateListRule(value)
+        default:
+            let unknownValue = try ATProtocolValueContainer(from: decoder)
+            self = .unexpected(unknownValue)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+
+        switch self {
+        case .appBskyFeedThreadgateMentionRule(let value):
+            try container.encode("app.bsky.feed.threadgate#mentionRule", forKey: .type)
+            try value.encode(to: encoder)
+        case .appBskyFeedThreadgateFollowerRule(let value):
+            try container.encode("app.bsky.feed.threadgate#followerRule", forKey: .type)
+            try value.encode(to: encoder)
+        case .appBskyFeedThreadgateFollowingRule(let value):
+            try container.encode("app.bsky.feed.threadgate#followingRule", forKey: .type)
+            try value.encode(to: encoder)
+        case .appBskyFeedThreadgateListRule(let value):
+            try container.encode("app.bsky.feed.threadgate#listRule", forKey: .type)
+            try value.encode(to: encoder)
+        case .unexpected(let container):
+            try container.encode(to: encoder)
+        }
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        switch self {
+        case .appBskyFeedThreadgateMentionRule(let value):
+            hasher.combine("app.bsky.feed.threadgate#mentionRule")
+            hasher.combine(value)
+        case .appBskyFeedThreadgateFollowerRule(let value):
+            hasher.combine("app.bsky.feed.threadgate#followerRule")
+            hasher.combine(value)
+        case .appBskyFeedThreadgateFollowingRule(let value):
+            hasher.combine("app.bsky.feed.threadgate#followingRule")
+            hasher.combine(value)
+        case .appBskyFeedThreadgateListRule(let value):
+            hasher.combine("app.bsky.feed.threadgate#listRule")
+            hasher.combine(value)
+        case .unexpected(let container):
+            hasher.combine("unexpected")
+            hasher.combine(container)
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case type = "$type"
+    }
+    
+    public static func == (lhs: PostInteractionSettingsPrefThreadgateAllowRulesUnion, rhs: PostInteractionSettingsPrefThreadgateAllowRulesUnion) -> Bool {
+        switch (lhs, rhs) {
+        case (.appBskyFeedThreadgateMentionRule(let lhsValue),
+              .appBskyFeedThreadgateMentionRule(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.appBskyFeedThreadgateFollowerRule(let lhsValue),
+              .appBskyFeedThreadgateFollowerRule(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.appBskyFeedThreadgateFollowingRule(let lhsValue),
+              .appBskyFeedThreadgateFollowingRule(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.appBskyFeedThreadgateListRule(let lhsValue),
+              .appBskyFeedThreadgateListRule(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.unexpected(let lhsValue), .unexpected(let rhsValue)):
+            return lhsValue.isEqual(to: rhsValue)
+        default:
+            return false
+        }
+    }
+    
+    public func isEqual(to other: any ATProtocolValue) -> Bool {
+        guard let other = other as? PostInteractionSettingsPrefThreadgateAllowRulesUnion else { return false }
+        return self == other
+    }
+    
+    // DAGCBOR encoding with field ordering
+    public func toCBORValue() throws -> Any {
+        // Create an ordered map to maintain field order
+        var map = OrderedCBORMap()
+        
+        switch self {
+        case .appBskyFeedThreadgateMentionRule(let value):
+            map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#mentionRule")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .appBskyFeedThreadgateFollowerRule(let value):
+            map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#followerRule")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .appBskyFeedThreadgateFollowingRule(let value):
+            map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#followingRule")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .appBskyFeedThreadgateListRule(let value):
+            map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#listRule")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .unexpected(let container):
+            return try container.toCBORValue()
+        }
+    }
+}
+
+
+
+
+public enum PostInteractionSettingsPrefPostgateEmbeddingRulesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
+    case appBskyFeedPostgateDisableRule(AppBskyFeedPostgate.DisableRule)
+    case unexpected(ATProtocolValueContainer)
+    public init(_ value: AppBskyFeedPostgate.DisableRule) {
+        self = .appBskyFeedPostgateDisableRule(value)
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let typeValue = try container.decode(String.self, forKey: .type)
+
+        switch typeValue {
+        case "app.bsky.feed.postgate#disableRule":
+            let value = try AppBskyFeedPostgate.DisableRule(from: decoder)
+            self = .appBskyFeedPostgateDisableRule(value)
+        default:
+            let unknownValue = try ATProtocolValueContainer(from: decoder)
+            self = .unexpected(unknownValue)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+
+        switch self {
+        case .appBskyFeedPostgateDisableRule(let value):
+            try container.encode("app.bsky.feed.postgate#disableRule", forKey: .type)
+            try value.encode(to: encoder)
+        case .unexpected(let container):
+            try container.encode(to: encoder)
+        }
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        switch self {
+        case .appBskyFeedPostgateDisableRule(let value):
+            hasher.combine("app.bsky.feed.postgate#disableRule")
+            hasher.combine(value)
+        case .unexpected(let container):
+            hasher.combine("unexpected")
+            hasher.combine(container)
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case type = "$type"
+    }
+    
+    public static func == (lhs: PostInteractionSettingsPrefPostgateEmbeddingRulesUnion, rhs: PostInteractionSettingsPrefPostgateEmbeddingRulesUnion) -> Bool {
+        switch (lhs, rhs) {
+        case (.appBskyFeedPostgateDisableRule(let lhsValue),
+              .appBskyFeedPostgateDisableRule(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.unexpected(let lhsValue), .unexpected(let rhsValue)):
+            return lhsValue.isEqual(to: rhsValue)
+        default:
+            return false
+        }
+    }
+    
+    public func isEqual(to other: any ATProtocolValue) -> Bool {
+        guard let other = other as? PostInteractionSettingsPrefPostgateEmbeddingRulesUnion else { return false }
+        return self == other
+    }
+    
+    // DAGCBOR encoding with field ordering
+    public func toCBORValue() throws -> Any {
+        // Create an ordered map to maintain field order
+        var map = OrderedCBORMap()
+        
+        switch self {
+        case .appBskyFeedPostgateDisableRule(let value):
+            map = map.adding(key: "$type", value: "app.bsky.feed.postgate#disableRule")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .unexpected(let container):
+            return try container.toCBORValue()
+        }
+    }
+}
+
+
+
+
+public enum StatusViewEmbedUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
+    case appBskyEmbedExternalView(AppBskyEmbedExternal.View)
+    case unexpected(ATProtocolValueContainer)
+    public init(_ value: AppBskyEmbedExternal.View) {
+        self = .appBskyEmbedExternalView(value)
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let typeValue = try container.decode(String.self, forKey: .type)
+
+        switch typeValue {
+        case "app.bsky.embed.external#view":
+            let value = try AppBskyEmbedExternal.View(from: decoder)
+            self = .appBskyEmbedExternalView(value)
+        default:
+            let unknownValue = try ATProtocolValueContainer(from: decoder)
+            self = .unexpected(unknownValue)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+
+        switch self {
+        case .appBskyEmbedExternalView(let value):
+            try container.encode("app.bsky.embed.external#view", forKey: .type)
+            try value.encode(to: encoder)
+        case .unexpected(let container):
+            try container.encode(to: encoder)
+        }
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        switch self {
+        case .appBskyEmbedExternalView(let value):
+            hasher.combine("app.bsky.embed.external#view")
+            hasher.combine(value)
+        case .unexpected(let container):
+            hasher.combine("unexpected")
+            hasher.combine(container)
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case type = "$type"
+    }
+    
+    public static func == (lhs: StatusViewEmbedUnion, rhs: StatusViewEmbedUnion) -> Bool {
+        switch (lhs, rhs) {
+        case (.appBskyEmbedExternalView(let lhsValue),
+              .appBskyEmbedExternalView(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.unexpected(let lhsValue), .unexpected(let rhsValue)):
+            return lhsValue.isEqual(to: rhsValue)
+        default:
+            return false
+        }
+    }
+    
+    public func isEqual(to other: any ATProtocolValue) -> Bool {
+        guard let other = other as? StatusViewEmbedUnion else { return false }
+        return self == other
+    }
+    
+    // DAGCBOR encoding with field ordering
+    public func toCBORValue() throws -> Any {
+        // Create an ordered map to maintain field order
+        var map = OrderedCBORMap()
+        
+        switch self {
+        case .appBskyEmbedExternalView(let value):
+            map = map.adding(key: "$type", value: "app.bsky.embed.external#view")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .unexpected(let container):
+            return try container.toCBORValue()
+        }
+    }
+}
+
+
+}
+
+
+                           
+

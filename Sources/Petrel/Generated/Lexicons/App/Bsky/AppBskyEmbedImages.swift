@@ -1,57 +1,61 @@
 import Foundation
 
+
+
 // lexicon: 1, id: app.bsky.embed.images
 
-public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
+
+public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue { 
+
     public static let typeIdentifier = "app.bsky.embed.images"
-    public let images: [Image]
+        public let images: [Image]
 
-    public init(images: [Image]) {
-        self.images = images
-    }
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        images = try container.decode([Image].self, forKey: .images)
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(images, forKey: .images)
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(images)
-    }
-
-    public func isEqual(to other: any ATProtocolValue) -> Bool {
-        guard let other = other as? Self else { return false }
-        if images != other.images {
-            return false
+        public init(images: [Image]) {
+            self.images = images
         }
-        return true
-    }
 
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
-    }
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self.images = try container.decode([Image].self, forKey: .images)
+        }
 
-    public func toCBORValue() throws -> Any {
-        var map = OrderedCBORMap()
-        let imagesValue = try images.toCBORValue()
-        map = map.adding(key: "images", value: imagesValue)
-        return map
-    }
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(images, forKey: .images)
+        }
 
-    private enum CodingKeys: String, CodingKey {
-        case images
-    }
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(images)
+        }
 
-    public struct Image: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.embed.images#image"
-        public let image: Blob
-        public let alt: String
-        public let aspectRatio: AppBskyEmbedDefs.AspectRatio?
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+            if images != other.images {
+                return false
+            }
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            let imagesValue = try images.toCBORValue()
+            map = map.adding(key: "images", value: imagesValue)
+            return map
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case images
+        }
+        
+public struct Image: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.embed.images#image"
+            public let image: Blob
+            public let alt: String
+            public let aspectRatio: AppBskyEmbedDefs.AspectRatio?
 
         public init(
             image: Blob, alt: String, aspectRatio: AppBskyEmbedDefs.AspectRatio?
@@ -64,19 +68,19 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                image = try container.decode(Blob.self, forKey: .image)
+                self.image = try container.decode(Blob.self, forKey: .image)
             } catch {
                 LogManager.logError("Decoding error for required property 'image': \(error)")
                 throw error
             }
             do {
-                alt = try container.decode(String.self, forKey: .alt)
+                self.alt = try container.decode(String.self, forKey: .alt)
             } catch {
                 LogManager.logError("Decoding error for required property 'alt': \(error)")
                 throw error
             }
             do {
-                aspectRatio = try container.decodeIfPresent(AppBskyEmbedDefs.AspectRatio.self, forKey: .aspectRatio)
+                self.aspectRatio = try container.decodeIfPresent(AppBskyEmbedDefs.AspectRatio.self, forKey: .aspectRatio)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'aspectRatio': \(error)")
                 throw error
@@ -140,10 +144,10 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
             case aspectRatio
         }
     }
-
-    public struct View: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.embed.images#view"
-        public let images: [ViewImage]
+        
+public struct View: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.embed.images#view"
+            public let images: [ViewImage]
 
         public init(
             images: [ViewImage]
@@ -154,7 +158,7 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                images = try container.decode([ViewImage].self, forKey: .images)
+                self.images = try container.decode([ViewImage].self, forKey: .images)
             } catch {
                 LogManager.logError("Decoding error for required property 'images': \(error)")
                 throw error
@@ -196,13 +200,13 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
             case images
         }
     }
-
-    public struct ViewImage: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.embed.images#viewImage"
-        public let thumb: URI
-        public let fullsize: URI
-        public let alt: String
-        public let aspectRatio: AppBskyEmbedDefs.AspectRatio?
+        
+public struct ViewImage: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.embed.images#viewImage"
+            public let thumb: URI
+            public let fullsize: URI
+            public let alt: String
+            public let aspectRatio: AppBskyEmbedDefs.AspectRatio?
 
         public init(
             thumb: URI, fullsize: URI, alt: String, aspectRatio: AppBskyEmbedDefs.AspectRatio?
@@ -216,25 +220,25 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                thumb = try container.decode(URI.self, forKey: .thumb)
+                self.thumb = try container.decode(URI.self, forKey: .thumb)
             } catch {
                 LogManager.logError("Decoding error for required property 'thumb': \(error)")
                 throw error
             }
             do {
-                fullsize = try container.decode(URI.self, forKey: .fullsize)
+                self.fullsize = try container.decode(URI.self, forKey: .fullsize)
             } catch {
                 LogManager.logError("Decoding error for required property 'fullsize': \(error)")
                 throw error
             }
             do {
-                alt = try container.decode(String.self, forKey: .alt)
+                self.alt = try container.decode(String.self, forKey: .alt)
             } catch {
                 LogManager.logError("Decoding error for required property 'alt': \(error)")
                 throw error
             }
             do {
-                aspectRatio = try container.decodeIfPresent(AppBskyEmbedDefs.AspectRatio.self, forKey: .aspectRatio)
+                self.aspectRatio = try container.decodeIfPresent(AppBskyEmbedDefs.AspectRatio.self, forKey: .aspectRatio)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'aspectRatio': \(error)")
                 throw error
@@ -306,4 +310,11 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
             case aspectRatio
         }
     }
+
+
+
 }
+
+
+                           
+

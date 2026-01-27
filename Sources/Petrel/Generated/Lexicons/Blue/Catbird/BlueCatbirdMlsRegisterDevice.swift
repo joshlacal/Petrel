@@ -1,15 +1,19 @@
 import Foundation
 
+
+
 // lexicon: 1, id: blue.catbird.mls.registerDevice
 
-public enum BlueCatbirdMlsRegisterDevice {
-    public static let typeIdentifier = "blue.catbird.mls.registerDevice"
 
-    public struct KeyPackageItem: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "blue.catbird.mls.registerDevice#keyPackageItem"
-        public let keyPackage: String
-        public let cipherSuite: String
-        public let expires: ATProtocolDate
+public struct BlueCatbirdMlsRegisterDevice { 
+
+    public static let typeIdentifier = "blue.catbird.mls.registerDevice"
+        
+public struct KeyPackageItem: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "blue.catbird.mls.registerDevice#keyPackageItem"
+            public let keyPackage: String
+            public let cipherSuite: String
+            public let expires: ATProtocolDate
 
         public init(
             keyPackage: String, cipherSuite: String, expires: ATProtocolDate
@@ -22,19 +26,19 @@ public enum BlueCatbirdMlsRegisterDevice {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                keyPackage = try container.decode(String.self, forKey: .keyPackage)
+                self.keyPackage = try container.decode(String.self, forKey: .keyPackage)
             } catch {
                 LogManager.logError("Decoding error for required property 'keyPackage': \(error)")
                 throw error
             }
             do {
-                cipherSuite = try container.decode(String.self, forKey: .cipherSuite)
+                self.cipherSuite = try container.decode(String.self, forKey: .cipherSuite)
             } catch {
                 LogManager.logError("Decoding error for required property 'cipherSuite': \(error)")
                 throw error
             }
             do {
-                expires = try container.decode(ATProtocolDate.self, forKey: .expires)
+                self.expires = try container.decode(ATProtocolDate.self, forKey: .expires)
             } catch {
                 LogManager.logError("Decoding error for required property 'expires': \(error)")
                 throw error
@@ -92,11 +96,11 @@ public enum BlueCatbirdMlsRegisterDevice {
             case expires
         }
     }
-
-    public struct WelcomeMessage: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "blue.catbird.mls.registerDevice#welcomeMessage"
-        public let convoId: String
-        public let welcome: String
+        
+public struct WelcomeMessage: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "blue.catbird.mls.registerDevice#welcomeMessage"
+            public let convoId: String
+            public let welcome: String
 
         public init(
             convoId: String, welcome: String
@@ -108,13 +112,13 @@ public enum BlueCatbirdMlsRegisterDevice {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                self.convoId = try container.decode(String.self, forKey: .convoId)
             } catch {
                 LogManager.logError("Decoding error for required property 'convoId': \(error)")
                 throw error
             }
             do {
-                welcome = try container.decode(String.self, forKey: .welcome)
+                self.welcome = try container.decode(String.self, forKey: .welcome)
             } catch {
                 LogManager.logError("Decoding error for required property 'welcome': \(error)")
                 throw error
@@ -164,8 +168,7 @@ public enum BlueCatbirdMlsRegisterDevice {
             case welcome
         }
     }
-
-    public struct Input: ATProtocolCodable {
+public struct Input: ATProtocolCodable {
         public let deviceName: String
         public let deviceUUID: String?
         public let keyPackages: [KeyPackageItem]
@@ -178,13 +181,14 @@ public enum BlueCatbirdMlsRegisterDevice {
             self.keyPackages = keyPackages
             self.signaturePublicKey = signaturePublicKey
         }
+        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            deviceName = try container.decode(String.self, forKey: .deviceName)
-            deviceUUID = try container.decodeIfPresent(String.self, forKey: .deviceUUID)
-            keyPackages = try container.decode([KeyPackageItem].self, forKey: .keyPackages)
-            signaturePublicKey = try container.decode(Bytes.self, forKey: .signaturePublicKey)
+            self.deviceName = try container.decode(String.self, forKey: .deviceName)
+            self.deviceUUID = try container.decodeIfPresent(String.self, forKey: .deviceUUID)
+            self.keyPackages = try container.decode([KeyPackageItem].self, forKey: .keyPackages)
+            self.signaturePublicKey = try container.decode(Bytes.self, forKey: .signaturePublicKey)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -217,128 +221,172 @@ public enum BlueCatbirdMlsRegisterDevice {
             case signaturePublicKey
         }
     }
-
-    public struct Output: ATProtocolCodable {
+    
+public struct Output: ATProtocolCodable {
+        
+        
         public let deviceId: String
-
+        
         public let mlsDid: String
-
+        
         public let autoJoinedConvos: [String]
-
+        
         public let welcomeMessages: [WelcomeMessage]?
-
-        /// Standard public initializer
+        
+        
+        
+        // Standard public initializer
         public init(
+            
+            
             deviceId: String,
-
+            
             mlsDid: String,
-
+            
             autoJoinedConvos: [String],
-
+            
             welcomeMessages: [WelcomeMessage]? = nil
-
+            
+            
         ) {
+            
+            
             self.deviceId = deviceId
-
+            
             self.mlsDid = mlsDid
-
+            
             self.autoJoinedConvos = autoJoinedConvos
-
+            
             self.welcomeMessages = welcomeMessages
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
-            deviceId = try container.decode(String.self, forKey: .deviceId)
-
-            mlsDid = try container.decode(String.self, forKey: .mlsDid)
-
-            autoJoinedConvos = try container.decode([String].self, forKey: .autoJoinedConvos)
-
-            welcomeMessages = try container.decodeIfPresent([WelcomeMessage].self, forKey: .welcomeMessages)
+            
+            self.deviceId = try container.decode(String.self, forKey: .deviceId)
+            
+            
+            self.mlsDid = try container.decode(String.self, forKey: .mlsDid)
+            
+            
+            self.autoJoinedConvos = try container.decode([String].self, forKey: .autoJoinedConvos)
+            
+            
+            self.welcomeMessages = try container.decodeIfPresent([WelcomeMessage].self, forKey: .welcomeMessages)
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
+            
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
             try container.encode(deviceId, forKey: .deviceId)
-
+            
+            
             try container.encode(mlsDid, forKey: .mlsDid)
-
+            
+            
             try container.encode(autoJoinedConvos, forKey: .autoJoinedConvos)
-
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(welcomeMessages, forKey: .welcomeMessages)
+            
+            
         }
 
         public func toCBORValue() throws -> Any {
+            
             var map = OrderedCBORMap()
 
+            
+            
             let deviceIdValue = try deviceId.toCBORValue()
             map = map.adding(key: "deviceId", value: deviceIdValue)
-
+            
+            
+            
             let mlsDidValue = try mlsDid.toCBORValue()
             map = map.adding(key: "mlsDid", value: mlsDidValue)
-
+            
+            
+            
             let autoJoinedConvosValue = try autoJoinedConvos.toCBORValue()
             map = map.adding(key: "autoJoinedConvos", value: autoJoinedConvosValue)
-
+            
+            
+            
             if let value = welcomeMessages {
                 // Encode optional property even if it's an empty array for CBOR
                 let welcomeMessagesValue = try value.toCBORValue()
                 map = map.adding(key: "welcomeMessages", value: welcomeMessagesValue)
             }
+            
+            
 
             return map
+            
         }
-
+        
+        
         private enum CodingKeys: String, CodingKey {
             case deviceId
             case mlsDid
             case autoJoinedConvos
             case welcomeMessages
         }
+        
     }
+        
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                case invalidDeviceName = "InvalidDeviceName."
+                case invalidKeyPackages = "InvalidKeyPackages."
+                case invalidSignatureKey = "InvalidSignatureKey."
+                case deviceAlreadyRegistered = "DeviceAlreadyRegistered."
+                case tooManyDevices = "TooManyDevices."
+            public var description: String {
+                return self.rawValue
+            }
 
-    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-        case invalidDeviceName = "InvalidDeviceName."
-        case invalidKeyPackages = "InvalidKeyPackages."
-        case invalidSignatureKey = "InvalidSignatureKey."
-        case deviceAlreadyRegistered = "DeviceAlreadyRegistered."
-        case tooManyDevices = "TooManyDevices."
-        public var description: String {
-            return rawValue
+            public var errorName: String {
+                // Extract just the error name from the raw value
+                let parts = self.rawValue.split(separator: ".")
+                return String(parts.first ?? "")
+            }
         }
 
-        public var errorName: String {
-            // Extract just the error name from the raw value
-            let parts = rawValue.split(separator: ".")
-            return String(parts.first ?? "")
-        }
-    }
+
+
 }
 
-public extension ATProtoClient.Blue.Catbird.Mls {
+extension ATProtoClient.Blue.Catbird.Mls {
     // MARK: - registerDevice
 
     /// Register a device for multi-device MLS support. Each device gets a unique device ID and credential (did:plc:user#device-uuid). Required for proper multi-device group conversations.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-    ///
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    func registerDevice(
+    public func registerDevice(
+        
         input: BlueCatbirdMlsRegisterDevice.Input
-
+        
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsRegisterDevice.Output?) {
         let endpoint = "blue.catbird.mls.registerDevice"
-
+        
         var headers: [String: String] = [:]
-
+        
         headers["Content-Type"] = "application/json"
-
+        
+        
+        
         headers["Accept"] = "application/json"
+        
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -355,6 +403,7 @@ public extension ATProtoClient.Blue.Catbird.Mls {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
+        
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
@@ -364,11 +413,12 @@ public extension ATProtoClient.Blue.Catbird.Mls {
         }
 
         // Only decode response data if request was successful
-        if (200 ... 299).contains(responseCode) {
+        if (200...299).contains(responseCode) {
             do {
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsRegisterDevice.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -379,5 +429,9 @@ public extension ATProtoClient.Blue.Catbird.Mls {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
+        
     }
+    
 }
+                           
+

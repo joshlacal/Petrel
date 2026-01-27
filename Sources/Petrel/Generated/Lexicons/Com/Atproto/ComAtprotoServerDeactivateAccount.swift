@@ -1,20 +1,25 @@
 import Foundation
 
+
+
 // lexicon: 1, id: com.atproto.server.deactivateAccount
 
-public enum ComAtprotoServerDeactivateAccount {
+
+public struct ComAtprotoServerDeactivateAccount { 
+
     public static let typeIdentifier = "com.atproto.server.deactivateAccount"
-    public struct Input: ATProtocolCodable {
+public struct Input: ATProtocolCodable {
         public let deleteAfter: ATProtocolDate?
 
         /// Standard public initializer
         public init(deleteAfter: ATProtocolDate? = nil) {
             self.deleteAfter = deleteAfter
         }
+        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            deleteAfter = try container.decodeIfPresent(ATProtocolDate.self, forKey: .deleteAfter)
+            self.deleteAfter = try container.decodeIfPresent(ATProtocolDate.self, forKey: .deleteAfter)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -35,26 +40,33 @@ public enum ComAtprotoServerDeactivateAccount {
             case deleteAfter
         }
     }
+
+
+
 }
 
-public extension ATProtoClient.Com.Atproto.Server {
+extension ATProtoClient.Com.Atproto.Server {
     // MARK: - deactivateAccount
 
     /// Deactivates a currently active account. Stops serving of repo, and future writes to repo until reactivated. Used to finalize account migration with the old host after the account has been activated on the new host.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-    ///
+    /// 
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    func deactivateAccount(
+    public func deactivateAccount(
+        
         input: ComAtprotoServerDeactivateAccount.Input
-
+        
     ) async throws -> Int {
         let endpoint = "com.atproto.server.deactivateAccount"
-
+        
         var headers: [String: String] = [:]
-
+        
         headers["Content-Type"] = "application/json"
+        
+        
+        
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -69,6 +81,13 @@ public extension ATProtoClient.Com.Atproto.Server {
         let serviceDID = await networkService.getServiceDID(for: "com.atproto.server.deactivateAccount")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
         let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        return response.statusCode
+        let responseCode = response.statusCode
+
+        
+        return responseCode
+        
     }
+    
 }
+                           
+

@@ -1,36 +1,47 @@
 import Foundation
 
+
+
 // lexicon: 1, id: com.atproto.admin.getAccountInfo
 
-public enum ComAtprotoAdminGetAccountInfo {
-    public static let typeIdentifier = "com.atproto.admin.getAccountInfo"
-    public struct Parameters: Parametrizable {
-        public let did: DID
 
+public struct ComAtprotoAdminGetAccountInfo { 
+
+    public static let typeIdentifier = "com.atproto.admin.getAccountInfo"    
+public struct Parameters: Parametrizable {
+        public let did: DID
+        
         public init(
             did: DID
-        ) {
+            ) {
             self.did = did
+            
         }
     }
-
     public typealias Output = ComAtprotoAdminDefs.AccountView
+    
+
+
+
 }
 
-public extension ATProtoClient.Com.Atproto.Admin {
+
+
+extension ATProtoClient.Com.Atproto.Admin {
     // MARK: - getAccountInfo
 
     /// Get details about an account.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-    ///
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    func getAccountInfo(input: ComAtprotoAdminGetAccountInfo.Parameters) async throws -> (responseCode: Int, data: ComAtprotoAdminGetAccountInfo.Output?) {
+    public func getAccountInfo(input: ComAtprotoAdminGetAccountInfo.Parameters) async throws -> (responseCode: Int, data: ComAtprotoAdminGetAccountInfo.Output?) {
         let endpoint = "com.atproto.admin.getAccountInfo"
 
+        
         let queryItems = input.asQueryItems()
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -54,11 +65,12 @@ public extension ATProtoClient.Com.Atproto.Admin {
         }
 
         // Only decode response data if request was successful
-        if (200 ... 299).contains(responseCode) {
+        if (200...299).contains(responseCode) {
             do {
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(ComAtprotoAdminGetAccountInfo.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -66,9 +78,12 @@ public extension ATProtoClient.Com.Atproto.Admin {
                 return (responseCode, nil)
             }
         } else {
+            
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
+                           
+

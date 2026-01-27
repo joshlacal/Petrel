@@ -1,19 +1,23 @@
 import Foundation
 
+
+
 // lexicon: 1, id: app.bsky.video.defs
 
-public enum AppBskyVideoDefs {
-    public static let typeIdentifier = "app.bsky.video.defs"
 
-    public struct JobStatus: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.video.defs#jobStatus"
-        public let jobId: String
-        public let did: DID
-        public let state: String
-        public let progress: Int?
-        public let blob: Blob?
-        public let error: String?
-        public let message: String?
+public struct AppBskyVideoDefs { 
+
+    public static let typeIdentifier = "app.bsky.video.defs"
+        
+public struct JobStatus: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.video.defs#jobStatus"
+            public let jobId: String
+            public let did: DID
+            public let state: String
+            public let progress: Int?
+            public let blob: Blob?
+            public let error: String?
+            public let message: String?
 
         public init(
             jobId: String, did: DID, state: String, progress: Int?, blob: Blob?, error: String?, message: String?
@@ -30,43 +34,43 @@ public enum AppBskyVideoDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                jobId = try container.decode(String.self, forKey: .jobId)
+                self.jobId = try container.decode(String.self, forKey: .jobId)
             } catch {
                 LogManager.logError("Decoding error for required property 'jobId': \(error)")
                 throw error
             }
             do {
-                did = try container.decode(DID.self, forKey: .did)
+                self.did = try container.decode(DID.self, forKey: .did)
             } catch {
                 LogManager.logError("Decoding error for required property 'did': \(error)")
                 throw error
             }
             do {
-                state = try container.decode(String.self, forKey: .state)
+                self.state = try container.decode(String.self, forKey: .state)
             } catch {
                 LogManager.logError("Decoding error for required property 'state': \(error)")
                 throw error
             }
             do {
-                progress = try container.decodeIfPresent(Int.self, forKey: .progress)
+                self.progress = try container.decodeIfPresent(Int.self, forKey: .progress)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'progress': \(error)")
                 throw error
             }
             do {
-                blob = try container.decodeIfPresent(Blob.self, forKey: .blob)
+                self.blob = try container.decodeIfPresent(Blob.self, forKey: .blob)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'blob': \(error)")
                 throw error
             }
             do {
-                error = try container.decodeIfPresent(String.self, forKey: .error)
+                self.error = try container.decodeIfPresent(String.self, forKey: .error)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'error': \(error)")
                 throw error
             }
             do {
-                message = try container.decodeIfPresent(String.self, forKey: .message)
+                self.message = try container.decodeIfPresent(String.self, forKey: .message)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'message': \(error)")
                 throw error
@@ -180,4 +184,11 @@ public enum AppBskyVideoDefs {
             case message
         }
     }
+
+
+
 }
+
+
+                           
+

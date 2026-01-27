@@ -1,10 +1,14 @@
 import Foundation
 
+
+
 // lexicon: 1, id: com.atproto.repo.putRecord
 
-public enum ComAtprotoRepoPutRecord {
+
+public struct ComAtprotoRepoPutRecord { 
+
     public static let typeIdentifier = "com.atproto.repo.putRecord"
-    public struct Input: ATProtocolCodable {
+public struct Input: ATProtocolCodable {
         public let repo: ATIdentifier
         public let collection: NSID
         public let rkey: RecordKey
@@ -23,16 +27,17 @@ public enum ComAtprotoRepoPutRecord {
             self.swapRecord = swapRecord
             self.swapCommit = swapCommit
         }
+        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            repo = try container.decode(ATIdentifier.self, forKey: .repo)
-            collection = try container.decode(NSID.self, forKey: .collection)
-            rkey = try container.decode(RecordKey.self, forKey: .rkey)
-            validate = try container.decodeIfPresent(Bool.self, forKey: .validate)
-            record = try container.decode(ATProtocolValueContainer.self, forKey: .record)
-            swapRecord = try container.decodeIfPresent(CID.self, forKey: .swapRecord)
-            swapCommit = try container.decodeIfPresent(CID.self, forKey: .swapCommit)
+            self.repo = try container.decode(ATIdentifier.self, forKey: .repo)
+            self.collection = try container.decode(NSID.self, forKey: .collection)
+            self.rkey = try container.decode(RecordKey.self, forKey: .rkey)
+            self.validate = try container.decodeIfPresent(Bool.self, forKey: .validate)
+            self.record = try container.decode(ATProtocolValueContainer.self, forKey: .record)
+            self.swapRecord = try container.decodeIfPresent(CID.self, forKey: .swapRecord)
+            self.swapCommit = try container.decodeIfPresent(CID.self, forKey: .swapCommit)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -81,128 +86,172 @@ public enum ComAtprotoRepoPutRecord {
             case swapCommit
         }
     }
-
-    public struct Output: ATProtocolCodable {
+    
+public struct Output: ATProtocolCodable {
+        
+        
         public let uri: ATProtocolURI
-
+        
         public let cid: CID
-
+        
         public let commit: ComAtprotoRepoDefs.CommitMeta?
-
+        
         public let validationStatus: String?
-
-        /// Standard public initializer
+        
+        
+        
+        // Standard public initializer
         public init(
+            
+            
             uri: ATProtocolURI,
-
+            
             cid: CID,
-
+            
             commit: ComAtprotoRepoDefs.CommitMeta? = nil,
-
+            
             validationStatus: String? = nil
-
+            
+            
         ) {
+            
+            
             self.uri = uri
-
+            
             self.cid = cid
-
+            
             self.commit = commit
-
+            
             self.validationStatus = validationStatus
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
-            uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-
-            cid = try container.decode(CID.self, forKey: .cid)
-
-            commit = try container.decodeIfPresent(ComAtprotoRepoDefs.CommitMeta.self, forKey: .commit)
-
-            validationStatus = try container.decodeIfPresent(String.self, forKey: .validationStatus)
+            
+            self.uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+            
+            
+            self.cid = try container.decode(CID.self, forKey: .cid)
+            
+            
+            self.commit = try container.decodeIfPresent(ComAtprotoRepoDefs.CommitMeta.self, forKey: .commit)
+            
+            
+            self.validationStatus = try container.decodeIfPresent(String.self, forKey: .validationStatus)
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
+            
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
             try container.encode(uri, forKey: .uri)
-
+            
+            
             try container.encode(cid, forKey: .cid)
-
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(commit, forKey: .commit)
-
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(validationStatus, forKey: .validationStatus)
+            
+            
         }
 
         public func toCBORValue() throws -> Any {
+            
             var map = OrderedCBORMap()
 
+            
+            
             let uriValue = try uri.toCBORValue()
             map = map.adding(key: "uri", value: uriValue)
-
+            
+            
+            
             let cidValue = try cid.toCBORValue()
             map = map.adding(key: "cid", value: cidValue)
-
+            
+            
+            
             if let value = commit {
                 // Encode optional property even if it's an empty array for CBOR
                 let commitValue = try value.toCBORValue()
                 map = map.adding(key: "commit", value: commitValue)
             }
-
+            
+            
+            
             if let value = validationStatus {
                 // Encode optional property even if it's an empty array for CBOR
                 let validationStatusValue = try value.toCBORValue()
                 map = map.adding(key: "validationStatus", value: validationStatusValue)
             }
+            
+            
 
             return map
+            
         }
-
+        
+        
         private enum CodingKeys: String, CodingKey {
             case uri
             case cid
             case commit
             case validationStatus
         }
+        
     }
+        
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                case invalidSwap = "InvalidSwap."
+            public var description: String {
+                return self.rawValue
+            }
 
-    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-        case invalidSwap = "InvalidSwap."
-        public var description: String {
-            return rawValue
+            public var errorName: String {
+                // Extract just the error name from the raw value
+                let parts = self.rawValue.split(separator: ".")
+                return String(parts.first ?? "")
+            }
         }
 
-        public var errorName: String {
-            // Extract just the error name from the raw value
-            let parts = rawValue.split(separator: ".")
-            return String(parts.first ?? "")
-        }
-    }
+
+
 }
 
-public extension ATProtoClient.Com.Atproto.Repo {
+extension ATProtoClient.Com.Atproto.Repo {
     // MARK: - putRecord
 
     /// Write a repository record, creating or updating it as needed. Requires auth, implemented by PDS.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-    ///
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    func putRecord(
+    public func putRecord(
+        
         input: ComAtprotoRepoPutRecord.Input
-
+        
     ) async throws -> (responseCode: Int, data: ComAtprotoRepoPutRecord.Output?) {
         let endpoint = "com.atproto.repo.putRecord"
-
+        
         var headers: [String: String] = [:]
-
+        
         headers["Content-Type"] = "application/json"
-
+        
+        
+        
         headers["Accept"] = "application/json"
+        
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -219,6 +268,7 @@ public extension ATProtoClient.Com.Atproto.Repo {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
+        
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
@@ -228,11 +278,12 @@ public extension ATProtoClient.Com.Atproto.Repo {
         }
 
         // Only decode response data if request was successful
-        if (200 ... 299).contains(responseCode) {
+        if (200...299).contains(responseCode) {
             do {
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(ComAtprotoRepoPutRecord.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -243,5 +294,9 @@ public extension ATProtoClient.Com.Atproto.Repo {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
+        
     }
+    
 }
+                           
+

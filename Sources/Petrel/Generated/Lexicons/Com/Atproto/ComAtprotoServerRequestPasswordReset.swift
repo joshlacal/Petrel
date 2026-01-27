@@ -1,20 +1,25 @@
 import Foundation
 
+
+
 // lexicon: 1, id: com.atproto.server.requestPasswordReset
 
-public enum ComAtprotoServerRequestPasswordReset {
+
+public struct ComAtprotoServerRequestPasswordReset { 
+
     public static let typeIdentifier = "com.atproto.server.requestPasswordReset"
-    public struct Input: ATProtocolCodable {
+public struct Input: ATProtocolCodable {
         public let email: String
 
         /// Standard public initializer
         public init(email: String) {
             self.email = email
         }
+        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            email = try container.decode(String.self, forKey: .email)
+            self.email = try container.decode(String.self, forKey: .email)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -33,26 +38,33 @@ public enum ComAtprotoServerRequestPasswordReset {
             case email
         }
     }
+
+
+
 }
 
-public extension ATProtoClient.Com.Atproto.Server {
+extension ATProtoClient.Com.Atproto.Server {
     // MARK: - requestPasswordReset
 
     /// Initiate a user account password reset via email.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-    ///
+    /// 
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    func requestPasswordReset(
+    public func requestPasswordReset(
+        
         input: ComAtprotoServerRequestPasswordReset.Input
-
+        
     ) async throws -> Int {
         let endpoint = "com.atproto.server.requestPasswordReset"
-
+        
         var headers: [String: String] = [:]
-
+        
         headers["Content-Type"] = "application/json"
+        
+        
+        
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -67,6 +79,13 @@ public extension ATProtoClient.Com.Atproto.Server {
         let serviceDID = await networkService.getServiceDID(for: "com.atproto.server.requestPasswordReset")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
         let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        return response.statusCode
+        let responseCode = response.statusCode
+
+        
+        return responseCode
+        
     }
+    
 }
+                           
+

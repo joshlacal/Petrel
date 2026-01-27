@@ -1,20 +1,25 @@
 import Foundation
 
+
+
 // lexicon: 1, id: app.bsky.draft.deleteDraft
 
-public enum AppBskyDraftDeleteDraft {
+
+public struct AppBskyDraftDeleteDraft { 
+
     public static let typeIdentifier = "app.bsky.draft.deleteDraft"
-    public struct Input: ATProtocolCodable {
+public struct Input: ATProtocolCodable {
         public let id: TID
 
         /// Standard public initializer
         public init(id: TID) {
             self.id = id
         }
+        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            id = try container.decode(TID.self, forKey: .id)
+            self.id = try container.decode(TID.self, forKey: .id)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -33,26 +38,33 @@ public enum AppBskyDraftDeleteDraft {
             case id
         }
     }
+
+
+
 }
 
-public extension ATProtoClient.App.Bsky.Draft {
+extension ATProtoClient.App.Bsky.Draft {
     // MARK: - deleteDraft
 
     /// Deletes a draft by ID. Requires authentication.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-    ///
+    /// 
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    func deleteDraft(
+    public func deleteDraft(
+        
         input: AppBskyDraftDeleteDraft.Input
-
+        
     ) async throws -> Int {
         let endpoint = "app.bsky.draft.deleteDraft"
-
+        
         var headers: [String: String] = [:]
-
+        
         headers["Content-Type"] = "application/json"
+        
+        
+        
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -67,6 +79,13 @@ public extension ATProtoClient.App.Bsky.Draft {
         let serviceDID = await networkService.getServiceDID(for: "app.bsky.draft.deleteDraft")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
         let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        return response.statusCode
+        let responseCode = response.statusCode
+
+        
+        return responseCode
+        
     }
+    
 }
+                           
+

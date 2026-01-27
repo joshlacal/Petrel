@@ -1,20 +1,25 @@
 import Foundation
 
+
+
 // lexicon: 1, id: app.bsky.feed.sendInteractions
 
-public enum AppBskyFeedSendInteractions {
+
+public struct AppBskyFeedSendInteractions { 
+
     public static let typeIdentifier = "app.bsky.feed.sendInteractions"
-    public struct Input: ATProtocolCodable {
+public struct Input: ATProtocolCodable {
         public let interactions: [AppBskyFeedDefs.Interaction]
 
         /// Standard public initializer
         public init(interactions: [AppBskyFeedDefs.Interaction]) {
             self.interactions = interactions
         }
+        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            interactions = try container.decode([AppBskyFeedDefs.Interaction].self, forKey: .interactions)
+            self.interactions = try container.decode([AppBskyFeedDefs.Interaction].self, forKey: .interactions)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -33,51 +38,72 @@ public enum AppBskyFeedSendInteractions {
             case interactions
         }
     }
-
-    public struct Output: ATProtocolCodable {
+    
+public struct Output: ATProtocolCodable {
+        
         // Empty output - no properties (response is {})
-
-        /// Standard public initializer
+        
+        
+        // Standard public initializer
         public init(
-        ) {}
-
+            
+        ) {
+            
+        }
+        
         public init(from decoder: Decoder) throws {
+            
             // Empty output - just validate it's an object by trying to get any container
             _ = try decoder.singleValueContainer()
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
+            
             // Empty output - encode empty object
             _ = encoder.singleValueContainer()
+            
         }
 
         public func toCBORValue() throws -> Any {
+            
             // Empty output - return empty CBOR map
             return OrderedCBORMap()
+            
         }
+        
+        
     }
+
+
+
+
 }
 
-public extension ATProtoClient.App.Bsky.Feed {
+extension ATProtoClient.App.Bsky.Feed {
     // MARK: - sendInteractions
 
     /// Send information about interactions with feed items back to the feed generator that served them.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-    ///
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    func sendInteractions(
+    public func sendInteractions(
+        
         input: AppBskyFeedSendInteractions.Input
-
+        
     ) async throws -> (responseCode: Int, data: AppBskyFeedSendInteractions.Output?) {
         let endpoint = "app.bsky.feed.sendInteractions"
-
+        
         var headers: [String: String] = [:]
-
+        
         headers["Content-Type"] = "application/json"
-
+        
+        
+        
         headers["Accept"] = "application/json"
+        
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -94,6 +120,7 @@ public extension ATProtoClient.App.Bsky.Feed {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
+        
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
@@ -103,11 +130,12 @@ public extension ATProtoClient.App.Bsky.Feed {
         }
 
         // Only decode response data if request was successful
-        if (200 ... 299).contains(responseCode) {
+        if (200...299).contains(responseCode) {
             do {
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(AppBskyFeedSendInteractions.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -118,5 +146,9 @@ public extension ATProtoClient.App.Bsky.Feed {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
+        
     }
+    
 }
+                           
+

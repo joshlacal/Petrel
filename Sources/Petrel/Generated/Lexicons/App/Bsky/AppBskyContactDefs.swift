@@ -1,14 +1,18 @@
 import Foundation
 
+
+
 // lexicon: 1, id: app.bsky.contact.defs
 
-public enum AppBskyContactDefs {
-    public static let typeIdentifier = "app.bsky.contact.defs"
 
-    public struct MatchAndContactIndex: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.contact.defs#matchAndContactIndex"
-        public let match: AppBskyActorDefs.ProfileView
-        public let contactIndex: Int
+public struct AppBskyContactDefs { 
+
+    public static let typeIdentifier = "app.bsky.contact.defs"
+        
+public struct MatchAndContactIndex: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.contact.defs#matchAndContactIndex"
+            public let match: AppBskyActorDefs.ProfileView
+            public let contactIndex: Int
 
         public init(
             match: AppBskyActorDefs.ProfileView, contactIndex: Int
@@ -20,13 +24,13 @@ public enum AppBskyContactDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                match = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: .match)
+                self.match = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: .match)
             } catch {
                 LogManager.logError("Decoding error for required property 'match': \(error)")
                 throw error
             }
             do {
-                contactIndex = try container.decode(Int.self, forKey: .contactIndex)
+                self.contactIndex = try container.decode(Int.self, forKey: .contactIndex)
             } catch {
                 LogManager.logError("Decoding error for required property 'contactIndex': \(error)")
                 throw error
@@ -76,11 +80,11 @@ public enum AppBskyContactDefs {
             case contactIndex
         }
     }
-
-    public struct SyncStatus: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.contact.defs#syncStatus"
-        public let syncedAt: ATProtocolDate
-        public let matchesCount: Int
+        
+public struct SyncStatus: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.contact.defs#syncStatus"
+            public let syncedAt: ATProtocolDate
+            public let matchesCount: Int
 
         public init(
             syncedAt: ATProtocolDate, matchesCount: Int
@@ -92,13 +96,13 @@ public enum AppBskyContactDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                syncedAt = try container.decode(ATProtocolDate.self, forKey: .syncedAt)
+                self.syncedAt = try container.decode(ATProtocolDate.self, forKey: .syncedAt)
             } catch {
                 LogManager.logError("Decoding error for required property 'syncedAt': \(error)")
                 throw error
             }
             do {
-                matchesCount = try container.decode(Int.self, forKey: .matchesCount)
+                self.matchesCount = try container.decode(Int.self, forKey: .matchesCount)
             } catch {
                 LogManager.logError("Decoding error for required property 'matchesCount': \(error)")
                 throw error
@@ -148,11 +152,11 @@ public enum AppBskyContactDefs {
             case matchesCount
         }
     }
-
-    public struct Notification: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.contact.defs#notification"
-        public let from: DID
-        public let to: DID
+        
+public struct Notification: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.contact.defs#notification"
+            public let from: DID
+            public let to: DID
 
         public init(
             from: DID, to: DID
@@ -164,13 +168,13 @@ public enum AppBskyContactDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                from = try container.decode(DID.self, forKey: .from)
+                self.from = try container.decode(DID.self, forKey: .from)
             } catch {
                 LogManager.logError("Decoding error for required property 'from': \(error)")
                 throw error
             }
             do {
-                to = try container.decode(DID.self, forKey: .to)
+                self.to = try container.decode(DID.self, forKey: .to)
             } catch {
                 LogManager.logError("Decoding error for required property 'to': \(error)")
                 throw error
@@ -220,4 +224,11 @@ public enum AppBskyContactDefs {
             case to
         }
     }
+
+
+
 }
+
+
+                           
+

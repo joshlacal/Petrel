@@ -1,76 +1,103 @@
 import Foundation
 
+
+
 // lexicon: 1, id: app.bsky.contact.removeData
 
-public enum AppBskyContactRemoveData {
+
+public struct AppBskyContactRemoveData { 
+
     public static let typeIdentifier = "app.bsky.contact.removeData"
-    public struct Input: ATProtocolCodable {
+public struct Input: ATProtocolCodable {
+
         /// Standard public initializer
-        public init() {}
+        public init() {
+        }
+        
 
         public func toCBORValue() throws -> Any {
             return OrderedCBORMap()
         }
     }
-
-    public struct Output: ATProtocolCodable {
+    
+public struct Output: ATProtocolCodable {
+        
         // Empty output - no properties (response is {})
-
-        /// Standard public initializer
+        
+        
+        // Standard public initializer
         public init(
-        ) {}
-
+            
+        ) {
+            
+        }
+        
         public init(from decoder: Decoder) throws {
+            
             // Empty output - just validate it's an object by trying to get any container
             _ = try decoder.singleValueContainer()
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
+            
             // Empty output - encode empty object
             _ = encoder.singleValueContainer()
+            
         }
 
         public func toCBORValue() throws -> Any {
+            
             // Empty output - return empty CBOR map
             return OrderedCBORMap()
+            
         }
+        
+        
     }
+        
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                case invalidDid = "InvalidDid."
+                case internalError = "InternalError."
+            public var description: String {
+                return self.rawValue
+            }
 
-    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-        case invalidDid = "InvalidDid."
-        case internalError = "InternalError."
-        public var description: String {
-            return rawValue
+            public var errorName: String {
+                // Extract just the error name from the raw value
+                let parts = self.rawValue.split(separator: ".")
+                return String(parts.first ?? "")
+            }
         }
 
-        public var errorName: String {
-            // Extract just the error name from the raw value
-            let parts = rawValue.split(separator: ".")
-            return String(parts.first ?? "")
-        }
-    }
+
+
 }
 
-public extension ATProtoClient.App.Bsky.Contact {
+extension ATProtoClient.App.Bsky.Contact {
     // MARK: - removeData
 
     /// Removes all stored hashes used for contact matching, existing matches, and sync status. Requires authentication.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-    ///
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    func removeData(
+    public func removeData(
+        
         input: AppBskyContactRemoveData.Input
-
+        
     ) async throws -> (responseCode: Int, data: AppBskyContactRemoveData.Output?) {
         let endpoint = "app.bsky.contact.removeData"
-
+        
         var headers: [String: String] = [:]
-
+        
         headers["Content-Type"] = "application/json"
-
+        
+        
+        
         headers["Accept"] = "application/json"
+        
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -87,6 +114,7 @@ public extension ATProtoClient.App.Bsky.Contact {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
+        
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
@@ -96,11 +124,12 @@ public extension ATProtoClient.App.Bsky.Contact {
         }
 
         // Only decode response data if request was successful
-        if (200 ... 299).contains(responseCode) {
+        if (200...299).contains(responseCode) {
             do {
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(AppBskyContactRemoveData.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -111,5 +140,9 @@ public extension ATProtoClient.App.Bsky.Contact {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
+        
     }
+    
 }
+                           
+
