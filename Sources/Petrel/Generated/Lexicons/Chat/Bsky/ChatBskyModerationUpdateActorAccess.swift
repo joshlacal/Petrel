@@ -1,10 +1,14 @@
 import Foundation
 
+
+
 // lexicon: 1, id: chat.bsky.moderation.updateActorAccess
 
-public enum ChatBskyModerationUpdateActorAccess {
+
+public struct ChatBskyModerationUpdateActorAccess { 
+
     public static let typeIdentifier = "chat.bsky.moderation.updateActorAccess"
-    public struct Input: ATProtocolCodable {
+public struct Input: ATProtocolCodable {
         public let actor: DID
         public let allowAccess: Bool
         public let ref: String?
@@ -15,12 +19,13 @@ public enum ChatBskyModerationUpdateActorAccess {
             self.allowAccess = allowAccess
             self.ref = ref
         }
+        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            actor = try container.decode(DID.self, forKey: .actor)
-            allowAccess = try container.decode(Bool.self, forKey: .allowAccess)
-            ref = try container.decodeIfPresent(String.self, forKey: .ref)
+            self.actor = try container.decode(DID.self, forKey: .actor)
+            self.allowAccess = try container.decode(Bool.self, forKey: .allowAccess)
+            self.ref = try container.decodeIfPresent(String.self, forKey: .ref)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -49,26 +54,33 @@ public enum ChatBskyModerationUpdateActorAccess {
             case ref
         }
     }
+
+
+
 }
 
-public extension ATProtoClient.Chat.Bsky.Moderation {
+extension ATProtoClient.Chat.Bsky.Moderation {
     // MARK: - updateActorAccess
 
-    ///
-    ///
+    /// 
+    /// 
     /// - Parameter input: The input parameters for the request
-    ///
+    /// 
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    func updateActorAccess(
+    public func updateActorAccess(
+        
         input: ChatBskyModerationUpdateActorAccess.Input
-
+        
     ) async throws -> Int {
         let endpoint = "chat.bsky.moderation.updateActorAccess"
-
+        
         var headers: [String: String] = [:]
-
+        
         headers["Content-Type"] = "application/json"
+        
+        
+        
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -83,6 +95,13 @@ public extension ATProtoClient.Chat.Bsky.Moderation {
         let serviceDID = await networkService.getServiceDID(for: "chat.bsky.moderation.updateActorAccess")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
         let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        return response.statusCode
+        let responseCode = response.statusCode
+
+        
+        return responseCode
+        
     }
+    
 }
+                           
+

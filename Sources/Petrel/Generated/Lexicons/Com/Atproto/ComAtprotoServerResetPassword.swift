@@ -1,10 +1,14 @@
 import Foundation
 
+
+
 // lexicon: 1, id: com.atproto.server.resetPassword
 
-public enum ComAtprotoServerResetPassword {
+
+public struct ComAtprotoServerResetPassword { 
+
     public static let typeIdentifier = "com.atproto.server.resetPassword"
-    public struct Input: ATProtocolCodable {
+public struct Input: ATProtocolCodable {
         public let token: String
         public let password: String
 
@@ -13,11 +17,12 @@ public enum ComAtprotoServerResetPassword {
             self.token = token
             self.password = password
         }
+        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            token = try container.decode(String.self, forKey: .token)
-            password = try container.decode(String.self, forKey: .password)
+            self.token = try container.decode(String.self, forKey: .token)
+            self.password = try container.decode(String.self, forKey: .password)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -39,41 +44,47 @@ public enum ComAtprotoServerResetPassword {
             case token
             case password
         }
-    }
+    }        
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                case expiredToken = "ExpiredToken."
+                case invalidToken = "InvalidToken."
+            public var description: String {
+                return self.rawValue
+            }
 
-    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-        case expiredToken = "ExpiredToken."
-        case invalidToken = "InvalidToken."
-        public var description: String {
-            return rawValue
+            public var errorName: String {
+                // Extract just the error name from the raw value
+                let parts = self.rawValue.split(separator: ".")
+                return String(parts.first ?? "")
+            }
         }
 
-        public var errorName: String {
-            // Extract just the error name from the raw value
-            let parts = rawValue.split(separator: ".")
-            return String(parts.first ?? "")
-        }
-    }
+
+
 }
 
-public extension ATProtoClient.Com.Atproto.Server {
+extension ATProtoClient.Com.Atproto.Server {
     // MARK: - resetPassword
 
     /// Reset a user account password using a token.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-    ///
+    /// 
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    func resetPassword(
+    public func resetPassword(
+        
         input: ComAtprotoServerResetPassword.Input
-
+        
     ) async throws -> Int {
         let endpoint = "com.atproto.server.resetPassword"
-
+        
         var headers: [String: String] = [:]
-
+        
         headers["Content-Type"] = "application/json"
+        
+        
+        
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -88,6 +99,13 @@ public extension ATProtoClient.Com.Atproto.Server {
         let serviceDID = await networkService.getServiceDID(for: "com.atproto.server.resetPassword")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
         let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        return response.statusCode
+        let responseCode = response.statusCode
+
+        
+        return responseCode
+        
     }
+    
 }
+                           
+

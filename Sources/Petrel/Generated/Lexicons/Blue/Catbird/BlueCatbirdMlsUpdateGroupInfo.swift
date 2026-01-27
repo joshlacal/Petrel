@@ -1,10 +1,14 @@
 import Foundation
 
+
+
 // lexicon: 1, id: blue.catbird.mls.updateGroupInfo
 
-public enum BlueCatbirdMlsUpdateGroupInfo {
+
+public struct BlueCatbirdMlsUpdateGroupInfo { 
+
     public static let typeIdentifier = "blue.catbird.mls.updateGroupInfo"
-    public struct Input: ATProtocolCodable {
+public struct Input: ATProtocolCodable {
         public let convoId: String
         public let groupInfo: String
         public let epoch: Int
@@ -15,12 +19,13 @@ public enum BlueCatbirdMlsUpdateGroupInfo {
             self.groupInfo = groupInfo
             self.epoch = epoch
         }
+        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            convoId = try container.decode(String.self, forKey: .convoId)
-            groupInfo = try container.decode(String.self, forKey: .groupInfo)
-            epoch = try container.decode(Int.self, forKey: .epoch)
+            self.convoId = try container.decode(String.self, forKey: .convoId)
+            self.groupInfo = try container.decode(String.self, forKey: .groupInfo)
+            self.epoch = try container.decode(Int.self, forKey: .epoch)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -47,79 +52,111 @@ public enum BlueCatbirdMlsUpdateGroupInfo {
             case epoch
         }
     }
-
-    public struct Output: ATProtocolCodable {
+    
+public struct Output: ATProtocolCodable {
+        
+        
         public let updated: Bool
-
-        /// Standard public initializer
+        
+        
+        
+        // Standard public initializer
         public init(
+            
+            
             updated: Bool
-
+            
+            
         ) {
+            
+            
             self.updated = updated
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
-            updated = try container.decode(Bool.self, forKey: .updated)
+            
+            self.updated = try container.decode(Bool.self, forKey: .updated)
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
+            
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
             try container.encode(updated, forKey: .updated)
+            
+            
         }
 
         public func toCBORValue() throws -> Any {
+            
             var map = OrderedCBORMap()
 
+            
+            
             let updatedValue = try updated.toCBORValue()
             map = map.adding(key: "updated", value: updatedValue)
+            
+            
 
             return map
+            
         }
-
+        
+        
         private enum CodingKeys: String, CodingKey {
             case updated
         }
+        
     }
+        
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                case unauthorized = "Unauthorized."
+                case invalidGroupInfo = "InvalidGroupInfo."
+            public var description: String {
+                return self.rawValue
+            }
 
-    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-        case unauthorized = "Unauthorized."
-        case invalidGroupInfo = "InvalidGroupInfo."
-        public var description: String {
-            return rawValue
+            public var errorName: String {
+                // Extract just the error name from the raw value
+                let parts = self.rawValue.split(separator: ".")
+                return String(parts.first ?? "")
+            }
         }
 
-        public var errorName: String {
-            // Extract just the error name from the raw value
-            let parts = rawValue.split(separator: ".")
-            return String(parts.first ?? "")
-        }
-    }
+
+
 }
 
-public extension ATProtoClient.Blue.Catbird.Mls {
+extension ATProtoClient.Blue.Catbird.Mls {
     // MARK: - updateGroupInfo
 
     /// Update the cached GroupInfo for a conversation. Should be called by clients after committing a group state change.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-    ///
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    func updateGroupInfo(
+    public func updateGroupInfo(
+        
         input: BlueCatbirdMlsUpdateGroupInfo.Input
-
+        
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsUpdateGroupInfo.Output?) {
         let endpoint = "blue.catbird.mls.updateGroupInfo"
-
+        
         var headers: [String: String] = [:]
-
+        
         headers["Content-Type"] = "application/json"
-
+        
+        
+        
         headers["Accept"] = "application/json"
+        
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -136,6 +173,7 @@ public extension ATProtoClient.Blue.Catbird.Mls {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
+        
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
@@ -145,11 +183,12 @@ public extension ATProtoClient.Blue.Catbird.Mls {
         }
 
         // Only decode response data if request was successful
-        if (200 ... 299).contains(responseCode) {
+        if (200...299).contains(responseCode) {
             do {
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsUpdateGroupInfo.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -160,5 +199,9 @@ public extension ATProtoClient.Blue.Catbird.Mls {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
+        
     }
+    
 }
+                           
+
