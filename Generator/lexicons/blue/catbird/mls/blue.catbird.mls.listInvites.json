@@ -1,0 +1,57 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mls.listInvites",
+  "description": "List all invite links for a conversation",
+  "defs": {
+    "main": {
+      "type": "query",
+      "description": "Query to fetch all invites for a conversation. Only admins can list invites.",
+      "parameters": {
+        "type": "params",
+        "required": ["convoId"],
+        "properties": {
+          "convoId": {
+            "type": "string",
+            "description": "Conversation identifier"
+          },
+          "includeRevoked": {
+            "type": "boolean",
+            "default": false,
+            "description": "Whether to include revoked invites in the results"
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["invites"],
+          "properties": {
+            "invites": {
+              "type": "array",
+              "items": {
+                "type": "ref",
+                "ref": "blue.catbird.mls.createInvite#inviteView"
+              },
+              "description": "List of invites for this conversation"
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "name": "Unauthorized",
+          "description": "Caller is not an admin of this conversation"
+        },
+        {
+          "name": "ConvoNotFound",
+          "description": "Conversation not found"
+        },
+        {
+          "name": "NotMember",
+          "description": "Caller is not a member of this conversation"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mls.getPolicy",
+  "description": "Retrieve conversation policy settings",
+  "defs": {
+    "main": {
+      "type": "query",
+      "description": "Query to fetch policy settings for a conversation. All members can view policy.",
+      "parameters": {
+        "type": "params",
+        "required": ["convoId"],
+        "properties": {
+          "convoId": {
+            "type": "string",
+            "description": "Conversation identifier"
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["policy"],
+          "properties": {
+            "policy": {
+              "type": "ref",
+              "ref": "blue.catbird.mls.updatePolicy#policyView",
+              "description": "Policy settings for this conversation"
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "name": "ConvoNotFound",
+          "description": "Conversation not found"
+        },
+        {
+          "name": "NotMember",
+          "description": "Caller is not a member of this conversation"
+        }
+      ]
+    }
+  }
+}

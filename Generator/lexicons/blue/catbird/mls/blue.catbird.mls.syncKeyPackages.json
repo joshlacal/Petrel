@@ -1,0 +1,67 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mls.syncKeyPackages",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Synchronize key packages between client and server to prevent NoMatchingKeyPackage errors. Compares server-side available key packages against client-provided local hashes and deletes orphaned server packages that no longer have corresponding private keys on the device. MULTI-DEVICE: deviceId is REQUIRED - only syncs packages for that specific device to prevent cross-device interference.",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["localHashes", "deviceId"],
+          "properties": {
+            "localHashes": {
+              "type": "array",
+              "items": { "type": "string" },
+              "maxLength": 200,
+              "description": "SHA256 hex hashes of key packages that exist in local storage (have private keys)"
+            },
+            "deviceId": {
+              "type": "string",
+              "description": "Device ID to scope the sync (REQUIRED). Only syncs key packages belonging to this device. This is the deviceId returned from registerDevice."
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["serverHashes", "orphanedCount", "deletedCount", "deviceId"],
+          "properties": {
+            "serverHashes": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "SHA256 hex hashes of available (unconsumed) key packages on server AFTER cleanup"
+            },
+            "orphanedCount": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of orphaned key packages detected (on server but not in local storage)"
+            },
+            "deletedCount": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of orphaned key packages successfully deleted"
+            },
+            "orphanedHashes": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Hashes of orphaned packages that were deleted (for debugging)"
+            },
+            "remainingAvailable": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of valid key packages remaining after cleanup"
+            },
+            "deviceId": {
+              "type": "string",
+              "description": "Device ID that was synced (echoed back for confirmation)"
+            }
+          }
+        }
+      }
+    }
+  }
+}

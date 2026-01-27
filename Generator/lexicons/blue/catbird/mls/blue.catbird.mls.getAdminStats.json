@@ -1,0 +1,137 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mls.getAdminStats",
+  "description": "Get moderation statistics for App Store compliance demonstration",
+  "defs": {
+    "main": {
+      "type": "query",
+      "description": "Query moderation and admin action statistics. Returns aggregate counts of reports, removals, and block conflicts resolved. Used for App Store review to demonstrate active moderation capabilities. Only accessible to conversation admins.",
+      "parameters": {
+        "type": "params",
+        "properties": {
+          "convoId": {
+            "type": "string",
+            "description": "Optional: Get stats for specific conversation (requires admin). Omit for global stats (requires superadmin)."
+          },
+          "since": {
+            "type": "string",
+            "format": "datetime",
+            "description": "Optional: Only include stats since this timestamp"
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["stats", "generatedAt"],
+          "properties": {
+            "stats": {
+              "type": "ref",
+              "ref": "#moderationStats"
+            },
+            "generatedAt": {
+              "type": "string",
+              "format": "datetime",
+              "description": "When these statistics were generated"
+            },
+            "convoId": {
+              "type": "string",
+              "description": "Conversation ID if stats are for a specific conversation"
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "name": "NotAuthorized",
+          "description": "User is not authorized to view moderation statistics"
+        },
+        {
+          "name": "ConvoNotFound",
+          "description": "Conversation not found (when convoId is specified)"
+        }
+      ]
+    },
+    "moderationStats": {
+      "type": "object",
+      "description": "Aggregate moderation statistics",
+      "required": ["totalReports", "pendingReports", "resolvedReports", "totalRemovals", "blockConflictsResolved"],
+      "properties": {
+        "totalReports": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total number of member reports submitted"
+        },
+        "pendingReports": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of reports awaiting admin review"
+        },
+        "resolvedReports": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of reports resolved by admins"
+        },
+        "totalRemovals": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total number of members removed by admins"
+        },
+        "blockConflictsResolved": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of Bluesky block conflicts resolved by admins"
+        },
+        "reportsByCategory": {
+          "type": "ref",
+          "ref": "#reportCategoryCounts",
+          "description": "Breakdown of reports by category"
+        },
+        "averageResolutionTimeHours": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Average time to resolve reports (in hours)"
+        }
+      }
+    },
+    "reportCategoryCounts": {
+      "type": "object",
+      "description": "Count of reports by category",
+      "properties": {
+        "harassment": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "spam": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "hateSpeech": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "violence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sexualContent": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "impersonation": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "privacyViolation": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "otherCategory": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

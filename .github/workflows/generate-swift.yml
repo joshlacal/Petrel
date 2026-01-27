@@ -16,7 +16,16 @@ jobs:
         run: |
           git clone --depth=1 --branch main https://github.com/bluesky-social/atproto.git
           mkdir -p Generator/lexicons
+          # Backup blue.catbird lexicons before sync
+          if [ -d "Generator/lexicons/blue/catbird" ]; then
+            cp -r Generator/lexicons/blue/catbird /tmp/catbird-backup
+          fi
           rsync -a --delete atproto/lexicons/ Generator/lexicons/
+          # Restore blue.catbird lexicons after sync
+          if [ -d "/tmp/catbird-backup" ]; then
+            mkdir -p Generator/lexicons/blue
+            cp -r /tmp/catbird-backup Generator/lexicons/blue/catbird
+          fi
       - name: Set up Python
         uses: actions/setup-python@v4
         with:

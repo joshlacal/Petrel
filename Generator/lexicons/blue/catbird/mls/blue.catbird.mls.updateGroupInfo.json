@@ -1,0 +1,47 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mls.updateGroupInfo",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Update the cached GroupInfo for a conversation. Should be called by clients after committing a group state change.",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["convoId", "groupInfo", "epoch"],
+          "properties": {
+            "convoId": {
+              "type": "string",
+              "description": "The conversation ID"
+            },
+            "groupInfo": {
+              "type": "string",
+              "description": "Base64 encoded serialized GroupInfo bytes"
+            },
+            "epoch": {
+              "type": "integer",
+              "description": "The epoch this GroupInfo corresponds to"
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["updated"],
+          "properties": {
+            "updated": {
+              "type": "boolean"
+            }
+          }
+        }
+      },
+      "errors": [
+        { "name": "Unauthorized" },
+        { "name": "InvalidGroupInfo" }
+      ]
+    }
+  }
+}

@@ -1,127 +1,174 @@
 import Foundation
 
+
+
 // lexicon: 1, id: blue.catbird.mls.demoteModerator
 
-public enum BlueCatbirdMlsDemoteModerator {
+
+public struct BlueCatbirdMlsDemoteModerator { 
+
     public static let typeIdentifier = "blue.catbird.mls.demoteModerator"
-    public struct Input: ATProtocolCodable {
-        public let convoId: String
-        public let targetDid: DID
+public struct Input: ATProtocolCodable {
+            public let convoId: String
+            public let targetDid: DID
 
-        /// Standard public initializer
-        public init(convoId: String, targetDid: DID) {
-            self.convoId = convoId
-            self.targetDid = targetDid
+            // Standard public initializer
+            public init(convoId: String, targetDid: DID) {
+                self.convoId = convoId
+                self.targetDid = targetDid
+                
+            }
+            
+            public init(from decoder: Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                
+                self.convoId = try container.decode(String.self, forKey: .convoId)
+                
+                
+                self.targetDid = try container.decode(DID.self, forKey: .targetDid)
+                
+            }
+            
+            public func encode(to encoder: Encoder) throws {
+                var container = encoder.container(keyedBy: CodingKeys.self)
+                
+                try container.encode(convoId, forKey: .convoId)
+                
+                
+                try container.encode(targetDid, forKey: .targetDid)
+                
+            }
+            
+            private enum CodingKeys: String, CodingKey {
+                case convoId
+                case targetDid
+            }
+            
+            public func toCBORValue() throws -> Any {
+                var map = OrderedCBORMap()
+
+                
+                
+                let convoIdValue = try convoId.toCBORValue()
+                map = map.adding(key: "convoId", value: convoIdValue)
+                
+                
+                
+                let targetDidValue = try targetDid.toCBORValue()
+                map = map.adding(key: "targetDid", value: targetDidValue)
+                
+                
+
+                return map
+            }
         }
-
-        public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-
-            convoId = try container.decode(String.self, forKey: .convoId)
-
-            targetDid = try container.decode(DID.self, forKey: .targetDid)
-        }
-
-        public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-
-            try container.encode(convoId, forKey: .convoId)
-
-            try container.encode(targetDid, forKey: .targetDid)
-        }
-
-        private enum CodingKeys: String, CodingKey {
-            case convoId
-            case targetDid
-        }
-
-        public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-
-            let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
-
-            let targetDidValue = try targetDid.toCBORValue()
-            map = map.adding(key: "targetDid", value: targetDidValue)
-
-            return map
-        }
-    }
-
-    public struct Output: ATProtocolCodable {
+    
+public struct Output: ATProtocolCodable {
+        
+        
         public let ok: Bool
-
-        /// Standard public initializer
+        
+        
+        
+        // Standard public initializer
         public init(
+            
+            
             ok: Bool
-
+            
+            
         ) {
+            
+            
             self.ok = ok
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
-            ok = try container.decode(Bool.self, forKey: .ok)
+            
+            self.ok = try container.decode(Bool.self, forKey: .ok)
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
+            
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
             try container.encode(ok, forKey: .ok)
+            
+            
         }
 
         public func toCBORValue() throws -> Any {
+            
             var map = OrderedCBORMap()
 
+            
+            
             let okValue = try ok.toCBORValue()
             map = map.adding(key: "ok", value: okValue)
+            
+            
 
             return map
+            
         }
-
+        
+        
         private enum CodingKeys: String, CodingKey {
             case ok
         }
+        
     }
+        
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                case notAdmin = "NotAdmin.Caller is not an admin (unless self-demotion)"
+                case notMember = "NotMember.Target is not a member"
+                case notModerator = "NotModerator.Target is not currently a moderator"
+                case convoNotFound = "ConvoNotFound.Conversation not found"
+            public var description: String {
+                return self.rawValue
+            }
 
-    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-        case notAdmin = "NotAdmin.Caller is not an admin (unless self-demotion)"
-        case notMember = "NotMember.Target is not a member"
-        case notModerator = "NotModerator.Target is not currently a moderator"
-        case convoNotFound = "ConvoNotFound.Conversation not found"
-        public var description: String {
-            return rawValue
+            public var errorName: String {
+                // Extract just the error name from the raw value
+                let parts = self.rawValue.split(separator: ".")
+                return String(parts.first ?? "")
+            }
         }
 
-        public var errorName: String {
-            // Extract just the error name from the raw value
-            let parts = rawValue.split(separator: ".")
-            return String(parts.first ?? "")
-        }
-    }
+
+
 }
 
-public extension ATProtoClient.Blue.Catbird.Mls {
+extension ATProtoClient.Blue.Catbird.Mls {
     // MARK: - demoteModerator
 
     /// Demote a moderator to regular member (admin-only, or self-demotion) Demote a moderator to regular member. Caller must be an admin (unless demoting self). Server enforces authorization, updates DB, and logs action.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-    ///
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    func demoteModerator(
+    public func demoteModerator(
+        
         input: BlueCatbirdMlsDemoteModerator.Input
-
+        
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsDemoteModerator.Output?) {
         let endpoint = "blue.catbird.mls.demoteModerator"
-
+        
         var headers: [String: String] = [:]
-
+        
         headers["Content-Type"] = "application/json"
-
+        
+        
+        
         headers["Accept"] = "application/json"
+        
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -138,6 +185,7 @@ public extension ATProtoClient.Blue.Catbird.Mls {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
+        
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
@@ -147,11 +195,12 @@ public extension ATProtoClient.Blue.Catbird.Mls {
         }
 
         // Only decode response data if request was successful
-        if (200 ... 299).contains(responseCode) {
+        if (200...299).contains(responseCode) {
             do {
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsDemoteModerator.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -162,5 +211,9 @@ public extension ATProtoClient.Blue.Catbird.Mls {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
+        
     }
+    
 }
+                           
+

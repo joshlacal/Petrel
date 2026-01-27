@@ -1,0 +1,51 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mls.revokeInvite",
+  "description": "Revoke an existing invite link",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Revoke an invite link to prevent further use. Only admins can revoke invites.",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["inviteId"],
+          "properties": {
+            "inviteId": {
+              "type": "string",
+              "description": "Unique identifier for the invite to revoke"
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["success"],
+          "properties": {
+            "success": {
+              "type": "boolean",
+              "description": "Whether the revocation succeeded"
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "name": "Unauthorized",
+          "description": "Caller is not an admin of this conversation"
+        },
+        {
+          "name": "InviteNotFound",
+          "description": "Invite not found"
+        },
+        {
+          "name": "AlreadyRevoked",
+          "description": "Invite has already been revoked"
+        }
+      ]
+    }
+  }
+}

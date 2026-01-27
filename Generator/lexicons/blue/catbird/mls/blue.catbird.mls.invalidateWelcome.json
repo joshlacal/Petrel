@@ -1,0 +1,54 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mls.invalidateWelcome",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Invalidate a Welcome message that cannot be processed (e.g., NoMatchingKeyPackage). This allows the client to fall back to External Commit or request re-addition.",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["convoId", "reason"],
+          "properties": {
+            "convoId": {
+              "type": "string",
+              "description": "Conversation ID"
+            },
+            "reason": {
+              "type": "string",
+              "description": "Why the Welcome cannot be processed (e.g., NoMatchingKeyPackage, KeyPackageExpired)"
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["invalidated"],
+          "properties": {
+            "invalidated": {
+              "type": "boolean",
+              "description": "Whether a Welcome message was invalidated"
+            },
+            "welcomeId": {
+              "type": "string",
+              "description": "ID of the invalidated Welcome message"
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "name": "NotFound",
+          "description": "No unconsumed Welcome found for this conversation and user"
+        },
+        {
+          "name": "Unauthorized",
+          "description": "Not the recipient of this Welcome"
+        }
+      ]
+    }
+  }
+}

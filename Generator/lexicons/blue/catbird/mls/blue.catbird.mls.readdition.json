@@ -1,0 +1,54 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mls.readdition",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Request re-addition to a conversation when both Welcome and External Commit have failed. Active members will receive an SSE event and can re-add the user with fresh KeyPackages.",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["convoId"],
+          "properties": {
+            "convoId": {
+              "type": "string",
+              "description": "Conversation ID to rejoin"
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["requested"],
+          "properties": {
+            "requested": {
+              "type": "boolean",
+              "description": "Whether the re-addition request was successfully sent"
+            },
+            "activeMembers": {
+              "type": "integer",
+              "description": "Number of active members who were notified"
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "name": "NotFound",
+          "description": "Conversation not found"
+        },
+        {
+          "name": "Unauthorized",
+          "description": "Not a member or past member of this conversation"
+        },
+        {
+          "name": "NoActiveMembers",
+          "description": "No active members available to process re-addition"
+        }
+      ]
+    }
+  }
+}
