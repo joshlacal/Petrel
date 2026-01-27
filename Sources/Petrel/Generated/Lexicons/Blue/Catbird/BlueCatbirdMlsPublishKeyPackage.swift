@@ -1,10 +1,14 @@
 import Foundation
 
+
+
 // lexicon: 1, id: blue.catbird.mls.publishKeyPackage
 
-public enum BlueCatbirdMlsPublishKeyPackage {
+
+public struct BlueCatbirdMlsPublishKeyPackage { 
+
     public static let typeIdentifier = "blue.catbird.mls.publishKeyPackage"
-    public struct Input: ATProtocolCodable {
+public struct Input: ATProtocolCodable {
         public let keyPackage: String
         public let idempotencyKey: String?
         public let cipherSuite: String
@@ -17,31 +21,39 @@ public enum BlueCatbirdMlsPublishKeyPackage {
             self.cipherSuite = cipherSuite
             self.expires = expires
         }
+        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
-            keyPackage = try container.decode(String.self, forKey: .keyPackage)
-
-            idempotencyKey = try container.decodeIfPresent(String.self, forKey: .idempotencyKey)
-
-            cipherSuite = try container.decode(String.self, forKey: .cipherSuite)
-
-            expires = try container.decodeIfPresent(ATProtocolDate.self, forKey: .expires)
+            self.keyPackage = try container.decode(String.self, forKey: .keyPackage)
+            self.idempotencyKey = try container.decodeIfPresent(String.self, forKey: .idempotencyKey)
+            self.cipherSuite = try container.decode(String.self, forKey: .cipherSuite)
+            self.expires = try container.decodeIfPresent(ATProtocolDate.self, forKey: .expires)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(keyPackage, forKey: .keyPackage)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(idempotencyKey, forKey: .idempotencyKey)
-
             try container.encode(cipherSuite, forKey: .cipherSuite)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(expires, forKey: .expires)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            let keyPackageValue = try keyPackage.toCBORValue()
+            map = map.adding(key: "keyPackage", value: keyPackageValue)
+            if let value = idempotencyKey {
+                let idempotencyKeyValue = try value.toCBORValue()
+                map = map.adding(key: "idempotencyKey", value: idempotencyKeyValue)
+            }
+            let cipherSuiteValue = try cipherSuite.toCBORValue()
+            map = map.adding(key: "cipherSuite", value: cipherSuiteValue)
+            if let value = expires {
+                let expiresValue = try value.toCBORValue()
+                map = map.adding(key: "expires", value: expiresValue)
+            }
+            return map
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -50,92 +62,88 @@ public enum BlueCatbirdMlsPublishKeyPackage {
             case cipherSuite
             case expires
         }
-
-        public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-
-            let keyPackageValue = try keyPackage.toCBORValue()
-            map = map.adding(key: "keyPackage", value: keyPackageValue)
-
-            if let value = idempotencyKey {
-                // Encode optional property even if it's an empty array for CBOR
-                let idempotencyKeyValue = try value.toCBORValue()
-                map = map.adding(key: "idempotencyKey", value: idempotencyKeyValue)
-            }
-
-            let cipherSuiteValue = try cipherSuite.toCBORValue()
-            map = map.adding(key: "cipherSuite", value: cipherSuiteValue)
-
-            if let value = expires {
-                // Encode optional property even if it's an empty array for CBOR
-                let expiresValue = try value.toCBORValue()
-                map = map.adding(key: "expires", value: expiresValue)
-            }
-
-            return map
-        }
     }
-
-    public struct Output: ATProtocolCodable {
+    
+public struct Output: ATProtocolCodable {
+        
         // Empty output - no properties (response is {})
-
-        /// Standard public initializer
+        
+        
+        // Standard public initializer
         public init(
-        ) {}
-
+            
+        ) {
+            
+        }
+        
         public init(from decoder: Decoder) throws {
+            
             // Empty output - just validate it's an object by trying to get any container
             _ = try decoder.singleValueContainer()
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
+            
             // Empty output - encode empty object
             _ = encoder.singleValueContainer()
+            
         }
 
         public func toCBORValue() throws -> Any {
+            
             // Empty output - return empty CBOR map
             return OrderedCBORMap()
+            
         }
+        
+        
     }
+        
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                case invalidKeyPackage = "InvalidKeyPackage.Key package is malformed or invalid"
+                case invalidCipherSuite = "InvalidCipherSuite.Cipher suite is not supported"
+                case expirationTooFar = "ExpirationTooFar.Expiration date is too far in the future (max 90 days)"
+                case tooManyKeyPackages = "TooManyKeyPackages.Maximum number of key packages per user exceeded"
+            public var description: String {
+                return self.rawValue
+            }
 
-    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-        case invalidKeyPackage = "InvalidKeyPackage.Key package is malformed or invalid"
-        case invalidCipherSuite = "InvalidCipherSuite.Cipher suite is not supported"
-        case expirationTooFar = "ExpirationTooFar.Expiration date is too far in the future (max 90 days)"
-        case tooManyKeyPackages = "TooManyKeyPackages.Maximum number of key packages per user exceeded"
-        public var description: String {
-            return rawValue
+            public var errorName: String {
+                // Extract just the error name from the raw value
+                let parts = self.rawValue.split(separator: ".")
+                return String(parts.first ?? "")
+            }
         }
 
-        public var errorName: String {
-            // Extract just the error name from the raw value
-            let parts = rawValue.split(separator: ".")
-            return String(parts.first ?? "")
-        }
-    }
+
+
 }
 
-public extension ATProtoClient.Blue.Catbird.Mls {
+extension ATProtoClient.Blue.Catbird.Mls {
     // MARK: - publishKeyPackage
 
     /// Publish an MLS key package to enable others to add you to conversations
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-    ///
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    func publishKeyPackage(
+    public func publishKeyPackage(
+        
         input: BlueCatbirdMlsPublishKeyPackage.Input
-
+        
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsPublishKeyPackage.Output?) {
         let endpoint = "blue.catbird.mls.publishKeyPackage"
-
+        
         var headers: [String: String] = [:]
-
+        
         headers["Content-Type"] = "application/json"
-
+        
+        
+        
         headers["Accept"] = "application/json"
+        
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -152,6 +160,7 @@ public extension ATProtoClient.Blue.Catbird.Mls {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
+        
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
@@ -161,11 +170,12 @@ public extension ATProtoClient.Blue.Catbird.Mls {
         }
 
         // Only decode response data if request was successful
-        if (200 ... 299).contains(responseCode) {
+        if (200...299).contains(responseCode) {
             do {
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsPublishKeyPackage.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -176,5 +186,9 @@ public extension ATProtoClient.Blue.Catbird.Mls {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
+        
     }
+    
 }
+                           
+
