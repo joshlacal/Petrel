@@ -1,10 +1,14 @@
 import Foundation
 
+
+
 // lexicon: 1, id: com.atproto.server.updateEmail
 
-public enum ComAtprotoServerUpdateEmail {
+
+public struct ComAtprotoServerUpdateEmail { 
+
     public static let typeIdentifier = "com.atproto.server.updateEmail"
-    public struct Input: ATProtocolCodable {
+public struct Input: ATProtocolCodable {
         public let email: String
         public let emailAuthFactor: Bool?
         public let token: String?
@@ -15,27 +19,35 @@ public enum ComAtprotoServerUpdateEmail {
             self.emailAuthFactor = emailAuthFactor
             self.token = token
         }
+        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
-            email = try container.decode(String.self, forKey: .email)
-
-            emailAuthFactor = try container.decodeIfPresent(Bool.self, forKey: .emailAuthFactor)
-
-            token = try container.decodeIfPresent(String.self, forKey: .token)
+            self.email = try container.decode(String.self, forKey: .email)
+            self.emailAuthFactor = try container.decodeIfPresent(Bool.self, forKey: .emailAuthFactor)
+            self.token = try container.decodeIfPresent(String.self, forKey: .token)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(email, forKey: .email)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(emailAuthFactor, forKey: .emailAuthFactor)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(token, forKey: .token)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            let emailValue = try email.toCBORValue()
+            map = map.adding(key: "email", value: emailValue)
+            if let value = emailAuthFactor {
+                let emailAuthFactorValue = try value.toCBORValue()
+                map = map.adding(key: "emailAuthFactor", value: emailAuthFactorValue)
+            }
+            if let value = token {
+                let tokenValue = try value.toCBORValue()
+                map = map.adding(key: "token", value: tokenValue)
+            }
+            return map
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -43,63 +55,48 @@ public enum ComAtprotoServerUpdateEmail {
             case emailAuthFactor
             case token
         }
-
-        public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-
-            let emailValue = try email.toCBORValue()
-            map = map.adding(key: "email", value: emailValue)
-
-            if let value = emailAuthFactor {
-                // Encode optional property even if it's an empty array for CBOR
-                let emailAuthFactorValue = try value.toCBORValue()
-                map = map.adding(key: "emailAuthFactor", value: emailAuthFactorValue)
+    }        
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                case expiredToken = "ExpiredToken."
+                case invalidToken = "InvalidToken."
+                case tokenRequired = "TokenRequired."
+            public var description: String {
+                return self.rawValue
             }
 
-            if let value = token {
-                // Encode optional property even if it's an empty array for CBOR
-                let tokenValue = try value.toCBORValue()
-                map = map.adding(key: "token", value: tokenValue)
+            public var errorName: String {
+                // Extract just the error name from the raw value
+                let parts = self.rawValue.split(separator: ".")
+                return String(parts.first ?? "")
             }
-
-            return map
-        }
-    }
-
-    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-        case expiredToken = "ExpiredToken."
-        case invalidToken = "InvalidToken."
-        case tokenRequired = "TokenRequired."
-        public var description: String {
-            return rawValue
         }
 
-        public var errorName: String {
-            // Extract just the error name from the raw value
-            let parts = rawValue.split(separator: ".")
-            return String(parts.first ?? "")
-        }
-    }
+
+
 }
 
-public extension ATProtoClient.Com.Atproto.Server {
+extension ATProtoClient.Com.Atproto.Server {
     // MARK: - updateEmail
 
     /// Update an account's email.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-    ///
+    /// 
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    func updateEmail(
+    public func updateEmail(
+        
         input: ComAtprotoServerUpdateEmail.Input
-
+        
     ) async throws -> Int {
         let endpoint = "com.atproto.server.updateEmail"
-
+        
         var headers: [String: String] = [:]
-
+        
         headers["Content-Type"] = "application/json"
+        
+        
+        
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -114,6 +111,13 @@ public extension ATProtoClient.Com.Atproto.Server {
         let serviceDID = await networkService.getServiceDID(for: "com.atproto.server.updateEmail")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
         let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        return response.statusCode
+        let responseCode = response.statusCode
+
+        
+        return responseCode
+        
     }
+    
 }
+                           
+
