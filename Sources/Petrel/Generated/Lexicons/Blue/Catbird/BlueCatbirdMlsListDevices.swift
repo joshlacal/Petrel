@@ -1,23 +1,19 @@
 import Foundation
 
-
-
 // lexicon: 1, id: blue.catbird.mls.listDevices
 
-
-public struct BlueCatbirdMlsListDevices { 
-
+public enum BlueCatbirdMlsListDevices {
     public static let typeIdentifier = "blue.catbird.mls.listDevices"
-        
-public struct DeviceInfo: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "blue.catbird.mls.listDevices#deviceInfo"
-            public let deviceId: String
-            public let deviceName: String
-            public let deviceUUID: String?
-            public let credentialDid: String
-            public let lastSeenAt: ATProtocolDate
-            public let registeredAt: ATProtocolDate
-            public let keyPackageCount: Int
+
+    public struct DeviceInfo: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "blue.catbird.mls.listDevices#deviceInfo"
+        public let deviceId: String
+        public let deviceName: String
+        public let deviceUUID: String?
+        public let credentialDid: String
+        public let lastSeenAt: ATProtocolDate
+        public let registeredAt: ATProtocolDate
+        public let keyPackageCount: Int
 
         public init(
             deviceId: String, deviceName: String, deviceUUID: String?, credentialDid: String, lastSeenAt: ATProtocolDate, registeredAt: ATProtocolDate, keyPackageCount: Int
@@ -34,43 +30,43 @@ public struct DeviceInfo: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.deviceId = try container.decode(String.self, forKey: .deviceId)
+                deviceId = try container.decode(String.self, forKey: .deviceId)
             } catch {
                 LogManager.logError("Decoding error for required property 'deviceId': \(error)")
                 throw error
             }
             do {
-                self.deviceName = try container.decode(String.self, forKey: .deviceName)
+                deviceName = try container.decode(String.self, forKey: .deviceName)
             } catch {
                 LogManager.logError("Decoding error for required property 'deviceName': \(error)")
                 throw error
             }
             do {
-                self.deviceUUID = try container.decodeIfPresent(String.self, forKey: .deviceUUID)
+                deviceUUID = try container.decodeIfPresent(String.self, forKey: .deviceUUID)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'deviceUUID': \(error)")
                 throw error
             }
             do {
-                self.credentialDid = try container.decode(String.self, forKey: .credentialDid)
+                credentialDid = try container.decode(String.self, forKey: .credentialDid)
             } catch {
                 LogManager.logError("Decoding error for required property 'credentialDid': \(error)")
                 throw error
             }
             do {
-                self.lastSeenAt = try container.decode(ATProtocolDate.self, forKey: .lastSeenAt)
+                lastSeenAt = try container.decode(ATProtocolDate.self, forKey: .lastSeenAt)
             } catch {
                 LogManager.logError("Decoding error for required property 'lastSeenAt': \(error)")
                 throw error
             }
             do {
-                self.registeredAt = try container.decode(ATProtocolDate.self, forKey: .registeredAt)
+                registeredAt = try container.decode(ATProtocolDate.self, forKey: .registeredAt)
             } catch {
                 LogManager.logError("Decoding error for required property 'registeredAt': \(error)")
                 throw error
             }
             do {
-                self.keyPackageCount = try container.decode(Int.self, forKey: .keyPackageCount)
+                keyPackageCount = try container.decode(Int.self, forKey: .keyPackageCount)
             } catch {
                 LogManager.logError("Decoding error for required property 'keyPackageCount': \(error)")
                 throw error
@@ -165,99 +161,65 @@ public struct DeviceInfo: ATProtocolCodable, ATProtocolValue {
             case registeredAt
             case keyPackageCount
         }
-    }    
-public struct Parameters: Parametrizable {
-        
-        public init(
-            ) {
-            
-        }
     }
-    
-public struct Output: ATProtocolCodable {
-        
-        
-        public let devices: [DeviceInfo]
-        
-        
-        
-        // Standard public initializer
+
+    public struct Parameters: Parametrizable {
         public init(
-            
-            
+        ) {}
+    }
+
+    public struct Output: ATProtocolCodable {
+        public let devices: [DeviceInfo]
+
+        /// Standard public initializer
+        public init(
             devices: [DeviceInfo]
-            
-            
+
         ) {
-            
-            
             self.devices = devices
-            
-            
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
-            self.devices = try container.decode([DeviceInfo].self, forKey: .devices)
-            
-            
+
+            devices = try container.decode([DeviceInfo].self, forKey: .devices)
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(devices, forKey: .devices)
-            
-            
         }
 
         public func toCBORValue() throws -> Any {
-            
             var map = OrderedCBORMap()
 
-            
-            
             let devicesValue = try devices.toCBORValue()
             map = map.adding(key: "devices", value: devicesValue)
-            
-            
 
             return map
-            
         }
-        
-        
+
         private enum CodingKeys: String, CodingKey {
             case devices
         }
-        
     }
-
-
-
-
 }
 
-
-
-extension ATProtoClient.Blue.Catbird.Mls {
+public extension ATProtoClient.Blue.Catbird.Mls {
     // MARK: - listDevices
 
     /// List all registered devices for the authenticated user with key package counts and last seen timestamps
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func listDevices(input: BlueCatbirdMlsListDevices.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsListDevices.Output?) {
+    func listDevices(input: BlueCatbirdMlsListDevices.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsListDevices.Output?) {
         let endpoint = "blue.catbird.mls.listDevices"
 
-        
         let queryItems = input.asQueryItems()
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -281,12 +243,11 @@ extension ATProtoClient.Blue.Catbird.Mls {
         }
 
         // Only decode response data if request was successful
-        if (200...299).contains(responseCode) {
+        if (200 ... 299).contains(responseCode) {
             do {
-                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsListDevices.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -294,12 +255,9 @@ extension ATProtoClient.Blue.Catbird.Mls {
                 return (responseCode, nil)
             }
         } else {
-            
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-                           
-

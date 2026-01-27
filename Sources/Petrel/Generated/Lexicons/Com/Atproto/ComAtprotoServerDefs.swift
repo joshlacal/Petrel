@@ -1,23 +1,19 @@
 import Foundation
 
-
-
 // lexicon: 1, id: com.atproto.server.defs
 
-
-public struct ComAtprotoServerDefs { 
-
+public enum ComAtprotoServerDefs {
     public static let typeIdentifier = "com.atproto.server.defs"
-        
-public struct InviteCode: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "com.atproto.server.defs#inviteCode"
-            public let code: String
-            public let available: Int
-            public let disabled: Bool
-            public let forAccount: String
-            public let createdBy: String
-            public let createdAt: ATProtocolDate
-            public let uses: [InviteCodeUse]
+
+    public struct InviteCode: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "com.atproto.server.defs#inviteCode"
+        public let code: String
+        public let available: Int
+        public let disabled: Bool
+        public let forAccount: String
+        public let createdBy: String
+        public let createdAt: ATProtocolDate
+        public let uses: [InviteCodeUse]
 
         public init(
             code: String, available: Int, disabled: Bool, forAccount: String, createdBy: String, createdAt: ATProtocolDate, uses: [InviteCodeUse]
@@ -34,43 +30,43 @@ public struct InviteCode: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.code = try container.decode(String.self, forKey: .code)
+                code = try container.decode(String.self, forKey: .code)
             } catch {
                 LogManager.logError("Decoding error for required property 'code': \(error)")
                 throw error
             }
             do {
-                self.available = try container.decode(Int.self, forKey: .available)
+                available = try container.decode(Int.self, forKey: .available)
             } catch {
                 LogManager.logError("Decoding error for required property 'available': \(error)")
                 throw error
             }
             do {
-                self.disabled = try container.decode(Bool.self, forKey: .disabled)
+                disabled = try container.decode(Bool.self, forKey: .disabled)
             } catch {
                 LogManager.logError("Decoding error for required property 'disabled': \(error)")
                 throw error
             }
             do {
-                self.forAccount = try container.decode(String.self, forKey: .forAccount)
+                forAccount = try container.decode(String.self, forKey: .forAccount)
             } catch {
                 LogManager.logError("Decoding error for required property 'forAccount': \(error)")
                 throw error
             }
             do {
-                self.createdBy = try container.decode(String.self, forKey: .createdBy)
+                createdBy = try container.decode(String.self, forKey: .createdBy)
             } catch {
                 LogManager.logError("Decoding error for required property 'createdBy': \(error)")
                 throw error
             }
             do {
-                self.createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
             } catch {
                 LogManager.logError("Decoding error for required property 'createdAt': \(error)")
                 throw error
             }
             do {
-                self.uses = try container.decode([InviteCodeUse].self, forKey: .uses)
+                uses = try container.decode([InviteCodeUse].self, forKey: .uses)
             } catch {
                 LogManager.logError("Decoding error for required property 'uses': \(error)")
                 throw error
@@ -160,11 +156,11 @@ public struct InviteCode: ATProtocolCodable, ATProtocolValue {
             case uses
         }
     }
-        
-public struct InviteCodeUse: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "com.atproto.server.defs#inviteCodeUse"
-            public let usedBy: DID
-            public let usedAt: ATProtocolDate
+
+    public struct InviteCodeUse: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "com.atproto.server.defs#inviteCodeUse"
+        public let usedBy: DID
+        public let usedAt: ATProtocolDate
 
         public init(
             usedBy: DID, usedAt: ATProtocolDate
@@ -176,13 +172,13 @@ public struct InviteCodeUse: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.usedBy = try container.decode(DID.self, forKey: .usedBy)
+                usedBy = try container.decode(DID.self, forKey: .usedBy)
             } catch {
                 LogManager.logError("Decoding error for required property 'usedBy': \(error)")
                 throw error
             }
             do {
-                self.usedAt = try container.decode(ATProtocolDate.self, forKey: .usedAt)
+                usedAt = try container.decode(ATProtocolDate.self, forKey: .usedAt)
             } catch {
                 LogManager.logError("Decoding error for required property 'usedAt': \(error)")
                 throw error
@@ -232,11 +228,4 @@ public struct InviteCodeUse: ATProtocolCodable, ATProtocolValue {
             case usedAt
         }
     }
-
-
-
 }
-
-
-                           
-

@@ -1,19 +1,15 @@
 import Foundation
 
-
-
 // lexicon: 1, id: com.atproto.identity.defs
 
-
-public struct ComAtprotoIdentityDefs { 
-
+public enum ComAtprotoIdentityDefs {
     public static let typeIdentifier = "com.atproto.identity.defs"
-        
-public struct IdentityInfo: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "com.atproto.identity.defs#identityInfo"
-            public let did: DID
-            public let handle: Handle
-            public let didDoc: DIDDocument
+
+    public struct IdentityInfo: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "com.atproto.identity.defs#identityInfo"
+        public let did: DID
+        public let handle: Handle
+        public let didDoc: DIDDocument
 
         public init(
             did: DID, handle: Handle, didDoc: DIDDocument
@@ -26,19 +22,19 @@ public struct IdentityInfo: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.did = try container.decode(DID.self, forKey: .did)
+                did = try container.decode(DID.self, forKey: .did)
             } catch {
                 LogManager.logError("Decoding error for required property 'did': \(error)")
                 throw error
             }
             do {
-                self.handle = try container.decode(Handle.self, forKey: .handle)
+                handle = try container.decode(Handle.self, forKey: .handle)
             } catch {
                 LogManager.logError("Decoding error for required property 'handle': \(error)")
                 throw error
             }
             do {
-                self.didDoc = try container.decode(DIDDocument.self, forKey: .didDoc)
+                didDoc = try container.decode(DIDDocument.self, forKey: .didDoc)
             } catch {
                 LogManager.logError("Decoding error for required property 'didDoc': \(error)")
                 throw error
@@ -96,11 +92,4 @@ public struct IdentityInfo: ATProtocolCodable, ATProtocolValue {
             case didDoc
         }
     }
-
-
-
 }
-
-
-                           
-

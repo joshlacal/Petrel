@@ -1,14 +1,10 @@
 import Foundation
 
-
-
 // lexicon: 1, id: com.atproto.admin.updateAccountHandle
 
-
-public struct ComAtprotoAdminUpdateAccountHandle { 
-
+public enum ComAtprotoAdminUpdateAccountHandle {
     public static let typeIdentifier = "com.atproto.admin.updateAccountHandle"
-public struct Input: ATProtocolCodable {
+    public struct Input: ATProtocolCodable {
         public let did: DID
         public let handle: Handle
 
@@ -17,12 +13,11 @@ public struct Input: ATProtocolCodable {
             self.did = did
             self.handle = handle
         }
-        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.did = try container.decode(DID.self, forKey: .did)
-            self.handle = try container.decode(Handle.self, forKey: .handle)
+            did = try container.decode(DID.self, forKey: .did)
+            handle = try container.decode(Handle.self, forKey: .handle)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -45,33 +40,26 @@ public struct Input: ATProtocolCodable {
             case handle
         }
     }
-
-
-
 }
 
-extension ATProtoClient.Com.Atproto.Admin {
+public extension ATProtoClient.Com.Atproto.Admin {
     // MARK: - updateAccountHandle
 
     /// Administrative action to update an account's handle.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func updateAccountHandle(
-        
+    func updateAccountHandle(
         input: ComAtprotoAdminUpdateAccountHandle.Input
-        
+
     ) async throws -> Int {
         let endpoint = "com.atproto.admin.updateAccountHandle"
-        
+
         var headers: [String: String] = [:]
-        
+
         headers["Content-Type"] = "application/json"
-        
-        
-        
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -86,13 +74,6 @@ extension ATProtoClient.Com.Atproto.Admin {
         let serviceDID = await networkService.getServiceDID(for: "com.atproto.admin.updateAccountHandle")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
         let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        let responseCode = response.statusCode
-
-        
-        return responseCode
-        
+        return response.statusCode
     }
-    
 }
-                           
-

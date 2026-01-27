@@ -1,25 +1,20 @@
 import Foundation
 
-
-
 // lexicon: 1, id: app.bsky.draft.createDraft
 
-
-public struct AppBskyDraftCreateDraft { 
-
+public enum AppBskyDraftCreateDraft {
     public static let typeIdentifier = "app.bsky.draft.createDraft"
-public struct Input: ATProtocolCodable {
+    public struct Input: ATProtocolCodable {
         public let draft: AppBskyDraftDefs.Draft
 
         /// Standard public initializer
         public init(draft: AppBskyDraftDefs.Draft) {
             self.draft = draft
         }
-        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.draft = try container.decode(AppBskyDraftDefs.Draft.self, forKey: .draft)
+            draft = try container.decode(AppBskyDraftDefs.Draft.self, forKey: .draft)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -38,110 +33,78 @@ public struct Input: ATProtocolCodable {
             case draft
         }
     }
-    
-public struct Output: ATProtocolCodable {
-        
-        
+
+    public struct Output: ATProtocolCodable {
         public let id: String
-        
-        
-        
-        // Standard public initializer
+
+        /// Standard public initializer
         public init(
-            
-            
             id: String
-            
-            
+
         ) {
-            
-            
             self.id = id
-            
-            
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
-            self.id = try container.decode(String.self, forKey: .id)
-            
-            
+
+            id = try container.decode(String.self, forKey: .id)
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(id, forKey: .id)
-            
-            
         }
 
         public func toCBORValue() throws -> Any {
-            
             var map = OrderedCBORMap()
 
-            
-            
             let idValue = try id.toCBORValue()
             map = map.adding(key: "id", value: idValue)
-            
-            
 
             return map
-            
         }
-        
-        
+
         private enum CodingKeys: String, CodingKey {
             case id
         }
-        
     }
-        
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case draftLimitReached = "DraftLimitReached.Trying to insert a new draft when the limit was already reached."
-            public var description: String {
-                return self.rawValue
-            }
 
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case draftLimitReached = "DraftLimitReached.Trying to insert a new draft when the limit was already reached."
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-extension ATProtoClient.App.Bsky.Draft {
+public extension ATProtoClient.App.Bsky.Draft {
     // MARK: - createDraft
 
     /// Inserts a draft using private storage (stash). An upper limit of drafts might be enforced. Requires authentication.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func createDraft(
-        
+    func createDraft(
         input: AppBskyDraftCreateDraft.Input
-        
+
     ) async throws -> (responseCode: Int, data: AppBskyDraftCreateDraft.Output?) {
         let endpoint = "app.bsky.draft.createDraft"
-        
+
         var headers: [String: String] = [:]
-        
+
         headers["Content-Type"] = "application/json"
-        
-        
-        
+
         headers["Accept"] = "application/json"
-        
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -158,7 +121,6 @@ extension ATProtoClient.App.Bsky.Draft {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
@@ -168,12 +130,11 @@ extension ATProtoClient.App.Bsky.Draft {
         }
 
         // Only decode response data if request was successful
-        if (200...299).contains(responseCode) {
+        if (200 ... 299).contains(responseCode) {
             do {
-                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(AppBskyDraftCreateDraft.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -184,9 +145,5 @@ extension ATProtoClient.App.Bsky.Draft {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-        
     }
-    
 }
-                           
-

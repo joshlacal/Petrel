@@ -1,25 +1,18 @@
 import Foundation
 
-
-
 // lexicon: 1, id: app.bsky.notification.defs
 
-
-public struct AppBskyNotificationDefs { 
-
+public enum AppBskyNotificationDefs {
     public static let typeIdentifier = "app.bsky.notification.defs"
-        
-public struct RecordDeleted: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.notification.defs#recordDeleted"
+
+    public struct RecordDeleted: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.notification.defs#recordDeleted"
 
         public init(
-            
-        ) {
-        }
+        ) {}
 
         public init(from decoder: Decoder) throws {
-            
-            let _ = decoder
+            _ = decoder
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -27,11 +20,9 @@ public struct RecordDeleted: ATProtocolCodable, ATProtocolValue {
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
         }
 
-        public func hash(into hasher: inout Hasher) {
-        }
+        public func hash(into hasher: inout Hasher) {}
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            
             return other is Self
         }
 
@@ -49,11 +40,11 @@ public struct RecordDeleted: ATProtocolCodable, ATProtocolValue {
             case typeIdentifier = "$type"
         }
     }
-        
-public struct ChatPreference: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.notification.defs#chatPreference"
-            public let include: String
-            public let push: Bool
+
+    public struct ChatPreference: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.notification.defs#chatPreference"
+        public let include: String
+        public let push: Bool
 
         public init(
             include: String, push: Bool
@@ -65,13 +56,13 @@ public struct ChatPreference: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.include = try container.decode(String.self, forKey: .include)
+                include = try container.decode(String.self, forKey: .include)
             } catch {
                 LogManager.logError("Decoding error for required property 'include': \(error)")
                 throw error
             }
             do {
-                self.push = try container.decode(Bool.self, forKey: .push)
+                push = try container.decode(Bool.self, forKey: .push)
             } catch {
                 LogManager.logError("Decoding error for required property 'push': \(error)")
                 throw error
@@ -121,12 +112,12 @@ public struct ChatPreference: ATProtocolCodable, ATProtocolValue {
             case push
         }
     }
-        
-public struct FilterablePreference: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.notification.defs#filterablePreference"
-            public let include: String
-            public let list: Bool
-            public let push: Bool
+
+    public struct FilterablePreference: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.notification.defs#filterablePreference"
+        public let include: String
+        public let list: Bool
+        public let push: Bool
 
         public init(
             include: String, list: Bool, push: Bool
@@ -139,19 +130,19 @@ public struct FilterablePreference: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.include = try container.decode(String.self, forKey: .include)
+                include = try container.decode(String.self, forKey: .include)
             } catch {
                 LogManager.logError("Decoding error for required property 'include': \(error)")
                 throw error
             }
             do {
-                self.list = try container.decode(Bool.self, forKey: .list)
+                list = try container.decode(Bool.self, forKey: .list)
             } catch {
                 LogManager.logError("Decoding error for required property 'list': \(error)")
                 throw error
             }
             do {
-                self.push = try container.decode(Bool.self, forKey: .push)
+                push = try container.decode(Bool.self, forKey: .push)
             } catch {
                 LogManager.logError("Decoding error for required property 'push': \(error)")
                 throw error
@@ -209,11 +200,11 @@ public struct FilterablePreference: ATProtocolCodable, ATProtocolValue {
             case push
         }
     }
-        
-public struct Preference: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.notification.defs#preference"
-            public let list: Bool
-            public let push: Bool
+
+    public struct Preference: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.notification.defs#preference"
+        public let list: Bool
+        public let push: Bool
 
         public init(
             list: Bool, push: Bool
@@ -225,13 +216,13 @@ public struct Preference: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.list = try container.decode(Bool.self, forKey: .list)
+                list = try container.decode(Bool.self, forKey: .list)
             } catch {
                 LogManager.logError("Decoding error for required property 'list': \(error)")
                 throw error
             }
             do {
-                self.push = try container.decode(Bool.self, forKey: .push)
+                push = try container.decode(Bool.self, forKey: .push)
             } catch {
                 LogManager.logError("Decoding error for required property 'push': \(error)")
                 throw error
@@ -281,22 +272,22 @@ public struct Preference: ATProtocolCodable, ATProtocolValue {
             case push
         }
     }
-        
-public struct Preferences: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.notification.defs#preferences"
-            public let chat: ChatPreference
-            public let follow: FilterablePreference
-            public let like: FilterablePreference
-            public let likeViaRepost: FilterablePreference
-            public let mention: FilterablePreference
-            public let quote: FilterablePreference
-            public let reply: FilterablePreference
-            public let repost: FilterablePreference
-            public let repostViaRepost: FilterablePreference
-            public let starterpackJoined: Preference
-            public let subscribedPost: Preference
-            public let unverified: Preference
-            public let verified: Preference
+
+    public struct Preferences: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.notification.defs#preferences"
+        public let chat: ChatPreference
+        public let follow: FilterablePreference
+        public let like: FilterablePreference
+        public let likeViaRepost: FilterablePreference
+        public let mention: FilterablePreference
+        public let quote: FilterablePreference
+        public let reply: FilterablePreference
+        public let repost: FilterablePreference
+        public let repostViaRepost: FilterablePreference
+        public let starterpackJoined: Preference
+        public let subscribedPost: Preference
+        public let unverified: Preference
+        public let verified: Preference
 
         public init(
             chat: ChatPreference, follow: FilterablePreference, like: FilterablePreference, likeViaRepost: FilterablePreference, mention: FilterablePreference, quote: FilterablePreference, reply: FilterablePreference, repost: FilterablePreference, repostViaRepost: FilterablePreference, starterpackJoined: Preference, subscribedPost: Preference, unverified: Preference, verified: Preference
@@ -319,79 +310,79 @@ public struct Preferences: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.chat = try container.decode(ChatPreference.self, forKey: .chat)
+                chat = try container.decode(ChatPreference.self, forKey: .chat)
             } catch {
                 LogManager.logError("Decoding error for required property 'chat': \(error)")
                 throw error
             }
             do {
-                self.follow = try container.decode(FilterablePreference.self, forKey: .follow)
+                follow = try container.decode(FilterablePreference.self, forKey: .follow)
             } catch {
                 LogManager.logError("Decoding error for required property 'follow': \(error)")
                 throw error
             }
             do {
-                self.like = try container.decode(FilterablePreference.self, forKey: .like)
+                like = try container.decode(FilterablePreference.self, forKey: .like)
             } catch {
                 LogManager.logError("Decoding error for required property 'like': \(error)")
                 throw error
             }
             do {
-                self.likeViaRepost = try container.decode(FilterablePreference.self, forKey: .likeViaRepost)
+                likeViaRepost = try container.decode(FilterablePreference.self, forKey: .likeViaRepost)
             } catch {
                 LogManager.logError("Decoding error for required property 'likeViaRepost': \(error)")
                 throw error
             }
             do {
-                self.mention = try container.decode(FilterablePreference.self, forKey: .mention)
+                mention = try container.decode(FilterablePreference.self, forKey: .mention)
             } catch {
                 LogManager.logError("Decoding error for required property 'mention': \(error)")
                 throw error
             }
             do {
-                self.quote = try container.decode(FilterablePreference.self, forKey: .quote)
+                quote = try container.decode(FilterablePreference.self, forKey: .quote)
             } catch {
                 LogManager.logError("Decoding error for required property 'quote': \(error)")
                 throw error
             }
             do {
-                self.reply = try container.decode(FilterablePreference.self, forKey: .reply)
+                reply = try container.decode(FilterablePreference.self, forKey: .reply)
             } catch {
                 LogManager.logError("Decoding error for required property 'reply': \(error)")
                 throw error
             }
             do {
-                self.repost = try container.decode(FilterablePreference.self, forKey: .repost)
+                repost = try container.decode(FilterablePreference.self, forKey: .repost)
             } catch {
                 LogManager.logError("Decoding error for required property 'repost': \(error)")
                 throw error
             }
             do {
-                self.repostViaRepost = try container.decode(FilterablePreference.self, forKey: .repostViaRepost)
+                repostViaRepost = try container.decode(FilterablePreference.self, forKey: .repostViaRepost)
             } catch {
                 LogManager.logError("Decoding error for required property 'repostViaRepost': \(error)")
                 throw error
             }
             do {
-                self.starterpackJoined = try container.decode(Preference.self, forKey: .starterpackJoined)
+                starterpackJoined = try container.decode(Preference.self, forKey: .starterpackJoined)
             } catch {
                 LogManager.logError("Decoding error for required property 'starterpackJoined': \(error)")
                 throw error
             }
             do {
-                self.subscribedPost = try container.decode(Preference.self, forKey: .subscribedPost)
+                subscribedPost = try container.decode(Preference.self, forKey: .subscribedPost)
             } catch {
                 LogManager.logError("Decoding error for required property 'subscribedPost': \(error)")
                 throw error
             }
             do {
-                self.unverified = try container.decode(Preference.self, forKey: .unverified)
+                unverified = try container.decode(Preference.self, forKey: .unverified)
             } catch {
                 LogManager.logError("Decoding error for required property 'unverified': \(error)")
                 throw error
             }
             do {
-                self.verified = try container.decode(Preference.self, forKey: .verified)
+                verified = try container.decode(Preference.self, forKey: .verified)
             } catch {
                 LogManager.logError("Decoding error for required property 'verified': \(error)")
                 throw error
@@ -529,11 +520,11 @@ public struct Preferences: ATProtocolCodable, ATProtocolValue {
             case verified
         }
     }
-        
-public struct ActivitySubscription: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.notification.defs#activitySubscription"
-            public let post: Bool
-            public let reply: Bool
+
+    public struct ActivitySubscription: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.notification.defs#activitySubscription"
+        public let post: Bool
+        public let reply: Bool
 
         public init(
             post: Bool, reply: Bool
@@ -545,13 +536,13 @@ public struct ActivitySubscription: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.post = try container.decode(Bool.self, forKey: .post)
+                post = try container.decode(Bool.self, forKey: .post)
             } catch {
                 LogManager.logError("Decoding error for required property 'post': \(error)")
                 throw error
             }
             do {
-                self.reply = try container.decode(Bool.self, forKey: .reply)
+                reply = try container.decode(Bool.self, forKey: .reply)
             } catch {
                 LogManager.logError("Decoding error for required property 'reply': \(error)")
                 throw error
@@ -601,11 +592,11 @@ public struct ActivitySubscription: ATProtocolCodable, ATProtocolValue {
             case reply
         }
     }
-        
-public struct SubjectActivitySubscription: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.notification.defs#subjectActivitySubscription"
-            public let subject: DID
-            public let activitySubscription: ActivitySubscription
+
+    public struct SubjectActivitySubscription: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.notification.defs#subjectActivitySubscription"
+        public let subject: DID
+        public let activitySubscription: ActivitySubscription
 
         public init(
             subject: DID, activitySubscription: ActivitySubscription
@@ -617,13 +608,13 @@ public struct SubjectActivitySubscription: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.subject = try container.decode(DID.self, forKey: .subject)
+                subject = try container.decode(DID.self, forKey: .subject)
             } catch {
                 LogManager.logError("Decoding error for required property 'subject': \(error)")
                 throw error
             }
             do {
-                self.activitySubscription = try container.decode(ActivitySubscription.self, forKey: .activitySubscription)
+                activitySubscription = try container.decode(ActivitySubscription.self, forKey: .activitySubscription)
             } catch {
                 LogManager.logError("Decoding error for required property 'activitySubscription': \(error)")
                 throw error
@@ -673,11 +664,4 @@ public struct SubjectActivitySubscription: ATProtocolCodable, ATProtocolValue {
             case activitySubscription
         }
     }
-
-
-
 }
-
-
-                           
-

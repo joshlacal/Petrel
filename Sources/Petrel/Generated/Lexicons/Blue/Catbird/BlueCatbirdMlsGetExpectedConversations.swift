@@ -1,23 +1,19 @@
 import Foundation
 
-
-
 // lexicon: 1, id: blue.catbird.mls.getExpectedConversations
 
-
-public struct BlueCatbirdMlsGetExpectedConversations { 
-
+public enum BlueCatbirdMlsGetExpectedConversations {
     public static let typeIdentifier = "blue.catbird.mls.getExpectedConversations"
-        
-public struct ExpectedConversation: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "blue.catbird.mls.getExpectedConversations#expectedConversation"
-            public let convoId: String
-            public let name: String
-            public let memberCount: Int
-            public let shouldBeInGroup: Bool
-            public let lastActivity: ATProtocolDate?
-            public let needsRejoin: Bool?
-            public let deviceInGroup: Bool?
+
+    public struct ExpectedConversation: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "blue.catbird.mls.getExpectedConversations#expectedConversation"
+        public let convoId: String
+        public let name: String
+        public let memberCount: Int
+        public let shouldBeInGroup: Bool
+        public let lastActivity: ATProtocolDate?
+        public let needsRejoin: Bool?
+        public let deviceInGroup: Bool?
 
         public init(
             convoId: String, name: String, memberCount: Int, shouldBeInGroup: Bool, lastActivity: ATProtocolDate?, needsRejoin: Bool?, deviceInGroup: Bool?
@@ -34,43 +30,43 @@ public struct ExpectedConversation: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: .convoId)
             } catch {
                 LogManager.logError("Decoding error for required property 'convoId': \(error)")
                 throw error
             }
             do {
-                self.name = try container.decode(String.self, forKey: .name)
+                name = try container.decode(String.self, forKey: .name)
             } catch {
                 LogManager.logError("Decoding error for required property 'name': \(error)")
                 throw error
             }
             do {
-                self.memberCount = try container.decode(Int.self, forKey: .memberCount)
+                memberCount = try container.decode(Int.self, forKey: .memberCount)
             } catch {
                 LogManager.logError("Decoding error for required property 'memberCount': \(error)")
                 throw error
             }
             do {
-                self.shouldBeInGroup = try container.decode(Bool.self, forKey: .shouldBeInGroup)
+                shouldBeInGroup = try container.decode(Bool.self, forKey: .shouldBeInGroup)
             } catch {
                 LogManager.logError("Decoding error for required property 'shouldBeInGroup': \(error)")
                 throw error
             }
             do {
-                self.lastActivity = try container.decodeIfPresent(ATProtocolDate.self, forKey: .lastActivity)
+                lastActivity = try container.decodeIfPresent(ATProtocolDate.self, forKey: .lastActivity)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'lastActivity': \(error)")
                 throw error
             }
             do {
-                self.needsRejoin = try container.decodeIfPresent(Bool.self, forKey: .needsRejoin)
+                needsRejoin = try container.decodeIfPresent(Bool.self, forKey: .needsRejoin)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'needsRejoin': \(error)")
                 throw error
             }
             do {
-                self.deviceInGroup = try container.decodeIfPresent(Bool.self, forKey: .deviceInGroup)
+                deviceInGroup = try container.decodeIfPresent(Bool.self, forKey: .deviceInGroup)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'deviceInGroup': \(error)")
                 throw error
@@ -177,114 +173,83 @@ public struct ExpectedConversation: ATProtocolCodable, ATProtocolValue {
             case needsRejoin
             case deviceInGroup
         }
-    }    
-public struct Parameters: Parametrizable {
+    }
+
+    public struct Parameters: Parametrizable {
         public let deviceId: String?
-        
+
         public init(
             deviceId: String? = nil
-            ) {
+        ) {
             self.deviceId = deviceId
-            
         }
     }
-    
-public struct Output: ATProtocolCodable {
-        
-        
+
+    public struct Output: ATProtocolCodable {
         public let conversations: [ExpectedConversation]
-        
-        
-        
-        // Standard public initializer
+
+        /// Standard public initializer
         public init(
-            
-            
             conversations: [ExpectedConversation]
-            
-            
+
         ) {
-            
-            
             self.conversations = conversations
-            
-            
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
-            self.conversations = try container.decode([ExpectedConversation].self, forKey: .conversations)
-            
-            
+
+            conversations = try container.decode([ExpectedConversation].self, forKey: .conversations)
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(conversations, forKey: .conversations)
-            
-            
         }
 
         public func toCBORValue() throws -> Any {
-            
             var map = OrderedCBORMap()
 
-            
-            
             let conversationsValue = try conversations.toCBORValue()
             map = map.adding(key: "conversations", value: conversationsValue)
-            
-            
 
             return map
-            
         }
-        
-        
+
         private enum CodingKeys: String, CodingKey {
             case conversations
         }
-        
     }
-        
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case unauthorized = "Unauthorized.Authentication required"
-            public var description: String {
-                return self.rawValue
-            }
 
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case unauthorized = "Unauthorized.Authentication required"
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-
-
-extension ATProtoClient.Blue.Catbird.Mls {
+public extension ATProtoClient.Blue.Catbird.Mls {
     // MARK: - getExpectedConversations
 
     /// Get list of conversations the user should be a member of but may be missing locally Returns conversations where the user is a member on the server but may not have local MLS state
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func getExpectedConversations(input: BlueCatbirdMlsGetExpectedConversations.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsGetExpectedConversations.Output?) {
+    func getExpectedConversations(input: BlueCatbirdMlsGetExpectedConversations.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsGetExpectedConversations.Output?) {
         let endpoint = "blue.catbird.mls.getExpectedConversations"
 
-        
         let queryItems = input.asQueryItems()
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -308,12 +273,11 @@ extension ATProtoClient.Blue.Catbird.Mls {
         }
 
         // Only decode response data if request was successful
-        if (200...299).contains(responseCode) {
+        if (200 ... 299).contains(responseCode) {
             do {
-                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsGetExpectedConversations.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -321,12 +285,9 @@ extension ATProtoClient.Blue.Catbird.Mls {
                 return (responseCode, nil)
             }
         } else {
-            
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-                           
-

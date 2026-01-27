@@ -1,20 +1,16 @@
 import Foundation
 
-
-
 // lexicon: 1, id: blue.catbird.mls.checkBlocks
 
-
-public struct BlueCatbirdMlsCheckBlocks { 
-
+public enum BlueCatbirdMlsCheckBlocks {
     public static let typeIdentifier = "blue.catbird.mls.checkBlocks"
-        
-public struct BlockRelationship: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "blue.catbird.mls.checkBlocks#blockRelationship"
-            public let blockerDid: DID
-            public let blockedDid: DID
-            public let createdAt: ATProtocolDate
-            public let blockUri: ATProtocolURI?
+
+    public struct BlockRelationship: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "blue.catbird.mls.checkBlocks#blockRelationship"
+        public let blockerDid: DID
+        public let blockedDid: DID
+        public let createdAt: ATProtocolDate
+        public let blockUri: ATProtocolURI?
 
         public init(
             blockerDid: DID, blockedDid: DID, createdAt: ATProtocolDate, blockUri: ATProtocolURI?
@@ -28,25 +24,25 @@ public struct BlockRelationship: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.blockerDid = try container.decode(DID.self, forKey: .blockerDid)
+                blockerDid = try container.decode(DID.self, forKey: .blockerDid)
             } catch {
                 LogManager.logError("Decoding error for required property 'blockerDid': \(error)")
                 throw error
             }
             do {
-                self.blockedDid = try container.decode(DID.self, forKey: .blockedDid)
+                blockedDid = try container.decode(DID.self, forKey: .blockedDid)
             } catch {
                 LogManager.logError("Decoding error for required property 'blockedDid': \(error)")
                 throw error
             }
             do {
-                self.createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
             } catch {
                 LogManager.logError("Decoding error for required property 'createdAt': \(error)")
                 throw error
             }
             do {
-                self.blockUri = try container.decodeIfPresent(ATProtocolURI.self, forKey: .blockUri)
+                blockUri = try container.decodeIfPresent(ATProtocolURI.self, forKey: .blockUri)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'blockUri': \(error)")
                 throw error
@@ -117,133 +113,98 @@ public struct BlockRelationship: ATProtocolCodable, ATProtocolValue {
             case createdAt
             case blockUri
         }
-    }    
-public struct Parameters: Parametrizable {
+    }
+
+    public struct Parameters: Parametrizable {
         public let dids: [DID]
-        
+
         public init(
             dids: [DID]
-            ) {
+        ) {
             self.dids = dids
-            
         }
     }
-    
-public struct Output: ATProtocolCodable {
-        
-        
+
+    public struct Output: ATProtocolCodable {
         public let blocks: [BlockRelationship]
-        
+
         public let checkedAt: ATProtocolDate
-        
-        
-        
-        // Standard public initializer
+
+        /// Standard public initializer
         public init(
-            
-            
             blocks: [BlockRelationship],
-            
+
             checkedAt: ATProtocolDate
-            
-            
+
         ) {
-            
-            
             self.blocks = blocks
-            
+
             self.checkedAt = checkedAt
-            
-            
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
-            self.blocks = try container.decode([BlockRelationship].self, forKey: .blocks)
-            
-            
-            self.checkedAt = try container.decode(ATProtocolDate.self, forKey: .checkedAt)
-            
-            
+
+            blocks = try container.decode([BlockRelationship].self, forKey: .blocks)
+
+            checkedAt = try container.decode(ATProtocolDate.self, forKey: .checkedAt)
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(blocks, forKey: .blocks)
-            
-            
+
             try container.encode(checkedAt, forKey: .checkedAt)
-            
-            
         }
 
         public func toCBORValue() throws -> Any {
-            
             var map = OrderedCBORMap()
 
-            
-            
             let blocksValue = try blocks.toCBORValue()
             map = map.adding(key: "blocks", value: blocksValue)
-            
-            
-            
+
             let checkedAtValue = try checkedAt.toCBORValue()
             map = map.adding(key: "checkedAt", value: checkedAtValue)
-            
-            
 
             return map
-            
         }
-        
-        
+
         private enum CodingKeys: String, CodingKey {
             case blocks
             case checkedAt
         }
-        
     }
-        
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case tooManyDids = "TooManyDids.Too many DIDs provided (max 100)"
-                case blueskyServiceUnavailable = "BlueskyServiceUnavailable.Could not reach Bluesky service to check blocks"
-            public var description: String {
-                return self.rawValue
-            }
 
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case tooManyDids = "TooManyDids.Too many DIDs provided (max 100)"
+        case blueskyServiceUnavailable = "BlueskyServiceUnavailable.Could not reach Bluesky service to check blocks"
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-
-
-extension ATProtoClient.Blue.Catbird.Mls {
+public extension ATProtoClient.Blue.Catbird.Mls {
     // MARK: - checkBlocks
 
     /// Check Bluesky block relationships between users for MLS conversation moderation Query Bluesky social graph to check block status between users. Returns block relationships relevant to MLS conversation membership. Server queries Bluesky PDS for current block state. Used before adding members to prevent blocked users from joining the same conversation.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func checkBlocks(input: BlueCatbirdMlsCheckBlocks.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsCheckBlocks.Output?) {
+    func checkBlocks(input: BlueCatbirdMlsCheckBlocks.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsCheckBlocks.Output?) {
         let endpoint = "blue.catbird.mls.checkBlocks"
 
-        
         let queryItems = input.asQueryItems()
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -267,12 +228,11 @@ extension ATProtoClient.Blue.Catbird.Mls {
         }
 
         // Only decode response data if request was successful
-        if (200...299).contains(responseCode) {
+        if (200 ... 299).contains(responseCode) {
             do {
-                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsCheckBlocks.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -280,12 +240,9 @@ extension ATProtoClient.Blue.Catbird.Mls {
                 return (responseCode, nil)
             }
         } else {
-            
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-                           
-

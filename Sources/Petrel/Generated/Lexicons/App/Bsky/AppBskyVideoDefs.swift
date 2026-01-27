@@ -1,23 +1,19 @@
 import Foundation
 
-
-
 // lexicon: 1, id: app.bsky.video.defs
 
-
-public struct AppBskyVideoDefs { 
-
+public enum AppBskyVideoDefs {
     public static let typeIdentifier = "app.bsky.video.defs"
-        
-public struct JobStatus: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.video.defs#jobStatus"
-            public let jobId: String
-            public let did: DID
-            public let state: String
-            public let progress: Int?
-            public let blob: Blob?
-            public let error: String?
-            public let message: String?
+
+    public struct JobStatus: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.video.defs#jobStatus"
+        public let jobId: String
+        public let did: DID
+        public let state: String
+        public let progress: Int?
+        public let blob: Blob?
+        public let error: String?
+        public let message: String?
 
         public init(
             jobId: String, did: DID, state: String, progress: Int?, blob: Blob?, error: String?, message: String?
@@ -34,43 +30,43 @@ public struct JobStatus: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.jobId = try container.decode(String.self, forKey: .jobId)
+                jobId = try container.decode(String.self, forKey: .jobId)
             } catch {
                 LogManager.logError("Decoding error for required property 'jobId': \(error)")
                 throw error
             }
             do {
-                self.did = try container.decode(DID.self, forKey: .did)
+                did = try container.decode(DID.self, forKey: .did)
             } catch {
                 LogManager.logError("Decoding error for required property 'did': \(error)")
                 throw error
             }
             do {
-                self.state = try container.decode(String.self, forKey: .state)
+                state = try container.decode(String.self, forKey: .state)
             } catch {
                 LogManager.logError("Decoding error for required property 'state': \(error)")
                 throw error
             }
             do {
-                self.progress = try container.decodeIfPresent(Int.self, forKey: .progress)
+                progress = try container.decodeIfPresent(Int.self, forKey: .progress)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'progress': \(error)")
                 throw error
             }
             do {
-                self.blob = try container.decodeIfPresent(Blob.self, forKey: .blob)
+                blob = try container.decodeIfPresent(Blob.self, forKey: .blob)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'blob': \(error)")
                 throw error
             }
             do {
-                self.error = try container.decodeIfPresent(String.self, forKey: .error)
+                error = try container.decodeIfPresent(String.self, forKey: .error)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'error': \(error)")
                 throw error
             }
             do {
-                self.message = try container.decodeIfPresent(String.self, forKey: .message)
+                message = try container.decodeIfPresent(String.self, forKey: .message)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'message': \(error)")
                 throw error
@@ -184,11 +180,4 @@ public struct JobStatus: ATProtocolCodable, ATProtocolValue {
             case message
         }
     }
-
-
-
 }
-
-
-                           
-

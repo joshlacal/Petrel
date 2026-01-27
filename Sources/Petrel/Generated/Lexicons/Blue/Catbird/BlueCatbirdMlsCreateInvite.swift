@@ -1,28 +1,24 @@
 import Foundation
 
-
-
 // lexicon: 1, id: blue.catbird.mls.createInvite
 
-
-public struct BlueCatbirdMlsCreateInvite { 
-
+public enum BlueCatbirdMlsCreateInvite {
     public static let typeIdentifier = "blue.catbird.mls.createInvite"
-        
-public struct InviteView: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "blue.catbird.mls.createInvite#inviteView"
-            public let inviteId: String
-            public let convoId: String
-            public let createdBy: DID
-            public let createdAt: ATProtocolDate
-            public let pskHash: String
-            public let targetDid: DID?
-            public let expiresAt: ATProtocolDate?
-            public let maxUses: Int?
-            public let useCount: Int
-            public let isRevoked: Bool
-            public let revokedAt: ATProtocolDate?
-            public let revokedBy: DID?
+
+    public struct InviteView: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "blue.catbird.mls.createInvite#inviteView"
+        public let inviteId: String
+        public let convoId: String
+        public let createdBy: DID
+        public let createdAt: ATProtocolDate
+        public let pskHash: String
+        public let targetDid: DID?
+        public let expiresAt: ATProtocolDate?
+        public let maxUses: Int?
+        public let useCount: Int
+        public let isRevoked: Bool
+        public let revokedAt: ATProtocolDate?
+        public let revokedBy: DID?
 
         public init(
             inviteId: String, convoId: String, createdBy: DID, createdAt: ATProtocolDate, pskHash: String, targetDid: DID?, expiresAt: ATProtocolDate?, maxUses: Int?, useCount: Int, isRevoked: Bool, revokedAt: ATProtocolDate?, revokedBy: DID?
@@ -44,73 +40,73 @@ public struct InviteView: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.inviteId = try container.decode(String.self, forKey: .inviteId)
+                inviteId = try container.decode(String.self, forKey: .inviteId)
             } catch {
                 LogManager.logError("Decoding error for required property 'inviteId': \(error)")
                 throw error
             }
             do {
-                self.convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: .convoId)
             } catch {
                 LogManager.logError("Decoding error for required property 'convoId': \(error)")
                 throw error
             }
             do {
-                self.createdBy = try container.decode(DID.self, forKey: .createdBy)
+                createdBy = try container.decode(DID.self, forKey: .createdBy)
             } catch {
                 LogManager.logError("Decoding error for required property 'createdBy': \(error)")
                 throw error
             }
             do {
-                self.createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
             } catch {
                 LogManager.logError("Decoding error for required property 'createdAt': \(error)")
                 throw error
             }
             do {
-                self.pskHash = try container.decode(String.self, forKey: .pskHash)
+                pskHash = try container.decode(String.self, forKey: .pskHash)
             } catch {
                 LogManager.logError("Decoding error for required property 'pskHash': \(error)")
                 throw error
             }
             do {
-                self.targetDid = try container.decodeIfPresent(DID.self, forKey: .targetDid)
+                targetDid = try container.decodeIfPresent(DID.self, forKey: .targetDid)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'targetDid': \(error)")
                 throw error
             }
             do {
-                self.expiresAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .expiresAt)
+                expiresAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .expiresAt)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'expiresAt': \(error)")
                 throw error
             }
             do {
-                self.maxUses = try container.decodeIfPresent(Int.self, forKey: .maxUses)
+                maxUses = try container.decodeIfPresent(Int.self, forKey: .maxUses)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'maxUses': \(error)")
                 throw error
             }
             do {
-                self.useCount = try container.decode(Int.self, forKey: .useCount)
+                useCount = try container.decode(Int.self, forKey: .useCount)
             } catch {
                 LogManager.logError("Decoding error for required property 'useCount': \(error)")
                 throw error
             }
             do {
-                self.isRevoked = try container.decode(Bool.self, forKey: .isRevoked)
+                isRevoked = try container.decode(Bool.self, forKey: .isRevoked)
             } catch {
                 LogManager.logError("Decoding error for required property 'isRevoked': \(error)")
                 throw error
             }
             do {
-                self.revokedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .revokedAt)
+                revokedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .revokedAt)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'revokedAt': \(error)")
                 throw error
             }
             do {
-                self.revokedBy = try container.decodeIfPresent(DID.self, forKey: .revokedBy)
+                revokedBy = try container.decodeIfPresent(DID.self, forKey: .revokedBy)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'revokedBy': \(error)")
                 throw error
@@ -270,7 +266,8 @@ public struct InviteView: ATProtocolCodable, ATProtocolValue {
             case revokedBy
         }
     }
-public struct Input: ATProtocolCodable {
+
+    public struct Input: ATProtocolCodable {
         public let convoId: String
         public let pskHash: String
         public let targetDid: DID?
@@ -285,15 +282,14 @@ public struct Input: ATProtocolCodable {
             self.expiresAt = expiresAt
             self.maxUses = maxUses
         }
-        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.convoId = try container.decode(String.self, forKey: .convoId)
-            self.pskHash = try container.decode(String.self, forKey: .pskHash)
-            self.targetDid = try container.decodeIfPresent(DID.self, forKey: .targetDid)
-            self.expiresAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .expiresAt)
-            self.maxUses = try container.decodeIfPresent(Int.self, forKey: .maxUses)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            pskHash = try container.decode(String.self, forKey: .pskHash)
+            targetDid = try container.decodeIfPresent(DID.self, forKey: .targetDid)
+            expiresAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .expiresAt)
+            maxUses = try container.decodeIfPresent(Int.self, forKey: .maxUses)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -334,131 +330,95 @@ public struct Input: ATProtocolCodable {
             case maxUses
         }
     }
-    
-public struct Output: ATProtocolCodable {
-        
-        
+
+    public struct Output: ATProtocolCodable {
         public let inviteId: String
-        
+
         public let invite: InviteView
-        
-        
-        
-        // Standard public initializer
+
+        /// Standard public initializer
         public init(
-            
-            
             inviteId: String,
-            
+
             invite: InviteView
-            
-            
+
         ) {
-            
-            
             self.inviteId = inviteId
-            
+
             self.invite = invite
-            
-            
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
-            self.inviteId = try container.decode(String.self, forKey: .inviteId)
-            
-            
-            self.invite = try container.decode(InviteView.self, forKey: .invite)
-            
-            
+
+            inviteId = try container.decode(String.self, forKey: .inviteId)
+
+            invite = try container.decode(InviteView.self, forKey: .invite)
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(inviteId, forKey: .inviteId)
-            
-            
+
             try container.encode(invite, forKey: .invite)
-            
-            
         }
 
         public func toCBORValue() throws -> Any {
-            
             var map = OrderedCBORMap()
 
-            
-            
             let inviteIdValue = try inviteId.toCBORValue()
             map = map.adding(key: "inviteId", value: inviteIdValue)
-            
-            
-            
+
             let inviteValue = try invite.toCBORValue()
             map = map.adding(key: "invite", value: inviteValue)
-            
-            
 
             return map
-            
         }
-        
-        
+
         private enum CodingKeys: String, CodingKey {
             case inviteId
             case invite
         }
-        
     }
-        
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case unauthorized = "Unauthorized.Caller is not an admin of this conversation"
-                case invalidPSKHash = "InvalidPSKHash.PSK hash is invalid or malformed"
-                case convoNotFound = "ConvoNotFound.Conversation not found"
-                case notMember = "NotMember.Caller is not a member of this conversation"
-            public var description: String {
-                return self.rawValue
-            }
 
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case unauthorized = "Unauthorized.Caller is not an admin of this conversation"
+        case invalidPSKHash = "InvalidPSKHash.PSK hash is invalid or malformed"
+        case convoNotFound = "ConvoNotFound.Conversation not found"
+        case notMember = "NotMember.Caller is not a member of this conversation"
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-extension ATProtoClient.Blue.Catbird.Mls {
+public extension ATProtoClient.Blue.Catbird.Mls {
     // MARK: - createInvite
 
     /// Create a new invite link for a conversation Create an invite link with optional PSK hash, expiration, and usage limits. Only admins can create invites.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func createInvite(
-        
+    func createInvite(
         input: BlueCatbirdMlsCreateInvite.Input
-        
+
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsCreateInvite.Output?) {
         let endpoint = "blue.catbird.mls.createInvite"
-        
+
         var headers: [String: String] = [:]
-        
+
         headers["Content-Type"] = "application/json"
-        
-        
-        
+
         headers["Accept"] = "application/json"
-        
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -475,7 +435,6 @@ extension ATProtoClient.Blue.Catbird.Mls {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
@@ -485,12 +444,11 @@ extension ATProtoClient.Blue.Catbird.Mls {
         }
 
         // Only decode response data if request was successful
-        if (200...299).contains(responseCode) {
+        if (200 ... 299).contains(responseCode) {
             do {
-                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsCreateInvite.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -501,9 +459,5 @@ extension ATProtoClient.Blue.Catbird.Mls {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-        
     }
-    
 }
-                           
-
