@@ -911,6 +911,33 @@ public actor ATProtoClient {
         }
     }
 
+    public lazy var blue: Blue = .init(networkService: self.networkService)
+
+    public final class Blue: @unchecked Sendable {
+        let networkService: NetworkService
+        init(networkService: NetworkService) {
+            self.networkService = networkService
+        }
+
+        public lazy var catbird: Catbird = .init(networkService: self.networkService)
+
+        public final class Catbird: @unchecked Sendable {
+            let networkService: NetworkService
+            init(networkService: NetworkService) {
+                self.networkService = networkService
+            }
+
+            public lazy var mls: Mls = .init(networkService: self.networkService)
+
+            public final class Mls: @unchecked Sendable {
+                let networkService: NetworkService
+                init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+        }
+    }
+
     public lazy var com: Com = .init(networkService: self.networkService)
 
     public final class Com: @unchecked Sendable {

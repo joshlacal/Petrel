@@ -1,140 +1,100 @@
 import Foundation
 
-
-
 // lexicon: 1, id: blue.catbird.mls.getWelcome
 
-
-public struct BlueCatbirdMlsGetWelcome { 
-
-    public static let typeIdentifier = "blue.catbird.mls.getWelcome"    
-public struct Parameters: Parametrizable {
+public enum BlueCatbirdMlsGetWelcome {
+    public static let typeIdentifier = "blue.catbird.mls.getWelcome"
+    public struct Parameters: Parametrizable {
         public let convoId: String
-        
+
         public init(
             convoId: String
-            ) {
+        ) {
             self.convoId = convoId
-            
         }
     }
-    
-public struct Output: ATProtocolCodable {
-        
-        
+
+    public struct Output: ATProtocolCodable {
         public let convoId: String
-        
+
         public let welcome: String
-        
-        
-        
-        // Standard public initializer
+
+        /// Standard public initializer
         public init(
-            
-            
             convoId: String,
-            
+
             welcome: String
-            
-            
+
         ) {
-            
-            
             self.convoId = convoId
-            
+
             self.welcome = welcome
-            
-            
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
-            self.convoId = try container.decode(String.self, forKey: .convoId)
-            
-            
-            self.welcome = try container.decode(String.self, forKey: .welcome)
-            
-            
+
+            convoId = try container.decode(String.self, forKey: .convoId)
+
+            welcome = try container.decode(String.self, forKey: .welcome)
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(convoId, forKey: .convoId)
-            
-            
+
             try container.encode(welcome, forKey: .welcome)
-            
-            
         }
 
         public func toCBORValue() throws -> Any {
-            
             var map = OrderedCBORMap()
 
-            
-            
             let convoIdValue = try convoId.toCBORValue()
             map = map.adding(key: "convoId", value: convoIdValue)
-            
-            
-            
+
             let welcomeValue = try welcome.toCBORValue()
             map = map.adding(key: "welcome", value: welcomeValue)
-            
-            
 
             return map
-            
         }
-        
-        
+
         private enum CodingKeys: String, CodingKey {
             case convoId
             case welcome
         }
-        
     }
-        
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case convoNotFound = "ConvoNotFound.Conversation not found"
-                case notMember = "NotMember.Caller is not a member of the conversation"
-                case welcomeNotFound = "WelcomeNotFound.No Welcome message available for this user"
-            public var description: String {
-                return self.rawValue
-            }
 
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case convoNotFound = "ConvoNotFound.Conversation not found"
+        case notMember = "NotMember.Caller is not a member of the conversation"
+        case welcomeNotFound = "WelcomeNotFound.No Welcome message available for this user"
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-
-
-extension ATProtoClient.Blue.Catbird.Mls {
+public extension ATProtoClient.Blue.Catbird.Mls {
     // MARK: - getWelcome
 
     /// Get Welcome message for joining an MLS conversation Retrieve the Welcome message for a conversation the user is a member of
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func getWelcome(input: BlueCatbirdMlsGetWelcome.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsGetWelcome.Output?) {
+    func getWelcome(input: BlueCatbirdMlsGetWelcome.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsGetWelcome.Output?) {
         let endpoint = "blue.catbird.mls.getWelcome"
 
-        
         let queryItems = input.asQueryItems()
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -158,12 +118,11 @@ extension ATProtoClient.Blue.Catbird.Mls {
         }
 
         // Only decode response data if request was successful
-        if (200...299).contains(responseCode) {
+        if (200 ... 299).contains(responseCode) {
             do {
-                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsGetWelcome.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -171,12 +130,9 @@ extension ATProtoClient.Blue.Catbird.Mls {
                 return (responseCode, nil)
             }
         } else {
-            
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-                           
-
