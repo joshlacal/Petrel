@@ -221,6 +221,25 @@ actor RefreshCircuitBreaker {
         )
     }
 
+    /// Forces the circuit to half-open state to allow an immediate recovery test.
+    /// Use this when the user explicitly requests to retry authentication.
+    /// - Parameter did: The DID to transition
+    /// - Returns: True if transitioned to half-open, false if already closed or couldn't transition
+    func forceHalfOpen(for did: String) -> Bool {
+        guard var info = failureTracking[did], info.state == .open else {
+            return false
+        }
+
+        info.state = .halfOpen
+        info.halfOpenTestInProgress = false
+        failureTracking[did] = info
+
+        LogManager.logInfo(
+            "RefreshCircuitBreaker: Forced circuit to half-open for DID \(LogManager.logDID(did)) for manual recovery attempt"
+        )
+        return true
+    }
+
     /// Resets all circuit breakers
     func resetAll() {
         let count = failureTracking.count
