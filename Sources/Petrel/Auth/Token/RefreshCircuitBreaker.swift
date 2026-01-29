@@ -158,8 +158,8 @@ actor RefreshCircuitBreaker {
             // Do not count recoverable nonce rotations toward opening the circuit
             break
         case .invalidGrant, .invalidDPoPProof:
-            info.consecutiveFailures += 2 // heavier weight for serious failures
-            info.backoffExponent = min(info.backoffExponent + 2, 6) // Faster escalation for serious failures
+            info.consecutiveFailures += 1 // Changed from += 2 to prevent premature circuit opening
+            info.backoffExponent = min(info.backoffExponent + 1, 6) // Changed from += 2
         case .metadataUnavailable:
             info.consecutiveFailures += 1 // Standard weight but longer backoff for server issues
             info.backoffExponent = min(info.backoffExponent + 1, 8) // Longer max backoff for server issues

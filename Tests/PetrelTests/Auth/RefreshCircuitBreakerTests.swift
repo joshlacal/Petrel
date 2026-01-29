@@ -14,7 +14,8 @@ struct RefreshCircuitBreakerTests {
         let did = "did:plc:test123"
 
         // Record enough failures to open circuit
-        await breaker.recordFailure(for: did, kind: .invalidGrant) // +2
+        await breaker.recordFailure(for: did, kind: .invalidGrant) // +1
+        await breaker.recordFailure(for: did, kind: .invalidGrant) // +1
         await breaker.recordFailure(for: did, kind: .network)      // +1 = 3, circuit opens
 
         // Verify circuit is open
@@ -38,9 +39,10 @@ struct RefreshCircuitBreakerTests {
         let breaker = RefreshCircuitBreaker()
         let did = "did:plc:test456"
 
-        // Open the circuit
-        await breaker.recordFailure(for: did, kind: .invalidGrant)
-        await breaker.recordFailure(for: did, kind: .network)
+        // Open the circuit (3 failures needed)
+        await breaker.recordFailure(for: did, kind: .invalidGrant) // +1
+        await breaker.recordFailure(for: did, kind: .invalidGrant) // +1
+        await breaker.recordFailure(for: did, kind: .network)      // +1 = 3
 
         // Verify circuit is open
         let initialState = await breaker.getState(for: did)
@@ -57,5 +59,28 @@ struct RefreshCircuitBreakerTests {
         // Should now allow one refresh attempt
         let canRefresh = await breaker.canAttemptRefresh(for: did)
         #expect(canRefresh == true)
+    }
+
+    @Test("invalidGrant counts as 1 failure, not 2")
+    func testInvalidGrantCountsAsOne() async {
+        let breaker = RefreshCircuitBreaker()
+        let did = "did:plc:weight-test"
+
+        // Record 2 invalidGrant failures
+        await breaker.recordFailure(for: did, kind: .invalidGrant)
+        await breaker.recordFailure(for: did, kind: .invalidGrant)
+
+        // Circuit should still be closed (need 3 failures)
+        let stateAfterTwo = await breaker.getState(for: did)
+        #expect(stateAfterTwo == .closed)
+
+        // Can still attempt refresh
+        let canRefresh = await breaker.canAttemptRefresh(for: did)
+        #expect(canRefresh == true)
+
+        // Third failure opens circuit
+        await breaker.recordFailure(for: did, kind: .invalidGrant)
+        let stateAfterThree = await breaker.getState(for: did)
+        #expect(stateAfterThree == .open)
     }
 }
