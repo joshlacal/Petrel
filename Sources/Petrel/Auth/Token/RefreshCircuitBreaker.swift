@@ -87,6 +87,12 @@ actor RefreshCircuitBreaker {
 
         let info = failureTracking[did] ?? FailureInfo()
 
+        LogManager.logDebug(
+            "RefreshCircuitBreaker: Checking refresh for DID \(LogManager.logDID(did)) - " +
+                "state=\(info.state), failures=\(info.consecutiveFailures), " +
+                "lastKind=\(String(describing: info.lastFailureKind))"
+        )
+
         switch info.state {
         case .closed:
             return true
@@ -173,6 +179,15 @@ actor RefreshCircuitBreaker {
         switch info.state {
         case .closed:
             if info.consecutiveFailures >= maxConsecutiveFailures {
+                LogManager.logAuthIncident(
+                    "CircuitBreakerOpened",
+                    details: [
+                        "did": LogManager.logDID(did),
+                        "failures": info.consecutiveFailures,
+                        "lastKind": String(describing: kind),
+                        "backoffExponent": info.backoffExponent,
+                    ]
+                )
                 info.state = .open
                 LogManager.logError(
                     "RefreshCircuitBreaker: Circuit opened for DID \(LogManager.logDID(did)) after \(info.consecutiveFailures) consecutive failures",
