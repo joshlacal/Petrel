@@ -1858,14 +1858,48 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
     /// - Parameter forceRefresh: If true, forces a refresh regardless of calculated expiry time
     /// - Returns: Result indicating whether token was refreshed, still valid, or skipped
     func refreshTokenIfNeeded(forceRefresh: Bool = false) async throws -> TokenRefreshResult {
-        // Get current account and session
-        guard let account = await accountManager.getCurrentAccount(),
-              let session = try? await storage.getSession(for: account.did)
-        else {
+        // Step 1: Get current account
+        guard let account = await accountManager.getCurrentAccount() else {
             throw AuthError.noActiveAccount
         }
 
         let did = account.did
+
+        // Step 2: Before checking circuit breaker, validate session exists
+        var session: Session
+        if let existingSession = try? await storage.getSession(for: did) {
+            session = existingSession
+        } else {
+            // Session missing - attempt recovery
+            LogManager.logWarning(
+                "AuthenticationService - Session missing for DID \(LogManager.logDID(did)), attempting recovery",
+                category: .authentication
+            )
+
+            if let recoveredSession = try? await storage.recoverSessionFromBackup(for: did) {
+                // Save recovered session to primary location
+                try await storage.saveSession(recoveredSession, for: did)
+                session = recoveredSession
+                LogManager.logInfo(
+                    "AuthenticationService - Successfully recovered session for DID \(LogManager.logDID(did))",
+                    category: .authentication
+                )
+
+                // Reset circuit breaker since we recovered
+                await refreshCircuitBreaker.reset(for: did)
+            } else {
+                // No session to recover - user needs to re-authenticate
+                LogManager.logError(
+                    "AuthenticationService - Cannot recover session for DID \(LogManager.logDID(did)), re-authentication required",
+                    category: .authentication
+                )
+
+                // Reset circuit breaker so user can try fresh login
+                await refreshCircuitBreaker.reset(for: did)
+
+                throw AuthError.noActiveAccount
+            }
+        }
 
         // 🚀 Modern Swift Concurrency: Single-flight refresh using actor isolation
         // Check if there's already an active refresh task for this DID
@@ -2144,6 +2178,31 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
                         return .stillValid
                     }
                 }
+                
+                // CRITICAL FIX: Before triggering logout, check if we still have a valid access token
+                // The invalid_grant might be due to a transient server issue, not an actually revoked session
+                if let session = try? await storage.getSession(for: did) {
+                    let tokenStillValid = Date() < session.createdAt.addingTimeInterval(session.expiresIn)
+                    if tokenStillValid {
+                        LogManager.logWarning(
+                            "invalid_grant received but access token still valid for DID \(LogManager.logDID(account.did)). "
+                            + "Preserving session and deferring logout. Error: \(description ?? "No details")",
+                            category: .authentication
+                        )
+                        LogManager.logAuthIncident(
+                            "InvalidGrantWithValidToken",
+                            details: [
+                                "did": did,
+                                "tokenExpiresIn": "\(session.expiresIn)",
+                                "description": description ?? "none",
+                            ]
+                        )
+                        // Set ambiguous timeout window so we don't retry refresh too aggressively
+                        ambiguousRefreshUntil[did] = Date().addingTimeInterval(60)
+                        return .stillValid
+                    }
+                }
+                
                 await refreshCircuitBreaker.recordFailure(for: did, kind: .invalidGrant)
                 LogManager.logError(
                     "❌ TOKEN_LIFECYCLE: Refresh failed with invalid_grant for DID \(LogManager.logDID(account.did)): "
@@ -3163,12 +3222,15 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
                 details: [
                     "did": did,
                     "tokenType": "dpop",
-                    "action": "force_logout",
+                    "action": "signal_reauth_needed",
                 ]
             )
 
-            // Force logout to clear corrupted state
-            try? await logout()
+            // CRITICAL FIX: Do NOT force logout here - this destroys the user's session
+            // Instead, throw an error that signals re-authentication is needed
+            // The caller can decide whether to prompt for re-auth or retry
+            // This preserves the session data so the user can potentially recover
+            // by re-authenticating without losing their account state
             throw AuthError.dpopKeyError
         }
 
