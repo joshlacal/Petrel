@@ -1185,6 +1185,31 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
         )
     }
 
+    // MARK: - Circuit Breaker Control
+
+    /// Resets the circuit breaker for a specific DID, allowing refresh attempts.
+    /// Call this when the user explicitly requests to retry authentication.
+    /// - Parameter did: The DID to reset circuit breaker for
+    public func resetCircuitBreaker(for did: String) async {
+        await refreshCircuitBreaker.reset(for: did)
+        LogManager.logInfo(
+            "AuthenticationService - Circuit breaker reset for DID \(LogManager.logDID(did)) by user request"
+        )
+    }
+
+    /// Forces the circuit to half-open state for an immediate recovery attempt.
+    /// - Parameter did: The DID to transition
+    /// - Returns: True if transitioned, false if already closed
+    public func forceCircuitBreakerRecovery(for did: String) async -> Bool {
+        let result = await refreshCircuitBreaker.forceHalfOpen(for: did)
+        if result {
+            LogManager.logInfo(
+                "AuthenticationService - Forced circuit to half-open for DID \(LogManager.logDID(did))"
+            )
+        }
+        return result
+    }
+
     /// Attempts to recover from catastrophic auth failures by resetting circuit breakers
     /// and attempting a fresh token refresh. Should be called when the app detects
     /// that server issues have been resolved (e.g., network connectivity restored).
