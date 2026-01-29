@@ -36,7 +36,7 @@ public actor KeychainStorage {
     public func saveAccount(_ account: Account, for did: String) async throws {
         let key = makeKey("account", did: did)
         let data = try JSONEncoder().encode(account)
-        try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace)
+        try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
 
         // Add to the accounts list if not already present
         try await addToAccountsList(did)
@@ -64,43 +64,43 @@ public actor KeychainStorage {
         do {
             // Step 1: Create backups of existing data if they exist
             if let existingAccountData = try? KeychainManager.retrieve(
-                key: accountKey, namespace: namespace
+                key: accountKey, namespace: namespace, accessGroup: accessGroup
             ) {
                 try KeychainManager.store(
-                    key: backupAccountKey, value: existingAccountData, namespace: namespace
+                    key: backupAccountKey, value: existingAccountData, namespace: namespace, accessGroup: accessGroup
                 )
                 LogManager.logDebug("Account backup created for DID: \(LogManager.logDID(did))")
             }
 
             if let existingSessionData = try? KeychainManager.retrieve(
-                key: sessionKey, namespace: namespace
+                key: sessionKey, namespace: namespace, accessGroup: accessGroup
             ) {
                 try KeychainManager.store(
-                    key: backupSessionKey, value: existingSessionData, namespace: namespace
+                    key: backupSessionKey, value: existingSessionData, namespace: namespace, accessGroup: accessGroup
                 )
                 LogManager.logDebug("Session backup created for DID: \(LogManager.logDID(did))")
             }
 
             // Step 2: Save both to temporary locations first
-            try KeychainManager.store(key: tempAccountKey, value: accountData, namespace: namespace)
+            try KeychainManager.store(key: tempAccountKey, value: accountData, namespace: namespace, accessGroup: accessGroup)
             LogManager.logDebug("Account saved to temporary location for DID: \(LogManager.logDID(did))")
 
-            try KeychainManager.store(key: tempSessionKey, value: sessionData, namespace: namespace)
+            try KeychainManager.store(key: tempSessionKey, value: sessionData, namespace: namespace, accessGroup: accessGroup)
             LogManager.logDebug("Session saved to temporary location for DID: \(LogManager.logDID(did))")
 
             // Step 3: Atomic move both to final locations
-            try KeychainManager.store(key: accountKey, value: accountData, namespace: namespace)
+            try KeychainManager.store(key: accountKey, value: accountData, namespace: namespace, accessGroup: accessGroup)
             LogManager.logDebug("Account moved to final location for DID: \(LogManager.logDID(did))")
 
-            try KeychainManager.store(key: sessionKey, value: sessionData, namespace: namespace)
+            try KeychainManager.store(key: sessionKey, value: sessionData, namespace: namespace, accessGroup: accessGroup)
             LogManager.logDebug("Session moved to final location for DID: \(LogManager.logDID(did))")
 
             // Step 4: Verify both saves were successful by reading them back
             let verificationAccountData = try KeychainManager.retrieve(
-                key: accountKey, namespace: namespace
+                key: accountKey, namespace: namespace, accessGroup: accessGroup
             )
             let verificationSessionData = try KeychainManager.retrieve(
-                key: sessionKey, namespace: namespace
+                key: sessionKey, namespace: namespace, accessGroup: accessGroup
             )
 
             let verifiedAccount = try JSONDecoder().decode(Account.self, from: verificationAccountData)
@@ -119,10 +119,10 @@ public actor KeychainStorage {
             try await addToAccountsList(did)
 
             // Step 6: Cleanup temporary and backup files
-            try? KeychainManager.delete(key: tempAccountKey, namespace: namespace)
-            try? KeychainManager.delete(key: tempSessionKey, namespace: namespace)
-            try? KeychainManager.delete(key: backupAccountKey, namespace: namespace)
-            try? KeychainManager.delete(key: backupSessionKey, namespace: namespace)
+            try? KeychainManager.delete(key: tempAccountKey, namespace: namespace, accessGroup: accessGroup)
+            try? KeychainManager.delete(key: tempSessionKey, namespace: namespace, accessGroup: accessGroup)
+            try? KeychainManager.delete(key: backupAccountKey, namespace: namespace, accessGroup: accessGroup)
+            try? KeychainManager.delete(key: backupSessionKey, namespace: namespace, accessGroup: accessGroup)
 
             LogManager.logDebug(
                 "Account+session saved atomically and verified for DID: \(LogManager.logDID(did))"
@@ -135,10 +135,10 @@ public actor KeychainStorage {
 
             // Recovery: Attempt to restore from backups if final saves failed
             if let backupAccountData = try? KeychainManager.retrieve(
-                key: backupAccountKey, namespace: namespace
+                key: backupAccountKey, namespace: namespace, accessGroup: accessGroup
             ) {
                 do {
-                    try KeychainManager.store(key: accountKey, value: backupAccountData, namespace: namespace)
+                    try KeychainManager.store(key: accountKey, value: backupAccountData, namespace: namespace, accessGroup: accessGroup)
                     LogManager.logDebug("Account restored from backup for DID: \(LogManager.logDID(did))")
                 } catch {
                     LogManager.logError(
@@ -148,10 +148,10 @@ public actor KeychainStorage {
             }
 
             if let backupSessionData = try? KeychainManager.retrieve(
-                key: backupSessionKey, namespace: namespace
+                key: backupSessionKey, namespace: namespace, accessGroup: accessGroup
             ) {
                 do {
-                    try KeychainManager.store(key: sessionKey, value: backupSessionData, namespace: namespace)
+                    try KeychainManager.store(key: sessionKey, value: backupSessionData, namespace: namespace, accessGroup: accessGroup)
                     LogManager.logDebug("Session restored from backup for DID: \(LogManager.logDID(did))")
                 } catch {
                     LogManager.logError(
@@ -161,10 +161,10 @@ public actor KeychainStorage {
             }
 
             // Cleanup temporary files in error case
-            try? KeychainManager.delete(key: tempAccountKey, namespace: namespace)
-            try? KeychainManager.delete(key: tempSessionKey, namespace: namespace)
-            try? KeychainManager.delete(key: backupAccountKey, namespace: namespace)
-            try? KeychainManager.delete(key: backupSessionKey, namespace: namespace)
+            try? KeychainManager.delete(key: tempAccountKey, namespace: namespace, accessGroup: accessGroup)
+            try? KeychainManager.delete(key: tempSessionKey, namespace: namespace, accessGroup: accessGroup)
+            try? KeychainManager.delete(key: backupAccountKey, namespace: namespace, accessGroup: accessGroup)
+            try? KeychainManager.delete(key: backupSessionKey, namespace: namespace, accessGroup: accessGroup)
 
             throw error
         }
@@ -176,7 +176,7 @@ public actor KeychainStorage {
     public func getAccount(for did: String) async throws -> Account? {
         let key = makeKey("account", did: did)
         do {
-            let data = try await KeychainManager.retrieveAsync(key: key, namespace: namespace)
+            let data = try await KeychainManager.retrieveAsync(key: key, namespace: namespace, accessGroup: accessGroup)
             return try JSONDecoder().decode(Account.self, from: data)
         } catch {
             return nil
@@ -187,7 +187,7 @@ public actor KeychainStorage {
     /// - Parameter did: The DID of the account to delete
     public func deleteAccount(for did: String) async throws {
         let key = makeKey("account", did: did)
-        try await KeychainManager.deleteAsync(key: key, namespace: namespace)
+        try await KeychainManager.deleteAsync(key: key, namespace: namespace, accessGroup: accessGroup)
 
         // Remove from the accounts list
         try await removeFromAccountsList(did)
@@ -198,7 +198,7 @@ public actor KeychainStorage {
     public func listAccountDIDs() async throws -> [String] {
         let key = makeKey("accountDIDs")
         do {
-            let data = try await KeychainManager.retrieveAsync(key: key, namespace: namespace)
+            let data = try await KeychainManager.retrieveAsync(key: key, namespace: namespace, accessGroup: accessGroup)
             return try JSONDecoder().decode([String].self, from: data)
         } catch {
             return []
@@ -210,7 +210,7 @@ public actor KeychainStorage {
     public func saveCurrentDID(_ did: String) async throws {
         let key = makeKey("currentDID")
         let data = did.data(using: .utf8) ?? Data()
-        try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace)
+        try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
     }
 
     /// Retrieves the current DID from the keychain.
@@ -218,7 +218,7 @@ public actor KeychainStorage {
     public func getCurrentDID() async throws -> String? {
         let key = makeKey("currentDID")
         do {
-            let data = try await KeychainManager.retrieveAsync(key: key, namespace: namespace)
+            let data = try await KeychainManager.retrieveAsync(key: key, namespace: namespace, accessGroup: accessGroup)
             return String(data: data, encoding: .utf8)
         } catch {
             return nil
@@ -231,21 +231,26 @@ public actor KeychainStorage {
     func saveGatewaySession(_ session: String, for did: String) async throws {
         let key = makeKey("gatewaySession", did: did)
         let data = session.data(using: .utf8) ?? Data()
-        try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace)
-        LogManager.logDebug("KeychainStorage - Saved gateway session for DID: \(did.prefix(20))...")
+        LogManager.logInfo("KeychainStorage - Saving gateway session with key: \(namespace).\(key) for DID: \(did.prefix(20))...")
+        try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+        LogManager.logInfo("KeychainStorage - Successfully saved gateway session for DID: \(did.prefix(20))...")
     }
 
     /// Retrieves the gateway session for a specific account
     func getGatewaySession(for did: String) async throws -> String? {
         let key = makeKey("gatewaySession", did: did)
+        LogManager.logInfo("KeychainStorage - Looking for gateway session with key: \(namespace).\(key)")
         do {
-            let data = try await KeychainManager.retrieveAsync(key: key, namespace: namespace)
-            LogManager.logDebug("KeychainStorage - Retrieved gateway session for DID: \(did.prefix(20))...")
+            let data = try await KeychainManager.retrieveAsync(key: key, namespace: namespace, accessGroup: accessGroup)
+            LogManager.logInfo("KeychainStorage - Retrieved gateway session for DID: \(did.prefix(20))...")
             return String(data: data, encoding: .utf8)
         } catch {
+            LogManager.logWarning("KeychainStorage - Gateway session not found for key \(namespace).\(key): \(error). Attempting legacy migration...")
             if let migratedSession = await migrateLegacyGatewaySessionIfNeeded(for: did) {
+                LogManager.logInfo("KeychainStorage - Successfully migrated legacy gateway session for DID: \(did.prefix(20))...")
                 return migratedSession
             }
+            LogManager.logWarning("KeychainStorage - No gateway session found for DID: \(did.prefix(20))... (including legacy locations)")
             return nil
         }
     }
@@ -253,7 +258,7 @@ public actor KeychainStorage {
     /// Deletes the gateway session for a specific account
     func deleteGatewaySession(for did: String) async throws {
         let key = makeKey("gatewaySession", did: did)
-        try await KeychainManager.deleteAsync(key: key, namespace: namespace)
+        try await KeychainManager.deleteAsync(key: key, namespace: namespace, accessGroup: accessGroup)
         LogManager.logDebug("KeychainStorage - Deleted gateway session for DID: \(did.prefix(20))...")
     }
 
@@ -285,7 +290,8 @@ public actor KeychainStorage {
 
         if let data = try? await KeychainManager.retrieveAsync(
             key: "gatewaySession",
-            namespace: "catbird.gateway"
+            namespace: "catbird.gateway",
+            accessGroup: accessGroup
         ),
             let session = String(data: data, encoding: .utf8),
             !session.isEmpty
@@ -294,7 +300,11 @@ public actor KeychainStorage {
                 "KeychainStorage - Migrating global gateway session to per-DID storage for DID: \(did.prefix(20))..."
             )
             try? await saveGatewaySession(session, for: did)
-            try? await KeychainManager.deleteAsync(key: "gatewaySession", namespace: "catbird.gateway")
+            try? await KeychainManager.deleteAsync(
+                key: "gatewaySession",
+                namespace: "catbird.gateway",
+                accessGroup: accessGroup
+            )
             return session
         }
 
@@ -306,14 +316,14 @@ public actor KeychainStorage {
     func saveGatewaySession(_ session: String) async throws {
         let key = makeKey("gatewaySession")
         let data = session.data(using: .utf8) ?? Data()
-        try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace)
+        try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
     }
 
     @available(*, deprecated, message: "Use getGatewaySession(for:) for multi-account support")
     func getGatewaySession() async throws -> String? {
         let key = makeKey("gatewaySession")
         do {
-            let data = try await KeychainManager.retrieveAsync(key: key, namespace: namespace)
+            let data = try await KeychainManager.retrieveAsync(key: key, namespace: namespace, accessGroup: accessGroup)
             return String(data: data, encoding: .utf8)
         } catch {
             return nil
@@ -323,7 +333,7 @@ public actor KeychainStorage {
     @available(*, deprecated, message: "Use deleteGatewaySession(for:) for multi-account support")
     func deleteGatewaySession() async throws {
         let key = makeKey("gatewaySession")
-        try await KeychainManager.deleteAsync(key: key, namespace: namespace)
+        try await KeychainManager.deleteAsync(key: key, namespace: namespace, accessGroup: accessGroup)
     }
 
     // MARK: - Session Management
@@ -360,9 +370,9 @@ public actor KeychainStorage {
         // Enhanced atomic save operation with comprehensive error handling
         do {
             // Step 1: Create backup of existing session if it exists
-            if let existingData = try? KeychainManager.retrieve(key: key, namespace: namespace) {
+            if let existingData = try? KeychainManager.retrieve(key: key, namespace: namespace, accessGroup: accessGroup) {
                 do {
-                    try KeychainManager.store(key: backupKey, value: existingData, namespace: namespace)
+                    try KeychainManager.store(key: backupKey, value: existingData, namespace: namespace, accessGroup: accessGroup)
                     LogManager.logDebug("Session backup created for DID: \(LogManager.logDID(did))")
                 } catch {
                     LogManager.logWarning(
@@ -373,7 +383,7 @@ public actor KeychainStorage {
 
             // Step 2: Save to temporary location first
             do {
-                try KeychainManager.store(key: tempKey, value: data, namespace: namespace)
+                try KeychainManager.store(key: tempKey, value: data, namespace: namespace, accessGroup: accessGroup)
                 LogManager.logDebug(
                     "Session saved to temporary location for DID: \(LogManager.logDID(did))"
                 )
@@ -386,7 +396,7 @@ public actor KeychainStorage {
 
             // Step 3: Atomic move to final location
             do {
-                try KeychainManager.store(key: key, value: data, namespace: namespace)
+                try KeychainManager.store(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
                 LogManager.logDebug("Session moved to final location for DID: \(LogManager.logDID(did))")
             } catch {
                 LogManager.logError(
@@ -397,7 +407,7 @@ public actor KeychainStorage {
 
             // Step 4: Verify the save was successful by reading it back
             do {
-                let verificationData = try KeychainManager.retrieve(key: key, namespace: namespace)
+                let verificationData = try KeychainManager.retrieve(key: key, namespace: namespace, accessGroup: accessGroup)
                 let verifiedSession = try JSONDecoder().decode(Session.self, from: verificationData)
 
                 // Comprehensive verification that the session has required fields
@@ -426,8 +436,8 @@ public actor KeychainStorage {
             }
 
             // Step 5: Cleanup temporary files
-            try? KeychainManager.delete(key: tempKey, namespace: namespace)
-            try? KeychainManager.delete(key: backupKey, namespace: namespace)
+            try? KeychainManager.delete(key: tempKey, namespace: namespace, accessGroup: accessGroup)
+            try? KeychainManager.delete(key: backupKey, namespace: namespace, accessGroup: accessGroup)
 
             LogManager.logDebug(
                 "Session saved atomically and verified for DID: \(LogManager.logDID(did))"
@@ -460,14 +470,14 @@ public actor KeychainStorage {
         switch error {
         case .temporarySaveFailed:
             // If we can't even save to temp, just cleanup and fail
-            try? KeychainManager.delete(key: tempKey, namespace: namespace)
-            try? KeychainManager.delete(key: backupKey, namespace: namespace)
+            try? KeychainManager.delete(key: tempKey, namespace: namespace, accessGroup: accessGroup)
+            try? KeychainManager.delete(key: backupKey, namespace: namespace, accessGroup: accessGroup)
 
         case .finalSaveFailed, .verificationFailed, .unexpectedError:
             // For final save or verification failures, attempt recovery from backup
-            if let backupData = try? KeychainManager.retrieve(key: backupKey, namespace: namespace) {
+            if let backupData = try? KeychainManager.retrieve(key: backupKey, namespace: namespace, accessGroup: accessGroup) {
                 do {
-                    try KeychainManager.store(key: key, value: backupData, namespace: namespace)
+                    try KeychainManager.store(key: key, value: backupData, namespace: namespace, accessGroup: accessGroup)
                     LogManager.logInfo(
                         "Session restored from backup after save failure for DID: \(LogManager.logDID(did))"
                     )
@@ -479,8 +489,8 @@ public actor KeychainStorage {
             }
 
             // Always cleanup temporary files in error cases
-            try? KeychainManager.delete(key: tempKey, namespace: namespace)
-            try? KeychainManager.delete(key: backupKey, namespace: namespace)
+            try? KeychainManager.delete(key: tempKey, namespace: namespace, accessGroup: accessGroup)
+            try? KeychainManager.delete(key: backupKey, namespace: namespace, accessGroup: accessGroup)
         }
     }
 
@@ -540,7 +550,7 @@ public actor KeychainStorage {
         let backupKey = makeKey("session.backup", did: did)
 
         do {
-            let data = try await KeychainManager.retrieveAsync(key: key, namespace: namespace)
+            let data = try await KeychainManager.retrieveAsync(key: key, namespace: namespace, accessGroup: accessGroup)
             return try JSONDecoder().decode(Session.self, from: data)
         } catch {
             LogManager.logDebug(
@@ -548,7 +558,7 @@ public actor KeychainStorage {
             )
 
             // Try to recover from temporary location if primary failed
-            if let tempData = try? await KeychainManager.retrieveAsync(key: tempKey, namespace: namespace) {
+            if let tempData = try? await KeychainManager.retrieveAsync(key: tempKey, namespace: namespace, accessGroup: accessGroup) {
                 do {
                     let session = try JSONDecoder().decode(Session.self, from: tempData)
                     LogManager.logDebug(
@@ -556,8 +566,8 @@ public actor KeychainStorage {
                     )
 
                     // Try to restore to primary location
-                    try? await KeychainManager.storeAsync(key: key, value: tempData, namespace: namespace)
-                    try? await KeychainManager.deleteAsync(key: tempKey, namespace: namespace)
+                    try? await KeychainManager.storeAsync(key: key, value: tempData, namespace: namespace, accessGroup: accessGroup)
+                    try? await KeychainManager.deleteAsync(key: tempKey, namespace: namespace, accessGroup: accessGroup)
 
                     return session
                 } catch {
@@ -568,7 +578,7 @@ public actor KeychainStorage {
             }
 
             // Try to recover from backup location if primary and temp failed
-            if let backupData = try? await KeychainManager.retrieveAsync(key: backupKey, namespace: namespace) {
+            if let backupData = try? await KeychainManager.retrieveAsync(key: backupKey, namespace: namespace, accessGroup: accessGroup) {
                 do {
                     let session = try JSONDecoder().decode(Session.self, from: backupData)
                     LogManager.logDebug(
@@ -576,8 +586,8 @@ public actor KeychainStorage {
                     )
 
                     // Try to restore to primary location
-                    try? await KeychainManager.storeAsync(key: key, value: backupData, namespace: namespace)
-                    try? await KeychainManager.deleteAsync(key: backupKey, namespace: namespace)
+                    try? await KeychainManager.storeAsync(key: key, value: backupData, namespace: namespace, accessGroup: accessGroup)
+                    try? await KeychainManager.deleteAsync(key: backupKey, namespace: namespace, accessGroup: accessGroup)
 
                     return session
                 } catch {
@@ -595,7 +605,75 @@ public actor KeychainStorage {
     /// - Parameter did: The DID associated with the session to delete
     public func deleteSession(for did: String) async throws {
         let key = makeKey("session", did: did)
-        try KeychainManager.delete(key: key, namespace: namespace)
+        try KeychainManager.delete(key: key, namespace: namespace, accessGroup: accessGroup)
+    }
+
+    // MARK: - Session Backup and Recovery
+
+    /// Saves a backup copy of the session for recovery purposes.
+    /// - Parameters:
+    ///   - session: The session to backup
+    ///   - did: The DID associated with the session
+    public func saveSessionBackup(_ session: Session, for did: String) async throws {
+        let key = makeKey("session.backup", did: did)
+        let data = try JSONEncoder().encode(session)
+        try KeychainManager.store(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+        LogManager.logDebug("KeychainStorage - Saved session backup for DID: \(LogManager.logDID(did))")
+    }
+
+    /// Saves a session to a temporary location (used during atomic saves).
+    /// - Parameters:
+    ///   - session: The session to save temporarily
+    ///   - did: The DID associated with the session
+    public func saveSessionToTemp(_ session: Session, for did: String) async throws {
+        let key = makeKey("session.temp", did: did)
+        let data = try JSONEncoder().encode(session)
+        try KeychainManager.store(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+        LogManager.logDebug("KeychainStorage - Saved session to temp for DID: \(LogManager.logDID(did))")
+    }
+
+    /// Attempts to recover a session from backup or temporary locations.
+    /// - Parameter did: The DID to recover session for
+    /// - Returns: The recovered session if available, nil otherwise
+    public func recoverSessionFromBackup(for did: String) async throws -> Session? {
+        let backupKey = makeKey("session.backup", did: did)
+
+        // Try backup location first
+        do {
+            let data = try KeychainManager.retrieve(key: backupKey, namespace: namespace, accessGroup: accessGroup)
+            let session = try JSONDecoder().decode(Session.self, from: data)
+            LogManager.logInfo("KeychainStorage - Recovered session from backup for DID: \(LogManager.logDID(did))")
+            return session
+        } catch {
+            LogManager.logDebug("KeychainStorage - No backup session found for DID: \(LogManager.logDID(did))")
+        }
+
+        // Try temporary location as fallback
+        let tempKey = makeKey("session.temp", did: did)
+        do {
+            let data = try KeychainManager.retrieve(key: tempKey, namespace: namespace, accessGroup: accessGroup)
+            let session = try JSONDecoder().decode(Session.self, from: data)
+            LogManager.logInfo("KeychainStorage - Recovered session from temp for DID: \(LogManager.logDID(did))")
+            return session
+        } catch {
+            LogManager.logDebug("KeychainStorage - No temp session found for DID: \(LogManager.logDID(did))")
+        }
+
+        return nil
+    }
+
+    /// Deletes a session backup from the keychain.
+    /// - Parameter did: The DID associated with the session backup to delete
+    public func deleteSessionBackup(for did: String) async throws {
+        let key = makeKey("session.backup", did: did)
+        try KeychainManager.delete(key: key, namespace: namespace, accessGroup: accessGroup)
+    }
+
+    /// Deletes a temporary session from the keychain.
+    /// - Parameter did: The DID associated with the temp session to delete
+    public func deleteSessionTemp(for did: String) async throws {
+        let key = makeKey("session.temp", did: did)
+        try KeychainManager.delete(key: key, namespace: namespace, accessGroup: accessGroup)
     }
 
     // MARK: - DPoP Key Management
@@ -607,7 +685,7 @@ public actor KeychainStorage {
     public func saveDPoPKey(_ key: P256.Signing.PrivateKey, for did: String) async throws {
         let keyTag = makeKey("dpopKey", did: did)
         do {
-            try KeychainManager.storeDPoPKey(key, keyTag: keyTag)
+            try KeychainManager.storeDPoPKey(key, keyTag: keyTag, accessGroup: accessGroup)
             LogManager.logDebug(
                 "Successfully saved DPoP key to Keychain for DID \(LogManager.logDID(did))"
             )
@@ -625,7 +703,7 @@ public actor KeychainStorage {
     public func getDPoPKey(for did: String) async throws -> P256.Signing.PrivateKey? {
         let keyTag = makeKey("dpopKey", did: did)
         do {
-            return try KeychainManager.retrieveDPoPKey(keyTag: keyTag)
+            return try KeychainManager.retrieveDPoPKey(keyTag: keyTag, accessGroup: accessGroup)
         } catch let KeychainError.itemRetrievalError(status) where status == errSecItemNotFound {
             LogManager.logDebug(
                 "DPoP key not found in Keychain for DID: \(did). A new key will be generated if needed."
@@ -651,7 +729,7 @@ public actor KeychainStorage {
     /// - Parameter did: The DID associated with the key to delete
     public func deleteDPoPKey(for did: String) async throws {
         let keyTag = makeKey("dpopKey", did: did)
-        try KeychainManager.deleteDPoPKey(keyTag: keyTag)
+        try KeychainManager.deleteDPoPKey(keyTag: keyTag, accessGroup: accessGroup)
     }
 
     // MARK: - DPoP Nonce Management
@@ -663,7 +741,7 @@ public actor KeychainStorage {
     public func saveDPoPNonces(_ nonces: [String: String], for did: String) async throws {
         let key = makeKey("dpopNonces", did: did)
         let data = try JSONEncoder().encode(nonces)
-        try KeychainManager.store(key: key, value: data, namespace: namespace)
+        try KeychainManager.store(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
     }
 
     /// Retrieves DPoP nonces from the keychain.
@@ -672,7 +750,7 @@ public actor KeychainStorage {
     public func getDPoPNonces(for did: String) async throws -> [String: String]? {
         let key = makeKey("dpopNonces", did: did)
         do {
-            let data = try KeychainManager.retrieve(key: key, namespace: namespace)
+            let data = try KeychainManager.retrieve(key: key, namespace: namespace, accessGroup: accessGroup)
             return try JSONDecoder().decode([String: String].self, from: data)
         } catch {
             return nil
@@ -688,7 +766,7 @@ public actor KeychainStorage {
     {
         let key = makeKey("dpopNoncesByJKT", did: did)
         let data = try JSONEncoder().encode(noncesByJKT)
-        try KeychainManager.store(key: key, value: data, namespace: namespace)
+        try KeychainManager.store(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
     }
 
     /// Retrieves DPoP nonces scoped by JKT (key thumbprint) from the keychain.
@@ -697,7 +775,7 @@ public actor KeychainStorage {
     public func getDPoPNoncesByJKT(for did: String) async throws -> [String: [String: String]]? {
         let key = makeKey("dpopNoncesByJKT", did: did)
         do {
-            let data = try KeychainManager.retrieve(key: key, namespace: namespace)
+            let data = try KeychainManager.retrieve(key: key, namespace: namespace, accessGroup: accessGroup)
             return try JSONDecoder().decode([String: [String: String]].self, from: data)
         } catch {
             return nil
@@ -711,7 +789,7 @@ public actor KeychainStorage {
     public func saveOAuthState(_ state: OAuthState) async throws {
         let key = makeKey("oauthState", stateToken: state.stateToken)
         let data = try JSONEncoder().encode(state)
-        try KeychainManager.store(key: key, value: data, namespace: namespace)
+        try KeychainManager.store(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
     }
 
     /// Retrieves an OAuth state from the keychain.
@@ -720,7 +798,7 @@ public actor KeychainStorage {
     public func getOAuthState(for stateToken: String) async throws -> OAuthState? {
         let key = makeKey("oauthState", stateToken: stateToken)
         do {
-            let data = try KeychainManager.retrieve(key: key, namespace: namespace)
+            let data = try KeychainManager.retrieve(key: key, namespace: namespace, accessGroup: accessGroup)
             return try JSONDecoder().decode(OAuthState.self, from: data)
         } catch {
             return nil
@@ -731,7 +809,7 @@ public actor KeychainStorage {
     /// - Parameter stateToken: The state token associated with the OAuth state to delete
     public func deleteOAuthState(for stateToken: String) async throws {
         let key = makeKey("oauthState", stateToken: stateToken)
-        try KeychainManager.delete(key: key, namespace: namespace)
+        try KeychainManager.delete(key: key, namespace: namespace, accessGroup: accessGroup)
     }
 
     // MARK: - Session Integrity Validation
@@ -765,12 +843,13 @@ public actor KeychainStorage {
                             "Successfully recovered session from backup for DID \(LogManager.logDID(did))"
                         )
                     } else {
-                        // If recovery fails, remove the orphaned account to force re-authentication
-                        try await deleteAccount(for: did)
-                        result.cleanedOrphanedAccounts.append(did)
-                        LogManager.logInfo(
-                            "Removed orphaned account for DID \(LogManager.logDID(did)) - user will need to re-authenticate"
+                        // Don't delete the account - just log the issue and let the normal auth flow
+                        // handle re-authentication. Deleting accounts aggressively causes problems
+                        // for gateway auth users where sessions might be temporarily inaccessible.
+                        LogManager.logWarning(
+                            "Account exists but session not found for DID \(LogManager.logDID(did)) - user may need to re-authenticate"
                         )
+                        result.requiresReauth.append(did)
                     }
                 } else if !accountExists && sessionExists {
                     LogManager.logWarning(
@@ -811,13 +890,13 @@ public actor KeychainStorage {
         let backupSessionKey = makeKey("session.backup", did: did)
 
         // Try temporary location first
-        if let tempData = try? KeychainManager.retrieve(key: tempSessionKey, namespace: namespace) {
+        if let tempData = try? KeychainManager.retrieve(key: tempSessionKey, namespace: namespace, accessGroup: accessGroup) {
             do {
                 let session = try JSONDecoder().decode(Session.self, from: tempData)
                 guard !session.accessToken.isEmpty else { return false }
 
-                try KeychainManager.store(key: sessionKey, value: tempData, namespace: namespace)
-                try? KeychainManager.delete(key: tempSessionKey, namespace: namespace)
+                try KeychainManager.store(key: sessionKey, value: tempData, namespace: namespace, accessGroup: accessGroup)
+                try? KeychainManager.delete(key: tempSessionKey, namespace: namespace, accessGroup: accessGroup)
 
                 LogManager.logDebug(
                     "Session recovered from temporary location for DID: \(LogManager.logDID(did))"
@@ -829,13 +908,13 @@ public actor KeychainStorage {
         }
 
         // Try backup location
-        if let backupData = try? KeychainManager.retrieve(key: backupSessionKey, namespace: namespace) {
+        if let backupData = try? KeychainManager.retrieve(key: backupSessionKey, namespace: namespace, accessGroup: accessGroup) {
             do {
                 let session = try JSONDecoder().decode(Session.self, from: backupData)
                 guard !session.accessToken.isEmpty else { return false }
 
-                try KeychainManager.store(key: sessionKey, value: backupData, namespace: namespace)
-                try? KeychainManager.delete(key: backupSessionKey, namespace: namespace)
+                try KeychainManager.store(key: sessionKey, value: backupData, namespace: namespace, accessGroup: accessGroup)
+                try? KeychainManager.delete(key: backupSessionKey, namespace: namespace, accessGroup: accessGroup)
 
                 LogManager.logDebug(
                     "Session recovered from backup location for DID: \(LogManager.logDID(did))"
@@ -855,10 +934,10 @@ public actor KeychainStorage {
 
         for did in accountDIDs {
             // Clean up temporary files
-            try? KeychainManager.delete(key: makeKey("session.temp", did: did), namespace: namespace)
-            try? KeychainManager.delete(key: makeKey("account.temp", did: did), namespace: namespace)
-            try? KeychainManager.delete(key: makeKey("session.backup", did: did), namespace: namespace)
-            try? KeychainManager.delete(key: makeKey("account.backup", did: did), namespace: namespace)
+            try? KeychainManager.delete(key: makeKey("session.temp", did: did), namespace: namespace, accessGroup: accessGroup)
+            try? KeychainManager.delete(key: makeKey("account.temp", did: did), namespace: namespace, accessGroup: accessGroup)
+            try? KeychainManager.delete(key: makeKey("session.backup", did: did), namespace: namespace, accessGroup: accessGroup)
+            try? KeychainManager.delete(key: makeKey("account.backup", did: did), namespace: namespace, accessGroup: accessGroup)
         }
 
         LogManager.logDebug("Cleaned up temporary keychain files")
@@ -870,11 +949,12 @@ public actor KeychainStorage {
         var recoveredSessions: [String] = []
         var cleanedOrphanedAccounts: [String] = []
         var cleanedOrphanedSessions: [String] = []
+        var requiresReauth: [String] = []
         var validationError: Error?
 
         var hasIssues: Bool {
             return !inconsistentStates.isEmpty || !cleanedOrphanedAccounts.isEmpty
-                || !cleanedOrphanedSessions.isEmpty || validationError != nil
+                || !cleanedOrphanedSessions.isEmpty || !requiresReauth.isEmpty || validationError != nil
         }
 
         var summary: String {
@@ -890,6 +970,9 @@ public actor KeychainStorage {
             }
             if !cleanedOrphanedSessions.isEmpty {
                 parts.append("\(cleanedOrphanedSessions.count) orphaned sessions cleaned")
+            }
+            if !requiresReauth.isEmpty {
+                parts.append("\(requiresReauth.count) accounts need re-authentication")
             }
             if let error = validationError {
                 parts.append("validation error: \(error)")
@@ -925,7 +1008,7 @@ public actor KeychainStorage {
         if !dids.contains(did) {
             dids.append(did)
             let data = try JSONEncoder().encode(dids)
-            try KeychainManager.store(key: key, value: data, namespace: namespace)
+            try KeychainManager.store(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
         }
     }
 
@@ -937,6 +1020,6 @@ public actor KeychainStorage {
 
         dids.removeAll { $0 == did }
         let data = try JSONEncoder().encode(dids)
-        try KeychainManager.store(key: key, value: data, namespace: namespace)
+        try KeychainManager.store(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
     }
 }
