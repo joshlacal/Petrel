@@ -161,7 +161,7 @@ class LogManager {
             var debugMessage = "Request URL: \(url)\n"
             debugMessage += "Method: \(request.httpMethod ?? "N/A")\n"
 
-            /// Filter sensitive headers
+            // Filter sensitive headers
             var filteredHeaders: [String: String] = [:]
             request.allHTTPHeaderFields?.forEach { key, value in
                 filteredHeaders[key] = sensitiveHeaders.contains(key.lowercased()) ? "[REDACTED]" : value
@@ -195,7 +195,7 @@ class LogManager {
             var debugMessage = "Response URL: \(url)\n"
             debugMessage += "Status Code: \(response.statusCode)\n"
 
-            /// Filter sensitive headers
+            // Filter sensitive headers
             var filteredHeaders: [String: Any] = [:]
             for (key, value) in response.allHeaderFields {
                 if let keyString = key as? String,

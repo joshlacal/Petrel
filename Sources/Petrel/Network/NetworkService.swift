@@ -1770,8 +1770,8 @@ actor NetworkService: NetworkServiceProtocol {
                 if (bytes[0] & 0xFE) == 0xFC { return true }
             }
         #else
-            /// Linux fallback: regex-based IP validation
-            /// IPv4 checks - parse manually
+            // Linux fallback: regex-based IP validation
+            // IPv4 checks - parse manually
             let components = ip.split(separator: ".").compactMap { Int($0) }
             if components.count == 4 {
                 let a = components[0]

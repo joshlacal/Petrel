@@ -7,16 +7,15 @@ import Testing
 
 @Suite("RefreshCircuitBreaker Tests")
 struct RefreshCircuitBreakerTests {
-
     @Test("Reset for DID clears failure tracking and allows refresh")
-    func testResetForDIDAllowsRefresh() async {
+    func resetForDIDAllowsRefresh() async {
         let breaker = RefreshCircuitBreaker()
         let did = "did:plc:test123"
 
         // Record enough failures to open circuit
         await breaker.recordFailure(for: did, kind: .invalidGrant) // +1
         await breaker.recordFailure(for: did, kind: .invalidGrant) // +1
-        await breaker.recordFailure(for: did, kind: .network)      // +1 = 3, circuit opens
+        await breaker.recordFailure(for: did, kind: .network) // +1 = 3, circuit opens
 
         // Verify circuit is open
         let canRefreshBeforeReset = await breaker.canAttemptRefresh(for: did)
@@ -35,14 +34,14 @@ struct RefreshCircuitBreakerTests {
     }
 
     @Test("forceHalfOpen transitions open circuit to half-open for recovery test")
-    func testForceHalfOpenTransition() async {
+    func forceHalfOpenTransition() async {
         let breaker = RefreshCircuitBreaker()
         let did = "did:plc:test456"
 
         // Open the circuit (3 failures needed)
         await breaker.recordFailure(for: did, kind: .invalidGrant) // +1
         await breaker.recordFailure(for: did, kind: .invalidGrant) // +1
-        await breaker.recordFailure(for: did, kind: .network)      // +1 = 3
+        await breaker.recordFailure(for: did, kind: .network) // +1 = 3
 
         // Verify circuit is open
         let initialState = await breaker.getState(for: did)
@@ -62,7 +61,7 @@ struct RefreshCircuitBreakerTests {
     }
 
     @Test("invalidGrant counts as 1 failure, not 2")
-    func testInvalidGrantCountsAsOne() async {
+    func invalidGrantCountsAsOne() async {
         let breaker = RefreshCircuitBreaker()
         let did = "did:plc:weight-test"
 
