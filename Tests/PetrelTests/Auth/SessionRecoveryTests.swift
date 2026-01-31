@@ -7,9 +7,8 @@ import Testing
 
 @Suite("Session Recovery Tests")
 struct SessionRecoveryTests {
-
     @Test("saveSessionBackup and recoverSessionFromBackup work correctly")
-    func testSessionRecoveryFromBackup() async throws {
+    func sessionRecoveryFromBackup() async throws {
         // Setup: Create a storage with test namespace
         let storage = KeychainStorage(namespace: "test.recovery")
         let did = "did:plc:recovery-test"
@@ -40,7 +39,7 @@ struct SessionRecoveryTests {
     }
 
     @Test("recoverSessionFromBackup returns nil when no backup exists")
-    func testRecoveryReturnsNilWhenNoBackup() async throws {
+    func recoveryReturnsNilWhenNoBackup() async throws {
         let storage = KeychainStorage(namespace: "test.recovery.empty")
         let did = "did:plc:nonexistent"
 
@@ -50,7 +49,7 @@ struct SessionRecoveryTests {
     }
 
     @Test("recoverSessionFromBackup falls back to temp location")
-    func testRecoveryFallsBackToTemp() async throws {
+    func recoveryFallsBackToTemp() async throws {
         let storage = KeychainStorage(namespace: "test.recovery.temp")
         let did = "did:plc:temp-test"
 

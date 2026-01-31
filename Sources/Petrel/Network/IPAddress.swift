@@ -35,7 +35,7 @@ struct IPAddress {
 
     func isInRange(_ cidr: String) -> Bool {
         #if canImport(Network)
-            /// Supports only IPv4 for simplicity
+            // Supports only IPv4 for simplicity
             let parts = cidr.split(separator: "/")
             guard parts.count == 2,
                   let cidrAddress = IPv4Address(String(parts[0])),
@@ -67,7 +67,7 @@ struct IPAddress {
 
             return true
         #else
-            /// Linux fallback - basic IPv4 CIDR checking
+            // Linux fallback - basic IPv4 CIDR checking
             let parts = cidr.split(separator: "/")
             guard parts.count == 2,
                   Self.isValidIPv4(String(parts[0])),

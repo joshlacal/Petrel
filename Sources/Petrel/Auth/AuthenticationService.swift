@@ -1190,7 +1190,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
     /// Resets the circuit breaker for a specific DID, allowing refresh attempts.
     /// Call this when the user explicitly requests to retry authentication.
     /// - Parameter did: The DID to reset circuit breaker for
-    public func resetCircuitBreaker(for did: String) async {
+    func resetCircuitBreaker(for did: String) async {
         await refreshCircuitBreaker.reset(for: did)
         LogManager.logInfo(
             "AuthenticationService - Circuit breaker reset for DID \(LogManager.logDID(did)) by user request"
@@ -1200,7 +1200,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
     /// Forces the circuit to half-open state for an immediate recovery attempt.
     /// - Parameter did: The DID to transition
     /// - Returns: True if transitioned, false if already closed
-    public func forceCircuitBreakerRecovery(for did: String) async -> Bool {
+    func forceCircuitBreakerRecovery(for did: String) async -> Bool {
         let result = await refreshCircuitBreaker.forceHalfOpen(for: did)
         if result {
             LogManager.logInfo(
@@ -2203,7 +2203,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
                         return .stillValid
                     }
                 }
-                
+
                 // CRITICAL FIX: Before triggering logout, check if we still have a valid access token
                 // The invalid_grant might be due to a transient server issue, not an actually revoked session
                 if let session = try? await storage.getSession(for: did) {
@@ -2211,7 +2211,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
                     if tokenStillValid {
                         LogManager.logWarning(
                             "invalid_grant received but access token still valid for DID \(LogManager.logDID(account.did)). "
-                            + "Preserving session and deferring logout. Error: \(description ?? "No details")",
+                                + "Preserving session and deferring logout. Error: \(description ?? "No details")",
                             category: .authentication
                         )
                         LogManager.logAuthIncident(
@@ -2227,7 +2227,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
                         return .stillValid
                     }
                 }
-                
+
                 await refreshCircuitBreaker.recordFailure(for: did, kind: .invalidGrant)
                 LogManager.logError(
                     "❌ TOKEN_LIFECYCLE: Refresh failed with invalid_grant for DID \(LogManager.logDID(account.did)): "

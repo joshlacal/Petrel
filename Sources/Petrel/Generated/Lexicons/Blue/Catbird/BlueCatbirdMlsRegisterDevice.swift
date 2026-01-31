@@ -201,7 +201,7 @@ public enum BlueCatbirdMlsRegisterDevice {
             map = map.adding(key: "deviceName", value: deviceNameValue)
             if let value = deviceUUID {
                 let deviceUUIDValue = try value.toCBORValue()
-                map = map.adding(key: "deviceUuid", value: deviceUUIDValue)  // Rust serde expects camelCase
+                map = map.adding(key: "deviceUUID", value: deviceUUIDValue)
             }
             let keyPackagesValue = try keyPackages.toCBORValue()
             map = map.adding(key: "keyPackages", value: keyPackagesValue)
@@ -212,7 +212,7 @@ public enum BlueCatbirdMlsRegisterDevice {
 
         private enum CodingKeys: String, CodingKey {
             case deviceName
-            case deviceUUID = "deviceUuid"  // Rust serde expects camelCase
+            case deviceUUID
             case keyPackages
             case signaturePublicKey
         }

@@ -13,7 +13,7 @@ import Foundation
     import FoundationNetworking
 #endif
 
-// Simplified CBOR decoder for firehose messages
+/// Simplified CBOR decoder for firehose messages
 enum CBORDecoder {
     static func decodeHeader(from data: Data) -> (op: Int, type: String?)? {
         // Very basic CBOR header parsing
