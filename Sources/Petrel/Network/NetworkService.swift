@@ -12,6 +12,105 @@ import Foundation
 #if canImport(Network)
     import Network
 #endif
+import Compression
+
+// MARK: - Content-Encoding Decompression
+
+/// Fallback decompression for cases where URLSession doesn't auto-decompress.
+/// With the fixed HardenedURLSessionDelegate (not implementing didReceive:),
+/// URLSession should handle decompression automatically. This is kept as a safety net.
+enum ContentDecoding {
+    /// Attempts to decompress data if it appears to still be compressed.
+    /// Returns original data if already decompressed or decompression fails.
+    static func decompressIfNeeded(_ data: Data, contentEncoding: String?) -> Data {
+        // Quick check: if data is valid UTF-8 starting with JSON structure, no decompression needed
+        if looksLikeValidJSON(data) {
+            return data
+        }
+        
+        // Check Content-Encoding header
+        guard let encoding = contentEncoding?.lowercased().trimmingCharacters(in: .whitespaces),
+              !encoding.isEmpty,
+              encoding != "identity" else {
+            // No encoding specified but data isn't JSON - try Brotli as last resort
+            if let decompressed = decompressBrotli(data), looksLikeValidJSON(decompressed) {
+                LogManager.logInfo("ContentDecoding: Brotli decompression succeeded without header (\(data.count) → \(decompressed.count) bytes)")
+                return decompressed
+            }
+            return data
+        }
+        
+        // If encoding says compressed, try to decompress
+        // Server may mislabel Brotli as gzip, so try Brotli for any compression header
+        if encoding == "br" || encoding == "gzip" || encoding == "deflate" {
+            if let decompressed = decompressBrotli(data), looksLikeValidJSON(decompressed) {
+                LogManager.logInfo("ContentDecoding: Fallback Brotli decompression succeeded (\(data.count) → \(decompressed.count) bytes)")
+                return decompressed
+            }
+        }
+        
+        return data
+    }
+    
+    /// Check if data looks like valid JSON (UTF-8 encoded, starts with { or [)
+    private static func looksLikeValidJSON(_ data: Data) -> Bool {
+        guard data.count >= 2 else { return false }
+        
+        // Must start with { or [
+        let firstByte = data[0]
+        guard firstByte == 0x7b || firstByte == 0x5b else { return false }
+        
+        // Check that at least the first few bytes are valid UTF-8/ASCII
+        // Valid JSON after { or [ should have ASCII characters (quotes, letters, numbers, whitespace)
+        let prefix = data.prefix(min(20, data.count))
+        for byte in prefix {
+            // Valid JSON characters are typically 0x09-0x0D (whitespace), 0x20-0x7E (printable ASCII)
+            if byte > 0x7E && byte < 0xC0 {
+                // This byte is in the Latin-1 extended range, not valid JSON/UTF-8 start
+                return false
+            }
+        }
+        
+        return true
+    }
+    
+    /// Decompress Brotli-encoded data using Apple's Compression framework
+    private static func decompressBrotli(_ data: Data) -> Data? {
+        guard !data.isEmpty else { return data }
+        
+        var outputSize = max(data.count * 10, 65536)
+        var outputData = Data(count: outputSize)
+        
+        for _ in 0..<5 {
+            let result = data.withUnsafeBytes { sourceBuffer -> Int in
+                guard let sourcePtr = sourceBuffer.baseAddress else { return 0 }
+                return outputData.withUnsafeMutableBytes { destBuffer -> Int in
+                    guard let destPtr = destBuffer.baseAddress else { return 0 }
+                    return compression_decode_buffer(
+                        destPtr.assumingMemoryBound(to: UInt8.self),
+                        outputSize,
+                        sourcePtr.assumingMemoryBound(to: UInt8.self),
+                        data.count,
+                        nil,
+                        COMPRESSION_BROTLI
+                    )
+                }
+            }
+            
+            if result > 0 && result < outputSize {
+                outputData.count = result
+                return outputData
+            } else if result == outputSize {
+                outputSize *= 2
+                outputData = Data(count: outputSize)
+            } else {
+                break
+            }
+        }
+        
+        return nil
+    }
+}
 
 /// Allows client apps to control connection routing (e.g., bypassing proxy for WebSockets)
 public protocol ConnectionPolicyAdapter: Sendable {
@@ -246,8 +345,8 @@ actor NetworkService: NetworkServiceProtocol {
 
         // Configure URL session
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 30.0
-        config.timeoutIntervalForResource = 60.0
+        config.timeoutIntervalForRequest = 120.0
+        config.timeoutIntervalForResource = 604800 // 1 week
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
         config.httpShouldSetCookies = false
 
@@ -493,6 +592,10 @@ actor NetworkService: NetworkServiceProtocol {
                 LogManager.logDebug(
                     "Authentication required for \(url.absoluteString) but no auth provider is set."
                 )
+                // Broadcast auto-logout event so UI can redirect to reauth
+                Task {
+                    await AuthEventBroadcaster.shared.broadcast(.autoLogoutTriggered(did: "", reason: "401_no_auth_provider"))
+                }
                 throw NetworkError.authenticationRequired
             }
             do {
@@ -520,8 +623,25 @@ actor NetworkService: NetworkServiceProtocol {
         // Perform the request using the internal session
         do {
             LogManager.logRequest(requestToSend)
-            let (data, response) = try await session.data(for: requestToSend)
+            let (rawData, response) = try await session.data(for: requestToSend)
+            
+            // Decompress if needed - use case-insensitive header lookup
+            var data = rawData
             if let httpResponse = response as? HTTPURLResponse {
+                // With the fixed HardenedURLSessionDelegate, URLSession should auto-decompress.
+                // Use fallback decompression only if data still appears compressed.
+                let contentEncoding: String? = {
+                    for (key, value) in httpResponse.allHeaderFields {
+                        if let keyString = key as? String,
+                           keyString.caseInsensitiveCompare("Content-Encoding") == .orderedSame,
+                           let valueString = value as? String {
+                            return valueString
+                        }
+                    }
+                    return nil
+                }()
+                data = ContentDecoding.decompressIfNeeded(rawData, contentEncoding: contentEncoding)
+                
                 LogManager.logResponse(httpResponse, data: data)
 
                 // Immediately capture and store DPoP-Nonce (case-insensitive) before any status handling
@@ -696,19 +816,34 @@ actor NetworkService: NetworkServiceProtocol {
                     throw NetworkError.invalidResponse(description: "Received non-HTTP response")
                 }
 
+                // Decompress response if needed (Brotli, gzip, deflate)
+                // With the fixed HardenedURLSessionDelegate, URLSession should auto-decompress.
+                // Use fallback decompression only if data still appears compressed.
+                let contentEncoding: String? = {
+                    for (key, value) in httpResponse.allHeaderFields {
+                        if let keyString = key as? String,
+                           keyString.caseInsensitiveCompare("Content-Encoding") == .orderedSame,
+                           let valueString = value as? String {
+                            return valueString
+                        }
+                    }
+                    return nil
+                }()
+                let decompressedData = ContentDecoding.decompressIfNeeded(data, contentEncoding: contentEncoding)
+
                 // Log structured response shape for BFF debugging
                 let elapsedMs = Int(Date().timeIntervalSince(requestStartTime) * 1000)
-                let responseShape = LogManager.jsonShape(from: data)
+                let responseShape = LogManager.jsonShape(from: decompressedData)
                 LogManager.logStructuredResponse(
                     requestId: requestId,
                     status: httpResponse.statusCode,
                     elapsedMs: elapsedMs,
-                    bodySize: data.count,
+                    bodySize: decompressedData.count,
                     bodyShape: responseShape
                 )
 
                 // Log the response
-                LogManager.logResponse(httpResponse, data: data) // *** STORE NONCE IMMEDIATELY AFTER RECEIVING RESPONSE ***
+                LogManager.logResponse(httpResponse, data: decompressedData) // *** STORE NONCE IMMEDIATELY AFTER RECEIVING RESPONSE ***
                 // This ensures the nonce is stored *before* any retry logic based on status code.
                 if let authProvider = authProvider, let url = requestToSend.url {
                     // Look for DPoP-Nonce header with case-insensitive matching
@@ -759,7 +894,7 @@ actor NetworkService: NetworkServiceProtocol {
                 switch httpResponse.statusCode {
                 case 200 ..< 300:
                     // Success - just return the data and response
-                    return (data, httpResponse)
+                    return (decompressedData, httpResponse)
 
                 case 401:
                     // Handle unauthorized (401)
@@ -767,6 +902,10 @@ actor NetworkService: NetworkServiceProtocol {
                         LogManager.logError(
                             "Network Service - Received 401 but no auth provider or URL for \(requestToSend.url?.absoluteString ?? "Unknown URL")"
                         )
+                        // Broadcast auto-logout event so UI can redirect to reauth
+                        Task {
+                            await AuthEventBroadcaster.shared.broadcast(.autoLogoutTriggered(did: authCtx?.did ?? "", reason: "401_no_auth_provider_or_url"))
+                        }
                         throw NetworkError.authenticationRequired // Cannot handle 401 without provider/URL
                     }
 
@@ -780,12 +919,17 @@ actor NetworkService: NetworkServiceProtocol {
                         LogManager.logInfo("Network Service - Gateway mode: delegating 401 to auth provider")
                         do {
                             let (retryData, retryResponse) = try await authProvider.handleUnauthorizedResponse(
-                                httpResponse, data: data, for: requestToSend
+                                httpResponse, data: decompressedData, for: requestToSend
                             )
                             return (retryData, retryResponse)
                         } catch {
                             LogManager.logError("Network Service - Gateway mode: auth provider failed to handle 401: \(error)")
-                            throw error
+                            // Broadcast auto-logout event so UI can redirect to reauth
+                            // This was missing - gateway mode wasn't notifying the UI of auth failures
+                            Task {
+                                await AuthEventBroadcaster.shared.broadcast(.autoLogoutTriggered(did: authCtx?.did ?? "", reason: "gateway_401_unhandled"))
+                            }
+                            throw NetworkError.authenticationRequired
                         }
                     }
 
@@ -804,7 +948,7 @@ actor NetworkService: NetworkServiceProtocol {
                         }
                     }
 
-                    if let errorResponse = try? jsonDecoder.decode(OAuthErrorResponse.self, from: data),
+                    if let errorResponse = try? jsonDecoder.decode(OAuthErrorResponse.self, from: decompressedData),
                        errorResponse.error == "use_dpop_nonce"
                     {
                         isNonceError = true
@@ -873,7 +1017,7 @@ actor NetworkService: NetworkServiceProtocol {
                             struct OAuthErrorResponse: Decodable { let error: String; let errorDescription: String?; enum CodingKeys: String, CodingKey { case error; case errorDescription = "error_description" } }
                             var isInvalidAudience = false
                             // First try JSON body (authorization server style)
-                            if let err = try? jsonDecoder.decode(OAuthErrorResponse.self, from: data) {
+                            if let err = try? jsonDecoder.decode(OAuthErrorResponse.self, from: decompressedData) {
                                 let desc = err.errorDescription?.lowercased() ?? ""
                                 isInvalidAudience = (err.error == "invalid_audience") || (err.error == "invalid_token" && desc.contains("invalid audience"))
                             }
@@ -894,7 +1038,7 @@ actor NetworkService: NetworkServiceProtocol {
                         do {
                             // Use the authProvider's handler (which should attempt refresh)
                             let (retryData, retryResponse) = try await authProvider.handleUnauthorizedResponse(
-                                httpResponse, data: data, for: requestToSend
+                                httpResponse, data: decompressedData, for: requestToSend
                             )
                             LogManager.logInfo(
                                 "Network Service - Successfully handled non-nonce 401 via authProvider."
@@ -904,6 +1048,10 @@ actor NetworkService: NetworkServiceProtocol {
                             LogManager.logError(
                                 "Network Service - authProvider failed to handle non-nonce 401: \(error). Giving up."
                             )
+                            // Broadcast auto-logout event so UI can redirect to reauth
+                            Task {
+                                await AuthEventBroadcaster.shared.broadcast(.autoLogoutTriggered(did: authCtx?.did ?? "", reason: "401_token_refresh_failed"))
+                            }
                             throw NetworkError.authenticationRequired // Throw if handling fails
                         }
                     } else {
@@ -911,12 +1059,16 @@ actor NetworkService: NetworkServiceProtocol {
                         LogManager.logError(
                             "Network Service - Received non-nonce 401 but skipping refresh for \(url.absoluteString). Cannot proceed."
                         )
+                        // Broadcast auto-logout event so UI can redirect to reauth
+                        Task {
+                            await AuthEventBroadcaster.shared.broadcast(.autoLogoutTriggered(did: authCtx?.did ?? "", reason: "401_skip_refresh"))
+                        }
                         throw NetworkError.authenticationRequired // Cannot handle this 401
                     }
 
                 // Handle 400 responses - check for ExpiredToken error which needs token refresh
                 case 400:
-                    let responseBody = String(data: data, encoding: .utf8) ?? "<binary data>"
+                    let responseBody = String(data: decompressedData, encoding: .utf8) ?? "<binary data>"
                     let redactedBody = responseBody.count > 500 ? String(responseBody.prefix(500)) + "..." : responseBody
                     LogManager.logError(
                         "Network Service - 400 Bad Request for \(requestToSend.url?.absoluteString ?? "Unknown URL")"
@@ -965,7 +1117,7 @@ actor NetworkService: NetworkServiceProtocol {
                             "Network Service - 400 Request headers: \(redactedHeaders)"
                         )
                     }
-                    return (data, httpResponse) // Return data and response for caller inspection
+                    return (decompressedData, httpResponse) // Return data and response for caller inspection
 
                 case 402 ..< 500: // Other client errors
                     LogManager.logError(
@@ -1064,7 +1216,13 @@ actor NetworkService: NetworkServiceProtocol {
         do {
             return try jsonDecoder.decode(T.self, from: data)
         } catch {
-            LogManager.logError("Network Service - Decoding error: \(error)")
+            // DIAGNOSTIC: Log raw response bytes to debug ANSI escape code issue
+            let hexPrefix = data.prefix(40).map { String(format: "%02x", $0) }.joined(separator: " ")
+            let stringPrefix = String(data: data.prefix(200), encoding: .utf8) ?? "<non-UTF8>"
+            LogManager.logError("Network Service - GET Decoding error for \(endpoint)")
+            LogManager.logError("  First 40 bytes (hex): \(hexPrefix)")
+            LogManager.logError("  First 200 chars: \(stringPrefix)")
+            LogManager.logError("  Decode error: \(error)")
             throw NetworkError.decodingError
         }
     }
@@ -1100,7 +1258,13 @@ actor NetworkService: NetworkServiceProtocol {
         do {
             return try jsonDecoder.decode(T.self, from: data)
         } catch {
-            LogManager.logError("Network Service - Decoding error: \(error)")
+            // DIAGNOSTIC: Log raw response bytes to debug ANSI escape code issue
+            let hexPrefix = data.prefix(40).map { String(format: "%02x", $0) }.joined(separator: " ")
+            let stringPrefix = String(data: data.prefix(200), encoding: .utf8) ?? "<non-UTF8>"
+            LogManager.logError("Network Service - POST Decoding error for \(endpoint)")
+            LogManager.logError("  First 40 bytes (hex): \(hexPrefix)")
+            LogManager.logError("  First 200 chars: \(stringPrefix)")
+            LogManager.logError("  Decode error: \(error)")
             throw NetworkError.decodingError
         }
     }
@@ -1173,6 +1337,10 @@ actor NetworkService: NetworkServiceProtocol {
         // Create the request
         var request = URLRequest(url: resolvedURL)
         request.httpMethod = method
+
+        // NOTE: Don't set Accept-Encoding manually - let URLSession negotiate automatically.
+        // With the HardenedURLSessionDelegate not implementing didReceive(data:), 
+        // URLSession will auto-decompress gzip, deflate, and br (Brotli).
 
         // Add custom headers
         for (key, value) in self.headers {
@@ -1398,7 +1566,7 @@ actor NetworkService: NetworkServiceProtocol {
                         switch message {
                         case let .data(data):
                             do {
-                                let decodedMessage = try self.decodeSubscriptionFrame(data, as: Message.self)
+                                let decodedMessage = try self.decodeSubscriptionFrame(data, as: Message.self, endpoint: endpoint)
                                 continuation.yield(decodedMessage)
                             } catch {
                                 LogManager.logError("Failed to decode WebSocket frame: \(error)")
@@ -1434,10 +1602,18 @@ actor NetworkService: NetworkServiceProtocol {
     /// Decode a subscription WebSocket frame containing two DAG-CBOR objects
     private func decodeSubscriptionFrame<Message: Codable & Sendable>(
         _ data: Data,
-        as messageType: Message.Type
+        as messageType: Message.Type,
+        endpoint: String
     ) throws -> Message {
-        let decoded = try ATProtoWebSocketFrameDecoder.decodeFrame(data)
-        return try jsonDecoder.decode(Message.self, from: decoded.jsonData)
+        let decoded = try ATProtoWebSocketFrameDecoder.decodeFrame(data, defaultLexicon: endpoint)
+        do {
+            return try jsonDecoder.decode(Message.self, from: decoded.jsonData)
+        } catch {
+            if let jsonString = String(data: decoded.jsonData, encoding: .utf8) {
+                LogManager.logError("Failed to decode JSON for message type \(decoded.messageType): \(jsonString)")
+            }
+            throw error
+        }
     }
 
     // MARK: - Helper Methods

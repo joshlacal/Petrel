@@ -270,21 +270,60 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
            let gatewayHost = gatewayURL.host,
            host == gatewayHost
         {
-            // Check if this is a misconfiguration error (e.g. invalid audience) rather than a session expiration
             let responseBody = String(data: data, encoding: .utf8) ?? ""
+            
+            // Check if this is a misconfiguration error (e.g. invalid audience) rather than a session expiration
             if responseBody.localizedCaseInsensitiveContains("invalid token audience") {
                 logger.warning(
-                    "Gateway returned 401 due to audience mismatch - preserving session: \(responseBody)"
+                    "Gateway returned 401 due to audience mismatch - preserving session: \(responseBody, privacy: .public)"
                 )
                 throw GatewayError.authenticationRequired
             }
-
-            logger.warning("Gateway returned 401 - session expired, clearing local session")
-            // Clear the session for the current account
-            if let currentAccount = await accountManager.getCurrentAccount() {
-                try? await storage.deleteGatewaySession(for: currentAccount.did)
+            
+            // CRITICAL FIX: Don't delete session on empty body responses
+            // Empty body (0 bytes) typically indicates a transient network error, proxy timeout,
+            // or server-side issue - NOT an actual session expiration.
+            // Only delete session if we receive an explicit session expiry indicator.
+            if data.isEmpty {
+                let urlString = requestURL.absoluteString
+                logger.warning(
+                    "Gateway returned 401 with empty body (likely transient error) - preserving session. URL: \(urlString, privacy: .public)"
+                )
+                throw GatewayError.authenticationRequired
             }
-            throw GatewayError.sessionExpired
+            
+            // Check for explicit session expiry indicators in the response
+            // These indicate the server has definitively invalidated our session
+            let isExplicitExpiry = responseBody.localizedCaseInsensitiveContains("session_expired")
+                || responseBody.localizedCaseInsensitiveContains("invalid_token")
+                || responseBody.localizedCaseInsensitiveContains("token expired")
+                || responseBody.localizedCaseInsensitiveContains("session expired")
+                || responseBody.localizedCaseInsensitiveContains("unauthorized")
+                || responseBody.localizedCaseInsensitiveContains("ExpiredToken")
+            
+            if isExplicitExpiry {
+                let bodyPreview = String(responseBody.prefix(200))
+                logger.warning(
+                    "Gateway returned 401 with explicit session expiry - clearing local session. Body: \(bodyPreview, privacy: .public)"
+                )
+                // Clear the session for the current account
+                if let currentAccount = await accountManager.getCurrentAccount() {
+                    do {
+                        try await storage.deleteGatewaySession(for: currentAccount.did)
+                    } catch {
+                        logger.error("Failed to delete gateway session during 401 handling: \(error, privacy: .public)")
+                    }
+                }
+                throw GatewayError.sessionExpired
+            }
+            
+            // Unknown 401 response - log details but preserve session
+            // This is safer than deleting the session on unknown errors
+            let bodyPreview = String(responseBody.prefix(200))
+            logger.warning(
+                "Gateway returned 401 with unrecognized body - preserving session. Body: \(bodyPreview, privacy: .public)"
+            )
+            throw GatewayError.authenticationRequired
         }
 
         // For non-gateway 401s, do NOT treat this as gateway session expiration.

@@ -330,9 +330,13 @@ actor AccountManager: AccountManaging {
         }
 
         // Check if there's a session for this account (warn but don't fail)
+        // Check both regular OAuth sessions AND gateway sessions since different auth strategies use different storage
         do {
             let session = try await storage.getSession(for: did)
-            if session == nil {
+            let gatewaySession = try? await storage.getGatewaySession(for: did)
+            let hasAnySession = session != nil || gatewaySession != nil
+            
+            if !hasAnySession {
                 LogManager.logWarning(
                     "AccountManager - Setting account \(LogManager.logDID(did)) as current but no session exists. This may cause authentication issues.",
                     category: .authentication
@@ -345,6 +349,7 @@ actor AccountManager: AccountManaging {
                         "did": LogManager.logDID(did),
                         "hasAccount": true,
                         "hasSession": false,
+                        "hasGatewaySession": false,
                     ]
                 )
             }
@@ -406,9 +411,13 @@ actor AccountManager: AccountManaging {
         }
 
         // Validate that the account has a corresponding session
+        // Check both regular OAuth sessions AND gateway sessions since different auth strategies use different storage
         do {
             let session = try await storage.getSession(for: did)
-            if session == nil {
+            let gatewaySession = try? await storage.getGatewaySession(for: did)
+            let hasAnySession = session != nil || gatewaySession != nil
+            
+            if !hasAnySession {
                 LogManager.logWarning(
                     "AccountManager - Account \(LogManager.logDID(did)) exists but has no session token. This indicates an inconsistent authentication state.",
                     category: .authentication
@@ -421,6 +430,7 @@ actor AccountManager: AccountManaging {
                         "did": LogManager.logDID(did),
                         "hasAccount": true,
                         "hasSession": false,
+                        "hasGatewaySession": false,
                     ]
                 )
                 // Don't clear the account automatically as it might be recoverable
