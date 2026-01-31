@@ -101,7 +101,9 @@
             let status = SecItemCopyMatching(query as CFDictionary, &item)
 
             if status == errSecItemNotFound {
-                LogManager.logError("AppleKeychainStore - Item not found for key \(namespacedKey).")
+                // Item not found is expected in many cases (e.g., gateway mode doesn't use regular sessions)
+                // Log at debug level to avoid spamming logs
+                LogManager.logDebug("AppleKeychainStore - Item not found for key \(namespacedKey).")
                 throw KeychainError.itemRetrievalError(status: Int(status))
             }
 

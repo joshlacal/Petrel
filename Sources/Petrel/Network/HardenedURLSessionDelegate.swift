@@ -69,18 +69,32 @@ final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, URLSession
     }
 
     // MARK: - URLSessionDataDelegate
-
-    nonisolated func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
-        Task {
-            await self.contextManager.updateContext(for: dataTask) { context in
-                context.receivedData.append(data)
-
-                if context.receivedData.count > maxResponseSize {
-                    LogManager.logError("Response size exceeded the maximum limit of \(maxResponseSize) bytes for task: \(dataTask.taskIdentifier)")
-                    dataTask.cancel()
-                }
-            }
+    
+    // NOTE: We intentionally do NOT implement urlSession(_:dataTask:didReceive:)
+    // Implementing that method causes URLSession to bypass automatic Content-Encoding
+    // decompression (gzip, br, deflate). By not implementing it, URLSession handles
+    // data accumulation AND decompression automatically.
+    //
+    // Size limiting is handled via:
+    // 1. URLSessionConfiguration.timeoutIntervalForResource
+    // 2. Checking Content-Length in didReceive(response:) below
+    
+    nonisolated func urlSession(
+        _ session: URLSession,
+        dataTask: URLSessionDataTask,
+        didReceive response: URLResponse,
+        completionHandler: @escaping @Sendable (URLSession.ResponseDisposition) -> Void
+    ) {
+        // Check Content-Length to enforce size limits before downloading
+        if let httpResponse = response as? HTTPURLResponse,
+           let contentLengthString = httpResponse.allHeaderFields["Content-Length"] as? String,
+           let contentLength = Int(contentLengthString),
+           contentLength > maxResponseSize {
+            LogManager.logError("Response Content-Length (\(contentLength) bytes) exceeds maximum limit of \(maxResponseSize) bytes")
+            completionHandler(.cancel)
+            return
         }
+        completionHandler(.allow)
     }
 
     // MARK: - URLSessionDelegate

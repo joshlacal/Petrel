@@ -13,7 +13,7 @@ public enum ATProtoWebSocketFrameDecoder {
     }
 
     /// Decode a subscription WebSocket frame containing two DAG-CBOR objects.
-    public static func decodeFrame(_ data: Data) throws -> DecodedFrame {
+    public static func decodeFrame(_ data: Data, defaultLexicon: String? = nil) throws -> DecodedFrame {
         var offset = 0
 
         guard offset < data.count else {
@@ -77,10 +77,15 @@ public enum ATProtoWebSocketFrameDecoder {
             throw NetworkError.invalidResponse(description: "Payload is not a JSON object")
         }
 
-        jsonObject["$type"] = messageTypeName
+        var resolvedType = messageTypeName
+        if resolvedType.hasPrefix("#"), let defaultLexicon = defaultLexicon {
+            resolvedType = defaultLexicon + resolvedType
+        }
+
+        jsonObject["$type"] = resolvedType
         let jsonData = try JSONSerialization.data(withJSONObject: jsonObject)
 
-        return DecodedFrame(messageType: messageTypeName, jsonData: jsonData)
+        return DecodedFrame(messageType: resolvedType, jsonData: jsonData)
     }
 
     private static func cborToJSONValue(_ cbor: CBOR) throws -> Any {
