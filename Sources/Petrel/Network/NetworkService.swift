@@ -27,11 +27,12 @@ enum ContentDecoding {
         if looksLikeValidJSON(data) {
             return data
         }
-        
+
         // Check Content-Encoding header
         guard let encoding = contentEncoding?.lowercased().trimmingCharacters(in: .whitespaces),
               !encoding.isEmpty,
-              encoding != "identity" else {
+              encoding != "identity"
+        else {
             // No encoding specified but data isn't JSON - try Brotli as last resort
             if let decompressed = decompressBrotli(data), looksLikeValidJSON(decompressed) {
                 LogManager.logInfo("ContentDecoding: Brotli decompression succeeded without header (\(data.count) → \(decompressed.count) bytes)")
@@ -39,7 +40,7 @@ enum ContentDecoding {
             }
             return data
         }
-        
+
         // If encoding says compressed, try to decompress
         // Server may mislabel Brotli as gzip, so try Brotli for any compression header
         if encoding == "br" || encoding == "gzip" || encoding == "deflate" {
@@ -48,18 +49,18 @@ enum ContentDecoding {
                 return decompressed
             }
         }
-        
+
         return data
     }
-    
+
     /// Check if data looks like valid JSON (UTF-8 encoded, starts with { or [)
     private static func looksLikeValidJSON(_ data: Data) -> Bool {
         guard data.count >= 2 else { return false }
-        
+
         // Must start with { or [
         let firstByte = data[0]
-        guard firstByte == 0x7b || firstByte == 0x5b else { return false }
-        
+        guard firstByte == 0x7B || firstByte == 0x5B else { return false }
+
         // Check that at least the first few bytes are valid UTF-8/ASCII
         // Valid JSON after { or [ should have ASCII characters (quotes, letters, numbers, whitespace)
         let prefix = data.prefix(min(20, data.count))
@@ -70,18 +71,18 @@ enum ContentDecoding {
                 return false
             }
         }
-        
+
         return true
     }
-    
+
     /// Decompress Brotli-encoded data using Apple's Compression framework
     private static func decompressBrotli(_ data: Data) -> Data? {
         guard !data.isEmpty else { return data }
-        
+
         var outputSize = max(data.count * 10, 65536)
         var outputData = Data(count: outputSize)
-        
-        for _ in 0..<5 {
+
+        for _ in 0 ..< 5 {
             let result = data.withUnsafeBytes { sourceBuffer -> Int in
                 guard let sourcePtr = sourceBuffer.baseAddress else { return 0 }
                 return outputData.withUnsafeMutableBytes { destBuffer -> Int in
@@ -96,8 +97,8 @@ enum ContentDecoding {
                     )
                 }
             }
-            
-            if result > 0 && result < outputSize {
+
+            if result > 0, result < outputSize {
                 outputData.count = result
                 return outputData
             } else if result == outputSize {
@@ -107,7 +108,7 @@ enum ContentDecoding {
                 break
             }
         }
-        
+
         return nil
     }
 }
@@ -346,7 +347,7 @@ actor NetworkService: NetworkServiceProtocol {
         // Configure URL session
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 120.0
-        config.timeoutIntervalForResource = 604800 // 1 week
+        config.timeoutIntervalForResource = 604_800 // 1 week
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
         config.httpShouldSetCookies = false
 
@@ -624,7 +625,7 @@ actor NetworkService: NetworkServiceProtocol {
         do {
             LogManager.logRequest(requestToSend)
             let (rawData, response) = try await session.data(for: requestToSend)
-            
+
             // Decompress if needed - use case-insensitive header lookup
             var data = rawData
             if let httpResponse = response as? HTTPURLResponse {
@@ -634,14 +635,15 @@ actor NetworkService: NetworkServiceProtocol {
                     for (key, value) in httpResponse.allHeaderFields {
                         if let keyString = key as? String,
                            keyString.caseInsensitiveCompare("Content-Encoding") == .orderedSame,
-                           let valueString = value as? String {
+                           let valueString = value as? String
+                        {
                             return valueString
                         }
                     }
                     return nil
                 }()
                 data = ContentDecoding.decompressIfNeeded(rawData, contentEncoding: contentEncoding)
-                
+
                 LogManager.logResponse(httpResponse, data: data)
 
                 // Immediately capture and store DPoP-Nonce (case-insensitive) before any status handling
@@ -823,7 +825,8 @@ actor NetworkService: NetworkServiceProtocol {
                     for (key, value) in httpResponse.allHeaderFields {
                         if let keyString = key as? String,
                            keyString.caseInsensitiveCompare("Content-Encoding") == .orderedSame,
-                           let valueString = value as? String {
+                           let valueString = value as? String
+                        {
                             return valueString
                         }
                     }
@@ -1339,7 +1342,7 @@ actor NetworkService: NetworkServiceProtocol {
         request.httpMethod = method
 
         // NOTE: Don't set Accept-Encoding manually - let URLSession negotiate automatically.
-        // With the HardenedURLSessionDelegate not implementing didReceive(data:), 
+        // With the HardenedURLSessionDelegate not implementing didReceive(data:),
         // URLSession will auto-decompress gzip, deflate, and br (Brotli).
 
         // Add custom headers

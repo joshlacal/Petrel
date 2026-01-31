@@ -271,7 +271,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
            host == gatewayHost
         {
             let responseBody = String(data: data, encoding: .utf8) ?? ""
-            
+
             // Check if this is a misconfiguration error (e.g. invalid audience) rather than a session expiration
             if responseBody.localizedCaseInsensitiveContains("invalid token audience") {
                 logger.warning(
@@ -279,7 +279,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
                 )
                 throw GatewayError.authenticationRequired
             }
-            
+
             // CRITICAL FIX: Don't delete session on empty body responses
             // Empty body (0 bytes) typically indicates a transient network error, proxy timeout,
             // or server-side issue - NOT an actual session expiration.
@@ -291,7 +291,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
                 )
                 throw GatewayError.authenticationRequired
             }
-            
+
             // Check for explicit session expiry indicators in the response
             // These indicate the server has definitively invalidated our session
             let isExplicitExpiry = responseBody.localizedCaseInsensitiveContains("session_expired")
@@ -300,7 +300,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
                 || responseBody.localizedCaseInsensitiveContains("session expired")
                 || responseBody.localizedCaseInsensitiveContains("unauthorized")
                 || responseBody.localizedCaseInsensitiveContains("ExpiredToken")
-            
+
             if isExplicitExpiry {
                 let bodyPreview = String(responseBody.prefix(200))
                 logger.warning(
@@ -316,7 +316,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
                 }
                 throw GatewayError.sessionExpired
             }
-            
+
             // Unknown 401 response - log details but preserve session
             // This is safer than deleting the session on unknown errors
             let bodyPreview = String(responseBody.prefix(200))
