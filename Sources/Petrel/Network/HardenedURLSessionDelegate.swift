@@ -69,7 +69,7 @@ final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, URLSession
     }
 
     // MARK: - URLSessionDataDelegate
-    
+
     // NOTE: We intentionally do NOT implement urlSession(_:dataTask:didReceive:)
     // Implementing that method causes URLSession to bypass automatic Content-Encoding
     // decompression (gzip, br, deflate). By not implementing it, URLSession handles
@@ -78,7 +78,7 @@ final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, URLSession
     // Size limiting is handled via:
     // 1. URLSessionConfiguration.timeoutIntervalForResource
     // 2. Checking Content-Length in didReceive(response:) below
-    
+
     nonisolated func urlSession(
         _ session: URLSession,
         dataTask: URLSessionDataTask,
@@ -89,7 +89,8 @@ final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, URLSession
         if let httpResponse = response as? HTTPURLResponse,
            let contentLengthString = httpResponse.allHeaderFields["Content-Length"] as? String,
            let contentLength = Int(contentLengthString),
-           contentLength > maxResponseSize {
+           contentLength > maxResponseSize
+        {
             LogManager.logError("Response Content-Length (\(contentLength) bytes) exceeds maximum limit of \(maxResponseSize) bytes")
             completionHandler(.cancel)
             return
