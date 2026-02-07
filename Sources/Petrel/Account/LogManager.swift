@@ -10,6 +10,7 @@ import Foundation
     import FoundationNetworking
 #endif
 import Logging
+import Synchronization
 
 public struct PetrelLogEvent: Sendable {
     public enum Level: Sendable { case debug, info, warning, error }
@@ -78,10 +79,8 @@ class LogManager {
 
     private static let observerStore = ObserverStore()
 
-    /// Cache for observer existence check (set once, read many times)
-    /// This is safe because it's only ever changed from false -> true, never back
-    /// nonisolated(unsafe) allows reading without actor isolation since write is one-way
-    private nonisolated(unsafe) static var cachedHasObservers = false
+    /// Cache for observer existence check (set once, read many times).
+    private static let cachedHasObservers = Mutex(false)
 
     /// Register a callback to receive Petrel log events.
     /// - Warning: DEPRECATED - Use `PetrelAuthEvents.addObserver()` for authentication events.
@@ -90,14 +89,18 @@ class LogManager {
     static func addObserver(_ observer: @escaping @Sendable (PetrelLogEvent) -> Void) {
         Task {
             await observerStore.add(observer)
-            cachedHasObservers = true
+            cachedHasObservers.withLock { hasObservers in
+                hasObservers = true
+            }
         }
     }
 
     private static func notifyObservers(_ event: PetrelLogEvent) {
         // Fast path: check cached flag first to avoid Task creation when no observers
-        // This is safe because the flag is only ever set to true, never back to false
-        guard cachedHasObservers else { return }
+        let hasObservers = cachedHasObservers.withLock { cachedValue in
+            cachedValue
+        }
+        guard hasObservers else { return }
 
         // Only notify for auth-related warnings/errors to preserve backwards compatibility
         // Regular logging (debug/info/network) no longer triggers observers

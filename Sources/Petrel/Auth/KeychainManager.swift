@@ -11,6 +11,7 @@
     @preconcurrency import Crypto
 #endif
 import Foundation
+import Synchronization
 #if os(iOS) || os(macOS)
     import Security
 #endif
@@ -142,13 +143,19 @@ enum KeychainManager {
         return cache
     }()
 
-    private nonisolated(unsafe) static var defaultAccessGroup: String?
+    private static let defaultAccessGroupState = Mutex<String?>(nil)
 
     static func configureDefaultAccessGroup(_ accessGroup: String?) {
-        if defaultAccessGroup != accessGroup {
-            clearCache()
+        let didChange = defaultAccessGroupState.withLock { currentAccessGroup in
+            guard currentAccessGroup != accessGroup else { return false }
+            // Clear caches before exposing the updated access group.
+            clearCacheStorage()
+            currentAccessGroup = accessGroup
+            return true
         }
-        defaultAccessGroup = accessGroup
+        if didChange {
+            LogManager.logDebug("KeychainManager - Cache cleared.")
+        }
         LogManager.logDebug(
             "KeychainManager - Default access group set to \(accessGroup ?? "nil")"
         )
@@ -163,6 +170,9 @@ enum KeychainManager {
     }()
 
     private static func resolvedAccessGroup(_ accessGroup: String?) -> String? {
+        let defaultAccessGroup = defaultAccessGroupState.withLock { currentAccessGroup in
+            currentAccessGroup
+        }
         let group = accessGroup ?? defaultAccessGroup
         return (group?.isEmpty == true) ? nil : group
     }
@@ -195,10 +205,14 @@ enum KeychainManager {
 
     // MARK: - Cache Management
 
-    /// Clears all cached items
-    static func clearCache() {
+    private static func clearCacheStorage() {
         dataCache.removeAllObjects()
         dpopKeyCache.removeAllObjects()
+    }
+
+    /// Clears all cached items
+    static func clearCache() {
+        clearCacheStorage()
         LogManager.logDebug("KeychainManager - Cache cleared.")
     }
 
