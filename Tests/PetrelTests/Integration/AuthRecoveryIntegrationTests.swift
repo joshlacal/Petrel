@@ -11,9 +11,8 @@ import Testing
 
 @Suite("Auth Recovery Integration Tests")
 struct AuthRecoveryIntegrationTests {
-
     @Test("Full recovery flow: circuit opens, user resets, refresh succeeds")
-    func testFullRecoveryFlow() async throws {
+    func fullRecoveryFlow() async {
         // Setup
         let breaker = RefreshCircuitBreaker()
         let did = "did:plc:integration-test"
@@ -40,7 +39,7 @@ struct AuthRecoveryIntegrationTests {
     }
 
     @Test("Session recovery restores missing session from backup")
-    func testSessionRecoveryFromBackup() async throws {
+    func sessionRecoveryFromBackup() async throws {
         let storage = KeychainStorage(namespace: "test.session.recovery.\(UUID().uuidString)")
         let did = "did:plc:session-recovery-\(UUID().uuidString)"
 
@@ -71,7 +70,7 @@ struct AuthRecoveryIntegrationTests {
     }
 
     @Test("Circuit breaker allows refresh after time-based recovery to half-open")
-    func testCircuitBreakerHalfOpenRecovery() async throws {
+    func circuitBreakerHalfOpenRecovery() async {
         let breaker = RefreshCircuitBreaker()
         let did = "did:plc:half-open-test"
 
@@ -96,7 +95,7 @@ struct AuthRecoveryIntegrationTests {
     }
 
     @Test("Successful refresh closes circuit from half-open state")
-    func testSuccessfulRefreshClosesCircuit() async throws {
+    func successfulRefreshClosesCircuit() async {
         let breaker = RefreshCircuitBreaker()
         let did = "did:plc:success-test"
 

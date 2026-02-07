@@ -335,7 +335,7 @@ actor AccountManager: AccountManaging {
             let session = try await storage.getSession(for: did)
             let gatewaySession = try? await storage.getGatewaySession(for: did)
             let hasAnySession = session != nil || gatewaySession != nil
-            
+
             if !hasAnySession {
                 LogManager.logWarning(
                     "AccountManager - Setting account \(LogManager.logDID(did)) as current but no session exists. This may cause authentication issues.",
@@ -416,7 +416,7 @@ actor AccountManager: AccountManaging {
             let session = try await storage.getSession(for: did)
             let gatewaySession = try? await storage.getGatewaySession(for: did)
             let hasAnySession = session != nil || gatewaySession != nil
-            
+
             if !hasAnySession {
                 LogManager.logWarning(
                     "AccountManager - Account \(LogManager.logDID(did)) exists but has no session token. This indicates an inconsistent authentication state.",

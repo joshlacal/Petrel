@@ -79,14 +79,18 @@ public enum AppBskyDraftDefs {
 
     public struct Draft: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.draft.defs#draft"
+        public let deviceId: String?
+        public let deviceName: String?
         public let posts: [DraftPost]
         public let langs: [LanguageCodeContainer]?
         public let postgateEmbeddingRules: [DraftPostgateEmbeddingRulesUnion]?
         public let threadgateAllow: [DraftThreadgateAllowUnion]?
 
         public init(
-            posts: [DraftPost], langs: [LanguageCodeContainer]?, postgateEmbeddingRules: [DraftPostgateEmbeddingRulesUnion]?, threadgateAllow: [DraftThreadgateAllowUnion]?
+            deviceId: String?, deviceName: String?, posts: [DraftPost], langs: [LanguageCodeContainer]?, postgateEmbeddingRules: [DraftPostgateEmbeddingRulesUnion]?, threadgateAllow: [DraftThreadgateAllowUnion]?
         ) {
+            self.deviceId = deviceId
+            self.deviceName = deviceName
             self.posts = posts
             self.langs = langs
             self.postgateEmbeddingRules = postgateEmbeddingRules
@@ -95,6 +99,18 @@ public enum AppBskyDraftDefs {
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                deviceId = try container.decodeIfPresent(String.self, forKey: .deviceId)
+            } catch {
+                LogManager.logDebug("Decoding error for optional property 'deviceId': \(error)")
+                throw error
+            }
+            do {
+                deviceName = try container.decodeIfPresent(String.self, forKey: .deviceName)
+            } catch {
+                LogManager.logDebug("Decoding error for optional property 'deviceName': \(error)")
+                throw error
+            }
             do {
                 posts = try container.decode([DraftPost].self, forKey: .posts)
             } catch {
@@ -124,6 +140,8 @@ public enum AppBskyDraftDefs {
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            try container.encodeIfPresent(deviceId, forKey: .deviceId)
+            try container.encodeIfPresent(deviceName, forKey: .deviceName)
             try container.encode(posts, forKey: .posts)
             try container.encodeIfPresent(langs, forKey: .langs)
             try container.encodeIfPresent(postgateEmbeddingRules, forKey: .postgateEmbeddingRules)
@@ -131,6 +149,16 @@ public enum AppBskyDraftDefs {
         }
 
         public func hash(into hasher: inout Hasher) {
+            if let value = deviceId {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = deviceName {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
             hasher.combine(posts)
             if let value = langs {
                 hasher.combine(value)
@@ -151,6 +179,12 @@ public enum AppBskyDraftDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
+            if deviceId != other.deviceId {
+                return false
+            }
+            if deviceName != other.deviceName {
+                return false
+            }
             if posts != other.posts {
                 return false
             }
@@ -173,6 +207,14 @@ public enum AppBskyDraftDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
             map = map.adding(key: "$type", value: Self.typeIdentifier)
+            if let value = deviceId {
+                let deviceIdValue = try value.toCBORValue()
+                map = map.adding(key: "deviceId", value: deviceIdValue)
+            }
+            if let value = deviceName {
+                let deviceNameValue = try value.toCBORValue()
+                map = map.adding(key: "deviceName", value: deviceNameValue)
+            }
             let postsValue = try posts.toCBORValue()
             map = map.adding(key: "posts", value: postsValue)
             if let value = langs {
@@ -192,6 +234,8 @@ public enum AppBskyDraftDefs {
 
         private enum CodingKeys: String, CodingKey {
             case typeIdentifier = "$type"
+            case deviceId
+            case deviceName
             case posts
             case langs
             case postgateEmbeddingRules
