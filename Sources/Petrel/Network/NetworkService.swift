@@ -941,7 +941,7 @@ actor NetworkService: NetworkServiceProtocol {
                                 case .authenticationRequired,
                                      .invalidCallbackURL,
                                      .invalidGatewayURL,
-                                     .networkError(_):
+                                     .networkError:
                                     return nil
                                 }
                             }()
