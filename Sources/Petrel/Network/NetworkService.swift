@@ -922,12 +922,38 @@ actor NetworkService: NetworkServiceProtocol {
                                 httpResponse, data: decompressedData, for: requestToSend
                             )
                             return (retryData, retryResponse)
+                        } catch let gatewayError as ConfidentialGatewayStrategy.GatewayError {
+                            LogManager.logError(
+                                "Network Service - Gateway mode: auth provider returned gateway error: \(gatewayError)"
+                            )
+
+                            let reason: String? = {
+                                switch gatewayError {
+                                case .sessionExpired:
+                                    return "gateway_session_expired"
+                                case .invalidSession:
+                                    return "gateway_invalid_session"
+                                case .missingSession:
+                                    return "gateway_missing_session"
+                                case .authenticationRequired,
+                                     .invalidCallbackURL,
+                                     .invalidGatewayURL,
+                                     .networkError(_):
+                                    return nil
+                                }
+                            }()
+
+                            if let reason {
+                                Task {
+                                    await AuthEventBroadcaster.shared.broadcast(.autoLogoutTriggered(did: authCtx?.did ?? "", reason: reason))
+                                }
+                            }
+                            throw NetworkError.authenticationRequired
                         } catch {
                             LogManager.logError("Network Service - Gateway mode: auth provider failed to handle 401: \(error)")
-                            // Broadcast auto-logout event so UI can redirect to reauth
-                            // This was missing - gateway mode wasn't notifying the UI of auth failures
+                            // Unknown gateway auth failure - still signal auto-logout as a fallback.
                             Task {
-                                await AuthEventBroadcaster.shared.broadcast(.autoLogoutTriggered(did: authCtx?.did ?? "", reason: "gateway_401_unhandled"))
+                                await AuthEventBroadcaster.shared.broadcast(.autoLogoutTriggered(did: authCtx?.did ?? "", reason: "gateway_401_unhandled_unknown"))
                             }
                             throw NetworkError.authenticationRequired
                         }

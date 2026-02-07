@@ -13,6 +13,7 @@ __pycache__/
 *$py.class
 .vscode/
 .claude/
+.letta/
 .venv/
 venv/
 Examples/PostCLIDemo/.build/

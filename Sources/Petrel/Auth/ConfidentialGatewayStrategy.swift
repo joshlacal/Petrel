@@ -19,6 +19,16 @@ public struct GatewaySessionInfo: Codable, Sendable {
     public let active: Bool?
 }
 
+private struct GatewayErrorResponse: Decodable {
+    let error: String?
+    let message: String?
+}
+
+private enum UnauthorizedDisposition {
+    case terminal(reason: String)
+    case transient(reason: String)
+}
+
 /// Authentication strategy that delegates auth to a confidential gateway (Nest).
 /// The gateway handles ATProto OAuth (PAR, PKCE, DPoP) and token management.
 /// The client only stores a gateway session UUID and attaches it as a Bearer token.
@@ -265,65 +275,25 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
     ) async throws -> (Data, HTTPURLResponse) {
         // Only clear session if the 401 came from our gateway
         // 401s from other services (MLS, Bluesky API) shouldn't invalidate gateway session
-        if let requestURL = request.url,
-           let host = requestURL.host,
+        if let host = request.url?.host,
            let gatewayHost = gatewayURL.host,
            host == gatewayHost
         {
-            let responseBody = String(data: data, encoding: .utf8) ?? ""
-            
-            // Check if this is a misconfiguration error (e.g. invalid audience) rather than a session expiration
-            if responseBody.localizedCaseInsensitiveContains("invalid token audience") {
+            switch classifyUnauthorizedGatewayResponse(data) {
+            case let .terminal(reason):
                 logger.warning(
-                    "Gateway returned 401 due to audience mismatch - preserving session: \(responseBody, privacy: .public)"
+                    "Gateway returned terminal auth error (reason: \(reason, privacy: .public)) - clearing local session"
                 )
-                throw GatewayError.authenticationRequired
-            }
-            
-            // CRITICAL FIX: Don't delete session on empty body responses
-            // Empty body (0 bytes) typically indicates a transient network error, proxy timeout,
-            // or server-side issue - NOT an actual session expiration.
-            // Only delete session if we receive an explicit session expiry indicator.
-            if data.isEmpty {
-                let urlString = requestURL.absoluteString
-                logger.warning(
-                    "Gateway returned 401 with empty body (likely transient error) - preserving session. URL: \(urlString, privacy: .public)"
-                )
-                throw GatewayError.authenticationRequired
-            }
-            
-            // Check for explicit session expiry indicators in the response
-            // These indicate the server has definitively invalidated our session
-            let isExplicitExpiry = responseBody.localizedCaseInsensitiveContains("session_expired")
-                || responseBody.localizedCaseInsensitiveContains("invalid_token")
-                || responseBody.localizedCaseInsensitiveContains("token expired")
-                || responseBody.localizedCaseInsensitiveContains("session expired")
-                || responseBody.localizedCaseInsensitiveContains("unauthorized")
-                || responseBody.localizedCaseInsensitiveContains("ExpiredToken")
-            
-            if isExplicitExpiry {
-                let bodyPreview = String(responseBody.prefix(200))
-                logger.warning(
-                    "Gateway returned 401 with explicit session expiry - clearing local session. Body: \(bodyPreview, privacy: .public)"
-                )
-                // Clear the session for the current account
-                if let currentAccount = await accountManager.getCurrentAccount() {
-                    do {
-                        try await storage.deleteGatewaySession(for: currentAccount.did)
-                    } catch {
-                        logger.error("Failed to delete gateway session during 401 handling: \(error, privacy: .public)")
-                    }
-                }
+                await clearCurrentGatewaySession()
                 throw GatewayError.sessionExpired
+
+            case let .transient(reason):
+                let bodyPreview = String((String(data: data, encoding: .utf8) ?? "").prefix(200))
+                logger.warning(
+                    "Gateway returned transient 401 (reason: \(reason, privacy: .public)) - preserving session. Body: \(bodyPreview, privacy: .public)"
+                )
+                throw GatewayError.authenticationRequired
             }
-            
-            // Unknown 401 response - log details but preserve session
-            // This is safer than deleting the session on unknown errors
-            let bodyPreview = String(responseBody.prefix(200))
-            logger.warning(
-                "Gateway returned 401 with unrecognized body - preserving session. Body: \(bodyPreview, privacy: .public)"
-            )
-            throw GatewayError.authenticationRequired
         }
 
         // For non-gateway 401s, do NOT treat this as gateway session expiration.
@@ -342,6 +312,80 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
     }
 
     // MARK: - Private Helpers
+
+    private func classifyUnauthorizedGatewayResponse(_ data: Data) -> UnauthorizedDisposition {
+        if data.isEmpty {
+            return .transient(reason: "empty_body")
+        }
+
+        let responseBody = String(data: data, encoding: .utf8) ?? ""
+        let bodyLower = responseBody.lowercased()
+
+        if bodyLower.contains("invalid token audience") {
+            return .transient(reason: "invalid_audience")
+        }
+
+        let payload = try? JSONDecoder().decode(GatewayErrorResponse.self, from: data)
+        let errorCode = (payload?.error ?? "").lowercased()
+        let message = (payload?.message ?? responseBody).lowercased()
+
+        let terminalCodes: Set<String> = [
+            "expiredtoken",
+            "invalidtoken",
+            "session_expired",
+            "invalid_session",
+            "token_refresh_failed",
+        ]
+
+        if terminalCodes.contains(errorCode) {
+            return .terminal(reason: errorCode)
+        }
+
+        if errorCode == "authenticationrequired",
+           message.contains("missing authentication session")
+        {
+            return .terminal(reason: "authentication_required_missing_session")
+        }
+
+        if message.contains("session expired")
+            || message.contains("invalid session")
+            || message.contains("please log in again")
+            || message.contains("token refresh rejected")
+        {
+            return .terminal(reason: "message_indicates_expiry")
+        }
+
+        let transientCodes: Set<String> = [
+            "temporarilyunavailable",
+            "use_dpop_nonce",
+            "upstream_error",
+        ]
+
+        if transientCodes.contains(errorCode)
+            || message.contains("temporarily unavailable")
+            || message.contains("please retry")
+            || message.contains("timeout")
+        {
+            return .transient(reason: errorCode.isEmpty ? "transient_message" : errorCode)
+        }
+
+        return .transient(reason: "unknown_401")
+    }
+
+    private func clearCurrentGatewaySession() async {
+        guard let currentAccount = await accountManager.getCurrentAccount() else {
+            logger.warning("No current account available while clearing gateway session")
+            return
+        }
+
+        do {
+            try await storage.deleteGatewaySession(for: currentAccount.did)
+        } catch {
+            logger.error(
+                "Failed to delete gateway session during 401 handling: \(error, privacy: .public)"
+            )
+        }
+    }
 
     /// Gets the gateway session for the current account
     private func gatewaySession() async throws -> String {
