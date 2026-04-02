@@ -1,0 +1,39 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.bskychat.updateMuteStatus",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Update the server-side mute status for a conversation. Used for push notification suppression.",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["convoId", "muted"],
+          "properties": {
+            "convoId": {
+              "type": "string",
+              "description": "The conversation identifier"
+            },
+            "muted": {
+              "type": "boolean",
+              "description": "Whether the conversation should be muted"
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["success"],
+          "properties": {
+            "success": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    }
+  }
+}

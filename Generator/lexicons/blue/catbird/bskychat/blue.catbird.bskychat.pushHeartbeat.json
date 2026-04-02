@@ -1,0 +1,37 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.bskychat.pushHeartbeat",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Send a heartbeat to indicate the client is actively viewing chat. Suppresses server-side polling.",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["platform"],
+          "properties": {
+            "platform": {
+              "type": "string",
+              "description": "Client platform identifier (e.g., 'ios', 'macos')"
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["leaseExpiresAt"],
+          "properties": {
+            "leaseExpiresAt": {
+              "type": "string",
+              "format": "datetime",
+              "description": "When the foreground lease expires"
+            }
+          }
+        }
+      }
+    }
+  }
+}
