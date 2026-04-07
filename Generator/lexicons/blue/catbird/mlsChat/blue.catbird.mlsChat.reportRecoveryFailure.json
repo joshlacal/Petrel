@@ -1,0 +1,50 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mlsChat.reportRecoveryFailure",
+  "description": "Report that recovery has been exhausted for a conversation (spec §8.6)",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Report that recovery has been exhausted for a conversation. Server uses these reports for quorum-based auto-reset (>=50% of members must report within 1 hour for auto-reset to trigger).",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["convoId"],
+          "properties": {
+            "convoId": {
+              "type": "string",
+              "description": "Conversation identifier"
+            },
+            "failureType": {
+              "type": "string",
+              "description": "Type of failure (default: external_commit_exhausted)",
+              "default": "external_commit_exhausted"
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["recorded", "autoResetTriggered"],
+          "properties": {
+            "recorded": {
+              "type": "boolean",
+              "description": "Whether the failure report was recorded"
+            },
+            "autoResetTriggered": {
+              "type": "boolean",
+              "description": "Whether quorum-based auto-reset was triggered"
+            }
+          }
+        }
+      },
+      "errors": [
+        {"name": "ConvoNotFound", "description": "Conversation not found"},
+        {"name": "NotMember", "description": "Caller is not a member of the conversation"}
+      ]
+    }
+  }
+}
