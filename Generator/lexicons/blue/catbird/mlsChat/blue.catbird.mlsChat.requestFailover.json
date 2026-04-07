@@ -1,0 +1,41 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mlsChat.requestFailover",
+  "description": "Request sequencer failover for a conversation (spec §8.8)",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Request sequencer failover for a conversation. Called when >= 3 consecutive send timeouts occur over >= 2 minutes.",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["convoId"],
+          "properties": {
+            "convoId": {
+              "type": "string",
+              "description": "Conversation identifier"
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["success"],
+          "properties": {
+            "success": {
+              "type": "boolean",
+              "description": "Whether the failover request was accepted"
+            }
+          }
+        }
+      },
+      "errors": [
+        {"name": "ConvoNotFound", "description": "Conversation not found"},
+        {"name": "NotMember", "description": "Caller is not a member of the conversation"}
+      ]
+    }
+  }
+}
