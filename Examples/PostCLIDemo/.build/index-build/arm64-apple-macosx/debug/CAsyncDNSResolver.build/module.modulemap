@@ -1,0 +1,4 @@
+module CAsyncDNSResolver {
+    umbrella header "/Users/joshlacalamito/Developer/Catbird+Petrel/Petrel/Examples/PostCLIDemo/.build/index-build/checkouts/swift-async-dns-resolver/Sources/CAsyncDNSResolver/include/CAsyncDNSResolver.h"
+    export *
+}

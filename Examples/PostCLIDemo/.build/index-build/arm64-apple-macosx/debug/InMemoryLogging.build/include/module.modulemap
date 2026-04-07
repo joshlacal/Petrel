@@ -1,0 +1,3 @@
+module InMemoryLogging {
+    header "/Users/joshlacalamito/Developer/Catbird+Petrel/Petrel/Examples/PostCLIDemo/.build/index-build/arm64-apple-macosx/debug/InMemoryLogging.build/include/InMemoryLogging-Swift.h"
+}

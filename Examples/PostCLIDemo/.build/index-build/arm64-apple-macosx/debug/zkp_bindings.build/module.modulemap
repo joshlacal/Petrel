@@ -1,0 +1,4 @@
+module zkp_bindings {
+    umbrella "/Users/joshlacalamito/Developer/Catbird+Petrel/Petrel/Examples/PostCLIDemo/.build/index-build/checkouts/secp256k1.swift/Sources/zkp_bindings/include"
+    export *
+}
