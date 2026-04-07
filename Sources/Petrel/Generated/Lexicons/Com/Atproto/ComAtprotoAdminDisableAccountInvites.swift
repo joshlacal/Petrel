@@ -1,10 +1,14 @@
 import Foundation
 
+
+
 // lexicon: 1, id: com.atproto.admin.disableAccountInvites
 
-public enum ComAtprotoAdminDisableAccountInvites {
+
+public struct ComAtprotoAdminDisableAccountInvites { 
+
     public static let typeIdentifier = "com.atproto.admin.disableAccountInvites"
-    public struct Input: ATProtocolCodable {
+public struct Input: ATProtocolCodable {
         public let account: DID
         public let note: String?
 
@@ -13,11 +17,12 @@ public enum ComAtprotoAdminDisableAccountInvites {
             self.account = account
             self.note = note
         }
+        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            account = try container.decode(DID.self, forKey: .account)
-            note = try container.decodeIfPresent(String.self, forKey: .note)
+            self.account = try container.decode(DID.self, forKey: .account)
+            self.note = try container.decodeIfPresent(String.self, forKey: .note)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -42,26 +47,33 @@ public enum ComAtprotoAdminDisableAccountInvites {
             case note
         }
     }
+
+
+
 }
 
-public extension ATProtoClient.Com.Atproto.Admin {
+extension ATProtoClient.Com.Atproto.Admin {
     // MARK: - disableAccountInvites
 
     /// Disable an account from receiving new invite codes, but does not invalidate existing codes.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-    ///
+    /// 
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    func disableAccountInvites(
+    public func disableAccountInvites(
+        
         input: ComAtprotoAdminDisableAccountInvites.Input
-
+        
     ) async throws -> Int {
         let endpoint = "com.atproto.admin.disableAccountInvites"
-
+        
         var headers: [String: String] = [:]
-
+        
         headers["Content-Type"] = "application/json"
+        
+        
+        
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -76,6 +88,13 @@ public extension ATProtoClient.Com.Atproto.Admin {
         let serviceDID = await networkService.getServiceDID(for: "com.atproto.admin.disableAccountInvites")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
         let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        return response.statusCode
+        let responseCode = response.statusCode
+
+        
+        return responseCode
+        
     }
+    
 }
+                           
+

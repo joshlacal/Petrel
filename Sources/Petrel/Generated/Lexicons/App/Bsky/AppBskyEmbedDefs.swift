@@ -1,14 +1,18 @@
 import Foundation
 
+
+
 // lexicon: 1, id: app.bsky.embed.defs
 
-public enum AppBskyEmbedDefs {
-    public static let typeIdentifier = "app.bsky.embed.defs"
 
-    public struct AspectRatio: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "app.bsky.embed.defs#aspectRatio"
-        public let width: Int
-        public let height: Int
+public struct AppBskyEmbedDefs { 
+
+    public static let typeIdentifier = "app.bsky.embed.defs"
+        
+public struct AspectRatio: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "app.bsky.embed.defs#aspectRatio"
+            public let width: Int
+            public let height: Int
 
         public init(
             width: Int, height: Int
@@ -20,13 +24,13 @@ public enum AppBskyEmbedDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                width = try container.decode(Int.self, forKey: .width)
+                self.width = try container.decode(Int.self, forKey: .width)
             } catch {
                 LogManager.logError("Decoding error for required property 'width': \(error)")
                 throw error
             }
             do {
-                height = try container.decode(Int.self, forKey: .height)
+                self.height = try container.decode(Int.self, forKey: .height)
             } catch {
                 LogManager.logError("Decoding error for required property 'height': \(error)")
                 throw error
@@ -76,4 +80,11 @@ public enum AppBskyEmbedDefs {
             case height
         }
     }
+
+
+
 }
+
+
+                           
+

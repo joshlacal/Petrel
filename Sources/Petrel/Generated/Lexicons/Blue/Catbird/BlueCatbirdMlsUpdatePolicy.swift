@@ -1,21 +1,25 @@
 import Foundation
 
+
+
 // lexicon: 1, id: blue.catbird.mls.updatePolicy
 
-public enum BlueCatbirdMlsUpdatePolicy {
-    public static let typeIdentifier = "blue.catbird.mls.updatePolicy"
 
-    public struct PolicyView: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "blue.catbird.mls.updatePolicy#policyView"
-        public let convoId: String
-        public let allowInvites: Bool
-        public let adminOnlyInvites: Bool
-        public let allowMemberAdd: Bool
-        public let allowMemberRemove: Bool
-        public let requireAdminApproval: Bool
-        public let maxMembers: Int
-        public let updatedAt: ATProtocolDate
-        public let updatedBy: DID?
+public struct BlueCatbirdMlsUpdatePolicy { 
+
+    public static let typeIdentifier = "blue.catbird.mls.updatePolicy"
+        
+public struct PolicyView: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "blue.catbird.mls.updatePolicy#policyView"
+            public let convoId: String
+            public let allowInvites: Bool
+            public let adminOnlyInvites: Bool
+            public let allowMemberAdd: Bool
+            public let allowMemberRemove: Bool
+            public let requireAdminApproval: Bool
+            public let maxMembers: Int
+            public let updatedAt: ATProtocolDate
+            public let updatedBy: DID?
 
         public init(
             convoId: String, allowInvites: Bool, adminOnlyInvites: Bool, allowMemberAdd: Bool, allowMemberRemove: Bool, requireAdminApproval: Bool, maxMembers: Int, updatedAt: ATProtocolDate, updatedBy: DID?
@@ -34,55 +38,55 @@ public enum BlueCatbirdMlsUpdatePolicy {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                self.convoId = try container.decode(String.self, forKey: .convoId)
             } catch {
                 LogManager.logError("Decoding error for required property 'convoId': \(error)")
                 throw error
             }
             do {
-                allowInvites = try container.decode(Bool.self, forKey: .allowInvites)
+                self.allowInvites = try container.decode(Bool.self, forKey: .allowInvites)
             } catch {
                 LogManager.logError("Decoding error for required property 'allowInvites': \(error)")
                 throw error
             }
             do {
-                adminOnlyInvites = try container.decode(Bool.self, forKey: .adminOnlyInvites)
+                self.adminOnlyInvites = try container.decode(Bool.self, forKey: .adminOnlyInvites)
             } catch {
                 LogManager.logError("Decoding error for required property 'adminOnlyInvites': \(error)")
                 throw error
             }
             do {
-                allowMemberAdd = try container.decode(Bool.self, forKey: .allowMemberAdd)
+                self.allowMemberAdd = try container.decode(Bool.self, forKey: .allowMemberAdd)
             } catch {
                 LogManager.logError("Decoding error for required property 'allowMemberAdd': \(error)")
                 throw error
             }
             do {
-                allowMemberRemove = try container.decode(Bool.self, forKey: .allowMemberRemove)
+                self.allowMemberRemove = try container.decode(Bool.self, forKey: .allowMemberRemove)
             } catch {
                 LogManager.logError("Decoding error for required property 'allowMemberRemove': \(error)")
                 throw error
             }
             do {
-                requireAdminApproval = try container.decode(Bool.self, forKey: .requireAdminApproval)
+                self.requireAdminApproval = try container.decode(Bool.self, forKey: .requireAdminApproval)
             } catch {
                 LogManager.logError("Decoding error for required property 'requireAdminApproval': \(error)")
                 throw error
             }
             do {
-                maxMembers = try container.decode(Int.self, forKey: .maxMembers)
+                self.maxMembers = try container.decode(Int.self, forKey: .maxMembers)
             } catch {
                 LogManager.logError("Decoding error for required property 'maxMembers': \(error)")
                 throw error
             }
             do {
-                updatedAt = try container.decode(ATProtocolDate.self, forKey: .updatedAt)
+                self.updatedAt = try container.decode(ATProtocolDate.self, forKey: .updatedAt)
             } catch {
                 LogManager.logError("Decoding error for required property 'updatedAt': \(error)")
                 throw error
             }
             do {
-                updatedBy = try container.decodeIfPresent(DID.self, forKey: .updatedBy)
+                self.updatedBy = try container.decodeIfPresent(DID.self, forKey: .updatedBy)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'updatedBy': \(error)")
                 throw error
@@ -194,8 +198,7 @@ public enum BlueCatbirdMlsUpdatePolicy {
             case updatedBy
         }
     }
-
-    public struct Input: ATProtocolCodable {
+public struct Input: ATProtocolCodable {
         public let convoId: String
         public let allowInvites: Bool?
         public let adminOnlyInvites: Bool?
@@ -214,16 +217,17 @@ public enum BlueCatbirdMlsUpdatePolicy {
             self.requireAdminApproval = requireAdminApproval
             self.maxMembers = maxMembers
         }
+        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            convoId = try container.decode(String.self, forKey: .convoId)
-            allowInvites = try container.decodeIfPresent(Bool.self, forKey: .allowInvites)
-            adminOnlyInvites = try container.decodeIfPresent(Bool.self, forKey: .adminOnlyInvites)
-            allowMemberAdd = try container.decodeIfPresent(Bool.self, forKey: .allowMemberAdd)
-            allowMemberRemove = try container.decodeIfPresent(Bool.self, forKey: .allowMemberRemove)
-            requireAdminApproval = try container.decodeIfPresent(Bool.self, forKey: .requireAdminApproval)
-            maxMembers = try container.decodeIfPresent(Int.self, forKey: .maxMembers)
+            self.convoId = try container.decode(String.self, forKey: .convoId)
+            self.allowInvites = try container.decodeIfPresent(Bool.self, forKey: .allowInvites)
+            self.adminOnlyInvites = try container.decodeIfPresent(Bool.self, forKey: .adminOnlyInvites)
+            self.allowMemberAdd = try container.decodeIfPresent(Bool.self, forKey: .allowMemberAdd)
+            self.allowMemberRemove = try container.decodeIfPresent(Bool.self, forKey: .allowMemberRemove)
+            self.requireAdminApproval = try container.decodeIfPresent(Bool.self, forKey: .requireAdminApproval)
+            self.maxMembers = try container.decodeIfPresent(Int.self, forKey: .maxMembers)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -278,82 +282,114 @@ public enum BlueCatbirdMlsUpdatePolicy {
             case maxMembers
         }
     }
-
-    public struct Output: ATProtocolCodable {
+    
+public struct Output: ATProtocolCodable {
+        
+        
         public let policy: PolicyView
-
-        /// Standard public initializer
+        
+        
+        
+        // Standard public initializer
         public init(
+            
+            
             policy: PolicyView
-
+            
+            
         ) {
+            
+            
             self.policy = policy
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
-            policy = try container.decode(PolicyView.self, forKey: .policy)
+            
+            self.policy = try container.decode(PolicyView.self, forKey: .policy)
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
+            
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
             try container.encode(policy, forKey: .policy)
+            
+            
         }
 
         public func toCBORValue() throws -> Any {
+            
             var map = OrderedCBORMap()
 
+            
+            
             let policyValue = try policy.toCBORValue()
             map = map.adding(key: "policy", value: policyValue)
+            
+            
 
             return map
+            
         }
-
+        
+        
         private enum CodingKeys: String, CodingKey {
             case policy
         }
+        
     }
+        
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                case unauthorized = "Unauthorized.Caller is not an admin of this conversation"
+                case convoNotFound = "ConvoNotFound.Conversation not found"
+                case notMember = "NotMember.Caller is not a member of this conversation"
+                case noFieldsProvided = "NoFieldsProvided.At least one policy field must be provided"
+                case invalidMaxMembers = "InvalidMaxMembers.maxMembers is less than current member count"
+            public var description: String {
+                return self.rawValue
+            }
 
-    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-        case unauthorized = "Unauthorized.Caller is not an admin of this conversation"
-        case convoNotFound = "ConvoNotFound.Conversation not found"
-        case notMember = "NotMember.Caller is not a member of this conversation"
-        case noFieldsProvided = "NoFieldsProvided.At least one policy field must be provided"
-        case invalidMaxMembers = "InvalidMaxMembers.maxMembers is less than current member count"
-        public var description: String {
-            return rawValue
+            public var errorName: String {
+                // Extract just the error name from the raw value
+                let parts = self.rawValue.split(separator: ".")
+                return String(parts.first ?? "")
+            }
         }
 
-        public var errorName: String {
-            // Extract just the error name from the raw value
-            let parts = rawValue.split(separator: ".")
-            return String(parts.first ?? "")
-        }
-    }
+
+
 }
 
-public extension ATProtoClient.Blue.Catbird.Mls {
+extension ATProtoClient.Blue.Catbird.Mls {
     // MARK: - updatePolicy
 
     /// Update conversation policy settings Update policy settings for a conversation. Only admins can update policies. At least one policy field must be provided.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-    ///
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    func updatePolicy(
+    public func updatePolicy(
+        
         input: BlueCatbirdMlsUpdatePolicy.Input
-
+        
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsUpdatePolicy.Output?) {
         let endpoint = "blue.catbird.mls.updatePolicy"
-
+        
         var headers: [String: String] = [:]
-
+        
         headers["Content-Type"] = "application/json"
-
+        
+        
+        
         headers["Accept"] = "application/json"
+        
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -370,6 +406,7 @@ public extension ATProtoClient.Blue.Catbird.Mls {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
+        
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
@@ -379,11 +416,12 @@ public extension ATProtoClient.Blue.Catbird.Mls {
         }
 
         // Only decode response data if request was successful
-        if (200 ... 299).contains(responseCode) {
+        if (200...299).contains(responseCode) {
             do {
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsUpdatePolicy.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -394,5 +432,9 @@ public extension ATProtoClient.Blue.Catbird.Mls {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
+        
     }
+    
 }
+                           
+

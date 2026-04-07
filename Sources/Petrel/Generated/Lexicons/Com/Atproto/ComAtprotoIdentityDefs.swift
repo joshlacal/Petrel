@@ -1,15 +1,19 @@
 import Foundation
 
+
+
 // lexicon: 1, id: com.atproto.identity.defs
 
-public enum ComAtprotoIdentityDefs {
-    public static let typeIdentifier = "com.atproto.identity.defs"
 
-    public struct IdentityInfo: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "com.atproto.identity.defs#identityInfo"
-        public let did: DID
-        public let handle: Handle
-        public let didDoc: DIDDocument
+public struct ComAtprotoIdentityDefs { 
+
+    public static let typeIdentifier = "com.atproto.identity.defs"
+        
+public struct IdentityInfo: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "com.atproto.identity.defs#identityInfo"
+            public let did: DID
+            public let handle: Handle
+            public let didDoc: DIDDocument
 
         public init(
             did: DID, handle: Handle, didDoc: DIDDocument
@@ -22,19 +26,19 @@ public enum ComAtprotoIdentityDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                did = try container.decode(DID.self, forKey: .did)
+                self.did = try container.decode(DID.self, forKey: .did)
             } catch {
                 LogManager.logError("Decoding error for required property 'did': \(error)")
                 throw error
             }
             do {
-                handle = try container.decode(Handle.self, forKey: .handle)
+                self.handle = try container.decode(Handle.self, forKey: .handle)
             } catch {
                 LogManager.logError("Decoding error for required property 'handle': \(error)")
                 throw error
             }
             do {
-                didDoc = try container.decode(DIDDocument.self, forKey: .didDoc)
+                self.didDoc = try container.decode(DIDDocument.self, forKey: .didDoc)
             } catch {
                 LogManager.logError("Decoding error for required property 'didDoc': \(error)")
                 throw error
@@ -92,4 +96,11 @@ public enum ComAtprotoIdentityDefs {
             case didDoc
         }
     }
+
+
+
 }
+
+
+                           
+

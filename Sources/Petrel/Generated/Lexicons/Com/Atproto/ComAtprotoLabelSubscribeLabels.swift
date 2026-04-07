@@ -1,14 +1,18 @@
 import Foundation
 
+
+
 // lexicon: 1, id: com.atproto.label.subscribeLabels
 
-public enum ComAtprotoLabelSubscribeLabels {
-    public static let typeIdentifier = "com.atproto.label.subscribeLabels"
 
-    public struct Labels: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "com.atproto.label.subscribeLabels#labels"
-        public let seq: Int
-        public let labels: [ComAtprotoLabelDefs.Label]
+public struct ComAtprotoLabelSubscribeLabels { 
+
+    public static let typeIdentifier = "com.atproto.label.subscribeLabels"
+        
+public struct Labels: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "com.atproto.label.subscribeLabels#labels"
+            public let seq: Int
+            public let labels: [ComAtprotoLabelDefs.Label]
 
         public init(
             seq: Int, labels: [ComAtprotoLabelDefs.Label]
@@ -20,13 +24,13 @@ public enum ComAtprotoLabelSubscribeLabels {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                seq = try container.decode(Int.self, forKey: .seq)
+                self.seq = try container.decode(Int.self, forKey: .seq)
             } catch {
                 LogManager.logError("Decoding error for required property 'seq': \(error)")
                 throw error
             }
             do {
-                labels = try container.decode([ComAtprotoLabelDefs.Label].self, forKey: .labels)
+                self.labels = try container.decode([ComAtprotoLabelDefs.Label].self, forKey: .labels)
             } catch {
                 LogManager.logError("Decoding error for required property 'labels': \(error)")
                 throw error
@@ -76,11 +80,11 @@ public enum ComAtprotoLabelSubscribeLabels {
             case labels
         }
     }
-
-    public struct Info: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "com.atproto.label.subscribeLabels#info"
-        public let name: String
-        public let message: String?
+        
+public struct Info: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "com.atproto.label.subscribeLabels#info"
+            public let name: String
+            public let message: String?
 
         public init(
             name: String, message: String?
@@ -92,13 +96,13 @@ public enum ComAtprotoLabelSubscribeLabels {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                name = try container.decode(String.self, forKey: .name)
+                self.name = try container.decode(String.self, forKey: .name)
             } catch {
                 LogManager.logError("Decoding error for required property 'name': \(error)")
                 throw error
             }
             do {
-                message = try container.decodeIfPresent(String.self, forKey: .message)
+                self.message = try container.decodeIfPresent(String.self, forKey: .message)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'message': \(error)")
                 throw error
@@ -153,92 +157,103 @@ public enum ComAtprotoLabelSubscribeLabels {
             case name
             case message
         }
-    }
-
-    public struct Parameters: Parametrizable {
+    }    
+public struct Parameters: Parametrizable {
         public let cursor: Int?
-
+        
         public init(
             cursor: Int? = nil
-        ) {
+            ) {
             self.cursor = cursor
+            
+        }
+    }
+public enum Message: Codable, Sendable {
+
+    case labels(Labels)
+
+    case info(Info)
+
+
+    enum CodingKeys: String, CodingKey {
+        case type = "$type"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let type = try container.decode(String.self, forKey: .type)
+        
+        switch type {
+
+        case "com.atproto.label.subscribeLabels#labels":
+            let value = try Labels(from: decoder)
+            self = .labels(value)
+
+        case "com.atproto.label.subscribeLabels#info":
+            let value = try Info(from: decoder)
+            self = .info(value)
+
+        default:
+            throw DecodingError.dataCorruptedError(
+                forKey: .type,
+                in: container,
+                debugDescription: "Unknown message type: \(type)"
+            )
         }
     }
 
-    public enum Message: Codable, Sendable {
-        case labels(Labels)
+    public func encode(to encoder: Encoder) throws {
+        switch self {
 
-        case info(Info)
+        case .labels(let value):
+            try value.encode(to: encoder)
 
-        enum CodingKeys: String, CodingKey {
-            case type = "$type"
+        case .info(let value):
+            try value.encode(to: encoder)
+
         }
+    }
+}        
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                case futureCursor = "FutureCursor."
+            public var description: String {
+                return self.rawValue
+            }
 
-        public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let type = try container.decode(String.self, forKey: .type)
-
-            switch type {
-            case "com.atproto.label.subscribeLabels#labels":
-                let value = try Labels(from: decoder)
-                self = .labels(value)
-
-            case "com.atproto.label.subscribeLabels#info":
-                let value = try Info(from: decoder)
-                self = .info(value)
-
-            default:
-                throw DecodingError.dataCorruptedError(
-                    forKey: .type,
-                    in: container,
-                    debugDescription: "Unknown message type: \(type)"
-                )
+            public var errorName: String {
+                // Extract just the error name from the raw value
+                let parts = self.rawValue.split(separator: ".")
+                return String(parts.first ?? "")
             }
         }
 
-        public func encode(to encoder: Encoder) throws {
-            switch self {
-            case let .labels(value):
-                try value.encode(to: encoder)
 
-            case let .info(value):
-                try value.encode(to: encoder)
-            }
-        }
-    }
 
-    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-        case futureCursor = "FutureCursor."
-        public var description: String {
-            return rawValue
-        }
-
-        public var errorName: String {
-            // Extract just the error name from the raw value
-            let parts = rawValue.split(separator: ".")
-            return String(parts.first ?? "")
-        }
-    }
 }
 
-// Subscribe to stream of labels (and negations). Public endpoint implemented by mod services. Uses same sequencing scheme as repo event stream.
 
-public extension ATProtoClient.Com.Atproto.Label {
-    func subscribeLabels(
+                           
+
+/// Subscribe to stream of labels (and negations). Public endpoint implemented by mod services. Uses same sequencing scheme as repo event stream.
+
+extension ATProtoClient.Com.Atproto.Label {
+    
+    public func subscribeLabels(
         cursor: Int? = nil
     ) async throws -> AsyncThrowingStream<ComAtprotoLabelSubscribeLabels.Message, Error> {
         let params = ComAtprotoLabelSubscribeLabels.Parameters(cursor: cursor)
-        return try await networkService.subscribe(
+        return try await self.networkService.subscribe(
             endpoint: "com.atproto.label.subscribeLabels",
             parameters: params
         )
     }
 
     /// Alternative signature accepting input struct
-    func subscribeLabels(input: ComAtprotoLabelSubscribeLabels.Parameters) async throws -> AsyncThrowingStream<ComAtprotoLabelSubscribeLabels.Message, Error> {
-        return try await networkService.subscribe(
+    public func subscribeLabels(input: ComAtprotoLabelSubscribeLabels.Parameters) async throws -> AsyncThrowingStream<ComAtprotoLabelSubscribeLabels.Message, Error> {
+        return try await self.networkService.subscribe(
             endpoint: "com.atproto.label.subscribeLabels",
             parameters: input
         )
     }
+    
 }

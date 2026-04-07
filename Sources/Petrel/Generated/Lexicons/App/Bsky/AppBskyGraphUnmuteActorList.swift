@@ -1,20 +1,25 @@
 import Foundation
 
+
+
 // lexicon: 1, id: app.bsky.graph.unmuteActorList
 
-public enum AppBskyGraphUnmuteActorList {
+
+public struct AppBskyGraphUnmuteActorList { 
+
     public static let typeIdentifier = "app.bsky.graph.unmuteActorList"
-    public struct Input: ATProtocolCodable {
+public struct Input: ATProtocolCodable {
         public let list: ATProtocolURI
 
         /// Standard public initializer
         public init(list: ATProtocolURI) {
             self.list = list
         }
+        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            list = try container.decode(ATProtocolURI.self, forKey: .list)
+            self.list = try container.decode(ATProtocolURI.self, forKey: .list)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -33,26 +38,33 @@ public enum AppBskyGraphUnmuteActorList {
             case list
         }
     }
+
+
+
 }
 
-public extension ATProtoClient.App.Bsky.Graph {
+extension ATProtoClient.App.Bsky.Graph {
     // MARK: - unmuteActorList
 
     /// Unmutes the specified list of accounts. Requires auth.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-    ///
+    /// 
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    func unmuteActorList(
+    public func unmuteActorList(
+        
         input: AppBskyGraphUnmuteActorList.Input
-
+        
     ) async throws -> Int {
         let endpoint = "app.bsky.graph.unmuteActorList"
-
+        
         var headers: [String: String] = [:]
-
+        
         headers["Content-Type"] = "application/json"
+        
+        
+        
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -67,6 +79,13 @@ public extension ATProtoClient.App.Bsky.Graph {
         let serviceDID = await networkService.getServiceDID(for: "app.bsky.graph.unmuteActorList")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
         let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        return response.statusCode
+        let responseCode = response.statusCode
+
+        
+        return responseCode
+        
     }
+    
 }
+                           
+
