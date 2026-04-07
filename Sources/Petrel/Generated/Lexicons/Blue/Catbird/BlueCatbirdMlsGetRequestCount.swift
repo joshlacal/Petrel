@@ -1,91 +1,130 @@
 import Foundation
 
+
+
 // lexicon: 1, id: blue.catbird.mls.getRequestCount
 
-public enum BlueCatbirdMlsGetRequestCount {
+
+public struct BlueCatbirdMlsGetRequestCount { 
+
     public static let typeIdentifier = "blue.catbird.mls.getRequestCount"
-
-    public struct Output: ATProtocolCodable {
+    
+public struct Output: ATProtocolCodable {
+        
+        
         public let pendingCount: Int
-
+        
         public let lastRequestAt: ATProtocolDate?
-
-        /// Standard public initializer
+        
+        
+        
+        // Standard public initializer
         public init(
+            
+            
             pendingCount: Int,
-
+            
             lastRequestAt: ATProtocolDate? = nil
-
+            
+            
         ) {
+            
+            
             self.pendingCount = pendingCount
-
+            
             self.lastRequestAt = lastRequestAt
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
-            pendingCount = try container.decode(Int.self, forKey: .pendingCount)
-
-            lastRequestAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .lastRequestAt)
+            
+            self.pendingCount = try container.decode(Int.self, forKey: .pendingCount)
+            
+            
+            self.lastRequestAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .lastRequestAt)
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
+            
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
             try container.encode(pendingCount, forKey: .pendingCount)
-
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(lastRequestAt, forKey: .lastRequestAt)
+            
+            
         }
 
         public func toCBORValue() throws -> Any {
+            
             var map = OrderedCBORMap()
 
+            
+            
             let pendingCountValue = try pendingCount.toCBORValue()
             map = map.adding(key: "pendingCount", value: pendingCountValue)
-
+            
+            
+            
             if let value = lastRequestAt {
                 // Encode optional property even if it's an empty array for CBOR
                 let lastRequestAtValue = try value.toCBORValue()
                 map = map.adding(key: "lastRequestAt", value: lastRequestAtValue)
             }
+            
+            
 
             return map
+            
         }
-
+        
+        
         private enum CodingKeys: String, CodingKey {
             case pendingCount
             case lastRequestAt
         }
+        
     }
+        
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                case unauthorized = "Unauthorized.Authentication required"
+            public var description: String {
+                return self.rawValue
+            }
 
-    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-        case unauthorized = "Unauthorized.Authentication required"
-        public var description: String {
-            return rawValue
+            public var errorName: String {
+                // Extract just the error name from the raw value
+                let parts = self.rawValue.split(separator: ".")
+                return String(parts.first ?? "")
+            }
         }
 
-        public var errorName: String {
-            // Extract just the error name from the raw value
-            let parts = rawValue.split(separator: ".")
-            return String(parts.first ?? "")
-        }
-    }
+
+
 }
 
-public extension ATProtoClient.Blue.Catbird.Mls {
+
+
+extension ATProtoClient.Blue.Catbird.Mls {
     // MARK: - getRequestCount
 
     /// Get count of pending chat requests for badge display Returns the count of pending chat requests. Lightweight endpoint for badge updates.
-    ///
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    func getRequestCount() async throws -> (responseCode: Int, data: BlueCatbirdMlsGetRequestCount.Output?) {
+    public func getRequestCount() async throws -> (responseCode: Int, data: BlueCatbirdMlsGetRequestCount.Output?) {
         let endpoint = "blue.catbird.mls.getRequestCount"
 
+        
         let queryItems: [URLQueryItem]? = nil
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -109,11 +148,12 @@ public extension ATProtoClient.Blue.Catbird.Mls {
         }
 
         // Only decode response data if request was successful
-        if (200 ... 299).contains(responseCode) {
+        if (200...299).contains(responseCode) {
             do {
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsGetRequestCount.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -121,9 +161,12 @@ public extension ATProtoClient.Blue.Catbird.Mls {
                 return (responseCode, nil)
             }
         } else {
+            
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
+                           
+

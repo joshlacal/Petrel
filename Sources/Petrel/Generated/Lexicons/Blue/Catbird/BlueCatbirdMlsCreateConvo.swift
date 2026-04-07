@@ -1,14 +1,18 @@
 import Foundation
 
+
+
 // lexicon: 1, id: blue.catbird.mls.createConvo
 
-public enum BlueCatbirdMlsCreateConvo {
-    public static let typeIdentifier = "blue.catbird.mls.createConvo"
 
-    public struct MetadataInput: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "blue.catbird.mls.createConvo#metadataInput"
-        public let name: String?
-        public let description: String?
+public struct BlueCatbirdMlsCreateConvo { 
+
+    public static let typeIdentifier = "blue.catbird.mls.createConvo"
+        
+public struct MetadataInput: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "blue.catbird.mls.createConvo#metadataInput"
+            public let name: String?
+            public let description: String?
 
         public init(
             name: String?, description: String?
@@ -20,13 +24,13 @@ public enum BlueCatbirdMlsCreateConvo {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                name = try container.decodeIfPresent(String.self, forKey: .name)
+                self.name = try container.decodeIfPresent(String.self, forKey: .name)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'name': \(error)")
                 throw error
             }
             do {
-                description = try container.decodeIfPresent(String.self, forKey: .description)
+                self.description = try container.decodeIfPresent(String.self, forKey: .description)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'description': \(error)")
                 throw error
@@ -88,11 +92,11 @@ public enum BlueCatbirdMlsCreateConvo {
             case description
         }
     }
-
-    public struct KeyPackageHashEntry: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "blue.catbird.mls.createConvo#keyPackageHashEntry"
-        public let did: DID
-        public let hash: String
+        
+public struct KeyPackageHashEntry: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "blue.catbird.mls.createConvo#keyPackageHashEntry"
+            public let did: DID
+            public let hash: String
 
         public init(
             did: DID, hash: String
@@ -104,13 +108,13 @@ public enum BlueCatbirdMlsCreateConvo {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                did = try container.decode(DID.self, forKey: .did)
+                self.did = try container.decode(DID.self, forKey: .did)
             } catch {
                 LogManager.logError("Decoding error for required property 'did': \(error)")
                 throw error
             }
             do {
-                hash = try container.decode(String.self, forKey: .hash)
+                self.hash = try container.decode(String.self, forKey: .hash)
             } catch {
                 LogManager.logError("Decoding error for required property 'hash': \(error)")
                 throw error
@@ -160,8 +164,7 @@ public enum BlueCatbirdMlsCreateConvo {
             case hash
         }
     }
-
-    public struct Input: ATProtocolCodable {
+public struct Input: ATProtocolCodable {
         public let groupId: String
         public let idempotencyKey: String?
         public let cipherSuite: String
@@ -182,17 +185,18 @@ public enum BlueCatbirdMlsCreateConvo {
             self.metadata = metadata
             self.currentEpoch = currentEpoch
         }
+        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            groupId = try container.decode(String.self, forKey: .groupId)
-            idempotencyKey = try container.decodeIfPresent(String.self, forKey: .idempotencyKey)
-            cipherSuite = try container.decode(String.self, forKey: .cipherSuite)
-            initialMembers = try container.decodeIfPresent([DID].self, forKey: .initialMembers)
-            welcomeMessage = try container.decodeIfPresent(String.self, forKey: .welcomeMessage)
-            keyPackageHashes = try container.decodeIfPresent([KeyPackageHashEntry].self, forKey: .keyPackageHashes)
-            metadata = try container.decodeIfPresent(MetadataInput.self, forKey: .metadata)
-            currentEpoch = try container.decodeIfPresent(Int.self, forKey: .currentEpoch)
+            self.groupId = try container.decode(String.self, forKey: .groupId)
+            self.idempotencyKey = try container.decodeIfPresent(String.self, forKey: .idempotencyKey)
+            self.cipherSuite = try container.decode(String.self, forKey: .cipherSuite)
+            self.initialMembers = try container.decodeIfPresent([DID].self, forKey: .initialMembers)
+            self.welcomeMessage = try container.decodeIfPresent(String.self, forKey: .welcomeMessage)
+            self.keyPackageHashes = try container.decodeIfPresent([KeyPackageHashEntry].self, forKey: .keyPackageHashes)
+            self.metadata = try container.decodeIfPresent(MetadataInput.self, forKey: .metadata)
+            self.currentEpoch = try container.decodeIfPresent(Int.self, forKey: .currentEpoch)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -251,46 +255,52 @@ public enum BlueCatbirdMlsCreateConvo {
             case currentEpoch
         }
     }
-
     public typealias Output = BlueCatbirdMlsDefs.ConvoView
+            
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                case invalidCipherSuite = "InvalidCipherSuite.The specified cipher suite is not supported"
+                case keyPackageNotFound = "KeyPackageNotFound.Key package not found for one or more initial members"
+                case tooManyMembers = "TooManyMembers.Too many initial members specified (default max 1000 total including creator, configurable per-conversation via policy)"
+                case mutualBlockDetected = "MutualBlockDetected.Cannot create conversation with users who have blocked each other on Bluesky"
+            public var description: String {
+                return self.rawValue
+            }
 
-    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-        case invalidCipherSuite = "InvalidCipherSuite.The specified cipher suite is not supported"
-        case keyPackageNotFound = "KeyPackageNotFound.Key package not found for one or more initial members"
-        case tooManyMembers = "TooManyMembers.Too many initial members specified (default max 1000 total including creator, configurable per-conversation via policy)"
-        case mutualBlockDetected = "MutualBlockDetected.Cannot create conversation with users who have blocked each other on Bluesky"
-        public var description: String {
-            return rawValue
+            public var errorName: String {
+                // Extract just the error name from the raw value
+                let parts = self.rawValue.split(separator: ".")
+                return String(parts.first ?? "")
+            }
         }
 
-        public var errorName: String {
-            // Extract just the error name from the raw value
-            let parts = rawValue.split(separator: ".")
-            return String(parts.first ?? "")
-        }
-    }
+
+
 }
 
-public extension ATProtoClient.Blue.Catbird.Mls {
+extension ATProtoClient.Blue.Catbird.Mls {
     // MARK: - createConvo
 
     /// Create a new MLS conversation with optional initial members and metadata Create a new MLS conversation
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-    ///
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    func createConvo(
+    public func createConvo(
+        
         input: BlueCatbirdMlsCreateConvo.Input
-
+        
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsCreateConvo.Output?) {
         let endpoint = "blue.catbird.mls.createConvo"
-
+        
         var headers: [String: String] = [:]
-
+        
         headers["Content-Type"] = "application/json"
-
+        
+        
+        
         headers["Accept"] = "application/json"
+        
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -307,6 +317,7 @@ public extension ATProtoClient.Blue.Catbird.Mls {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
+        
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
@@ -316,11 +327,12 @@ public extension ATProtoClient.Blue.Catbird.Mls {
         }
 
         // Only decode response data if request was successful
-        if (200 ... 299).contains(responseCode) {
+        if (200...299).contains(responseCode) {
             do {
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsCreateConvo.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -331,5 +343,9 @@ public extension ATProtoClient.Blue.Catbird.Mls {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
+        
     }
+    
 }
+                           
+

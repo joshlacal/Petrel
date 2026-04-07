@@ -1,14 +1,18 @@
 import Foundation
 
+
+
 // lexicon: 1, id: com.atproto.repo.defs
 
-public enum ComAtprotoRepoDefs {
-    public static let typeIdentifier = "com.atproto.repo.defs"
 
-    public struct CommitMeta: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "com.atproto.repo.defs#commitMeta"
-        public let cid: CID
-        public let rev: TID
+public struct ComAtprotoRepoDefs { 
+
+    public static let typeIdentifier = "com.atproto.repo.defs"
+        
+public struct CommitMeta: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "com.atproto.repo.defs#commitMeta"
+            public let cid: CID
+            public let rev: TID
 
         public init(
             cid: CID, rev: TID
@@ -20,13 +24,13 @@ public enum ComAtprotoRepoDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                cid = try container.decode(CID.self, forKey: .cid)
+                self.cid = try container.decode(CID.self, forKey: .cid)
             } catch {
                 LogManager.logError("Decoding error for required property 'cid': \(error)")
                 throw error
             }
             do {
-                rev = try container.decode(TID.self, forKey: .rev)
+                self.rev = try container.decode(TID.self, forKey: .rev)
             } catch {
                 LogManager.logError("Decoding error for required property 'rev': \(error)")
                 throw error
@@ -76,4 +80,11 @@ public enum ComAtprotoRepoDefs {
             case rev
         }
     }
+
+
+
 }
+
+
+                           
+

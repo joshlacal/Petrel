@@ -2,7 +2,6 @@ import Foundation
 
 
 
-
 // lexicon: 1, id: blue.catbird.bskychat.updateMuteStatus
 
 
@@ -139,10 +138,7 @@ extension ATProtoClient.Blue.Catbird.Bskychat {
         headers["Accept"] = "application/json"
         
 
-        
         let requestData: Data? = try JSONEncoder().encode(input)
-        
-        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
@@ -158,7 +154,6 @@ extension ATProtoClient.Blue.Catbird.Bskychat {
         let responseCode = response.statusCode
 
         
-        
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
@@ -166,7 +161,6 @@ extension ATProtoClient.Blue.Catbird.Bskychat {
         if !contentType.lowercased().contains("application/json") {
             throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
         }
-        
 
         // Only decode response data if request was successful
         if (200...299).contains(responseCode) {
@@ -187,6 +181,7 @@ extension ATProtoClient.Blue.Catbird.Bskychat {
         }
         
     }
+    
 }
                            
 

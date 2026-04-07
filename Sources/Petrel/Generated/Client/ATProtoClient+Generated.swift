@@ -17,8 +17,6 @@ public enum AuthMode: Sendable {
     case publicOAuth
     /// Confidential gateway authentication via a backend service.
     case gateway
-    /// Client Assertion Backend — confidential client via DPoP-bound assertions.
-    case cab
 }
 
 // MARK: - API Error Enum
@@ -177,7 +175,6 @@ public actor ATProtoClient {
         } else {
             self.didResolver = await DIDResolutionService(networkService: networkService)
         }
-        await networkService.setDIDResolver(self.didResolver)
 
         // Convert AuthMode to AuthManager.Mode
         let managerMode: AuthManager.Mode
@@ -188,8 +185,6 @@ public actor ATProtoClient {
             managerMode = .publicOAuth
         case .gateway:
             managerMode = .gateway
-        case .cab:
-            managerMode = .cab
         }
 
         // Initialize auth manager with the selected mode
@@ -475,8 +470,6 @@ public actor ATProtoClient {
             managerMode = .publicOAuth
         case .gateway:
             managerMode = .gateway
-        case .cab:
-            managerMode = .cab
         }
         try await authManager.switchMode(managerMode)
     }
@@ -491,8 +484,6 @@ public actor ATProtoClient {
                 return .publicOAuth
             case .gateway:
                 return .gateway
-            case .cab:
-                return .cab
             }
         }
     }
@@ -1043,59 +1034,23 @@ public final class Blue: @unchecked Sendable {
 
         }
 
+        public lazy var mls: Mls = {
+            return Mls(networkService: self.networkService)
+        }()
+
+        public final class Mls: @unchecked Sendable {
+            internal let networkService: NetworkService
+            internal init(networkService: NetworkService) {
+                self.networkService = networkService
+            }
+
+        }
+
         public lazy var bskychat: Bskychat = {
             return Bskychat(networkService: self.networkService)
         }()
 
         public final class Bskychat: @unchecked Sendable {
-            internal let networkService: NetworkService
-            internal init(networkService: NetworkService) {
-                self.networkService = networkService
-            }
-
-        }
-
-        public lazy var mlsds: MlsDS = {
-            return MlsDS(networkService: self.networkService)
-        }()
-
-        public final class MlsDS: @unchecked Sendable {
-            internal let networkService: NetworkService
-            internal init(networkService: NetworkService) {
-                self.networkService = networkService
-            }
-
-        }
-
-    }
-
-}
-
-public lazy var ing: Ing = {
-    return Ing(networkService: self.networkService)
-}()
-
-public final class Ing: @unchecked Sendable {
-    internal let networkService: NetworkService
-    internal init(networkService: NetworkService) {
-        self.networkService = networkService
-    }
-
-    public lazy var dasl: Dasl = {
-        return Dasl(networkService: self.networkService)
-    }()
-
-    public final class Dasl: @unchecked Sendable {
-        internal let networkService: NetworkService
-        internal init(networkService: NetworkService) {
-            self.networkService = networkService
-        }
-
-        public lazy var masl: Masl = {
-            return Masl(networkService: self.networkService)
-        }()
-
-        public final class Masl: @unchecked Sendable {
             internal let networkService: NetworkService
             internal init(networkService: NetworkService) {
                 self.networkService = networkService

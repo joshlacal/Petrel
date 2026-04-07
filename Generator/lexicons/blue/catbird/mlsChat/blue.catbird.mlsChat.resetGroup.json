@@ -1,0 +1,72 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mlsChat.resetGroup",
+  "description": "Reset an MLS group by replacing its group ID and clearing ephemeral state",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Reset an MLS group for a conversation. Only admins may reset a group. This increments the reset count, swaps the group ID, resets the epoch to 0, and clears welcome messages and pending device additions.",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["convoId", "newGroupId", "cipherSuite"],
+          "properties": {
+            "convoId": {
+              "type": "string",
+              "description": "Conversation identifier"
+            },
+            "newGroupId": {
+              "type": "string",
+              "description": "New MLS group identifier to replace the current one"
+            },
+            "cipherSuite": {
+              "type": "string",
+              "description": "MLS cipher suite identifier for the new group"
+            },
+            "groupInfo": {
+              "type": "string",
+              "description": "Optional base64-encoded MLS GroupInfo for the new group"
+            },
+            "reason": {
+              "type": "string",
+              "description": "Optional human-readable reason for the reset"
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["success", "newGroupId", "resetGeneration", "newEpoch"],
+          "properties": {
+            "success": {
+              "type": "boolean",
+              "description": "Whether the reset succeeded"
+            },
+            "newGroupId": {
+              "type": "string",
+              "description": "The new group identifier that was applied"
+            },
+            "resetGeneration": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Cumulative reset count for this conversation"
+            },
+            "newEpoch": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "New epoch number (always 0 after reset)"
+            }
+          }
+        }
+      },
+      "errors": [
+        {"name": "ConvoNotFound", "description": "Conversation not found"},
+        {"name": "NotAdmin", "description": "Caller is not an admin of the conversation"},
+        {"name": "GroupIdAlreadyExists", "description": "The new group ID is already in use by another conversation"}
+      ]
+    }
+  }
+}

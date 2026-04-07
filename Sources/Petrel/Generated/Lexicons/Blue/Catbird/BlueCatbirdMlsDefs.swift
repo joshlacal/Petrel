@@ -1,20 +1,24 @@
 import Foundation
 
+
+
 // lexicon: 1, id: blue.catbird.mls.defs
 
-public enum BlueCatbirdMlsDefs {
-    public static let typeIdentifier = "blue.catbird.mls.defs"
 
-    public struct ConvoView: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "blue.catbird.mls.defs#convoView"
-        public let groupId: String
-        public let creator: DID
-        public let members: [MemberView]
-        public let epoch: Int
-        public let cipherSuite: String
-        public let createdAt: ATProtocolDate
-        public let lastMessageAt: ATProtocolDate?
-        public let metadata: ConvoMetadata?
+public struct BlueCatbirdMlsDefs { 
+
+    public static let typeIdentifier = "blue.catbird.mls.defs"
+        
+public struct ConvoView: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "blue.catbird.mls.defs#convoView"
+            public let groupId: String
+            public let creator: DID
+            public let members: [MemberView]
+            public let epoch: Int
+            public let cipherSuite: String
+            public let createdAt: ATProtocolDate
+            public let lastMessageAt: ATProtocolDate?
+            public let metadata: ConvoMetadata?
 
         public init(
             groupId: String, creator: DID, members: [MemberView], epoch: Int, cipherSuite: String, createdAt: ATProtocolDate, lastMessageAt: ATProtocolDate?, metadata: ConvoMetadata?
@@ -32,49 +36,49 @@ public enum BlueCatbirdMlsDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                groupId = try container.decode(String.self, forKey: .groupId)
+                self.groupId = try container.decode(String.self, forKey: .groupId)
             } catch {
                 LogManager.logError("Decoding error for required property 'groupId': \(error)")
                 throw error
             }
             do {
-                creator = try container.decode(DID.self, forKey: .creator)
+                self.creator = try container.decode(DID.self, forKey: .creator)
             } catch {
                 LogManager.logError("Decoding error for required property 'creator': \(error)")
                 throw error
             }
             do {
-                members = try container.decode([MemberView].self, forKey: .members)
+                self.members = try container.decode([MemberView].self, forKey: .members)
             } catch {
                 LogManager.logError("Decoding error for required property 'members': \(error)")
                 throw error
             }
             do {
-                epoch = try container.decode(Int.self, forKey: .epoch)
+                self.epoch = try container.decode(Int.self, forKey: .epoch)
             } catch {
                 LogManager.logError("Decoding error for required property 'epoch': \(error)")
                 throw error
             }
             do {
-                cipherSuite = try container.decode(String.self, forKey: .cipherSuite)
+                self.cipherSuite = try container.decode(String.self, forKey: .cipherSuite)
             } catch {
                 LogManager.logError("Decoding error for required property 'cipherSuite': \(error)")
                 throw error
             }
             do {
-                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+                self.createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
             } catch {
                 LogManager.logError("Decoding error for required property 'createdAt': \(error)")
                 throw error
             }
             do {
-                lastMessageAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .lastMessageAt)
+                self.lastMessageAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .lastMessageAt)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'lastMessageAt': \(error)")
                 throw error
             }
             do {
-                metadata = try container.decodeIfPresent(ConvoMetadata.self, forKey: .metadata)
+                self.metadata = try container.decodeIfPresent(ConvoMetadata.self, forKey: .metadata)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'metadata': \(error)")
                 throw error
@@ -184,11 +188,11 @@ public enum BlueCatbirdMlsDefs {
             case metadata
         }
     }
-
-    public struct ConvoMetadata: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "blue.catbird.mls.defs#convoMetadata"
-        public let name: String?
-        public let description: String?
+        
+public struct ConvoMetadata: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "blue.catbird.mls.defs#convoMetadata"
+            public let name: String?
+            public let description: String?
 
         public init(
             name: String?, description: String?
@@ -200,13 +204,13 @@ public enum BlueCatbirdMlsDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                name = try container.decodeIfPresent(String.self, forKey: .name)
+                self.name = try container.decodeIfPresent(String.self, forKey: .name)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'name': \(error)")
                 throw error
             }
             do {
-                description = try container.decodeIfPresent(String.self, forKey: .description)
+                self.description = try container.decodeIfPresent(String.self, forKey: .description)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'description': \(error)")
                 throw error
@@ -268,20 +272,20 @@ public enum BlueCatbirdMlsDefs {
             case description
         }
     }
-
-    public struct MemberView: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "blue.catbird.mls.defs#memberView"
-        public let did: DID
-        public let userDid: DID
-        public let deviceId: String?
-        public let deviceName: String?
-        public let joinedAt: ATProtocolDate
-        public let isAdmin: Bool
-        public let isModerator: Bool?
-        public let promotedAt: ATProtocolDate?
-        public let promotedBy: DID?
-        public let leafIndex: Int?
-        public let credential: Bytes?
+        
+public struct MemberView: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "blue.catbird.mls.defs#memberView"
+            public let did: DID
+            public let userDid: DID
+            public let deviceId: String?
+            public let deviceName: String?
+            public let joinedAt: ATProtocolDate
+            public let isAdmin: Bool
+            public let isModerator: Bool?
+            public let promotedAt: ATProtocolDate?
+            public let promotedBy: DID?
+            public let leafIndex: Int?
+            public let credential: Bytes?
 
         public init(
             did: DID, userDid: DID, deviceId: String?, deviceName: String?, joinedAt: ATProtocolDate, isAdmin: Bool, isModerator: Bool?, promotedAt: ATProtocolDate?, promotedBy: DID?, leafIndex: Int?, credential: Bytes?
@@ -302,67 +306,67 @@ public enum BlueCatbirdMlsDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                did = try container.decode(DID.self, forKey: .did)
+                self.did = try container.decode(DID.self, forKey: .did)
             } catch {
                 LogManager.logError("Decoding error for required property 'did': \(error)")
                 throw error
             }
             do {
-                userDid = try container.decode(DID.self, forKey: .userDid)
+                self.userDid = try container.decode(DID.self, forKey: .userDid)
             } catch {
                 LogManager.logError("Decoding error for required property 'userDid': \(error)")
                 throw error
             }
             do {
-                deviceId = try container.decodeIfPresent(String.self, forKey: .deviceId)
+                self.deviceId = try container.decodeIfPresent(String.self, forKey: .deviceId)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'deviceId': \(error)")
                 throw error
             }
             do {
-                deviceName = try container.decodeIfPresent(String.self, forKey: .deviceName)
+                self.deviceName = try container.decodeIfPresent(String.self, forKey: .deviceName)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'deviceName': \(error)")
                 throw error
             }
             do {
-                joinedAt = try container.decode(ATProtocolDate.self, forKey: .joinedAt)
+                self.joinedAt = try container.decode(ATProtocolDate.self, forKey: .joinedAt)
             } catch {
                 LogManager.logError("Decoding error for required property 'joinedAt': \(error)")
                 throw error
             }
             do {
-                isAdmin = try container.decode(Bool.self, forKey: .isAdmin)
+                self.isAdmin = try container.decode(Bool.self, forKey: .isAdmin)
             } catch {
                 LogManager.logError("Decoding error for required property 'isAdmin': \(error)")
                 throw error
             }
             do {
-                isModerator = try container.decodeIfPresent(Bool.self, forKey: .isModerator)
+                self.isModerator = try container.decodeIfPresent(Bool.self, forKey: .isModerator)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'isModerator': \(error)")
                 throw error
             }
             do {
-                promotedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .promotedAt)
+                self.promotedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .promotedAt)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'promotedAt': \(error)")
                 throw error
             }
             do {
-                promotedBy = try container.decodeIfPresent(DID.self, forKey: .promotedBy)
+                self.promotedBy = try container.decodeIfPresent(DID.self, forKey: .promotedBy)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'promotedBy': \(error)")
                 throw error
             }
             do {
-                leafIndex = try container.decodeIfPresent(Int.self, forKey: .leafIndex)
+                self.leafIndex = try container.decodeIfPresent(Int.self, forKey: .leafIndex)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'leafIndex': \(error)")
                 throw error
             }
             do {
-                credential = try container.decodeIfPresent(Bytes.self, forKey: .credential)
+                self.credential = try container.decodeIfPresent(Bytes.self, forKey: .credential)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'credential': \(error)")
                 throw error
@@ -526,16 +530,16 @@ public enum BlueCatbirdMlsDefs {
             case credential
         }
     }
-
-    public struct MessageView: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "blue.catbird.mls.defs#messageView"
-        public let id: String
-        public let convoId: String
-        public let ciphertext: Bytes
-        public let epoch: Int
-        public let seq: Int
-        public let createdAt: ATProtocolDate
-        public let messageType: String?
+        
+public struct MessageView: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "blue.catbird.mls.defs#messageView"
+            public let id: String
+            public let convoId: String
+            public let ciphertext: Bytes
+            public let epoch: Int
+            public let seq: Int
+            public let createdAt: ATProtocolDate
+            public let messageType: String?
 
         public init(
             id: String, convoId: String, ciphertext: Bytes, epoch: Int, seq: Int, createdAt: ATProtocolDate, messageType: String?
@@ -552,43 +556,43 @@ public enum BlueCatbirdMlsDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                id = try container.decode(String.self, forKey: .id)
+                self.id = try container.decode(String.self, forKey: .id)
             } catch {
                 LogManager.logError("Decoding error for required property 'id': \(error)")
                 throw error
             }
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                self.convoId = try container.decode(String.self, forKey: .convoId)
             } catch {
                 LogManager.logError("Decoding error for required property 'convoId': \(error)")
                 throw error
             }
             do {
-                ciphertext = try container.decode(Bytes.self, forKey: .ciphertext)
+                self.ciphertext = try container.decode(Bytes.self, forKey: .ciphertext)
             } catch {
                 LogManager.logError("Decoding error for required property 'ciphertext': \(error)")
                 throw error
             }
             do {
-                epoch = try container.decode(Int.self, forKey: .epoch)
+                self.epoch = try container.decode(Int.self, forKey: .epoch)
             } catch {
                 LogManager.logError("Decoding error for required property 'epoch': \(error)")
                 throw error
             }
             do {
-                seq = try container.decode(Int.self, forKey: .seq)
+                self.seq = try container.decode(Int.self, forKey: .seq)
             } catch {
                 LogManager.logError("Decoding error for required property 'seq': \(error)")
                 throw error
             }
             do {
-                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+                self.createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
             } catch {
                 LogManager.logError("Decoding error for required property 'createdAt': \(error)")
                 throw error
             }
             do {
-                messageType = try container.decodeIfPresent(String.self, forKey: .messageType)
+                self.messageType = try container.decodeIfPresent(String.self, forKey: .messageType)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'messageType': \(error)")
                 throw error
@@ -684,13 +688,13 @@ public enum BlueCatbirdMlsDefs {
             case messageType
         }
     }
-
-    public struct KeyPackageRef: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "blue.catbird.mls.defs#keyPackageRef"
-        public let did: DID
-        public let keyPackage: String
-        public let keyPackageHash: String?
-        public let cipherSuite: String
+        
+public struct KeyPackageRef: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "blue.catbird.mls.defs#keyPackageRef"
+            public let did: DID
+            public let keyPackage: String
+            public let keyPackageHash: String?
+            public let cipherSuite: String
 
         public init(
             did: DID, keyPackage: String, keyPackageHash: String?, cipherSuite: String
@@ -704,25 +708,25 @@ public enum BlueCatbirdMlsDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                did = try container.decode(DID.self, forKey: .did)
+                self.did = try container.decode(DID.self, forKey: .did)
             } catch {
                 LogManager.logError("Decoding error for required property 'did': \(error)")
                 throw error
             }
             do {
-                keyPackage = try container.decode(String.self, forKey: .keyPackage)
+                self.keyPackage = try container.decode(String.self, forKey: .keyPackage)
             } catch {
                 LogManager.logError("Decoding error for required property 'keyPackage': \(error)")
                 throw error
             }
             do {
-                keyPackageHash = try container.decodeIfPresent(String.self, forKey: .keyPackageHash)
+                self.keyPackageHash = try container.decodeIfPresent(String.self, forKey: .keyPackageHash)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'keyPackageHash': \(error)")
                 throw error
             }
             do {
-                cipherSuite = try container.decode(String.self, forKey: .cipherSuite)
+                self.cipherSuite = try container.decode(String.self, forKey: .cipherSuite)
             } catch {
                 LogManager.logError("Decoding error for required property 'cipherSuite': \(error)")
                 throw error
@@ -794,4 +798,11 @@ public enum BlueCatbirdMlsDefs {
             case cipherSuite
         }
     }
+
+
+
 }
+
+
+                           
+

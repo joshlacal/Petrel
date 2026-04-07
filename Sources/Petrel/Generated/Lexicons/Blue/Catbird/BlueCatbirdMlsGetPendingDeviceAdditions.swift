@@ -1,21 +1,25 @@
 import Foundation
 
+
+
 // lexicon: 1, id: blue.catbird.mls.getPendingDeviceAdditions
 
-public enum BlueCatbirdMlsGetPendingDeviceAdditions {
-    public static let typeIdentifier = "blue.catbird.mls.getPendingDeviceAdditions"
 
-    public struct PendingDeviceAddition: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "blue.catbird.mls.getPendingDeviceAdditions#pendingDeviceAddition"
-        public let id: String
-        public let convoId: String
-        public let userDid: DID
-        public let deviceId: String
-        public let deviceName: String?
-        public let deviceCredentialDid: String
-        public let status: String
-        public let claimedBy: DID?
-        public let createdAt: ATProtocolDate
+public struct BlueCatbirdMlsGetPendingDeviceAdditions { 
+
+    public static let typeIdentifier = "blue.catbird.mls.getPendingDeviceAdditions"
+        
+public struct PendingDeviceAddition: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "blue.catbird.mls.getPendingDeviceAdditions#pendingDeviceAddition"
+            public let id: String
+            public let convoId: String
+            public let userDid: DID
+            public let deviceId: String
+            public let deviceName: String?
+            public let deviceCredentialDid: String
+            public let status: String
+            public let claimedBy: DID?
+            public let createdAt: ATProtocolDate
 
         public init(
             id: String, convoId: String, userDid: DID, deviceId: String, deviceName: String?, deviceCredentialDid: String, status: String, claimedBy: DID?, createdAt: ATProtocolDate
@@ -34,55 +38,55 @@ public enum BlueCatbirdMlsGetPendingDeviceAdditions {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                id = try container.decode(String.self, forKey: .id)
+                self.id = try container.decode(String.self, forKey: .id)
             } catch {
                 LogManager.logError("Decoding error for required property 'id': \(error)")
                 throw error
             }
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                self.convoId = try container.decode(String.self, forKey: .convoId)
             } catch {
                 LogManager.logError("Decoding error for required property 'convoId': \(error)")
                 throw error
             }
             do {
-                userDid = try container.decode(DID.self, forKey: .userDid)
+                self.userDid = try container.decode(DID.self, forKey: .userDid)
             } catch {
                 LogManager.logError("Decoding error for required property 'userDid': \(error)")
                 throw error
             }
             do {
-                deviceId = try container.decode(String.self, forKey: .deviceId)
+                self.deviceId = try container.decode(String.self, forKey: .deviceId)
             } catch {
                 LogManager.logError("Decoding error for required property 'deviceId': \(error)")
                 throw error
             }
             do {
-                deviceName = try container.decodeIfPresent(String.self, forKey: .deviceName)
+                self.deviceName = try container.decodeIfPresent(String.self, forKey: .deviceName)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'deviceName': \(error)")
                 throw error
             }
             do {
-                deviceCredentialDid = try container.decode(String.self, forKey: .deviceCredentialDid)
+                self.deviceCredentialDid = try container.decode(String.self, forKey: .deviceCredentialDid)
             } catch {
                 LogManager.logError("Decoding error for required property 'deviceCredentialDid': \(error)")
                 throw error
             }
             do {
-                status = try container.decode(String.self, forKey: .status)
+                self.status = try container.decode(String.self, forKey: .status)
             } catch {
                 LogManager.logError("Decoding error for required property 'status': \(error)")
                 throw error
             }
             do {
-                claimedBy = try container.decodeIfPresent(DID.self, forKey: .claimedBy)
+                self.claimedBy = try container.decodeIfPresent(DID.self, forKey: .claimedBy)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'claimedBy': \(error)")
                 throw error
             }
             do {
-                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+                self.createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
             } catch {
                 LogManager.logError("Decoding error for required property 'createdAt': \(error)")
                 throw error
@@ -199,86 +203,117 @@ public enum BlueCatbirdMlsGetPendingDeviceAdditions {
             case claimedBy
             case createdAt
         }
-    }
-
-    public struct Parameters: Parametrizable {
+    }    
+public struct Parameters: Parametrizable {
         public let convoIds: [String]?
         public let limit: Int?
-
+        
         public init(
-            convoIds: [String]? = nil,
+            convoIds: [String]? = nil, 
             limit: Int? = nil
-        ) {
+            ) {
             self.convoIds = convoIds
             self.limit = limit
+            
         }
     }
-
-    public struct Output: ATProtocolCodable {
+    
+public struct Output: ATProtocolCodable {
+        
+        
         public let pendingAdditions: [PendingDeviceAddition]
-
-        /// Standard public initializer
+        
+        
+        
+        // Standard public initializer
         public init(
+            
+            
             pendingAdditions: [PendingDeviceAddition]
-
+            
+            
         ) {
+            
+            
             self.pendingAdditions = pendingAdditions
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
-            pendingAdditions = try container.decode([PendingDeviceAddition].self, forKey: .pendingAdditions)
+            
+            self.pendingAdditions = try container.decode([PendingDeviceAddition].self, forKey: .pendingAdditions)
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
+            
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
             try container.encode(pendingAdditions, forKey: .pendingAdditions)
+            
+            
         }
 
         public func toCBORValue() throws -> Any {
+            
             var map = OrderedCBORMap()
 
+            
+            
             let pendingAdditionsValue = try pendingAdditions.toCBORValue()
             map = map.adding(key: "pendingAdditions", value: pendingAdditionsValue)
+            
+            
 
             return map
+            
         }
-
+        
+        
         private enum CodingKeys: String, CodingKey {
             case pendingAdditions
         }
+        
     }
+        
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                case unauthorized = "Unauthorized.Authentication required"
+            public var description: String {
+                return self.rawValue
+            }
 
-    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-        case unauthorized = "Unauthorized.Authentication required"
-        public var description: String {
-            return rawValue
+            public var errorName: String {
+                // Extract just the error name from the raw value
+                let parts = self.rawValue.split(separator: ".")
+                return String(parts.first ?? "")
+            }
         }
 
-        public var errorName: String {
-            // Extract just the error name from the raw value
-            let parts = rawValue.split(separator: ".")
-            return String(parts.first ?? "")
-        }
-    }
+
+
 }
 
-public extension ATProtoClient.Blue.Catbird.Mls {
+
+
+extension ATProtoClient.Blue.Catbird.Mls {
     // MARK: - getPendingDeviceAdditions
 
     /// Get pending device additions for conversations (polling fallback for SSE) Returns pending device additions for conversations where caller is a member. Used as fallback when SSE events are missed.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-    ///
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    func getPendingDeviceAdditions(input: BlueCatbirdMlsGetPendingDeviceAdditions.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsGetPendingDeviceAdditions.Output?) {
+    public func getPendingDeviceAdditions(input: BlueCatbirdMlsGetPendingDeviceAdditions.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsGetPendingDeviceAdditions.Output?) {
         let endpoint = "blue.catbird.mls.getPendingDeviceAdditions"
 
+        
         let queryItems = input.asQueryItems()
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -302,11 +337,12 @@ public extension ATProtoClient.Blue.Catbird.Mls {
         }
 
         // Only decode response data if request was successful
-        if (200 ... 299).contains(responseCode) {
+        if (200...299).contains(responseCode) {
             do {
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsGetPendingDeviceAdditions.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -314,9 +350,12 @@ public extension ATProtoClient.Blue.Catbird.Mls {
                 return (responseCode, nil)
             }
         } else {
+            
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
+                           
+

@@ -1,14 +1,18 @@
 import Foundation
 
+
+
 // lexicon: 1, id: com.atproto.server.createInviteCodes
 
-public enum ComAtprotoServerCreateInviteCodes {
-    public static let typeIdentifier = "com.atproto.server.createInviteCodes"
 
-    public struct AccountCodes: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "com.atproto.server.createInviteCodes#accountCodes"
-        public let account: String
-        public let codes: [String]
+public struct ComAtprotoServerCreateInviteCodes { 
+
+    public static let typeIdentifier = "com.atproto.server.createInviteCodes"
+        
+public struct AccountCodes: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "com.atproto.server.createInviteCodes#accountCodes"
+            public let account: String
+            public let codes: [String]
 
         public init(
             account: String, codes: [String]
@@ -20,13 +24,13 @@ public enum ComAtprotoServerCreateInviteCodes {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                account = try container.decode(String.self, forKey: .account)
+                self.account = try container.decode(String.self, forKey: .account)
             } catch {
                 LogManager.logError("Decoding error for required property 'account': \(error)")
                 throw error
             }
             do {
-                codes = try container.decode([String].self, forKey: .codes)
+                self.codes = try container.decode([String].self, forKey: .codes)
             } catch {
                 LogManager.logError("Decoding error for required property 'codes': \(error)")
                 throw error
@@ -76,8 +80,7 @@ public enum ComAtprotoServerCreateInviteCodes {
             case codes
         }
     }
-
-    public struct Input: ATProtocolCodable {
+public struct Input: ATProtocolCodable {
         public let codeCount: Int
         public let useCount: Int
         public let forAccounts: [DID]?
@@ -88,12 +91,13 @@ public enum ComAtprotoServerCreateInviteCodes {
             self.useCount = useCount
             self.forAccounts = forAccounts
         }
+        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            codeCount = try container.decode(Int.self, forKey: .codeCount)
-            useCount = try container.decode(Int.self, forKey: .useCount)
-            forAccounts = try container.decodeIfPresent([DID].self, forKey: .forAccounts)
+            self.codeCount = try container.decode(Int.self, forKey: .codeCount)
+            self.useCount = try container.decode(Int.self, forKey: .useCount)
+            self.forAccounts = try container.decodeIfPresent([DID].self, forKey: .forAccounts)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -122,65 +126,98 @@ public enum ComAtprotoServerCreateInviteCodes {
             case forAccounts
         }
     }
-
-    public struct Output: ATProtocolCodable {
+    
+public struct Output: ATProtocolCodable {
+        
+        
         public let codes: [AccountCodes]
-
-        /// Standard public initializer
+        
+        
+        
+        // Standard public initializer
         public init(
+            
+            
             codes: [AccountCodes]
-
+            
+            
         ) {
+            
+            
             self.codes = codes
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
-            codes = try container.decode([AccountCodes].self, forKey: .codes)
+            
+            self.codes = try container.decode([AccountCodes].self, forKey: .codes)
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
+            
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
             try container.encode(codes, forKey: .codes)
+            
+            
         }
 
         public func toCBORValue() throws -> Any {
+            
             var map = OrderedCBORMap()
 
+            
+            
             let codesValue = try codes.toCBORValue()
             map = map.adding(key: "codes", value: codesValue)
+            
+            
 
             return map
+            
         }
-
+        
+        
         private enum CodingKeys: String, CodingKey {
             case codes
         }
+        
     }
+
+
+
+
 }
 
-public extension ATProtoClient.Com.Atproto.Server {
+extension ATProtoClient.Com.Atproto.Server {
     // MARK: - createInviteCodes
 
     /// Create invite codes.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-    ///
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    func createInviteCodes(
+    public func createInviteCodes(
+        
         input: ComAtprotoServerCreateInviteCodes.Input
-
+        
     ) async throws -> (responseCode: Int, data: ComAtprotoServerCreateInviteCodes.Output?) {
         let endpoint = "com.atproto.server.createInviteCodes"
-
+        
         var headers: [String: String] = [:]
-
+        
         headers["Content-Type"] = "application/json"
-
+        
+        
+        
         headers["Accept"] = "application/json"
+        
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -197,6 +234,7 @@ public extension ATProtoClient.Com.Atproto.Server {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
+        
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
@@ -206,11 +244,12 @@ public extension ATProtoClient.Com.Atproto.Server {
         }
 
         // Only decode response data if request was successful
-        if (200 ... 299).contains(responseCode) {
+        if (200...299).contains(responseCode) {
             do {
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(ComAtprotoServerCreateInviteCodes.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -221,5 +260,9 @@ public extension ATProtoClient.Com.Atproto.Server {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
+        
     }
+    
 }
+                           
+

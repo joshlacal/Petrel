@@ -1,14 +1,18 @@
 import Foundation
 
+
+
 // lexicon: 1, id: com.atproto.admin.defs
 
-public enum ComAtprotoAdminDefs {
-    public static let typeIdentifier = "com.atproto.admin.defs"
 
-    public struct StatusAttr: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "com.atproto.admin.defs#statusAttr"
-        public let applied: Bool
-        public let ref: String?
+public struct ComAtprotoAdminDefs { 
+
+    public static let typeIdentifier = "com.atproto.admin.defs"
+        
+public struct StatusAttr: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "com.atproto.admin.defs#statusAttr"
+            public let applied: Bool
+            public let ref: String?
 
         public init(
             applied: Bool, ref: String?
@@ -20,13 +24,13 @@ public enum ComAtprotoAdminDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                applied = try container.decode(Bool.self, forKey: .applied)
+                self.applied = try container.decode(Bool.self, forKey: .applied)
             } catch {
                 LogManager.logError("Decoding error for required property 'applied': \(error)")
                 throw error
             }
             do {
-                ref = try container.decodeIfPresent(String.self, forKey: .ref)
+                self.ref = try container.decodeIfPresent(String.self, forKey: .ref)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'ref': \(error)")
                 throw error
@@ -82,21 +86,21 @@ public enum ComAtprotoAdminDefs {
             case ref
         }
     }
-
-    public struct AccountView: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "com.atproto.admin.defs#accountView"
-        public let did: DID
-        public let handle: Handle
-        public let email: String?
-        public let relatedRecords: [ATProtocolValueContainer]?
-        public let indexedAt: ATProtocolDate
-        public let invitedBy: ComAtprotoServerDefs.InviteCode?
-        public let invites: [ComAtprotoServerDefs.InviteCode]?
-        public let invitesDisabled: Bool?
-        public let emailConfirmedAt: ATProtocolDate?
-        public let inviteNote: String?
-        public let deactivatedAt: ATProtocolDate?
-        public let threatSignatures: [ThreatSignature]?
+        
+public struct AccountView: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "com.atproto.admin.defs#accountView"
+            public let did: DID
+            public let handle: Handle
+            public let email: String?
+            public let relatedRecords: [ATProtocolValueContainer]?
+            public let indexedAt: ATProtocolDate
+            public let invitedBy: ComAtprotoServerDefs.InviteCode?
+            public let invites: [ComAtprotoServerDefs.InviteCode]?
+            public let invitesDisabled: Bool?
+            public let emailConfirmedAt: ATProtocolDate?
+            public let inviteNote: String?
+            public let deactivatedAt: ATProtocolDate?
+            public let threatSignatures: [ThreatSignature]?
 
         public init(
             did: DID, handle: Handle, email: String?, relatedRecords: [ATProtocolValueContainer]?, indexedAt: ATProtocolDate, invitedBy: ComAtprotoServerDefs.InviteCode?, invites: [ComAtprotoServerDefs.InviteCode]?, invitesDisabled: Bool?, emailConfirmedAt: ATProtocolDate?, inviteNote: String?, deactivatedAt: ATProtocolDate?, threatSignatures: [ThreatSignature]?
@@ -118,73 +122,73 @@ public enum ComAtprotoAdminDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                did = try container.decode(DID.self, forKey: .did)
+                self.did = try container.decode(DID.self, forKey: .did)
             } catch {
                 LogManager.logError("Decoding error for required property 'did': \(error)")
                 throw error
             }
             do {
-                handle = try container.decode(Handle.self, forKey: .handle)
+                self.handle = try container.decode(Handle.self, forKey: .handle)
             } catch {
                 LogManager.logError("Decoding error for required property 'handle': \(error)")
                 throw error
             }
             do {
-                email = try container.decodeIfPresent(String.self, forKey: .email)
+                self.email = try container.decodeIfPresent(String.self, forKey: .email)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'email': \(error)")
                 throw error
             }
             do {
-                relatedRecords = try container.decodeIfPresent([ATProtocolValueContainer].self, forKey: .relatedRecords)
+                self.relatedRecords = try container.decodeIfPresent([ATProtocolValueContainer].self, forKey: .relatedRecords)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'relatedRecords': \(error)")
                 throw error
             }
             do {
-                indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
+                self.indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
             } catch {
                 LogManager.logError("Decoding error for required property 'indexedAt': \(error)")
                 throw error
             }
             do {
-                invitedBy = try container.decodeIfPresent(ComAtprotoServerDefs.InviteCode.self, forKey: .invitedBy)
+                self.invitedBy = try container.decodeIfPresent(ComAtprotoServerDefs.InviteCode.self, forKey: .invitedBy)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'invitedBy': \(error)")
                 throw error
             }
             do {
-                invites = try container.decodeIfPresent([ComAtprotoServerDefs.InviteCode].self, forKey: .invites)
+                self.invites = try container.decodeIfPresent([ComAtprotoServerDefs.InviteCode].self, forKey: .invites)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'invites': \(error)")
                 throw error
             }
             do {
-                invitesDisabled = try container.decodeIfPresent(Bool.self, forKey: .invitesDisabled)
+                self.invitesDisabled = try container.decodeIfPresent(Bool.self, forKey: .invitesDisabled)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'invitesDisabled': \(error)")
                 throw error
             }
             do {
-                emailConfirmedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .emailConfirmedAt)
+                self.emailConfirmedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .emailConfirmedAt)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'emailConfirmedAt': \(error)")
                 throw error
             }
             do {
-                inviteNote = try container.decodeIfPresent(String.self, forKey: .inviteNote)
+                self.inviteNote = try container.decodeIfPresent(String.self, forKey: .inviteNote)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'inviteNote': \(error)")
                 throw error
             }
             do {
-                deactivatedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .deactivatedAt)
+                self.deactivatedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .deactivatedAt)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'deactivatedAt': \(error)")
                 throw error
             }
             do {
-                threatSignatures = try container.decodeIfPresent([ThreatSignature].self, forKey: .threatSignatures)
+                self.threatSignatures = try container.decodeIfPresent([ThreatSignature].self, forKey: .threatSignatures)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'threatSignatures': \(error)")
                 throw error
@@ -368,10 +372,10 @@ public enum ComAtprotoAdminDefs {
             case threatSignatures
         }
     }
-
-    public struct RepoRef: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "com.atproto.admin.defs#repoRef"
-        public let did: DID
+        
+public struct RepoRef: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "com.atproto.admin.defs#repoRef"
+            public let did: DID
 
         public init(
             did: DID
@@ -382,7 +386,7 @@ public enum ComAtprotoAdminDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                did = try container.decode(DID.self, forKey: .did)
+                self.did = try container.decode(DID.self, forKey: .did)
             } catch {
                 LogManager.logError("Decoding error for required property 'did': \(error)")
                 throw error
@@ -424,12 +428,12 @@ public enum ComAtprotoAdminDefs {
             case did
         }
     }
-
-    public struct RepoBlobRef: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "com.atproto.admin.defs#repoBlobRef"
-        public let did: DID
-        public let cid: CID
-        public let recordUri: ATProtocolURI?
+        
+public struct RepoBlobRef: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "com.atproto.admin.defs#repoBlobRef"
+            public let did: DID
+            public let cid: CID
+            public let recordUri: ATProtocolURI?
 
         public init(
             did: DID, cid: CID, recordUri: ATProtocolURI?
@@ -442,19 +446,19 @@ public enum ComAtprotoAdminDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                did = try container.decode(DID.self, forKey: .did)
+                self.did = try container.decode(DID.self, forKey: .did)
             } catch {
                 LogManager.logError("Decoding error for required property 'did': \(error)")
                 throw error
             }
             do {
-                cid = try container.decode(CID.self, forKey: .cid)
+                self.cid = try container.decode(CID.self, forKey: .cid)
             } catch {
                 LogManager.logError("Decoding error for required property 'cid': \(error)")
                 throw error
             }
             do {
-                recordUri = try container.decodeIfPresent(ATProtocolURI.self, forKey: .recordUri)
+                self.recordUri = try container.decodeIfPresent(ATProtocolURI.self, forKey: .recordUri)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'recordUri': \(error)")
                 throw error
@@ -518,11 +522,11 @@ public enum ComAtprotoAdminDefs {
             case recordUri
         }
     }
-
-    public struct ThreatSignature: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "com.atproto.admin.defs#threatSignature"
-        public let property: String
-        public let value: String
+        
+public struct ThreatSignature: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "com.atproto.admin.defs#threatSignature"
+            public let property: String
+            public let value: String
 
         public init(
             property: String, value: String
@@ -534,13 +538,13 @@ public enum ComAtprotoAdminDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                property = try container.decode(String.self, forKey: .property)
+                self.property = try container.decode(String.self, forKey: .property)
             } catch {
                 LogManager.logError("Decoding error for required property 'property': \(error)")
                 throw error
             }
             do {
-                value = try container.decode(String.self, forKey: .value)
+                self.value = try container.decode(String.self, forKey: .value)
             } catch {
                 LogManager.logError("Decoding error for required property 'value': \(error)")
                 throw error
@@ -590,4 +594,11 @@ public enum ComAtprotoAdminDefs {
             case value
         }
     }
+
+
+
 }
+
+
+                           
+
