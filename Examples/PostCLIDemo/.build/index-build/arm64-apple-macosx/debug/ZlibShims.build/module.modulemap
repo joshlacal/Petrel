@@ -1,4 +1,0 @@
-module ZlibShims {
-    umbrella "/Users/joshlacalamito/Developer/Catbird+Petrel/Petrel/Examples/PostCLIDemo/.build/index-build/checkouts/zlib/Sources/ZlibShims/include"
-    export *
-}

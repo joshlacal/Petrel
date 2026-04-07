@@ -1,4 +1,0 @@
-module secp256k1_bindings {
-    umbrella "/Users/joshlacalamito/Developer/Catbird+Petrel/Petrel/Examples/PostCLIDemo/.build/index-build/checkouts/secp256k1.swift/Sources/secp256k1_bindings/include"
-    export *
-}

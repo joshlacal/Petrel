@@ -17,3 +17,4 @@ __pycache__/
 .venv/
 venv/
 Examples/PostCLIDemo/.build/PetrelTemplate/.build/
+.build/

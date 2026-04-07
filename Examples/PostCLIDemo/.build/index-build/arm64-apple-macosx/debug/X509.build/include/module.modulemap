@@ -1,3 +1,0 @@
-module X509 {
-    header "/Users/joshlacalamito/Developer/Catbird+Petrel/Petrel/Examples/PostCLIDemo/.build/index-build/arm64-apple-macosx/debug/X509.build/include/X509-Swift.h"
-}

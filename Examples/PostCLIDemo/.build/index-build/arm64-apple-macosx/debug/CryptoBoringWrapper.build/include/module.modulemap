@@ -1,3 +1,0 @@
-module CryptoBoringWrapper {
-    header "/Users/joshlacalamito/Developer/Catbird+Petrel/Petrel/Examples/PostCLIDemo/.build/index-build/arm64-apple-macosx/debug/CryptoBoringWrapper.build/include/CryptoBoringWrapper-Swift.h"
-}
