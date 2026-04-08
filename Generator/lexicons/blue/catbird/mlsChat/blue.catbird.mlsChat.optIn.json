@@ -51,6 +51,18 @@
                 "ref": "#optInStatus"
               },
               "description": "Array of opt-in statuses (for getStatus action)"
+            },
+            "allowFollowersBypass": {
+              "type": "boolean",
+              "description": "Whether followers can bypass chat request approval"
+            },
+            "allowFollowingBypass": {
+              "type": "boolean",
+              "description": "Whether users being followed can bypass chat request approval"
+            },
+            "autoExpireDays": {
+              "type": "integer",
+              "description": "Number of days after which unanswered chat requests auto-expire"
             }
           }
         }
