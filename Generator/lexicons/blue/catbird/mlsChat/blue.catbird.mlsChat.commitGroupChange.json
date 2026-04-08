@@ -54,6 +54,14 @@
             "pendingAdditionId": {
               "type": "string",
               "description": "ID of the pending addition to claim (for claimPending action)"
+            },
+            "keyPackageHashes": {
+              "type": "array",
+              "items": {
+                "type": "ref",
+                "ref": "#keyPackageHashEntry"
+              },
+              "description": "Array of {did, hash} objects mapping each member to their key package hash. Required for multi-device support."
             }
           }
         }
@@ -113,6 +121,54 @@
         {
           "name": "Conflict",
           "description": "Conflicting group state (e.g., epoch mismatch)"
+        },
+        {
+          "name": "ConvoNotFound",
+          "description": "Conversation not found"
+        },
+        {
+          "name": "NotMember",
+          "description": "User is not a member of this conversation"
+        },
+        {
+          "name": "AlreadyMember",
+          "description": "User is already a member of this conversation"
+        },
+        {
+          "name": "KeyPackageNotFound",
+          "description": "Key package not found for one or more members"
+        },
+        {
+          "name": "TooManyMembers",
+          "description": "Adding these members would exceed the maximum group size"
+        },
+        {
+          "name": "BlockedByMember",
+          "description": "Action blocked by a member's block list"
+        },
+        {
+          "name": "InvalidAction",
+          "description": "The specified action is not valid"
+        },
+        {
+          "name": "InvalidCommit",
+          "description": "The MLS commit message is invalid"
+        },
+        {
+          "name": "InvalidGroupInfo",
+          "description": "The MLS group info is invalid"
+        },
+        {
+          "name": "PendingAdditionNotFound",
+          "description": "The specified pending addition was not found"
+        },
+        {
+          "name": "PendingAdditionAlreadyClaimed",
+          "description": "The pending addition has already been claimed by another device"
+        },
+        {
+          "name": "Unauthorized",
+          "description": "User is not authorized for this action"
         }
       ]
     },
@@ -142,6 +198,11 @@
           "type": "string",
           "description": "Full device credential DID"
         },
+        "status": {
+          "type": "string",
+          "description": "Current status of the pending addition",
+          "knownValues": ["pending", "in_progress", "completed"]
+        },
         "createdAt": {
           "type": "string",
           "format": "datetime",
@@ -156,6 +217,22 @@
           "type": "string",
           "format": "datetime",
           "description": "When the addition was claimed"
+        }
+      }
+    },
+    "keyPackageHashEntry": {
+      "type": "object",
+      "description": "Maps a DID to the key package hash used for their Welcome message",
+      "required": ["did", "hash"],
+      "properties": {
+        "did": {
+          "type": "string",
+          "format": "did",
+          "description": "DID of the member"
+        },
+        "hash": {
+          "type": "string",
+          "description": "Hex-encoded SHA-256 hash of the key package used"
         }
       }
     }

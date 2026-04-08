@@ -16,18 +16,20 @@ public struct PendingDeviceAddition: ATProtocolCodable, ATProtocolValue {
             public let userDid: DID
             public let deviceId: String
             public let deviceCredentialDid: String?
+            public let status: String?
             public let createdAt: ATProtocolDate?
             public let claimedBy: DID?
             public let claimedAt: ATProtocolDate?
 
         public init(
-            id: String, convoId: String, userDid: DID, deviceId: String, deviceCredentialDid: String?, createdAt: ATProtocolDate?, claimedBy: DID?, claimedAt: ATProtocolDate?
+            id: String, convoId: String, userDid: DID, deviceId: String, deviceCredentialDid: String?, status: String?, createdAt: ATProtocolDate?, claimedBy: DID?, claimedAt: ATProtocolDate?
         ) {
             self.id = id
             self.convoId = convoId
             self.userDid = userDid
             self.deviceId = deviceId
             self.deviceCredentialDid = deviceCredentialDid
+            self.status = status
             self.createdAt = createdAt
             self.claimedBy = claimedBy
             self.claimedAt = claimedAt
@@ -66,6 +68,12 @@ public struct PendingDeviceAddition: ATProtocolCodable, ATProtocolValue {
                 throw error
             }
             do {
+                self.status = try container.decodeIfPresent(String.self, forKey: .status)
+            } catch {
+                LogManager.logDebug("Decoding error for optional property 'status': \(error)")
+                throw error
+            }
+            do {
                 self.createdAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .createdAt)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'createdAt': \(error)")
@@ -93,6 +101,7 @@ public struct PendingDeviceAddition: ATProtocolCodable, ATProtocolValue {
             try container.encode(userDid, forKey: .userDid)
             try container.encode(deviceId, forKey: .deviceId)
             try container.encodeIfPresent(deviceCredentialDid, forKey: .deviceCredentialDid)
+            try container.encodeIfPresent(status, forKey: .status)
             try container.encodeIfPresent(createdAt, forKey: .createdAt)
             try container.encodeIfPresent(claimedBy, forKey: .claimedBy)
             try container.encodeIfPresent(claimedAt, forKey: .claimedAt)
@@ -104,6 +113,11 @@ public struct PendingDeviceAddition: ATProtocolCodable, ATProtocolValue {
             hasher.combine(userDid)
             hasher.combine(deviceId)
             if let value = deviceCredentialDid {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = status {
                 hasher.combine(value)
             } else {
                 hasher.combine(nil as Int?)
@@ -142,6 +156,9 @@ public struct PendingDeviceAddition: ATProtocolCodable, ATProtocolValue {
             if deviceCredentialDid != other.deviceCredentialDid {
                 return false
             }
+            if status != other.status {
+                return false
+            }
             if createdAt != other.createdAt {
                 return false
             }
@@ -173,6 +190,10 @@ public struct PendingDeviceAddition: ATProtocolCodable, ATProtocolValue {
                 let deviceCredentialDidValue = try value.toCBORValue()
                 map = map.adding(key: "deviceCredentialDid", value: deviceCredentialDidValue)
             }
+            if let value = status {
+                let statusValue = try value.toCBORValue()
+                map = map.adding(key: "status", value: statusValue)
+            }
             if let value = createdAt {
                 let createdAtValue = try value.toCBORValue()
                 map = map.adding(key: "createdAt", value: createdAtValue)
@@ -195,9 +216,82 @@ public struct PendingDeviceAddition: ATProtocolCodable, ATProtocolValue {
             case userDid
             case deviceId
             case deviceCredentialDid
+            case status
             case createdAt
             case claimedBy
             case claimedAt
+        }
+    }
+        
+public struct KeyPackageHashEntry: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "blue.catbird.mlsChat.commitGroupChange#keyPackageHashEntry"
+            public let did: DID
+            public let hash: String
+
+        public init(
+            did: DID, hash: String
+        ) {
+            self.did = did
+            self.hash = hash
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                self.did = try container.decode(DID.self, forKey: .did)
+            } catch {
+                LogManager.logError("Decoding error for required property 'did': \(error)")
+                throw error
+            }
+            do {
+                self.hash = try container.decode(String.self, forKey: .hash)
+            } catch {
+                LogManager.logError("Decoding error for required property 'hash': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            try container.encode(did, forKey: .did)
+            try container.encode(hash, forKey: .hash)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(did)
+            hasher.combine(hash)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+            if did != other.did {
+                return false
+            }
+            if hash != other.hash {
+                return false
+            }
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            let didValue = try did.toCBORValue()
+            map = map.adding(key: "did", value: didValue)
+            let hashValue = try hash.toCBORValue()
+            map = map.adding(key: "hash", value: hashValue)
+            return map
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case did
+            case hash
         }
     }
 public struct Input: ATProtocolCodable {
@@ -211,9 +305,10 @@ public struct Input: ATProtocolCodable {
         public let confirmationTag: String?
         public let idempotencyKey: String?
         public let pendingAdditionId: String?
+        public let keyPackageHashes: [KeyPackageHashEntry]?
 
         /// Standard public initializer
-        public init(convoId: String, action: String, memberDids: [String]? = nil, commit: Bytes? = nil, welcome: Bytes? = nil, groupInfo: Bytes? = nil, externalCommit: Bytes? = nil, confirmationTag: String? = nil, idempotencyKey: String? = nil, pendingAdditionId: String? = nil) {
+        public init(convoId: String, action: String, memberDids: [String]? = nil, commit: Bytes? = nil, welcome: Bytes? = nil, groupInfo: Bytes? = nil, externalCommit: Bytes? = nil, confirmationTag: String? = nil, idempotencyKey: String? = nil, pendingAdditionId: String? = nil, keyPackageHashes: [KeyPackageHashEntry]? = nil) {
             self.convoId = convoId
             self.action = action
             self.memberDids = memberDids
@@ -224,6 +319,7 @@ public struct Input: ATProtocolCodable {
             self.confirmationTag = confirmationTag
             self.idempotencyKey = idempotencyKey
             self.pendingAdditionId = pendingAdditionId
+            self.keyPackageHashes = keyPackageHashes
         }
         
 
@@ -239,6 +335,7 @@ public struct Input: ATProtocolCodable {
             self.confirmationTag = try container.decodeIfPresent(String.self, forKey: .confirmationTag)
             self.idempotencyKey = try container.decodeIfPresent(String.self, forKey: .idempotencyKey)
             self.pendingAdditionId = try container.decodeIfPresent(String.self, forKey: .pendingAdditionId)
+            self.keyPackageHashes = try container.decodeIfPresent([KeyPackageHashEntry].self, forKey: .keyPackageHashes)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -253,6 +350,7 @@ public struct Input: ATProtocolCodable {
             try container.encodeIfPresent(confirmationTag, forKey: .confirmationTag)
             try container.encodeIfPresent(idempotencyKey, forKey: .idempotencyKey)
             try container.encodeIfPresent(pendingAdditionId, forKey: .pendingAdditionId)
+            try container.encodeIfPresent(keyPackageHashes, forKey: .keyPackageHashes)
         }
 
         public func toCBORValue() throws -> Any {
@@ -293,6 +391,10 @@ public struct Input: ATProtocolCodable {
                 let pendingAdditionIdValue = try value.toCBORValue()
                 map = map.adding(key: "pendingAdditionId", value: pendingAdditionIdValue)
             }
+            if let value = keyPackageHashes {
+                let keyPackageHashesValue = try value.toCBORValue()
+                map = map.adding(key: "keyPackageHashes", value: keyPackageHashesValue)
+            }
             return map
         }
 
@@ -307,6 +409,7 @@ public struct Input: ATProtocolCodable {
             case confirmationTag
             case idempotencyKey
             case pendingAdditionId
+            case keyPackageHashes
         }
     }
     
@@ -487,6 +590,18 @@ public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertibl
                 case authRequired = "AuthRequired.Authentication required"
                 case forbidden = "Forbidden.User does not have permission for this action"
                 case conflict = "Conflict.Conflicting group state (e.g., epoch mismatch)"
+                case convoNotFound = "ConvoNotFound.Conversation not found"
+                case notMember = "NotMember.User is not a member of this conversation"
+                case alreadyMember = "AlreadyMember.User is already a member of this conversation"
+                case keyPackageNotFound = "KeyPackageNotFound.Key package not found for one or more members"
+                case tooManyMembers = "TooManyMembers.Adding these members would exceed the maximum group size"
+                case blockedByMember = "BlockedByMember.Action blocked by a member's block list"
+                case invalidAction = "InvalidAction.The specified action is not valid"
+                case invalidCommit = "InvalidCommit.The MLS commit message is invalid"
+                case invalidGroupInfo = "InvalidGroupInfo.The MLS group info is invalid"
+                case pendingAdditionNotFound = "PendingAdditionNotFound.The specified pending addition was not found"
+                case pendingAdditionAlreadyClaimed = "PendingAdditionAlreadyClaimed.The pending addition has already been claimed by another device"
+                case unauthorized = "Unauthorized.User is not authorized for this action"
             public var description: String {
                 return self.rawValue
             }

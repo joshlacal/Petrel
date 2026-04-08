@@ -9,7 +9,6 @@
         "encoding": "application/json",
         "schema": {
           "type": "object",
-          "required": ["keyPackages"],
           "properties": {
             "keyPackages": {
               "type": "array",
@@ -20,6 +19,11 @@
                 "type": "ref",
                 "ref": "#keyPackageItem"
               }
+            },
+            "action": {
+              "type": "string",
+              "description": "Action to perform. If omitted, publishes key packages.",
+              "knownValues": ["publish", "stats", "requestReplenish"]
             }
           }
         }
@@ -28,7 +32,7 @@
         "encoding": "application/json",
         "schema": {
           "type": "object",
-          "required": ["succeeded", "failed"],
+          "required": ["succeeded", "failed", "stats"],
           "properties": {
             "succeeded": {
               "type": "integer",

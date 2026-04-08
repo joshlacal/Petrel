@@ -38,9 +38,13 @@
             "#groupInfoRefreshRequestedEvent",
             "#readditionRequestedEvent",
             "#membershipChangeEvent",
+            "#memberJoined",
+            "#memberLeft",
+            "#epochAdvanced",
+            "#conversationUpdated",
             "#readEvent",
             "#groupResetEvent",
-            "#treeChangedEvent"
+            "#treeChanged"
           ]
         }
       }
@@ -67,7 +71,7 @@
     "reactionEvent": {
       "type": "object",
       "description": "Event for a reaction added or removed",
-      "required": ["cursor", "convoId", "messageId", "did", "emoji", "action"],
+      "required": ["cursor", "convoId", "messageId", "did", "emoji", "reaction", "action"],
       "properties": {
         "cursor": {
           "type": "string",
@@ -87,6 +91,10 @@
           "description": "DID of the user who performed the reaction"
         },
         "emoji": {
+          "type": "string",
+          "description": "Emoji content of the reaction (alias for reaction)"
+        },
+        "reaction": {
           "type": "string",
           "description": "Emoji content of the reaction"
         },
@@ -325,7 +333,7 @@
         }
       }
     },
-    "treeChangedEvent": {
+    "treeChanged": {
       "type": "object",
       "description": "Event indicating the MLS ratchet tree has changed (commit processed)",
       "required": ["cursor", "convoId", "confirmationTag", "epoch"],
@@ -345,6 +353,102 @@
         "epoch": {
           "type": "integer",
           "description": "New epoch after the tree change"
+        }
+      }
+    },
+    "memberJoined": {
+      "type": "object",
+      "description": "Event indicating a member joined the conversation",
+      "required": ["cursor", "convoId", "did"],
+      "properties": {
+        "cursor": {
+          "type": "string",
+          "description": "Resume cursor for this event position"
+        },
+        "convoId": {
+          "type": "string",
+          "description": "Conversation identifier"
+        },
+        "did": {
+          "type": "string",
+          "format": "did",
+          "description": "DID of the member who joined"
+        },
+        "epoch": {
+          "type": "integer",
+          "description": "New epoch after this change"
+        }
+      }
+    },
+    "memberLeft": {
+      "type": "object",
+      "description": "Event indicating a member left or was removed from the conversation",
+      "required": ["cursor", "convoId", "did"],
+      "properties": {
+        "cursor": {
+          "type": "string",
+          "description": "Resume cursor for this event position"
+        },
+        "convoId": {
+          "type": "string",
+          "description": "Conversation identifier"
+        },
+        "did": {
+          "type": "string",
+          "format": "did",
+          "description": "DID of the member who left"
+        },
+        "action": {
+          "type": "string",
+          "description": "Action performed",
+          "knownValues": ["left", "removed", "kicked"]
+        },
+        "actor": {
+          "type": "string",
+          "format": "did",
+          "description": "DID of the actor who performed the removal (for removed/kicked)"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Optional reason for removal"
+        },
+        "epoch": {
+          "type": "integer",
+          "description": "New epoch after this change"
+        }
+      }
+    },
+    "epochAdvanced": {
+      "type": "object",
+      "description": "Event indicating the MLS epoch has advanced",
+      "required": ["cursor", "convoId", "epoch"],
+      "properties": {
+        "cursor": {
+          "type": "string",
+          "description": "Resume cursor for this event position"
+        },
+        "convoId": {
+          "type": "string",
+          "description": "Conversation identifier"
+        },
+        "epoch": {
+          "type": "integer",
+          "description": "New epoch number"
+        }
+      }
+    },
+    "conversationUpdated": {
+      "type": "object",
+      "description": "Event indicating conversation metadata was updated",
+      "required": ["cursor", "convoId"],
+      "properties": {
+        "cursor": {
+          "type": "string",
+          "description": "Resume cursor for this event position"
+        },
+        "convoId": {
+          "type": "string",
+          "description": "Conversation identifier"
         }
       }
     }
