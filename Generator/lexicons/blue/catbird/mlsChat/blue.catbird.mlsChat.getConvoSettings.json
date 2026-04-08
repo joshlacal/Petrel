@@ -1,0 +1,42 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mlsChat.getConvoSettings",
+  "description": "Get conversation settings and policy",
+  "defs": {
+    "main": {
+      "type": "query",
+      "description": "Retrieve current settings and policy for a conversation.",
+      "parameters": {
+        "type": "params",
+        "required": ["convoId"],
+        "properties": {
+          "convoId": {
+            "type": "string",
+            "description": "Conversation identifier"
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["convoId", "policy"],
+          "properties": {
+            "convoId": {
+              "type": "string",
+              "description": "Conversation identifier"
+            },
+            "policy": {
+              "type": "unknown",
+              "description": "Conversation policy object (structure varies by conversation type)"
+            }
+          }
+        }
+      },
+      "errors": [
+        {"name": "ConvoNotFound", "description": "Conversation not found"},
+        {"name": "NotMember", "description": "Caller is not a member of this conversation"}
+      ]
+    }
+  }
+}

@@ -55,6 +55,10 @@ public struct Output: ATProtocolCodable {
         
         public let autoResetTriggered: Bool
         
+        public let failureCount: Int
+        
+        public let memberCount: Int
+        
         
         
         // Standard public initializer
@@ -63,7 +67,11 @@ public struct Output: ATProtocolCodable {
             
             recorded: Bool,
             
-            autoResetTriggered: Bool
+            autoResetTriggered: Bool,
+            
+            failureCount: Int,
+            
+            memberCount: Int
             
             
         ) {
@@ -72,6 +80,10 @@ public struct Output: ATProtocolCodable {
             self.recorded = recorded
             
             self.autoResetTriggered = autoResetTriggered
+            
+            self.failureCount = failureCount
+            
+            self.memberCount = memberCount
             
             
         }
@@ -86,6 +98,12 @@ public struct Output: ATProtocolCodable {
             self.autoResetTriggered = try container.decode(Bool.self, forKey: .autoResetTriggered)
             
             
+            self.failureCount = try container.decode(Int.self, forKey: .failureCount)
+            
+            
+            self.memberCount = try container.decode(Int.self, forKey: .memberCount)
+            
+            
         }
         
         public func encode(to encoder: Encoder) throws {
@@ -96,6 +114,12 @@ public struct Output: ATProtocolCodable {
             
             
             try container.encode(autoResetTriggered, forKey: .autoResetTriggered)
+            
+            
+            try container.encode(failureCount, forKey: .failureCount)
+            
+            
+            try container.encode(memberCount, forKey: .memberCount)
             
             
         }
@@ -115,6 +139,16 @@ public struct Output: ATProtocolCodable {
             map = map.adding(key: "autoResetTriggered", value: autoResetTriggeredValue)
             
             
+            
+            let failureCountValue = try failureCount.toCBORValue()
+            map = map.adding(key: "failureCount", value: failureCountValue)
+            
+            
+            
+            let memberCountValue = try memberCount.toCBORValue()
+            map = map.adding(key: "memberCount", value: memberCountValue)
+            
+            
 
             return map
             
@@ -124,6 +158,8 @@ public struct Output: ATProtocolCodable {
         private enum CodingKeys: String, CodingKey {
             case recorded
             case autoResetTriggered
+            case failureCount
+            case memberCount
         }
         
     }
@@ -149,9 +185,10 @@ public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertibl
 extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - reportRecoveryFailure
 
-    /// Report that recovery has been exhausted for a conversation (spec §8.6) Report that recovery has been exhausted for a conversation. Server uses these reports for quorum-based auto-reset (>=50% of members must report within 1 hour for auto-reset to trigger).
+    /// Report that recovery has been exhausted for a conversation Report that a client has exhausted all recovery attempts for a conversation. Any member may report. When >=50% of active members have reported within a 1-hour window, the server auto-resets the group.
     /// 
     /// - Parameter input: The input parameters for the request
+    
     /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
@@ -171,13 +208,18 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         headers["Accept"] = "application/json"
         
 
+        
         let requestData: Data? = try JSONEncoder().encode(input)
+        
+        
+        let queryItems: [URLQueryItem]? = nil
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
             headers: headers,
             body: requestData,
-            queryItems: nil
+            queryItems: queryItems
         )
 
         // Determine service DID for this endpoint

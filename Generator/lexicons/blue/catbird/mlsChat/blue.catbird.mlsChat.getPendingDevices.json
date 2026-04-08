@@ -1,0 +1,57 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mlsChat.getPendingDevices",
+  "description": "Get pending device additions for the authenticated user",
+  "defs": {
+    "main": {
+      "type": "query",
+      "description": "List pending device additions — conversations that a newly registered device should join via Welcome messages.",
+      "parameters": {
+        "type": "params",
+        "properties": {
+          "convoIds": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Optional: filter to specific conversation IDs"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 50,
+            "description": "Maximum results to return"
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["pendingAdditions"],
+          "properties": {
+            "pendingAdditions": {
+              "type": "array",
+              "items": {
+                "type": "ref",
+                "ref": "#pendingDeviceAddition"
+              }
+            }
+          }
+        }
+      }
+    },
+    "pendingDeviceAddition": {
+      "type": "object",
+      "required": ["convoId", "deviceId", "createdAt"],
+      "properties": {
+        "convoId": { "type": "string" },
+        "deviceId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "datetime" },
+        "welcome": {
+          "type": "bytes",
+          "description": "MLS Welcome message if available"
+        }
+      }
+    }
+  }
+}

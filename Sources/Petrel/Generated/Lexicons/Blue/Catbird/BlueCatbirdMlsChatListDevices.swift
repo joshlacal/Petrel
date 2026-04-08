@@ -18,9 +18,10 @@ public struct DeviceInfo: ATProtocolCodable, ATProtocolValue {
             public let lastSeenAt: ATProtocolDate
             public let registeredAt: ATProtocolDate
             public let keyPackageCount: Int
+            public let pushTokenRegistered: Bool?
 
         public init(
-            deviceId: String, deviceName: String, deviceUUID: String?, credentialDid: String, lastSeenAt: ATProtocolDate, registeredAt: ATProtocolDate, keyPackageCount: Int
+            deviceId: String, deviceName: String, deviceUUID: String?, credentialDid: String, lastSeenAt: ATProtocolDate, registeredAt: ATProtocolDate, keyPackageCount: Int, pushTokenRegistered: Bool?
         ) {
             self.deviceId = deviceId
             self.deviceName = deviceName
@@ -29,6 +30,7 @@ public struct DeviceInfo: ATProtocolCodable, ATProtocolValue {
             self.lastSeenAt = lastSeenAt
             self.registeredAt = registeredAt
             self.keyPackageCount = keyPackageCount
+            self.pushTokenRegistered = pushTokenRegistered
         }
 
         public init(from decoder: Decoder) throws {
@@ -75,6 +77,12 @@ public struct DeviceInfo: ATProtocolCodable, ATProtocolValue {
                 LogManager.logError("Decoding error for required property 'keyPackageCount': \(error)")
                 throw error
             }
+            do {
+                self.pushTokenRegistered = try container.decodeIfPresent(Bool.self, forKey: .pushTokenRegistered)
+            } catch {
+                LogManager.logDebug("Decoding error for optional property 'pushTokenRegistered': \(error)")
+                throw error
+            }
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -87,6 +95,7 @@ public struct DeviceInfo: ATProtocolCodable, ATProtocolValue {
             try container.encode(lastSeenAt, forKey: .lastSeenAt)
             try container.encode(registeredAt, forKey: .registeredAt)
             try container.encode(keyPackageCount, forKey: .keyPackageCount)
+            try container.encodeIfPresent(pushTokenRegistered, forKey: .pushTokenRegistered)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -101,6 +110,11 @@ public struct DeviceInfo: ATProtocolCodable, ATProtocolValue {
             hasher.combine(lastSeenAt)
             hasher.combine(registeredAt)
             hasher.combine(keyPackageCount)
+            if let value = pushTokenRegistered {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -124,6 +138,9 @@ public struct DeviceInfo: ATProtocolCodable, ATProtocolValue {
                 return false
             }
             if keyPackageCount != other.keyPackageCount {
+                return false
+            }
+            if pushTokenRegistered != other.pushTokenRegistered {
                 return false
             }
             return true
@@ -152,6 +169,10 @@ public struct DeviceInfo: ATProtocolCodable, ATProtocolValue {
             map = map.adding(key: "registeredAt", value: registeredAtValue)
             let keyPackageCountValue = try keyPackageCount.toCBORValue()
             map = map.adding(key: "keyPackageCount", value: keyPackageCountValue)
+            if let value = pushTokenRegistered {
+                let pushTokenRegisteredValue = try value.toCBORValue()
+                map = map.adding(key: "pushTokenRegistered", value: pushTokenRegisteredValue)
+            }
             return map
         }
 
@@ -164,12 +185,16 @@ public struct DeviceInfo: ATProtocolCodable, ATProtocolValue {
             case lastSeenAt
             case registeredAt
             case keyPackageCount
+            case pushTokenRegistered
         }
     }    
 public struct Parameters: Parametrizable {
+        public let deviceId: String?
         
         public init(
+            deviceId: String? = nil
             ) {
+            self.deviceId = deviceId
             
         }
     }
@@ -246,7 +271,7 @@ public struct Output: ATProtocolCodable {
 extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - listDevices
 
-    /// List all registered devices for the authenticated user with key package counts and last seen timestamps
+    /// List and manage registered devices (consolidates listDevices + deleteDevice) List all registered devices for the authenticated user with key package counts and last seen timestamps. To remove a device, use the blue.catbird.mlsChat.registerDevice endpoint with the same deviceUUID (server handles cleanup), or call this endpoint with a DELETE method and deviceId parameter.
     /// 
     /// - Parameter input: The input parameters for the request
     /// 

@@ -1,0 +1,53 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mlsDS.upsertFederationPeer",
+  "description": "Create or update a federation peer policy (admin only).",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Upsert a federation peer policy record. Requires federation admin privileges.",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["dsDid", "status"],
+          "properties": {
+            "dsDid": {
+              "type": "string",
+              "description": "DID of the peer delivery service"
+            },
+            "status": {
+              "type": "string",
+              "description": "Peer status to set (trusted, blocked, probation)"
+            },
+            "maxRequestsPerMinute": {
+              "type": "integer",
+              "description": "Per-peer rate limit override"
+            },
+            "note": {
+              "type": "string",
+              "description": "Admin note"
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["updated", "peer"],
+          "properties": {
+            "updated": {
+              "type": "boolean",
+              "description": "Whether the upsert succeeded"
+            },
+            "peer": {
+              "type": "ref",
+              "ref": "blue.catbird.mlsDS.getFederationPeers#peerRecord"
+            }
+          }
+        }
+      }
+    }
+  }
+}

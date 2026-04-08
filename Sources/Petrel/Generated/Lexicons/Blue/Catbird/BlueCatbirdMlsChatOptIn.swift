@@ -103,62 +103,89 @@ public struct OptInStatus: ATProtocolCodable, ATProtocolValue {
         }
     }
 public struct Input: ATProtocolCodable {
-        public let deviceId: String?
-        public let action: String?
+        public let action: String
         public let dids: [DID]?
+        public let deviceId: String?
+        public let allowFollowersBypass: Bool?
+        public let allowFollowingBypass: Bool?
+        public let autoExpireDays: Int?
 
         /// Standard public initializer
-        public init(deviceId: String? = nil, action: String? = nil, dids: [DID]? = nil) {
-            self.deviceId = deviceId
+        public init(action: String, dids: [DID]? = nil, deviceId: String? = nil, allowFollowersBypass: Bool? = nil, allowFollowingBypass: Bool? = nil, autoExpireDays: Int? = nil) {
             self.action = action
             self.dids = dids
+            self.deviceId = deviceId
+            self.allowFollowersBypass = allowFollowersBypass
+            self.allowFollowingBypass = allowFollowingBypass
+            self.autoExpireDays = autoExpireDays
         }
         
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.deviceId = try container.decodeIfPresent(String.self, forKey: .deviceId)
-            self.action = try container.decodeIfPresent(String.self, forKey: .action)
+            self.action = try container.decode(String.self, forKey: .action)
             self.dids = try container.decodeIfPresent([DID].self, forKey: .dids)
+            self.deviceId = try container.decodeIfPresent(String.self, forKey: .deviceId)
+            self.allowFollowersBypass = try container.decodeIfPresent(Bool.self, forKey: .allowFollowersBypass)
+            self.allowFollowingBypass = try container.decodeIfPresent(Bool.self, forKey: .allowFollowingBypass)
+            self.autoExpireDays = try container.decodeIfPresent(Int.self, forKey: .autoExpireDays)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encodeIfPresent(deviceId, forKey: .deviceId)
-            try container.encodeIfPresent(action, forKey: .action)
+            try container.encode(action, forKey: .action)
             try container.encodeIfPresent(dids, forKey: .dids)
+            try container.encodeIfPresent(deviceId, forKey: .deviceId)
+            try container.encodeIfPresent(allowFollowersBypass, forKey: .allowFollowersBypass)
+            try container.encodeIfPresent(allowFollowingBypass, forKey: .allowFollowingBypass)
+            try container.encodeIfPresent(autoExpireDays, forKey: .autoExpireDays)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
+            let actionValue = try action.toCBORValue()
+            map = map.adding(key: "action", value: actionValue)
+            if let value = dids {
+                let didsValue = try value.toCBORValue()
+                map = map.adding(key: "dids", value: didsValue)
+            }
             if let value = deviceId {
                 let deviceIdValue = try value.toCBORValue()
                 map = map.adding(key: "deviceId", value: deviceIdValue)
             }
-            if let value = action {
-                let actionValue = try value.toCBORValue()
-                map = map.adding(key: "action", value: actionValue)
+            if let value = allowFollowersBypass {
+                let allowFollowersBypassValue = try value.toCBORValue()
+                map = map.adding(key: "allowFollowersBypass", value: allowFollowersBypassValue)
             }
-            if let value = dids {
-                let didsValue = try value.toCBORValue()
-                map = map.adding(key: "dids", value: didsValue)
+            if let value = allowFollowingBypass {
+                let allowFollowingBypassValue = try value.toCBORValue()
+                map = map.adding(key: "allowFollowingBypass", value: allowFollowingBypassValue)
+            }
+            if let value = autoExpireDays {
+                let autoExpireDaysValue = try value.toCBORValue()
+                map = map.adding(key: "autoExpireDays", value: autoExpireDaysValue)
             }
             return map
         }
 
         private enum CodingKeys: String, CodingKey {
-            case deviceId
             case action
             case dids
+            case deviceId
+            case allowFollowersBypass
+            case allowFollowingBypass
+            case autoExpireDays
         }
     }
     
 public struct Output: ATProtocolCodable {
         
         
-        public let optedIn: Bool
+        public let success: Bool?
         
-        public let optedInAt: ATProtocolDate
+        public let optedIn: Bool?
+        
+        public let optedInAt: ATProtocolDate?
         
         public let statuses: [OptInStatus]?
         
@@ -174,9 +201,11 @@ public struct Output: ATProtocolCodable {
         public init(
             
             
-            optedIn: Bool,
+            success: Bool? = nil,
             
-            optedInAt: ATProtocolDate,
+            optedIn: Bool? = nil,
+            
+            optedInAt: ATProtocolDate? = nil,
             
             statuses: [OptInStatus]? = nil,
             
@@ -189,6 +218,8 @@ public struct Output: ATProtocolCodable {
             
         ) {
             
+            
+            self.success = success
             
             self.optedIn = optedIn
             
@@ -209,10 +240,13 @@ public struct Output: ATProtocolCodable {
             
             let container = try decoder.container(keyedBy: CodingKeys.self)
             
-            self.optedIn = try container.decode(Bool.self, forKey: .optedIn)
+            self.success = try container.decodeIfPresent(Bool.self, forKey: .success)
             
             
-            self.optedInAt = try container.decode(ATProtocolDate.self, forKey: .optedInAt)
+            self.optedIn = try container.decodeIfPresent(Bool.self, forKey: .optedIn)
+            
+            
+            self.optedInAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .optedInAt)
             
             
             self.statuses = try container.decodeIfPresent([OptInStatus].self, forKey: .statuses)
@@ -233,10 +267,16 @@ public struct Output: ATProtocolCodable {
             
             var container = encoder.container(keyedBy: CodingKeys.self)
             
-            try container.encode(optedIn, forKey: .optedIn)
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(success, forKey: .success)
             
             
-            try container.encode(optedInAt, forKey: .optedInAt)
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(optedIn, forKey: .optedIn)
+            
+            
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(optedInAt, forKey: .optedInAt)
             
             
             // Encode optional property even if it's an empty array
@@ -263,13 +303,27 @@ public struct Output: ATProtocolCodable {
 
             
             
-            let optedInValue = try optedIn.toCBORValue()
-            map = map.adding(key: "optedIn", value: optedInValue)
+            if let value = success {
+                // Encode optional property even if it's an empty array for CBOR
+                let successValue = try value.toCBORValue()
+                map = map.adding(key: "success", value: successValue)
+            }
             
             
             
-            let optedInAtValue = try optedInAt.toCBORValue()
-            map = map.adding(key: "optedInAt", value: optedInAtValue)
+            if let value = optedIn {
+                // Encode optional property even if it's an empty array for CBOR
+                let optedInValue = try value.toCBORValue()
+                map = map.adding(key: "optedIn", value: optedInValue)
+            }
+            
+            
+            
+            if let value = optedInAt {
+                // Encode optional property even if it's an empty array for CBOR
+                let optedInAtValue = try value.toCBORValue()
+                map = map.adding(key: "optedInAt", value: optedInAtValue)
+            }
             
             
             
@@ -311,6 +365,7 @@ public struct Output: ATProtocolCodable {
         
         
         private enum CodingKeys: String, CodingKey {
+            case success
             case optedIn
             case optedInAt
             case statuses
@@ -320,7 +375,22 @@ public struct Output: ATProtocolCodable {
         }
         
     }
+        
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                case invalidAction = "InvalidAction.Unknown action value"
+                case alreadyOptedIn = "AlreadyOptedIn.User is already opted in"
+                case alreadyOptedOut = "AlreadyOptedOut.User is already opted out"
+                case tooManyDids = "TooManyDids.Too many DIDs requested (max 100)"
+            public var description: String {
+                return self.rawValue
+            }
 
+            public var errorName: String {
+                // Extract just the error name from the raw value
+                let parts = self.rawValue.split(separator: ".")
+                return String(parts.first ?? "")
+            }
+        }
 
 
 
@@ -329,9 +399,10 @@ public struct Output: ATProtocolCodable {
 extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - optIn
 
-    /// Opt in to MLS chat or query opt-in status for users.
+    /// Manage MLS chat opt-in status (consolidates optIn + optOut + getOptInStatus + getChatRequestSettings + updateChatRequestSettings + acceptChatRequest + declineChatRequest + sendChatRequest) Manage MLS chat participation. Supports opting in/out, checking status for multiple DIDs, and managing chat request settings.
     /// 
     /// - Parameter input: The input parameters for the request
+    
     /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
@@ -351,13 +422,18 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         headers["Accept"] = "application/json"
         
 
+        
         let requestData: Data? = try JSONEncoder().encode(input)
+        
+        
+        let queryItems: [URLQueryItem]? = nil
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
             headers: headers,
             body: requestData,
-            queryItems: nil
+            queryItems: queryItems
         )
 
         // Determine service DID for this endpoint

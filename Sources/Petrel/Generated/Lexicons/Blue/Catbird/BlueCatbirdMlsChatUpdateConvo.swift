@@ -11,54 +11,54 @@ public struct BlueCatbirdMlsChatUpdateConvo {
         
 public struct PolicyInput: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.updateConvo#policyInput"
-            public let allowExternalCommits: Bool?
-            public let requireInviteForJoin: Bool?
-            public let allowRejoin: Bool?
-            public let rejoinWindowDays: Int?
-            public let preventRemovingLastAdmin: Bool?
+            public let allowInvites: Bool?
+            public let adminOnlyInvites: Bool?
+            public let allowMemberAdd: Bool?
+            public let allowMemberRemove: Bool?
+            public let requireAdminApproval: Bool?
             public let maxMembers: Int?
 
         public init(
-            allowExternalCommits: Bool?, requireInviteForJoin: Bool?, allowRejoin: Bool?, rejoinWindowDays: Int?, preventRemovingLastAdmin: Bool?, maxMembers: Int?
+            allowInvites: Bool?, adminOnlyInvites: Bool?, allowMemberAdd: Bool?, allowMemberRemove: Bool?, requireAdminApproval: Bool?, maxMembers: Int?
         ) {
-            self.allowExternalCommits = allowExternalCommits
-            self.requireInviteForJoin = requireInviteForJoin
-            self.allowRejoin = allowRejoin
-            self.rejoinWindowDays = rejoinWindowDays
-            self.preventRemovingLastAdmin = preventRemovingLastAdmin
+            self.allowInvites = allowInvites
+            self.adminOnlyInvites = adminOnlyInvites
+            self.allowMemberAdd = allowMemberAdd
+            self.allowMemberRemove = allowMemberRemove
+            self.requireAdminApproval = requireAdminApproval
             self.maxMembers = maxMembers
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.allowExternalCommits = try container.decodeIfPresent(Bool.self, forKey: .allowExternalCommits)
+                self.allowInvites = try container.decodeIfPresent(Bool.self, forKey: .allowInvites)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'allowExternalCommits': \(error)")
+                LogManager.logDebug("Decoding error for optional property 'allowInvites': \(error)")
                 throw error
             }
             do {
-                self.requireInviteForJoin = try container.decodeIfPresent(Bool.self, forKey: .requireInviteForJoin)
+                self.adminOnlyInvites = try container.decodeIfPresent(Bool.self, forKey: .adminOnlyInvites)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'requireInviteForJoin': \(error)")
+                LogManager.logDebug("Decoding error for optional property 'adminOnlyInvites': \(error)")
                 throw error
             }
             do {
-                self.allowRejoin = try container.decodeIfPresent(Bool.self, forKey: .allowRejoin)
+                self.allowMemberAdd = try container.decodeIfPresent(Bool.self, forKey: .allowMemberAdd)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'allowRejoin': \(error)")
+                LogManager.logDebug("Decoding error for optional property 'allowMemberAdd': \(error)")
                 throw error
             }
             do {
-                self.rejoinWindowDays = try container.decodeIfPresent(Int.self, forKey: .rejoinWindowDays)
+                self.allowMemberRemove = try container.decodeIfPresent(Bool.self, forKey: .allowMemberRemove)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'rejoinWindowDays': \(error)")
+                LogManager.logDebug("Decoding error for optional property 'allowMemberRemove': \(error)")
                 throw error
             }
             do {
-                self.preventRemovingLastAdmin = try container.decodeIfPresent(Bool.self, forKey: .preventRemovingLastAdmin)
+                self.requireAdminApproval = try container.decodeIfPresent(Bool.self, forKey: .requireAdminApproval)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'preventRemovingLastAdmin': \(error)")
+                LogManager.logDebug("Decoding error for optional property 'requireAdminApproval': \(error)")
                 throw error
             }
             do {
@@ -72,36 +72,36 @@ public struct PolicyInput: ATProtocolCodable, ATProtocolValue {
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            try container.encodeIfPresent(allowExternalCommits, forKey: .allowExternalCommits)
-            try container.encodeIfPresent(requireInviteForJoin, forKey: .requireInviteForJoin)
-            try container.encodeIfPresent(allowRejoin, forKey: .allowRejoin)
-            try container.encodeIfPresent(rejoinWindowDays, forKey: .rejoinWindowDays)
-            try container.encodeIfPresent(preventRemovingLastAdmin, forKey: .preventRemovingLastAdmin)
+            try container.encodeIfPresent(allowInvites, forKey: .allowInvites)
+            try container.encodeIfPresent(adminOnlyInvites, forKey: .adminOnlyInvites)
+            try container.encodeIfPresent(allowMemberAdd, forKey: .allowMemberAdd)
+            try container.encodeIfPresent(allowMemberRemove, forKey: .allowMemberRemove)
+            try container.encodeIfPresent(requireAdminApproval, forKey: .requireAdminApproval)
             try container.encodeIfPresent(maxMembers, forKey: .maxMembers)
         }
 
         public func hash(into hasher: inout Hasher) {
-            if let value = allowExternalCommits {
+            if let value = allowInvites {
                 hasher.combine(value)
             } else {
                 hasher.combine(nil as Int?)
             }
-            if let value = requireInviteForJoin {
+            if let value = adminOnlyInvites {
                 hasher.combine(value)
             } else {
                 hasher.combine(nil as Int?)
             }
-            if let value = allowRejoin {
+            if let value = allowMemberAdd {
                 hasher.combine(value)
             } else {
                 hasher.combine(nil as Int?)
             }
-            if let value = rejoinWindowDays {
+            if let value = allowMemberRemove {
                 hasher.combine(value)
             } else {
                 hasher.combine(nil as Int?)
             }
-            if let value = preventRemovingLastAdmin {
+            if let value = requireAdminApproval {
                 hasher.combine(value)
             } else {
                 hasher.combine(nil as Int?)
@@ -115,19 +115,19 @@ public struct PolicyInput: ATProtocolCodable, ATProtocolValue {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if allowExternalCommits != other.allowExternalCommits {
+            if allowInvites != other.allowInvites {
                 return false
             }
-            if requireInviteForJoin != other.requireInviteForJoin {
+            if adminOnlyInvites != other.adminOnlyInvites {
                 return false
             }
-            if allowRejoin != other.allowRejoin {
+            if allowMemberAdd != other.allowMemberAdd {
                 return false
             }
-            if rejoinWindowDays != other.rejoinWindowDays {
+            if allowMemberRemove != other.allowMemberRemove {
                 return false
             }
-            if preventRemovingLastAdmin != other.preventRemovingLastAdmin {
+            if requireAdminApproval != other.requireAdminApproval {
                 return false
             }
             if maxMembers != other.maxMembers {
@@ -143,25 +143,25 @@ public struct PolicyInput: ATProtocolCodable, ATProtocolValue {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-            if let value = allowExternalCommits {
-                let allowExternalCommitsValue = try value.toCBORValue()
-                map = map.adding(key: "allowExternalCommits", value: allowExternalCommitsValue)
+            if let value = allowInvites {
+                let allowInvitesValue = try value.toCBORValue()
+                map = map.adding(key: "allowInvites", value: allowInvitesValue)
             }
-            if let value = requireInviteForJoin {
-                let requireInviteForJoinValue = try value.toCBORValue()
-                map = map.adding(key: "requireInviteForJoin", value: requireInviteForJoinValue)
+            if let value = adminOnlyInvites {
+                let adminOnlyInvitesValue = try value.toCBORValue()
+                map = map.adding(key: "adminOnlyInvites", value: adminOnlyInvitesValue)
             }
-            if let value = allowRejoin {
-                let allowRejoinValue = try value.toCBORValue()
-                map = map.adding(key: "allowRejoin", value: allowRejoinValue)
+            if let value = allowMemberAdd {
+                let allowMemberAddValue = try value.toCBORValue()
+                map = map.adding(key: "allowMemberAdd", value: allowMemberAddValue)
             }
-            if let value = rejoinWindowDays {
-                let rejoinWindowDaysValue = try value.toCBORValue()
-                map = map.adding(key: "rejoinWindowDays", value: rejoinWindowDaysValue)
+            if let value = allowMemberRemove {
+                let allowMemberRemoveValue = try value.toCBORValue()
+                map = map.adding(key: "allowMemberRemove", value: allowMemberRemoveValue)
             }
-            if let value = preventRemovingLastAdmin {
-                let preventRemovingLastAdminValue = try value.toCBORValue()
-                map = map.adding(key: "preventRemovingLastAdmin", value: preventRemovingLastAdminValue)
+            if let value = requireAdminApproval {
+                let requireAdminApprovalValue = try value.toCBORValue()
+                map = map.adding(key: "requireAdminApproval", value: requireAdminApprovalValue)
             }
             if let value = maxMembers {
                 let maxMembersValue = try value.toCBORValue()
@@ -172,71 +172,95 @@ public struct PolicyInput: ATProtocolCodable, ATProtocolValue {
 
         private enum CodingKeys: String, CodingKey {
             case typeIdentifier = "$type"
-            case allowExternalCommits
-            case requireInviteForJoin
-            case allowRejoin
-            case rejoinWindowDays
-            case preventRemovingLastAdmin
+            case allowInvites
+            case adminOnlyInvites
+            case allowMemberAdd
+            case allowMemberRemove
+            case requireAdminApproval
             case maxMembers
         }
     }
         
 public struct PolicyView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.updateConvo#policyView"
-            public let allowExternalCommits: Bool?
-            public let requireInviteForJoin: Bool?
-            public let allowRejoin: Bool?
-            public let rejoinWindowDays: Int?
-            public let preventRemovingLastAdmin: Bool?
-            public let maxMembers: Int?
+            public let convoId: String
+            public let allowInvites: Bool
+            public let adminOnlyInvites: Bool
+            public let allowMemberAdd: Bool
+            public let allowMemberRemove: Bool
+            public let requireAdminApproval: Bool
+            public let maxMembers: Int
+            public let updatedAt: ATProtocolDate
+            public let updatedBy: DID?
 
         public init(
-            allowExternalCommits: Bool?, requireInviteForJoin: Bool?, allowRejoin: Bool?, rejoinWindowDays: Int?, preventRemovingLastAdmin: Bool?, maxMembers: Int?
+            convoId: String, allowInvites: Bool, adminOnlyInvites: Bool, allowMemberAdd: Bool, allowMemberRemove: Bool, requireAdminApproval: Bool, maxMembers: Int, updatedAt: ATProtocolDate, updatedBy: DID?
         ) {
-            self.allowExternalCommits = allowExternalCommits
-            self.requireInviteForJoin = requireInviteForJoin
-            self.allowRejoin = allowRejoin
-            self.rejoinWindowDays = rejoinWindowDays
-            self.preventRemovingLastAdmin = preventRemovingLastAdmin
+            self.convoId = convoId
+            self.allowInvites = allowInvites
+            self.adminOnlyInvites = adminOnlyInvites
+            self.allowMemberAdd = allowMemberAdd
+            self.allowMemberRemove = allowMemberRemove
+            self.requireAdminApproval = requireAdminApproval
             self.maxMembers = maxMembers
+            self.updatedAt = updatedAt
+            self.updatedBy = updatedBy
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.allowExternalCommits = try container.decodeIfPresent(Bool.self, forKey: .allowExternalCommits)
+                self.convoId = try container.decode(String.self, forKey: .convoId)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'allowExternalCommits': \(error)")
+                LogManager.logError("Decoding error for required property 'convoId': \(error)")
                 throw error
             }
             do {
-                self.requireInviteForJoin = try container.decodeIfPresent(Bool.self, forKey: .requireInviteForJoin)
+                self.allowInvites = try container.decode(Bool.self, forKey: .allowInvites)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'requireInviteForJoin': \(error)")
+                LogManager.logError("Decoding error for required property 'allowInvites': \(error)")
                 throw error
             }
             do {
-                self.allowRejoin = try container.decodeIfPresent(Bool.self, forKey: .allowRejoin)
+                self.adminOnlyInvites = try container.decode(Bool.self, forKey: .adminOnlyInvites)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'allowRejoin': \(error)")
+                LogManager.logError("Decoding error for required property 'adminOnlyInvites': \(error)")
                 throw error
             }
             do {
-                self.rejoinWindowDays = try container.decodeIfPresent(Int.self, forKey: .rejoinWindowDays)
+                self.allowMemberAdd = try container.decode(Bool.self, forKey: .allowMemberAdd)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'rejoinWindowDays': \(error)")
+                LogManager.logError("Decoding error for required property 'allowMemberAdd': \(error)")
                 throw error
             }
             do {
-                self.preventRemovingLastAdmin = try container.decodeIfPresent(Bool.self, forKey: .preventRemovingLastAdmin)
+                self.allowMemberRemove = try container.decode(Bool.self, forKey: .allowMemberRemove)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'preventRemovingLastAdmin': \(error)")
+                LogManager.logError("Decoding error for required property 'allowMemberRemove': \(error)")
                 throw error
             }
             do {
-                self.maxMembers = try container.decodeIfPresent(Int.self, forKey: .maxMembers)
+                self.requireAdminApproval = try container.decode(Bool.self, forKey: .requireAdminApproval)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'maxMembers': \(error)")
+                LogManager.logError("Decoding error for required property 'requireAdminApproval': \(error)")
+                throw error
+            }
+            do {
+                self.maxMembers = try container.decode(Int.self, forKey: .maxMembers)
+            } catch {
+                LogManager.logError("Decoding error for required property 'maxMembers': \(error)")
+                throw error
+            }
+            do {
+                self.updatedAt = try container.decode(ATProtocolDate.self, forKey: .updatedAt)
+            } catch {
+                LogManager.logError("Decoding error for required property 'updatedAt': \(error)")
+                throw error
+            }
+            do {
+                self.updatedBy = try container.decodeIfPresent(DID.self, forKey: .updatedBy)
+            } catch {
+                LogManager.logDebug("Decoding error for optional property 'updatedBy': \(error)")
                 throw error
             }
         }
@@ -244,41 +268,27 @@ public struct PolicyView: ATProtocolCodable, ATProtocolValue {
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            try container.encodeIfPresent(allowExternalCommits, forKey: .allowExternalCommits)
-            try container.encodeIfPresent(requireInviteForJoin, forKey: .requireInviteForJoin)
-            try container.encodeIfPresent(allowRejoin, forKey: .allowRejoin)
-            try container.encodeIfPresent(rejoinWindowDays, forKey: .rejoinWindowDays)
-            try container.encodeIfPresent(preventRemovingLastAdmin, forKey: .preventRemovingLastAdmin)
-            try container.encodeIfPresent(maxMembers, forKey: .maxMembers)
+            try container.encode(convoId, forKey: .convoId)
+            try container.encode(allowInvites, forKey: .allowInvites)
+            try container.encode(adminOnlyInvites, forKey: .adminOnlyInvites)
+            try container.encode(allowMemberAdd, forKey: .allowMemberAdd)
+            try container.encode(allowMemberRemove, forKey: .allowMemberRemove)
+            try container.encode(requireAdminApproval, forKey: .requireAdminApproval)
+            try container.encode(maxMembers, forKey: .maxMembers)
+            try container.encode(updatedAt, forKey: .updatedAt)
+            try container.encodeIfPresent(updatedBy, forKey: .updatedBy)
         }
 
         public func hash(into hasher: inout Hasher) {
-            if let value = allowExternalCommits {
-                hasher.combine(value)
-            } else {
-                hasher.combine(nil as Int?)
-            }
-            if let value = requireInviteForJoin {
-                hasher.combine(value)
-            } else {
-                hasher.combine(nil as Int?)
-            }
-            if let value = allowRejoin {
-                hasher.combine(value)
-            } else {
-                hasher.combine(nil as Int?)
-            }
-            if let value = rejoinWindowDays {
-                hasher.combine(value)
-            } else {
-                hasher.combine(nil as Int?)
-            }
-            if let value = preventRemovingLastAdmin {
-                hasher.combine(value)
-            } else {
-                hasher.combine(nil as Int?)
-            }
-            if let value = maxMembers {
+            hasher.combine(convoId)
+            hasher.combine(allowInvites)
+            hasher.combine(adminOnlyInvites)
+            hasher.combine(allowMemberAdd)
+            hasher.combine(allowMemberRemove)
+            hasher.combine(requireAdminApproval)
+            hasher.combine(maxMembers)
+            hasher.combine(updatedAt)
+            if let value = updatedBy {
                 hasher.combine(value)
             } else {
                 hasher.combine(nil as Int?)
@@ -287,22 +297,31 @@ public struct PolicyView: ATProtocolCodable, ATProtocolValue {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if allowExternalCommits != other.allowExternalCommits {
+            if convoId != other.convoId {
                 return false
             }
-            if requireInviteForJoin != other.requireInviteForJoin {
+            if allowInvites != other.allowInvites {
                 return false
             }
-            if allowRejoin != other.allowRejoin {
+            if adminOnlyInvites != other.adminOnlyInvites {
                 return false
             }
-            if rejoinWindowDays != other.rejoinWindowDays {
+            if allowMemberAdd != other.allowMemberAdd {
                 return false
             }
-            if preventRemovingLastAdmin != other.preventRemovingLastAdmin {
+            if allowMemberRemove != other.allowMemberRemove {
+                return false
+            }
+            if requireAdminApproval != other.requireAdminApproval {
                 return false
             }
             if maxMembers != other.maxMembers {
+                return false
+            }
+            if updatedAt != other.updatedAt {
+                return false
+            }
+            if updatedBy != other.updatedBy {
                 return false
             }
             return true
@@ -315,41 +334,40 @@ public struct PolicyView: ATProtocolCodable, ATProtocolValue {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-            if let value = allowExternalCommits {
-                let allowExternalCommitsValue = try value.toCBORValue()
-                map = map.adding(key: "allowExternalCommits", value: allowExternalCommitsValue)
-            }
-            if let value = requireInviteForJoin {
-                let requireInviteForJoinValue = try value.toCBORValue()
-                map = map.adding(key: "requireInviteForJoin", value: requireInviteForJoinValue)
-            }
-            if let value = allowRejoin {
-                let allowRejoinValue = try value.toCBORValue()
-                map = map.adding(key: "allowRejoin", value: allowRejoinValue)
-            }
-            if let value = rejoinWindowDays {
-                let rejoinWindowDaysValue = try value.toCBORValue()
-                map = map.adding(key: "rejoinWindowDays", value: rejoinWindowDaysValue)
-            }
-            if let value = preventRemovingLastAdmin {
-                let preventRemovingLastAdminValue = try value.toCBORValue()
-                map = map.adding(key: "preventRemovingLastAdmin", value: preventRemovingLastAdminValue)
-            }
-            if let value = maxMembers {
-                let maxMembersValue = try value.toCBORValue()
-                map = map.adding(key: "maxMembers", value: maxMembersValue)
+            let convoIdValue = try convoId.toCBORValue()
+            map = map.adding(key: "convoId", value: convoIdValue)
+            let allowInvitesValue = try allowInvites.toCBORValue()
+            map = map.adding(key: "allowInvites", value: allowInvitesValue)
+            let adminOnlyInvitesValue = try adminOnlyInvites.toCBORValue()
+            map = map.adding(key: "adminOnlyInvites", value: adminOnlyInvitesValue)
+            let allowMemberAddValue = try allowMemberAdd.toCBORValue()
+            map = map.adding(key: "allowMemberAdd", value: allowMemberAddValue)
+            let allowMemberRemoveValue = try allowMemberRemove.toCBORValue()
+            map = map.adding(key: "allowMemberRemove", value: allowMemberRemoveValue)
+            let requireAdminApprovalValue = try requireAdminApproval.toCBORValue()
+            map = map.adding(key: "requireAdminApproval", value: requireAdminApprovalValue)
+            let maxMembersValue = try maxMembers.toCBORValue()
+            map = map.adding(key: "maxMembers", value: maxMembersValue)
+            let updatedAtValue = try updatedAt.toCBORValue()
+            map = map.adding(key: "updatedAt", value: updatedAtValue)
+            if let value = updatedBy {
+                let updatedByValue = try value.toCBORValue()
+                map = map.adding(key: "updatedBy", value: updatedByValue)
             }
             return map
         }
 
         private enum CodingKeys: String, CodingKey {
             case typeIdentifier = "$type"
-            case allowExternalCommits
-            case requireInviteForJoin
-            case allowRejoin
-            case rejoinWindowDays
-            case preventRemovingLastAdmin
+            case convoId
+            case allowInvites
+            case adminOnlyInvites
+            case allowMemberAdd
+            case allowMemberRemove
+            case requireAdminApproval
             case maxMembers
+            case updatedAt
+            case updatedBy
         }
     }
 public struct Input: ATProtocolCodable {
@@ -533,10 +551,15 @@ public struct Output: ATProtocolCodable {
     }
         
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case invalidRequest = "InvalidRequest.Invalid request parameters"
-                case unauthorized = "Unauthorized.Authentication required"
-                case forbidden = "Forbidden.User does not have permission for this action"
-                case notFound = "NotFound.Conversation not found"
+                case convoNotFound = "ConvoNotFound.Conversation not found"
+                case notMember = "NotMember.Caller is not a member of this conversation"
+                case unauthorized = "Unauthorized.Caller does not have required admin/moderator privileges"
+                case invalidAction = "InvalidAction.Unknown action value"
+                case missingTargetDid = "MissingTargetDid.targetDid is required for promote/demote actions"
+                case targetNotMember = "TargetNotMember.Target DID is not a member of the conversation"
+                case noFieldsProvided = "NoFieldsProvided.At least one policy field must be provided for updatePolicy"
+                case invalidGroupInfo = "InvalidGroupInfo.Provided GroupInfo is invalid or malformed"
+                case invalidMaxMembers = "InvalidMaxMembers.maxMembers is less than current member count"
             public var description: String {
                 return self.rawValue
             }
@@ -555,9 +578,10 @@ public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertibl
 extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - updateConvo
 
-    /// Update conversation settings including admin/moderator management, policy, and group info
+    /// Update conversation settings (consolidates updatePolicy + promoteAdmin + demoteAdmin + promoteModerator + demoteModerator + updateGroupInfo + groupInfoRefresh) Perform administrative actions on a conversation. The 'action' field determines the operation. Most actions require admin privileges.
     /// 
     /// - Parameter input: The input parameters for the request
+    
     /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
@@ -577,13 +601,18 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         headers["Accept"] = "application/json"
         
 
+        
         let requestData: Data? = try JSONEncoder().encode(input)
+        
+        
+        let queryItems: [URLQueryItem]? = nil
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
             headers: headers,
             body: requestData,
-            queryItems: nil
+            queryItems: queryItems
         )
 
         // Determine service DID for this endpoint

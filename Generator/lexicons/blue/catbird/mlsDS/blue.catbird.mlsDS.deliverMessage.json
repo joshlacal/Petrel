@@ -1,0 +1,109 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mlsDS.deliverMessage",
+  "description": "Accept an inbound MLS message from a remote DS and store it for local subscribers.",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Deliver a federated MLS message to a local DS for storage and SSE fanout.",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["convoId", "msgId", "epoch", "senderDsDid", "ciphertext", "paddedSize", "deliveryId", "sequencerTerm"],
+          "properties": {
+            "convoId": {
+              "type": "string",
+              "description": "Conversation ID"
+            },
+            "msgId": {
+              "type": "string",
+              "description": "Unique message ID (ULID)"
+            },
+            "epoch": {
+              "type": "integer",
+              "description": "MLS epoch of the message"
+            },
+            "senderDsDid": {
+              "type": "string",
+              "description": "DID of the sending delivery service"
+            },
+            "ciphertext": {
+              "type": "bytes",
+              "description": "Encrypted MLS message payload"
+            },
+            "paddedSize": {
+              "type": "integer",
+              "description": "Padded size of the plaintext for uniform message lengths"
+            },
+            "messageType": {
+              "type": "string",
+              "description": "Message type (default: 'app')"
+            },
+            "deliveryId": {
+              "type": "string",
+              "description": "Delivery tracking ID (ULID)"
+            },
+            "sequencerTerm": {
+              "type": "integer",
+              "description": "Current sequencer term for CAS validation"
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["accepted", "seq", "deliveryId"],
+          "properties": {
+            "accepted": {
+              "type": "boolean",
+              "description": "Whether the message was accepted"
+            },
+            "seq": {
+              "type": "integer",
+              "description": "Assigned sequence number"
+            },
+            "deliveryId": {
+              "type": "string",
+              "description": "Echo of the delivery ID"
+            },
+            "ack": {
+              "type": "ref",
+              "ref": "#deliveryAck"
+            }
+          }
+        }
+      },
+      "errors": [
+        {"name": "ConversationNotFound"},
+        {"name": "NotSequencer"},
+        {"name": "TermStale"}
+      ]
+    },
+    "deliveryAck": {
+      "type": "object",
+      "description": "Signed delivery acknowledgment",
+      "required": ["sig"],
+      "properties": {
+        "sig": {
+          "type": "string",
+          "description": "Signed acknowledgment token"
+        },
+        "msgId": {
+          "type": "string"
+        },
+        "convoId": {
+          "type": "string"
+        },
+        "epoch": {
+          "type": "integer"
+        },
+        "term": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+}

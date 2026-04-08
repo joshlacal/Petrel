@@ -6,11 +6,16 @@
     "convoView": {
       "type": "object",
       "description": "View of an MLS conversation with member and epoch information",
-      "required": ["groupId", "creator", "members", "epoch", "cipherSuite", "createdAt"],
+      "required": ["conversationId", "groupId", "creator", "members", "epoch", "cipherSuite", "createdAt"],
       "properties": {
+        "conversationId": {
+          "type": "string",
+          "description": "Stable conversation identifier (survives group resets)",
+          "maxLength": 128
+        },
         "groupId": {
           "type": "string",
-          "description": "MLS group identifier (hex-encoded) - canonical conversation ID",
+          "description": "Current MLS group identifier (hex-encoded). Changes on group reset.",
           "maxLength": 128
         },
         "creator": { "type": "string", "format": "did", "description": "DID of the conversation creator" },
@@ -31,8 +36,15 @@
         "createdAt": { "type": "string", "format": "datetime", "description": "Conversation creation timestamp" },
         "lastMessageAt": { "type": "string", "format": "datetime", "description": "Timestamp of last message" },
         "metadata": { "type": "ref", "ref": "#convoMetadata", "description": "Optional conversation metadata" },
-        "confirmationTag": { "type": "string", "description": "Base64 encoded confirmation tag from the latest commit" },
-        "resetGeneration": { "type": "integer", "minimum": 0, "description": "Monotonically increasing reset generation counter. Incremented each time the group is reset." }
+        "confirmationTag": {
+          "type": "bytes",
+          "description": "Confirmation tag of the server's canonical MLS tree state."
+        },
+        "resetGeneration": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of times this conversation's MLS group has been reset. Absent or 0 means never reset."
+        }
       }
     },
 
@@ -122,7 +134,7 @@
       "required": ["did", "keyPackage", "cipherSuite"],
       "properties": {
         "did": { "type": "string", "format": "did", "description": "Owner DID" },
-        "keyPackage": { "type": "string", "description": "Base64url-encoded MLS key package bytes" },
+        "keyPackage": { "type": "bytes", "description": "MLS key package bytes" },
         "keyPackageHash": {
           "type": "string",
           "description": "Hex-encoded SHA-256 hash of the key package bytes. Clients should use this server-computed hash when creating conversations to ensure hash consistency.",

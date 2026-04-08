@@ -107,7 +107,7 @@ public struct Output: ATProtocolCodable {
     }
         
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case tooManyDids = "TooManyDids.Too many DIDs requested"
+                case tooManyDids = "TooManyDids.Too many DIDs requested (max 100)"
                 case invalidDid = "InvalidDid.One or more DIDs are invalid"
             public var description: String {
                 return self.rawValue
@@ -129,7 +129,7 @@ public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertibl
 extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - getKeyPackages
 
-    /// Retrieve key packages for one or more DIDs to add them to conversations
+    /// Retrieve key packages for one or more DIDs (same as v1, in v2 namespace for consistency) Retrieve key packages for one or more DIDs to add them to conversations. Returns one key package per device per DID.
     /// 
     /// - Parameter input: The input parameters for the request
     /// 

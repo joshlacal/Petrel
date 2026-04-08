@@ -1,11 +1,11 @@
 {
   "lexicon": 1,
   "id": "blue.catbird.mlsChat.getConvos",
-  "description": "Retrieve MLS conversations for the authenticated user with pagination support",
+  "description": "Retrieve conversations with flexible filtering (consolidates getConvos + getExpectedConversations + listChatRequests + getRequestCount)",
   "defs": {
     "main": {
       "type": "query",
-      "description": "Query to fetch user's MLS conversations",
+      "description": "Query conversations for the authenticated user with pagination and filtering. The 'filter' parameter replaces separate endpoints for expected conversations, chat requests, and request counts.",
       "parameters": {
         "type": "params",
         "properties": {
@@ -19,6 +19,17 @@
           "cursor": {
             "type": "string",
             "description": "Pagination cursor from previous response"
+          },
+          "filter": {
+            "type": "string",
+            "description": "Filter conversations: 'all' (default, active conversations), 'pending' (incoming chat requests awaiting acceptance), 'expected' (conversations user is expected to join via Welcome/ExternalCommit)",
+            "knownValues": ["all", "pending", "expected"],
+            "default": "all"
+          },
+          "countOnly": {
+            "type": "boolean",
+            "description": "If true, only return counts without conversation data. Useful for badge counts.",
+            "default": false
           }
         }
       },
@@ -34,20 +45,28 @@
                 "type": "ref",
                 "ref": "blue.catbird.mlsChat.defs#convoView"
               },
-              "description": "List of conversations"
+              "description": "List of conversations (empty if countOnly is true)"
             },
             "cursor": {
               "type": "string",
               "description": "Pagination cursor for next page"
+            },
+            "pendingCount": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of pending chat requests (always included for badge display)"
+            },
+            "requestCount": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Total number of unresolved chat requests"
             }
           }
         }
       },
       "errors": [
-        {
-          "name": "InvalidCursor",
-          "description": "The provided pagination cursor is invalid"
-        }
+        {"name": "InvalidCursor", "description": "The provided pagination cursor is invalid"},
+        {"name": "InvalidFilter", "description": "Unknown filter value"}
       ]
     }
   }

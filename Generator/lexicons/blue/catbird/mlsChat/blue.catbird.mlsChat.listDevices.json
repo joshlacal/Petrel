@@ -1,13 +1,19 @@
 {
   "lexicon": 1,
   "id": "blue.catbird.mlsChat.listDevices",
+  "description": "List and manage registered devices (consolidates listDevices + deleteDevice)",
   "defs": {
     "main": {
       "type": "query",
-      "description": "List all registered devices for the authenticated user with key package counts and last seen timestamps",
+      "description": "List all registered devices for the authenticated user with key package counts and last seen timestamps. To remove a device, use the blue.catbird.mlsChat.registerDevice endpoint with the same deviceUUID (server handles cleanup), or call this endpoint with a DELETE method and deviceId parameter.",
       "parameters": {
         "type": "params",
-        "properties": {}
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "description": "Optional: when provided with DELETE method, removes this device and its key packages"
+          }
+        }
       },
       "output": {
         "encoding": "application/json",
@@ -61,6 +67,10 @@
           "type": "integer",
           "minimum": 0,
           "description": "Number of available (unconsumed) key packages for this device"
+        },
+        "pushTokenRegistered": {
+          "type": "boolean",
+          "description": "Whether this device has a push token registered"
         }
       }
     }

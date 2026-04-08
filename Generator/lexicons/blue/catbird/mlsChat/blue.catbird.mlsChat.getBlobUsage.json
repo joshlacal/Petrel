@@ -1,0 +1,32 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mlsChat.getBlobUsage",
+  "description": "Get blob storage usage for the authenticated user",
+  "defs": {
+    "main": {
+      "type": "query",
+      "description": "Returns the authenticated user's current blob storage usage, quota, and blob count.",
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["usedBytes", "quotaBytes", "blobCount"],
+          "properties": {
+            "usedBytes": {
+              "type": "integer",
+              "description": "Total bytes used by the user's active blobs"
+            },
+            "quotaBytes": {
+              "type": "integer",
+              "description": "Maximum allowed bytes (500MB)"
+            },
+            "blobCount": {
+              "type": "integer",
+              "description": "Number of active blobs"
+            }
+          }
+        }
+      }
+    }
+  }
+}

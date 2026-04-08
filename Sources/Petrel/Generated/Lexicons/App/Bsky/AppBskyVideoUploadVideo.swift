@@ -112,6 +112,7 @@ extension ATProtoClient.App.Bsky.Video {
     /// Upload a video to be processed then stored on the PDS.
     /// 
     /// - Parameter data: The binary data to upload
+    
     /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
@@ -132,13 +133,16 @@ extension ATProtoClient.App.Bsky.Video {
         headers["Accept"] = "application/json"
         
 
-        let requestData: Data? = nil
+        
+        
+        let queryItems: [URLQueryItem]? = nil
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
             headers: headers,
             body: dataToUpload,
-            queryItems: nil
+            queryItems: queryItems
         )
 
         // Determine service DID for this endpoint

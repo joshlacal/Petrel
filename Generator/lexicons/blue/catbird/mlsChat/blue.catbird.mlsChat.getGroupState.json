@@ -1,10 +1,11 @@
 {
   "lexicon": 1,
   "id": "blue.catbird.mlsChat.getGroupState",
+  "description": "Retrieve group state including GroupInfo, epoch, and welcome data (consolidates getGroupInfo + getEpoch + validateWelcome)",
   "defs": {
     "main": {
       "type": "query",
-      "description": "Get the current MLS group state for a conversation, including epoch and group info",
+      "description": "Fetch MLS group state for a conversation. The 'include' parameter selects which state components to return, reducing multiple round-trips to a single call.",
       "parameters": {
         "type": "params",
         "required": ["convoId"],
@@ -15,7 +16,7 @@
           },
           "include": {
             "type": "string",
-            "description": "Comma-separated list of fields to include in response",
+            "description": "Comma-separated list of state components to include: 'groupInfo' (TLS-serialized GroupInfo for external commit), 'welcome' (pending Welcome message), 'epoch' (current epoch number). Defaults to 'groupInfo,epoch'.",
             "default": "groupInfo,epoch"
           }
         }
@@ -25,40 +26,31 @@
         "schema": {
           "type": "object",
           "properties": {
+            "groupInfo": {
+              "type": "bytes",
+              "description": "TLS-serialized GroupInfo (present when 'groupInfo' included)"
+            },
             "epoch": {
               "type": "integer",
               "minimum": 0,
-              "description": "Current MLS epoch number"
-            },
-            "groupInfo": {
-              "type": "bytes",
-              "description": "MLS group info bytes for external commit joins"
+              "description": "Current MLS epoch number (present when 'epoch' included)"
             },
             "welcome": {
               "type": "bytes",
-              "description": "MLS welcome message bytes if available"
+              "description": "Pending MLS Welcome message (present when 'welcome' included and a Welcome exists)"
             },
             "expiresAt": {
               "type": "string",
               "format": "datetime",
-              "description": "When the cached group info expires"
+              "description": "When the GroupInfo becomes stale (typically 5 minutes)"
             }
           }
         }
       },
       "errors": [
-        {
-          "name": "NotFound",
-          "description": "Conversation not found"
-        },
-        {
-          "name": "Unauthorized",
-          "description": "Authentication required"
-        },
-        {
-          "name": "GroupInfoUnavailable",
-          "description": "Group info is not currently available for this conversation"
-        }
+        {"name": "NotFound", "description": "Conversation not found"},
+        {"name": "Unauthorized", "description": "Not a current or past member"},
+        {"name": "GroupInfoUnavailable", "description": "GroupInfo not yet generated for this conversation"}
       ]
     }
   }

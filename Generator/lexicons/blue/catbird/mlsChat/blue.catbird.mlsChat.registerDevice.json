@@ -1,10 +1,11 @@
 {
   "lexicon": 1,
   "id": "blue.catbird.mlsChat.registerDevice",
+  "description": "Consolidated device registration with optional push token (replaces registerDevice + registerDeviceToken)",
   "defs": {
     "main": {
       "type": "procedure",
-      "description": "Register a device for multi-device MLS support. Each device gets a unique device ID and credential (did:plc:user#device-uuid). Required for proper multi-device group conversations.",
+      "description": "Register a device for multi-device MLS support. Each device gets a unique device ID and credential (did:plc:user#device-uuid). Optionally registers a push token in the same call, eliminating the need for a separate registerDeviceToken request.",
       "input": {
         "encoding": "application/json",
         "schema": {
@@ -35,6 +36,11 @@
               "type": "bytes",
               "description": "Device Ed25519 signature public key (32 bytes)",
               "maxLength": 32
+            },
+            "pushToken": {
+              "type": "string",
+              "description": "Optional APNS/FCM push token for this device. If provided, registers the push token in the same atomic operation as device registration.",
+              "maxLength": 512
             }
           }
         }
@@ -62,7 +68,7 @@
             },
             "welcomeMessages": {
               "type": "array",
-              "description": "Welcome messages for auto-joining conversations (may be null)",
+              "description": "Welcome messages for auto-joining conversations (may be empty)",
               "items": {
                 "type": "ref",
                 "ref": "#welcomeMessage"
@@ -84,8 +90,8 @@
       "required": ["keyPackage", "cipherSuite", "expires"],
       "properties": {
         "keyPackage": {
-          "type": "string",
-          "description": "Base64-encoded MLS key package"
+          "type": "bytes",
+          "description": "MLS key package"
         },
         "cipherSuite": {
           "type": "string",
@@ -107,8 +113,8 @@
           "description": "Conversation ID"
         },
         "welcome": {
-          "type": "string",
-          "description": "Base64-encoded MLS Welcome message"
+          "type": "bytes",
+          "description": "MLS Welcome message"
         }
       }
     }

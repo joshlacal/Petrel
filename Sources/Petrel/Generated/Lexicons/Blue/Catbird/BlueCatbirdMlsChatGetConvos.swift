@@ -11,13 +11,19 @@ public struct BlueCatbirdMlsChatGetConvos {
 public struct Parameters: Parametrizable {
         public let limit: Int?
         public let cursor: String?
+        public let filter: String?
+        public let countOnly: Bool?
         
         public init(
             limit: Int? = nil, 
-            cursor: String? = nil
+            cursor: String? = nil, 
+            filter: String? = nil, 
+            countOnly: Bool? = nil
             ) {
             self.limit = limit
             self.cursor = cursor
+            self.filter = filter
+            self.countOnly = countOnly
             
         }
     }
@@ -29,6 +35,10 @@ public struct Output: ATProtocolCodable {
         
         public let cursor: String?
         
+        public let pendingCount: Int?
+        
+        public let requestCount: Int?
+        
         
         
         // Standard public initializer
@@ -37,7 +47,11 @@ public struct Output: ATProtocolCodable {
             
             conversations: [BlueCatbirdMlsChatDefs.ConvoView],
             
-            cursor: String? = nil
+            cursor: String? = nil,
+            
+            pendingCount: Int? = nil,
+            
+            requestCount: Int? = nil
             
             
         ) {
@@ -46,6 +60,10 @@ public struct Output: ATProtocolCodable {
             self.conversations = conversations
             
             self.cursor = cursor
+            
+            self.pendingCount = pendingCount
+            
+            self.requestCount = requestCount
             
             
         }
@@ -60,6 +78,12 @@ public struct Output: ATProtocolCodable {
             self.cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
             
             
+            self.pendingCount = try container.decodeIfPresent(Int.self, forKey: .pendingCount)
+            
+            
+            self.requestCount = try container.decodeIfPresent(Int.self, forKey: .requestCount)
+            
+            
         }
         
         public func encode(to encoder: Encoder) throws {
@@ -71,6 +95,14 @@ public struct Output: ATProtocolCodable {
             
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(cursor, forKey: .cursor)
+            
+            
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(pendingCount, forKey: .pendingCount)
+            
+            
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(requestCount, forKey: .requestCount)
             
             
         }
@@ -93,6 +125,22 @@ public struct Output: ATProtocolCodable {
             }
             
             
+            
+            if let value = pendingCount {
+                // Encode optional property even if it's an empty array for CBOR
+                let pendingCountValue = try value.toCBORValue()
+                map = map.adding(key: "pendingCount", value: pendingCountValue)
+            }
+            
+            
+            
+            if let value = requestCount {
+                // Encode optional property even if it's an empty array for CBOR
+                let requestCountValue = try value.toCBORValue()
+                map = map.adding(key: "requestCount", value: requestCountValue)
+            }
+            
+            
 
             return map
             
@@ -102,12 +150,15 @@ public struct Output: ATProtocolCodable {
         private enum CodingKeys: String, CodingKey {
             case conversations
             case cursor
+            case pendingCount
+            case requestCount
         }
         
     }
         
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case invalidCursor = "InvalidCursor.The provided pagination cursor is invalid"
+                case invalidFilter = "InvalidFilter.Unknown filter value"
             public var description: String {
                 return self.rawValue
             }
@@ -128,7 +179,7 @@ public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertibl
 extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - getConvos
 
-    /// Retrieve MLS conversations for the authenticated user with pagination support Query to fetch user's MLS conversations
+    /// Retrieve conversations with flexible filtering (consolidates getConvos + getExpectedConversations + listChatRequests + getRequestCount) Query conversations for the authenticated user with pagination and filtering. The 'filter' parameter replaces separate endpoints for expected conversations, chat requests, and request counts.
     /// 
     /// - Parameter input: The input parameters for the request
     /// 

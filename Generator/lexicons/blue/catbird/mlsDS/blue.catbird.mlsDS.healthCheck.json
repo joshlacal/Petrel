@@ -1,0 +1,39 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mlsDS.healthCheck",
+  "description": "Simple health/status endpoint for DS-to-DS discovery.",
+  "defs": {
+    "main": {
+      "type": "query",
+      "description": "Return the health status and federation capabilities of this delivery service. No authentication required.",
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["did", "version", "uptime", "federationCapabilities"],
+          "properties": {
+            "did": {
+              "type": "string",
+              "description": "Service DID of this delivery service"
+            },
+            "version": {
+              "type": "string",
+              "description": "Server version"
+            },
+            "uptime": {
+              "type": "integer",
+              "description": "Server uptime in seconds"
+            },
+            "federationCapabilities": {
+              "type": "array",
+              "description": "List of supported federation capabilities",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

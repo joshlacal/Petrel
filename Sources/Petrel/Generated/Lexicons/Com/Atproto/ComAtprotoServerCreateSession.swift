@@ -336,6 +336,7 @@ extension ATProtoClient.Com.Atproto.Server {
     /// Create an authentication session.
     /// 
     /// - Parameter input: The input parameters for the request
+    
     /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
@@ -355,13 +356,18 @@ extension ATProtoClient.Com.Atproto.Server {
         headers["Accept"] = "application/json"
         
 
+        
         let requestData: Data? = try JSONEncoder().encode(input)
+        
+        
+        let queryItems: [URLQueryItem]? = nil
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
             headers: headers,
             body: requestData,
-            queryItems: nil
+            queryItems: queryItems
         )
 
         // Determine service DID for this endpoint

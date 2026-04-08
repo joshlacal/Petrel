@@ -49,6 +49,7 @@ extension ATProtoClient.Com.Atproto.Repo {
     /// Import a repo in the form of a CAR file. Requires Content-Length HTTP header to be set.
     /// 
     /// - Parameter data: The binary data to upload
+    
     /// 
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
@@ -67,13 +68,16 @@ extension ATProtoClient.Com.Atproto.Repo {
         
         
 
-        let requestData: Data? = nil
+        
+        
+        let queryItems: [URLQueryItem]? = nil
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
             headers: headers,
             body: dataToUpload,
-            queryItems: nil
+            queryItems: queryItems
         )
 
         // Determine service DID for this endpoint

@@ -49,6 +49,7 @@ extension ATProtoClient.App.Bsky.Draft {
     /// Updates a draft using private storage (stash). If the draft ID points to a non-existing ID, the update will be silently ignored. This is done because updates don't enforce draft limit, so it accepts all writes, but will ignore invalid ones. Requires authentication.
     /// 
     /// - Parameter input: The input parameters for the request
+    
     /// 
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
@@ -66,13 +67,18 @@ extension ATProtoClient.App.Bsky.Draft {
         
         
 
+        
         let requestData: Data? = try JSONEncoder().encode(input)
+        
+        
+        let queryItems: [URLQueryItem]? = nil
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
             headers: headers,
             body: requestData,
-            queryItems: nil
+            queryItems: queryItems
         )
 
         // Determine service DID for this endpoint

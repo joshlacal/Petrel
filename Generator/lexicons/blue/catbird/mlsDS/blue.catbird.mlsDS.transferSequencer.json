@@ -1,0 +1,55 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mlsDS.transferSequencer",
+  "description": "Accept a sequencer role transfer from the current sequencer DS.",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Transfer sequencer responsibility for a conversation to this DS.",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["convoId", "newSequencerTerm"],
+          "properties": {
+            "convoId": {
+              "type": "string",
+              "description": "Conversation ID"
+            },
+            "currentEpoch": {
+              "type": "integer",
+              "description": "Current epoch at time of transfer (informational)"
+            },
+            "newSequencerTerm": {
+              "type": "integer",
+              "description": "New sequencer term to establish"
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["accepted", "newSequencerTerm"],
+          "properties": {
+            "accepted": {
+              "type": "boolean",
+              "description": "Whether the transfer was accepted"
+            },
+            "newSequencerTerm": {
+              "type": "integer",
+              "description": "Confirmed new sequencer term"
+            }
+          }
+        }
+      },
+      "errors": [
+        {"name": "ConversationNotFound"},
+        {"name": "NotCurrentSequencer"},
+        {"name": "TermStale"},
+        {"name": "TransferFailed"}
+      ]
+    }
+  }
+}

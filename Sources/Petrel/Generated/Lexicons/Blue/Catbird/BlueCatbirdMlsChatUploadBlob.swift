@@ -14,7 +14,17 @@ import AppKit
 
 public struct BlueCatbirdMlsChatUploadBlob { 
 
-    public static let typeIdentifier = "blue.catbird.mlsChat.uploadBlob"
+    public static let typeIdentifier = "blue.catbird.mlsChat.uploadBlob"    
+public struct Parameters: Parametrizable {
+        public let convoId: String
+        
+        public init(
+            convoId: String
+            ) {
+            self.convoId = convoId
+            
+        }
+    }
 public struct Input: ATProtocolCodable {
         public let data: Data
 
@@ -154,6 +164,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     ///   - data: The binary data to upload
     ///   - mimeType: The MIME type of the data being uploaded
     ///   - stripMetadata: Whether to strip metadata from images (default: true)
+    ///   - params: The query parameters for the request
     /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
@@ -161,7 +172,8 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         
         data: Data,
         mimeType: String,
-        stripMetadata: Bool = true
+        stripMetadata: Bool = true,
+        params: BlueCatbirdMlsChatUploadBlob.Parameters
         
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatUploadBlob.Output?) {
         let endpoint = "blue.catbird.mlsChat.uploadBlob"
@@ -182,12 +194,16 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         headers["Accept"] = "application/json"
         
 
+        
+        
+        let queryItems = params.asQueryItems()
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
             headers: headers,
             body: dataToUpload,
-            queryItems: nil
+            queryItems: queryItems
         )
 
         // Determine service DID for this endpoint

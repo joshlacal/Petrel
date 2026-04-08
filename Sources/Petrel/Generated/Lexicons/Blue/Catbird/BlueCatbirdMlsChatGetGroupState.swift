@@ -25,9 +25,9 @@ public struct Parameters: Parametrizable {
 public struct Output: ATProtocolCodable {
         
         
-        public let epoch: Int?
-        
         public let groupInfo: Bytes?
+        
+        public let epoch: Int?
         
         public let welcome: Bytes?
         
@@ -39,9 +39,9 @@ public struct Output: ATProtocolCodable {
         public init(
             
             
-            epoch: Int? = nil,
-            
             groupInfo: Bytes? = nil,
+            
+            epoch: Int? = nil,
             
             welcome: Bytes? = nil,
             
@@ -51,9 +51,9 @@ public struct Output: ATProtocolCodable {
         ) {
             
             
-            self.epoch = epoch
-            
             self.groupInfo = groupInfo
+            
+            self.epoch = epoch
             
             self.welcome = welcome
             
@@ -66,10 +66,10 @@ public struct Output: ATProtocolCodable {
             
             let container = try decoder.container(keyedBy: CodingKeys.self)
             
-            self.epoch = try container.decodeIfPresent(Int.self, forKey: .epoch)
-            
-            
             self.groupInfo = try container.decodeIfPresent(Bytes.self, forKey: .groupInfo)
+            
+            
+            self.epoch = try container.decodeIfPresent(Int.self, forKey: .epoch)
             
             
             self.welcome = try container.decodeIfPresent(Bytes.self, forKey: .welcome)
@@ -85,11 +85,11 @@ public struct Output: ATProtocolCodable {
             var container = encoder.container(keyedBy: CodingKeys.self)
             
             // Encode optional property even if it's an empty array
-            try container.encodeIfPresent(epoch, forKey: .epoch)
+            try container.encodeIfPresent(groupInfo, forKey: .groupInfo)
             
             
             // Encode optional property even if it's an empty array
-            try container.encodeIfPresent(groupInfo, forKey: .groupInfo)
+            try container.encodeIfPresent(epoch, forKey: .epoch)
             
             
             // Encode optional property even if it's an empty array
@@ -108,18 +108,18 @@ public struct Output: ATProtocolCodable {
 
             
             
-            if let value = epoch {
-                // Encode optional property even if it's an empty array for CBOR
-                let epochValue = try value.toCBORValue()
-                map = map.adding(key: "epoch", value: epochValue)
-            }
-            
-            
-            
             if let value = groupInfo {
                 // Encode optional property even if it's an empty array for CBOR
                 let groupInfoValue = try value.toCBORValue()
                 map = map.adding(key: "groupInfo", value: groupInfoValue)
+            }
+            
+            
+            
+            if let value = epoch {
+                // Encode optional property even if it's an empty array for CBOR
+                let epochValue = try value.toCBORValue()
+                map = map.adding(key: "epoch", value: epochValue)
             }
             
             
@@ -146,8 +146,8 @@ public struct Output: ATProtocolCodable {
         
         
         private enum CodingKeys: String, CodingKey {
-            case epoch
             case groupInfo
+            case epoch
             case welcome
             case expiresAt
         }
@@ -156,8 +156,8 @@ public struct Output: ATProtocolCodable {
         
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case notFound = "NotFound.Conversation not found"
-                case unauthorized = "Unauthorized.Authentication required"
-                case groupInfoUnavailable = "GroupInfoUnavailable.Group info is not currently available for this conversation"
+                case unauthorized = "Unauthorized.Not a current or past member"
+                case groupInfoUnavailable = "GroupInfoUnavailable.GroupInfo not yet generated for this conversation"
             public var description: String {
                 return self.rawValue
             }
@@ -178,7 +178,7 @@ public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertibl
 extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - getGroupState
 
-    /// Get the current MLS group state for a conversation, including epoch and group info
+    /// Retrieve group state including GroupInfo, epoch, and welcome data (consolidates getGroupInfo + getEpoch + validateWelcome) Fetch MLS group state for a conversation. The 'include' parameter selects which state components to return, reducing multiple round-trips to a single call.
     /// 
     /// - Parameter input: The input parameters for the request
     /// 

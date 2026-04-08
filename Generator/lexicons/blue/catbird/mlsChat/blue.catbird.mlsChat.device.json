@@ -8,16 +8,8 @@
       "description": "Per-device MLS signature key published to the user's repo. Used to verify that key packages served by the delivery service belong to an authorized device.",
       "record": {
         "type": "object",
-        "required": ["deviceId", "mlsSignaturePublicKey", "algorithm", "createdAt"],
+        "required": ["mlsSignaturePublicKey", "algorithm", "createdAt"],
         "properties": {
-          "deviceId": {
-            "type": "string",
-            "description": "Unique device identifier (server-assigned or client-generated UUID)"
-          },
-          "deviceName": {
-            "type": "string",
-            "description": "Human-readable device name (e.g. 'Josh's iPhone')"
-          },
           "mlsSignaturePublicKey": {
             "type": "bytes",
             "description": "The MLS credential signature public key for this device"
@@ -25,10 +17,6 @@
           "algorithm": {
             "type": "string",
             "description": "Signature algorithm: 'ed25519' or 'p256'"
-          },
-          "platform": {
-            "type": "string",
-            "description": "Device platform: 'ios', 'macos', 'catmos', 'android'"
           },
           "createdAt": {
             "type": "string",

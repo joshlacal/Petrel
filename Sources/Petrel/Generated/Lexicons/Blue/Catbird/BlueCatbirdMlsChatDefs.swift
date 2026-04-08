@@ -11,6 +11,7 @@ public struct BlueCatbirdMlsChatDefs {
         
 public struct ConvoView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.defs#convoView"
+            public let conversationId: String
             public let groupId: String
             public let creator: DID
             public let members: [MemberView]
@@ -19,12 +20,13 @@ public struct ConvoView: ATProtocolCodable, ATProtocolValue {
             public let createdAt: ATProtocolDate
             public let lastMessageAt: ATProtocolDate?
             public let metadata: ConvoMetadata?
-            public let confirmationTag: String?
+            public let confirmationTag: Bytes?
             public let resetGeneration: Int?
 
         public init(
-            groupId: String, creator: DID, members: [MemberView], epoch: Int, cipherSuite: String, createdAt: ATProtocolDate, lastMessageAt: ATProtocolDate?, metadata: ConvoMetadata?, confirmationTag: String?, resetGeneration: Int?
+            conversationId: String, groupId: String, creator: DID, members: [MemberView], epoch: Int, cipherSuite: String, createdAt: ATProtocolDate, lastMessageAt: ATProtocolDate?, metadata: ConvoMetadata?, confirmationTag: Bytes?, resetGeneration: Int?
         ) {
+            self.conversationId = conversationId
             self.groupId = groupId
             self.creator = creator
             self.members = members
@@ -39,6 +41,12 @@ public struct ConvoView: ATProtocolCodable, ATProtocolValue {
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                self.conversationId = try container.decode(String.self, forKey: .conversationId)
+            } catch {
+                LogManager.logError("Decoding error for required property 'conversationId': \(error)")
+                throw error
+            }
             do {
                 self.groupId = try container.decode(String.self, forKey: .groupId)
             } catch {
@@ -88,7 +96,7 @@ public struct ConvoView: ATProtocolCodable, ATProtocolValue {
                 throw error
             }
             do {
-                self.confirmationTag = try container.decodeIfPresent(String.self, forKey: .confirmationTag)
+                self.confirmationTag = try container.decodeIfPresent(Bytes.self, forKey: .confirmationTag)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'confirmationTag': \(error)")
                 throw error
@@ -104,6 +112,7 @@ public struct ConvoView: ATProtocolCodable, ATProtocolValue {
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            try container.encode(conversationId, forKey: .conversationId)
             try container.encode(groupId, forKey: .groupId)
             try container.encode(creator, forKey: .creator)
             try container.encode(members, forKey: .members)
@@ -117,6 +126,7 @@ public struct ConvoView: ATProtocolCodable, ATProtocolValue {
         }
 
         public func hash(into hasher: inout Hasher) {
+            hasher.combine(conversationId)
             hasher.combine(groupId)
             hasher.combine(creator)
             hasher.combine(members)
@@ -147,6 +157,9 @@ public struct ConvoView: ATProtocolCodable, ATProtocolValue {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
+            if conversationId != other.conversationId {
+                return false
+            }
             if groupId != other.groupId {
                 return false
             }
@@ -187,6 +200,8 @@ public struct ConvoView: ATProtocolCodable, ATProtocolValue {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
             map = map.adding(key: "$type", value: Self.typeIdentifier)
+            let conversationIdValue = try conversationId.toCBORValue()
+            map = map.adding(key: "conversationId", value: conversationIdValue)
             let groupIdValue = try groupId.toCBORValue()
             map = map.adding(key: "groupId", value: groupIdValue)
             let creatorValue = try creator.toCBORValue()
@@ -220,6 +235,7 @@ public struct ConvoView: ATProtocolCodable, ATProtocolValue {
 
         private enum CodingKeys: String, CodingKey {
             case typeIdentifier = "$type"
+            case conversationId
             case groupId
             case creator
             case members
@@ -736,12 +752,12 @@ public struct MessageView: ATProtocolCodable, ATProtocolValue {
 public struct KeyPackageRef: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.defs#keyPackageRef"
             public let did: DID
-            public let keyPackage: String
+            public let keyPackage: Bytes
             public let keyPackageHash: String?
             public let cipherSuite: String
 
         public init(
-            did: DID, keyPackage: String, keyPackageHash: String?, cipherSuite: String
+            did: DID, keyPackage: Bytes, keyPackageHash: String?, cipherSuite: String
         ) {
             self.did = did
             self.keyPackage = keyPackage
@@ -758,7 +774,7 @@ public struct KeyPackageRef: ATProtocolCodable, ATProtocolValue {
                 throw error
             }
             do {
-                self.keyPackage = try container.decode(String.self, forKey: .keyPackage)
+                self.keyPackage = try container.decode(Bytes.self, forKey: .keyPackage)
             } catch {
                 LogManager.logError("Decoding error for required property 'keyPackage': \(error)")
                 throw error

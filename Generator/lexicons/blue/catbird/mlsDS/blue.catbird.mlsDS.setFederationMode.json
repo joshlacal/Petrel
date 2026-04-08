@@ -1,0 +1,49 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mlsDS.setFederationMode",
+  "description": "Set the federation mode at runtime (admin only).",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Set a runtime override for the federation mode. Requires federation admin privileges.",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["mode"],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "description": "Federation mode to set (e.g., 'off', 'allowlist', 'open')"
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["updated", "effectiveMode", "envMode"],
+          "properties": {
+            "updated": {
+              "type": "boolean",
+              "description": "Whether the mode was updated"
+            },
+            "effectiveMode": {
+              "type": "string",
+              "description": "New effective federation mode"
+            },
+            "overrideMode": {
+              "type": "string",
+              "description": "Runtime override mode"
+            },
+            "envMode": {
+              "type": "string",
+              "description": "Federation mode from environment configuration"
+            }
+          }
+        }
+      }
+    }
+  }
+}

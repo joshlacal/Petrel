@@ -1,15 +1,16 @@
 {
   "lexicon": 1,
   "id": "blue.catbird.mlsChat.sendMessage",
+  "description": "Send an encrypted message with optional reaction support (consolidates sendMessage + reaction sub-actions)",
   "defs": {
     "main": {
       "type": "procedure",
-      "description": "Send an encrypted message to an MLS conversation",
+      "description": "Send an encrypted message to an MLS conversation. Supports application messages, reactions (add/remove), and ephemeral delivery. The msgId serves as the idempotency key.",
       "input": {
         "encoding": "application/json",
         "schema": {
           "type": "object",
-          "required": ["convoId", "ciphertext", "epoch", "msgId", "paddedSize"],
+          "required": ["convoId", "msgId", "ciphertext", "epoch", "paddedSize"],
           "properties": {
             "convoId": {
               "type": "string",
@@ -20,14 +21,9 @@
               "description": "Client-generated ULID for message deduplication. MUST be included in MLS message AAD.",
               "maxLength": 26
             },
-            "idempotencyKey": {
-              "type": "string",
-              "description": "Deprecated: Use msgId instead. Client-generated UUID for idempotent request retries.",
-              "maxLength": 36
-            },
             "ciphertext": {
               "type": "bytes",
-              "description": "MLS encrypted message ciphertext bytes (MUST be padded to paddedSize). The actual message length MUST be encrypted inside the MLS ciphertext for recipients to strip padding.",
+              "description": "MLS encrypted message ciphertext bytes (MUST be padded to paddedSize)",
               "maxLength": 10485760
             },
             "epoch": {
@@ -39,13 +35,31 @@
               "type": "integer",
               "minimum": 512,
               "maximum": 10485760,
-              "description": "Padded ciphertext size in bytes. Must be 512, 1024, 2048, 4096, 8192, or multiples of 8192 up to 10MB. For metadata privacy, only this bucket size is revealed; the actual message size is encrypted inside the ciphertext."
+              "description": "Padded ciphertext size in bytes (512, 1024, 2048, 4096, 8192, or multiples of 8192)"
             },
             "delivery": {
               "type": "string",
-              "description": "Delivery mode: persistent (stored, replayed on sync) or ephemeral (SSE only, not stored). Default is persistent. Both modes skip unread count and push notifications.",
+              "description": "Delivery mode: 'persistent' (stored, replayed on sync) or 'ephemeral' (SSE only, not stored)",
               "knownValues": ["persistent", "ephemeral"],
               "default": "persistent"
+            },
+            "action": {
+              "type": "string",
+              "description": "Optional sub-action: 'addReaction' or 'removeReaction' for reaction messages",
+              "knownValues": ["addReaction", "removeReaction"]
+            },
+            "reactionEmoji": {
+              "type": "string",
+              "description": "Emoji for reaction (required when action is 'addReaction' or 'removeReaction')",
+              "maxLength": 16
+            },
+            "targetMessageId": {
+              "type": "string",
+              "description": "Message ID being reacted to (required when action is 'addReaction' or 'removeReaction')"
+            },
+            "confirmationTag": {
+              "type": "bytes",
+              "description": "MLS confirmation tag. Server rejects with TreeStateDiverged if it does not match the canonical tree."
             }
           }
         }
@@ -68,34 +82,24 @@
             "seq": {
               "type": "integer",
               "minimum": 0,
-              "description": "Server-assigned sequence number for this message. Monotonically increasing within the conversation."
+              "description": "Server-assigned monotonically increasing sequence number"
             },
             "epoch": {
               "type": "integer",
               "minimum": 0,
-              "description": "MLS epoch number (echoed from input for client confirmation)"
+              "description": "MLS epoch number (echoed from input)"
             }
           }
         }
       },
       "errors": [
-        { "name": "ConvoNotFound", "description": "Conversation not found" },
-        {
-          "name": "NotMember",
-          "description": "Caller is not a member of the conversation"
-        },
-        {
-          "name": "InvalidAsset",
-          "description": "Payload or attachment pointer is invalid"
-        },
-        {
-          "name": "EpochMismatch",
-          "description": "Message epoch does not match current conversation epoch"
-        },
-        {
-          "name": "MessageTooLarge",
-          "description": "Message exceeds maximum size policy"
-        }
+        {"name": "ConvoNotFound", "description": "Conversation not found"},
+        {"name": "NotMember", "description": "Caller is not a member of the conversation"},
+        {"name": "EpochMismatch", "description": "Message epoch does not match current conversation epoch"},
+        {"name": "MessageTooLarge", "description": "Message exceeds maximum size policy"},
+        {"name": "InvalidReaction", "description": "Missing reactionEmoji or targetMessageId for reaction action"},
+        {"name": "InvalidAsset", "description": "Payload or attachment pointer is invalid"},
+        {"name": "TreeStateDiverged", "description": "Client MLS tree state does not match server canonical tree. Client must re-join via external commit."}
       ]
     }
   }

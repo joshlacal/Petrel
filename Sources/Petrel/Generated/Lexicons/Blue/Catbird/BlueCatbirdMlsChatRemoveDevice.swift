@@ -146,8 +146,7 @@ public struct Output: ATProtocolCodable {
     }
         
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case unauthorized = "Unauthorized.User does not own this device or is not authenticated"
-                case invalidRequest = "InvalidRequest.Empty or invalid device ID"
+                case deviceNotFound = "DeviceNotFound."
             public var description: String {
                 return self.rawValue
             }
@@ -166,9 +165,10 @@ public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertibl
 extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - removeDevice
 
-    /// Remove a registered device, its key packages, and leave all conversations the device was a member of
+    /// Remove a registered MLS device and clean up associated resources (key packages, conversation memberships, pending welcome messages).
     /// 
     /// - Parameter input: The input parameters for the request
+    
     /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
@@ -188,13 +188,18 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         headers["Accept"] = "application/json"
         
 
+        
         let requestData: Data? = try JSONEncoder().encode(input)
+        
+        
+        let queryItems: [URLQueryItem]? = nil
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
             headers: headers,
             body: requestData,
-            queryItems: nil
+            queryItems: queryItems
         )
 
         // Determine service DID for this endpoint

@@ -49,6 +49,7 @@ extension ATProtoClient.Com.Atproto.Identity {
     /// Validates a PLC operation to ensure that it doesn't violate a service's constraints or get the identity into a bad state, then submits it to the PLC registry
     /// 
     /// - Parameter input: The input parameters for the request
+    
     /// 
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
@@ -66,13 +67,18 @@ extension ATProtoClient.Com.Atproto.Identity {
         
         
 
+        
         let requestData: Data? = try JSONEncoder().encode(input)
+        
+        
+        let queryItems: [URLQueryItem]? = nil
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
             headers: headers,
             body: requestData,
-            queryItems: nil
+            queryItems: queryItems
         )
 
         // Determine service DID for this endpoint

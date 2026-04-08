@@ -1,0 +1,101 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mlsDS.getConvoEvents",
+  "description": "Paginated retrieval of conversation events for federation reconciliation.",
+  "defs": {
+    "main": {
+      "type": "query",
+      "description": "Fetch a page of conversation events (messages) after a given sequence number.",
+      "parameters": {
+        "type": "params",
+        "required": ["convoId"],
+        "properties": {
+          "convoId": {
+            "type": "string",
+            "description": "Conversation ID"
+          },
+          "afterSeq": {
+            "type": "integer",
+            "description": "Return events after this sequence number (exclusive). Defaults to 0."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Maximum number of events to return (1-1000, default 200).",
+            "minimum": 1,
+            "maximum": 1000,
+            "default": 200
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["convoId", "fromSeqExclusive", "toSeqInclusive", "events"],
+          "properties": {
+            "convoId": {
+              "type": "string",
+              "description": "Conversation ID"
+            },
+            "fromSeqExclusive": {
+              "type": "integer",
+              "description": "Lower bound sequence number (exclusive)"
+            },
+            "toSeqInclusive": {
+              "type": "integer",
+              "description": "Upper bound sequence number (inclusive)"
+            },
+            "events": {
+              "type": "array",
+              "description": "Ordered list of conversation events",
+              "items": {
+                "type": "ref",
+                "ref": "#convoEventEntry"
+              }
+            }
+          }
+        }
+      },
+      "errors": [
+        {"name": "ConversationNotFound"},
+        {"name": "NotAuthorized"}
+      ]
+    },
+    "convoEventEntry": {
+      "type": "object",
+      "description": "A single conversation event (message) with metadata.",
+      "required": ["seq", "epoch", "msgId", "messageType", "ciphertext", "paddedSize", "createdAt"],
+      "properties": {
+        "seq": {
+          "type": "integer",
+          "description": "Sequence number"
+        },
+        "epoch": {
+          "type": "integer",
+          "description": "MLS epoch"
+        },
+        "msgId": {
+          "type": "string",
+          "description": "Message ID"
+        },
+        "messageType": {
+          "type": "string",
+          "description": "Message type (e.g., 'app')"
+        },
+        "ciphertext": {
+          "type": "bytes",
+          "description": "Encrypted message payload"
+        },
+        "paddedSize": {
+          "type": "integer",
+          "description": "Padded plaintext size"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "datetime",
+          "description": "Creation timestamp"
+        }
+      }
+    }
+  }
+}

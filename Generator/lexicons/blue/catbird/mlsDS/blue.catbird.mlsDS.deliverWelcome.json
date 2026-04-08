@@ -1,0 +1,65 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mlsDS.deliverWelcome",
+  "description": "Accept a Welcome message for a new member from a remote DS.",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Deliver a federated MLS Welcome message to add a user to a group on the local DS.",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["convoId", "recipientDid", "senderDsDid", "keyPackageHash", "welcomeData", "initialEpoch"],
+          "properties": {
+            "convoId": {
+              "type": "string",
+              "description": "Conversation ID"
+            },
+            "recipientDid": {
+              "type": "string",
+              "description": "DID of the recipient user"
+            },
+            "senderDsDid": {
+              "type": "string",
+              "description": "DID of the sending delivery service"
+            },
+            "keyPackageHash": {
+              "type": "string",
+              "description": "Hash of the consumed key package"
+            },
+            "welcomeData": {
+              "type": "bytes",
+              "description": "Serialized MLS Welcome message"
+            },
+            "initialEpoch": {
+              "type": "integer",
+              "description": "Initial epoch of the group for the new member"
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["accepted"],
+          "properties": {
+            "accepted": {
+              "type": "boolean",
+              "description": "Whether the welcome was accepted"
+            },
+            "ack": {
+              "type": "ref",
+              "ref": "blue.catbird.mlsDS.deliverMessage#deliveryAck"
+            }
+          }
+        }
+      },
+      "errors": [
+        {"name": "RecipientNotFound"},
+        {"name": "NotSequencer"}
+      ]
+    }
+  }
+}

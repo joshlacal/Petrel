@@ -1,23 +1,39 @@
 {
   "lexicon": 1,
   "id": "blue.catbird.mlsChat.getKeyPackageStatus",
+  "description": "Get key package statistics and status for the authenticated user's devices",
   "defs": {
     "main": {
       "type": "query",
-      "description": "Get key package statistics and consumption history for the authenticated user. Helps clients detect missing bundles before processing Welcome messages.",
+      "description": "Retrieve key package counts, status, and history for the authenticated user. Useful for clients to know when to replenish key packages.",
       "parameters": {
         "type": "params",
         "properties": {
+          "did": {
+            "type": "string",
+            "format": "did",
+            "description": "DID to check status for (defaults to authenticated user)"
+          },
+          "cipherSuite": {
+            "type": "string",
+            "description": "Filter by cipher suite"
+          },
+          "include": {
+            "type": "string",
+            "description": "Comma-separated sections to include",
+            "default": "stats",
+            "knownValues": ["stats", "status", "history"]
+          },
           "limit": {
             "type": "integer",
             "minimum": 1,
             "maximum": 100,
-            "default": 20,
-            "description": "Maximum number of consumed packages to return in history"
+            "default": 50,
+            "description": "Maximum results for status/history sections"
           },
           "cursor": {
             "type": "string",
-            "description": "Pagination cursor from previous response. Returns consumed packages after this cursor."
+            "description": "Pagination cursor"
           }
         }
       },
@@ -25,74 +41,75 @@
         "encoding": "application/json",
         "schema": {
           "type": "object",
-          "required": ["totalUploaded", "available", "consumed"],
           "properties": {
-            "totalUploaded": {
-              "type": "integer",
-              "minimum": 0,
-              "description": "Total number of key packages ever uploaded by this user"
+            "stats": {
+              "type": "ref",
+              "ref": "#keyPackageStats"
             },
-            "available": {
-              "type": "integer",
-              "minimum": 0,
-              "description": "Number of available (unconsumed, unreserved) key packages"
-            },
-            "consumed": {
-              "type": "integer",
-              "minimum": 0,
-              "description": "Number of consumed key packages"
-            },
-            "reserved": {
-              "type": "integer",
-              "minimum": 0,
-              "description": "Number of temporarily reserved key packages (during welcome validation)"
-            },
-            "consumedPackages": {
+            "status": {
               "type": "array",
               "items": {
                 "type": "ref",
-                "ref": "#consumedPackageView"
-              },
-              "description": "Paginated list of consumed key package history"
+                "ref": "#keyPackageStatusItem"
+              }
+            },
+            "history": {
+              "type": "array",
+              "items": {
+                "type": "ref",
+                "ref": "#keyPackageHistoryItem"
+              }
             },
             "cursor": {
-              "type": "string",
-              "description": "Cursor for fetching next page of consumed packages. Omitted if no more results."
+              "type": "string"
             }
           }
         }
       }
     },
-    "consumedPackageView": {
+    "keyPackageStats": {
       "type": "object",
-      "description": "View of a consumed key package with usage metadata",
-      "required": ["keyPackageHash", "consumedAt"],
+      "required": ["totalAvailable", "totalConsumed"],
       "properties": {
-        "keyPackageHash": {
-          "type": "string",
-          "description": "SHA256 hex hash of the key package bytes"
-        },
-        "usedInGroup": {
-          "type": "string",
-          "description": "Group ID (hex-encoded) where this key package was consumed. May be null for historical data."
-        },
-        "consumedAt": {
-          "type": "string",
-          "format": "datetime",
-          "description": "When the key package was consumed"
-        },
-        "cipherSuite": {
-          "type": "string",
-          "description": "Cipher suite of the consumed key package",
-          "knownValues": [
-            "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
-            "MLS_128_DHKEMP256_AES128GCM_SHA256_P256",
-            "MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519",
-            "MLS_256_DHKEMX448_AES256GCM_SHA512_Ed448",
-            "MLS_256_DHKEMP521_AES256GCM_SHA512_P521",
-            "MLS_256_DHKEMX448_CHACHA20POLY1305_SHA512_Ed448"
-          ]
+        "totalAvailable": { "type": "integer", "minimum": 0 },
+        "totalConsumed": { "type": "integer", "minimum": 0 },
+        "byDevice": {
+          "type": "array",
+          "items": {
+            "type": "ref",
+            "ref": "#deviceKeyPackageCount"
+          }
         }
+      }
+    },
+    "deviceKeyPackageCount": {
+      "type": "object",
+      "required": ["deviceId", "available"],
+      "properties": {
+        "deviceId": { "type": "string" },
+        "available": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "keyPackageStatusItem": {
+      "type": "object",
+      "required": ["id", "deviceId", "cipherSuite", "createdAt", "consumed"],
+      "properties": {
+        "id": { "type": "string" },
+        "deviceId": { "type": "string" },
+        "cipherSuite": { "type": "string" },
+        "createdAt": { "type": "string", "format": "datetime" },
+        "expiresAt": { "type": "string", "format": "datetime" },
+        "consumed": { "type": "boolean" }
+      }
+    },
+    "keyPackageHistoryItem": {
+      "type": "object",
+      "required": ["id", "action", "createdAt"],
+      "properties": {
+        "id": { "type": "string" },
+        "action": { "type": "string", "knownValues": ["uploaded", "consumed", "expired"] },
+        "createdAt": { "type": "string", "format": "datetime" },
+        "consumedByDid": { "type": "string", "format": "did" }
       }
     }
   }

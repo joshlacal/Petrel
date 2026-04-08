@@ -100,15 +100,18 @@ public struct Parameters: Parametrizable {
         public let convoId: String
         public let limit: Int?
         public let sinceSeq: Int?
+        public let type: String?
         
         public init(
             convoId: String, 
             limit: Int? = nil, 
-            sinceSeq: Int? = nil
+            sinceSeq: Int? = nil, 
+            type: String? = nil
             ) {
             self.convoId = convoId
             self.limit = limit
             self.sinceSeq = sinceSeq
+            self.type = type
             
         }
     }
@@ -243,7 +246,7 @@ public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertibl
 extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - getMessages
 
-    /// Retrieve messages from an MLS conversation. Messages are GUARANTEED to be returned in MLS sequential order (epoch ASC, seq ASC). Clients MUST process messages in this order for proper MLS decryption.
+    /// Retrieve messages from a conversation with type filtering (consolidates getMessages + getCommits) Retrieve messages from an MLS conversation. Messages are GUARANTEED to be returned in MLS sequential order (epoch ASC, seq ASC). Clients MUST process messages in this order for proper MLS decryption. The 'type' filter replaces the separate getCommits endpoint.
     /// 
     /// - Parameter input: The input parameters for the request
     /// 

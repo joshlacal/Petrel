@@ -1,0 +1,75 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mlsDS.submitCommit",
+  "description": "Submit a commit for CAS sequencing on the sequencer DS.",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Submit an MLS commit for epoch ordering via compare-and-swap. The sequencer assigns the epoch and returns a receipt.",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["convoId", "senderDsDid", "epoch", "proposedEpoch", "commitData", "sequencerTerm"],
+          "properties": {
+            "convoId": {
+              "type": "string",
+              "description": "Conversation ID"
+            },
+            "senderDsDid": {
+              "type": "string",
+              "description": "DID of the submitting delivery service"
+            },
+            "epoch": {
+              "type": "integer",
+              "description": "Current expected epoch"
+            },
+            "proposedEpoch": {
+              "type": "integer",
+              "description": "Proposed next epoch"
+            },
+            "commitData": {
+              "type": "bytes",
+              "description": "Serialized MLS commit"
+            },
+            "sequencerTerm": {
+              "type": "integer",
+              "description": "Current sequencer term for CAS validation"
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["accepted", "assignedEpoch", "sequencerTerm"],
+          "properties": {
+            "accepted": {
+              "type": "boolean",
+              "description": "Whether the commit was accepted"
+            },
+            "assignedEpoch": {
+              "type": "integer",
+              "description": "Epoch assigned by the sequencer"
+            },
+            "sequencerTerm": {
+              "type": "integer",
+              "description": "Current sequencer term"
+            },
+            "receipt": {
+              "type": "string",
+              "description": "Sequencer receipt for the commit"
+            }
+          }
+        }
+      },
+      "errors": [
+        {"name": "ConversationNotFound"},
+        {"name": "NotSequencer"},
+        {"name": "TermStale"},
+        {"name": "CommitConflict"}
+      ]
+    }
+  }
+}
