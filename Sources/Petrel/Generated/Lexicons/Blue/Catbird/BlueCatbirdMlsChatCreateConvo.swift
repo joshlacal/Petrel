@@ -255,8 +255,69 @@ public struct Input: ATProtocolCodable {
             case currentEpoch
         }
     }
-    public typealias Output = BlueCatbirdMlsChatDefs.ConvoView
+    
+public struct Output: ATProtocolCodable {
+        
+        
+        public let convo: BlueCatbirdMlsChatDefs.ConvoView
+        
+        
+        
+        // Standard public initializer
+        public init(
             
+            
+            convo: BlueCatbirdMlsChatDefs.ConvoView
+            
+            
+        ) {
+            
+            
+            self.convo = convo
+            
+            
+        }
+        
+        public init(from decoder: Decoder) throws {
+            
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            
+            self.convo = try container.decode(BlueCatbirdMlsChatDefs.ConvoView.self, forKey: .convo)
+            
+            
+        }
+        
+        public func encode(to encoder: Encoder) throws {
+            
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            
+            try container.encode(convo, forKey: .convo)
+            
+            
+        }
+
+        public func toCBORValue() throws -> Any {
+            
+            var map = OrderedCBORMap()
+
+            
+            
+            let convoValue = try convo.toCBORValue()
+            map = map.adding(key: "convo", value: convoValue)
+            
+            
+
+            return map
+            
+        }
+        
+        
+        private enum CodingKeys: String, CodingKey {
+            case convo
+        }
+        
+    }
+        
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case invalidCipherSuite = "InvalidCipherSuite.The specified cipher suite is not supported"
                 case keyPackageNotFound = "KeyPackageNotFound.Key package not found for one or more initial members"

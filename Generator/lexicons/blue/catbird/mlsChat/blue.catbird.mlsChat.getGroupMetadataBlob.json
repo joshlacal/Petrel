@@ -1,0 +1,70 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mlsChat.getGroupMetadataBlob",
+  "description": "Fetch an encrypted group metadata blob by locator or latest for a group",
+  "defs": {
+    "main": {
+      "type": "query",
+      "description": "Retrieve an encrypted group metadata blob from the server. If blobLocator is provided, fetches that specific blob. If only groupId is provided, returns the most recently uploaded blob for the group.",
+      "parameters": {
+        "type": "params",
+        "required": ["groupId"],
+        "properties": {
+          "blobLocator": {
+            "type": "string",
+            "description": "The blob locator UUID to fetch. If omitted, returns the latest blob for the group."
+          },
+          "groupId": {
+            "type": "string",
+            "description": "Hex-encoded MLS group ID (for server-side membership check)"
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["blobLocator", "groupId", "data"],
+          "properties": {
+            "blobLocator": {
+              "type": "string",
+              "description": "The blob locator UUID"
+            },
+            "groupId": {
+              "type": "string",
+              "description": "Hex-encoded MLS group ID"
+            },
+            "data": {
+              "type": "bytes",
+              "description": "The encrypted blob data (nonce || ciphertext || tag)"
+            },
+            "size": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Size of the blob in bytes"
+            },
+            "createdAt": {
+              "type": "string",
+              "format": "datetime",
+              "description": "When the blob was uploaded"
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "name": "BlobNotFound",
+          "description": "The specified blob locator was not found (may have been garbage collected)"
+        },
+        {
+          "name": "NotMember",
+          "description": "Caller is not a member of the specified group"
+        },
+        {
+          "name": "Unauthorized",
+          "description": "Authentication required"
+        }
+      ]
+    }
+  }
+}

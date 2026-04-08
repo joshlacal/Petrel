@@ -1,0 +1,54 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mlsChat.putGroupMetadataBlob",
+  "description": "Upload an encrypted group metadata blob",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Upload an encrypted group metadata blob to the server. The blobLocator (UUIDv4) is client-generated and serves as the idempotency key.",
+      "input": {
+        "encoding": "*/*",
+        "schema": {
+          "type": "bytes",
+          "description": "The encrypted blob data (nonce || ciphertext || tag)"
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["blobLocator", "size"],
+          "properties": {
+            "blobLocator": {
+              "type": "string",
+              "description": "The confirmed blob locator UUID"
+            },
+            "size": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Size of the stored blob in bytes"
+            },
+            "groupId": {
+              "type": "string",
+              "description": "Hex-encoded MLS group ID"
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "name": "BlobTooLarge",
+          "description": "The blob exceeds the maximum allowed size"
+        },
+        {
+          "name": "NotMember",
+          "description": "Caller is not a member of the specified group"
+        },
+        {
+          "name": "Unauthorized",
+          "description": "Authentication required"
+        }
+      ]
+    }
+  }
+}

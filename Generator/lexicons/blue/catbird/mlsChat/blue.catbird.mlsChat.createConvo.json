@@ -72,8 +72,15 @@
       "output": {
         "encoding": "application/json",
         "schema": {
-          "type": "ref",
-          "ref": "blue.catbird.mlsChat.defs#convoView"
+          "type": "object",
+          "required": ["convo"],
+          "properties": {
+            "convo": {
+              "type": "ref",
+              "ref": "blue.catbird.mlsChat.defs#convoView",
+              "description": "The newly created conversation"
+            }
+          }
         }
       },
       "errors": [

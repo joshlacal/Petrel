@@ -4,7 +4,7 @@
   "defs": {
     "main": {
       "type": "procedure",
-      "description": "Opt in to MLS chat. Creates private server-side record.",
+      "description": "Opt in to MLS chat or query opt-in status for users.",
       "input": {
         "encoding": "application/json",
         "schema": {
@@ -13,6 +13,20 @@
             "deviceId": {
               "type": "string",
               "description": "Device identifier for this opt-in"
+            },
+            "action": {
+              "type": "string",
+              "description": "Action to perform",
+              "knownValues": ["optIn", "getStatus"]
+            },
+            "dids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "did"
+              },
+              "description": "List of DIDs to check status for (for getStatus action, max 100)",
+              "maxLength": 100
             }
           }
         }
@@ -29,8 +43,37 @@
             "optedInAt": {
               "type": "string",
               "format": "datetime"
+            },
+            "statuses": {
+              "type": "array",
+              "items": {
+                "type": "ref",
+                "ref": "#optInStatus"
+              },
+              "description": "Array of opt-in statuses (for getStatus action)"
             }
           }
+        }
+      }
+    },
+    "optInStatus": {
+      "type": "object",
+      "description": "Opt-in status for a single user",
+      "required": ["did", "optedIn"],
+      "properties": {
+        "did": {
+          "type": "string",
+          "format": "did",
+          "description": "User DID"
+        },
+        "optedIn": {
+          "type": "boolean",
+          "description": "Whether user has opted into MLS"
+        },
+        "optedInAt": {
+          "type": "string",
+          "format": "datetime",
+          "description": "When user opted in (if applicable)"
         }
       }
     }

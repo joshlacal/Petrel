@@ -323,33 +323,44 @@ public struct KeyPackageStats: ATProtocolCodable, ATProtocolValue {
         }
     }
 public struct Input: ATProtocolCodable {
-        public let keyPackages: [KeyPackageItem]
+        public let keyPackages: [KeyPackageItem]?
+        public let action: String?
 
         /// Standard public initializer
-        public init(keyPackages: [KeyPackageItem]) {
+        public init(keyPackages: [KeyPackageItem]? = nil, action: String? = nil) {
             self.keyPackages = keyPackages
+            self.action = action
         }
         
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.keyPackages = try container.decode([KeyPackageItem].self, forKey: .keyPackages)
+            self.keyPackages = try container.decodeIfPresent([KeyPackageItem].self, forKey: .keyPackages)
+            self.action = try container.decodeIfPresent(String.self, forKey: .action)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(keyPackages, forKey: .keyPackages)
+            try container.encodeIfPresent(keyPackages, forKey: .keyPackages)
+            try container.encodeIfPresent(action, forKey: .action)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            let keyPackagesValue = try keyPackages.toCBORValue()
-            map = map.adding(key: "keyPackages", value: keyPackagesValue)
+            if let value = keyPackages {
+                let keyPackagesValue = try value.toCBORValue()
+                map = map.adding(key: "keyPackages", value: keyPackagesValue)
+            }
+            if let value = action {
+                let actionValue = try value.toCBORValue()
+                map = map.adding(key: "action", value: actionValue)
+            }
             return map
         }
 
         private enum CodingKeys: String, CodingKey {
             case keyPackages
+            case action
         }
     }
     
@@ -362,7 +373,7 @@ public struct Output: ATProtocolCodable {
         
         public let errors: [BatchError]?
         
-        public let stats: KeyPackageStats?
+        public let stats: KeyPackageStats
         
         public let syncResult: String?
         
@@ -380,7 +391,7 @@ public struct Output: ATProtocolCodable {
             
             errors: [BatchError]? = nil,
             
-            stats: KeyPackageStats? = nil,
+            stats: KeyPackageStats,
             
             syncResult: String? = nil,
             
@@ -418,7 +429,7 @@ public struct Output: ATProtocolCodable {
             self.errors = try container.decodeIfPresent([BatchError].self, forKey: .errors)
             
             
-            self.stats = try container.decodeIfPresent(KeyPackageStats.self, forKey: .stats)
+            self.stats = try container.decode(KeyPackageStats.self, forKey: .stats)
             
             
             self.syncResult = try container.decodeIfPresent(String.self, forKey: .syncResult)
@@ -443,8 +454,7 @@ public struct Output: ATProtocolCodable {
             try container.encodeIfPresent(errors, forKey: .errors)
             
             
-            // Encode optional property even if it's an empty array
-            try container.encodeIfPresent(stats, forKey: .stats)
+            try container.encode(stats, forKey: .stats)
             
             
             // Encode optional property even if it's an empty array
@@ -481,11 +491,8 @@ public struct Output: ATProtocolCodable {
             
             
             
-            if let value = stats {
-                // Encode optional property even if it's an empty array for CBOR
-                let statsValue = try value.toCBORValue()
-                map = map.adding(key: "stats", value: statsValue)
-            }
+            let statsValue = try stats.toCBORValue()
+            map = map.adding(key: "stats", value: statsValue)
             
             
             
