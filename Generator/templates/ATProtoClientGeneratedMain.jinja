@@ -164,18 +164,20 @@ public actor ATProtoClient {
         authMode: AuthMode = .publicOAuth,
         gatewayURL: URL? = nil,
         userAgent: String? = nil,
-        didResolver: DIDResolving? = nil,
+        didResolver: (any DIDResolving)? = nil,
         bskyAppViewDID: String = "did:web:api.bsky.app#bsky_appview",
         bskyChatDID: String = "did:web:api.bsky.chat#bsky_chat",
         accessGroup: String? = nil
     ) async throws {
-        // Initialize storage first
-        storage = KeychainStorage(namespace: namespace, accessGroup: accessGroup)
+        // Initialize storage first — use locals then assign to optional properties
+        let theStorage = KeychainStorage(namespace: namespace, accessGroup: accessGroup)
+        self.storage = theStorage
         self.oauthConfig = oauthConfig
         self.authMode = authMode
 
         // Initialize account manager
-        accountManager = await AccountManager(storage: storage)
+        let theAccountManager = await AccountManager(storage: theStorage)
+        self.accountManager = theAccountManager
 
         // For gateway mode, always use the gateway URL as the base URL
         // Otherwise use the provided baseURL (defaults to bsky.social)
@@ -187,15 +189,15 @@ public actor ATProtoClient {
         } else {
             effectiveBaseURL = baseURL
         }
-        
+
         // Initialize network service with the appropriate base URL
         networkService = NetworkService(baseURL: effectiveBaseURL)
-        
+
         // Enable gateway mode on network service if using gateway auth
         if self.isGatewayMode {
             await networkService.setGatewayMode(true)
         }
-        
+
         // Configure service DIDs
         LogManager.logInfo("ATProtoClient - Initializing with bskyAppViewDID: \(bskyAppViewDID), bskyChatDID: \(bskyChatDID)")
         await networkService.setServiceDID(bskyAppViewDID, for: "app.bsky")
@@ -204,13 +206,15 @@ public actor ATProtoClient {
         if let userAgent = userAgent {
             await networkService.setUserAgent(userAgent)
         }
-        
+
         // Create or use provided DID resolver before using it
+        let theDidResolver: any DIDResolving
         if let providedResolver = didResolver {
-            self.didResolver = providedResolver
+            theDidResolver = providedResolver
         } else {
-            self.didResolver = await DIDResolutionService(networkService: networkService)
+            theDidResolver = await DIDResolutionService(networkService: networkService)
         }
+        self.didResolver = theDidResolver
 
         // Convert AuthMode to AuthManager.Mode
         let managerMode: AuthManager.Mode
@@ -228,18 +232,19 @@ public actor ATProtoClient {
         }
 
         // Initialize auth manager with the selected mode
-        authManager = try AuthManager(
+        let theAuthManager = try AuthManager(
             mode: managerMode,
-            storage: storage,
-            accountManager: accountManager,
+            storage: theStorage,
+            accountManager: theAccountManager,
             networkService: networkService,
             oauthConfig: oauthConfig,
-            didResolver: self.didResolver,
+            didResolver: theDidResolver,
             gatewayBaseURL: gatewayURL
         )
+        self.authManager = theAuthManager
 
         // Now set the authentication provider on the network service
-        await networkService.setAuthenticationProvider(authManager)
+        await networkService.setAuthenticationProvider(theAuthManager)
 
         // Validate and repair authentication state before initialization
         await validateAuthenticationState()
@@ -683,6 +688,9 @@ public actor ATProtoClient {
     /// - Parameter handle: The handle to resolve.
     /// - Returns: The resolved DID.
     public func resolveHandleToDID(handle: String) async throws -> String {
+        guard let didResolver else {
+            throw APIError.serviceNotInitialized
+        }
         return try await didResolver.resolveHandleToDID(handle: handle)
     }
 
@@ -690,6 +698,9 @@ public actor ATProtoClient {
     /// - Parameter did: The DID to resolve.
     /// - Returns: The resolved PDS URL.
     public func resolveDIDToPDSURL(did: String) async throws -> URL {
+        guard let didResolver else {
+            throw APIError.serviceNotInitialized
+        }
         return try await didResolver.resolveDIDToPDSURL(did: did)
     }
 
