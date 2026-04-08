@@ -1,0 +1,28 @@
+{
+  "lexicon": 1,
+  "id": "place.stream.playback.getVideoPlaylist",
+  "defs": {
+    "main": {
+      "type": "query",
+      "description": "Get the HLS playlist for a video",
+      "parameters": {
+        "type": "params",
+        "required": ["uri"],
+        "properties": {
+          "uri": {
+            "type": "string",
+            "format": "at-uri",
+            "description": "The AT URI of the video record"
+          },
+          "track": {
+            "type": "integer",
+            "description": "Track number to retrieve"
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/vnd.apple.mpegurl"
+      }
+    }
+  }
+}

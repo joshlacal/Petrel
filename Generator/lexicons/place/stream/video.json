@@ -1,0 +1,43 @@
+{
+  "lexicon": 1,
+  "id": "place.stream.video",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "Record representing a video on Streamplace",
+      "key": "tid",
+      "record": {
+        "type": "object",
+        "required": ["title", "createdAt"],
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 3000,
+            "maxGraphemes": 300,
+            "description": "The title of the video."
+          },
+          "duration": {
+            "type": "integer",
+            "description": "The duration of the video in nanoseconds."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "datetime",
+            "description": "Client-declared timestamp when this video was created."
+          },
+          "thumb": {
+            "type": "blob",
+            "accept": ["image/*"],
+            "maxSize": 1000000
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 10000,
+            "maxGraphemes": 1000,
+            "description": "Optional description of the video."
+          }
+        }
+      }
+    }
+  }
+}

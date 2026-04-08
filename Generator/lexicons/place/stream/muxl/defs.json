@@ -1,0 +1,37 @@
+{
+  "lexicon": 1,
+  "id": "place.stream.muxl.defs",
+  "defs": {
+    "track": {
+      "type": "object",
+      "description": "A track within a multiplexed stream",
+      "required": ["id", "codec"],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "Track identifier"
+        },
+        "codec": {
+          "type": "string",
+          "description": "Codec used for this track"
+        },
+        "width": {
+          "type": "integer",
+          "description": "Width in pixels (video tracks)"
+        },
+        "height": {
+          "type": "integer",
+          "description": "Height in pixels (video tracks)"
+        },
+        "rate": {
+          "type": "integer",
+          "description": "Sample rate (audio tracks)"
+        },
+        "channels": {
+          "type": "integer",
+          "description": "Number of audio channels"
+        }
+      }
+    }
+  }
+}

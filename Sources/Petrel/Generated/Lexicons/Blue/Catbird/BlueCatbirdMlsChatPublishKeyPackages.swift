@@ -234,6 +234,94 @@ public struct BatchError: ATProtocolCodable, ATProtocolValue {
             case error
         }
     }
+        
+public struct KeyPackageStats: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "blue.catbird.mlsChat.publishKeyPackages#keyPackageStats"
+            public let published: Int
+            public let available: Int
+            public let expired: Int
+
+        public init(
+            published: Int, available: Int, expired: Int
+        ) {
+            self.published = published
+            self.available = available
+            self.expired = expired
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                self.published = try container.decode(Int.self, forKey: .published)
+            } catch {
+                LogManager.logError("Decoding error for required property 'published': \(error)")
+                throw error
+            }
+            do {
+                self.available = try container.decode(Int.self, forKey: .available)
+            } catch {
+                LogManager.logError("Decoding error for required property 'available': \(error)")
+                throw error
+            }
+            do {
+                self.expired = try container.decode(Int.self, forKey: .expired)
+            } catch {
+                LogManager.logError("Decoding error for required property 'expired': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            try container.encode(published, forKey: .published)
+            try container.encode(available, forKey: .available)
+            try container.encode(expired, forKey: .expired)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(published)
+            hasher.combine(available)
+            hasher.combine(expired)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+            if published != other.published {
+                return false
+            }
+            if available != other.available {
+                return false
+            }
+            if expired != other.expired {
+                return false
+            }
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            let publishedValue = try published.toCBORValue()
+            map = map.adding(key: "published", value: publishedValue)
+            let availableValue = try available.toCBORValue()
+            map = map.adding(key: "available", value: availableValue)
+            let expiredValue = try expired.toCBORValue()
+            map = map.adding(key: "expired", value: expiredValue)
+            return map
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case published
+            case available
+            case expired
+        }
+    }
 public struct Input: ATProtocolCodable {
         public let keyPackages: [KeyPackageItem]
 
@@ -274,6 +362,12 @@ public struct Output: ATProtocolCodable {
         
         public let errors: [BatchError]?
         
+        public let stats: KeyPackageStats?
+        
+        public let syncResult: String?
+        
+        public let publishResult: String?
+        
         
         
         // Standard public initializer
@@ -284,7 +378,13 @@ public struct Output: ATProtocolCodable {
             
             failed: Int,
             
-            errors: [BatchError]? = nil
+            errors: [BatchError]? = nil,
+            
+            stats: KeyPackageStats? = nil,
+            
+            syncResult: String? = nil,
+            
+            publishResult: String? = nil
             
             
         ) {
@@ -295,6 +395,12 @@ public struct Output: ATProtocolCodable {
             self.failed = failed
             
             self.errors = errors
+            
+            self.stats = stats
+            
+            self.syncResult = syncResult
+            
+            self.publishResult = publishResult
             
             
         }
@@ -312,6 +418,15 @@ public struct Output: ATProtocolCodable {
             self.errors = try container.decodeIfPresent([BatchError].self, forKey: .errors)
             
             
+            self.stats = try container.decodeIfPresent(KeyPackageStats.self, forKey: .stats)
+            
+            
+            self.syncResult = try container.decodeIfPresent(String.self, forKey: .syncResult)
+            
+            
+            self.publishResult = try container.decodeIfPresent(String.self, forKey: .publishResult)
+            
+            
         }
         
         public func encode(to encoder: Encoder) throws {
@@ -326,6 +441,18 @@ public struct Output: ATProtocolCodable {
             
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(errors, forKey: .errors)
+            
+            
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(stats, forKey: .stats)
+            
+            
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(syncResult, forKey: .syncResult)
+            
+            
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(publishResult, forKey: .publishResult)
             
             
         }
@@ -353,6 +480,30 @@ public struct Output: ATProtocolCodable {
             }
             
             
+            
+            if let value = stats {
+                // Encode optional property even if it's an empty array for CBOR
+                let statsValue = try value.toCBORValue()
+                map = map.adding(key: "stats", value: statsValue)
+            }
+            
+            
+            
+            if let value = syncResult {
+                // Encode optional property even if it's an empty array for CBOR
+                let syncResultValue = try value.toCBORValue()
+                map = map.adding(key: "syncResult", value: syncResultValue)
+            }
+            
+            
+            
+            if let value = publishResult {
+                // Encode optional property even if it's an empty array for CBOR
+                let publishResultValue = try value.toCBORValue()
+                map = map.adding(key: "publishResult", value: publishResultValue)
+            }
+            
+            
 
             return map
             
@@ -363,6 +514,9 @@ public struct Output: ATProtocolCodable {
             case succeeded
             case failed
             case errors
+            case stats
+            case syncResult
+            case publishResult
         }
         
     }

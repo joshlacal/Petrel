@@ -20,7 +20,8 @@ object BlueCatbirdMlsRemoveMemberDefs {
         val convoId: String,// DID of member to remove        @SerialName("targetDid")
         val targetDid: DID,// Client-generated ULID for idempotent removal operations        @SerialName("idempotencyKey")
         val idempotencyKey: String,// Optional reason for removal (logged in audit trail)        @SerialName("reason")
-        val reason: String? = null    )
+        val reason: String? = null,// Base64-encoded MLS commit message. REQUIRED for epoch synchronization. Without this, other members cannot advance epochs and will be unable to decrypt subsequent messages.        @SerialName("commit")
+        val commit: String? = null    )
 
     @Serializable
     data class BlueCatbirdMlsRemoveMemberOutput(

@@ -21,7 +21,8 @@ object AppBskyGraphFollowDefs {
     data class AppBskyGraphFollow(
         @SerialName("subject")
         val subject: DID,        @SerialName("createdAt")
-        val createdAt: ATProtocolDate    ) {
+        val createdAt: ATProtocolDate,        @SerialName("via")
+        val via: ComAtprotoRepoStrongRef? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = ""
         }

@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: com.atproto.server.deleteSession
-// Delete the current session. Requires auth.
+// Delete the current session. Requires auth using the 'refreshJwt' (not the 'accessJwt').
 package com.atproto.generated
 
 import kotlinx.serialization.*
@@ -14,8 +14,13 @@ object ComAtprotoServerDeleteSessionDefs {
     const val TYPE_IDENTIFIER = "com.atproto.server.deleteSession"
 }
 
+sealed class ComAtprotoServerDeleteSessionError(val name: String, val description: String?) {
+        object InvalidToken: ComAtprotoServerDeleteSessionError("InvalidToken", "")
+        object ExpiredToken: ComAtprotoServerDeleteSessionError("ExpiredToken", "")
+    }
+
 /**
- * Delete the current session. Requires auth.
+ * Delete the current session. Requires auth using the 'refreshJwt' (not the 'accessJwt').
  *
  * Endpoint: com.atproto.server.deleteSession
  */

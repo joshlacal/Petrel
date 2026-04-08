@@ -1,0 +1,65 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mlsChat.getGroupState",
+  "defs": {
+    "main": {
+      "type": "query",
+      "description": "Get the current MLS group state for a conversation, including epoch and group info",
+      "parameters": {
+        "type": "params",
+        "required": ["convoId"],
+        "properties": {
+          "convoId": {
+            "type": "string",
+            "description": "Conversation identifier"
+          },
+          "include": {
+            "type": "string",
+            "description": "Comma-separated list of fields to include in response",
+            "default": "groupInfo,epoch"
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "epoch": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Current MLS epoch number"
+            },
+            "groupInfo": {
+              "type": "bytes",
+              "description": "MLS group info bytes for external commit joins"
+            },
+            "welcome": {
+              "type": "bytes",
+              "description": "MLS welcome message bytes if available"
+            },
+            "expiresAt": {
+              "type": "string",
+              "format": "datetime",
+              "description": "When the cached group info expires"
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "name": "NotFound",
+          "description": "Conversation not found"
+        },
+        {
+          "name": "Unauthorized",
+          "description": "Authentication required"
+        },
+        {
+          "name": "GroupInfoUnavailable",
+          "description": "Group info is not currently available for this conversation"
+        }
+      ]
+    }
+  }
+}

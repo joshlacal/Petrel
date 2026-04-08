@@ -163,7 +163,8 @@ sealed interface AppBskyFeedDefsSkeletonFeedPostReasonUnion {
         val indexedAt: ATProtocolDate,        @SerialName("viewer")
         val viewer: AppBskyFeedDefsViewerState?,        @SerialName("labels")
         val labels: List<ComAtprotoLabelDefsLabel>?,        @SerialName("threadgate")
-        val threadgate: AppBskyFeedDefsThreadgateView?    ) {
+        val threadgate: AppBskyFeedDefsThreadgateView?,/** Debug information for internal development */        @SerialName("debug")
+        val debug: JsonElement?    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyFeedDefsPostView"
         }

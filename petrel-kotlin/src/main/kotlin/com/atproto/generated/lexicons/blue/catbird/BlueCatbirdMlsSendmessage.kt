@@ -22,7 +22,8 @@ object BlueCatbirdMlsSendMessageDefs {
         val idempotencyKey: String? = null,// MLS encrypted message ciphertext bytes (MUST be padded to paddedSize). The actual message length MUST be encrypted inside the MLS ciphertext for recipients to strip padding.        @SerialName("ciphertext")
         val ciphertext: ByteArray,// MLS epoch number when message was encrypted        @SerialName("epoch")
         val epoch: Int,// Padded ciphertext size in bytes. Must be 512, 1024, 2048, 4096, 8192, or multiples of 8192 up to 10MB. For metadata privacy, only this bucket size is revealed; the actual message size is encrypted inside the ciphertext.        @SerialName("paddedSize")
-        val paddedSize: Int    )
+        val paddedSize: Int,// Delivery mode: persistent (stored, replayed on sync) or ephemeral (SSE only, not stored). Default is persistent. Both modes skip unread count and push notifications.        @SerialName("delivery")
+        val delivery: String? = null    )
 
     @Serializable
     data class BlueCatbirdMlsSendMessageOutput(

@@ -21,12 +21,17 @@ object ComAtprotoServerRefreshSessionDefs {
         val refreshJwt: String,        @SerialName("handle")
         val handle: Handle,        @SerialName("did")
         val did: DID,        @SerialName("didDoc")
-        val didDoc: JsonElement? = null,        @SerialName("active")
+        val didDoc: JsonElement? = null,        @SerialName("email")
+        val email: String? = null,        @SerialName("emailConfirmed")
+        val emailConfirmed: Boolean? = null,        @SerialName("emailAuthFactor")
+        val emailAuthFactor: Boolean? = null,        @SerialName("active")
         val active: Boolean? = null,// Hosting status of the account. If not specified, then assume 'active'.        @SerialName("status")
         val status: String? = null    )
 
 sealed class ComAtprotoServerRefreshSessionError(val name: String, val description: String?) {
         object AccountTakedown: ComAtprotoServerRefreshSessionError("AccountTakedown", "")
+        object InvalidToken: ComAtprotoServerRefreshSessionError("InvalidToken", "")
+        object ExpiredToken: ComAtprotoServerRefreshSessionError("ExpiredToken", "")
     }
 
 /**

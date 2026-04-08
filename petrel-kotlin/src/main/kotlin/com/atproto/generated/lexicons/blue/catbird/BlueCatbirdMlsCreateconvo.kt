@@ -45,7 +45,7 @@ object BlueCatbirdMlsCreateConvoDefs {
 // Hex-encoded MLS group identifier        @SerialName("groupId")
         val groupId: String,// Client-generated UUID for idempotent request retries. Optional but recommended.        @SerialName("idempotencyKey")
         val idempotencyKey: String? = null,// MLS cipher suite to use for this conversation        @SerialName("cipherSuite")
-        val cipherSuite: String,// DIDs of initial members to add to the conversation        @SerialName("initialMembers")
+        val cipherSuite: String,// DIDs of initial members to add to the conversation (max 999 excluding creator, default policy allows up to 1000 total)        @SerialName("initialMembers")
         val initialMembers: List<DID>? = null,// Base64url-encoded MLS Welcome message containing encrypted secrets for ALL initial members        @SerialName("welcomeMessage")
         val welcomeMessage: String? = null,// Array of {did, hash} objects mapping each initial member to their key package hash. Required for multi-device support.        @SerialName("keyPackageHashes")
         val keyPackageHashes: List<BlueCatbirdMlsCreateConvoKeyPackageHashEntry>? = null,// Optional conversation metadata (name, description, avatar)        @SerialName("metadata")
@@ -57,7 +57,7 @@ object BlueCatbirdMlsCreateConvoDefs {
 sealed class BlueCatbirdMlsCreateConvoError(val name: String, val description: String?) {
         object InvalidCipherSuite: BlueCatbirdMlsCreateConvoError("InvalidCipherSuite", "The specified cipher suite is not supported")
         object KeyPackageNotFound: BlueCatbirdMlsCreateConvoError("KeyPackageNotFound", "Key package not found for one or more initial members")
-        object TooManyMembers: BlueCatbirdMlsCreateConvoError("TooManyMembers", "Too many initial members specified (max 100)")
+        object TooManyMembers: BlueCatbirdMlsCreateConvoError("TooManyMembers", "Too many initial members specified (default max 1000 total including creator, configurable per-conversation via policy)")
         object MutualBlockDetected: BlueCatbirdMlsCreateConvoError("MutualBlockDetected", "Cannot create conversation with users who have blocked each other on Bluesky")
     }
 

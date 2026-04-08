@@ -30,7 +30,9 @@
         },
         "createdAt": { "type": "string", "format": "datetime", "description": "Conversation creation timestamp" },
         "lastMessageAt": { "type": "string", "format": "datetime", "description": "Timestamp of last message" },
-        "metadata": { "type": "ref", "ref": "#convoMetadata", "description": "Optional conversation metadata" }
+        "metadata": { "type": "ref", "ref": "#convoMetadata", "description": "Optional conversation metadata" },
+        "confirmationTag": { "type": "string", "description": "Base64 encoded confirmation tag from the latest commit" },
+        "resetGeneration": { "type": "integer", "minimum": 0, "description": "Monotonically increasing reset generation counter. Incremented each time the group is reset." }
       }
     },
 

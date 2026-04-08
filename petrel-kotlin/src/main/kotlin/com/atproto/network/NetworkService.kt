@@ -22,12 +22,15 @@ class NetworkService(
     @PublishedApi
     internal val serviceDIDs = mutableMapOf<String, String>()
     var authenticatedDID: String? = null
+    var authorizationHeader: String? = null
 
     fun setServiceDID(did: String, namespace: String) {
         serviceDIDs[namespace] = did
     }
 
     fun getDid(): String? = authenticatedDID
+
+    fun getBaseUrl(): String = baseUrl
 
     @PublishedApi
     internal val client = HttpClient(CIO) {
@@ -54,6 +57,11 @@ class NetworkService(
         try {
             val response: HttpResponse = client.request(buildUrl(endpoint, queryParams)) {
                 this.method = HttpMethod.parse(method)
+
+                // Inject stored auth header if no explicit Authorization provided
+                if (!headers.containsKey("Authorization") && authorizationHeader != null) {
+                    header("Authorization", authorizationHeader!!)
+                }
 
                 headers.forEach { (key, value) ->
                     header(key, value)

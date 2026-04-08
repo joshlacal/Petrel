@@ -20,9 +20,9 @@ object BlueCatbirdMlsGetCommitsDefs {
     @Serializable
     data class BlueCatbirdMlsGetCommitsCommitMessage(
 /** MLS epoch number for this commit */        @SerialName("epoch")
-        val epoch: Int,/** DID of the member who created the commit */        @SerialName("sender")
-        val sender: DID,/** MLS commit message bytes */        @SerialName("commitData")
-        val commitData: ByteArray,/** Timestamp when commit was created */        @SerialName("createdAt")
+        val epoch: Int,/** DID of the member who created the commit (may include device fragment) */        @SerialName("sender")
+        val sender: String,/** MLS commit message bytes */        @SerialName("commitData")
+        val commitData: ByteArray?,/** Timestamp when commit was created */        @SerialName("createdAt")
         val createdAt: ATProtocolDate    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#blueCatbirdMlsGetCommitsCommitMessage"

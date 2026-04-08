@@ -57,7 +57,8 @@ object BlueCatbirdMlsDefsDefs {
         val deviceId: String?,/** Human-readable device name (e.g., 'Josh's iPhone'). Optional, may be null for legacy members. */        @SerialName("deviceName")
         val deviceName: String?,/** When this device joined the conversation */        @SerialName("joinedAt")
         val joinedAt: ATProtocolDate,/** Whether this member (device) has admin privileges. Admin status is synced across all devices of the same user. */        @SerialName("isAdmin")
-        val isAdmin: Boolean,/** When member was promoted to admin (if applicable) */        @SerialName("promotedAt")
+        val isAdmin: Boolean,/** Whether this member has moderator privileges. Moderators can warn members and view reports but cannot promote/demote others. */        @SerialName("isModerator")
+        val isModerator: Boolean?,/** When member was promoted to admin (if applicable) */        @SerialName("promotedAt")
         val promotedAt: ATProtocolDate?,/** DID of admin who promoted this member (if applicable) */        @SerialName("promotedBy")
         val promotedBy: DID?,/** MLS leaf index in ratchet tree structure */        @SerialName("leafIndex")
         val leafIndex: Int?,/** MLS credential bytes */        @SerialName("credential")
@@ -78,7 +79,8 @@ object BlueCatbirdMlsDefsDefs {
         val ciphertext: ByteArray,/** MLS epoch when message was sent */        @SerialName("epoch")
         val epoch: Int,/** Monotonically increasing sequence number within conversation. Server assigns sequentially starting from 1. Gaps may occur when members are removed from the conversation, but seq values are never reused. */        @SerialName("seq")
         val seq: Int,/** Message creation timestamp (bucketed to 2-second intervals for traffic analysis protection) */        @SerialName("createdAt")
-        val createdAt: ATProtocolDate    ) {
+        val createdAt: ATProtocolDate,/** Message type discriminator: 'app' for application messages (user content), 'commit' for MLS protocol control messages (epoch changes, membership updates). Clients should process both types for MLS state tracking but only display 'app' messages in the UI. */        @SerialName("messageType")
+        val messageType: String?    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#blueCatbirdMlsDefsMessageView"
         }

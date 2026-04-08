@@ -1,0 +1,55 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mlsChat.updateCursor",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Update the read cursor position for a conversation",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["convoId", "cursor"],
+          "properties": {
+            "convoId": {
+              "type": "string",
+              "description": "Conversation identifier"
+            },
+            "cursor": {
+              "type": "string",
+              "description": "Opaque cursor string marking the read position"
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["updatedAt"],
+          "properties": {
+            "updatedAt": {
+              "type": "string",
+              "format": "datetime",
+              "description": "Server timestamp when the cursor was updated"
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "name": "AuthRequired",
+          "description": "Authentication required"
+        },
+        {
+          "name": "Forbidden",
+          "description": "User is not a member of the conversation"
+        },
+        {
+          "name": "InvalidRequest",
+          "description": "Invalid cursor or conversation ID"
+        }
+      ]
+    }
+  }
+}

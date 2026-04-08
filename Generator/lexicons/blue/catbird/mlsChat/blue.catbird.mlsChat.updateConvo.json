@@ -1,0 +1,140 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mlsChat.updateConvo",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Update conversation settings including admin/moderator management, policy, and group info",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["convoId", "action"],
+          "properties": {
+            "convoId": {
+              "type": "string",
+              "description": "Conversation identifier"
+            },
+            "action": {
+              "type": "string",
+              "description": "Update action to perform",
+              "knownValues": ["promoteAdmin", "demoteAdmin", "promoteModerator", "demoteModerator", "updatePolicy", "updateGroupInfo", "refreshGroupInfo"]
+            },
+            "targetDid": {
+              "type": "string",
+              "format": "did",
+              "description": "Target member DID for promote/demote actions"
+            },
+            "policy": {
+              "type": "ref",
+              "ref": "#policyInput",
+              "description": "Policy object for updatePolicy action"
+            },
+            "groupInfo": {
+              "type": "bytes",
+              "description": "MLS group info bytes for updateGroupInfo action"
+            },
+            "epoch": {
+              "type": "integer",
+              "description": "Expected epoch for optimistic concurrency"
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["success"],
+          "properties": {
+            "success": {
+              "type": "boolean",
+              "description": "Whether the update was successful"
+            },
+            "newEpoch": {
+              "type": "integer",
+              "description": "New epoch number after the update"
+            },
+            "policy": {
+              "type": "ref",
+              "ref": "#policyView",
+              "description": "Updated policy view"
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "name": "InvalidRequest",
+          "description": "Invalid request parameters"
+        },
+        {
+          "name": "Unauthorized",
+          "description": "Authentication required"
+        },
+        {
+          "name": "Forbidden",
+          "description": "User does not have permission for this action"
+        },
+        {
+          "name": "NotFound",
+          "description": "Conversation not found"
+        }
+      ]
+    },
+    "policyInput": {
+      "type": "object",
+      "description": "Policy settings to update",
+      "properties": {
+        "allowExternalCommits": {
+          "type": "boolean",
+          "description": "Allow members to join via external commits"
+        },
+        "requireInviteForJoin": {
+          "type": "boolean",
+          "description": "Require an invite to join the conversation"
+        },
+        "allowRejoin": {
+          "type": "boolean",
+          "description": "Allow removed members to rejoin"
+        },
+        "rejoinWindowDays": {
+          "type": "integer",
+          "description": "Number of days a removed member can rejoin"
+        },
+        "preventRemovingLastAdmin": {
+          "type": "boolean",
+          "description": "Prevent removal of the last admin"
+        },
+        "maxMembers": {
+          "type": "integer",
+          "description": "Maximum number of members allowed"
+        }
+      }
+    },
+    "policyView": {
+      "type": "object",
+      "description": "Current policy state",
+      "properties": {
+        "allowExternalCommits": {
+          "type": "boolean"
+        },
+        "requireInviteForJoin": {
+          "type": "boolean"
+        },
+        "allowRejoin": {
+          "type": "boolean"
+        },
+        "rejoinWindowDays": {
+          "type": "integer"
+        },
+        "preventRemovingLastAdmin": {
+          "type": "boolean"
+        },
+        "maxMembers": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+}

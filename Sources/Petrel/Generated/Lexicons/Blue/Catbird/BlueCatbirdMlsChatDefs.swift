@@ -19,9 +19,11 @@ public struct ConvoView: ATProtocolCodable, ATProtocolValue {
             public let createdAt: ATProtocolDate
             public let lastMessageAt: ATProtocolDate?
             public let metadata: ConvoMetadata?
+            public let confirmationTag: String?
+            public let resetGeneration: Int?
 
         public init(
-            groupId: String, creator: DID, members: [MemberView], epoch: Int, cipherSuite: String, createdAt: ATProtocolDate, lastMessageAt: ATProtocolDate?, metadata: ConvoMetadata?
+            groupId: String, creator: DID, members: [MemberView], epoch: Int, cipherSuite: String, createdAt: ATProtocolDate, lastMessageAt: ATProtocolDate?, metadata: ConvoMetadata?, confirmationTag: String?, resetGeneration: Int?
         ) {
             self.groupId = groupId
             self.creator = creator
@@ -31,6 +33,8 @@ public struct ConvoView: ATProtocolCodable, ATProtocolValue {
             self.createdAt = createdAt
             self.lastMessageAt = lastMessageAt
             self.metadata = metadata
+            self.confirmationTag = confirmationTag
+            self.resetGeneration = resetGeneration
         }
 
         public init(from decoder: Decoder) throws {
@@ -83,6 +87,18 @@ public struct ConvoView: ATProtocolCodable, ATProtocolValue {
                 LogManager.logDebug("Decoding error for optional property 'metadata': \(error)")
                 throw error
             }
+            do {
+                self.confirmationTag = try container.decodeIfPresent(String.self, forKey: .confirmationTag)
+            } catch {
+                LogManager.logDebug("Decoding error for optional property 'confirmationTag': \(error)")
+                throw error
+            }
+            do {
+                self.resetGeneration = try container.decodeIfPresent(Int.self, forKey: .resetGeneration)
+            } catch {
+                LogManager.logDebug("Decoding error for optional property 'resetGeneration': \(error)")
+                throw error
+            }
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -96,6 +112,8 @@ public struct ConvoView: ATProtocolCodable, ATProtocolValue {
             try container.encode(createdAt, forKey: .createdAt)
             try container.encodeIfPresent(lastMessageAt, forKey: .lastMessageAt)
             try container.encodeIfPresent(metadata, forKey: .metadata)
+            try container.encodeIfPresent(confirmationTag, forKey: .confirmationTag)
+            try container.encodeIfPresent(resetGeneration, forKey: .resetGeneration)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -111,6 +129,16 @@ public struct ConvoView: ATProtocolCodable, ATProtocolValue {
                 hasher.combine(nil as Int?)
             }
             if let value = metadata {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = confirmationTag {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = resetGeneration {
                 hasher.combine(value)
             } else {
                 hasher.combine(nil as Int?)
@@ -143,6 +171,12 @@ public struct ConvoView: ATProtocolCodable, ATProtocolValue {
             if metadata != other.metadata {
                 return false
             }
+            if confirmationTag != other.confirmationTag {
+                return false
+            }
+            if resetGeneration != other.resetGeneration {
+                return false
+            }
             return true
         }
 
@@ -173,6 +207,14 @@ public struct ConvoView: ATProtocolCodable, ATProtocolValue {
                 let metadataValue = try value.toCBORValue()
                 map = map.adding(key: "metadata", value: metadataValue)
             }
+            if let value = confirmationTag {
+                let confirmationTagValue = try value.toCBORValue()
+                map = map.adding(key: "confirmationTag", value: confirmationTagValue)
+            }
+            if let value = resetGeneration {
+                let resetGenerationValue = try value.toCBORValue()
+                map = map.adding(key: "resetGeneration", value: resetGenerationValue)
+            }
             return map
         }
 
@@ -186,6 +228,8 @@ public struct ConvoView: ATProtocolCodable, ATProtocolValue {
             case createdAt
             case lastMessageAt
             case metadata
+            case confirmationTag
+            case resetGeneration
         }
     }
         

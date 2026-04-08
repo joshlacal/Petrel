@@ -1,0 +1,163 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mlsChat.commitGroupChange",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Commit an MLS group change (add members, process external commit, rejoin, readdition, or manage pending device additions)",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["convoId", "action"],
+          "properties": {
+            "convoId": {
+              "type": "string",
+              "description": "Conversation identifier"
+            },
+            "action": {
+              "type": "string",
+              "description": "Group change action to perform",
+              "knownValues": ["addMembers", "processExternalCommit", "rejoin", "readdition", "listPending", "claimPending"]
+            },
+            "memberDids": {
+              "type": "array",
+              "description": "DIDs of members to add (for addMembers action)",
+              "items": {
+                "type": "string"
+              }
+            },
+            "commit": {
+              "type": "bytes",
+              "description": "MLS commit message bytes"
+            },
+            "welcome": {
+              "type": "bytes",
+              "description": "MLS welcome message bytes"
+            },
+            "groupInfo": {
+              "type": "bytes",
+              "description": "MLS group info bytes"
+            },
+            "externalCommit": {
+              "type": "bytes",
+              "description": "MLS external commit bytes"
+            },
+            "confirmationTag": {
+              "type": "string",
+              "description": "Base64 encoded confirmation tag"
+            },
+            "idempotencyKey": {
+              "type": "string",
+              "description": "Client-generated UUID for idempotent request retries"
+            },
+            "pendingAdditionId": {
+              "type": "string",
+              "description": "ID of the pending addition to claim (for claimPending action)"
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["success"],
+          "properties": {
+            "success": {
+              "type": "boolean",
+              "description": "Whether the group change was successfully committed"
+            },
+            "newEpoch": {
+              "type": "integer",
+              "description": "New epoch number after the change"
+            },
+            "confirmationTag": {
+              "type": "string",
+              "description": "Base64 encoded confirmation tag from the commit"
+            },
+            "claimedAddition": {
+              "type": "ref",
+              "ref": "#pendingDeviceAddition",
+              "description": "Details of the claimed pending addition (for claimPending action)"
+            },
+            "pendingAdditions": {
+              "type": "array",
+              "description": "List of pending device additions (for listPending action)",
+              "items": {
+                "type": "ref",
+                "ref": "#pendingDeviceAddition"
+              }
+            },
+            "rejoinedAt": {
+              "type": "string",
+              "format": "datetime",
+              "description": "Timestamp when the rejoin was processed"
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "name": "InvalidRequest",
+          "description": "Invalid request parameters"
+        },
+        {
+          "name": "AuthRequired",
+          "description": "Authentication required"
+        },
+        {
+          "name": "Forbidden",
+          "description": "User does not have permission for this action"
+        },
+        {
+          "name": "Conflict",
+          "description": "Conflicting group state (e.g., epoch mismatch)"
+        }
+      ]
+    },
+    "pendingDeviceAddition": {
+      "type": "object",
+      "description": "A pending device addition waiting to be claimed and completed",
+      "required": ["id", "convoId", "userDid", "deviceId"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the pending addition"
+        },
+        "convoId": {
+          "type": "string",
+          "description": "Conversation the device is being added to"
+        },
+        "userDid": {
+          "type": "string",
+          "format": "did",
+          "description": "User DID who owns the device"
+        },
+        "deviceId": {
+          "type": "string",
+          "description": "Device identifier"
+        },
+        "deviceCredentialDid": {
+          "type": "string",
+          "description": "Full device credential DID"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "datetime",
+          "description": "When the pending addition was created"
+        },
+        "claimedBy": {
+          "type": "string",
+          "format": "did",
+          "description": "DID of the device that claimed this addition"
+        },
+        "claimedAt": {
+          "type": "string",
+          "format": "datetime",
+          "description": "When the addition was claimed"
+        }
+      }
+    }
+  }
+}

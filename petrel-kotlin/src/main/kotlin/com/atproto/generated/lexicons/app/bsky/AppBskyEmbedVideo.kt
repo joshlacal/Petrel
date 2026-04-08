@@ -31,7 +31,8 @@ object AppBskyEmbedVideoDefs {
         val playlist: URI,        @SerialName("thumbnail")
         val thumbnail: URI?,        @SerialName("alt")
         val alt: String?,        @SerialName("aspectRatio")
-        val aspectRatio: AppBskyEmbedDefsAspectRatio?    ) {
+        val aspectRatio: AppBskyEmbedDefsAspectRatio?,/** A hint to the client about how to present the video. */        @SerialName("presentation")
+        val presentation: String?    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyEmbedVideoView"
         }
@@ -43,4 +44,5 @@ data class AppBskyEmbedVideo(
     val video: Blob,    @SerialName("captions")
     val captions: List<AppBskyEmbedVideoCaption>?,// Alt text description of the video, for accessibility.    @SerialName("alt")
     val alt: String?,    @SerialName("aspectRatio")
-    val aspectRatio: AppBskyEmbedDefsAspectRatio?)
+    val aspectRatio: AppBskyEmbedDefsAspectRatio?,// A hint to the client about how to present the video.    @SerialName("presentation")
+    val presentation: String?)
