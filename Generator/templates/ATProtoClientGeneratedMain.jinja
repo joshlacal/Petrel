@@ -11,25 +11,30 @@ import Foundation
 
 /// Enum to represent the available authentication modes.
 public enum AuthMode: Sendable {
+    /// No authentication — raw XRPC calls only.
+    case none
     /// Legacy password-based authentication (App Passwords).
     case legacy
     /// Public OAuth for mobile/native apps (PAR + PKCE + DPoP).
     case publicOAuth
     /// Confidential gateway authentication via a backend service.
     case gateway
+    /// Client Assertion Backend — DPoP-bound client assertions for confidential browser-based apps.
+    case cab(backendURL: URL)
 }
 
 // MARK: - API Error Enum
 
 /// Errors that can occur during API operations
-enum APIError: String, Error {
-    case expiredToken = "ExpiredToken"
+enum APIError: Error {
+    case expiredToken
     case invalidToken
     case invalidResponse
     case methodNotSupported
     case authorizationFailed
     case invalidPDSURL
-    case serviceNotInitialized = "AuthenticationService not initialized"
+    case serviceNotInitialized
+    case unauthenticatedClient(String)
 }
 
 // MARK: - Initialization State Enum
@@ -81,33 +86,63 @@ public actor ATProtoClient {
     // MARK: - Properties
 
     /// The network service used for all API requests.
-    private let networkService: NetworkService
+    let networkService: NetworkService
 
     /// The authentication manager handling all auth strategies.
-    private let authManager: AuthManager
+    private let authManager: AuthManager?
 
     /// The account manager for handling multiple accounts.
-    private let accountManager: AccountManager
+    private let accountManager: AccountManager?
 
     /// The DID resolver for resolving DIDs to handles and PDS URLs.
-    private let didResolver: DIDResolving
+    let didResolver: (any DIDResolving)?
 
     /// The storage layer for persistent data.
-    private let storage: KeychainStorage
+    private let storage: KeychainStorage?
 
     /// The OAuth configuration.
-    private let oauthConfig: OAuthConfig
+    private let oauthConfig: OAuthConfig?
 
     /// The delegate for authentication events.
     private weak var authDelegate: AuthenticationDelegate?
 
     /// Temporary storage for account info after OAuth callback
     private var justAuthenticatedAccount: (did: String, handle: String?, pdsURL: URL)?
-    
+
     /// Whether the client is operating in gateway mode (all requests go through gateway)
     private let isGatewayMode: Bool
 
-    /// Namespaces for the AT Protocol APIs.
+    /// The authentication mode.
+    public let authMode: AuthMode
+
+    // MARK: - Unauthenticated Initialization
+
+    /// Creates a lightweight unauthenticated client for public XRPC calls.
+    /// No keychain, account manager, or auth strategy is created.
+    public init(
+        baseURL: URL,
+        userAgent: String? = nil,
+        didResolver: (any DIDResolving)? = nil
+    ) async {
+        self.authMode = .none
+        self.isGatewayMode = false
+        self.authManager = nil
+        self.accountManager = nil
+        self.storage = nil
+        self.oauthConfig = nil
+
+        networkService = NetworkService(baseURL: baseURL)
+
+        if let userAgent {
+            await networkService.setUserAgent(userAgent)
+        }
+
+        if let didResolver {
+            self.didResolver = didResolver
+        } else {
+            self.didResolver = await DIDResolutionService(networkService: networkService)
+        }
+    }
 
     // MARK: - Initialization
 
@@ -137,6 +172,7 @@ public actor ATProtoClient {
         // Initialize storage first
         storage = KeychainStorage(namespace: namespace, accessGroup: accessGroup)
         self.oauthConfig = oauthConfig
+        self.authMode = authMode
 
         // Initialize account manager
         accountManager = await AccountManager(storage: storage)
@@ -179,12 +215,16 @@ public actor ATProtoClient {
         // Convert AuthMode to AuthManager.Mode
         let managerMode: AuthManager.Mode
         switch authMode {
+        case .none:
+            fatalError("Use the unauthenticated init for .none mode")
         case .legacy:
             managerMode = .legacy
         case .publicOAuth:
             managerMode = .publicOAuth
         case .gateway:
             managerMode = .gateway
+        case .cab(let backendURL):
+            managerMode = .cab(backendURL: backendURL)
         }
 
         // Initialize auth manager with the selected mode
@@ -212,6 +252,7 @@ public actor ATProtoClient {
 
     /// Validates and repairs authentication state to prevent race condition issues.
     private func validateAuthenticationState() async {
+        guard let storage else { return }
         let validationResult = await storage.validateAndRepairAuthenticationState()
 
         if validationResult.hasIssues {
@@ -228,6 +269,7 @@ public actor ATProtoClient {
 
     /// Attempts to initialize the client from a stored account.
     private func initializeFromStoredAccount() async {
+        guard let accountManager else { return }
         LogManager.logInfo("ATProtoClient - initializeFromStoredAccount called, isGatewayMode: \(isGatewayMode)")
         if let account = await accountManager.getCurrentAccount() {
             LogManager.logInfo("ATProtoClient - Found current account: \(account.did), pdsURL: \(account.pdsURL)")
@@ -246,21 +288,23 @@ public actor ATProtoClient {
             await networkService.setServiceDID(account.bskyChatDID, for: "chat.bsky")
 
             // Check if tokens need refreshing
-            do {
-                _ = try await authManager.refreshTokenIfNeeded()
-            } catch let error as AuthError where error == .dpopKeyError {
-                // If it's a DPoP error, let's try one more explicit refresh
-                // This is a fallback in case we just need a fresh nonce
-                LogManager.logInfo("Attempting one final explicit token refresh after DPoP error")
+            if let authManager {
                 do {
                     _ = try await authManager.refreshTokenIfNeeded()
+                } catch let error as AuthError where error == .dpopKeyError {
+                    // If it's a DPoP error, let's try one more explicit refresh
+                    // This is a fallback in case we just need a fresh nonce
+                    LogManager.logInfo("Attempting one final explicit token refresh after DPoP error")
+                    do {
+                        _ = try await authManager.refreshTokenIfNeeded()
+                    } catch {
+                        LogManager.logError("Final explicit refresh failed: \(error)")
+                        authDelegate?.authenticationRequired(client: self)
+                    }
                 } catch {
-                    LogManager.logError("Final explicit refresh failed: \(error)")
+                    // If refresh fails, trigger authentication required
                     authDelegate?.authenticationRequired(client: self)
                 }
-            } catch {
-                // If refresh fails, trigger authentication required
-                authDelegate?.authenticationRequired(client: self)
             }
         } else {
             LogManager.logWarning("ATProtoClient - initializeFromStoredAccount: No current account found!")
@@ -290,6 +334,9 @@ public actor ATProtoClient {
     /// Gets the DID (Decentralized Identifier) of the current active account.
     /// - Returns: The DID string of the current account
     public func getDid() async throws -> String {
+        guard authManager != nil else {
+            throw APIError.unauthenticatedClient("No authenticated session on unauthenticated client")
+        }
         let (did, _, _) = await getActiveAccountInfo()
         guard let did = did else {
             throw APIError.serviceNotInitialized
@@ -300,6 +347,9 @@ public actor ATProtoClient {
     /// Gets the handle of the current active account.
     /// - Returns: The handle string of the current account
     public func getHandle() async throws -> String {
+        guard authManager != nil else {
+            throw APIError.unauthenticatedClient("No authenticated session on unauthenticated client")
+        }
         let (_, handle, _) = await getActiveAccountInfo()
         guard let handle = handle else {
             throw APIError.serviceNotInitialized
@@ -310,6 +360,7 @@ public actor ATProtoClient {
     /// Checks if the current session is valid.
     /// - Returns: Boolean indicating whether the session is valid
     public func hasValidSession() async -> Bool {
+        guard let authManager else { return false }
         let (did, _, _) = await getActiveAccountInfo()
         if did == nil {
             return false
@@ -328,6 +379,9 @@ public actor ATProtoClient {
     /// - Returns: Boolean indicating whether token was refreshed
     /// - Throws: Error if token refresh fails
     public func refreshToken() async throws -> Bool {
+        guard let authManager else {
+            throw APIError.unauthenticatedClient("Cannot refresh token on an unauthenticated client")
+        }
         let result = try await authManager.refreshTokenIfNeeded()
         // Return true if token was actually refreshed
         return result == .refreshedSuccessfully
@@ -352,6 +406,9 @@ public actor ATProtoClient {
     /// - Parameter pdsURL: The PDS URL to use (defaults to bsky.social)
     /// - Returns: The authorization URL to present to the user
     public func startSignUpFlow(pdsURL: URL = URL(string: "https://bsky.social")!) async throws -> URL {
+        guard let authManager else {
+            throw APIError.unauthenticatedClient("Cannot start sign-up flow on an unauthenticated client")
+        }
         return try await authManager.startOAuthFlowForSignUp(pdsURL: pdsURL, bskyAppViewDID: nil, bskyChatDID: nil)
     }
 
@@ -360,7 +417,7 @@ public actor ATProtoClient {
     /// Gets the base URL of the current service
     public var baseURL: URL {
         get async {
-            if let account = await accountManager.getCurrentAccount() {
+            if let accountManager, let account = await accountManager.getCurrentAccount() {
                 return account.pdsURL
             } else {
                 return await networkService.baseURL
@@ -379,19 +436,22 @@ public actor ATProtoClient {
     /// Sets the authentication progress delegate.
     /// - Parameter delegate: The delegate to receive progress updates.
     public func setAuthProgressDelegate(_ delegate: AuthProgressDelegate?) async {
-        await authManager.setProgressDelegate(delegate)
+        await authManager?.setProgressDelegate(delegate)
     }
 
     /// Sets the authentication failure delegate.
     /// - Parameter delegate: The delegate to handle catastrophic failures.
     public func setFailureDelegate(_ delegate: AuthFailureDelegate?) async {
-        await authManager.setFailureDelegate(delegate)
+        await authManager?.setFailureDelegate(delegate)
     }
 
     /// Attempts to recover from catastrophic auth failures by resetting circuit breakers.
     /// Should be called when network connectivity is restored.
     /// - Parameter did: The DID to attempt recovery for, or nil for current account
     public func attemptRecoveryFromServerFailures(for did: String? = nil) async throws {
+        guard let authManager else {
+            throw APIError.unauthenticatedClient("Cannot attempt recovery on an unauthenticated client")
+        }
         try await authManager.attemptRecoveryFromServerFailures(for: did)
     }
 
@@ -402,6 +462,9 @@ public actor ATProtoClient {
     ///   - bskyChatDID: Optional custom Chat DID to use for this account
     /// - Returns: The authorization URL to present to the user.
     public func startOAuthFlow(identifier: String? = nil, bskyAppViewDID: String? = nil, bskyChatDID: String? = nil) async throws -> URL {
+        guard let authManager else {
+            throw APIError.unauthenticatedClient("Cannot start OAuth flow on an unauthenticated client")
+        }
         return try await authManager.startOAuthFlow(identifier: identifier, bskyAppViewDID: bskyAppViewDID, bskyChatDID: bskyChatDID)
     }
 
@@ -419,6 +482,9 @@ public actor ATProtoClient {
         bskyAppViewDID: String? = nil,
         bskyChatDID: String? = nil
     ) async throws -> (did: String, handle: String?, pdsURL: URL) {
+        guard let authManager else {
+            throw APIError.unauthenticatedClient("Cannot login on an unauthenticated client")
+        }
         let accountInfo = try await authManager.loginWithPassword(
             identifier: identifier,
             password: password,
@@ -438,6 +504,9 @@ public actor ATProtoClient {
     /// Handles the OAuth callback URL after user authentication.
     /// - Parameter url: The callback URL received from the authorization server.
     public func handleOAuthCallback(url: URL) async throws {
+        guard let authManager else {
+            throw APIError.unauthenticatedClient("Cannot handle OAuth callback on an unauthenticated client")
+        }
         // Get account info from auth manager
         let accountInfo = try await authManager.handleOAuthCallback(url: url)
 
@@ -451,25 +520,35 @@ public actor ATProtoClient {
 
     /// Logs out the current user.
     public func logout() async throws {
+        guard let authManager else {
+            throw APIError.unauthenticatedClient("Cannot logout on an unauthenticated client")
+        }
         try await authManager.logout()
     }
 
     /// Cancels any ongoing OAuth authentication flows.
     public func cancelOAuthFlow() async {
-        await authManager.cancelOAuthFlow()
+        await authManager?.cancelOAuthFlow()
     }
 
     /// Switches the authentication mode at runtime.
     /// - Parameter mode: The new authentication mode to use.
     public func switchAuthMode(_ mode: AuthMode) async throws {
+        guard let authManager else {
+            throw APIError.unauthenticatedClient("Cannot switch auth mode on an unauthenticated client")
+        }
         let managerMode: AuthManager.Mode
         switch mode {
+        case .none:
+            throw APIError.unauthenticatedClient("Cannot switch to .none mode — create a new unauthenticated client instead")
         case .legacy:
             managerMode = .legacy
         case .publicOAuth:
             managerMode = .publicOAuth
         case .gateway:
             managerMode = .gateway
+        case .cab(let backendURL):
+            managerMode = .cab(backendURL: backendURL)
         }
         try await authManager.switchMode(managerMode)
     }
@@ -477,14 +556,7 @@ public actor ATProtoClient {
     /// Gets the current authentication mode.
     public var currentAuthMode: AuthMode {
         get async {
-            switch await authManager.currentMode {
-            case .legacy:
-                return .legacy
-            case .publicOAuth:
-                return .publicOAuth
-            case .gateway:
-                return .gateway
-            }
+            return authMode
         }
     }
 
@@ -500,7 +572,7 @@ public actor ATProtoClient {
             LogManager.logDebug("Found temporary account: \(tempAccount.did)")
 
             // Always try AccountManager first, but don't clear temp storage yet
-            if let account = await accountManager.getCurrentAccount(), account.did == tempAccount.did {
+            if let accountManager, let account = await accountManager.getCurrentAccount(), account.did == tempAccount.did {
                 LogManager.logDebug("AccountManager ready, using AccountManager but keeping temp storage")
                 // Don't clear temp storage yet - let it persist for multiple calls during OAuth completion
                 return (did: account.did, handle: account.handle, pdsURL: account.pdsURL)
@@ -515,7 +587,7 @@ public actor ATProtoClient {
 
         // Fall back to normal AccountManager query
         LogManager.logDebug("Falling back to AccountManager query")
-        if let account = await accountManager.getCurrentAccount() {
+        if let accountManager, let account = await accountManager.getCurrentAccount() {
             LogManager.logDebug("AccountManager returned account: \(account.did)")
             return (did: account.did, handle: account.handle, pdsURL: account.pdsURL)
         } else {
@@ -533,12 +605,16 @@ public actor ATProtoClient {
     /// Lists all available accounts.
     /// - Returns: An array of accounts.
     public func listAccounts() async -> [Account] {
+        guard let accountManager else { return [] }
         return await accountManager.listAccounts()
     }
 
     /// Switches to the specified account.
     /// - Parameter did: The DID of the account to switch to.
     public func switchToAccount(did: String) async throws {
+        guard let accountManager else {
+            throw APIError.unauthenticatedClient("Cannot switch account on an unauthenticated client")
+        }
         try await accountManager.setCurrentAccount(did: did)
 
         // Update network service base URL and service DIDs
@@ -560,6 +636,9 @@ public actor ATProtoClient {
     /// Removes an account.
     /// - Parameter did: The DID of the account to remove.
     public func removeAccount(did: String) async throws {
+        guard let accountManager else {
+            throw APIError.unauthenticatedClient("Cannot remove account on an unauthenticated client")
+        }
         try await accountManager.removeAccount(did: did)
     }
     
@@ -580,9 +659,12 @@ public actor ATProtoClient {
     ///   - bskyAppViewDID: The new Bluesky AppView service DID
     ///   - bskyChatDID: The new Bluesky Chat service DID
     public func updateAndPersistServiceDIDs(bskyAppViewDID: String, bskyChatDID: String) async throws {
+        guard let accountManager else {
+            throw APIError.unauthenticatedClient("Cannot persist service DIDs on an unauthenticated client")
+        }
         // Update NetworkService mappings
         await updateServiceDIDs(bskyAppViewDID: bskyAppViewDID, bskyChatDID: bskyChatDID)
-        
+
         // Persist to account storage
         try await accountManager.updateServiceDIDs(bskyAppViewDID: bskyAppViewDID, bskyChatDID: bskyChatDID)
         
@@ -592,7 +674,7 @@ public actor ATProtoClient {
     /// Gets the current account information including service DIDs.
     /// - Returns: The current account if available, or nil if not authenticated.
     public func getCurrentAccount() async -> Account? {
-        return await accountManager.getCurrentAccount()
+        return await accountManager?.getCurrentAccount()
     }
 
     // MARK: - DID Resolution
