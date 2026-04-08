@@ -14,13 +14,15 @@ actor AuthManager: AuthStrategy {
     // MARK: - Types
 
     /// Authentication mode determining which strategy to use.
-    enum Mode: Sendable {
+    enum Mode: Sendable, Equatable {
         /// Legacy password-based authentication (App Passwords).
         case legacy
         /// Public OAuth for mobile/native apps (PAR + PKCE + DPoP).
         case publicOAuth
         /// Confidential gateway authentication via Nest.
         case gateway
+        /// Client Assertion Backend — DPoP-bound client assertions for confidential browser-based apps.
+        case cab(backendURL: URL)
     }
 
     /// Error types specific to AuthManager.
@@ -152,6 +154,10 @@ actor AuthManager: AuthStrategy {
                 storage: storage,
                 accountManager: accountManager
             )
+
+        case .cab:
+            // CAB strategy not yet implemented — will be added in a future task.
+            throw ManagerError.strategyCreationFailed
         }
     }
 
