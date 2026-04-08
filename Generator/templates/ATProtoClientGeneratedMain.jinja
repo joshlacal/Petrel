@@ -10,7 +10,7 @@ import Foundation
 // MARK: - Authentication Mode Enum
 
 /// Enum to represent the available authentication modes.
-public enum AuthMode: Sendable {
+public enum AuthMode: Sendable, Equatable {
     /// No authentication — raw XRPC calls only.
     case none
     /// Legacy password-based authentication (App Passwords).
