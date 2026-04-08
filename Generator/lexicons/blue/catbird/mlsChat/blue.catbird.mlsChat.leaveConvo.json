@@ -1,10 +1,11 @@
 {
   "lexicon": 1,
   "id": "blue.catbird.mlsChat.leaveConvo",
+  "description": "Leave or remove a member from an MLS conversation (consolidates leaveConvo + removeMember)",
   "defs": {
     "main": {
       "type": "procedure",
-      "description": "Leave an MLS conversation",
+      "description": "Leave an MLS conversation or remove another member (admin only). When targetDid is omitted, the caller leaves. When targetDid is provided, the caller must be an admin to remove that member.",
       "input": {
         "encoding": "application/json",
         "schema": {
@@ -18,11 +19,11 @@
             "targetDid": {
               "type": "string",
               "format": "did",
-              "description": "DID of member to remove (defaults to caller's DID)"
+              "description": "DID of member to remove (defaults to caller's DID). Admin privileges required to remove others."
             },
             "commit": {
-              "type": "string",
-              "description": "Optional base64url-encoded MLS Commit message"
+              "type": "bytes",
+              "description": "Optional MLS Commit message for the removal"
             }
           }
         }
@@ -46,18 +47,11 @@
         }
       },
       "errors": [
-        {
-          "name": "ConvoNotFound",
-          "description": "Conversation not found"
-        },
-        {
-          "name": "NotMember",
-          "description": "Caller is not a member of the conversation"
-        },
-        {
-          "name": "LastMember",
-          "description": "Cannot leave as the last member (delete the conversation instead)"
-        }
+        {"name": "ConvoNotFound", "description": "Conversation not found"},
+        {"name": "NotMember", "description": "Caller is not a member of the conversation"},
+        {"name": "Unauthorized", "description": "Admin privileges required to remove other members"},
+        {"name": "TargetNotMember", "description": "Target DID is not a member of the conversation"},
+        {"name": "LastMember", "description": "Cannot leave as the last member (delete the conversation instead)"}
       ]
     }
   }

@@ -30,13 +30,18 @@ extension ATProtoClient.Com.Atproto.Identity {
         
         
 
+        
         let requestData: Data? = nil
+        
+        
+        let queryItems: [URLQueryItem]? = nil
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
             headers: headers,
             body: requestData,
-            queryItems: nil
+            queryItems: queryItems
         )
 
         // Determine service DID for this endpoint

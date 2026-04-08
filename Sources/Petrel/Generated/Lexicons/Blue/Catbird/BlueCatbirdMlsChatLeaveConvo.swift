@@ -11,10 +11,10 @@ public struct BlueCatbirdMlsChatLeaveConvo {
 public struct Input: ATProtocolCodable {
         public let convoId: String
         public let targetDid: DID?
-        public let commit: String?
+        public let commit: Bytes?
 
         /// Standard public initializer
-        public init(convoId: String, targetDid: DID? = nil, commit: String? = nil) {
+        public init(convoId: String, targetDid: DID? = nil, commit: Bytes? = nil) {
             self.convoId = convoId
             self.targetDid = targetDid
             self.commit = commit
@@ -25,7 +25,7 @@ public struct Input: ATProtocolCodable {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             self.convoId = try container.decode(String.self, forKey: .convoId)
             self.targetDid = try container.decodeIfPresent(DID.self, forKey: .targetDid)
-            self.commit = try container.decodeIfPresent(String.self, forKey: .commit)
+            self.commit = try container.decodeIfPresent(Bytes.self, forKey: .commit)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -140,6 +140,8 @@ public struct Output: ATProtocolCodable {
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case convoNotFound = "ConvoNotFound.Conversation not found"
                 case notMember = "NotMember.Caller is not a member of the conversation"
+                case unauthorized = "Unauthorized.Admin privileges required to remove other members"
+                case targetNotMember = "TargetNotMember.Target DID is not a member of the conversation"
                 case lastMember = "LastMember.Cannot leave as the last member (delete the conversation instead)"
             public var description: String {
                 return self.rawValue
@@ -159,9 +161,10 @@ public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertibl
 extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - leaveConvo
 
-    /// Leave an MLS conversation
+    /// Leave or remove a member from an MLS conversation (consolidates leaveConvo + removeMember) Leave an MLS conversation or remove another member (admin only). When targetDid is omitted, the caller leaves. When targetDid is provided, the caller must be an admin to remove that member.
     /// 
     /// - Parameter input: The input parameters for the request
+    
     /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
@@ -181,13 +184,18 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         headers["Accept"] = "application/json"
         
 
+        
         let requestData: Data? = try JSONEncoder().encode(input)
+        
+        
+        let queryItems: [URLQueryItem]? = nil
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
             headers: headers,
             body: requestData,
-            queryItems: nil
+            queryItems: queryItems
         )
 
         // Determine service DID for this endpoint

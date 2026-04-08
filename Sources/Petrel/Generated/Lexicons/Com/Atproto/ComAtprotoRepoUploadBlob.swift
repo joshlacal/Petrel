@@ -122,6 +122,7 @@ extension ATProtoClient.Com.Atproto.Repo {
     ///   - data: The binary data to upload
     ///   - mimeType: The MIME type of the data being uploaded
     ///   - stripMetadata: Whether to strip metadata from images (default: true)
+    
     /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
@@ -150,13 +151,16 @@ extension ATProtoClient.Com.Atproto.Repo {
         headers["Accept"] = "application/json"
         
 
-        let requestData: Data? = nil
+        
+        
+        let queryItems: [URLQueryItem]? = nil
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
             headers: headers,
             body: dataToUpload,
-            queryItems: nil
+            queryItems: queryItems
         )
 
         // Determine service DID for this endpoint

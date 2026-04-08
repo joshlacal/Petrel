@@ -14,7 +14,20 @@ import AppKit
 
 public struct BlueCatbirdMlsChatPutGroupMetadataBlob { 
 
-    public static let typeIdentifier = "blue.catbird.mlsChat.putGroupMetadataBlob"
+    public static let typeIdentifier = "blue.catbird.mlsChat.putGroupMetadataBlob"    
+public struct Parameters: Parametrizable {
+        public let blobLocator: String
+        public let groupId: String
+        
+        public init(
+            blobLocator: String, 
+            groupId: String
+            ) {
+            self.blobLocator = blobLocator
+            self.groupId = groupId
+            
+        }
+    }
 public struct Input: ATProtocolCodable {
         public let data: Data
 
@@ -53,8 +66,6 @@ public struct Output: ATProtocolCodable {
         
         public let size: Int
         
-        public let groupId: String?
-        
         
         
         // Standard public initializer
@@ -63,9 +74,7 @@ public struct Output: ATProtocolCodable {
             
             blobLocator: String,
             
-            size: Int,
-            
-            groupId: String? = nil
+            size: Int
             
             
         ) {
@@ -74,8 +83,6 @@ public struct Output: ATProtocolCodable {
             self.blobLocator = blobLocator
             
             self.size = size
-            
-            self.groupId = groupId
             
             
         }
@@ -90,9 +97,6 @@ public struct Output: ATProtocolCodable {
             self.size = try container.decode(Int.self, forKey: .size)
             
             
-            self.groupId = try container.decodeIfPresent(String.self, forKey: .groupId)
-            
-            
         }
         
         public func encode(to encoder: Encoder) throws {
@@ -103,10 +107,6 @@ public struct Output: ATProtocolCodable {
             
             
             try container.encode(size, forKey: .size)
-            
-            
-            // Encode optional property even if it's an empty array
-            try container.encodeIfPresent(groupId, forKey: .groupId)
             
             
         }
@@ -126,14 +126,6 @@ public struct Output: ATProtocolCodable {
             map = map.adding(key: "size", value: sizeValue)
             
             
-            
-            if let value = groupId {
-                // Encode optional property even if it's an empty array for CBOR
-                let groupIdValue = try value.toCBORValue()
-                map = map.adding(key: "groupId", value: groupIdValue)
-            }
-            
-            
 
             return map
             
@@ -143,15 +135,14 @@ public struct Output: ATProtocolCodable {
         private enum CodingKeys: String, CodingKey {
             case blobLocator
             case size
-            case groupId
         }
         
     }
         
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case blobTooLarge = "BlobTooLarge.The blob exceeds the maximum allowed size"
-                case notMember = "NotMember.Caller is not a member of the specified group"
-                case unauthorized = "Unauthorized.Authentication required"
+                case blobTooLarge = "BlobTooLarge.Metadata blob exceeds maximum size (1MB)"
+                case invalidBlobLocator = "InvalidBlobLocator.blobLocator is not a valid UUIDv4"
+                case groupNotFound = "GroupNotFound.The specified group does not exist or caller is not a member"
             public var description: String {
                 return self.rawValue
             }
@@ -170,12 +161,13 @@ public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertibl
 extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - putGroupMetadataBlob
 
-    /// Upload an encrypted group metadata blob Upload an encrypted group metadata blob to the server. The blobLocator (UUIDv4) is client-generated and serves as the idempotency key.
+    /// Store an encrypted group metadata blob Upload an encrypted metadata blob. The blobLocator is client-generated (UUIDv4) and serves as the idempotency key. The server stores opaque bytes — it never sees plaintext metadata. Used for both metadata JSON blobs and encrypted avatar images.
     /// 
     /// - Parameters:
     ///   - data: The binary data to upload
     ///   - mimeType: The MIME type of the data being uploaded
     ///   - stripMetadata: Whether to strip metadata from images (default: true)
+    ///   - params: The query parameters for the request
     /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
@@ -183,7 +175,8 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         
         data: Data,
         mimeType: String,
-        stripMetadata: Bool = true
+        stripMetadata: Bool = true,
+        params: BlueCatbirdMlsChatPutGroupMetadataBlob.Parameters
         
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatPutGroupMetadataBlob.Output?) {
         let endpoint = "blue.catbird.mlsChat.putGroupMetadataBlob"
@@ -204,12 +197,16 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         headers["Accept"] = "application/json"
         
 
+        
+        
+        let queryItems = params.asQueryItems()
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
             headers: headers,
             body: dataToUpload,
-            queryItems: nil
+            queryItems: queryItems
         )
 
         // Determine service DID for this endpoint

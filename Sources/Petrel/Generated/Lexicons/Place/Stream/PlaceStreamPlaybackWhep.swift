@@ -14,7 +14,20 @@ import AppKit
 
 public struct PlaceStreamPlaybackWhep { 
 
-    public static let typeIdentifier = "place.stream.playback.whep"
+    public static let typeIdentifier = "place.stream.playback.whep"    
+public struct Parameters: Parametrizable {
+        public let streamer: String
+        public let rendition: String
+        
+        public init(
+            streamer: String, 
+            rendition: String
+            ) {
+            self.streamer = streamer
+            self.rendition = rendition
+            
+        }
+    }
 public struct Input: ATProtocolCodable {
         public let data: Data
 
@@ -134,6 +147,7 @@ extension ATProtoClient.Place.Stream.Playback {
     ///   - data: The binary data to upload
     ///   - mimeType: The MIME type of the data being uploaded
     ///   - stripMetadata: Whether to strip metadata from images (default: true)
+    ///   - params: The query parameters for the request
     /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
@@ -141,7 +155,8 @@ extension ATProtoClient.Place.Stream.Playback {
         
         data: Data,
         mimeType: String,
-        stripMetadata: Bool = true
+        stripMetadata: Bool = true,
+        params: PlaceStreamPlaybackWhep.Parameters
         
     ) async throws -> (responseCode: Int, data: PlaceStreamPlaybackWhep.Output?) {
         let endpoint = "place.stream.playback.whep"
@@ -162,13 +177,16 @@ extension ATProtoClient.Place.Stream.Playback {
         headers["Accept"] = "*/*"
         
 
-        let requestData: Data? = nil
+        
+        
+        let queryItems = params.asQueryItems()
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
             headers: headers,
             body: dataToUpload,
-            queryItems: nil
+            queryItems: queryItems
         )
 
         // Determine service DID for this endpoint

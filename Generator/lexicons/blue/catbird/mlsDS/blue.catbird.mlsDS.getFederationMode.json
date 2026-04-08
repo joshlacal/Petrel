@@ -1,0 +1,32 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mlsDS.getFederationMode",
+  "description": "Get the current federation mode (admin only).",
+  "defs": {
+    "main": {
+      "type": "query",
+      "description": "Return the effective, override, and environment federation mode settings.",
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["effectiveMode", "envMode"],
+          "properties": {
+            "effectiveMode": {
+              "type": "string",
+              "description": "Currently effective federation mode"
+            },
+            "overrideMode": {
+              "type": "string",
+              "description": "Runtime override mode (if set)"
+            },
+            "envMode": {
+              "type": "string",
+              "description": "Federation mode from environment configuration"
+            }
+          }
+        }
+      }
+    }
+  }
+}

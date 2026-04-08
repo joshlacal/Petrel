@@ -11,12 +11,12 @@ public struct BlueCatbirdMlsChatRegisterDevice {
         
 public struct KeyPackageItem: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.registerDevice#keyPackageItem"
-            public let keyPackage: String
+            public let keyPackage: Bytes
             public let cipherSuite: String
             public let expires: ATProtocolDate
 
         public init(
-            keyPackage: String, cipherSuite: String, expires: ATProtocolDate
+            keyPackage: Bytes, cipherSuite: String, expires: ATProtocolDate
         ) {
             self.keyPackage = keyPackage
             self.cipherSuite = cipherSuite
@@ -26,7 +26,7 @@ public struct KeyPackageItem: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.keyPackage = try container.decode(String.self, forKey: .keyPackage)
+                self.keyPackage = try container.decode(Bytes.self, forKey: .keyPackage)
             } catch {
                 LogManager.logError("Decoding error for required property 'keyPackage': \(error)")
                 throw error
@@ -100,10 +100,10 @@ public struct KeyPackageItem: ATProtocolCodable, ATProtocolValue {
 public struct WelcomeMessage: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.registerDevice#welcomeMessage"
             public let convoId: String
-            public let welcome: String
+            public let welcome: Bytes
 
         public init(
-            convoId: String, welcome: String
+            convoId: String, welcome: Bytes
         ) {
             self.convoId = convoId
             self.welcome = welcome
@@ -118,7 +118,7 @@ public struct WelcomeMessage: ATProtocolCodable, ATProtocolValue {
                 throw error
             }
             do {
-                self.welcome = try container.decode(String.self, forKey: .welcome)
+                self.welcome = try container.decode(Bytes.self, forKey: .welcome)
             } catch {
                 LogManager.logError("Decoding error for required property 'welcome': \(error)")
                 throw error
@@ -173,13 +173,15 @@ public struct Input: ATProtocolCodable {
         public let deviceUUID: String?
         public let keyPackages: [KeyPackageItem]
         public let signaturePublicKey: Bytes
+        public let pushToken: String?
 
         /// Standard public initializer
-        public init(deviceName: String, deviceUUID: String? = nil, keyPackages: [KeyPackageItem], signaturePublicKey: Bytes) {
+        public init(deviceName: String, deviceUUID: String? = nil, keyPackages: [KeyPackageItem], signaturePublicKey: Bytes, pushToken: String? = nil) {
             self.deviceName = deviceName
             self.deviceUUID = deviceUUID
             self.keyPackages = keyPackages
             self.signaturePublicKey = signaturePublicKey
+            self.pushToken = pushToken
         }
         
 
@@ -189,6 +191,7 @@ public struct Input: ATProtocolCodable {
             self.deviceUUID = try container.decodeIfPresent(String.self, forKey: .deviceUUID)
             self.keyPackages = try container.decode([KeyPackageItem].self, forKey: .keyPackages)
             self.signaturePublicKey = try container.decode(Bytes.self, forKey: .signaturePublicKey)
+            self.pushToken = try container.decodeIfPresent(String.self, forKey: .pushToken)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -197,6 +200,7 @@ public struct Input: ATProtocolCodable {
             try container.encodeIfPresent(deviceUUID, forKey: .deviceUUID)
             try container.encode(keyPackages, forKey: .keyPackages)
             try container.encode(signaturePublicKey, forKey: .signaturePublicKey)
+            try container.encodeIfPresent(pushToken, forKey: .pushToken)
         }
 
         public func toCBORValue() throws -> Any {
@@ -211,6 +215,10 @@ public struct Input: ATProtocolCodable {
             map = map.adding(key: "keyPackages", value: keyPackagesValue)
             let signaturePublicKeyValue = try signaturePublicKey.toCBORValue()
             map = map.adding(key: "signaturePublicKey", value: signaturePublicKeyValue)
+            if let value = pushToken {
+                let pushTokenValue = try value.toCBORValue()
+                map = map.adding(key: "pushToken", value: pushTokenValue)
+            }
             return map
         }
 
@@ -219,6 +227,7 @@ public struct Input: ATProtocolCodable {
             case deviceUUID
             case keyPackages
             case signaturePublicKey
+            case pushToken
         }
     }
     
@@ -366,9 +375,10 @@ public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertibl
 extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - registerDevice
 
-    /// Register a device for multi-device MLS support. Each device gets a unique device ID and credential (did:plc:user#device-uuid). Required for proper multi-device group conversations.
+    /// Consolidated device registration with optional push token (replaces registerDevice + registerDeviceToken) Register a device for multi-device MLS support. Each device gets a unique device ID and credential (did:plc:user#device-uuid). Optionally registers a push token in the same call, eliminating the need for a separate registerDeviceToken request.
     /// 
     /// - Parameter input: The input parameters for the request
+    
     /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
@@ -388,13 +398,18 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         headers["Accept"] = "application/json"
         
 
+        
         let requestData: Data? = try JSONEncoder().encode(input)
+        
+        
+        let queryItems: [URLQueryItem]? = nil
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
             headers: headers,
             body: requestData,
-            queryItems: nil
+            queryItems: queryItems
         )
 
         // Determine service DID for this endpoint

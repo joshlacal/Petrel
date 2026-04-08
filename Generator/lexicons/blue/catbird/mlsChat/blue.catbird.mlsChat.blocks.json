@@ -1,10 +1,11 @@
 {
   "lexicon": 1,
   "id": "blue.catbird.mlsChat.blocks",
+  "description": "Manage Bluesky block relationships for MLS conversations (consolidates checkBlocks + getBlockStatus + handleBlockChange)",
   "defs": {
     "main": {
       "type": "procedure",
-      "description": "Manage block relationships for MLS conversations. Supports checking block status, querying blocks between DIDs, and handling block changes.",
+      "description": "Check, query, or handle Bluesky block relationships relevant to MLS conversations. The 'action' field determines the operation.",
       "input": {
         "encoding": "application/json",
         "schema": {
@@ -13,26 +14,31 @@
           "properties": {
             "action": {
               "type": "string",
-              "description": "Block action to perform",
-              "knownValues": ["getStatus", "check", "handleChange"]
-            },
-            "convoId": {
-              "type": "string",
-              "description": "Conversation identifier (for getStatus action)"
+              "description": "Block operation: 'check' queries Bluesky for block relationships between DIDs, 'getStatus' returns blocks within a conversation, 'handleChange' processes a block/unblock event from Bluesky firehose",
+              "knownValues": ["check", "getStatus", "handleChange"]
             },
             "dids": {
               "type": "array",
-              "description": "DIDs to check for block relationships (for check action, 2-100 DIDs)",
               "items": {
-                "type": "string"
+                "type": "string",
+                "format": "did"
               },
-              "minItems": 2,
-              "maxItems": 100
+              "description": "DIDs to check for mutual blocks (required for 'check', 2-100 users)",
+              "maxLength": 100
+            },
+            "convoId": {
+              "type": "string",
+              "description": "Conversation identifier (required for 'getStatus')"
+            },
+            "did": {
+              "type": "string",
+              "format": "did",
+              "description": "DID involved in the block change (for 'handleChange')"
             },
             "blockRecord": {
               "type": "ref",
-              "ref": "#blockRecord",
-              "description": "Block record for handleChange action"
+              "ref": "#blockChangeRecord",
+              "description": "Block/unblock event data from Bluesky firehose (for 'handleChange')"
             }
           }
         }
@@ -42,86 +48,66 @@
         "schema": {
           "type": "object",
           "properties": {
-            "hasConflicts": {
+            "blocked": {
               "type": "boolean",
-              "description": "Whether any block conflicts were found"
+              "description": "Whether any blocks exist (for 'check')"
             },
             "blocks": {
               "type": "array",
-              "description": "Block relationships found",
               "items": {
                 "type": "ref",
                 "ref": "#blockRelationship"
-              }
+              },
+              "description": "Block relationships found (for 'check' and 'getStatus')"
+            },
+            "hasConflicts": {
+              "type": "boolean",
+              "description": "Whether any conversation members have blocked each other (for 'getStatus')"
             },
             "checkedAt": {
               "type": "string",
               "format": "datetime",
-              "description": "When the check was performed"
+              "description": "When the block status was checked"
+            },
+            "changes": {
+              "type": "array",
+              "items": {
+                "type": "ref",
+                "ref": "#blockChangeResult"
+              },
+              "description": "Results of handling block changes (for 'handleChange')"
             },
             "status": {
               "type": "ref",
               "ref": "#conversationBlockStatus",
-              "description": "Block status for a specific conversation"
-            },
-            "changes": {
-              "type": "array",
-              "description": "Results of block change processing",
-              "items": {
-                "type": "ref",
-                "ref": "#blockChangeResult"
-              }
+              "description": "Full conversation block status (for 'getStatus')"
             }
           }
         }
       },
       "errors": [
-        {
-          "name": "InvalidRequest",
-          "description": "Invalid request parameters"
-        },
-        {
-          "name": "Unauthorized",
-          "description": "Authentication required"
-        }
+        {"name": "InvalidAction", "description": "Unknown action value"},
+        {"name": "MissingDids", "description": "dids is required for 'check'"},
+        {"name": "TooManyDids", "description": "Too many DIDs provided (max 100)"},
+        {"name": "ConvoNotFound", "description": "Conversation not found (for 'getStatus')"},
+        {"name": "NotMember", "description": "Caller is not a member (for 'getStatus')"},
+        {"name": "NotAdmin", "description": "Admin privileges required (for 'getStatus')"},
+        {"name": "BlueskyServiceUnavailable", "description": "Could not reach Bluesky service"}
       ]
-    },
-    "blockRecord": {
-      "type": "object",
-      "description": "A block record change to process",
-      "required": ["blockerDid", "blockedDid", "action"],
-      "properties": {
-        "blockerDid": {
-          "type": "string",
-          "format": "did",
-          "description": "DID of the user who created/deleted the block"
-        },
-        "blockedDid": {
-          "type": "string",
-          "format": "did",
-          "description": "DID of the user being blocked/unblocked"
-        },
-        "action": {
-          "type": "string",
-          "description": "Whether the block was created or deleted",
-          "knownValues": ["created", "deleted"]
-        }
-      }
     },
     "blockRelationship": {
       "type": "object",
-      "description": "A block relationship between two users",
       "required": ["blockerDid", "blockedDid", "createdAt"],
       "properties": {
         "blockerDid": {
           "type": "string",
           "format": "did",
-          "description": "DID of the blocking user"
+          "description": "DID of user who created the block"
         },
         "blockedDid": {
           "type": "string",
           "format": "did",
-          "description": "DID of the blocked user"
+          "description": "DID of user who was blocked"
         },
         "createdAt": {
           "type": "string",
@@ -130,53 +116,65 @@
         },
         "blockUri": {
           "type": "string",
-          "description": "AT URI of the block record"
+          "format": "at-uri",
+          "description": "AT-URI of the block record on Bluesky"
         }
       }
     },
-    "conversationBlockStatus": {
+    "blockChangeRecord": {
       "type": "object",
-      "description": "Block status for a specific conversation",
-      "required": ["convoId", "hasConflicts", "memberCount"],
+      "required": ["action", "blockerDid", "blockedDid"],
       "properties": {
-        "convoId": {
+        "action": {
           "type": "string",
-          "description": "Conversation identifier"
+          "description": "Whether a block was created or deleted",
+          "knownValues": ["block", "unblock"]
         },
-        "hasConflicts": {
-          "type": "boolean",
-          "description": "Whether there are block conflicts in this conversation"
-        },
-        "memberCount": {
-          "type": "integer",
-          "description": "Number of members in the conversation"
-        },
-        "checkedAt": {
+        "blockerDid": {
           "type": "string",
-          "format": "datetime",
-          "description": "When the status was last checked"
+          "format": "did",
+          "description": "DID of the blocker"
+        },
+        "blockedDid": {
+          "type": "string",
+          "format": "did",
+          "description": "DID of the blocked user"
+        },
+        "blockUri": {
+          "type": "string",
+          "format": "at-uri",
+          "description": "AT-URI of the block record"
         }
       }
     },
     "blockChangeResult": {
       "type": "object",
-      "description": "Result of processing a block change for a conversation",
       "required": ["convoId", "action"],
       "properties": {
         "convoId": {
           "type": "string",
-          "description": "Affected conversation identifier"
+          "description": "Affected conversation"
         },
         "action": {
           "type": "string",
-          "description": "Action taken",
-          "knownValues": ["block_detected", "block_removed"]
+          "description": "Action taken in response to block change",
+          "knownValues": ["memberRemoved", "notificationSent", "noAction"]
         },
         "removedDid": {
           "type": "string",
           "format": "did",
-          "description": "DID of the member removed due to block conflict"
+          "description": "DID of member removed (if action is memberRemoved)"
         }
+      }
+    },
+    "conversationBlockStatus": {
+      "type": "object",
+      "required": ["convoId", "hasConflicts", "memberCount"],
+      "properties": {
+        "convoId": { "type": "string" },
+        "hasConflicts": { "type": "boolean" },
+        "memberCount": { "type": "integer", "minimum": 0 },
+        "checkedAt": { "type": "string", "format": "datetime" }
       }
     }
   }

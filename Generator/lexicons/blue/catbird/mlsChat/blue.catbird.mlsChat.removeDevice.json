@@ -4,7 +4,7 @@
   "defs": {
     "main": {
       "type": "procedure",
-      "description": "Remove a registered device, its key packages, and leave all conversations the device was a member of",
+      "description": "Remove a registered MLS device and clean up associated resources (key packages, conversation memberships, pending welcome messages).",
       "input": {
         "encoding": "application/json",
         "schema": {
@@ -13,7 +13,7 @@
           "properties": {
             "deviceId": {
               "type": "string",
-              "description": "Device ID to remove (must be owned by authenticated user)"
+              "description": "The device ID to remove."
             }
           }
         }
@@ -26,27 +26,24 @@
           "properties": {
             "deleted": {
               "type": "boolean",
-              "description": "True if device was successfully removed"
+              "description": "Whether the device was successfully deleted."
             },
             "keyPackagesDeleted": {
               "type": "integer",
-              "description": "Number of key packages deleted with the device"
+              "minimum": 0,
+              "description": "Number of key packages that were removed."
             },
             "conversationsLeft": {
               "type": "integer",
-              "description": "Number of conversations the device was removed from"
+              "minimum": 0,
+              "description": "Number of conversations the device was removed from."
             }
           }
         }
       },
       "errors": [
         {
-          "name": "Unauthorized",
-          "description": "User does not own this device or is not authenticated"
-        },
-        {
-          "name": "InvalidRequest",
-          "description": "Empty or invalid device ID"
+          "name": "DeviceNotFound"
         }
       ]
     }

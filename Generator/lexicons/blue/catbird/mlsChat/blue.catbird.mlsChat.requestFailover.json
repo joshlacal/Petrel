@@ -1,11 +1,11 @@
 {
   "lexicon": 1,
   "id": "blue.catbird.mlsChat.requestFailover",
-  "description": "Request sequencer failover for a conversation (spec §8.8)",
+  "description": "Request sequencer failover when the current sequencer is unreachable",
   "defs": {
     "main": {
       "type": "procedure",
-      "description": "Request sequencer failover for a conversation. Called when >= 3 consecutive send timeouts occur over >= 2 minutes.",
+      "description": "Request sequencer failover for a conversation. Only members may call this. The handler health-checks the current sequencer before allowing the takeover. Returns CONFLICT if the current sequencer is still healthy.",
       "input": {
         "encoding": "application/json",
         "schema": {
@@ -23,18 +23,34 @@
         "encoding": "application/json",
         "schema": {
           "type": "object",
-          "required": ["success"],
+          "required": ["newSequencerDid", "convoId", "epoch", "sequencerTerm"],
           "properties": {
-            "success": {
-              "type": "boolean",
-              "description": "Whether the failover request was accepted"
+            "newSequencerDid": {
+              "type": "string",
+              "format": "did",
+              "description": "DID of the new sequencer that assumed the role"
+            },
+            "convoId": {
+              "type": "string",
+              "description": "Conversation identifier"
+            },
+            "epoch": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Current MLS epoch after failover"
+            },
+            "sequencerTerm": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "New sequencer term number"
             }
           }
         }
       },
       "errors": [
         {"name": "ConvoNotFound", "description": "Conversation not found"},
-        {"name": "NotMember", "description": "Caller is not a member of the conversation"}
+        {"name": "NotMember", "description": "Caller is not a member of the conversation"},
+        {"name": "SequencerHealthy", "description": "Current sequencer is still healthy, failover denied"}
       ]
     }
   }

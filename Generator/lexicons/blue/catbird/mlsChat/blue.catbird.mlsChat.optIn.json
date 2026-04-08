@@ -1,23 +1,21 @@
 {
   "lexicon": 1,
   "id": "blue.catbird.mlsChat.optIn",
+  "description": "Manage MLS chat opt-in status (consolidates optIn + optOut + getOptInStatus + getChatRequestSettings + updateChatRequestSettings + acceptChatRequest + declineChatRequest + sendChatRequest)",
   "defs": {
     "main": {
       "type": "procedure",
-      "description": "Opt in to MLS chat or query opt-in status for users.",
+      "description": "Manage MLS chat participation. Supports opting in/out, checking status for multiple DIDs, and managing chat request settings.",
       "input": {
         "encoding": "application/json",
         "schema": {
           "type": "object",
+          "required": ["action"],
           "properties": {
-            "deviceId": {
-              "type": "string",
-              "description": "Device identifier for this opt-in"
-            },
             "action": {
               "type": "string",
-              "description": "Action to perform",
-              "knownValues": ["optIn", "getStatus"]
+              "description": "Action to perform: 'optIn' enables MLS chat, 'optOut' disables it, 'getStatus' checks opt-in status for one or more DIDs, 'getSettings' retrieves chat request settings, 'updateSettings' updates chat request settings",
+              "knownValues": ["optIn", "optOut", "getStatus", "getSettings", "updateSettings"]
             },
             "dids": {
               "type": "array",
@@ -25,8 +23,25 @@
                 "type": "string",
                 "format": "did"
               },
-              "description": "List of DIDs to check status for (for getStatus action, max 100)",
+              "description": "DIDs to check status for (used with 'getStatus' action)",
               "maxLength": 100
+            },
+            "deviceId": {
+              "type": "string",
+              "description": "Device identifier (optional, for 'optIn' action)"
+            },
+            "allowFollowersBypass": {
+              "type": "boolean",
+              "description": "Allow followers to bypass chat request approval (for 'updateSettings' action)"
+            },
+            "allowFollowingBypass": {
+              "type": "boolean",
+              "description": "Allow accounts you follow to bypass chat request approval (for 'updateSettings' action)"
+            },
+            "autoExpireDays": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Auto-expire pending chat requests after N days, 0 = no expiry (for 'updateSettings' action)"
             }
           }
         }
@@ -35,14 +50,19 @@
         "encoding": "application/json",
         "schema": {
           "type": "object",
-          "required": ["optedIn", "optedInAt"],
           "properties": {
+            "success": {
+              "type": "boolean",
+              "description": "Whether the opt-in/opt-out operation succeeded"
+            },
             "optedIn": {
-              "type": "boolean"
+              "type": "boolean",
+              "description": "Current opt-in status of the caller (for 'optIn'/'optOut')"
             },
             "optedInAt": {
               "type": "string",
-              "format": "datetime"
+              "format": "datetime",
+              "description": "When the user opted in (for 'optIn')"
             },
             "statuses": {
               "type": "array",
@@ -50,27 +70,32 @@
                 "type": "ref",
                 "ref": "#optInStatus"
               },
-              "description": "Array of opt-in statuses (for getStatus action)"
+              "description": "Opt-in statuses for requested DIDs (for 'getStatus')"
             },
             "allowFollowersBypass": {
               "type": "boolean",
-              "description": "Whether followers can bypass chat request approval"
+              "description": "Whether followers can bypass chat request approval (for 'getSettings'/'updateSettings')"
             },
             "allowFollowingBypass": {
               "type": "boolean",
-              "description": "Whether users being followed can bypass chat request approval"
+              "description": "Whether accounts you follow can bypass chat request approval (for 'getSettings'/'updateSettings')"
             },
             "autoExpireDays": {
               "type": "integer",
-              "description": "Number of days after which unanswered chat requests auto-expire"
+              "description": "Auto-expire pending chat requests after N days (for 'getSettings'/'updateSettings')"
             }
           }
         }
-      }
+      },
+      "errors": [
+        {"name": "InvalidAction", "description": "Unknown action value"},
+        {"name": "AlreadyOptedIn", "description": "User is already opted in"},
+        {"name": "AlreadyOptedOut", "description": "User is already opted out"},
+        {"name": "TooManyDids", "description": "Too many DIDs requested (max 100)"}
+      ]
     },
     "optInStatus": {
       "type": "object",
-      "description": "Opt-in status for a single user",
       "required": ["did", "optedIn"],
       "properties": {
         "did": {
@@ -80,12 +105,12 @@
         },
         "optedIn": {
           "type": "boolean",
-          "description": "Whether user has opted into MLS"
+          "description": "Whether the user has opted into MLS chat"
         },
         "optedInAt": {
           "type": "string",
           "format": "datetime",
-          "description": "When user opted in (if applicable)"
+          "description": "When the user opted in (if applicable)"
         }
       }
     }

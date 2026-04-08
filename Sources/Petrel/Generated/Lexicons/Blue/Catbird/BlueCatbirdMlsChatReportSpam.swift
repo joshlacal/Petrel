@@ -136,9 +136,9 @@ public struct Output: ATProtocolCodable {
     }
         
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case unauthorized = "Unauthorized.Authentication required"
-                case notFound = "NotFound.Conversation or member not found"
-                case duplicateReport = "DuplicateReport.A report for this member in this conversation already exists"
+                case conversationNotFound = "ConversationNotFound."
+                case notAMember = "NotAMember."
+                case alreadyReported = "AlreadyReported."
             public var description: String {
                 return self.rawValue
             }
@@ -157,9 +157,10 @@ public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertibl
 extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - reportSpam
 
-    /// Report a conversation member for spam
+    /// Report an account as spam in an MLS conversation.
     /// 
     /// - Parameter input: The input parameters for the request
+    
     /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
@@ -179,13 +180,18 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         headers["Accept"] = "application/json"
         
 
+        
         let requestData: Data? = try JSONEncoder().encode(input)
+        
+        
+        let queryItems: [URLQueryItem]? = nil
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
             headers: headers,
             body: requestData,
-            queryItems: nil
+            queryItems: queryItems
         )
 
         // Determine service DID for this endpoint

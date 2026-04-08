@@ -1,11 +1,11 @@
 {
   "lexicon": 1,
   "id": "blue.catbird.mlsChat.createConvo",
-  "description": "Create a new MLS conversation with optional initial members and metadata",
+  "description": "Create a new MLS conversation with optional initial members, metadata, and invite link (consolidates createConvo + createInvite + revokeInvite)",
   "defs": {
     "main": {
       "type": "procedure",
-      "description": "Create a new MLS conversation",
+      "description": "Create a new MLS conversation. Optionally adds initial members with a Welcome message and creates an invite link in one atomic operation.",
       "input": {
         "encoding": "application/json",
         "schema": {
@@ -16,10 +16,6 @@
               "type": "string",
               "description": "Hex-encoded MLS group identifier",
               "maxLength": 128
-            },
-            "idempotencyKey": {
-              "type": "string",
-              "description": "Client-generated UUID for idempotent request retries. Optional but recommended."
             },
             "cipherSuite": {
               "type": "string",
@@ -39,13 +35,12 @@
                 "type": "string",
                 "format": "did"
               },
-              "description": "DIDs of initial members to add to the conversation (max 999 excluding creator, default policy allows up to 1000 total)",
-              "maxLength": 999,
-              "minLength": 0
+              "description": "DIDs of initial members to add (max 999 excluding creator)",
+              "maxLength": 999
             },
             "welcomeMessage": {
-              "type": "string",
-              "description": "Base64url-encoded MLS Welcome message containing encrypted secrets for ALL initial members"
+              "type": "bytes",
+              "description": "MLS Welcome message for ALL initial members"
             },
             "keyPackageHashes": {
               "type": "array",
@@ -53,16 +48,21 @@
                 "type": "ref",
                 "ref": "#keyPackageHashEntry"
               },
-              "description": "Array of {did, hash} objects mapping each initial member to their key package hash. Required for multi-device support."
+              "description": "Array of {did, hash} objects mapping each initial member to their key package hash"
             },
             "metadata": {
               "type": "ref",
               "ref": "#metadataInput",
-              "description": "Optional conversation metadata (name, description, avatar)"
+              "description": "Optional conversation metadata (name, description)"
+            },
+            "invite": {
+              "type": "ref",
+              "ref": "#inviteAction",
+              "description": "Optional invite link management: create or revoke invite codes at conversation creation time"
             },
             "currentEpoch": {
               "type": "integer",
-              "description": "Client's current MLS epoch after group creation and adding initial members. Used for server telemetry only (server is not authoritative for MLS state). Defaults to 0 if not provided.",
+              "description": "Client's current MLS epoch after group creation (for server telemetry only)",
               "minimum": 0,
               "default": 0
             }
@@ -78,33 +78,30 @@
             "convo": {
               "type": "ref",
               "ref": "blue.catbird.mlsChat.defs#convoView",
-              "description": "The newly created conversation"
+              "description": "The created conversation view"
+            },
+            "inviteCode": {
+              "type": "string",
+              "description": "Generated invite code (only present if invite.action was 'create')"
+            },
+            "sequencerDs": {
+              "type": "string",
+              "format": "did",
+              "description": "DID of the delivery service acting as sequencer for this conversation"
             }
           }
         }
       },
       "errors": [
-        {
-          "name": "InvalidCipherSuite",
-          "description": "The specified cipher suite is not supported"
-        },
-        {
-          "name": "KeyPackageNotFound",
-          "description": "Key package not found for one or more initial members"
-        },
-        {
-          "name": "TooManyMembers",
-          "description": "Too many initial members specified (default max 1000 total including creator, configurable per-conversation via policy)"
-        },
-        {
-          "name": "MutualBlockDetected",
-          "description": "Cannot create conversation with users who have blocked each other on Bluesky"
-        }
+        {"name": "InvalidCipherSuite", "description": "The specified cipher suite is not supported"},
+        {"name": "KeyPackageNotFound", "description": "Key package not found for one or more initial members"},
+        {"name": "TooManyMembers", "description": "Too many initial members specified"},
+        {"name": "MutualBlockDetected", "description": "Cannot create conversation with users who have blocked each other"}
       ]
     },
     "metadataInput": {
       "type": "object",
-      "description": "Input metadata for conversation creation (text-only, no avatar)",
+      "description": "Input metadata for conversation creation",
       "properties": {
         "name": {
           "type": "string",
@@ -120,7 +117,6 @@
     },
     "keyPackageHashEntry": {
       "type": "object",
-      "description": "Maps a DID to the key package hash used for their Welcome message",
       "required": ["did", "hash"],
       "properties": {
         "did": {
@@ -131,6 +127,22 @@
         "hash": {
           "type": "string",
           "description": "Hex-encoded SHA-256 hash of the key package used"
+        }
+      }
+    },
+    "inviteAction": {
+      "type": "object",
+      "required": ["action"],
+      "description": "Invite link management sub-resource",
+      "properties": {
+        "action": {
+          "type": "string",
+          "description": "Action to perform: 'create' generates a new invite code, 'revoke' invalidates an existing code",
+          "knownValues": ["create", "revoke"]
+        },
+        "code": {
+          "type": "string",
+          "description": "Invite code to revoke (required when action is 'revoke')"
         }
       }
     }

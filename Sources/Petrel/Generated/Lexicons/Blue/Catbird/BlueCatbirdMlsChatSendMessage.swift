@@ -11,21 +11,27 @@ public struct BlueCatbirdMlsChatSendMessage {
 public struct Input: ATProtocolCodable {
         public let convoId: String
         public let msgId: String
-        public let idempotencyKey: String?
         public let ciphertext: Bytes
         public let epoch: Int
         public let paddedSize: Int
         public let delivery: String?
+        public let action: String?
+        public let reactionEmoji: String?
+        public let targetMessageId: String?
+        public let confirmationTag: Bytes?
 
         /// Standard public initializer
-        public init(convoId: String, msgId: String, idempotencyKey: String? = nil, ciphertext: Bytes, epoch: Int, paddedSize: Int, delivery: String? = nil) {
+        public init(convoId: String, msgId: String, ciphertext: Bytes, epoch: Int, paddedSize: Int, delivery: String? = nil, action: String? = nil, reactionEmoji: String? = nil, targetMessageId: String? = nil, confirmationTag: Bytes? = nil) {
             self.convoId = convoId
             self.msgId = msgId
-            self.idempotencyKey = idempotencyKey
             self.ciphertext = ciphertext
             self.epoch = epoch
             self.paddedSize = paddedSize
             self.delivery = delivery
+            self.action = action
+            self.reactionEmoji = reactionEmoji
+            self.targetMessageId = targetMessageId
+            self.confirmationTag = confirmationTag
         }
         
 
@@ -33,22 +39,28 @@ public struct Input: ATProtocolCodable {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             self.convoId = try container.decode(String.self, forKey: .convoId)
             self.msgId = try container.decode(String.self, forKey: .msgId)
-            self.idempotencyKey = try container.decodeIfPresent(String.self, forKey: .idempotencyKey)
             self.ciphertext = try container.decode(Bytes.self, forKey: .ciphertext)
             self.epoch = try container.decode(Int.self, forKey: .epoch)
             self.paddedSize = try container.decode(Int.self, forKey: .paddedSize)
             self.delivery = try container.decodeIfPresent(String.self, forKey: .delivery)
+            self.action = try container.decodeIfPresent(String.self, forKey: .action)
+            self.reactionEmoji = try container.decodeIfPresent(String.self, forKey: .reactionEmoji)
+            self.targetMessageId = try container.decodeIfPresent(String.self, forKey: .targetMessageId)
+            self.confirmationTag = try container.decodeIfPresent(Bytes.self, forKey: .confirmationTag)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(convoId, forKey: .convoId)
             try container.encode(msgId, forKey: .msgId)
-            try container.encodeIfPresent(idempotencyKey, forKey: .idempotencyKey)
             try container.encode(ciphertext, forKey: .ciphertext)
             try container.encode(epoch, forKey: .epoch)
             try container.encode(paddedSize, forKey: .paddedSize)
             try container.encodeIfPresent(delivery, forKey: .delivery)
+            try container.encodeIfPresent(action, forKey: .action)
+            try container.encodeIfPresent(reactionEmoji, forKey: .reactionEmoji)
+            try container.encodeIfPresent(targetMessageId, forKey: .targetMessageId)
+            try container.encodeIfPresent(confirmationTag, forKey: .confirmationTag)
         }
 
         public func toCBORValue() throws -> Any {
@@ -57,10 +69,6 @@ public struct Input: ATProtocolCodable {
             map = map.adding(key: "convoId", value: convoIdValue)
             let msgIdValue = try msgId.toCBORValue()
             map = map.adding(key: "msgId", value: msgIdValue)
-            if let value = idempotencyKey {
-                let idempotencyKeyValue = try value.toCBORValue()
-                map = map.adding(key: "idempotencyKey", value: idempotencyKeyValue)
-            }
             let ciphertextValue = try ciphertext.toCBORValue()
             map = map.adding(key: "ciphertext", value: ciphertextValue)
             let epochValue = try epoch.toCBORValue()
@@ -71,17 +79,36 @@ public struct Input: ATProtocolCodable {
                 let deliveryValue = try value.toCBORValue()
                 map = map.adding(key: "delivery", value: deliveryValue)
             }
+            if let value = action {
+                let actionValue = try value.toCBORValue()
+                map = map.adding(key: "action", value: actionValue)
+            }
+            if let value = reactionEmoji {
+                let reactionEmojiValue = try value.toCBORValue()
+                map = map.adding(key: "reactionEmoji", value: reactionEmojiValue)
+            }
+            if let value = targetMessageId {
+                let targetMessageIdValue = try value.toCBORValue()
+                map = map.adding(key: "targetMessageId", value: targetMessageIdValue)
+            }
+            if let value = confirmationTag {
+                let confirmationTagValue = try value.toCBORValue()
+                map = map.adding(key: "confirmationTag", value: confirmationTagValue)
+            }
             return map
         }
 
         private enum CodingKeys: String, CodingKey {
             case convoId
             case msgId
-            case idempotencyKey
             case ciphertext
             case epoch
             case paddedSize
             case delivery
+            case action
+            case reactionEmoji
+            case targetMessageId
+            case confirmationTag
         }
     }
     
@@ -204,9 +231,11 @@ public struct Output: ATProtocolCodable {
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case convoNotFound = "ConvoNotFound.Conversation not found"
                 case notMember = "NotMember.Caller is not a member of the conversation"
-                case invalidAsset = "InvalidAsset.Payload or attachment pointer is invalid"
                 case epochMismatch = "EpochMismatch.Message epoch does not match current conversation epoch"
                 case messageTooLarge = "MessageTooLarge.Message exceeds maximum size policy"
+                case invalidReaction = "InvalidReaction.Missing reactionEmoji or targetMessageId for reaction action"
+                case invalidAsset = "InvalidAsset.Payload or attachment pointer is invalid"
+                case treeStateDiverged = "TreeStateDiverged.Client MLS tree state does not match server canonical tree. Client must re-join via external commit."
             public var description: String {
                 return self.rawValue
             }
@@ -225,9 +254,10 @@ public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertibl
 extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - sendMessage
 
-    /// Send an encrypted message to an MLS conversation
+    /// Send an encrypted message with optional reaction support (consolidates sendMessage + reaction sub-actions) Send an encrypted message to an MLS conversation. Supports application messages, reactions (add/remove), and ephemeral delivery. The msgId serves as the idempotency key.
     /// 
     /// - Parameter input: The input parameters for the request
+    
     /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
@@ -247,13 +277,18 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         headers["Accept"] = "application/json"
         
 
+        
         let requestData: Data? = try JSONEncoder().encode(input)
+        
+        
+        let queryItems: [URLQueryItem]? = nil
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
             headers: headers,
             body: requestData,
-            queryItems: nil
+            queryItems: queryItems
         )
 
         // Determine service DID for this endpoint

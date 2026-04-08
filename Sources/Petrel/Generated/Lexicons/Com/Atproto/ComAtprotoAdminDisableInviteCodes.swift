@@ -60,6 +60,7 @@ extension ATProtoClient.Com.Atproto.Admin {
     /// Disable some set of codes and/or all codes associated with a set of users.
     /// 
     /// - Parameter input: The input parameters for the request
+    
     /// 
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
@@ -77,13 +78,18 @@ extension ATProtoClient.Com.Atproto.Admin {
         
         
 
+        
         let requestData: Data? = try JSONEncoder().encode(input)
+        
+        
+        let queryItems: [URLQueryItem]? = nil
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
             headers: headers,
             body: requestData,
-            queryItems: nil
+            queryItems: queryItems
         )
 
         // Determine service DID for this endpoint

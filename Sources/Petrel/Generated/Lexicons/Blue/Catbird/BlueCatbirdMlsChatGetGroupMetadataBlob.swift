@@ -25,15 +25,7 @@ public struct Parameters: Parametrizable {
 public struct Output: ATProtocolCodable {
         
         
-        public let blobLocator: String
-        
-        public let groupId: String
-        
-        public let data: Bytes
-        
-        public let size: Int?
-        
-        public let createdAt: ATProtocolDate?
+        public let data: Data
         
         
         
@@ -41,29 +33,13 @@ public struct Output: ATProtocolCodable {
         public init(
             
             
-            blobLocator: String,
-            
-            groupId: String,
-            
-            data: Bytes,
-            
-            size: Int? = nil,
-            
-            createdAt: ATProtocolDate? = nil
+            data: Data
             
             
         ) {
             
             
-            self.blobLocator = blobLocator
-            
-            self.groupId = groupId
-            
             self.data = data
-            
-            self.size = size
-            
-            self.createdAt = createdAt
             
             
         }
@@ -72,19 +48,7 @@ public struct Output: ATProtocolCodable {
             
             let container = try decoder.container(keyedBy: CodingKeys.self)
             
-            self.blobLocator = try container.decode(String.self, forKey: .blobLocator)
-            
-            
-            self.groupId = try container.decode(String.self, forKey: .groupId)
-            
-            
-            self.data = try container.decode(Bytes.self, forKey: .data)
-            
-            
-            self.size = try container.decodeIfPresent(Int.self, forKey: .size)
-            
-            
-            self.createdAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .createdAt)
+            self.data = try container.decode(Data.self, forKey: .data)
             
             
         }
@@ -93,21 +57,7 @@ public struct Output: ATProtocolCodable {
             
             var container = encoder.container(keyedBy: CodingKeys.self)
             
-            try container.encode(blobLocator, forKey: .blobLocator)
-            
-            
-            try container.encode(groupId, forKey: .groupId)
-            
-            
             try container.encode(data, forKey: .data)
-            
-            
-            // Encode optional property even if it's an empty array
-            try container.encodeIfPresent(size, forKey: .size)
-            
-            
-            // Encode optional property even if it's an empty array
-            try container.encodeIfPresent(createdAt, forKey: .createdAt)
             
             
         }
@@ -118,34 +68,8 @@ public struct Output: ATProtocolCodable {
 
             
             
-            let blobLocatorValue = try blobLocator.toCBORValue()
-            map = map.adding(key: "blobLocator", value: blobLocatorValue)
-            
-            
-            
-            let groupIdValue = try groupId.toCBORValue()
-            map = map.adding(key: "groupId", value: groupIdValue)
-            
-            
-            
             let dataValue = try data.toCBORValue()
             map = map.adding(key: "data", value: dataValue)
-            
-            
-            
-            if let value = size {
-                // Encode optional property even if it's an empty array for CBOR
-                let sizeValue = try value.toCBORValue()
-                map = map.adding(key: "size", value: sizeValue)
-            }
-            
-            
-            
-            if let value = createdAt {
-                // Encode optional property even if it's an empty array for CBOR
-                let createdAtValue = try value.toCBORValue()
-                map = map.adding(key: "createdAt", value: createdAtValue)
-            }
             
             
 
@@ -155,19 +79,13 @@ public struct Output: ATProtocolCodable {
         
         
         private enum CodingKeys: String, CodingKey {
-            case blobLocator
-            case groupId
             case data
-            case size
-            case createdAt
         }
         
     }
         
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case blobNotFound = "BlobNotFound.The specified blob locator was not found (may have been garbage collected)"
-                case notMember = "NotMember.Caller is not a member of the specified group"
-                case unauthorized = "Unauthorized.Authentication required"
+                case blobNotFound = "BlobNotFound.Metadata blob does not exist or has been garbage collected"
             public var description: String {
                 return self.rawValue
             }
@@ -188,7 +106,7 @@ public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertibl
 extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - getGroupMetadataBlob
 
-    /// Fetch an encrypted group metadata blob by locator or latest for a group Retrieve an encrypted group metadata blob from the server. If blobLocator is provided, fetches that specific blob. If only groupId is provided, returns the most recently uploaded blob for the group.
+    /// Fetch an encrypted group metadata blob by locator Download an encrypted metadata blob. Returns raw encrypted bytes. The blob is opaque — decryption requires the MLS epoch key derived by group members.
     /// 
     /// - Parameter input: The input parameters for the request
     /// 
@@ -203,7 +121,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
-            headers: ["Accept": "application/json"],
+            headers: ["Accept": "*/*"],
             body: nil,
             queryItems: queryItems
         )
@@ -215,19 +133,18 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         let responseCode = response.statusCode
 
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+            throw NetworkError.invalidContentType(expected: "*/*", actual: "nil")
         }
 
-        if !contentType.lowercased().contains("application/json") {
-            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        if !contentType.lowercased().contains("*/*") {
+            throw NetworkError.invalidContentType(expected: "*/*", actual: contentType)
         }
 
         // Only decode response data if request was successful
         if (200...299).contains(responseCode) {
             do {
                 
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(BlueCatbirdMlsChatGetGroupMetadataBlob.Output.self, from: responseData)
+                let decodedData = BlueCatbirdMlsChatGetGroupMetadataBlob.Output(data: responseData)
                 
                 return (responseCode, decodedData)
             } catch {

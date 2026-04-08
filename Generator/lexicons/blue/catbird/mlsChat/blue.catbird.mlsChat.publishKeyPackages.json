@@ -1,29 +1,40 @@
 {
   "lexicon": 1,
   "id": "blue.catbird.mlsChat.publishKeyPackages",
+  "description": "Unified key package management: publish new packages or sync with server (consolidates publishKeyPackages + syncKeyPackages + getKeyPackageStats)",
   "defs": {
     "main": {
       "type": "procedure",
-      "description": "Publish multiple MLS key packages in a single batch request (up to 100 packages). More efficient than individual uploads for replenishing key package pools.",
+      "description": "Manage key packages for the authenticated user's device. Supports two actions: 'publish' uploads new key packages, 'sync' compares local hashes against server to clean up orphaned packages. Both actions return current stats.",
       "input": {
         "encoding": "application/json",
         "schema": {
           "type": "object",
+          "required": ["action"],
           "properties": {
+            "action": {
+              "type": "string",
+              "description": "Action to perform: 'publish' to upload new key packages, 'sync' to reconcile local/server state",
+              "knownValues": ["publish", "sync"]
+            },
             "keyPackages": {
               "type": "array",
-              "description": "Array of key packages to upload (max 100)",
-              "minItems": 1,
+              "description": "Key packages to upload (required for 'publish' action, max 100)",
               "maxItems": 100,
               "items": {
                 "type": "ref",
                 "ref": "#keyPackageItem"
               }
             },
-            "action": {
+            "localHashes": {
+              "type": "array",
+              "items": { "type": "string" },
+              "maxLength": 200,
+              "description": "SHA256 hex hashes of key packages that exist in local storage (required for 'sync' action)"
+            },
+            "deviceId": {
               "type": "string",
-              "description": "Action to perform. If omitted, publishes key packages.",
-              "knownValues": ["publish", "stats", "requestReplenish"]
+              "description": "Device ID to scope the operation. Required for 'sync', recommended for 'publish'."
             }
           }
         }
@@ -32,64 +43,42 @@
         "encoding": "application/json",
         "schema": {
           "type": "object",
-          "required": ["succeeded", "failed", "stats"],
+          "required": ["stats"],
           "properties": {
-            "succeeded": {
-              "type": "integer",
-              "minimum": 0,
-              "description": "Number of key packages successfully uploaded"
-            },
-            "failed": {
-              "type": "integer",
-              "minimum": 0,
-              "description": "Number of key packages that failed to upload"
-            },
-            "errors": {
-              "type": "array",
-              "description": "Detailed error information for failed uploads (omitted if all succeeded)",
-              "items": {
-                "type": "ref",
-                "ref": "#batchError"
-              }
-            },
             "stats": {
               "type": "ref",
               "ref": "#keyPackageStats",
-              "description": "Key package pool statistics after the publish operation"
+              "description": "Current key package statistics after the operation"
             },
             "syncResult": {
-              "type": "string",
-              "description": "Result of the sync operation",
-              "knownValues": ["synced", "skipped", "failed"]
+              "type": "ref",
+              "ref": "#syncResult",
+              "description": "Detailed sync results (only present when action is 'sync')"
             },
             "publishResult": {
-              "type": "string",
-              "description": "Result of the publish operation",
-              "knownValues": ["published", "partial", "failed"]
+              "type": "ref",
+              "ref": "#publishResult",
+              "description": "Detailed publish results (only present when action is 'publish')"
             }
           }
         }
       },
       "errors": [
-        {
-          "name": "BatchTooLarge",
-          "description": "Batch size exceeds maximum of 100 key packages"
-        },
-        {
-          "name": "InvalidBatch",
-          "description": "Batch validation failed (see errors array in response)"
-        }
+        {"name": "InvalidAction", "description": "Action must be 'publish' or 'sync'"},
+        {"name": "MissingKeyPackages", "description": "keyPackages required for 'publish' action"},
+        {"name": "MissingLocalHashes", "description": "localHashes required for 'sync' action"},
+        {"name": "MissingDeviceId", "description": "deviceId required for 'sync' action"},
+        {"name": "BatchTooLarge", "description": "Batch size exceeds maximum of 100 key packages"},
+        {"name": "InvalidBatch", "description": "Batch validation failed"}
       ]
     },
     "keyPackageItem": {
       "type": "object",
-      "description": "A single key package in a batch upload",
       "required": ["keyPackage", "cipherSuite", "expires"],
       "properties": {
         "keyPackage": {
-          "type": "string",
-          "description": "Base64-encoded MLS key package",
-          "maxLength": 65536
+          "type": "bytes",
+          "description": "MLS key package"
         },
         "cipherSuite": {
           "type": "string",
@@ -107,24 +96,91 @@
           "type": "string",
           "format": "datetime",
           "description": "Expiration timestamp (required, max 90 days from now)"
+        }
+      }
+    },
+    "keyPackageStats": {
+      "type": "object",
+      "required": ["published", "available", "expired"],
+      "properties": {
+        "published": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total key packages ever published for this device"
         },
-        "idempotencyKey": {
-          "type": "string",
-          "description": "Client-generated UUID for deduplication within batch. Optional but recommended for reliability."
+        "available": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Currently available (unconsumed, non-expired) key packages"
+        },
+        "expired": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of expired key packages pending cleanup"
+        }
+      }
+    },
+    "syncResult": {
+      "type": "object",
+      "required": ["serverHashes", "orphanedCount", "deletedCount", "deviceId"],
+      "properties": {
+        "serverHashes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "SHA256 hex hashes of available key packages on server AFTER cleanup"
+        },
+        "orphanedCount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of orphaned key packages detected"
+        },
+        "orphanedHashes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "SHA256 hex hashes of orphaned key packages that were deleted during sync"
+        },
+        "deletedCount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of orphaned key packages successfully deleted"
+        },
+        "remainingAvailable": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of valid key packages remaining after cleanup"
         },
         "deviceId": {
           "type": "string",
-          "description": "Device ID for multi-device support. Used to deduplicate key packages by device when fetching."
+          "description": "Device ID that was synced (echoed back for confirmation)"
+        }
+      }
+    },
+    "publishResult": {
+      "type": "object",
+      "required": ["succeeded", "failed"],
+      "properties": {
+        "succeeded": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of key packages successfully uploaded"
         },
-        "credentialDid": {
-          "type": "string",
-          "description": "Device-specific credential DID (did:plc:user#device-uuid). Extracted from key package for verification."
+        "failed": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of key packages that failed to upload"
+        },
+        "errors": {
+          "type": "array",
+          "description": "Detailed error information for failed uploads",
+          "items": {
+            "type": "ref",
+            "ref": "#batchError"
+          }
         }
       }
     },
     "batchError": {
       "type": "object",
-      "description": "Error information for a failed key package upload",
       "required": ["index", "error"],
       "properties": {
         "index": {
@@ -134,29 +190,7 @@
         },
         "error": {
           "type": "string",
-          "description": "Human-readable error message describing why the upload failed"
-        }
-      }
-    },
-    "keyPackageStats": {
-      "type": "object",
-      "description": "Key package pool statistics",
-      "required": ["published", "available", "expired"],
-      "properties": {
-        "published": {
-          "type": "integer",
-          "minimum": 0,
-          "description": "Total number of key packages published"
-        },
-        "available": {
-          "type": "integer",
-          "minimum": 0,
-          "description": "Number of key packages currently available for consumption"
-        },
-        "expired": {
-          "type": "integer",
-          "minimum": 0,
-          "description": "Number of expired key packages"
+          "description": "Human-readable error message"
         }
       }
     }

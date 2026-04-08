@@ -68,6 +68,7 @@ extension ATProtoClient.App.Bsky.Bookmark {
     /// Creates a private bookmark for the specified record. Currently, only `app.bsky.feed.post` records are supported. Requires authentication.
     /// 
     /// - Parameter input: The input parameters for the request
+    
     /// 
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
@@ -85,13 +86,18 @@ extension ATProtoClient.App.Bsky.Bookmark {
         
         
 
+        
         let requestData: Data? = try JSONEncoder().encode(input)
+        
+        
+        let queryItems: [URLQueryItem]? = nil
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
             headers: headers,
             body: requestData,
-            queryItems: nil
+            queryItems: queryItems
         )
 
         // Determine service DID for this endpoint

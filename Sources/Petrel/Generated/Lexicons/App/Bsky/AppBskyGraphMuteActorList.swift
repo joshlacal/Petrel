@@ -49,6 +49,7 @@ extension ATProtoClient.App.Bsky.Graph {
     /// Creates a mute relationship for the specified list of accounts. Mutes are private in Bluesky. Requires auth.
     /// 
     /// - Parameter input: The input parameters for the request
+    
     /// 
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
@@ -66,13 +67,18 @@ extension ATProtoClient.App.Bsky.Graph {
         
         
 
+        
         let requestData: Data? = try JSONEncoder().encode(input)
+        
+        
+        let queryItems: [URLQueryItem]? = nil
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
             headers: headers,
             body: requestData,
-            queryItems: nil
+            queryItems: queryItems
         )
 
         // Determine service DID for this endpoint

@@ -1,0 +1,41 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mlsDS.deleteFederationPeer",
+  "description": "Delete a federation peer policy (admin only).",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Remove a federation peer policy record. Requires federation admin privileges.",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["dsDid"],
+          "properties": {
+            "dsDid": {
+              "type": "string",
+              "description": "DID of the peer delivery service to remove"
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["deleted", "dsDid"],
+          "properties": {
+            "deleted": {
+              "type": "boolean",
+              "description": "Whether the peer was deleted"
+            },
+            "dsDid": {
+              "type": "string",
+              "description": "DID that was deleted"
+            }
+          }
+        }
+      }
+    }
+  }
+}

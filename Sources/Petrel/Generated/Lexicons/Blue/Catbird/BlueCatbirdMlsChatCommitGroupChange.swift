@@ -9,220 +9,6 @@ public struct BlueCatbirdMlsChatCommitGroupChange {
 
     public static let typeIdentifier = "blue.catbird.mlsChat.commitGroupChange"
         
-public struct PendingDeviceAddition: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "blue.catbird.mlsChat.commitGroupChange#pendingDeviceAddition"
-            public let id: String
-            public let convoId: String
-            public let userDid: DID
-            public let deviceId: String
-            public let deviceCredentialDid: String?
-            public let status: String?
-            public let createdAt: ATProtocolDate?
-            public let claimedBy: DID?
-            public let claimedAt: ATProtocolDate?
-
-        public init(
-            id: String, convoId: String, userDid: DID, deviceId: String, deviceCredentialDid: String?, status: String?, createdAt: ATProtocolDate?, claimedBy: DID?, claimedAt: ATProtocolDate?
-        ) {
-            self.id = id
-            self.convoId = convoId
-            self.userDid = userDid
-            self.deviceId = deviceId
-            self.deviceCredentialDid = deviceCredentialDid
-            self.status = status
-            self.createdAt = createdAt
-            self.claimedBy = claimedBy
-            self.claimedAt = claimedAt
-        }
-
-        public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                self.id = try container.decode(String.self, forKey: .id)
-            } catch {
-                LogManager.logError("Decoding error for required property 'id': \(error)")
-                throw error
-            }
-            do {
-                self.convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
-            do {
-                self.userDid = try container.decode(DID.self, forKey: .userDid)
-            } catch {
-                LogManager.logError("Decoding error for required property 'userDid': \(error)")
-                throw error
-            }
-            do {
-                self.deviceId = try container.decode(String.self, forKey: .deviceId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'deviceId': \(error)")
-                throw error
-            }
-            do {
-                self.deviceCredentialDid = try container.decodeIfPresent(String.self, forKey: .deviceCredentialDid)
-            } catch {
-                LogManager.logDebug("Decoding error for optional property 'deviceCredentialDid': \(error)")
-                throw error
-            }
-            do {
-                self.status = try container.decodeIfPresent(String.self, forKey: .status)
-            } catch {
-                LogManager.logDebug("Decoding error for optional property 'status': \(error)")
-                throw error
-            }
-            do {
-                self.createdAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .createdAt)
-            } catch {
-                LogManager.logDebug("Decoding error for optional property 'createdAt': \(error)")
-                throw error
-            }
-            do {
-                self.claimedBy = try container.decodeIfPresent(DID.self, forKey: .claimedBy)
-            } catch {
-                LogManager.logDebug("Decoding error for optional property 'claimedBy': \(error)")
-                throw error
-            }
-            do {
-                self.claimedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .claimedAt)
-            } catch {
-                LogManager.logDebug("Decoding error for optional property 'claimedAt': \(error)")
-                throw error
-            }
-        }
-
-        public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            try container.encode(id, forKey: .id)
-            try container.encode(convoId, forKey: .convoId)
-            try container.encode(userDid, forKey: .userDid)
-            try container.encode(deviceId, forKey: .deviceId)
-            try container.encodeIfPresent(deviceCredentialDid, forKey: .deviceCredentialDid)
-            try container.encodeIfPresent(status, forKey: .status)
-            try container.encodeIfPresent(createdAt, forKey: .createdAt)
-            try container.encodeIfPresent(claimedBy, forKey: .claimedBy)
-            try container.encodeIfPresent(claimedAt, forKey: .claimedAt)
-        }
-
-        public func hash(into hasher: inout Hasher) {
-            hasher.combine(id)
-            hasher.combine(convoId)
-            hasher.combine(userDid)
-            hasher.combine(deviceId)
-            if let value = deviceCredentialDid {
-                hasher.combine(value)
-            } else {
-                hasher.combine(nil as Int?)
-            }
-            if let value = status {
-                hasher.combine(value)
-            } else {
-                hasher.combine(nil as Int?)
-            }
-            if let value = createdAt {
-                hasher.combine(value)
-            } else {
-                hasher.combine(nil as Int?)
-            }
-            if let value = claimedBy {
-                hasher.combine(value)
-            } else {
-                hasher.combine(nil as Int?)
-            }
-            if let value = claimedAt {
-                hasher.combine(value)
-            } else {
-                hasher.combine(nil as Int?)
-            }
-        }
-
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let other = other as? Self else { return false }
-            if id != other.id {
-                return false
-            }
-            if convoId != other.convoId {
-                return false
-            }
-            if userDid != other.userDid {
-                return false
-            }
-            if deviceId != other.deviceId {
-                return false
-            }
-            if deviceCredentialDid != other.deviceCredentialDid {
-                return false
-            }
-            if status != other.status {
-                return false
-            }
-            if createdAt != other.createdAt {
-                return false
-            }
-            if claimedBy != other.claimedBy {
-                return false
-            }
-            if claimedAt != other.claimedAt {
-                return false
-            }
-            return true
-        }
-
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
-        public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
-            let idValue = try id.toCBORValue()
-            map = map.adding(key: "id", value: idValue)
-            let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
-            let userDidValue = try userDid.toCBORValue()
-            map = map.adding(key: "userDid", value: userDidValue)
-            let deviceIdValue = try deviceId.toCBORValue()
-            map = map.adding(key: "deviceId", value: deviceIdValue)
-            if let value = deviceCredentialDid {
-                let deviceCredentialDidValue = try value.toCBORValue()
-                map = map.adding(key: "deviceCredentialDid", value: deviceCredentialDidValue)
-            }
-            if let value = status {
-                let statusValue = try value.toCBORValue()
-                map = map.adding(key: "status", value: statusValue)
-            }
-            if let value = createdAt {
-                let createdAtValue = try value.toCBORValue()
-                map = map.adding(key: "createdAt", value: createdAtValue)
-            }
-            if let value = claimedBy {
-                let claimedByValue = try value.toCBORValue()
-                map = map.adding(key: "claimedBy", value: claimedByValue)
-            }
-            if let value = claimedAt {
-                let claimedAtValue = try value.toCBORValue()
-                map = map.adding(key: "claimedAt", value: claimedAtValue)
-            }
-            return map
-        }
-
-        private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
-            case id
-            case convoId
-            case userDid
-            case deviceId
-            case deviceCredentialDid
-            case status
-            case createdAt
-            case claimedBy
-            case claimedAt
-        }
-    }
-        
 public struct KeyPackageHashEntry: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.commitGroupChange#keyPackageHashEntry"
             public let did: DID
@@ -294,32 +80,228 @@ public struct KeyPackageHashEntry: ATProtocolCodable, ATProtocolValue {
             case hash
         }
     }
+        
+public struct PendingDeviceAddition: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "blue.catbird.mlsChat.commitGroupChange#pendingDeviceAddition"
+            public let id: String
+            public let convoId: String
+            public let userDid: DID
+            public let deviceId: String
+            public let deviceName: String?
+            public let deviceCredentialDid: String
+            public let status: String
+            public let claimedBy: DID?
+            public let createdAt: ATProtocolDate
+
+        public init(
+            id: String, convoId: String, userDid: DID, deviceId: String, deviceName: String?, deviceCredentialDid: String, status: String, claimedBy: DID?, createdAt: ATProtocolDate
+        ) {
+            self.id = id
+            self.convoId = convoId
+            self.userDid = userDid
+            self.deviceId = deviceId
+            self.deviceName = deviceName
+            self.deviceCredentialDid = deviceCredentialDid
+            self.status = status
+            self.claimedBy = claimedBy
+            self.createdAt = createdAt
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                self.id = try container.decode(String.self, forKey: .id)
+            } catch {
+                LogManager.logError("Decoding error for required property 'id': \(error)")
+                throw error
+            }
+            do {
+                self.convoId = try container.decode(String.self, forKey: .convoId)
+            } catch {
+                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                throw error
+            }
+            do {
+                self.userDid = try container.decode(DID.self, forKey: .userDid)
+            } catch {
+                LogManager.logError("Decoding error for required property 'userDid': \(error)")
+                throw error
+            }
+            do {
+                self.deviceId = try container.decode(String.self, forKey: .deviceId)
+            } catch {
+                LogManager.logError("Decoding error for required property 'deviceId': \(error)")
+                throw error
+            }
+            do {
+                self.deviceName = try container.decodeIfPresent(String.self, forKey: .deviceName)
+            } catch {
+                LogManager.logDebug("Decoding error for optional property 'deviceName': \(error)")
+                throw error
+            }
+            do {
+                self.deviceCredentialDid = try container.decode(String.self, forKey: .deviceCredentialDid)
+            } catch {
+                LogManager.logError("Decoding error for required property 'deviceCredentialDid': \(error)")
+                throw error
+            }
+            do {
+                self.status = try container.decode(String.self, forKey: .status)
+            } catch {
+                LogManager.logError("Decoding error for required property 'status': \(error)")
+                throw error
+            }
+            do {
+                self.claimedBy = try container.decodeIfPresent(DID.self, forKey: .claimedBy)
+            } catch {
+                LogManager.logDebug("Decoding error for optional property 'claimedBy': \(error)")
+                throw error
+            }
+            do {
+                self.createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+            } catch {
+                LogManager.logError("Decoding error for required property 'createdAt': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            try container.encode(id, forKey: .id)
+            try container.encode(convoId, forKey: .convoId)
+            try container.encode(userDid, forKey: .userDid)
+            try container.encode(deviceId, forKey: .deviceId)
+            try container.encodeIfPresent(deviceName, forKey: .deviceName)
+            try container.encode(deviceCredentialDid, forKey: .deviceCredentialDid)
+            try container.encode(status, forKey: .status)
+            try container.encodeIfPresent(claimedBy, forKey: .claimedBy)
+            try container.encode(createdAt, forKey: .createdAt)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(id)
+            hasher.combine(convoId)
+            hasher.combine(userDid)
+            hasher.combine(deviceId)
+            if let value = deviceName {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            hasher.combine(deviceCredentialDid)
+            hasher.combine(status)
+            if let value = claimedBy {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            hasher.combine(createdAt)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+            if id != other.id {
+                return false
+            }
+            if convoId != other.convoId {
+                return false
+            }
+            if userDid != other.userDid {
+                return false
+            }
+            if deviceId != other.deviceId {
+                return false
+            }
+            if deviceName != other.deviceName {
+                return false
+            }
+            if deviceCredentialDid != other.deviceCredentialDid {
+                return false
+            }
+            if status != other.status {
+                return false
+            }
+            if claimedBy != other.claimedBy {
+                return false
+            }
+            if createdAt != other.createdAt {
+                return false
+            }
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            let idValue = try id.toCBORValue()
+            map = map.adding(key: "id", value: idValue)
+            let convoIdValue = try convoId.toCBORValue()
+            map = map.adding(key: "convoId", value: convoIdValue)
+            let userDidValue = try userDid.toCBORValue()
+            map = map.adding(key: "userDid", value: userDidValue)
+            let deviceIdValue = try deviceId.toCBORValue()
+            map = map.adding(key: "deviceId", value: deviceIdValue)
+            if let value = deviceName {
+                let deviceNameValue = try value.toCBORValue()
+                map = map.adding(key: "deviceName", value: deviceNameValue)
+            }
+            let deviceCredentialDidValue = try deviceCredentialDid.toCBORValue()
+            map = map.adding(key: "deviceCredentialDid", value: deviceCredentialDidValue)
+            let statusValue = try status.toCBORValue()
+            map = map.adding(key: "status", value: statusValue)
+            if let value = claimedBy {
+                let claimedByValue = try value.toCBORValue()
+                map = map.adding(key: "claimedBy", value: claimedByValue)
+            }
+            let createdAtValue = try createdAt.toCBORValue()
+            map = map.adding(key: "createdAt", value: createdAtValue)
+            return map
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case id
+            case convoId
+            case userDid
+            case deviceId
+            case deviceName
+            case deviceCredentialDid
+            case status
+            case claimedBy
+            case createdAt
+        }
+    }
 public struct Input: ATProtocolCodable {
         public let convoId: String
         public let action: String
-        public let memberDids: [String]?
+        public let memberDids: [DID]?
         public let commit: Bytes?
         public let welcome: Bytes?
         public let groupInfo: Bytes?
-        public let externalCommit: Bytes?
-        public let confirmationTag: String?
-        public let idempotencyKey: String?
-        public let pendingAdditionId: String?
         public let keyPackageHashes: [KeyPackageHashEntry]?
+        public let deviceId: String?
+        public let pendingAdditionId: String?
+        public let idempotencyKey: String?
+        public let confirmationTag: Bytes?
 
         /// Standard public initializer
-        public init(convoId: String, action: String, memberDids: [String]? = nil, commit: Bytes? = nil, welcome: Bytes? = nil, groupInfo: Bytes? = nil, externalCommit: Bytes? = nil, confirmationTag: String? = nil, idempotencyKey: String? = nil, pendingAdditionId: String? = nil, keyPackageHashes: [KeyPackageHashEntry]? = nil) {
+        public init(convoId: String, action: String, memberDids: [DID]? = nil, commit: Bytes? = nil, welcome: Bytes? = nil, groupInfo: Bytes? = nil, keyPackageHashes: [KeyPackageHashEntry]? = nil, deviceId: String? = nil, pendingAdditionId: String? = nil, idempotencyKey: String? = nil, confirmationTag: Bytes? = nil) {
             self.convoId = convoId
             self.action = action
             self.memberDids = memberDids
             self.commit = commit
             self.welcome = welcome
             self.groupInfo = groupInfo
-            self.externalCommit = externalCommit
-            self.confirmationTag = confirmationTag
-            self.idempotencyKey = idempotencyKey
-            self.pendingAdditionId = pendingAdditionId
             self.keyPackageHashes = keyPackageHashes
+            self.deviceId = deviceId
+            self.pendingAdditionId = pendingAdditionId
+            self.idempotencyKey = idempotencyKey
+            self.confirmationTag = confirmationTag
         }
         
 
@@ -327,15 +309,15 @@ public struct Input: ATProtocolCodable {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             self.convoId = try container.decode(String.self, forKey: .convoId)
             self.action = try container.decode(String.self, forKey: .action)
-            self.memberDids = try container.decodeIfPresent([String].self, forKey: .memberDids)
+            self.memberDids = try container.decodeIfPresent([DID].self, forKey: .memberDids)
             self.commit = try container.decodeIfPresent(Bytes.self, forKey: .commit)
             self.welcome = try container.decodeIfPresent(Bytes.self, forKey: .welcome)
             self.groupInfo = try container.decodeIfPresent(Bytes.self, forKey: .groupInfo)
-            self.externalCommit = try container.decodeIfPresent(Bytes.self, forKey: .externalCommit)
-            self.confirmationTag = try container.decodeIfPresent(String.self, forKey: .confirmationTag)
-            self.idempotencyKey = try container.decodeIfPresent(String.self, forKey: .idempotencyKey)
-            self.pendingAdditionId = try container.decodeIfPresent(String.self, forKey: .pendingAdditionId)
             self.keyPackageHashes = try container.decodeIfPresent([KeyPackageHashEntry].self, forKey: .keyPackageHashes)
+            self.deviceId = try container.decodeIfPresent(String.self, forKey: .deviceId)
+            self.pendingAdditionId = try container.decodeIfPresent(String.self, forKey: .pendingAdditionId)
+            self.idempotencyKey = try container.decodeIfPresent(String.self, forKey: .idempotencyKey)
+            self.confirmationTag = try container.decodeIfPresent(Bytes.self, forKey: .confirmationTag)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -346,11 +328,11 @@ public struct Input: ATProtocolCodable {
             try container.encodeIfPresent(commit, forKey: .commit)
             try container.encodeIfPresent(welcome, forKey: .welcome)
             try container.encodeIfPresent(groupInfo, forKey: .groupInfo)
-            try container.encodeIfPresent(externalCommit, forKey: .externalCommit)
-            try container.encodeIfPresent(confirmationTag, forKey: .confirmationTag)
-            try container.encodeIfPresent(idempotencyKey, forKey: .idempotencyKey)
-            try container.encodeIfPresent(pendingAdditionId, forKey: .pendingAdditionId)
             try container.encodeIfPresent(keyPackageHashes, forKey: .keyPackageHashes)
+            try container.encodeIfPresent(deviceId, forKey: .deviceId)
+            try container.encodeIfPresent(pendingAdditionId, forKey: .pendingAdditionId)
+            try container.encodeIfPresent(idempotencyKey, forKey: .idempotencyKey)
+            try container.encodeIfPresent(confirmationTag, forKey: .confirmationTag)
         }
 
         public func toCBORValue() throws -> Any {
@@ -375,25 +357,25 @@ public struct Input: ATProtocolCodable {
                 let groupInfoValue = try value.toCBORValue()
                 map = map.adding(key: "groupInfo", value: groupInfoValue)
             }
-            if let value = externalCommit {
-                let externalCommitValue = try value.toCBORValue()
-                map = map.adding(key: "externalCommit", value: externalCommitValue)
+            if let value = keyPackageHashes {
+                let keyPackageHashesValue = try value.toCBORValue()
+                map = map.adding(key: "keyPackageHashes", value: keyPackageHashesValue)
             }
-            if let value = confirmationTag {
-                let confirmationTagValue = try value.toCBORValue()
-                map = map.adding(key: "confirmationTag", value: confirmationTagValue)
-            }
-            if let value = idempotencyKey {
-                let idempotencyKeyValue = try value.toCBORValue()
-                map = map.adding(key: "idempotencyKey", value: idempotencyKeyValue)
+            if let value = deviceId {
+                let deviceIdValue = try value.toCBORValue()
+                map = map.adding(key: "deviceId", value: deviceIdValue)
             }
             if let value = pendingAdditionId {
                 let pendingAdditionIdValue = try value.toCBORValue()
                 map = map.adding(key: "pendingAdditionId", value: pendingAdditionIdValue)
             }
-            if let value = keyPackageHashes {
-                let keyPackageHashesValue = try value.toCBORValue()
-                map = map.adding(key: "keyPackageHashes", value: keyPackageHashesValue)
+            if let value = idempotencyKey {
+                let idempotencyKeyValue = try value.toCBORValue()
+                map = map.adding(key: "idempotencyKey", value: idempotencyKeyValue)
+            }
+            if let value = confirmationTag {
+                let confirmationTagValue = try value.toCBORValue()
+                map = map.adding(key: "confirmationTag", value: confirmationTagValue)
             }
             return map
         }
@@ -405,11 +387,11 @@ public struct Input: ATProtocolCodable {
             case commit
             case welcome
             case groupInfo
-            case externalCommit
-            case confirmationTag
-            case idempotencyKey
-            case pendingAdditionId
             case keyPackageHashes
+            case deviceId
+            case pendingAdditionId
+            case idempotencyKey
+            case confirmationTag
         }
     }
     
@@ -420,13 +402,13 @@ public struct Output: ATProtocolCodable {
         
         public let newEpoch: Int?
         
-        public let confirmationTag: String?
-        
-        public let claimedAddition: PendingDeviceAddition?
+        public let rejoinedAt: ATProtocolDate?
         
         public let pendingAdditions: [PendingDeviceAddition]?
         
-        public let rejoinedAt: ATProtocolDate?
+        public let claimedAddition: PendingDeviceAddition?
+        
+        public let confirmationTag: Bytes?
         
         
         
@@ -438,13 +420,13 @@ public struct Output: ATProtocolCodable {
             
             newEpoch: Int? = nil,
             
-            confirmationTag: String? = nil,
-            
-            claimedAddition: PendingDeviceAddition? = nil,
+            rejoinedAt: ATProtocolDate? = nil,
             
             pendingAdditions: [PendingDeviceAddition]? = nil,
             
-            rejoinedAt: ATProtocolDate? = nil
+            claimedAddition: PendingDeviceAddition? = nil,
+            
+            confirmationTag: Bytes? = nil
             
             
         ) {
@@ -454,13 +436,13 @@ public struct Output: ATProtocolCodable {
             
             self.newEpoch = newEpoch
             
-            self.confirmationTag = confirmationTag
-            
-            self.claimedAddition = claimedAddition
+            self.rejoinedAt = rejoinedAt
             
             self.pendingAdditions = pendingAdditions
             
-            self.rejoinedAt = rejoinedAt
+            self.claimedAddition = claimedAddition
+            
+            self.confirmationTag = confirmationTag
             
             
         }
@@ -475,16 +457,16 @@ public struct Output: ATProtocolCodable {
             self.newEpoch = try container.decodeIfPresent(Int.self, forKey: .newEpoch)
             
             
-            self.confirmationTag = try container.decodeIfPresent(String.self, forKey: .confirmationTag)
-            
-            
-            self.claimedAddition = try container.decodeIfPresent(PendingDeviceAddition.self, forKey: .claimedAddition)
+            self.rejoinedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .rejoinedAt)
             
             
             self.pendingAdditions = try container.decodeIfPresent([PendingDeviceAddition].self, forKey: .pendingAdditions)
             
             
-            self.rejoinedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .rejoinedAt)
+            self.claimedAddition = try container.decodeIfPresent(PendingDeviceAddition.self, forKey: .claimedAddition)
+            
+            
+            self.confirmationTag = try container.decodeIfPresent(Bytes.self, forKey: .confirmationTag)
             
             
         }
@@ -501,11 +483,7 @@ public struct Output: ATProtocolCodable {
             
             
             // Encode optional property even if it's an empty array
-            try container.encodeIfPresent(confirmationTag, forKey: .confirmationTag)
-            
-            
-            // Encode optional property even if it's an empty array
-            try container.encodeIfPresent(claimedAddition, forKey: .claimedAddition)
+            try container.encodeIfPresent(rejoinedAt, forKey: .rejoinedAt)
             
             
             // Encode optional property even if it's an empty array
@@ -513,7 +491,11 @@ public struct Output: ATProtocolCodable {
             
             
             // Encode optional property even if it's an empty array
-            try container.encodeIfPresent(rejoinedAt, forKey: .rejoinedAt)
+            try container.encodeIfPresent(claimedAddition, forKey: .claimedAddition)
+            
+            
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(confirmationTag, forKey: .confirmationTag)
             
             
         }
@@ -537,18 +519,10 @@ public struct Output: ATProtocolCodable {
             
             
             
-            if let value = confirmationTag {
+            if let value = rejoinedAt {
                 // Encode optional property even if it's an empty array for CBOR
-                let confirmationTagValue = try value.toCBORValue()
-                map = map.adding(key: "confirmationTag", value: confirmationTagValue)
-            }
-            
-            
-            
-            if let value = claimedAddition {
-                // Encode optional property even if it's an empty array for CBOR
-                let claimedAdditionValue = try value.toCBORValue()
-                map = map.adding(key: "claimedAddition", value: claimedAdditionValue)
+                let rejoinedAtValue = try value.toCBORValue()
+                map = map.adding(key: "rejoinedAt", value: rejoinedAtValue)
             }
             
             
@@ -561,10 +535,18 @@ public struct Output: ATProtocolCodable {
             
             
             
-            if let value = rejoinedAt {
+            if let value = claimedAddition {
                 // Encode optional property even if it's an empty array for CBOR
-                let rejoinedAtValue = try value.toCBORValue()
-                map = map.adding(key: "rejoinedAt", value: rejoinedAtValue)
+                let claimedAdditionValue = try value.toCBORValue()
+                map = map.adding(key: "claimedAddition", value: claimedAdditionValue)
+            }
+            
+            
+            
+            if let value = confirmationTag {
+                // Encode optional property even if it's an empty array for CBOR
+                let confirmationTagValue = try value.toCBORValue()
+                map = map.adding(key: "confirmationTag", value: confirmationTagValue)
             }
             
             
@@ -577,31 +559,31 @@ public struct Output: ATProtocolCodable {
         private enum CodingKeys: String, CodingKey {
             case success
             case newEpoch
-            case confirmationTag
-            case claimedAddition
-            case pendingAdditions
             case rejoinedAt
+            case pendingAdditions
+            case claimedAddition
+            case confirmationTag
         }
         
     }
         
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case invalidRequest = "InvalidRequest.Invalid request parameters"
-                case authRequired = "AuthRequired.Authentication required"
-                case forbidden = "Forbidden.User does not have permission for this action"
-                case conflict = "Conflict.Conflicting group state (e.g., epoch mismatch)"
                 case convoNotFound = "ConvoNotFound.Conversation not found"
-                case notMember = "NotMember.User is not a member of this conversation"
-                case alreadyMember = "AlreadyMember.User is already a member of this conversation"
+                case notMember = "NotMember.Caller is not a member of the conversation"
+                case invalidAction = "InvalidAction.Unknown action value"
                 case keyPackageNotFound = "KeyPackageNotFound.Key package not found for one or more members"
-                case tooManyMembers = "TooManyMembers.Adding these members would exceed the maximum group size"
-                case blockedByMember = "BlockedByMember.Action blocked by a member's block list"
-                case invalidAction = "InvalidAction.The specified action is not valid"
-                case invalidCommit = "InvalidCommit.The MLS commit message is invalid"
-                case invalidGroupInfo = "InvalidGroupInfo.The MLS group info is invalid"
-                case pendingAdditionNotFound = "PendingAdditionNotFound.The specified pending addition was not found"
-                case pendingAdditionAlreadyClaimed = "PendingAdditionAlreadyClaimed.The pending addition has already been claimed by another device"
-                case unauthorized = "Unauthorized.User is not authorized for this action"
+                case alreadyMember = "AlreadyMember.One or more DIDs are already members"
+                case tooManyMembers = "TooManyMembers.Would exceed maximum member count"
+                case blockedByMember = "BlockedByMember.Cannot add user who has blocked or been blocked by an existing member"
+                case invalidCommit = "InvalidCommit.The provided MLS Commit message is invalid"
+                case invalidGroupInfo = "InvalidGroupInfo.The provided GroupInfo is invalid"
+                case pendingAdditionNotFound = "PendingAdditionNotFound.The specified pending addition does not exist"
+                case pendingAdditionAlreadyClaimed = "PendingAdditionAlreadyClaimed.The pending addition was already claimed by another member"
+                case unauthorized = "Unauthorized.Insufficient privileges for this operation"
+                case invalidRequest = "InvalidRequest.The request is malformed or missing required fields"
+                case authRequired = "AuthRequired.Authentication is required for this operation"
+                case forbidden = "Forbidden.The caller does not have permission for this operation"
+                case conflict = "Conflict.The operation conflicts with the current group state (e.g., epoch mismatch)"
             public var description: String {
                 return self.rawValue
             }
@@ -620,9 +602,10 @@ public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertibl
 extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - commitGroupChange
 
-    /// Commit an MLS group change (add members, process external commit, rejoin, readdition, or manage pending device additions)
+    /// Commit MLS group membership changes (consolidates addMembers + processExternalCommit + rejoin + readdition + getPendingDeviceAdditions + claimPendingDeviceAddition + completePendingDeviceAddition) Perform MLS group membership operations. The 'action' field determines the operation type. This consolidates all membership-changing operations into a single endpoint.
     /// 
     /// - Parameter input: The input parameters for the request
+    
     /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
@@ -642,13 +625,18 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         headers["Accept"] = "application/json"
         
 
+        
         let requestData: Data? = try JSONEncoder().encode(input)
+        
+        
+        let queryItems: [URLQueryItem]? = nil
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
             headers: headers,
             body: requestData,
-            queryItems: nil
+            queryItems: queryItems
         )
 
         // Determine service DID for this endpoint

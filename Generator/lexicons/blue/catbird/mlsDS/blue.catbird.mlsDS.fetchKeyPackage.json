@@ -1,0 +1,47 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mlsDS.fetchKeyPackage",
+  "description": "Return and consume a key package for a local user, requested by a remote DS.",
+  "defs": {
+    "main": {
+      "type": "query",
+      "description": "Fetch and atomically consume one key package for a user in the context of a conversation.",
+      "parameters": {
+        "type": "params",
+        "required": ["recipientDid", "convoId"],
+        "properties": {
+          "recipientDid": {
+            "type": "string",
+            "description": "DID of the user whose key package to fetch"
+          },
+          "convoId": {
+            "type": "string",
+            "description": "Conversation context for authorization"
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["keyPackage", "keyPackageHash"],
+          "properties": {
+            "keyPackage": {
+              "type": "bytes",
+              "description": "MLS key package"
+            },
+            "keyPackageHash": {
+              "type": "string",
+              "description": "Hash of the key package"
+            }
+          }
+        }
+      },
+      "errors": [
+        {"name": "ConversationNotFound"},
+        {"name": "RecipientNotFound"},
+        {"name": "NoKeyPackagesAvailable"}
+      ]
+    }
+  }
+}

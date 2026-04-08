@@ -1,10 +1,11 @@
 {
   "lexicon": 1,
   "id": "blue.catbird.mlsChat.updateConvo",
+  "description": "Update conversation settings (consolidates updatePolicy + promoteAdmin + demoteAdmin + promoteModerator + demoteModerator + updateGroupInfo + groupInfoRefresh)",
   "defs": {
     "main": {
       "type": "procedure",
-      "description": "Update conversation settings including admin/moderator management, policy, and group info",
+      "description": "Perform administrative actions on a conversation. The 'action' field determines the operation. Most actions require admin privileges.",
       "input": {
         "encoding": "application/json",
         "schema": {
@@ -17,26 +18,35 @@
             },
             "action": {
               "type": "string",
-              "description": "Update action to perform",
-              "knownValues": ["promoteAdmin", "demoteAdmin", "promoteModerator", "demoteModerator", "updatePolicy", "updateGroupInfo", "refreshGroupInfo"]
+              "description": "Action to perform on the conversation",
+              "knownValues": [
+                "updatePolicy",
+                "promoteAdmin",
+                "demoteAdmin",
+                "promoteModerator",
+                "demoteModerator",
+                "updateGroupInfo",
+                "refreshGroupInfo"
+              ]
             },
             "targetDid": {
               "type": "string",
               "format": "did",
-              "description": "Target member DID for promote/demote actions"
+              "description": "Target member DID (required for promote/demote actions)"
             },
             "policy": {
               "type": "ref",
               "ref": "#policyInput",
-              "description": "Policy object for updatePolicy action"
+              "description": "Policy settings to update (required for 'updatePolicy' action)"
             },
             "groupInfo": {
               "type": "bytes",
-              "description": "MLS group info bytes for updateGroupInfo action"
+              "description": "Serialized GroupInfo bytes (required for 'updateGroupInfo' action)"
             },
             "epoch": {
               "type": "integer",
-              "description": "Expected epoch for optimistic concurrency"
+              "minimum": 0,
+              "description": "MLS epoch the GroupInfo corresponds to (required for 'updateGroupInfo' action)"
             }
           }
         }
@@ -49,90 +59,92 @@
           "properties": {
             "success": {
               "type": "boolean",
-              "description": "Whether the update was successful"
+              "description": "Whether the operation succeeded"
             },
             "newEpoch": {
               "type": "integer",
-              "description": "New epoch number after the update"
+              "minimum": 0,
+              "description": "New epoch number (if the action caused an epoch change)"
             },
             "policy": {
               "type": "ref",
               "ref": "#policyView",
-              "description": "Updated policy view"
+              "description": "Updated policy settings (present when action is 'updatePolicy')"
             }
           }
         }
       },
       "errors": [
-        {
-          "name": "InvalidRequest",
-          "description": "Invalid request parameters"
-        },
-        {
-          "name": "Unauthorized",
-          "description": "Authentication required"
-        },
-        {
-          "name": "Forbidden",
-          "description": "User does not have permission for this action"
-        },
-        {
-          "name": "NotFound",
-          "description": "Conversation not found"
-        }
+        {"name": "ConvoNotFound", "description": "Conversation not found"},
+        {"name": "NotMember", "description": "Caller is not a member of this conversation"},
+        {"name": "Unauthorized", "description": "Caller does not have required admin/moderator privileges"},
+        {"name": "InvalidAction", "description": "Unknown action value"},
+        {"name": "MissingTargetDid", "description": "targetDid is required for promote/demote actions"},
+        {"name": "TargetNotMember", "description": "Target DID is not a member of the conversation"},
+        {"name": "NoFieldsProvided", "description": "At least one policy field must be provided for updatePolicy"},
+        {"name": "InvalidGroupInfo", "description": "Provided GroupInfo is invalid or malformed"},
+        {"name": "InvalidMaxMembers", "description": "maxMembers is less than current member count"}
       ]
     },
     "policyInput": {
       "type": "object",
-      "description": "Policy settings to update",
+      "description": "Policy settings to update (at least one field required)",
       "properties": {
-        "allowExternalCommits": {
+        "allowInvites": {
           "type": "boolean",
-          "description": "Allow members to join via external commits"
+          "description": "Whether invite links are enabled"
         },
-        "requireInviteForJoin": {
+        "adminOnlyInvites": {
           "type": "boolean",
-          "description": "Require an invite to join the conversation"
+          "description": "Whether only admins can create invite links"
         },
-        "allowRejoin": {
+        "allowMemberAdd": {
           "type": "boolean",
-          "description": "Allow removed members to rejoin"
+          "description": "Whether non-admin members can add other members"
         },
-        "rejoinWindowDays": {
-          "type": "integer",
-          "description": "Number of days a removed member can rejoin"
-        },
-        "preventRemovingLastAdmin": {
+        "allowMemberRemove": {
           "type": "boolean",
-          "description": "Prevent removal of the last admin"
+          "description": "Whether non-admin members can remove other members"
+        },
+        "requireAdminApproval": {
+          "type": "boolean",
+          "description": "Whether new members require admin approval"
         },
         "maxMembers": {
           "type": "integer",
+          "minimum": 2,
+          "maximum": 1000,
           "description": "Maximum number of members allowed"
         }
       }
     },
     "policyView": {
       "type": "object",
-      "description": "Current policy state",
+      "required": ["convoId", "allowInvites", "adminOnlyInvites", "allowMemberAdd", "allowMemberRemove", "requireAdminApproval", "maxMembers", "updatedAt"],
       "properties": {
-        "allowExternalCommits": {
-          "type": "boolean"
+        "convoId": {
+          "type": "string",
+          "description": "Conversation identifier"
         },
-        "requireInviteForJoin": {
-          "type": "boolean"
-        },
-        "allowRejoin": {
-          "type": "boolean"
-        },
-        "rejoinWindowDays": {
-          "type": "integer"
-        },
-        "preventRemovingLastAdmin": {
-          "type": "boolean"
-        },
+        "allowInvites": { "type": "boolean" },
+        "adminOnlyInvites": { "type": "boolean" },
+        "allowMemberAdd": { "type": "boolean" },
+        "allowMemberRemove": { "type": "boolean" },
+        "requireAdminApproval": { "type": "boolean" },
         "maxMembers": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 1000
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "datetime",
+          "description": "Timestamp of last policy update"
+        },
+        "updatedBy": {
+          "type": "string",
+          "format": "did",
+          "description": "DID of admin who last updated the policy"
         }
       }
     }

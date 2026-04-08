@@ -1,0 +1,67 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mlsDS.getConvoDigest",
+  "description": "Get a cryptographic digest of all messages in a conversation for reconciliation.",
+  "defs": {
+    "main": {
+      "type": "query",
+      "description": "Compute and return a SHA-256 digest over all messages in a conversation, along with sequencer state.",
+      "parameters": {
+        "type": "params",
+        "required": ["convoId"],
+        "properties": {
+          "convoId": {
+            "type": "string",
+            "description": "Conversation ID"
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["convoId", "sequencerDsDid", "sequencerTerm", "epoch", "lastSeq", "eventCount", "digestSha256", "generatedAt"],
+          "properties": {
+            "convoId": {
+              "type": "string",
+              "description": "Conversation ID"
+            },
+            "sequencerDsDid": {
+              "type": "string",
+              "description": "DID of the current sequencer DS"
+            },
+            "sequencerTerm": {
+              "type": "integer",
+              "description": "Current sequencer term"
+            },
+            "epoch": {
+              "type": "integer",
+              "description": "Current MLS epoch"
+            },
+            "lastSeq": {
+              "type": "integer",
+              "description": "Highest sequence number"
+            },
+            "eventCount": {
+              "type": "integer",
+              "description": "Total number of events/messages"
+            },
+            "digestSha256": {
+              "type": "string",
+              "description": "Hex-encoded SHA-256 digest over all messages"
+            },
+            "generatedAt": {
+              "type": "string",
+              "format": "datetime",
+              "description": "Timestamp when the digest was generated"
+            }
+          }
+        }
+      },
+      "errors": [
+        {"name": "ConversationNotFound"},
+        {"name": "NotAuthorized"}
+      ]
+    }
+  }
+}

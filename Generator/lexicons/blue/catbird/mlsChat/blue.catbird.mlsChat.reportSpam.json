@@ -4,27 +4,16 @@
   "defs": {
     "main": {
       "type": "procedure",
-      "description": "Report a conversation member for spam",
+      "description": "Report an account as spam in an MLS conversation.",
       "input": {
         "encoding": "application/json",
         "schema": {
           "type": "object",
           "required": ["convoId", "reportedDid"],
           "properties": {
-            "convoId": {
-              "type": "string",
-              "description": "Conversation identifier"
-            },
-            "reportedDid": {
-              "type": "string",
-              "format": "did",
-              "description": "DID of the member being reported for spam"
-            },
-            "reason": {
-              "type": "string",
-              "description": "Optional reason for the report",
-              "maxLength": 1024
-            }
+            "convoId": { "type": "string", "description": "The conversation ID" },
+            "reportedDid": { "type": "string", "format": "did", "description": "DID of the account being reported" },
+            "reason": { "type": "string", "maxLength": 1000, "description": "Optional reason for the report" }
           }
         }
       },
@@ -34,31 +23,15 @@
           "type": "object",
           "required": ["id", "createdAt"],
           "properties": {
-            "id": {
-              "type": "string",
-              "description": "Unique identifier for the spam report"
-            },
-            "createdAt": {
-              "type": "string",
-              "format": "datetime",
-              "description": "When the report was created"
-            }
+            "id": { "type": "string" },
+            "createdAt": { "type": "string", "format": "datetime" }
           }
         }
       },
       "errors": [
-        {
-          "name": "Unauthorized",
-          "description": "Authentication required"
-        },
-        {
-          "name": "NotFound",
-          "description": "Conversation or member not found"
-        },
-        {
-          "name": "DuplicateReport",
-          "description": "A report for this member in this conversation already exists"
-        }
+        { "name": "ConversationNotFound" },
+        { "name": "NotAMember" },
+        { "name": "AlreadyReported" }
       ]
     }
   }

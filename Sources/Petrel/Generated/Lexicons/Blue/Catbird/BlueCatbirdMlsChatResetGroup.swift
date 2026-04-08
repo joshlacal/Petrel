@@ -12,11 +12,11 @@ public struct Input: ATProtocolCodable {
         public let convoId: String
         public let newGroupId: String
         public let cipherSuite: String
-        public let groupInfo: String?
+        public let groupInfo: Bytes?
         public let reason: String?
 
         /// Standard public initializer
-        public init(convoId: String, newGroupId: String, cipherSuite: String, groupInfo: String? = nil, reason: String? = nil) {
+        public init(convoId: String, newGroupId: String, cipherSuite: String, groupInfo: Bytes? = nil, reason: String? = nil) {
             self.convoId = convoId
             self.newGroupId = newGroupId
             self.cipherSuite = cipherSuite
@@ -30,7 +30,7 @@ public struct Input: ATProtocolCodable {
             self.convoId = try container.decode(String.self, forKey: .convoId)
             self.newGroupId = try container.decode(String.self, forKey: .newGroupId)
             self.cipherSuite = try container.decode(String.self, forKey: .cipherSuite)
-            self.groupInfo = try container.decodeIfPresent(String.self, forKey: .groupInfo)
+            self.groupInfo = try container.decodeIfPresent(Bytes.self, forKey: .groupInfo)
             self.reason = try container.decodeIfPresent(String.self, forKey: .reason)
         }
 
@@ -212,6 +212,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     /// Reset an MLS group by replacing its group ID and clearing ephemeral state Reset an MLS group for a conversation. Only admins may reset a group. This increments the reset count, swaps the group ID, resets the epoch to 0, and clears welcome messages and pending device additions.
     /// 
     /// - Parameter input: The input parameters for the request
+    
     /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
@@ -231,13 +232,18 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         headers["Accept"] = "application/json"
         
 
+        
         let requestData: Data? = try JSONEncoder().encode(input)
+        
+        
+        let queryItems: [URLQueryItem]? = nil
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
             headers: headers,
             body: requestData,
-            queryItems: nil
+            queryItems: queryItems
         )
 
         // Determine service DID for this endpoint

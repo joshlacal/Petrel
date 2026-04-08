@@ -1,10 +1,11 @@
 {
   "lexicon": 1,
   "id": "blue.catbird.mlsChat.updateCursor",
+  "description": "Update the read cursor position for a conversation",
   "defs": {
     "main": {
       "type": "procedure",
-      "description": "Update the read cursor position for a conversation",
+      "description": "Update the read cursor for a conversation to track the last-read position.",
       "input": {
         "encoding": "application/json",
         "schema": {
@@ -17,7 +18,7 @@
             },
             "cursor": {
               "type": "string",
-              "description": "Opaque cursor string marking the read position"
+              "description": "Opaque cursor value representing the read position (e.g., seq number as string)"
             }
           }
         }
@@ -31,24 +32,15 @@
             "updatedAt": {
               "type": "string",
               "format": "datetime",
-              "description": "Server timestamp when the cursor was updated"
+              "description": "Timestamp when the cursor was updated"
             }
           }
         }
       },
       "errors": [
-        {
-          "name": "AuthRequired",
-          "description": "Authentication required"
-        },
-        {
-          "name": "Forbidden",
-          "description": "User is not a member of the conversation"
-        },
-        {
-          "name": "InvalidRequest",
-          "description": "Invalid cursor or conversation ID"
-        }
+        {"name": "ConvoNotFound", "description": "Conversation not found"},
+        {"name": "NotMember", "description": "Caller is not a member of the conversation"},
+        {"name": "InvalidCursor", "description": "The provided cursor value is invalid"}
       ]
     }
   }

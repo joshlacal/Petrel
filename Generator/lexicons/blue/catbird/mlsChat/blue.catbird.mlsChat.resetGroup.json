@@ -25,8 +25,8 @@
               "description": "MLS cipher suite identifier for the new group"
             },
             "groupInfo": {
-              "type": "string",
-              "description": "Optional base64-encoded MLS GroupInfo for the new group"
+              "type": "bytes",
+              "description": "Optional MLS GroupInfo for the new group"
             },
             "reason": {
               "type": "string",

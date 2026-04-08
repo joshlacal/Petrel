@@ -1,0 +1,90 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mlsDS.getFederationPeers",
+  "description": "List federation peer policies (admin only).",
+  "defs": {
+    "main": {
+      "type": "query",
+      "description": "Return a list of known federation peer DS policies, optionally filtered by status.",
+      "parameters": {
+        "type": "params",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Filter by peer status (e.g., 'trusted', 'blocked', 'probation')"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Maximum number of peers to return (default 100)",
+            "default": 100
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["peers"],
+          "properties": {
+            "peers": {
+              "type": "array",
+              "description": "List of peer records",
+              "items": {
+                "type": "ref",
+                "ref": "#peerRecord"
+              }
+            }
+          }
+        }
+      }
+    },
+    "peerRecord": {
+      "type": "object",
+      "description": "Federation peer policy record.",
+      "required": ["dsDid", "status"],
+      "properties": {
+        "dsDid": {
+          "type": "string",
+          "description": "DID of the peer delivery service"
+        },
+        "status": {
+          "type": "string",
+          "description": "Peer status (trusted, blocked, probation, unknown)"
+        },
+        "trustScore": {
+          "type": "integer",
+          "description": "Computed trust score"
+        },
+        "maxRequestsPerMinute": {
+          "type": "integer",
+          "description": "Per-peer rate limit override"
+        },
+        "note": {
+          "type": "string",
+          "description": "Admin note"
+        },
+        "invalidTokenCount": {
+          "type": "integer"
+        },
+        "rejectedRequestCount": {
+          "type": "integer"
+        },
+        "successfulRequestCount": {
+          "type": "integer"
+        },
+        "lastSeenAt": {
+          "type": "string",
+          "format": "datetime"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "datetime"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "datetime"
+        }
+      }
+    }
+  }
+}

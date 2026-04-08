@@ -1,10 +1,11 @@
 {
   "lexicon": 1,
   "id": "blue.catbird.mlsChat.getKeyPackages",
+  "description": "Retrieve key packages for one or more DIDs (same as v1, in v2 namespace for consistency)",
   "defs": {
     "main": {
       "type": "query",
-      "description": "Retrieve key packages for one or more DIDs to add them to conversations",
+      "description": "Retrieve key packages for one or more DIDs to add them to conversations. Returns one key package per device per DID.",
       "parameters": {
         "type": "params",
         "required": ["dids"],
@@ -59,14 +60,8 @@
         }
       },
       "errors": [
-        {
-          "name": "TooManyDids",
-          "description": "Too many DIDs requested"
-        },
-        {
-          "name": "InvalidDid",
-          "description": "One or more DIDs are invalid"
-        }
+        {"name": "TooManyDids", "description": "Too many DIDs requested (max 100)"},
+        {"name": "InvalidDid", "description": "One or more DIDs are invalid"}
       ]
     }
   }

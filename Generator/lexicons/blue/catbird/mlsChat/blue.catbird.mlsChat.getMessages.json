@@ -1,10 +1,11 @@
 {
   "lexicon": 1,
   "id": "blue.catbird.mlsChat.getMessages",
+  "description": "Retrieve messages from a conversation with type filtering (consolidates getMessages + getCommits)",
   "defs": {
     "main": {
       "type": "query",
-      "description": "Retrieve messages from an MLS conversation. Messages are GUARANTEED to be returned in MLS sequential order (epoch ASC, seq ASC). Clients MUST process messages in this order for proper MLS decryption.",
+      "description": "Retrieve messages from an MLS conversation. Messages are GUARANTEED to be returned in MLS sequential order (epoch ASC, seq ASC). Clients MUST process messages in this order for proper MLS decryption. The 'type' filter replaces the separate getCommits endpoint.",
       "parameters": {
         "type": "params",
         "required": ["convoId"],
@@ -23,7 +24,13 @@
           "sinceSeq": {
             "type": "integer",
             "minimum": 0,
-            "description": "Fetch messages with seq > sinceSeq (pagination cursor). Use lastSeq from previous response."
+            "description": "Fetch messages with seq > sinceSeq (pagination cursor)"
+          },
+          "type": {
+            "type": "string",
+            "description": "Filter by message type: 'app' for user content only, 'commit' for MLS protocol control messages only, 'all' for both",
+            "knownValues": ["app", "commit", "all"],
+            "default": "all"
           }
         }
       },
@@ -39,38 +46,28 @@
                 "type": "ref",
                 "ref": "blue.catbird.mlsChat.defs#messageView"
               },
-              "description": "Messages in MLS sequential order (epoch ASC, seq ASC). Clients MUST process in this order."
+              "description": "Messages in MLS sequential order (epoch ASC, seq ASC)"
             },
             "lastSeq": {
               "type": "integer",
-              "description": "Sequence number of the last message in this response. Use as sinceSeq for next page. Omitted if no messages returned."
+              "description": "Sequence number of the last message in this response. Use as sinceSeq for next page."
             },
             "gapInfo": {
               "type": "ref",
               "ref": "#gapInfo",
-              "description": "Gap detection metadata for missing messages. Omitted if no gaps detected or conversation is empty."
+              "description": "Gap detection metadata for missing messages"
             }
           }
         }
       },
       "errors": [
-        {
-          "name": "ConvoNotFound",
-          "description": "Conversation not found"
-        },
-        {
-          "name": "NotMember",
-          "description": "Caller is not a member of the conversation"
-        },
-        {
-          "name": "InvalidCursor",
-          "description": "sinceSeq parameter is invalid or exceeds available messages"
-        }
+        {"name": "ConvoNotFound", "description": "Conversation not found"},
+        {"name": "NotMember", "description": "Caller is not a member of the conversation"},
+        {"name": "InvalidCursor", "description": "sinceSeq parameter is invalid or exceeds available messages"}
       ]
     },
     "gapInfo": {
       "type": "object",
-      "description": "Metadata about missing sequence numbers in a conversation. Gaps can occur when members are removed from the conversation.",
       "required": ["hasGaps", "missingSeqs", "totalMessages"],
       "properties": {
         "hasGaps": {
@@ -79,15 +76,13 @@
         },
         "missingSeqs": {
           "type": "array",
-          "items": {
-            "type": "integer"
-          },
-          "description": "Array of missing sequence numbers within the conversation's min-max seq range. Empty if hasGaps is false."
+          "items": { "type": "integer" },
+          "description": "Array of missing sequence numbers"
         },
         "totalMessages": {
           "type": "integer",
           "minimum": 0,
-          "description": "Total number of messages in the conversation (including gaps)"
+          "description": "Total number of messages in the conversation"
         }
       }
     }

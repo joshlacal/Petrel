@@ -1,11 +1,11 @@
 {
   "lexicon": 1,
   "id": "blue.catbird.mlsChat.reportRecoveryFailure",
-  "description": "Report that recovery has been exhausted for a conversation (spec §8.6)",
+  "description": "Report that recovery has been exhausted for a conversation",
   "defs": {
     "main": {
       "type": "procedure",
-      "description": "Report that recovery has been exhausted for a conversation. Server uses these reports for quorum-based auto-reset (>=50% of members must report within 1 hour for auto-reset to trigger).",
+      "description": "Report that a client has exhausted all recovery attempts for a conversation. Any member may report. When >=50% of active members have reported within a 1-hour window, the server auto-resets the group.",
       "input": {
         "encoding": "application/json",
         "schema": {
@@ -18,8 +18,9 @@
             },
             "failureType": {
               "type": "string",
-              "description": "Type of failure (default: external_commit_exhausted)",
-              "default": "external_commit_exhausted"
+              "description": "Type of failure that was exhausted",
+              "default": "external_commit_exhausted",
+              "knownValues": ["external_commit_exhausted"]
             }
           }
         }
@@ -28,7 +29,7 @@
         "encoding": "application/json",
         "schema": {
           "type": "object",
-          "required": ["recorded", "autoResetTriggered"],
+          "required": ["recorded", "autoResetTriggered", "failureCount", "memberCount"],
           "properties": {
             "recorded": {
               "type": "boolean",
@@ -36,7 +37,17 @@
             },
             "autoResetTriggered": {
               "type": "boolean",
-              "description": "Whether quorum-based auto-reset was triggered"
+              "description": "Whether the quorum threshold was met and an automatic group reset was triggered"
+            },
+            "failureCount": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of members who have reported failures within the expiry window"
+            },
+            "memberCount": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Total number of active members in the conversation"
             }
           }
         }

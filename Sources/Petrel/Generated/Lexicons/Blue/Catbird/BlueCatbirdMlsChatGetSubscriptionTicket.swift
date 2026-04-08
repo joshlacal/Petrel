@@ -46,7 +46,7 @@ public struct Output: ATProtocolCodable {
         
         public let ticket: String
         
-        public let endpoint: String
+        public let endpoint: URI?
         
         public let expiresAt: ATProtocolDate
         
@@ -58,7 +58,7 @@ public struct Output: ATProtocolCodable {
             
             ticket: String,
             
-            endpoint: String,
+            endpoint: URI? = nil,
             
             expiresAt: ATProtocolDate
             
@@ -82,7 +82,7 @@ public struct Output: ATProtocolCodable {
             self.ticket = try container.decode(String.self, forKey: .ticket)
             
             
-            self.endpoint = try container.decode(String.self, forKey: .endpoint)
+            self.endpoint = try container.decodeIfPresent(URI.self, forKey: .endpoint)
             
             
             self.expiresAt = try container.decode(ATProtocolDate.self, forKey: .expiresAt)
@@ -97,7 +97,8 @@ public struct Output: ATProtocolCodable {
             try container.encode(ticket, forKey: .ticket)
             
             
-            try container.encode(endpoint, forKey: .endpoint)
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(endpoint, forKey: .endpoint)
             
             
             try container.encode(expiresAt, forKey: .expiresAt)
@@ -116,8 +117,11 @@ public struct Output: ATProtocolCodable {
             
             
             
-            let endpointValue = try endpoint.toCBORValue()
-            map = map.adding(key: "endpoint", value: endpointValue)
+            if let value = endpoint {
+                // Encode optional property even if it's an empty array for CBOR
+                let endpointValue = try value.toCBORValue()
+                map = map.adding(key: "endpoint", value: endpointValue)
+            }
             
             
             
@@ -140,8 +144,7 @@ public struct Output: ATProtocolCodable {
     }
         
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case unauthorized = "Unauthorized.Authentication required"
-                case forbidden = "Forbidden.User is not a member of the specified conversation"
+                case notMember = "NotMember.User is not a member of one or more specified conversations"
             public var description: String {
                 return self.rawValue
             }
@@ -160,9 +163,10 @@ public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertibl
 extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - getSubscriptionTicket
 
-    /// Get a short-lived signed ticket for subscribing to MLS events via WebSocket. The ticket is valid for 30 seconds and must be used to establish a WebSocket connection.
+    /// Get a short-lived ticket for WebSocket subscription authentication (same as v1, in v2 namespace) Get a short-lived ticket for WebSocket subscription authentication. Call this via PDS proxy, then connect directly to the MLS DS WebSocket endpoint with the ticket.
     /// 
     /// - Parameter input: The input parameters for the request
+    
     /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
@@ -182,13 +186,18 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         headers["Accept"] = "application/json"
         
 
+        
         let requestData: Data? = try JSONEncoder().encode(input)
+        
+        
+        let queryItems: [URLQueryItem]? = nil
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
             headers: headers,
             body: requestData,
-            queryItems: nil
+            queryItems: queryItems
         )
 
         // Determine service DID for this endpoint

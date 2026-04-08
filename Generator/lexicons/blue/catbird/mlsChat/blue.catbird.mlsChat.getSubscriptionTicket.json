@@ -1,10 +1,11 @@
 {
   "lexicon": 1,
   "id": "blue.catbird.mlsChat.getSubscriptionTicket",
+  "description": "Get a short-lived ticket for WebSocket subscription authentication (same as v1, in v2 namespace)",
   "defs": {
     "main": {
       "type": "procedure",
-      "description": "Get a short-lived signed ticket for subscribing to MLS events via WebSocket. The ticket is valid for 30 seconds and must be used to establish a WebSocket connection.",
+      "description": "Get a short-lived ticket for WebSocket subscription authentication. Call this via PDS proxy, then connect directly to the MLS DS WebSocket endpoint with the ticket.",
       "input": {
         "encoding": "application/json",
         "schema": {
@@ -12,10 +13,9 @@
           "properties": {
             "convoIds": {
               "type": "array",
-              "description": "Optional: limit subscription to specific conversations. If omitted, subscribes to all conversations the user is a member of.",
-              "items": {
-                "type": "string"
-              }
+              "items": { "type": "string" },
+              "description": "Conversation IDs to subscribe to. If omitted, subscribes to all user conversations.",
+              "maxLength": 100
             }
           }
         }
@@ -24,33 +24,27 @@
         "encoding": "application/json",
         "schema": {
           "type": "object",
-          "required": ["ticket", "endpoint", "expiresAt"],
+          "required": ["ticket", "expiresAt"],
           "properties": {
             "ticket": {
               "type": "string",
-              "description": "Signed subscription ticket (JWT) to use as query parameter when connecting to WebSocket"
+              "description": "Short-lived JWT ticket for WebSocket authentication"
             },
             "endpoint": {
               "type": "string",
-              "description": "WebSocket endpoint URL to connect to (e.g., wss://mls.catbird.blue/xrpc/blue.catbird.mlsChat.subscribeConvoEvents)"
+              "format": "uri",
+              "description": "WebSocket endpoint URL to connect to"
             },
             "expiresAt": {
               "type": "string",
               "format": "datetime",
-              "description": "When the ticket expires (ISO 8601). Must connect before this time."
+              "description": "Ticket expiration time (typically 30 seconds from issuance)"
             }
           }
         }
       },
       "errors": [
-        {
-          "name": "Unauthorized",
-          "description": "Authentication required"
-        },
-        {
-          "name": "Forbidden",
-          "description": "User is not a member of the specified conversation"
-        }
+        {"name": "NotMember", "description": "User is not a member of one or more specified conversations"}
       ]
     }
   }

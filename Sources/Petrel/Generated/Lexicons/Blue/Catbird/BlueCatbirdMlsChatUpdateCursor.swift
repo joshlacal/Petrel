@@ -109,9 +109,9 @@ public struct Output: ATProtocolCodable {
     }
         
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case authRequired = "AuthRequired.Authentication required"
-                case forbidden = "Forbidden.User is not a member of the conversation"
-                case invalidRequest = "InvalidRequest.Invalid cursor or conversation ID"
+                case convoNotFound = "ConvoNotFound.Conversation not found"
+                case notMember = "NotMember.Caller is not a member of the conversation"
+                case invalidCursor = "InvalidCursor.The provided cursor value is invalid"
             public var description: String {
                 return self.rawValue
             }
@@ -130,9 +130,10 @@ public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertibl
 extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - updateCursor
 
-    /// Update the read cursor position for a conversation
+    /// Update the read cursor position for a conversation Update the read cursor for a conversation to track the last-read position.
     /// 
     /// - Parameter input: The input parameters for the request
+    
     /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
@@ -152,13 +153,18 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         headers["Accept"] = "application/json"
         
 
+        
         let requestData: Data? = try JSONEncoder().encode(input)
+        
+        
+        let queryItems: [URLQueryItem]? = nil
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
             headers: headers,
             body: requestData,
-            queryItems: nil
+            queryItems: queryItems
         )
 
         // Determine service DID for this endpoint
