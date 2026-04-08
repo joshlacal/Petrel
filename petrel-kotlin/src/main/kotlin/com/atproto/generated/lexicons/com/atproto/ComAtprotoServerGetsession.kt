@@ -18,11 +18,11 @@ object ComAtprotoServerGetSessionDefs {
     data class ComAtprotoServerGetSessionOutput(
         @SerialName("handle")
         val handle: Handle,        @SerialName("did")
-        val did: DID,        @SerialName("email")
+        val did: DID,        @SerialName("didDoc")
+        val didDoc: JsonElement? = null,        @SerialName("email")
         val email: String? = null,        @SerialName("emailConfirmed")
         val emailConfirmed: Boolean? = null,        @SerialName("emailAuthFactor")
-        val emailAuthFactor: Boolean? = null,        @SerialName("didDoc")
-        val didDoc: JsonElement? = null,        @SerialName("active")
+        val emailAuthFactor: Boolean? = null,        @SerialName("active")
         val active: Boolean? = null,// If active=false, this optional field indicates a possible reason for why the account is not active. If active=false and no status is supplied, then the host makes no claim for why the repository is no longer being hosted.        @SerialName("status")
         val status: String? = null    )
 

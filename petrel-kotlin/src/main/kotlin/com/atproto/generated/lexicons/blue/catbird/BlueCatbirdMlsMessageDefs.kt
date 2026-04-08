@@ -39,12 +39,15 @@ sealed interface BlueCatbirdMlsMessageDefsPayloadViewEmbedUnion {
     @Serializable
     data class BlueCatbirdMlsMessageDefsPayloadView(
 /** Payload format version for future compatibility. Current version is 1. */        @SerialName("version")
-        val version: Int,/** Message type discriminator: text (default), adminRoster, adminAction */        @SerialName("messageType")
-        val messageType: String?,/** Message text content (for messageType: text) */        @SerialName("text")
+        val version: Int,/** Message type discriminator */        @SerialName("messageType")
+        val messageType: String,/** Message text content (for messageType: text) */        @SerialName("text")
         val text: String?,/** Optional rich media embed (record, link, or GIF). Clients can add new types in future versions. */        @SerialName("embed")
         val embed: BlueCatbirdMlsMessageDefsPayloadViewEmbedUnion?,/** Admin roster update (for messageType: adminRoster) */        @SerialName("adminRoster")
         val adminRoster: BlueCatbirdMlsMessageDefsAdminRoster?,/** Admin action notification (for messageType: adminAction) */        @SerialName("adminAction")
-        val adminAction: BlueCatbirdMlsMessageDefsAdminAction?    ) {
+        val adminAction: BlueCatbirdMlsMessageDefsAdminAction?,/** Reaction payload (for messageType: reaction) */        @SerialName("reaction")
+        val reaction: BlueCatbirdMlsMessageDefsReactionPayload?,/** Read receipt payload (for messageType: readReceipt) */        @SerialName("readReceipt")
+        val readReceipt: BlueCatbirdMlsMessageDefsReadReceiptPayload?,/** Typing indicator payload (for messageType: typing) */        @SerialName("typing")
+        val typing: BlueCatbirdMlsMessageDefsTypingPayload?    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#blueCatbirdMlsMessageDefsPayloadView"
         }
@@ -125,5 +128,44 @@ sealed interface BlueCatbirdMlsMessageDefsPayloadViewEmbedUnion {
         val reason: String?    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#blueCatbirdMlsMessageDefsAdminAction"
+        }
+    }
+
+    /**
+     * Encrypted reaction to a message (add or remove emoji)
+     */
+    @Serializable
+    data class BlueCatbirdMlsMessageDefsReactionPayload(
+/** ID of the message being reacted to */        @SerialName("messageId")
+        val messageId: String,/** Emoji reaction (single emoji or short sequence) */        @SerialName("emoji")
+        val emoji: String,/** Whether to add or remove the reaction */        @SerialName("action")
+        val action: String    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#blueCatbirdMlsMessageDefsReactionPayload"
+        }
+    }
+
+    /**
+     * Encrypted read receipt for a specific message
+     */
+    @Serializable
+    data class BlueCatbirdMlsMessageDefsReadReceiptPayload(
+/** ID of the message that was read */        @SerialName("messageId")
+        val messageId: String    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#blueCatbirdMlsMessageDefsReadReceiptPayload"
+        }
+    }
+
+    /**
+     * Encrypted typing indicator (ephemeral, not stored). Sent as MLS PrivateMessage without epoch advancement.
+     */
+    @Serializable
+    data class BlueCatbirdMlsMessageDefsTypingPayload(
+/** Whether the user is currently typing */        @SerialName("isTyping")
+        val isTyping: Boolean,/** Unix timestamp in milliseconds when typing state changed */        @SerialName("ts")
+        val ts: Int?    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#blueCatbirdMlsMessageDefsTypingPayload"
         }
     }

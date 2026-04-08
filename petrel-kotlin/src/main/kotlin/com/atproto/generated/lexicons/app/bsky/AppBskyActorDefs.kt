@@ -37,6 +37,10 @@ sealed interface AppBskyActorDefsPreferencesPreferencesUnion {
     data class AppBskyActorDefsPersonalDetailsPref(val value: AppBskyActorDefsPersonalDetailsPref) : AppBskyActorDefsPreferencesPreferencesUnion
 
     @Serializable
+    @SerialName("app.bsky.actor.defs#AppBskyActorDefsDeclaredAgePref")
+    data class AppBskyActorDefsDeclaredAgePref(val value: AppBskyActorDefsDeclaredAgePref) : AppBskyActorDefsPreferencesPreferencesUnion
+
+    @Serializable
     @SerialName("app.bsky.actor.defs#AppBskyActorDefsFeedViewPref")
     data class AppBskyActorDefsFeedViewPref(val value: AppBskyActorDefsFeedViewPref) : AppBskyActorDefsPreferencesPreferencesUnion
 
@@ -73,6 +77,10 @@ sealed interface AppBskyActorDefsPreferencesPreferencesUnion {
     data class AppBskyActorDefsVerificationPrefs(val value: AppBskyActorDefsVerificationPrefs) : AppBskyActorDefsPreferencesPreferencesUnion
 
     @Serializable
+    @SerialName("app.bsky.actor.defs#AppBskyActorDefsLiveEventPreferences")
+    data class AppBskyActorDefsLiveEventPreferences(val value: AppBskyActorDefsLiveEventPreferences) : AppBskyActorDefsPreferencesPreferencesUnion
+
+    @Serializable
     @SerialName("unknown")
     data class Unexpected(val value: JsonElement) : AppBskyActorDefsPreferencesPreferencesUnion
 }
@@ -98,6 +106,10 @@ sealed interface AppBskyActorDefsPreferencesUnion {
     @Serializable
     @SerialName("app.bsky.actor.defs#AppBskyActorDefsPersonalDetailsPref")
     data class AppBskyActorDefsPersonalDetailsPref(val value: AppBskyActorDefsPersonalDetailsPref) : AppBskyActorDefsPreferencesUnion
+
+    @Serializable
+    @SerialName("app.bsky.actor.defs#AppBskyActorDefsDeclaredAgePref")
+    data class AppBskyActorDefsDeclaredAgePref(val value: AppBskyActorDefsDeclaredAgePref) : AppBskyActorDefsPreferencesUnion
 
     @Serializable
     @SerialName("app.bsky.actor.defs#AppBskyActorDefsFeedViewPref")
@@ -134,6 +146,10 @@ sealed interface AppBskyActorDefsPreferencesUnion {
     @Serializable
     @SerialName("app.bsky.actor.defs#AppBskyActorDefsVerificationPrefs")
     data class AppBskyActorDefsVerificationPrefs(val value: AppBskyActorDefsVerificationPrefs) : AppBskyActorDefsPreferencesUnion
+
+    @Serializable
+    @SerialName("app.bsky.actor.defs#AppBskyActorDefsLiveEventPreferences")
+    data class AppBskyActorDefsLiveEventPreferences(val value: AppBskyActorDefsLiveEventPreferences) : AppBskyActorDefsPreferencesUnion
 
     @Serializable
     @SerialName("unknown")
@@ -205,7 +221,8 @@ enum class AppBskyActorDefsMutedWordTarget {
         val labels: List<ComAtprotoLabelDefsLabel>?,        @SerialName("createdAt")
         val createdAt: ATProtocolDate?,        @SerialName("verification")
         val verification: AppBskyActorDefsVerificationState?,        @SerialName("status")
-        val status: AppBskyActorDefsStatusView?    ) {
+        val status: AppBskyActorDefsStatusView?,/** Debug information for internal development */        @SerialName("debug")
+        val debug: JsonElement?    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyActorDefsProfileViewBasic"
         }
@@ -226,7 +243,8 @@ enum class AppBskyActorDefsMutedWordTarget {
         val viewer: AppBskyActorDefsViewerState?,        @SerialName("labels")
         val labels: List<ComAtprotoLabelDefsLabel>?,        @SerialName("verification")
         val verification: AppBskyActorDefsVerificationState?,        @SerialName("status")
-        val status: AppBskyActorDefsStatusView?    ) {
+        val status: AppBskyActorDefsStatusView?,/** Debug information for internal development */        @SerialName("debug")
+        val debug: JsonElement?    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyActorDefsProfileView"
         }
@@ -254,7 +272,8 @@ enum class AppBskyActorDefsMutedWordTarget {
         val labels: List<ComAtprotoLabelDefsLabel>?,        @SerialName("pinnedPost")
         val pinnedPost: ComAtprotoRepoStrongRef?,        @SerialName("verification")
         val verification: AppBskyActorDefsVerificationState?,        @SerialName("status")
-        val status: AppBskyActorDefsStatusView?    ) {
+        val status: AppBskyActorDefsStatusView?,/** Debug information for internal development */        @SerialName("debug")
+        val debug: JsonElement?    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyActorDefsProfileViewDetailed"
         }
@@ -268,7 +287,8 @@ enum class AppBskyActorDefsMutedWordTarget {
         val starterPacks: Int?,        @SerialName("labeler")
         val labeler: Boolean?,        @SerialName("chat")
         val chat: AppBskyActorDefsProfileAssociatedChat?,        @SerialName("activitySubscription")
-        val activitySubscription: AppBskyActorDefsProfileAssociatedActivitySubscription?    ) {
+        val activitySubscription: AppBskyActorDefsProfileAssociatedActivitySubscription?,        @SerialName("germ")
+        val germ: AppBskyActorDefsProfileAssociatedGerm?    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyActorDefsProfileAssociated"
         }
@@ -280,6 +300,16 @@ enum class AppBskyActorDefsMutedWordTarget {
         val allowIncoming: String    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyActorDefsProfileAssociatedChat"
+        }
+    }
+
+    @Serializable
+    data class AppBskyActorDefsProfileAssociatedGerm(
+        @SerialName("messageMeUrl")
+        val messageMeUrl: URI,        @SerialName("showButtonTo")
+        val showButtonTo: String    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#appBskyActorDefsProfileAssociatedGerm"
         }
     }
 
@@ -417,6 +447,20 @@ enum class AppBskyActorDefsMutedWordTarget {
         }
     }
 
+    /**
+     * Read-only preference containing value(s) inferred from the user's declared birthdate. Absence of this preference object in the response indicates that the user has not made a declaration.
+     */
+    @Serializable
+    data class AppBskyActorDefsDeclaredAgePref(
+/** Indicates if the user has declared that they are over 13 years of age. */        @SerialName("isOverAge13")
+        val isOverAge13: Boolean?,/** Indicates if the user has declared that they are over 16 years of age. */        @SerialName("isOverAge16")
+        val isOverAge16: Boolean?,/** Indicates if the user has declared that they are over 18 years of age. */        @SerialName("isOverAge18")
+        val isOverAge18: Boolean?    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#appBskyActorDefsDeclaredAgePref"
+        }
+    }
+
     @Serializable
     data class AppBskyActorDefsFeedViewPref(
 /** The URI of the feed, or an identifier which describes the feed. */        @SerialName("feed")
@@ -434,8 +478,7 @@ enum class AppBskyActorDefsMutedWordTarget {
     @Serializable
     data class AppBskyActorDefsThreadViewPref(
 /** Sorting mode for threads. */        @SerialName("sort")
-        val sort: String?,/** Show followed users at the top of all replies. */        @SerialName("prioritizeFollowedUsers")
-        val prioritizeFollowedUsers: Boolean?    ) {
+        val sort: String?    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyActorDefsThreadViewPref"
         }
@@ -556,6 +599,19 @@ enum class AppBskyActorDefsMutedWordTarget {
     }
 
     /**
+     * Preferences for live events.
+     */
+    @Serializable
+    data class AppBskyActorDefsLiveEventPreferences(
+/** A list of feed IDs that the user has hidden from live events. */        @SerialName("hiddenFeedIds")
+        val hiddenFeedIds: List<String>?,/** Whether to hide all feeds from live events. */        @SerialName("hideAllFeeds")
+        val hideAllFeeds: Boolean?    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#appBskyActorDefsLiveEventPreferences"
+        }
+    }
+
+    /**
      * Default post interaction settings for the account. These values should be applied as default values when creating new posts. These refs should mirror the threadgate and postgate records exactly.
      */
     @Serializable
@@ -570,12 +626,15 @@ enum class AppBskyActorDefsMutedWordTarget {
 
     @Serializable
     data class AppBskyActorDefsStatusView(
-/** The status for the account. */        @SerialName("status")
+        @SerialName("uri")
+        val uri: ATProtocolURI?,        @SerialName("cid")
+        val cid: CID?,/** The status for the account. */        @SerialName("status")
         val status: String,        @SerialName("record")
         val record: JsonElement,/** An optional embed associated with the status. */        @SerialName("embed")
         val embed: AppBskyActorDefsStatusViewEmbedUnion?,/** The date when this status will expire. The application might choose to no longer return the status after expiration. */        @SerialName("expiresAt")
         val expiresAt: ATProtocolDate?,/** True if the status is not expired, false if it is expired. Only present if expiration was set. */        @SerialName("isActive")
-        val isActive: Boolean?    ) {
+        val isActive: Boolean?,/** True if the user's go-live access has been disabled by a moderator, false otherwise. */        @SerialName("isDisabled")
+        val isDisabled: Boolean?    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyActorDefsStatusView"
         }

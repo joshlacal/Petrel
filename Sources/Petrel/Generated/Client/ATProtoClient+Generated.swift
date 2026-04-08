@@ -1062,6 +1062,270 @@ public final class Blue: @unchecked Sendable {
 
 }
 
+public lazy var place: Place = {
+    return Place(networkService: self.networkService)
+}()
+
+public final class Place: @unchecked Sendable {
+    internal let networkService: NetworkService
+    internal init(networkService: NetworkService) {
+        self.networkService = networkService
+    }
+
+    public lazy var stream: Stream = {
+        return Stream(networkService: self.networkService)
+    }()
+
+    public final class Stream: @unchecked Sendable {
+        internal let networkService: NetworkService
+        internal init(networkService: NetworkService) {
+            self.networkService = networkService
+        }
+
+        public lazy var defs: Defs = {
+            return Defs(networkService: self.networkService)
+        }()
+
+        public final class Defs: @unchecked Sendable {
+            internal let networkService: NetworkService
+            internal init(networkService: NetworkService) {
+                self.networkService = networkService
+            }
+
+        }
+
+        public lazy var livestream: Livestream = {
+            return Livestream(networkService: self.networkService)
+        }()
+
+        public final class Livestream: @unchecked Sendable {
+            internal let networkService: NetworkService
+            internal init(networkService: NetworkService) {
+                self.networkService = networkService
+            }
+
+        }
+
+        public lazy var key: Key = {
+            return Key(networkService: self.networkService)
+        }()
+
+        public final class Key: @unchecked Sendable {
+            internal let networkService: NetworkService
+            internal init(networkService: NetworkService) {
+                self.networkService = networkService
+            }
+
+        }
+
+        public lazy var video: Video = {
+            return Video(networkService: self.networkService)
+        }()
+
+        public final class Video: @unchecked Sendable {
+            internal let networkService: NetworkService
+            internal init(networkService: NetworkService) {
+                self.networkService = networkService
+            }
+
+        }
+
+        public lazy var segment: Segment = {
+            return Segment(networkService: self.networkService)
+        }()
+
+        public final class Segment: @unchecked Sendable {
+            internal let networkService: NetworkService
+            internal init(networkService: NetworkService) {
+                self.networkService = networkService
+            }
+
+        }
+
+        public lazy var branding: Branding = {
+            return Branding(networkService: self.networkService)
+        }()
+
+        public final class Branding: @unchecked Sendable {
+            internal let networkService: NetworkService
+            internal init(networkService: NetworkService) {
+                self.networkService = networkService
+            }
+
+        }
+
+        public lazy var chat: Chat = {
+            return Chat(networkService: self.networkService)
+        }()
+
+        public final class Chat: @unchecked Sendable {
+            internal let networkService: NetworkService
+            internal init(networkService: NetworkService) {
+                self.networkService = networkService
+            }
+
+        }
+
+        public lazy var config: Config = {
+            return Config(networkService: self.networkService)
+        }()
+
+        public final class Config: @unchecked Sendable {
+            internal let networkService: NetworkService
+            internal init(networkService: NetworkService) {
+                self.networkService = networkService
+            }
+
+        }
+
+        public lazy var multistream: Multistream = {
+            return Multistream(networkService: self.networkService)
+        }()
+
+        public final class Multistream: @unchecked Sendable {
+            internal let networkService: NetworkService
+            internal init(networkService: NetworkService) {
+                self.networkService = networkService
+            }
+
+        }
+
+        public lazy var ingest: Ingest = {
+            return Ingest(networkService: self.networkService)
+        }()
+
+        public final class Ingest: @unchecked Sendable {
+            internal let networkService: NetworkService
+            internal init(networkService: NetworkService) {
+                self.networkService = networkService
+            }
+
+        }
+
+        public lazy var graph: Graph = {
+            return Graph(networkService: self.networkService)
+        }()
+
+        public final class Graph: @unchecked Sendable {
+            internal let networkService: NetworkService
+            internal init(networkService: NetworkService) {
+                self.networkService = networkService
+            }
+
+        }
+
+        public lazy var server: Server = {
+            return Server(networkService: self.networkService)
+        }()
+
+        public final class Server: @unchecked Sendable {
+            internal let networkService: NetworkService
+            internal init(networkService: NetworkService) {
+                self.networkService = networkService
+            }
+
+        }
+
+        public lazy var playback: Playback = {
+            return Playback(networkService: self.networkService)
+        }()
+
+        public final class Playback: @unchecked Sendable {
+            internal let networkService: NetworkService
+            internal init(networkService: NetworkService) {
+                self.networkService = networkService
+            }
+
+        }
+
+        public lazy var live: Live = {
+            return Live(networkService: self.networkService)
+        }()
+
+        public final class Live: @unchecked Sendable {
+            internal let networkService: NetworkService
+            internal init(networkService: NetworkService) {
+                self.networkService = networkService
+            }
+
+        }
+
+        public lazy var richtext: Richtext = {
+            return Richtext(networkService: self.networkService)
+        }()
+
+        public final class Richtext: @unchecked Sendable {
+            internal let networkService: NetworkService
+            internal init(networkService: NetworkService) {
+                self.networkService = networkService
+            }
+
+        }
+
+        public lazy var muxl: Muxl = {
+            return Muxl(networkService: self.networkService)
+        }()
+
+        public final class Muxl: @unchecked Sendable {
+            internal let networkService: NetworkService
+            internal init(networkService: NetworkService) {
+                self.networkService = networkService
+            }
+
+        }
+
+        public lazy var metadata: Metadata = {
+            return Metadata(networkService: self.networkService)
+        }()
+
+        public final class Metadata: @unchecked Sendable {
+            internal let networkService: NetworkService
+            internal init(networkService: NetworkService) {
+                self.networkService = networkService
+            }
+
+        }
+
+        public lazy var broadcast: Broadcast = {
+            return Broadcast(networkService: self.networkService)
+        }()
+
+        public final class Broadcast: @unchecked Sendable {
+            internal let networkService: NetworkService
+            internal init(networkService: NetworkService) {
+                self.networkService = networkService
+            }
+
+        }
+
+        public lazy var badge: Badge = {
+            return Badge(networkService: self.networkService)
+        }()
+
+        public final class Badge: @unchecked Sendable {
+            internal let networkService: NetworkService
+            internal init(networkService: NetworkService) {
+                self.networkService = networkService
+            }
+
+        }
+
+        public lazy var moderation: Moderation = {
+            return Moderation(networkService: self.networkService)
+        }()
+
+        public final class Moderation: @unchecked Sendable {
+            internal let networkService: NetworkService
+            internal init(networkService: NetworkService) {
+                self.networkService = networkService
+            }
+
+        }
+
+    }
+
+}
+
 public lazy var com: Com = {
     return Com(networkService: self.networkService)
 }()

@@ -54,8 +54,7 @@ sealed interface AppBskyUnspeccedGetPostThreadV2ThreadItemValueUnion {
         val anchor: ATProtocolURI,// Whether to include parents above the anchor.        @SerialName("above")
         val above: Boolean? = null,// How many levels of replies to include below the anchor.        @SerialName("below")
         val below: Int? = null,// Maximum of replies to include at each level of the thread, except for the direct replies to the anchor, which are (NOTE: currently, during unspecced phase) all returned (NOTE: later they might be paginated).        @SerialName("branchingFactor")
-        val branchingFactor: Int? = null,// Whether to prioritize posts from followed users. It only has effect when the user is authenticated.        @SerialName("prioritizeFollowedUsers")
-        val prioritizeFollowedUsers: Boolean? = null,// Sorting for the thread replies.        @SerialName("sort")
+        val branchingFactor: Int? = null,// Sorting for the thread replies.        @SerialName("sort")
         val sort: String? = null    )
 
     @Serializable

@@ -47,6 +47,21 @@
                 "type": "ref",
                 "ref": "#batchError"
               }
+            },
+            "stats": {
+              "type": "ref",
+              "ref": "#keyPackageStats",
+              "description": "Key package pool statistics after the publish operation"
+            },
+            "syncResult": {
+              "type": "string",
+              "description": "Result of the sync operation",
+              "knownValues": ["synced", "skipped", "failed"]
+            },
+            "publishResult": {
+              "type": "string",
+              "description": "Result of the publish operation",
+              "knownValues": ["published", "partial", "failed"]
             }
           }
         }
@@ -116,6 +131,28 @@
         "error": {
           "type": "string",
           "description": "Human-readable error message describing why the upload failed"
+        }
+      }
+    },
+    "keyPackageStats": {
+      "type": "object",
+      "description": "Key package pool statistics",
+      "required": ["published", "available", "expired"],
+      "properties": {
+        "published": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total number of key packages published"
+        },
+        "available": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of key packages currently available for consumption"
+        },
+        "expired": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of expired key packages"
         }
       }
     }

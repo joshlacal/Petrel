@@ -10,9 +10,12 @@
         "schema": {
           "type": "object",
           "properties": {
-            "convoId": {
-              "type": "string",
-              "description": "Optional: limit subscription to a specific conversation. If omitted, subscribes to all conversations the user is a member of."
+            "convoIds": {
+              "type": "array",
+              "description": "Optional: limit subscription to specific conversations. If omitted, subscribes to all conversations the user is a member of.",
+              "items": {
+                "type": "string"
+              }
             }
           }
         }

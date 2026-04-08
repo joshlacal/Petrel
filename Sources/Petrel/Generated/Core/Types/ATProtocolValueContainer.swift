@@ -2031,6 +2031,16 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
             
+            decoders["blue.catbird.mlsChat.commitGroupChange#pendingDeviceAddition"] = { decoder in
+                do {
+                    let decodedObject = try BlueCatbirdMlsChatCommitGroupChange.PendingDeviceAddition(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding BlueCatbirdMlsChatCommitGroupChange.PendingDeviceAddition: \(error)")
+                    return .decodeError("Error decoding BlueCatbirdMlsChatCommitGroupChange.PendingDeviceAddition: \(error)")
+                }
+            }
+            
             decoders["blue.catbird.mlsChat.listChatRequests#chatRequest"] = { decoder in
                 do {
                     let decodedObject = try BlueCatbirdMlsChatListChatRequests.ChatRequest(from: decoder)
@@ -2231,6 +2241,26 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
             
+            decoders["blue.catbird.mlsChat.updateConvo#policyInput"] = { decoder in
+                do {
+                    let decodedObject = try BlueCatbirdMlsChatUpdateConvo.PolicyInput(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding BlueCatbirdMlsChatUpdateConvo.PolicyInput: \(error)")
+                    return .decodeError("Error decoding BlueCatbirdMlsChatUpdateConvo.PolicyInput: \(error)")
+                }
+            }
+            
+            decoders["blue.catbird.mlsChat.updateConvo#policyView"] = { decoder in
+                do {
+                    let decodedObject = try BlueCatbirdMlsChatUpdateConvo.PolicyView(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding BlueCatbirdMlsChatUpdateConvo.PolicyView: \(error)")
+                    return .decodeError("Error decoding BlueCatbirdMlsChatUpdateConvo.PolicyView: \(error)")
+                }
+            }
+            
             decoders["blue.catbird.mlsChat.getMessages#gapInfo"] = { decoder in
                 do {
                     let decodedObject = try BlueCatbirdMlsChatGetMessages.GapInfo(from: decoder)
@@ -2248,6 +2278,46 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 } catch {
                     LogManager.logDebug("Error decoding BlueCatbirdMlsChatDevice: \(error)")
                     return .decodeError("Error decoding BlueCatbirdMlsChatDevice: \(error)")
+                }
+            }
+            
+            decoders["blue.catbird.mlsChat.blocks#blockRecord"] = { decoder in
+                do {
+                    let decodedObject = try BlueCatbirdMlsChatBlocks.BlockRecord(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding BlueCatbirdMlsChatBlocks.BlockRecord: \(error)")
+                    return .decodeError("Error decoding BlueCatbirdMlsChatBlocks.BlockRecord: \(error)")
+                }
+            }
+            
+            decoders["blue.catbird.mlsChat.blocks#blockRelationship"] = { decoder in
+                do {
+                    let decodedObject = try BlueCatbirdMlsChatBlocks.BlockRelationship(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding BlueCatbirdMlsChatBlocks.BlockRelationship: \(error)")
+                    return .decodeError("Error decoding BlueCatbirdMlsChatBlocks.BlockRelationship: \(error)")
+                }
+            }
+            
+            decoders["blue.catbird.mlsChat.blocks#conversationBlockStatus"] = { decoder in
+                do {
+                    let decodedObject = try BlueCatbirdMlsChatBlocks.ConversationBlockStatus(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding BlueCatbirdMlsChatBlocks.ConversationBlockStatus: \(error)")
+                    return .decodeError("Error decoding BlueCatbirdMlsChatBlocks.ConversationBlockStatus: \(error)")
+                }
+            }
+            
+            decoders["blue.catbird.mlsChat.blocks#blockChangeResult"] = { decoder in
+                do {
+                    let decodedObject = try BlueCatbirdMlsChatBlocks.BlockChangeResult(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding BlueCatbirdMlsChatBlocks.BlockChangeResult: \(error)")
+                    return .decodeError("Error decoding BlueCatbirdMlsChatBlocks.BlockChangeResult: \(error)")
                 }
             }
             
@@ -2308,6 +2378,16 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 } catch {
                     LogManager.logDebug("Error decoding BlueCatbirdMlsChatPublishKeyPackages.BatchError: \(error)")
                     return .decodeError("Error decoding BlueCatbirdMlsChatPublishKeyPackages.BatchError: \(error)")
+                }
+            }
+            
+            decoders["blue.catbird.mlsChat.publishKeyPackages#keyPackageStats"] = { decoder in
+                do {
+                    let decodedObject = try BlueCatbirdMlsChatPublishKeyPackages.KeyPackageStats(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding BlueCatbirdMlsChatPublishKeyPackages.KeyPackageStats: \(error)")
+                    return .decodeError("Error decoding BlueCatbirdMlsChatPublishKeyPackages.KeyPackageStats: \(error)")
                 }
             }
             
@@ -2488,6 +2568,116 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 } catch {
                     LogManager.logDebug("Error decoding BlueCatbirdMlsChatMessageDefs.TypingPayload: \(error)")
                     return .decodeError("Error decoding BlueCatbirdMlsChatMessageDefs.TypingPayload: \(error)")
+                }
+            }
+            
+            decoders["blue.catbird.mlsChat.subscribeEvents#messageEvent"] = { decoder in
+                do {
+                    let decodedObject = try BlueCatbirdMlsChatSubscribeEvents.MessageEvent(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding BlueCatbirdMlsChatSubscribeEvents.MessageEvent: \(error)")
+                    return .decodeError("Error decoding BlueCatbirdMlsChatSubscribeEvents.MessageEvent: \(error)")
+                }
+            }
+            
+            decoders["blue.catbird.mlsChat.subscribeEvents#reactionEvent"] = { decoder in
+                do {
+                    let decodedObject = try BlueCatbirdMlsChatSubscribeEvents.ReactionEvent(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding BlueCatbirdMlsChatSubscribeEvents.ReactionEvent: \(error)")
+                    return .decodeError("Error decoding BlueCatbirdMlsChatSubscribeEvents.ReactionEvent: \(error)")
+                }
+            }
+            
+            decoders["blue.catbird.mlsChat.subscribeEvents#typingEvent"] = { decoder in
+                do {
+                    let decodedObject = try BlueCatbirdMlsChatSubscribeEvents.TypingEvent(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding BlueCatbirdMlsChatSubscribeEvents.TypingEvent: \(error)")
+                    return .decodeError("Error decoding BlueCatbirdMlsChatSubscribeEvents.TypingEvent: \(error)")
+                }
+            }
+            
+            decoders["blue.catbird.mlsChat.subscribeEvents#infoEvent"] = { decoder in
+                do {
+                    let decodedObject = try BlueCatbirdMlsChatSubscribeEvents.InfoEvent(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding BlueCatbirdMlsChatSubscribeEvents.InfoEvent: \(error)")
+                    return .decodeError("Error decoding BlueCatbirdMlsChatSubscribeEvents.InfoEvent: \(error)")
+                }
+            }
+            
+            decoders["blue.catbird.mlsChat.subscribeEvents#newDeviceEvent"] = { decoder in
+                do {
+                    let decodedObject = try BlueCatbirdMlsChatSubscribeEvents.NewDeviceEvent(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding BlueCatbirdMlsChatSubscribeEvents.NewDeviceEvent: \(error)")
+                    return .decodeError("Error decoding BlueCatbirdMlsChatSubscribeEvents.NewDeviceEvent: \(error)")
+                }
+            }
+            
+            decoders["blue.catbird.mlsChat.subscribeEvents#groupInfoRefreshRequestedEvent"] = { decoder in
+                do {
+                    let decodedObject = try BlueCatbirdMlsChatSubscribeEvents.GroupInfoRefreshRequestedEvent(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding BlueCatbirdMlsChatSubscribeEvents.GroupInfoRefreshRequestedEvent: \(error)")
+                    return .decodeError("Error decoding BlueCatbirdMlsChatSubscribeEvents.GroupInfoRefreshRequestedEvent: \(error)")
+                }
+            }
+            
+            decoders["blue.catbird.mlsChat.subscribeEvents#readditionRequestedEvent"] = { decoder in
+                do {
+                    let decodedObject = try BlueCatbirdMlsChatSubscribeEvents.ReadditionRequestedEvent(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding BlueCatbirdMlsChatSubscribeEvents.ReadditionRequestedEvent: \(error)")
+                    return .decodeError("Error decoding BlueCatbirdMlsChatSubscribeEvents.ReadditionRequestedEvent: \(error)")
+                }
+            }
+            
+            decoders["blue.catbird.mlsChat.subscribeEvents#membershipChangeEvent"] = { decoder in
+                do {
+                    let decodedObject = try BlueCatbirdMlsChatSubscribeEvents.MembershipChangeEvent(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding BlueCatbirdMlsChatSubscribeEvents.MembershipChangeEvent: \(error)")
+                    return .decodeError("Error decoding BlueCatbirdMlsChatSubscribeEvents.MembershipChangeEvent: \(error)")
+                }
+            }
+            
+            decoders["blue.catbird.mlsChat.subscribeEvents#readEvent"] = { decoder in
+                do {
+                    let decodedObject = try BlueCatbirdMlsChatSubscribeEvents.ReadEvent(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding BlueCatbirdMlsChatSubscribeEvents.ReadEvent: \(error)")
+                    return .decodeError("Error decoding BlueCatbirdMlsChatSubscribeEvents.ReadEvent: \(error)")
+                }
+            }
+            
+            decoders["blue.catbird.mlsChat.subscribeEvents#groupResetEvent"] = { decoder in
+                do {
+                    let decodedObject = try BlueCatbirdMlsChatSubscribeEvents.GroupResetEvent(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding BlueCatbirdMlsChatSubscribeEvents.GroupResetEvent: \(error)")
+                    return .decodeError("Error decoding BlueCatbirdMlsChatSubscribeEvents.GroupResetEvent: \(error)")
+                }
+            }
+            
+            decoders["blue.catbird.mlsChat.subscribeEvents#treeChangedEvent"] = { decoder in
+                do {
+                    let decodedObject = try BlueCatbirdMlsChatSubscribeEvents.TreeChangedEvent(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding BlueCatbirdMlsChatSubscribeEvents.TreeChangedEvent: \(error)")
+                    return .decodeError("Error decoding BlueCatbirdMlsChatSubscribeEvents.TreeChangedEvent: \(error)")
                 }
             }
             
@@ -3008,6 +3198,516 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 } catch {
                     LogManager.logDebug("Error decoding BlueCatbirdMlsHandleBlockChange.AffectedConvo: \(error)")
                     return .decodeError("Error decoding BlueCatbirdMlsHandleBlockChange.AffectedConvo: \(error)")
+                }
+            }
+            
+            decoders["place.stream.defs#blockView"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamDefs.BlockView(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamDefs.BlockView: \(error)")
+                    return .decodeError("Error decoding PlaceStreamDefs.BlockView: \(error)")
+                }
+            }
+            
+            decoders["place.stream.defs#renditions"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamDefs.Renditions(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamDefs.Renditions: \(error)")
+                    return .decodeError("Error decoding PlaceStreamDefs.Renditions: \(error)")
+                }
+            }
+            
+            decoders["place.stream.defs#rendition"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamDefs.Rendition(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamDefs.Rendition: \(error)")
+                    return .decodeError("Error decoding PlaceStreamDefs.Rendition: \(error)")
+                }
+            }
+            
+            decoders["place.stream.livestream"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamLivestream(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamLivestream: \(error)")
+                    return .decodeError("Error decoding PlaceStreamLivestream: \(error)")
+                }
+            }
+            
+            decoders["place.stream.livestream#notificationSettings"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamLivestream.NotificationSettings(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamLivestream.NotificationSettings: \(error)")
+                    return .decodeError("Error decoding PlaceStreamLivestream.NotificationSettings: \(error)")
+                }
+            }
+            
+            decoders["place.stream.livestream#livestreamView"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamLivestream.LivestreamView(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamLivestream.LivestreamView: \(error)")
+                    return .decodeError("Error decoding PlaceStreamLivestream.LivestreamView: \(error)")
+                }
+            }
+            
+            decoders["place.stream.livestream#viewerCount"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamLivestream.ViewerCount(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamLivestream.ViewerCount: \(error)")
+                    return .decodeError("Error decoding PlaceStreamLivestream.ViewerCount: \(error)")
+                }
+            }
+            
+            decoders["place.stream.livestream#teleportArrival"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamLivestream.TeleportArrival(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamLivestream.TeleportArrival: \(error)")
+                    return .decodeError("Error decoding PlaceStreamLivestream.TeleportArrival: \(error)")
+                }
+            }
+            
+            decoders["place.stream.livestream#teleportCanceled"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamLivestream.TeleportCanceled(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamLivestream.TeleportCanceled: \(error)")
+                    return .decodeError("Error decoding PlaceStreamLivestream.TeleportCanceled: \(error)")
+                }
+            }
+            
+            decoders["place.stream.livestream#streamplaceAnything"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamLivestream.StreamplaceAnything(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamLivestream.StreamplaceAnything: \(error)")
+                    return .decodeError("Error decoding PlaceStreamLivestream.StreamplaceAnything: \(error)")
+                }
+            }
+            
+            decoders["place.stream.key"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamKey(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamKey: \(error)")
+                    return .decodeError("Error decoding PlaceStreamKey: \(error)")
+                }
+            }
+            
+            decoders["place.stream.video"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamVideo(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamVideo: \(error)")
+                    return .decodeError("Error decoding PlaceStreamVideo: \(error)")
+                }
+            }
+            
+            decoders["place.stream.segment"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamSegment(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamSegment: \(error)")
+                    return .decodeError("Error decoding PlaceStreamSegment: \(error)")
+                }
+            }
+            
+            decoders["place.stream.segment#audio"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamSegment.Audio(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamSegment.Audio: \(error)")
+                    return .decodeError("Error decoding PlaceStreamSegment.Audio: \(error)")
+                }
+            }
+            
+            decoders["place.stream.segment#video"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamSegment.Video(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamSegment.Video: \(error)")
+                    return .decodeError("Error decoding PlaceStreamSegment.Video: \(error)")
+                }
+            }
+            
+            decoders["place.stream.segment#framerate"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamSegment.Framerate(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamSegment.Framerate: \(error)")
+                    return .decodeError("Error decoding PlaceStreamSegment.Framerate: \(error)")
+                }
+            }
+            
+            decoders["place.stream.segment#segmentView"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamSegment.SegmentView(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamSegment.SegmentView: \(error)")
+                    return .decodeError("Error decoding PlaceStreamSegment.SegmentView: \(error)")
+                }
+            }
+            
+            decoders["place.stream.branding.getBranding#brandingAsset"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamBrandingGetBranding.BrandingAsset(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamBrandingGetBranding.BrandingAsset: \(error)")
+                    return .decodeError("Error decoding PlaceStreamBrandingGetBranding.BrandingAsset: \(error)")
+                }
+            }
+            
+            decoders["place.stream.chat.defs#messageView"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamChatDefs.MessageView(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamChatDefs.MessageView: \(error)")
+                    return .decodeError("Error decoding PlaceStreamChatDefs.MessageView: \(error)")
+                }
+            }
+            
+            decoders["place.stream.chat.defs#pinnedRecordView"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamChatDefs.PinnedRecordView(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamChatDefs.PinnedRecordView: \(error)")
+                    return .decodeError("Error decoding PlaceStreamChatDefs.PinnedRecordView: \(error)")
+                }
+            }
+            
+            decoders["place.stream.chat.gate"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamChatGate(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamChatGate: \(error)")
+                    return .decodeError("Error decoding PlaceStreamChatGate: \(error)")
+                }
+            }
+            
+            decoders["place.stream.chat.pinnedRecord"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamChatPinnedRecord(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamChatPinnedRecord: \(error)")
+                    return .decodeError("Error decoding PlaceStreamChatPinnedRecord: \(error)")
+                }
+            }
+            
+            decoders["place.stream.chat.profile"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamChatProfile(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamChatProfile: \(error)")
+                    return .decodeError("Error decoding PlaceStreamChatProfile: \(error)")
+                }
+            }
+            
+            decoders["place.stream.chat.profile#color"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamChatProfile.Color(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamChatProfile.Color: \(error)")
+                    return .decodeError("Error decoding PlaceStreamChatProfile.Color: \(error)")
+                }
+            }
+            
+            decoders["place.stream.chat.message"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamChatMessage(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamChatMessage: \(error)")
+                    return .decodeError("Error decoding PlaceStreamChatMessage: \(error)")
+                }
+            }
+            
+            decoders["place.stream.chat.message#replyRef"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamChatMessage.ReplyRef(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamChatMessage.ReplyRef: \(error)")
+                    return .decodeError("Error decoding PlaceStreamChatMessage.ReplyRef: \(error)")
+                }
+            }
+            
+            decoders["place.stream.multistream.defs#targetView"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamMultistreamDefs.TargetView(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamMultistreamDefs.TargetView: \(error)")
+                    return .decodeError("Error decoding PlaceStreamMultistreamDefs.TargetView: \(error)")
+                }
+            }
+            
+            decoders["place.stream.multistream.defs#event"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamMultistreamDefs.Event(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamMultistreamDefs.Event: \(error)")
+                    return .decodeError("Error decoding PlaceStreamMultistreamDefs.Event: \(error)")
+                }
+            }
+            
+            decoders["place.stream.multistream.target"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamMultistreamTarget(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamMultistreamTarget: \(error)")
+                    return .decodeError("Error decoding PlaceStreamMultistreamTarget: \(error)")
+                }
+            }
+            
+            decoders["place.stream.multistream.listTargets#record"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamMultistreamListTargets.Record(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamMultistreamListTargets.Record: \(error)")
+                    return .decodeError("Error decoding PlaceStreamMultistreamListTargets.Record: \(error)")
+                }
+            }
+            
+            decoders["place.stream.ingest.defs#ingest"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamIngestDefs.Ingest(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamIngestDefs.Ingest: \(error)")
+                    return .decodeError("Error decoding PlaceStreamIngestDefs.Ingest: \(error)")
+                }
+            }
+            
+            decoders["place.stream.server.defs#webhook"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamServerDefs.Webhook(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamServerDefs.Webhook: \(error)")
+                    return .decodeError("Error decoding PlaceStreamServerDefs.Webhook: \(error)")
+                }
+            }
+            
+            decoders["place.stream.server.defs#rewriteRule"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamServerDefs.RewriteRule(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamServerDefs.RewriteRule: \(error)")
+                    return .decodeError("Error decoding PlaceStreamServerDefs.RewriteRule: \(error)")
+                }
+            }
+            
+            decoders["place.stream.server.settings"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamServerSettings(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamServerSettings: \(error)")
+                    return .decodeError("Error decoding PlaceStreamServerSettings: \(error)")
+                }
+            }
+            
+            decoders["place.stream.live.searchActorsTypeahead#actor"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamLiveSearchActorsTypeahead.Actor(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamLiveSearchActorsTypeahead.Actor: \(error)")
+                    return .decodeError("Error decoding PlaceStreamLiveSearchActorsTypeahead.Actor: \(error)")
+                }
+            }
+            
+            decoders["place.stream.live.teleport"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamLiveTeleport(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamLiveTeleport: \(error)")
+                    return .decodeError("Error decoding PlaceStreamLiveTeleport: \(error)")
+                }
+            }
+            
+            decoders["place.stream.live.viewerCount"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamLiveViewerCount(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamLiveViewerCount: \(error)")
+                    return .decodeError("Error decoding PlaceStreamLiveViewerCount: \(error)")
+                }
+            }
+            
+            decoders["place.stream.live.getRecommendations#livestreamRecommendation"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamLiveGetRecommendations.LivestreamRecommendation(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamLiveGetRecommendations.LivestreamRecommendation: \(error)")
+                    return .decodeError("Error decoding PlaceStreamLiveGetRecommendations.LivestreamRecommendation: \(error)")
+                }
+            }
+            
+            decoders["place.stream.live.recommendations"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamLiveRecommendations(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamLiveRecommendations: \(error)")
+                    return .decodeError("Error decoding PlaceStreamLiveRecommendations: \(error)")
+                }
+            }
+            
+            decoders["place.stream.richtext.facet"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamRichtextFacet(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamRichtextFacet: \(error)")
+                    return .decodeError("Error decoding PlaceStreamRichtextFacet: \(error)")
+                }
+            }
+            
+            decoders["place.stream.muxl.defs#track"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamMuxlDefs.Track(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamMuxlDefs.Track: \(error)")
+                    return .decodeError("Error decoding PlaceStreamMuxlDefs.Track: \(error)")
+                }
+            }
+            
+            decoders["place.stream.metadata.distributionPolicy"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamMetadataDistributionPolicy(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamMetadataDistributionPolicy: \(error)")
+                    return .decodeError("Error decoding PlaceStreamMetadataDistributionPolicy: \(error)")
+                }
+            }
+            
+            decoders["place.stream.metadata.contentRights"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamMetadataContentRights(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamMetadataContentRights: \(error)")
+                    return .decodeError("Error decoding PlaceStreamMetadataContentRights: \(error)")
+                }
+            }
+            
+            decoders["place.stream.metadata.configuration"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamMetadataConfiguration(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamMetadataConfiguration: \(error)")
+                    return .decodeError("Error decoding PlaceStreamMetadataConfiguration: \(error)")
+                }
+            }
+            
+            decoders["place.stream.metadata.contentWarnings"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamMetadataContentWarnings(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamMetadataContentWarnings: \(error)")
+                    return .decodeError("Error decoding PlaceStreamMetadataContentWarnings: \(error)")
+                }
+            }
+            
+            decoders["place.stream.broadcast.defs#broadcastOriginView"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamBroadcastDefs.BroadcastOriginView(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamBroadcastDefs.BroadcastOriginView: \(error)")
+                    return .decodeError("Error decoding PlaceStreamBroadcastDefs.BroadcastOriginView: \(error)")
+                }
+            }
+            
+            decoders["place.stream.broadcast.origin"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamBroadcastOrigin(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamBroadcastOrigin: \(error)")
+                    return .decodeError("Error decoding PlaceStreamBroadcastOrigin: \(error)")
+                }
+            }
+            
+            decoders["place.stream.broadcast.syndication"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamBroadcastSyndication(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamBroadcastSyndication: \(error)")
+                    return .decodeError("Error decoding PlaceStreamBroadcastSyndication: \(error)")
+                }
+            }
+            
+            decoders["place.stream.badge.defs#badgeView"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamBadgeDefs.BadgeView(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamBadgeDefs.BadgeView: \(error)")
+                    return .decodeError("Error decoding PlaceStreamBadgeDefs.BadgeView: \(error)")
+                }
+            }
+            
+            decoders["place.stream.moderation.defs#permissionView"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamModerationDefs.PermissionView(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamModerationDefs.PermissionView: \(error)")
+                    return .decodeError("Error decoding PlaceStreamModerationDefs.PermissionView: \(error)")
+                }
+            }
+            
+            decoders["place.stream.moderation.permission"] = { decoder in
+                do {
+                    let decodedObject = try PlaceStreamModerationPermission(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding PlaceStreamModerationPermission: \(error)")
+                    return .decodeError("Error decoding PlaceStreamModerationPermission: \(error)")
                 }
             }
             

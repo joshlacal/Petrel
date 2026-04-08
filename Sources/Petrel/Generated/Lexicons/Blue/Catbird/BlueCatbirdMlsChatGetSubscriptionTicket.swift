@@ -9,35 +9,35 @@ public struct BlueCatbirdMlsChatGetSubscriptionTicket {
 
     public static let typeIdentifier = "blue.catbird.mlsChat.getSubscriptionTicket"
 public struct Input: ATProtocolCodable {
-        public let convoId: String?
+        public let convoIds: [String]?
 
         /// Standard public initializer
-        public init(convoId: String? = nil) {
-            self.convoId = convoId
+        public init(convoIds: [String]? = nil) {
+            self.convoIds = convoIds
         }
         
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.convoId = try container.decodeIfPresent(String.self, forKey: .convoId)
+            self.convoIds = try container.decodeIfPresent([String].self, forKey: .convoIds)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encodeIfPresent(convoId, forKey: .convoId)
+            try container.encodeIfPresent(convoIds, forKey: .convoIds)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            if let value = convoId {
-                let convoIdValue = try value.toCBORValue()
-                map = map.adding(key: "convoId", value: convoIdValue)
+            if let value = convoIds {
+                let convoIdsValue = try value.toCBORValue()
+                map = map.adding(key: "convoIds", value: convoIdsValue)
             }
             return map
         }
 
         private enum CodingKeys: String, CodingKey {
-            case convoId
+            case convoIds
         }
     }
     

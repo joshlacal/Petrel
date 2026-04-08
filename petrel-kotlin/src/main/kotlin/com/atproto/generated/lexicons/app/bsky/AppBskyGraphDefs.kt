@@ -137,7 +137,11 @@ enum class AppBskyGraphDefsListPurpose {
         @SerialName("did")
         val did: DID,/** if the actor follows this DID, this is the AT-URI of the follow record */        @SerialName("following")
         val following: ATProtocolURI?,/** if the actor is followed by this DID, contains the AT-URI of the follow record */        @SerialName("followedBy")
-        val followedBy: ATProtocolURI?    ) {
+        val followedBy: ATProtocolURI?,/** if the actor blocks this DID, this is the AT-URI of the block record */        @SerialName("blocking")
+        val blocking: ATProtocolURI?,/** if the actor is blocked by this DID, contains the AT-URI of the block record */        @SerialName("blockedBy")
+        val blockedBy: ATProtocolURI?,/** if the actor blocks this DID via a block list, this is the AT-URI of the listblock record */        @SerialName("blockingByList")
+        val blockingByList: ATProtocolURI?,/** if the actor is blocked by this DID via a block list, contains the AT-URI of the listblock record */        @SerialName("blockedByList")
+        val blockedByList: ATProtocolURI?    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyGraphDefsRelationship"
         }

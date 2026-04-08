@@ -39,8 +39,7 @@ sealed interface AppBskyUnspeccedGetPostThreadOtherV2ThreadItemValueUnion {
 @Serializable
     data class AppBskyUnspeccedGetPostThreadOtherV2Parameters(
 // Reference (AT-URI) to post record. This is the anchor post.        @SerialName("anchor")
-        val anchor: ATProtocolURI,// Whether to prioritize posts from followed users. It only has effect when the user is authenticated.        @SerialName("prioritizeFollowedUsers")
-        val prioritizeFollowedUsers: Boolean? = null    )
+        val anchor: ATProtocolURI    )
 
     @Serializable
     data class AppBskyUnspeccedGetPostThreadOtherV2Output(
