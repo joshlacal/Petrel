@@ -1,0 +1,51 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mlsChat.uploadBlob",
+  "description": "Upload an encrypted blob for image DM attachments",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Upload an encrypted blob to the blob store. The server assigns a blobId (UUIDv4) on success. Content-Type must be application/octet-stream. The blob bytes are opaque encrypted data — the server never sees plaintext. The uploader must be an active member of the target conversation.",
+      "parameters": {
+        "type": "params",
+        "required": ["convoId"],
+        "properties": {
+          "convoId": {
+            "type": "string",
+            "description": "The conversation ID this blob belongs to. Used for authorization — only conversation members can download the blob."
+          }
+        }
+      },
+      "input": {
+        "encoding": "*/*",
+        "schema": {
+          "type": "bytes",
+          "description": "Raw encrypted blob bytes",
+          "maxLength": 10485760
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["blobId", "size"],
+          "properties": {
+            "blobId": {
+              "type": "string",
+              "description": "Server-assigned UUIDv4 blob identifier"
+            },
+            "size": {
+              "type": "integer",
+              "description": "Stored blob size in bytes"
+            }
+          }
+        }
+      },
+      "errors": [
+        {"name": "QuotaExceeded", "description": "User's blob storage quota has been exceeded (500MB per user)"},
+        {"name": "BlobTooLarge", "description": "Blob exceeds maximum size (10MB)"},
+        {"name": "NotAMember", "description": "Uploader is not an active member of the target conversation"}
+      ]
+    }
+  }
+}

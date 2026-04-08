@@ -1,0 +1,27 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mlsChat.deleteBlob",
+  "description": "Delete an encrypted blob (owner only)",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Soft-delete an encrypted blob. Only the blob owner can delete it. The MLS message still contains the embed reference, but blob download will return 404 (same UX as expired blobs). Allows users to free quota space before the 90-day TTL.",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["blobId"],
+          "properties": {
+            "blobId": {
+              "type": "string",
+              "description": "The blob identifier to delete"
+            }
+          }
+        }
+      },
+      "errors": [
+        {"name": "BlobNotFound", "description": "Blob does not exist or is not owned by the authenticated user"}
+      ]
+    }
+  }
+}

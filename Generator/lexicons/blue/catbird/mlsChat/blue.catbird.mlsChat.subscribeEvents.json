@@ -141,6 +141,15 @@
         "info": {
           "type": "string",
           "description": "Human-readable info or keep-alive message"
+        },
+        "convoId": {
+          "type": "string",
+          "description": "Conversation identifier (present for conversation-scoped info events)"
+        },
+        "requestedBy": {
+          "type": "string",
+          "format": "did",
+          "description": "DID of the user who triggered this info event"
         }
       }
     },

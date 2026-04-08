@@ -1,0 +1,32 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mlsChat.getBlob",
+  "description": "Download an encrypted blob by ID",
+  "defs": {
+    "main": {
+      "type": "query",
+      "description": "Fetch an encrypted blob from the blob store. Returns raw encrypted bytes (application/octet-stream). Only active members of the blob's conversation can download it.",
+      "parameters": {
+        "type": "params",
+        "required": ["blobId"],
+        "properties": {
+          "blobId": {
+            "type": "string",
+            "description": "The blob identifier to download"
+          }
+        }
+      },
+      "output": {
+        "encoding": "*/*",
+        "schema": {
+          "type": "bytes",
+          "description": "Raw encrypted blob bytes"
+        }
+      },
+      "errors": [
+        {"name": "BlobNotFound", "description": "Blob does not exist or has expired/been deleted"},
+        {"name": "NotAMember", "description": "Requester is not an active member of the blob's conversation"}
+      ]
+    }
+  }
+}

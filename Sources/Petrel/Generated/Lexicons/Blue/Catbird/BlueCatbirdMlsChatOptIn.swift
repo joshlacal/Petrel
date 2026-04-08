@@ -162,6 +162,12 @@ public struct Output: ATProtocolCodable {
         
         public let statuses: [OptInStatus]?
         
+        public let allowFollowersBypass: Bool?
+        
+        public let allowFollowingBypass: Bool?
+        
+        public let autoExpireDays: Int?
+        
         
         
         // Standard public initializer
@@ -172,7 +178,13 @@ public struct Output: ATProtocolCodable {
             
             optedInAt: ATProtocolDate,
             
-            statuses: [OptInStatus]? = nil
+            statuses: [OptInStatus]? = nil,
+            
+            allowFollowersBypass: Bool? = nil,
+            
+            allowFollowingBypass: Bool? = nil,
+            
+            autoExpireDays: Int? = nil
             
             
         ) {
@@ -183,6 +195,12 @@ public struct Output: ATProtocolCodable {
             self.optedInAt = optedInAt
             
             self.statuses = statuses
+            
+            self.allowFollowersBypass = allowFollowersBypass
+            
+            self.allowFollowingBypass = allowFollowingBypass
+            
+            self.autoExpireDays = autoExpireDays
             
             
         }
@@ -200,6 +218,15 @@ public struct Output: ATProtocolCodable {
             self.statuses = try container.decodeIfPresent([OptInStatus].self, forKey: .statuses)
             
             
+            self.allowFollowersBypass = try container.decodeIfPresent(Bool.self, forKey: .allowFollowersBypass)
+            
+            
+            self.allowFollowingBypass = try container.decodeIfPresent(Bool.self, forKey: .allowFollowingBypass)
+            
+            
+            self.autoExpireDays = try container.decodeIfPresent(Int.self, forKey: .autoExpireDays)
+            
+            
         }
         
         public func encode(to encoder: Encoder) throws {
@@ -214,6 +241,18 @@ public struct Output: ATProtocolCodable {
             
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(statuses, forKey: .statuses)
+            
+            
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(allowFollowersBypass, forKey: .allowFollowersBypass)
+            
+            
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(allowFollowingBypass, forKey: .allowFollowingBypass)
+            
+            
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(autoExpireDays, forKey: .autoExpireDays)
             
             
         }
@@ -241,6 +280,30 @@ public struct Output: ATProtocolCodable {
             }
             
             
+            
+            if let value = allowFollowersBypass {
+                // Encode optional property even if it's an empty array for CBOR
+                let allowFollowersBypassValue = try value.toCBORValue()
+                map = map.adding(key: "allowFollowersBypass", value: allowFollowersBypassValue)
+            }
+            
+            
+            
+            if let value = allowFollowingBypass {
+                // Encode optional property even if it's an empty array for CBOR
+                let allowFollowingBypassValue = try value.toCBORValue()
+                map = map.adding(key: "allowFollowingBypass", value: allowFollowingBypassValue)
+            }
+            
+            
+            
+            if let value = autoExpireDays {
+                // Encode optional property even if it's an empty array for CBOR
+                let autoExpireDaysValue = try value.toCBORValue()
+                map = map.adding(key: "autoExpireDays", value: autoExpireDaysValue)
+            }
+            
+            
 
             return map
             
@@ -251,6 +314,9 @@ public struct Output: ATProtocolCodable {
             case optedIn
             case optedInAt
             case statuses
+            case allowFollowersBypass
+            case allowFollowingBypass
+            case autoExpireDays
         }
         
     }

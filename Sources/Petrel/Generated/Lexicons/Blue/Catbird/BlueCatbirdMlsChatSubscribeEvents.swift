@@ -363,12 +363,16 @@ public struct InfoEvent: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#infoEvent"
             public let cursor: String
             public let info: String
+            public let convoId: String?
+            public let requestedBy: DID?
 
         public init(
-            cursor: String, info: String
+            cursor: String, info: String, convoId: String?, requestedBy: DID?
         ) {
             self.cursor = cursor
             self.info = info
+            self.convoId = convoId
+            self.requestedBy = requestedBy
         }
 
         public init(from decoder: Decoder) throws {
@@ -385,6 +389,18 @@ public struct InfoEvent: ATProtocolCodable, ATProtocolValue {
                 LogManager.logError("Decoding error for required property 'info': \(error)")
                 throw error
             }
+            do {
+                self.convoId = try container.decodeIfPresent(String.self, forKey: .convoId)
+            } catch {
+                LogManager.logDebug("Decoding error for optional property 'convoId': \(error)")
+                throw error
+            }
+            do {
+                self.requestedBy = try container.decodeIfPresent(DID.self, forKey: .requestedBy)
+            } catch {
+                LogManager.logDebug("Decoding error for optional property 'requestedBy': \(error)")
+                throw error
+            }
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -392,11 +408,23 @@ public struct InfoEvent: ATProtocolCodable, ATProtocolValue {
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(cursor, forKey: .cursor)
             try container.encode(info, forKey: .info)
+            try container.encodeIfPresent(convoId, forKey: .convoId)
+            try container.encodeIfPresent(requestedBy, forKey: .requestedBy)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(cursor)
             hasher.combine(info)
+            if let value = convoId {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = requestedBy {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -405,6 +433,12 @@ public struct InfoEvent: ATProtocolCodable, ATProtocolValue {
                 return false
             }
             if info != other.info {
+                return false
+            }
+            if convoId != other.convoId {
+                return false
+            }
+            if requestedBy != other.requestedBy {
                 return false
             }
             return true
@@ -421,6 +455,14 @@ public struct InfoEvent: ATProtocolCodable, ATProtocolValue {
             map = map.adding(key: "cursor", value: cursorValue)
             let infoValue = try info.toCBORValue()
             map = map.adding(key: "info", value: infoValue)
+            if let value = convoId {
+                let convoIdValue = try value.toCBORValue()
+                map = map.adding(key: "convoId", value: convoIdValue)
+            }
+            if let value = requestedBy {
+                let requestedByValue = try value.toCBORValue()
+                map = map.adding(key: "requestedBy", value: requestedByValue)
+            }
             return map
         }
 
@@ -428,6 +470,8 @@ public struct InfoEvent: ATProtocolCodable, ATProtocolValue {
             case typeIdentifier = "$type"
             case cursor
             case info
+            case convoId
+            case requestedBy
         }
     }
         
