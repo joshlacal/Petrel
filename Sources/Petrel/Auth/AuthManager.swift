@@ -155,9 +155,15 @@ actor AuthManager: AuthStrategy {
                 accountManager: accountManager
             )
 
-        case .cab:
-            // CAB strategy not yet implemented — will be added in a future task.
-            throw ManagerError.strategyCreationFailed
+        case .cab(let backendURL):
+            return CABOAuthStrategy(
+                backendURL: backendURL,
+                storage: storage,
+                accountManager: accountManager,
+                networkService: networkService,
+                oauthConfig: oauthConfig,
+                didResolver: didResolver
+            )
         }
     }
 
