@@ -18,9 +18,9 @@ object ComAtprotoSyncListHostsDefs {
     data class ComAtprotoSyncListHostsHost(
 /** hostname of server; not a URL (no scheme) */        @SerialName("hostname")
         val hostname: String,/** Recent repo stream event sequence number. May be delayed from actual stream processing (eg, persisted cursor not in-memory cursor). */        @SerialName("seq")
-        val seq: Int?,        @SerialName("accountCount")
-        val accountCount: Int?,        @SerialName("status")
-        val status: ComAtprotoSyncDefsHostStatus?    ) {
+        val seq: Int? = null,        @SerialName("accountCount")
+        val accountCount: Int? = null,        @SerialName("status")
+        val status: ComAtprotoSyncDefsHostStatus? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#comAtprotoSyncListHostsHost"
         }

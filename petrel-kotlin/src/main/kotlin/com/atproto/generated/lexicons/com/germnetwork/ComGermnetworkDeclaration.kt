@@ -31,9 +31,9 @@ object ComGermnetworkDeclarationDefs {
     data class ComGermnetworkDeclaration(
         @SerialName("version")
         val version: String,        @SerialName("currentKey")
-        val currentKey: ByteArray,        @SerialName("messageMe")
+        val currentKey: Bytes,        @SerialName("messageMe")
         val messageMe: ComGermnetworkDeclarationMessageMe? = null,        @SerialName("keyPackage")
-        val keyPackage: ByteArray? = null,        @SerialName("continuityProofs")
+        val keyPackage: Bytes? = null,        @SerialName("continuityProofs")
         val continuityProofs: List<JsonElement>? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = ""

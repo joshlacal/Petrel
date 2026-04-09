@@ -14,19 +14,58 @@ object ChatBskyConvoGetMessagesDefs {
     const val TYPE_IDENTIFIER = "chat.bsky.convo.getMessages"
 }
 
-@Serializable
+@Serializable(with = ChatBskyConvoGetMessagesOutputMessagesUnionSerializer::class)
 sealed interface ChatBskyConvoGetMessagesOutputMessagesUnion {
     @Serializable
-    @SerialName("chat.bsky.convo.getMessages#ChatBskyConvoDefsMessageView")
-    data class ChatBskyConvoDefsMessageView(val value: ChatBskyConvoDefsMessageView) : ChatBskyConvoGetMessagesOutputMessagesUnion
+    data class MessageView(val value: com.atproto.generated.ChatBskyConvoDefsMessageView) : ChatBskyConvoGetMessagesOutputMessagesUnion
 
     @Serializable
-    @SerialName("chat.bsky.convo.getMessages#ChatBskyConvoDefsDeletedMessageView")
-    data class ChatBskyConvoDefsDeletedMessageView(val value: ChatBskyConvoDefsDeletedMessageView) : ChatBskyConvoGetMessagesOutputMessagesUnion
+    data class DeletedMessageView(val value: com.atproto.generated.ChatBskyConvoDefsDeletedMessageView) : ChatBskyConvoGetMessagesOutputMessagesUnion
 
     @Serializable
-    @SerialName("unknown")
     data class Unexpected(val value: JsonElement) : ChatBskyConvoGetMessagesOutputMessagesUnion
+}
+
+object ChatBskyConvoGetMessagesOutputMessagesUnionSerializer : kotlinx.serialization.KSerializer<ChatBskyConvoGetMessagesOutputMessagesUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("ChatBskyConvoGetMessagesOutputMessagesUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ChatBskyConvoGetMessagesOutputMessagesUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is ChatBskyConvoGetMessagesOutputMessagesUnion.MessageView -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsMessageView.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#messageView")
+                })
+            }
+            is ChatBskyConvoGetMessagesOutputMessagesUnion.DeletedMessageView -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsDeletedMessageView.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#deletedMessageView")
+                })
+            }
+            is ChatBskyConvoGetMessagesOutputMessagesUnion.Unexpected -> value.value
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ChatBskyConvoGetMessagesOutputMessagesUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "chat.bsky.convo.defs#messageView" -> ChatBskyConvoGetMessagesOutputMessagesUnion.MessageView(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsMessageView.serializer(), element)
+            )
+            "chat.bsky.convo.defs#deletedMessageView" -> ChatBskyConvoGetMessagesOutputMessagesUnion.DeletedMessageView(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsDeletedMessageView.serializer(), element)
+            )
+            else -> ChatBskyConvoGetMessagesOutputMessagesUnion.Unexpected(element)
+        }
+    }
 }
 
 @Serializable

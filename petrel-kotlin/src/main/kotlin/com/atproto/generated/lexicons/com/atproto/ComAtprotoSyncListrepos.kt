@@ -20,8 +20,8 @@ object ComAtprotoSyncListReposDefs {
         val did: DID,/** Current repo commit CID */        @SerialName("head")
         val head: CID,        @SerialName("rev")
         val rev: String,        @SerialName("active")
-        val active: Boolean?,/** If active=false, this optional field indicates a possible reason for why the account is not active. If active=false and no status is supplied, then the host makes no claim for why the repository is no longer being hosted. */        @SerialName("status")
-        val status: String?    ) {
+        val active: Boolean? = null,/** If active=false, this optional field indicates a possible reason for why the account is not active. If active=false and no status is supplied, then the host makes no claim for why the repository is no longer being hosted. */        @SerialName("status")
+        val status: String? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#comAtprotoSyncListReposRepo"
         }

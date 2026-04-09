@@ -19,10 +19,10 @@ object PlaceStreamBrandingGetBrandingDefs {
 /** Asset key identifier */        @SerialName("key")
         val key: String,/** MIME type of the asset */        @SerialName("mimeType")
         val mimeType: String,/** URL to fetch the asset blob (for images) */        @SerialName("url")
-        val url: String?,/** Inline data for text assets */        @SerialName("data")
-        val `data`: String?,/** Image width in pixels (optional, for images only) */        @SerialName("width")
-        val width: Int?,/** Image height in pixels (optional, for images only) */        @SerialName("height")
-        val height: Int?    ) {
+        val url: String? = null,/** Inline data for text assets */        @SerialName("data")
+        val `data`: String? = null,/** Image width in pixels (optional, for images only) */        @SerialName("width")
+        val width: Int? = null,/** Image height in pixels (optional, for images only) */        @SerialName("height")
+        val height: Int? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#placeStreamBrandingGetBrandingBrandingAsset"
         }

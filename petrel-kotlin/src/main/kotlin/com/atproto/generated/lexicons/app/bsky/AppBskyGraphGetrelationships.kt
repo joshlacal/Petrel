@@ -14,19 +14,58 @@ object AppBskyGraphGetRelationshipsDefs {
     const val TYPE_IDENTIFIER = "app.bsky.graph.getRelationships"
 }
 
-@Serializable
+@Serializable(with = AppBskyGraphGetRelationshipsOutputRelationshipsUnionSerializer::class)
 sealed interface AppBskyGraphGetRelationshipsOutputRelationshipsUnion {
     @Serializable
-    @SerialName("app.bsky.graph.getRelationships#AppBskyGraphDefsRelationship")
-    data class AppBskyGraphDefsRelationship(val value: AppBskyGraphDefsRelationship) : AppBskyGraphGetRelationshipsOutputRelationshipsUnion
+    data class Relationship(val value: com.atproto.generated.AppBskyGraphDefsRelationship) : AppBskyGraphGetRelationshipsOutputRelationshipsUnion
 
     @Serializable
-    @SerialName("app.bsky.graph.getRelationships#AppBskyGraphDefsNotFoundActor")
-    data class AppBskyGraphDefsNotFoundActor(val value: AppBskyGraphDefsNotFoundActor) : AppBskyGraphGetRelationshipsOutputRelationshipsUnion
+    data class NotFoundActor(val value: com.atproto.generated.AppBskyGraphDefsNotFoundActor) : AppBskyGraphGetRelationshipsOutputRelationshipsUnion
 
     @Serializable
-    @SerialName("unknown")
     data class Unexpected(val value: JsonElement) : AppBskyGraphGetRelationshipsOutputRelationshipsUnion
+}
+
+object AppBskyGraphGetRelationshipsOutputRelationshipsUnionSerializer : kotlinx.serialization.KSerializer<AppBskyGraphGetRelationshipsOutputRelationshipsUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyGraphGetRelationshipsOutputRelationshipsUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyGraphGetRelationshipsOutputRelationshipsUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is AppBskyGraphGetRelationshipsOutputRelationshipsUnion.Relationship -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyGraphDefsRelationship.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.graph.defs#relationship")
+                })
+            }
+            is AppBskyGraphGetRelationshipsOutputRelationshipsUnion.NotFoundActor -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyGraphDefsNotFoundActor.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.graph.defs#notFoundActor")
+                })
+            }
+            is AppBskyGraphGetRelationshipsOutputRelationshipsUnion.Unexpected -> value.value
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyGraphGetRelationshipsOutputRelationshipsUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "app.bsky.graph.defs#relationship" -> AppBskyGraphGetRelationshipsOutputRelationshipsUnion.Relationship(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyGraphDefsRelationship.serializer(), element)
+            )
+            "app.bsky.graph.defs#notFoundActor" -> AppBskyGraphGetRelationshipsOutputRelationshipsUnion.NotFoundActor(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyGraphDefsNotFoundActor.serializer(), element)
+            )
+            else -> AppBskyGraphGetRelationshipsOutputRelationshipsUnion.Unexpected(element)
+        }
+    }
 }
 
 @Serializable

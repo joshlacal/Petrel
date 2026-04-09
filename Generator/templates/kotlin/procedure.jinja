@@ -4,7 +4,8 @@
  * Endpoint: {{ endpoint }}
  */
 suspend fun ATProtoClient.{{ namespace_path }}.{{ function_name }}(
-    {% if has_input %}input: {{ input_type }}{% endif %}
+    {% if has_input and has_parameters %}input: {{ input_type }},
+    params: {{ parameters_type }}{% elif has_input %}input: {{ input_type }}{% elif has_parameters %}params: {{ parameters_type }}{% endif %}
 ): ATProtoResponse<{% if output_type %}{{ output_type }}{% else %}Unit{% endif %}> {
     val endpoint = "{{ endpoint }}"
 
@@ -27,10 +28,16 @@ suspend fun ATProtoClient.{{ namespace_path }}.{{ function_name }}(
     val contentType = "application/json"
     {% endif %}
 
+    {% if has_parameters %}
+    val queryParams = params.toQueryParams()
+    {% else %}
+    val queryParams: Map<String, String>? = null
+    {% endif %}
+
     return client.networkService.performRequest(
         method = "POST",
         endpoint = endpoint,
-        queryParams = null,
+        queryParams = queryParams,
         headers = mapOf(
             "Content-Type" to contentType,
             "Accept" to "{{ output_encoding }}"

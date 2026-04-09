@@ -17,8 +17,8 @@ object ComAtprotoServerDescribeServerDefs {
     @Serializable
     data class ComAtprotoServerDescribeServerLinks(
         @SerialName("privacyPolicy")
-        val privacyPolicy: URI?,        @SerialName("termsOfService")
-        val termsOfService: URI?    ) {
+        val privacyPolicy: URI? = null,        @SerialName("termsOfService")
+        val termsOfService: URI? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#comAtprotoServerDescribeServerLinks"
         }
@@ -27,7 +27,7 @@ object ComAtprotoServerDescribeServerDefs {
     @Serializable
     data class ComAtprotoServerDescribeServerContact(
         @SerialName("email")
-        val email: String?    ) {
+        val email: String? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#comAtprotoServerDescribeServerContact"
         }

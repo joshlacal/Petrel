@@ -306,6 +306,7 @@ class SwiftCodeGenerator:
                     lex_definitions = self.generate_lex_definitions()
                     query = self.generate_query_function(lexicon_id=self.lexicon_id, main_def=self.main_def)
                 elif main_def_type == 'procedure':
+                    query_parameters = self.generate_query_parameters(self.main_def.get('parameters'))
                     input_struct = self.generate_input_struct(self.main_def.get('input'))
                     output_struct = self.generate_output_struct(self.main_def.get('output'))
                     errors_enum = self.generate_errors_enum(self.main_def.get('errors'))
@@ -398,37 +399,41 @@ class SwiftCodeGenerator:
         # Split the lexicon ID to determine the namespace
         template_namespace_parts = lexicon_id.split('.')[:-1]
         template_namespace_name = '.'.join(convert_to_camel_case(part) for part in template_namespace_parts)
-        
+
         # Determine the procedure name by converting the last part of the lexicon ID to CamelCase
         procedure_name = convert_to_camel_case(lexicon_id.split('.')[-1])
-                
+
         # Determine if the procedure is a blob upload based on the input encoding
         input_encoding = main_def.get('input', {}).get('encoding', '') if 'input' in main_def else None
         is_blob_upload = 'input' in main_def and input_encoding == '*/*'
         is_binary_data = 'input' in main_def and input_encoding != '' and input_encoding != 'application/json' and input_encoding != '*/*'
-        
+
         input_parameters = ''
         input_values = ''
         input_struct_name = None
-        
+
         # Extract input and output encodings, defaulting to 'application/json' if not specified
         input_encoding = main_def.get('input', {}).get('encoding', 'application/json') if 'input' in main_def else None
         output_encoding = main_def.get('output', {}).get('encoding', 'application/json') if 'output' in main_def else None
-        
+
         if 'input' in main_def and 'schema' in main_def['input']:
             input_params = main_def['input']['schema'].get('properties', {})
             current_struct_name = convert_to_camel_case(lexicon_id)
-            
+
             input_parameters = ', '.join([
-                f"{param}: {self.type_converter.determine_swift_type(param, details, main_def['input'].get('required', []), current_struct_name)}" 
+                f"{param}: {self.type_converter.determine_swift_type(param, details, main_def['input'].get('required', []), current_struct_name)}"
                 for param, details in input_params.items()
             ])
             input_values = ', '.join([f"{param}: {param}" for param in input_params.keys()])
             input_struct_name = convert_to_camel_case(lexicon_id) + ".Input"
-        
+
+        # Determine if the procedure has query parameters (like queries do)
+        has_parameters = 'parameters' in main_def
+        parameters_struct_name = convert_to_camel_case(lexicon_id) + ".Parameters" if has_parameters else None
+
         # Define the API endpoint
         endpoint = f"{lexicon_id}"
-        
+
         # Render the procedure template with the encoding information
         return self.template_manager.procedure_template.render(
             template_namespace_name=template_namespace_name,
@@ -442,7 +447,9 @@ class SwiftCodeGenerator:
             is_blob_upload=is_blob_upload,
             is_binary_data=is_binary_data,
             input_encoding=input_encoding,    # Pass the input encoding to the template
-            output_encoding=output_encoding   # Pass the output encoding to the template
+            output_encoding=output_encoding,  # Pass the output encoding to the template
+            has_parameters=has_parameters,
+            parameters_struct_name=parameters_struct_name
         )
 
     def generate_subscription_function(self, lexicon_id, main_def):

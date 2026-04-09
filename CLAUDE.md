@@ -20,7 +20,11 @@ swift test
 
 ### Regenerating Code from Lexicons
 ```bash
+# Swift only (default)
 python run.py Generator/lexicons Sources/Petrel/Generated
+
+# Swift + Kotlin (for Android)
+python run.py Generator/lexicons Sources/Petrel/Generated --language both
 ```
 
 ## High-Level Architecture
@@ -70,3 +74,9 @@ The project uses Swift's actor model for thread safety:
 - `NetworkError` enum for all networking errors
 - Proper error propagation through async throws
 - Retry logic for transient failures
+
+## Coding Style
+
+- SwiftFormat config: `.swiftformat`
+- 2-space indentation
+- Swift 6 strict concurrency: actor-based client, async/await throughout

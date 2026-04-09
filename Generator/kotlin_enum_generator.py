@@ -13,7 +13,7 @@ class KotlinEnumGenerator:
         self.generated_sealed_interfaces = set()
         self.generated_enum_classes = set()
 
-    def generate_sealed_interface_for_union(self, current_struct_name: str, prop_name: str, refs: List[str]):
+    def generate_sealed_interface_for_union(self, current_struct_name: str, prop_name: str, refs: List[str], raw_refs: List[str] = None):
         """Generate a sealed interface for a union type property."""
         union_name = f"{current_struct_name}{convert_to_pascal_case(prop_name)}Union"
         print(f"Generating union: {union_name}", flush=True)
@@ -24,15 +24,24 @@ class KotlinEnumGenerator:
 
         self.generated_sealed_interfaces.add(union_name)
 
-        # Build variant cases
+        # Build variant cases with both short and full names
         variants = []
-        for ref in refs:
-            # Use full name to avoid conflicts
-            variant_name = self._get_unique_variant_name(ref)
+        short_names_seen = set()
+        for i, ref in enumerate(refs):
+            raw_ref = raw_refs[i] if raw_refs and i < len(raw_refs) else ref
+            short_name = self._get_short_variant_name(raw_ref)
+            full_name = ref  # refs are already converted to full PascalCase names
+            resolved_type = ref  # Already converted
+            # Deduplicate short names by falling back to full name
+            if short_name in short_names_seen:
+                short_name = full_name
+            short_names_seen.add(short_name)
             variants.append({
-                'name': variant_name,
-                'type': self.code_generator.type_converter.convert_ref(ref),
-                'lexicon_ref': self._get_lexicon_ref(ref)
+                'short_name': short_name,
+                'full_name': full_name,
+                'name': full_name,  # Use full name as the actual class name
+                'type': resolved_type,
+                'lexicon_ref': self._get_lexicon_ref(raw_ref)
             })
 
         # Render the sealed interface
@@ -45,18 +54,31 @@ class KotlinEnumGenerator:
 
         self.code_generator.sealed_interfaces += sealed_code + '\n\n'
 
-    def _get_unique_variant_name(self, ref: str) -> str:
-        """Get a unique variant name from a reference."""
+    def _get_short_variant_name(self, ref: str) -> str:
+        """Get a short variant name from a reference (fragment only)."""
+        if '#' in ref:
+            _, fragment = ref.split('#')
+            return convert_to_pascal_case(fragment)
+        else:
+            parts = ref.split('.')
+            return convert_to_pascal_case(parts[-1])
+
+    def _get_full_variant_name(self, ref: str) -> str:
+        """Get the full variant name from a reference (includes namespace)."""
         if '#' in ref:
             base, fragment = ref.split('#')
             return convert_to_pascal_case(base) + convert_to_pascal_case(fragment)
         else:
             return convert_to_pascal_case(ref)
 
-    def generate_sealed_interface_for_union_array(self, current_struct_name: str, prop_name: str, refs: List[str]):
+    def _get_unique_variant_name(self, ref: str) -> str:
+        """Get a unique variant name from a reference (uses short name)."""
+        return self._get_short_variant_name(ref)
+
+    def generate_sealed_interface_for_union_array(self, current_struct_name: str, prop_name: str, refs: List[str], raw_refs: List[str] = None):
         """Generate a sealed interface for an array of unions."""
         # Same as regular union for Kotlin
-        self.generate_sealed_interface_for_union(current_struct_name, prop_name, refs)
+        self.generate_sealed_interface_for_union(current_struct_name, prop_name, refs, raw_refs=raw_refs)
 
     def generate_enum_class_from_known_values(self, enum_name: str, known_values: List[str], descriptions: dict = None):
         """Generate an enum class from known values."""

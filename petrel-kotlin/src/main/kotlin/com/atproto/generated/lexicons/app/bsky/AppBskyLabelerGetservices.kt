@@ -14,19 +14,58 @@ object AppBskyLabelerGetServicesDefs {
     const val TYPE_IDENTIFIER = "app.bsky.labeler.getServices"
 }
 
-@Serializable
+@Serializable(with = AppBskyLabelerGetServicesOutputViewsUnionSerializer::class)
 sealed interface AppBskyLabelerGetServicesOutputViewsUnion {
     @Serializable
-    @SerialName("app.bsky.labeler.getServices#AppBskyLabelerDefsLabelerView")
-    data class AppBskyLabelerDefsLabelerView(val value: AppBskyLabelerDefsLabelerView) : AppBskyLabelerGetServicesOutputViewsUnion
+    data class LabelerView(val value: com.atproto.generated.AppBskyLabelerDefsLabelerView) : AppBskyLabelerGetServicesOutputViewsUnion
 
     @Serializable
-    @SerialName("app.bsky.labeler.getServices#AppBskyLabelerDefsLabelerViewDetailed")
-    data class AppBskyLabelerDefsLabelerViewDetailed(val value: AppBskyLabelerDefsLabelerViewDetailed) : AppBskyLabelerGetServicesOutputViewsUnion
+    data class LabelerViewDetailed(val value: com.atproto.generated.AppBskyLabelerDefsLabelerViewDetailed) : AppBskyLabelerGetServicesOutputViewsUnion
 
     @Serializable
-    @SerialName("unknown")
     data class Unexpected(val value: JsonElement) : AppBskyLabelerGetServicesOutputViewsUnion
+}
+
+object AppBskyLabelerGetServicesOutputViewsUnionSerializer : kotlinx.serialization.KSerializer<AppBskyLabelerGetServicesOutputViewsUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyLabelerGetServicesOutputViewsUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyLabelerGetServicesOutputViewsUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is AppBskyLabelerGetServicesOutputViewsUnion.LabelerView -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyLabelerDefsLabelerView.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.labeler.defs#labelerView")
+                })
+            }
+            is AppBskyLabelerGetServicesOutputViewsUnion.LabelerViewDetailed -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyLabelerDefsLabelerViewDetailed.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.labeler.defs#labelerViewDetailed")
+                })
+            }
+            is AppBskyLabelerGetServicesOutputViewsUnion.Unexpected -> value.value
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyLabelerGetServicesOutputViewsUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "app.bsky.labeler.defs#labelerView" -> AppBskyLabelerGetServicesOutputViewsUnion.LabelerView(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyLabelerDefsLabelerView.serializer(), element)
+            )
+            "app.bsky.labeler.defs#labelerViewDetailed" -> AppBskyLabelerGetServicesOutputViewsUnion.LabelerViewDetailed(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyLabelerDefsLabelerViewDetailed.serializer(), element)
+            )
+            else -> AppBskyLabelerGetServicesOutputViewsUnion.Unexpected(element)
+        }
+    }
 }
 
 @Serializable

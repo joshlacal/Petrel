@@ -14,42 +14,136 @@ object ComAtprotoRepoApplyWritesDefs {
     const val TYPE_IDENTIFIER = "com.atproto.repo.applyWrites"
 }
 
-@Serializable
+@Serializable(with = ComAtprotoRepoApplyWritesInputWritesUnionSerializer::class)
 sealed interface ComAtprotoRepoApplyWritesInputWritesUnion {
     @Serializable
-    @SerialName("com.atproto.repo.applyWrites#ComAtprotoRepoApplyWritesCreate")
-    data class ComAtprotoRepoApplyWritesCreate(val value: ComAtprotoRepoApplyWritesCreate) : ComAtprotoRepoApplyWritesInputWritesUnion
+    data class Create(val value: com.atproto.generated.ComAtprotoRepoApplyWritesCreate) : ComAtprotoRepoApplyWritesInputWritesUnion
 
     @Serializable
-    @SerialName("com.atproto.repo.applyWrites#ComAtprotoRepoApplyWritesUpdate")
-    data class ComAtprotoRepoApplyWritesUpdate(val value: ComAtprotoRepoApplyWritesUpdate) : ComAtprotoRepoApplyWritesInputWritesUnion
+    data class Update(val value: com.atproto.generated.ComAtprotoRepoApplyWritesUpdate) : ComAtprotoRepoApplyWritesInputWritesUnion
 
     @Serializable
-    @SerialName("com.atproto.repo.applyWrites#ComAtprotoRepoApplyWritesDelete")
-    data class ComAtprotoRepoApplyWritesDelete(val value: ComAtprotoRepoApplyWritesDelete) : ComAtprotoRepoApplyWritesInputWritesUnion
+    data class Delete(val value: com.atproto.generated.ComAtprotoRepoApplyWritesDelete) : ComAtprotoRepoApplyWritesInputWritesUnion
 
     @Serializable
-    @SerialName("unknown")
     data class Unexpected(val value: JsonElement) : ComAtprotoRepoApplyWritesInputWritesUnion
 }
 
-@Serializable
+object ComAtprotoRepoApplyWritesInputWritesUnionSerializer : kotlinx.serialization.KSerializer<ComAtprotoRepoApplyWritesInputWritesUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("ComAtprotoRepoApplyWritesInputWritesUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ComAtprotoRepoApplyWritesInputWritesUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is ComAtprotoRepoApplyWritesInputWritesUnion.Create -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ComAtprotoRepoApplyWritesCreate.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.repo.applyWrites#create")
+                })
+            }
+            is ComAtprotoRepoApplyWritesInputWritesUnion.Update -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ComAtprotoRepoApplyWritesUpdate.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.repo.applyWrites#update")
+                })
+            }
+            is ComAtprotoRepoApplyWritesInputWritesUnion.Delete -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ComAtprotoRepoApplyWritesDelete.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.repo.applyWrites#delete")
+                })
+            }
+            is ComAtprotoRepoApplyWritesInputWritesUnion.Unexpected -> value.value
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ComAtprotoRepoApplyWritesInputWritesUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "com.atproto.repo.applyWrites#create" -> ComAtprotoRepoApplyWritesInputWritesUnion.Create(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ComAtprotoRepoApplyWritesCreate.serializer(), element)
+            )
+            "com.atproto.repo.applyWrites#update" -> ComAtprotoRepoApplyWritesInputWritesUnion.Update(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ComAtprotoRepoApplyWritesUpdate.serializer(), element)
+            )
+            "com.atproto.repo.applyWrites#delete" -> ComAtprotoRepoApplyWritesInputWritesUnion.Delete(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ComAtprotoRepoApplyWritesDelete.serializer(), element)
+            )
+            else -> ComAtprotoRepoApplyWritesInputWritesUnion.Unexpected(element)
+        }
+    }
+}
+
+@Serializable(with = ComAtprotoRepoApplyWritesOutputResultsUnionSerializer::class)
 sealed interface ComAtprotoRepoApplyWritesOutputResultsUnion {
     @Serializable
-    @SerialName("com.atproto.repo.applyWrites#ComAtprotoRepoApplyWritesCreateResult")
-    data class ComAtprotoRepoApplyWritesCreateResult(val value: ComAtprotoRepoApplyWritesCreateResult) : ComAtprotoRepoApplyWritesOutputResultsUnion
+    data class CreateResult(val value: com.atproto.generated.ComAtprotoRepoApplyWritesCreateResult) : ComAtprotoRepoApplyWritesOutputResultsUnion
 
     @Serializable
-    @SerialName("com.atproto.repo.applyWrites#ComAtprotoRepoApplyWritesUpdateResult")
-    data class ComAtprotoRepoApplyWritesUpdateResult(val value: ComAtprotoRepoApplyWritesUpdateResult) : ComAtprotoRepoApplyWritesOutputResultsUnion
+    data class UpdateResult(val value: com.atproto.generated.ComAtprotoRepoApplyWritesUpdateResult) : ComAtprotoRepoApplyWritesOutputResultsUnion
 
     @Serializable
-    @SerialName("com.atproto.repo.applyWrites#ComAtprotoRepoApplyWritesDeleteResult")
-    data class ComAtprotoRepoApplyWritesDeleteResult(val value: ComAtprotoRepoApplyWritesDeleteResult) : ComAtprotoRepoApplyWritesOutputResultsUnion
+    data class DeleteResult(val value: com.atproto.generated.ComAtprotoRepoApplyWritesDeleteResult) : ComAtprotoRepoApplyWritesOutputResultsUnion
 
     @Serializable
-    @SerialName("unknown")
     data class Unexpected(val value: JsonElement) : ComAtprotoRepoApplyWritesOutputResultsUnion
+}
+
+object ComAtprotoRepoApplyWritesOutputResultsUnionSerializer : kotlinx.serialization.KSerializer<ComAtprotoRepoApplyWritesOutputResultsUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("ComAtprotoRepoApplyWritesOutputResultsUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ComAtprotoRepoApplyWritesOutputResultsUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is ComAtprotoRepoApplyWritesOutputResultsUnion.CreateResult -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ComAtprotoRepoApplyWritesCreateResult.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.repo.applyWrites#createResult")
+                })
+            }
+            is ComAtprotoRepoApplyWritesOutputResultsUnion.UpdateResult -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ComAtprotoRepoApplyWritesUpdateResult.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.repo.applyWrites#updateResult")
+                })
+            }
+            is ComAtprotoRepoApplyWritesOutputResultsUnion.DeleteResult -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ComAtprotoRepoApplyWritesDeleteResult.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.repo.applyWrites#deleteResult")
+                })
+            }
+            is ComAtprotoRepoApplyWritesOutputResultsUnion.Unexpected -> value.value
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ComAtprotoRepoApplyWritesOutputResultsUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "com.atproto.repo.applyWrites#createResult" -> ComAtprotoRepoApplyWritesOutputResultsUnion.CreateResult(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ComAtprotoRepoApplyWritesCreateResult.serializer(), element)
+            )
+            "com.atproto.repo.applyWrites#updateResult" -> ComAtprotoRepoApplyWritesOutputResultsUnion.UpdateResult(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ComAtprotoRepoApplyWritesUpdateResult.serializer(), element)
+            )
+            "com.atproto.repo.applyWrites#deleteResult" -> ComAtprotoRepoApplyWritesOutputResultsUnion.DeleteResult(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ComAtprotoRepoApplyWritesDeleteResult.serializer(), element)
+            )
+            else -> ComAtprotoRepoApplyWritesOutputResultsUnion.Unexpected(element)
+        }
+    }
 }
 
     /**
@@ -59,7 +153,7 @@ sealed interface ComAtprotoRepoApplyWritesOutputResultsUnion {
     data class ComAtprotoRepoApplyWritesCreate(
         @SerialName("collection")
         val collection: NSID,/** NOTE: maxLength is redundant with record-key format. Keeping it temporarily to ensure backwards compatibility. */        @SerialName("rkey")
-        val rkey: String?,        @SerialName("value")
+        val rkey: String? = null,        @SerialName("value")
         val value: JsonElement    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#comAtprotoRepoApplyWritesCreate"
@@ -98,7 +192,7 @@ sealed interface ComAtprotoRepoApplyWritesOutputResultsUnion {
         @SerialName("uri")
         val uri: ATProtocolURI,        @SerialName("cid")
         val cid: CID,        @SerialName("validationStatus")
-        val validationStatus: String?    ) {
+        val validationStatus: String? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#comAtprotoRepoApplyWritesCreateResult"
         }
@@ -109,7 +203,7 @@ sealed interface ComAtprotoRepoApplyWritesOutputResultsUnion {
         @SerialName("uri")
         val uri: ATProtocolURI,        @SerialName("cid")
         val cid: CID,        @SerialName("validationStatus")
-        val validationStatus: String?    ) {
+        val validationStatus: String? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#comAtprotoRepoApplyWritesUpdateResult"
         }
@@ -153,10 +247,12 @@ input: ComAtprotoRepoApplyWritesInput): ATProtoResponse<ComAtprotoRepoApplyWrite
     val body = Json.encodeToString(input)
     val contentType = "application/json"
 
+    val queryParams: Map<String, String>? = null
+
     return client.networkService.performRequest(
         method = "POST",
         endpoint = endpoint,
-        queryParams = null,
+        queryParams = queryParams,
         headers = mapOf(
             "Content-Type" to contentType,
             "Accept" to "application/json"

@@ -14,15 +14,46 @@ object AppBskyUnspeccedGetPostThreadOtherV2Defs {
     const val TYPE_IDENTIFIER = "app.bsky.unspecced.getPostThreadOtherV2"
 }
 
-@Serializable
+@Serializable(with = AppBskyUnspeccedGetPostThreadOtherV2ThreadItemValueUnionSerializer::class)
 sealed interface AppBskyUnspeccedGetPostThreadOtherV2ThreadItemValueUnion {
     @Serializable
-    @SerialName("app.bsky.unspecced.getPostThreadOtherV2#AppBskyUnspeccedDefsThreadItemPost")
-    data class AppBskyUnspeccedDefsThreadItemPost(val value: AppBskyUnspeccedDefsThreadItemPost) : AppBskyUnspeccedGetPostThreadOtherV2ThreadItemValueUnion
+    data class ThreadItemPost(val value: com.atproto.generated.AppBskyUnspeccedDefsThreadItemPost) : AppBskyUnspeccedGetPostThreadOtherV2ThreadItemValueUnion
 
     @Serializable
-    @SerialName("unknown")
     data class Unexpected(val value: JsonElement) : AppBskyUnspeccedGetPostThreadOtherV2ThreadItemValueUnion
+}
+
+object AppBskyUnspeccedGetPostThreadOtherV2ThreadItemValueUnionSerializer : kotlinx.serialization.KSerializer<AppBskyUnspeccedGetPostThreadOtherV2ThreadItemValueUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyUnspeccedGetPostThreadOtherV2ThreadItemValueUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyUnspeccedGetPostThreadOtherV2ThreadItemValueUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is AppBskyUnspeccedGetPostThreadOtherV2ThreadItemValueUnion.ThreadItemPost -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyUnspeccedDefsThreadItemPost.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.unspecced.defs#threadItemPost")
+                })
+            }
+            is AppBskyUnspeccedGetPostThreadOtherV2ThreadItemValueUnion.Unexpected -> value.value
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyUnspeccedGetPostThreadOtherV2ThreadItemValueUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "app.bsky.unspecced.defs#threadItemPost" -> AppBskyUnspeccedGetPostThreadOtherV2ThreadItemValueUnion.ThreadItemPost(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyUnspeccedDefsThreadItemPost.serializer(), element)
+            )
+            else -> AppBskyUnspeccedGetPostThreadOtherV2ThreadItemValueUnion.Unexpected(element)
+        }
+    }
 }
 
     @Serializable

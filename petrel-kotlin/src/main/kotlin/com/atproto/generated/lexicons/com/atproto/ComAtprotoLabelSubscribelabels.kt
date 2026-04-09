@@ -28,7 +28,7 @@ object ComAtprotoLabelSubscribeLabelsDefs {
     data class ComAtprotoLabelSubscribeLabelsInfo(
         @SerialName("name")
         val name: String,        @SerialName("message")
-        val message: String?    ) {
+        val message: String? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#comAtprotoLabelSubscribeLabelsInfo"
         }

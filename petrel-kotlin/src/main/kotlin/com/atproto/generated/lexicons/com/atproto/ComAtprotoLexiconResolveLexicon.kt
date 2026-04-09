@@ -23,7 +23,7 @@ object ComAtprotoLexiconResolveLexiconDefs {
     data class ComAtprotoLexiconResolveLexiconOutput(
 // The CID of the lexicon schema record.        @SerialName("cid")
         val cid: CID,// The resolved lexicon schema record.        @SerialName("schema")
-        val schema: ComAtprotoLexiconSchemaMain,// The AT-URI of the lexicon schema record.        @SerialName("uri")
+        val schema: ComAtprotoLexiconSchema,// The AT-URI of the lexicon schema record.        @SerialName("uri")
         val uri: ATProtocolURI    )
 
 sealed class ComAtprotoLexiconResolveLexiconError(val name: String, val description: String?) {

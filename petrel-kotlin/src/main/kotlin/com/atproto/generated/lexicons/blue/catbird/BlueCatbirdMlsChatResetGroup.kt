@@ -19,8 +19,8 @@ object BlueCatbirdMlsChatResetGroupDefs {
 // Conversation identifier        @SerialName("convoId")
         val convoId: String,// New MLS group identifier to replace the current one        @SerialName("newGroupId")
         val newGroupId: String,// MLS cipher suite identifier for the new group        @SerialName("cipherSuite")
-        val cipherSuite: String,// Optional base64-encoded MLS GroupInfo for the new group        @SerialName("groupInfo")
-        val groupInfo: String? = null,// Optional human-readable reason for the reset        @SerialName("reason")
+        val cipherSuite: String,// Optional MLS GroupInfo for the new group        @SerialName("groupInfo")
+        val groupInfo: Bytes? = null,// Optional human-readable reason for the reset        @SerialName("reason")
         val reason: String? = null    )
 
     @Serializable
@@ -50,10 +50,12 @@ input: BlueCatbirdMlsChatResetGroupInput): ATProtoResponse<BlueCatbirdMlsChatRes
     val body = Json.encodeToString(input)
     val contentType = "application/json"
 
+    val queryParams: Map<String, String>? = null
+
     return client.networkService.performRequest(
         method = "POST",
         endpoint = endpoint,
-        queryParams = null,
+        queryParams = queryParams,
         headers = mapOf(
             "Content-Type" to contentType,
             "Accept" to "application/json"

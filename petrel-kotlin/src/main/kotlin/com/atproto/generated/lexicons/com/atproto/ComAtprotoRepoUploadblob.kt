@@ -37,10 +37,12 @@ input: ComAtprotoRepoUploadBlobInput): ATProtoResponse<ComAtprotoRepoUploadBlobO
     val body = input.data
     val contentType = "*/*"
 
+    val queryParams: Map<String, String>? = null
+
     return client.networkService.performRequest(
         method = "POST",
         endpoint = endpoint,
-        queryParams = null,
+        queryParams = queryParams,
         headers = mapOf(
             "Content-Type" to contentType,
             "Accept" to "application/json"

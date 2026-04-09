@@ -17,8 +17,8 @@ object PlaceStreamMetadataContentRightsDefs {
 @Serializable
 data class PlaceStreamMetadataContentRights(
 // Name of the creator of the work.    @SerialName("creator")
-    val creator: String?,// Copyright notice for the work.    @SerialName("copyrightNotice")
-    val copyrightNotice: String?,// Year of creation or publication.    @SerialName("copyrightYear")
-    val copyrightYear: Int?,// License URL or identifier.    @SerialName("license")
-    val license: String?,// Credit line for the work.    @SerialName("creditLine")
-    val creditLine: String?)
+    val creator: String? = null,// Copyright notice for the work.    @SerialName("copyrightNotice")
+    val copyrightNotice: String? = null,// Year of creation or publication.    @SerialName("copyrightYear")
+    val copyrightYear: Int? = null,// License URL or identifier.    @SerialName("license")
+    val license: String? = null,// Credit line for the work.    @SerialName("creditLine")
+    val creditLine: String? = null)

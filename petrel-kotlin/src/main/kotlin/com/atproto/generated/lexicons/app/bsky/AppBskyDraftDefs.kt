@@ -14,49 +14,166 @@ object AppBskyDraftDefsDefs {
     const val TYPE_IDENTIFIER = "app.bsky.draft.defs"
 }
 
-@Serializable
+@Serializable(with = AppBskyDraftDefsDraftPostgateEmbeddingRulesUnionSerializer::class)
 sealed interface AppBskyDraftDefsDraftPostgateEmbeddingRulesUnion {
     @Serializable
-    @SerialName("app.bsky.draft.defs#AppBskyFeedPostgateDisableRule")
-    data class AppBskyFeedPostgateDisableRule(val value: AppBskyFeedPostgateDisableRule) : AppBskyDraftDefsDraftPostgateEmbeddingRulesUnion
+    data class DisableRule(val value: com.atproto.generated.AppBskyFeedPostgateDisableRule) : AppBskyDraftDefsDraftPostgateEmbeddingRulesUnion
 
     @Serializable
-    @SerialName("unknown")
     data class Unexpected(val value: JsonElement) : AppBskyDraftDefsDraftPostgateEmbeddingRulesUnion
 }
 
-@Serializable
+object AppBskyDraftDefsDraftPostgateEmbeddingRulesUnionSerializer : kotlinx.serialization.KSerializer<AppBskyDraftDefsDraftPostgateEmbeddingRulesUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyDraftDefsDraftPostgateEmbeddingRulesUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyDraftDefsDraftPostgateEmbeddingRulesUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is AppBskyDraftDefsDraftPostgateEmbeddingRulesUnion.DisableRule -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyFeedPostgateDisableRule.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.postgate#disableRule")
+                })
+            }
+            is AppBskyDraftDefsDraftPostgateEmbeddingRulesUnion.Unexpected -> value.value
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyDraftDefsDraftPostgateEmbeddingRulesUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "app.bsky.feed.postgate#disableRule" -> AppBskyDraftDefsDraftPostgateEmbeddingRulesUnion.DisableRule(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyFeedPostgateDisableRule.serializer(), element)
+            )
+            else -> AppBskyDraftDefsDraftPostgateEmbeddingRulesUnion.Unexpected(element)
+        }
+    }
+}
+
+@Serializable(with = AppBskyDraftDefsDraftThreadgateAllowUnionSerializer::class)
 sealed interface AppBskyDraftDefsDraftThreadgateAllowUnion {
     @Serializable
-    @SerialName("app.bsky.draft.defs#AppBskyFeedThreadgateMentionRule")
-    data class AppBskyFeedThreadgateMentionRule(val value: AppBskyFeedThreadgateMentionRule) : AppBskyDraftDefsDraftThreadgateAllowUnion
+    data class MentionRule(val value: com.atproto.generated.AppBskyFeedThreadgateMentionRule) : AppBskyDraftDefsDraftThreadgateAllowUnion
 
     @Serializable
-    @SerialName("app.bsky.draft.defs#AppBskyFeedThreadgateFollowerRule")
-    data class AppBskyFeedThreadgateFollowerRule(val value: AppBskyFeedThreadgateFollowerRule) : AppBskyDraftDefsDraftThreadgateAllowUnion
+    data class FollowerRule(val value: com.atproto.generated.AppBskyFeedThreadgateFollowerRule) : AppBskyDraftDefsDraftThreadgateAllowUnion
 
     @Serializable
-    @SerialName("app.bsky.draft.defs#AppBskyFeedThreadgateFollowingRule")
-    data class AppBskyFeedThreadgateFollowingRule(val value: AppBskyFeedThreadgateFollowingRule) : AppBskyDraftDefsDraftThreadgateAllowUnion
+    data class FollowingRule(val value: com.atproto.generated.AppBskyFeedThreadgateFollowingRule) : AppBskyDraftDefsDraftThreadgateAllowUnion
 
     @Serializable
-    @SerialName("app.bsky.draft.defs#AppBskyFeedThreadgateListRule")
-    data class AppBskyFeedThreadgateListRule(val value: AppBskyFeedThreadgateListRule) : AppBskyDraftDefsDraftThreadgateAllowUnion
+    data class ListRule(val value: com.atproto.generated.AppBskyFeedThreadgateListRule) : AppBskyDraftDefsDraftThreadgateAllowUnion
 
     @Serializable
-    @SerialName("unknown")
     data class Unexpected(val value: JsonElement) : AppBskyDraftDefsDraftThreadgateAllowUnion
 }
 
-@Serializable
+object AppBskyDraftDefsDraftThreadgateAllowUnionSerializer : kotlinx.serialization.KSerializer<AppBskyDraftDefsDraftThreadgateAllowUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyDraftDefsDraftThreadgateAllowUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyDraftDefsDraftThreadgateAllowUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is AppBskyDraftDefsDraftThreadgateAllowUnion.MentionRule -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyFeedThreadgateMentionRule.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.threadgate#mentionRule")
+                })
+            }
+            is AppBskyDraftDefsDraftThreadgateAllowUnion.FollowerRule -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyFeedThreadgateFollowerRule.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.threadgate#followerRule")
+                })
+            }
+            is AppBskyDraftDefsDraftThreadgateAllowUnion.FollowingRule -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyFeedThreadgateFollowingRule.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.threadgate#followingRule")
+                })
+            }
+            is AppBskyDraftDefsDraftThreadgateAllowUnion.ListRule -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyFeedThreadgateListRule.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.threadgate#listRule")
+                })
+            }
+            is AppBskyDraftDefsDraftThreadgateAllowUnion.Unexpected -> value.value
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyDraftDefsDraftThreadgateAllowUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "app.bsky.feed.threadgate#mentionRule" -> AppBskyDraftDefsDraftThreadgateAllowUnion.MentionRule(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyFeedThreadgateMentionRule.serializer(), element)
+            )
+            "app.bsky.feed.threadgate#followerRule" -> AppBskyDraftDefsDraftThreadgateAllowUnion.FollowerRule(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyFeedThreadgateFollowerRule.serializer(), element)
+            )
+            "app.bsky.feed.threadgate#followingRule" -> AppBskyDraftDefsDraftThreadgateAllowUnion.FollowingRule(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyFeedThreadgateFollowingRule.serializer(), element)
+            )
+            "app.bsky.feed.threadgate#listRule" -> AppBskyDraftDefsDraftThreadgateAllowUnion.ListRule(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyFeedThreadgateListRule.serializer(), element)
+            )
+            else -> AppBskyDraftDefsDraftThreadgateAllowUnion.Unexpected(element)
+        }
+    }
+}
+
+@Serializable(with = AppBskyDraftDefsDraftPostLabelsUnionSerializer::class)
 sealed interface AppBskyDraftDefsDraftPostLabelsUnion {
     @Serializable
-    @SerialName("app.bsky.draft.defs#ComAtprotoLabelDefsSelfLabels")
-    data class ComAtprotoLabelDefsSelfLabels(val value: ComAtprotoLabelDefsSelfLabels) : AppBskyDraftDefsDraftPostLabelsUnion
+    data class SelfLabels(val value: com.atproto.generated.ComAtprotoLabelDefsSelfLabels) : AppBskyDraftDefsDraftPostLabelsUnion
 
     @Serializable
-    @SerialName("unknown")
     data class Unexpected(val value: JsonElement) : AppBskyDraftDefsDraftPostLabelsUnion
+}
+
+object AppBskyDraftDefsDraftPostLabelsUnionSerializer : kotlinx.serialization.KSerializer<AppBskyDraftDefsDraftPostLabelsUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyDraftDefsDraftPostLabelsUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyDraftDefsDraftPostLabelsUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is AppBskyDraftDefsDraftPostLabelsUnion.SelfLabels -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ComAtprotoLabelDefsSelfLabels.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.label.defs#selfLabels")
+                })
+            }
+            is AppBskyDraftDefsDraftPostLabelsUnion.Unexpected -> value.value
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyDraftDefsDraftPostLabelsUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "com.atproto.label.defs#selfLabels" -> AppBskyDraftDefsDraftPostLabelsUnion.SelfLabels(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ComAtprotoLabelDefsSelfLabels.serializer(), element)
+            )
+            else -> AppBskyDraftDefsDraftPostLabelsUnion.Unexpected(element)
+        }
+    }
 }
 
     /**
@@ -78,12 +195,12 @@ sealed interface AppBskyDraftDefsDraftPostLabelsUnion {
     @Serializable
     data class AppBskyDraftDefsDraft(
 /** UUIDv4 identifier of the device that created this draft. */        @SerialName("deviceId")
-        val deviceId: String?,/** The device and/or platform on which the draft was created. */        @SerialName("deviceName")
-        val deviceName: String?,/** Array of draft posts that compose this draft. */        @SerialName("posts")
+        val deviceId: String? = null,/** The device and/or platform on which the draft was created. */        @SerialName("deviceName")
+        val deviceName: String? = null,/** Array of draft posts that compose this draft. */        @SerialName("posts")
         val posts: List<AppBskyDraftDefsDraftPost>,/** Indicates human language of posts primary text content. */        @SerialName("langs")
-        val langs: List<Language>?,/** Embedding rules for the postgates to be created when this draft is published. */        @SerialName("postgateEmbeddingRules")
-        val postgateEmbeddingRules: List<AppBskyDraftDefsDraftPostgateEmbeddingRulesUnion>?,/** Allow-rules for the threadgate to be created when this draft is published. */        @SerialName("threadgateAllow")
-        val threadgateAllow: List<AppBskyDraftDefsDraftThreadgateAllowUnion>?    ) {
+        val langs: List<Language>? = null,/** Embedding rules for the postgates to be created when this draft is published. */        @SerialName("postgateEmbeddingRules")
+        val postgateEmbeddingRules: List<AppBskyDraftDefsDraftPostgateEmbeddingRulesUnion>? = null,/** Allow-rules for the threadgate to be created when this draft is published. */        @SerialName("threadgateAllow")
+        val threadgateAllow: List<AppBskyDraftDefsDraftThreadgateAllowUnion>? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyDraftDefsDraft"
         }
@@ -96,11 +213,11 @@ sealed interface AppBskyDraftDefsDraftPostLabelsUnion {
     data class AppBskyDraftDefsDraftPost(
 /** The primary post content. */        @SerialName("text")
         val text: String,/** Self-label values for this post. Effectively content warnings. */        @SerialName("labels")
-        val labels: AppBskyDraftDefsDraftPostLabelsUnion?,        @SerialName("embedImages")
-        val embedImages: List<AppBskyDraftDefsDraftEmbedImage>?,        @SerialName("embedVideos")
-        val embedVideos: List<AppBskyDraftDefsDraftEmbedVideo>?,        @SerialName("embedExternals")
-        val embedExternals: List<AppBskyDraftDefsDraftEmbedExternal>?,        @SerialName("embedRecords")
-        val embedRecords: List<AppBskyDraftDefsDraftEmbedRecord>?    ) {
+        val labels: AppBskyDraftDefsDraftPostLabelsUnion? = null,        @SerialName("embedImages")
+        val embedImages: List<AppBskyDraftDefsDraftEmbedImage>? = null,        @SerialName("embedVideos")
+        val embedVideos: List<AppBskyDraftDefsDraftEmbedVideo>? = null,        @SerialName("embedExternals")
+        val embedExternals: List<AppBskyDraftDefsDraftEmbedExternal>? = null,        @SerialName("embedRecords")
+        val embedRecords: List<AppBskyDraftDefsDraftEmbedRecord>? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyDraftDefsDraftPost"
         }
@@ -144,7 +261,7 @@ sealed interface AppBskyDraftDefsDraftPostLabelsUnion {
     data class AppBskyDraftDefsDraftEmbedImage(
         @SerialName("localRef")
         val localRef: AppBskyDraftDefsDraftEmbedLocalRef,        @SerialName("alt")
-        val alt: String?    ) {
+        val alt: String? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyDraftDefsDraftEmbedImage"
         }
@@ -154,8 +271,8 @@ sealed interface AppBskyDraftDefsDraftPostLabelsUnion {
     data class AppBskyDraftDefsDraftEmbedVideo(
         @SerialName("localRef")
         val localRef: AppBskyDraftDefsDraftEmbedLocalRef,        @SerialName("alt")
-        val alt: String?,        @SerialName("captions")
-        val captions: List<AppBskyDraftDefsDraftEmbedCaption>?    ) {
+        val alt: String? = null,        @SerialName("captions")
+        val captions: List<AppBskyDraftDefsDraftEmbedCaption>? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyDraftDefsDraftEmbedVideo"
         }

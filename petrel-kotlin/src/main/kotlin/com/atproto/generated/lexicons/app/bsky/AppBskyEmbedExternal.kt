@@ -20,7 +20,7 @@ object AppBskyEmbedExternalDefs {
         val uri: URI,        @SerialName("title")
         val title: String,        @SerialName("description")
         val description: String,        @SerialName("thumb")
-        val thumb: Blob?    ) {
+        val thumb: Blob? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyEmbedExternalExternal"
         }
@@ -41,7 +41,7 @@ object AppBskyEmbedExternalDefs {
         val uri: URI,        @SerialName("title")
         val title: String,        @SerialName("description")
         val description: String,        @SerialName("thumb")
-        val thumb: URI?    ) {
+        val thumb: URI? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyEmbedExternalViewExternal"
         }

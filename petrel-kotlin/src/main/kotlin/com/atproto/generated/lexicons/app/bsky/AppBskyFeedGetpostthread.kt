@@ -14,23 +14,70 @@ object AppBskyFeedGetPostThreadDefs {
     const val TYPE_IDENTIFIER = "app.bsky.feed.getPostThread"
 }
 
-@Serializable
+@Serializable(with = AppBskyFeedGetPostThreadOutputThreadUnionSerializer::class)
 sealed interface AppBskyFeedGetPostThreadOutputThreadUnion {
     @Serializable
-    @SerialName("app.bsky.feed.getPostThread#AppBskyFeedDefsThreadViewPost")
-    data class AppBskyFeedDefsThreadViewPost(val value: AppBskyFeedDefsThreadViewPost) : AppBskyFeedGetPostThreadOutputThreadUnion
+    data class ThreadViewPost(val value: com.atproto.generated.AppBskyFeedDefsThreadViewPost) : AppBskyFeedGetPostThreadOutputThreadUnion
 
     @Serializable
-    @SerialName("app.bsky.feed.getPostThread#AppBskyFeedDefsNotFoundPost")
-    data class AppBskyFeedDefsNotFoundPost(val value: AppBskyFeedDefsNotFoundPost) : AppBskyFeedGetPostThreadOutputThreadUnion
+    data class NotFoundPost(val value: com.atproto.generated.AppBskyFeedDefsNotFoundPost) : AppBskyFeedGetPostThreadOutputThreadUnion
 
     @Serializable
-    @SerialName("app.bsky.feed.getPostThread#AppBskyFeedDefsBlockedPost")
-    data class AppBskyFeedDefsBlockedPost(val value: AppBskyFeedDefsBlockedPost) : AppBskyFeedGetPostThreadOutputThreadUnion
+    data class BlockedPost(val value: com.atproto.generated.AppBskyFeedDefsBlockedPost) : AppBskyFeedGetPostThreadOutputThreadUnion
 
     @Serializable
-    @SerialName("unknown")
     data class Unexpected(val value: JsonElement) : AppBskyFeedGetPostThreadOutputThreadUnion
+}
+
+object AppBskyFeedGetPostThreadOutputThreadUnionSerializer : kotlinx.serialization.KSerializer<AppBskyFeedGetPostThreadOutputThreadUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyFeedGetPostThreadOutputThreadUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyFeedGetPostThreadOutputThreadUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is AppBskyFeedGetPostThreadOutputThreadUnion.ThreadViewPost -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyFeedDefsThreadViewPost.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#threadViewPost")
+                })
+            }
+            is AppBskyFeedGetPostThreadOutputThreadUnion.NotFoundPost -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyFeedDefsNotFoundPost.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#notFoundPost")
+                })
+            }
+            is AppBskyFeedGetPostThreadOutputThreadUnion.BlockedPost -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyFeedDefsBlockedPost.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#blockedPost")
+                })
+            }
+            is AppBskyFeedGetPostThreadOutputThreadUnion.Unexpected -> value.value
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyFeedGetPostThreadOutputThreadUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "app.bsky.feed.defs#threadViewPost" -> AppBskyFeedGetPostThreadOutputThreadUnion.ThreadViewPost(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyFeedDefsThreadViewPost.serializer(), element)
+            )
+            "app.bsky.feed.defs#notFoundPost" -> AppBskyFeedGetPostThreadOutputThreadUnion.NotFoundPost(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyFeedDefsNotFoundPost.serializer(), element)
+            )
+            "app.bsky.feed.defs#blockedPost" -> AppBskyFeedGetPostThreadOutputThreadUnion.BlockedPost(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyFeedDefsBlockedPost.serializer(), element)
+            )
+            else -> AppBskyFeedGetPostThreadOutputThreadUnion.Unexpected(element)
+        }
+    }
 }
 
 @Serializable

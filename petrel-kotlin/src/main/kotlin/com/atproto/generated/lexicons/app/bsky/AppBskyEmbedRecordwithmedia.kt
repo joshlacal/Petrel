@@ -14,42 +14,136 @@ object AppBskyEmbedRecordWithMediaDefs {
     const val TYPE_IDENTIFIER = "app.bsky.embed.recordWithMedia"
 }
 
-@Serializable
+@Serializable(with = AppBskyEmbedRecordWithMediaViewMediaUnionSerializer::class)
 sealed interface AppBskyEmbedRecordWithMediaViewMediaUnion {
     @Serializable
-    @SerialName("app.bsky.embed.recordWithMedia#AppBskyEmbedImagesView")
-    data class AppBskyEmbedImagesView(val value: AppBskyEmbedImagesView) : AppBskyEmbedRecordWithMediaViewMediaUnion
+    data class View(val value: com.atproto.generated.AppBskyEmbedImagesView) : AppBskyEmbedRecordWithMediaViewMediaUnion
 
     @Serializable
-    @SerialName("app.bsky.embed.recordWithMedia#AppBskyEmbedVideoView")
-    data class AppBskyEmbedVideoView(val value: AppBskyEmbedVideoView) : AppBskyEmbedRecordWithMediaViewMediaUnion
+    data class AppBskyEmbedVideoView(val value: com.atproto.generated.AppBskyEmbedVideoView) : AppBskyEmbedRecordWithMediaViewMediaUnion
 
     @Serializable
-    @SerialName("app.bsky.embed.recordWithMedia#AppBskyEmbedExternalView")
-    data class AppBskyEmbedExternalView(val value: AppBskyEmbedExternalView) : AppBskyEmbedRecordWithMediaViewMediaUnion
+    data class AppBskyEmbedExternalView(val value: com.atproto.generated.AppBskyEmbedExternalView) : AppBskyEmbedRecordWithMediaViewMediaUnion
 
     @Serializable
-    @SerialName("unknown")
     data class Unexpected(val value: JsonElement) : AppBskyEmbedRecordWithMediaViewMediaUnion
 }
 
-@Serializable
+object AppBskyEmbedRecordWithMediaViewMediaUnionSerializer : kotlinx.serialization.KSerializer<AppBskyEmbedRecordWithMediaViewMediaUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyEmbedRecordWithMediaViewMediaUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyEmbedRecordWithMediaViewMediaUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is AppBskyEmbedRecordWithMediaViewMediaUnion.View -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyEmbedImagesView.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.images#view")
+                })
+            }
+            is AppBskyEmbedRecordWithMediaViewMediaUnion.AppBskyEmbedVideoView -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyEmbedVideoView.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.video#view")
+                })
+            }
+            is AppBskyEmbedRecordWithMediaViewMediaUnion.AppBskyEmbedExternalView -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyEmbedExternalView.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.external#view")
+                })
+            }
+            is AppBskyEmbedRecordWithMediaViewMediaUnion.Unexpected -> value.value
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyEmbedRecordWithMediaViewMediaUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "app.bsky.embed.images#view" -> AppBskyEmbedRecordWithMediaViewMediaUnion.View(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyEmbedImagesView.serializer(), element)
+            )
+            "app.bsky.embed.video#view" -> AppBskyEmbedRecordWithMediaViewMediaUnion.AppBskyEmbedVideoView(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyEmbedVideoView.serializer(), element)
+            )
+            "app.bsky.embed.external#view" -> AppBskyEmbedRecordWithMediaViewMediaUnion.AppBskyEmbedExternalView(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyEmbedExternalView.serializer(), element)
+            )
+            else -> AppBskyEmbedRecordWithMediaViewMediaUnion.Unexpected(element)
+        }
+    }
+}
+
+@Serializable(with = AppBskyEmbedRecordWithMediaMediaUnionSerializer::class)
 sealed interface AppBskyEmbedRecordWithMediaMediaUnion {
     @Serializable
-    @SerialName("app.bsky.embed.recordWithMedia#AppBskyEmbedImages")
-    data class AppBskyEmbedImages(val value: AppBskyEmbedImages) : AppBskyEmbedRecordWithMediaMediaUnion
+    data class Images(val value: com.atproto.generated.AppBskyEmbedImages) : AppBskyEmbedRecordWithMediaMediaUnion
 
     @Serializable
-    @SerialName("app.bsky.embed.recordWithMedia#AppBskyEmbedVideo")
-    data class AppBskyEmbedVideo(val value: AppBskyEmbedVideo) : AppBskyEmbedRecordWithMediaMediaUnion
+    data class Video(val value: com.atproto.generated.AppBskyEmbedVideo) : AppBskyEmbedRecordWithMediaMediaUnion
 
     @Serializable
-    @SerialName("app.bsky.embed.recordWithMedia#AppBskyEmbedExternal")
-    data class AppBskyEmbedExternal(val value: AppBskyEmbedExternal) : AppBskyEmbedRecordWithMediaMediaUnion
+    data class External(val value: com.atproto.generated.AppBskyEmbedExternal) : AppBskyEmbedRecordWithMediaMediaUnion
 
     @Serializable
-    @SerialName("unknown")
     data class Unexpected(val value: JsonElement) : AppBskyEmbedRecordWithMediaMediaUnion
+}
+
+object AppBskyEmbedRecordWithMediaMediaUnionSerializer : kotlinx.serialization.KSerializer<AppBskyEmbedRecordWithMediaMediaUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyEmbedRecordWithMediaMediaUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyEmbedRecordWithMediaMediaUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is AppBskyEmbedRecordWithMediaMediaUnion.Images -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyEmbedImages.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.images")
+                })
+            }
+            is AppBskyEmbedRecordWithMediaMediaUnion.Video -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyEmbedVideo.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.video")
+                })
+            }
+            is AppBskyEmbedRecordWithMediaMediaUnion.External -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyEmbedExternal.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.external")
+                })
+            }
+            is AppBskyEmbedRecordWithMediaMediaUnion.Unexpected -> value.value
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyEmbedRecordWithMediaMediaUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "app.bsky.embed.images" -> AppBskyEmbedRecordWithMediaMediaUnion.Images(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyEmbedImages.serializer(), element)
+            )
+            "app.bsky.embed.video" -> AppBskyEmbedRecordWithMediaMediaUnion.Video(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyEmbedVideo.serializer(), element)
+            )
+            "app.bsky.embed.external" -> AppBskyEmbedRecordWithMediaMediaUnion.External(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyEmbedExternal.serializer(), element)
+            )
+            else -> AppBskyEmbedRecordWithMediaMediaUnion.Unexpected(element)
+        }
+    }
 }
 
     @Serializable

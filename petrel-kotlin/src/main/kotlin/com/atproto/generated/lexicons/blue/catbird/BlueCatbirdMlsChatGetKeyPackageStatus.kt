@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: blue.catbird.mlsChat.getKeyPackageStatus
-// Get key package statistics and consumption history for the authenticated user. Helps clients detect missing bundles before processing Welcome messages.
+// Get key package statistics and status for the authenticated user's devices Retrieve key package counts, status, and history for the authenticated user. Useful for clients to know when to replenish key packages.
 package com.atproto.generated
 
 import kotlinx.serialization.*
@@ -14,39 +14,72 @@ object BlueCatbirdMlsChatGetKeyPackageStatusDefs {
     const val TYPE_IDENTIFIER = "blue.catbird.mlsChat.getKeyPackageStatus"
 }
 
-    /**
-     * View of a consumed key package with usage metadata
-     */
     @Serializable
-    data class BlueCatbirdMlsChatGetKeyPackageStatusConsumedPackageView(
-/** SHA256 hex hash of the key package bytes */        @SerialName("keyPackageHash")
-        val keyPackageHash: String,/** Group ID (hex-encoded) where this key package was consumed. May be null for historical data. */        @SerialName("usedInGroup")
-        val usedInGroup: String?,/** When the key package was consumed */        @SerialName("consumedAt")
-        val consumedAt: ATProtocolDate,/** Cipher suite of the consumed key package */        @SerialName("cipherSuite")
-        val cipherSuite: String?    ) {
+    data class BlueCatbirdMlsChatGetKeyPackageStatusKeyPackageStats(
+        @SerialName("totalAvailable")
+        val totalAvailable: Int,        @SerialName("totalConsumed")
+        val totalConsumed: Int,        @SerialName("byDevice")
+        val byDevice: List<BlueCatbirdMlsChatGetKeyPackageStatusDeviceKeyPackageCount>? = null    ) {
         companion object {
-            const val TYPE_IDENTIFIER = "#blueCatbirdMlsChatGetKeyPackageStatusConsumedPackageView"
+            const val TYPE_IDENTIFIER = "#blueCatbirdMlsChatGetKeyPackageStatusKeyPackageStats"
+        }
+    }
+
+    @Serializable
+    data class BlueCatbirdMlsChatGetKeyPackageStatusDeviceKeyPackageCount(
+        @SerialName("deviceId")
+        val deviceId: String,        @SerialName("available")
+        val available: Int    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#blueCatbirdMlsChatGetKeyPackageStatusDeviceKeyPackageCount"
+        }
+    }
+
+    @Serializable
+    data class BlueCatbirdMlsChatGetKeyPackageStatusKeyPackageStatusItem(
+        @SerialName("id")
+        val id: String,        @SerialName("deviceId")
+        val deviceId: String,        @SerialName("cipherSuite")
+        val cipherSuite: String,        @SerialName("createdAt")
+        val createdAt: ATProtocolDate,        @SerialName("expiresAt")
+        val expiresAt: ATProtocolDate? = null,        @SerialName("consumed")
+        val consumed: Boolean    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#blueCatbirdMlsChatGetKeyPackageStatusKeyPackageStatusItem"
+        }
+    }
+
+    @Serializable
+    data class BlueCatbirdMlsChatGetKeyPackageStatusKeyPackageHistoryItem(
+        @SerialName("id")
+        val id: String,        @SerialName("action")
+        val action: String,        @SerialName("createdAt")
+        val createdAt: ATProtocolDate,        @SerialName("consumedByDid")
+        val consumedByDid: DID? = null    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#blueCatbirdMlsChatGetKeyPackageStatusKeyPackageHistoryItem"
         }
     }
 
 @Serializable
     data class BlueCatbirdMlsChatGetKeyPackageStatusParameters(
-// Maximum number of consumed packages to return in history        @SerialName("limit")
-        val limit: Int? = null,// Pagination cursor from previous response. Returns consumed packages after this cursor.        @SerialName("cursor")
+// DID to check status for (defaults to authenticated user)        @SerialName("did")
+        val did: DID? = null,// Filter by cipher suite        @SerialName("cipherSuite")
+        val cipherSuite: String? = null,// Comma-separated sections to include        @SerialName("include")
+        val include: String? = null,// Maximum results for status/history sections        @SerialName("limit")
+        val limit: Int? = null,// Pagination cursor        @SerialName("cursor")
         val cursor: String? = null    )
 
     @Serializable
     data class BlueCatbirdMlsChatGetKeyPackageStatusOutput(
-// Total number of key packages ever uploaded by this user        @SerialName("totalUploaded")
-        val totalUploaded: Int,// Number of available (unconsumed, unreserved) key packages        @SerialName("available")
-        val available: Int,// Number of consumed key packages        @SerialName("consumed")
-        val consumed: Int,// Number of temporarily reserved key packages (during welcome validation)        @SerialName("reserved")
-        val reserved: Int? = null,// Paginated list of consumed key package history        @SerialName("consumedPackages")
-        val consumedPackages: List<BlueCatbirdMlsChatGetKeyPackageStatusConsumedPackageView>? = null,// Cursor for fetching next page of consumed packages. Omitted if no more results.        @SerialName("cursor")
+        @SerialName("stats")
+        val stats: BlueCatbirdMlsChatGetKeyPackageStatusKeyPackageStats? = null,        @SerialName("status")
+        val status: List<BlueCatbirdMlsChatGetKeyPackageStatusKeyPackageStatusItem>? = null,        @SerialName("history")
+        val history: List<BlueCatbirdMlsChatGetKeyPackageStatusKeyPackageHistoryItem>? = null,        @SerialName("cursor")
         val cursor: String? = null    )
 
 /**
- * Get key package statistics and consumption history for the authenticated user. Helps clients detect missing bundles before processing Welcome messages.
+ * Get key package statistics and status for the authenticated user's devices Retrieve key package counts, status, and history for the authenticated user. Useful for clients to know when to replenish key packages.
  *
  * Endpoint: blue.catbird.mlsChat.getKeyPackageStatus
  */

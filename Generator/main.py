@@ -258,31 +258,36 @@ async def generate_kotlin_from_lexicons_recursive(folder_path: str, output_folde
 
     await asyncio.gather(*tasks)
 
-    # Generate namespace classes for Kotlin
+    # Generate namespace classes for Kotlin (inner content only, like Swift)
     kotlin_namespace_classes = generate_kotlin_namespace_classes(namespace_hierarchy)
+    kotlin_client = render_kotlin_atproto_client(kotlin_namespace_classes)
 
     # Output main client file to client directory within output folder
     client_dir = os.path.join(output_folder, 'client')
     os.makedirs(client_dir, exist_ok=True)
     client_main_file_path = os.path.join(client_dir, 'ATProtoClientGenerated.kt')
     async with aiofiles.open(client_main_file_path, 'w') as client_file:
-        await client_file.write(kotlin_namespace_classes)
+        await client_file.write(kotlin_client)
 
     print(f"Kotlin generation complete: {len(lexicons)} files generated")
 
 
+def render_kotlin_atproto_client(generated_classes):
+    """Render the Kotlin ATProtoClient using the Jinja template."""
+    from templates import TemplateManager
+    template_manager = TemplateManager()
+    template = template_manager.env.get_template('kotlin/KotlinClientMain.jinja')
+    rendered_code = template.render(generated_classes=generated_classes)
+    return rendered_code
+
+
 def generate_kotlin_namespace_classes(namespace_hierarchy, depth=0):
-    """Generate Kotlin namespace object hierarchy."""
+    """Generate Kotlin namespace inner class hierarchy (content only, no class wrapper)."""
     kotlin_code = ""
     indent = "    " * depth
 
     if depth == 0:
-        kotlin_code += "package com.atproto.client\n\n"
-        kotlin_code += "import com.atproto.network.NetworkService\n\n"
-        kotlin_code += "class ATProtoClient(internal val networkService: NetworkService) {\n"
-        kotlin_code += "    constructor(baseUrl: String = \"https://bsky.social\") : this(NetworkService(baseUrl))\n\n"
-        kotlin_code += "    fun close() {\n        networkService.close()\n    }\n\n"
-
+        # Generate only the inner namespace content (injected into template)
         for namespace, sub_hierarchy in namespace_hierarchy.items():
             namespace_class = convert_to_pascal_case(namespace)
             kotlin_code += f"    val {namespace.lower()}: {namespace_class} = {namespace_class}()\n\n"
@@ -290,8 +295,6 @@ def generate_kotlin_namespace_classes(namespace_hierarchy, depth=0):
             kotlin_code += f"        val client: ATProtoClient get() = this@ATProtoClient\n"
             kotlin_code += generate_kotlin_namespace_classes(sub_hierarchy, depth + 2)
             kotlin_code += "    }\n\n"
-
-        kotlin_code += "}\n"
     else:
         for namespace, sub_namespaces in namespace_hierarchy.items():
             class_name = convert_to_pascal_case(namespace)
@@ -312,12 +315,12 @@ async def main(input_dir, output_dir, language='swift'):
     elif language == 'kotlin':
         await generate_kotlin_from_lexicons_recursive(input_dir, output_dir)
     elif language == 'both':
-        # Generate both Swift and Kotlin
-        swift_output = os.path.join(output_dir, 'swift')
+        # Swift goes directly to output_dir (same as --language swift)
+        # Kotlin goes to a kotlin/ subdirectory
         kotlin_output = os.path.join(output_dir, 'kotlin')
 
         await asyncio.gather(
-            generate_swift_from_lexicons_recursive(input_dir, swift_output),
+            generate_swift_from_lexicons_recursive(input_dir, output_dir),
             generate_kotlin_from_lexicons_recursive(input_dir, kotlin_output)
         )
 

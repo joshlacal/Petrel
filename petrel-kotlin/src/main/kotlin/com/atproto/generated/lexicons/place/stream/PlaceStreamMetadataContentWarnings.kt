@@ -17,4 +17,4 @@ object PlaceStreamMetadataContentWarningsDefs {
 @Serializable
 data class PlaceStreamMetadataContentWarnings(
     @SerialName("warnings")
-    val warnings: List<String>?)
+    val warnings: List<String>? = null)

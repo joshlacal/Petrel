@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: blue.catbird.mlsChat.getKeyPackages
-// Retrieve key packages for one or more DIDs to add them to conversations
+// Retrieve key packages for one or more DIDs (same as v1, in v2 namespace for consistency) Retrieve key packages for one or more DIDs to add them to conversations. Returns one key package per device per DID.
 package com.atproto.generated
 
 import kotlinx.serialization.*
@@ -27,12 +27,12 @@ object BlueCatbirdMlsChatGetKeyPackagesDefs {
         val missing: List<DID>? = null    )
 
 sealed class BlueCatbirdMlsChatGetKeyPackagesError(val name: String, val description: String?) {
-        object TooManyDids: BlueCatbirdMlsChatGetKeyPackagesError("TooManyDids", "Too many DIDs requested")
+        object TooManyDids: BlueCatbirdMlsChatGetKeyPackagesError("TooManyDids", "Too many DIDs requested (max 100)")
         object InvalidDid: BlueCatbirdMlsChatGetKeyPackagesError("InvalidDid", "One or more DIDs are invalid")
     }
 
 /**
- * Retrieve key packages for one or more DIDs to add them to conversations
+ * Retrieve key packages for one or more DIDs (same as v1, in v2 namespace for consistency) Retrieve key packages for one or more DIDs to add them to conversations. Returns one key package per device per DID.
  *
  * Endpoint: blue.catbird.mlsChat.getKeyPackages
  */

@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: blue.catbird.mlsChat.updateCursor
-// Update the read cursor position for a conversation
+// Update the read cursor position for a conversation Update the read cursor for a conversation to track the last-read position.
 package com.atproto.generated
 
 import kotlinx.serialization.*
@@ -17,22 +17,22 @@ object BlueCatbirdMlsChatUpdateCursorDefs {
 @Serializable
     data class BlueCatbirdMlsChatUpdateCursorInput(
 // Conversation identifier        @SerialName("convoId")
-        val convoId: String,// Opaque cursor string marking the read position        @SerialName("cursor")
+        val convoId: String,// Opaque cursor value representing the read position (e.g., seq number as string)        @SerialName("cursor")
         val cursor: String    )
 
     @Serializable
     data class BlueCatbirdMlsChatUpdateCursorOutput(
-// Server timestamp when the cursor was updated        @SerialName("updatedAt")
+// Timestamp when the cursor was updated        @SerialName("updatedAt")
         val updatedAt: ATProtocolDate    )
 
 sealed class BlueCatbirdMlsChatUpdateCursorError(val name: String, val description: String?) {
-        object AuthRequired: BlueCatbirdMlsChatUpdateCursorError("AuthRequired", "Authentication required")
-        object Forbidden: BlueCatbirdMlsChatUpdateCursorError("Forbidden", "User is not a member of the conversation")
-        object InvalidRequest: BlueCatbirdMlsChatUpdateCursorError("InvalidRequest", "Invalid cursor or conversation ID")
+        object ConvoNotFound: BlueCatbirdMlsChatUpdateCursorError("ConvoNotFound", "Conversation not found")
+        object NotMember: BlueCatbirdMlsChatUpdateCursorError("NotMember", "Caller is not a member of the conversation")
+        object InvalidCursor: BlueCatbirdMlsChatUpdateCursorError("InvalidCursor", "The provided cursor value is invalid")
     }
 
 /**
- * Update the read cursor position for a conversation
+ * Update the read cursor position for a conversation Update the read cursor for a conversation to track the last-read position.
  *
  * Endpoint: blue.catbird.mlsChat.updateCursor
  */
@@ -44,10 +44,12 @@ input: BlueCatbirdMlsChatUpdateCursorInput): ATProtoResponse<BlueCatbirdMlsChatU
     val body = Json.encodeToString(input)
     val contentType = "application/json"
 
+    val queryParams: Map<String, String>? = null
+
     return client.networkService.performRequest(
         method = "POST",
         endpoint = endpoint,
-        queryParams = null,
+        queryParams = queryParams,
         headers = mapOf(
             "Content-Type" to contentType,
             "Accept" to "application/json"

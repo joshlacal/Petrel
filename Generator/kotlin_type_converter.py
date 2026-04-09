@@ -19,7 +19,7 @@ def convert_kotlin_ref(ref: str) -> str:
         # Convert dots to nested class notation
         type_name = convert_to_pascal_case(base)
 
-        if fragment:
+        if fragment and fragment != 'main':
             type_name += convert_to_pascal_case(fragment)
 
         return type_name
@@ -74,15 +74,16 @@ class KotlinTypeConverter(BaseTypeConverter):
             union_name = f"{current_struct_name}{convert_to_pascal_case(name)}Union"
             # Register this union with the enum generator
             if hasattr(self.code_generator, 'enum_generator'):
-                refs = [self.convert_ref(r) for r in prop_schema.get('refs', [])]
+                raw_refs = prop_schema.get('refs', [])
+                refs = [self.convert_ref(r) for r in raw_refs]
                 self.code_generator.enum_generator.generate_sealed_interface_for_union(
-                    current_struct_name, name, refs
+                    current_struct_name, name, refs, raw_refs=raw_refs
                 )
             return union_name
         elif prop_type == 'blob':
             return 'Blob'
         elif prop_type == 'bytes':
-            return 'ByteArray'
+            return 'Bytes'
         elif prop_type == 'unknown':
             # Special case for DID documents
             if 'didDoc' in name.lower():
@@ -121,9 +122,10 @@ class KotlinTypeConverter(BaseTypeConverter):
             # Generate union for array items
             union_name = f"{current_struct_name}{convert_to_pascal_case(name)}Union"
             if hasattr(self.code_generator, 'enum_generator'):
-                refs = [self.convert_ref(r) for r in items_schema.get('refs', [])]
+                raw_refs = items_schema.get('refs', [])
+                refs = [self.convert_ref(r) for r in raw_refs]
                 self.code_generator.enum_generator.generate_sealed_interface_for_union_array(
-                    current_struct_name, name, refs
+                    current_struct_name, name, refs, raw_refs=raw_refs
                 )
             return union_name
         elif items_type == 'string':

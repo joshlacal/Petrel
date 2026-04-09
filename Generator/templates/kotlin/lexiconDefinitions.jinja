@@ -11,7 +11,7 @@
         {% for prop in def.properties %}
         {% if prop.description %}/** {{ prop.description }} */{% endif %}
         @SerialName("{{ prop.name }}")
-        val {{ prop.name | sanitizeKeyword }}: {{ prop.type }}{% if not loop.last %},{% endif %}
+        val {{ prop.name | sanitizeKeyword }}: {{ prop.type }}{% if prop.optional %} = null{% endif %}{% if not loop.last %},{% endif %}
         {% endfor %}
     ) {
         companion object {

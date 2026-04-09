@@ -18,7 +18,7 @@ object ComAtprotoAdminDefsDefs {
     data class ComAtprotoAdminDefsStatusAttr(
         @SerialName("applied")
         val applied: Boolean,        @SerialName("ref")
-        val ref: String?    ) {
+        val ref: String? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#comAtprotoAdminDefsStatusAttr"
         }
@@ -29,16 +29,16 @@ object ComAtprotoAdminDefsDefs {
         @SerialName("did")
         val did: DID,        @SerialName("handle")
         val handle: Handle,        @SerialName("email")
-        val email: String?,        @SerialName("relatedRecords")
-        val relatedRecords: List<JsonElement>?,        @SerialName("indexedAt")
+        val email: String? = null,        @SerialName("relatedRecords")
+        val relatedRecords: List<JsonElement>? = null,        @SerialName("indexedAt")
         val indexedAt: ATProtocolDate,        @SerialName("invitedBy")
-        val invitedBy: ComAtprotoServerDefsInviteCode?,        @SerialName("invites")
-        val invites: List<ComAtprotoServerDefsInviteCode>?,        @SerialName("invitesDisabled")
-        val invitesDisabled: Boolean?,        @SerialName("emailConfirmedAt")
-        val emailConfirmedAt: ATProtocolDate?,        @SerialName("inviteNote")
-        val inviteNote: String?,        @SerialName("deactivatedAt")
-        val deactivatedAt: ATProtocolDate?,        @SerialName("threatSignatures")
-        val threatSignatures: List<ComAtprotoAdminDefsThreatSignature>?    ) {
+        val invitedBy: ComAtprotoServerDefsInviteCode? = null,        @SerialName("invites")
+        val invites: List<ComAtprotoServerDefsInviteCode>? = null,        @SerialName("invitesDisabled")
+        val invitesDisabled: Boolean? = null,        @SerialName("emailConfirmedAt")
+        val emailConfirmedAt: ATProtocolDate? = null,        @SerialName("inviteNote")
+        val inviteNote: String? = null,        @SerialName("deactivatedAt")
+        val deactivatedAt: ATProtocolDate? = null,        @SerialName("threatSignatures")
+        val threatSignatures: List<ComAtprotoAdminDefsThreatSignature>? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#comAtprotoAdminDefsAccountView"
         }
@@ -58,7 +58,7 @@ object ComAtprotoAdminDefsDefs {
         @SerialName("did")
         val did: DID,        @SerialName("cid")
         val cid: CID,        @SerialName("recordUri")
-        val recordUri: ATProtocolURI?    ) {
+        val recordUri: ATProtocolURI? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#comAtprotoAdminDefsRepoBlobRef"
         }

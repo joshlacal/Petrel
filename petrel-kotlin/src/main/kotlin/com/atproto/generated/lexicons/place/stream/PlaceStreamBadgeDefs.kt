@@ -23,7 +23,7 @@ object PlaceStreamBadgeDefsDefs {
         val badgeType: String,/** DID of the badge issuer. */        @SerialName("issuer")
         val issuer: DID,/** DID of the badge recipient. */        @SerialName("recipient")
         val recipient: DID,/** TODO: Cryptographic signature of the badge (of a place.stream.key). */        @SerialName("signature")
-        val signature: String?    ) {
+        val signature: String? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#placeStreamBadgeDefsBadgeView"
         }

@@ -14,23 +14,70 @@ object AppBskyRichtextFacetDefs {
     const val TYPE_IDENTIFIER = "app.bsky.richtext.facet"
 }
 
-@Serializable
+@Serializable(with = AppBskyRichtextFacetFeaturesUnionSerializer::class)
 sealed interface AppBskyRichtextFacetFeaturesUnion {
     @Serializable
-    @SerialName("app.bsky.richtext.facet#AppBskyRichtextFacetMention")
-    data class AppBskyRichtextFacetMention(val value: AppBskyRichtextFacetMention) : AppBskyRichtextFacetFeaturesUnion
+    data class Mention(val value: com.atproto.generated.AppBskyRichtextFacetMention) : AppBskyRichtextFacetFeaturesUnion
 
     @Serializable
-    @SerialName("app.bsky.richtext.facet#AppBskyRichtextFacetLink")
-    data class AppBskyRichtextFacetLink(val value: AppBskyRichtextFacetLink) : AppBskyRichtextFacetFeaturesUnion
+    data class Link(val value: com.atproto.generated.AppBskyRichtextFacetLink) : AppBskyRichtextFacetFeaturesUnion
 
     @Serializable
-    @SerialName("app.bsky.richtext.facet#AppBskyRichtextFacetTag")
-    data class AppBskyRichtextFacetTag(val value: AppBskyRichtextFacetTag) : AppBskyRichtextFacetFeaturesUnion
+    data class Tag(val value: com.atproto.generated.AppBskyRichtextFacetTag) : AppBskyRichtextFacetFeaturesUnion
 
     @Serializable
-    @SerialName("unknown")
     data class Unexpected(val value: JsonElement) : AppBskyRichtextFacetFeaturesUnion
+}
+
+object AppBskyRichtextFacetFeaturesUnionSerializer : kotlinx.serialization.KSerializer<AppBskyRichtextFacetFeaturesUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyRichtextFacetFeaturesUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyRichtextFacetFeaturesUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is AppBskyRichtextFacetFeaturesUnion.Mention -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyRichtextFacetMention.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.richtext.facet#mention")
+                })
+            }
+            is AppBskyRichtextFacetFeaturesUnion.Link -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyRichtextFacetLink.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.richtext.facet#link")
+                })
+            }
+            is AppBskyRichtextFacetFeaturesUnion.Tag -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyRichtextFacetTag.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.richtext.facet#tag")
+                })
+            }
+            is AppBskyRichtextFacetFeaturesUnion.Unexpected -> value.value
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyRichtextFacetFeaturesUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "app.bsky.richtext.facet#mention" -> AppBskyRichtextFacetFeaturesUnion.Mention(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyRichtextFacetMention.serializer(), element)
+            )
+            "app.bsky.richtext.facet#link" -> AppBskyRichtextFacetFeaturesUnion.Link(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyRichtextFacetLink.serializer(), element)
+            )
+            "app.bsky.richtext.facet#tag" -> AppBskyRichtextFacetFeaturesUnion.Tag(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyRichtextFacetTag.serializer(), element)
+            )
+            else -> AppBskyRichtextFacetFeaturesUnion.Unexpected(element)
+        }
+    }
 }
 
     /**

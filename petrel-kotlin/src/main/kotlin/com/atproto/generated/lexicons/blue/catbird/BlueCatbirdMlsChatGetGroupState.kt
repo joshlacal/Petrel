@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: blue.catbird.mlsChat.getGroupState
-// Get the current MLS group state for a conversation, including epoch and group info
+// Retrieve group state including GroupInfo, epoch, and welcome data (consolidates getGroupInfo + getEpoch + validateWelcome) Fetch MLS group state for a conversation. The 'include' parameter selects which state components to return, reducing multiple round-trips to a single call.
 package com.atproto.generated
 
 import kotlinx.serialization.*
@@ -17,25 +17,25 @@ object BlueCatbirdMlsChatGetGroupStateDefs {
 @Serializable
     data class BlueCatbirdMlsChatGetGroupStateParameters(
 // Conversation identifier        @SerialName("convoId")
-        val convoId: String,// Comma-separated list of fields to include in response        @SerialName("include")
+        val convoId: String,// Comma-separated list of state components to include: 'groupInfo' (TLS-serialized GroupInfo for external commit), 'welcome' (pending Welcome message), 'epoch' (current epoch number). Defaults to 'groupInfo,epoch'.        @SerialName("include")
         val include: String? = null    )
 
     @Serializable
     data class BlueCatbirdMlsChatGetGroupStateOutput(
-// Current MLS epoch number        @SerialName("epoch")
-        val epoch: Int? = null,// MLS group info bytes for external commit joins        @SerialName("groupInfo")
-        val groupInfo: ByteArray? = null,// MLS welcome message bytes if available        @SerialName("welcome")
-        val welcome: ByteArray? = null,// When the cached group info expires        @SerialName("expiresAt")
+// TLS-serialized GroupInfo (present when 'groupInfo' included)        @SerialName("groupInfo")
+        val groupInfo: Bytes? = null,// Current MLS epoch number (present when 'epoch' included)        @SerialName("epoch")
+        val epoch: Int? = null,// Pending MLS Welcome message (present when 'welcome' included and a Welcome exists)        @SerialName("welcome")
+        val welcome: Bytes? = null,// When the GroupInfo becomes stale (typically 5 minutes)        @SerialName("expiresAt")
         val expiresAt: ATProtocolDate? = null    )
 
 sealed class BlueCatbirdMlsChatGetGroupStateError(val name: String, val description: String?) {
         object NotFound: BlueCatbirdMlsChatGetGroupStateError("NotFound", "Conversation not found")
-        object Unauthorized: BlueCatbirdMlsChatGetGroupStateError("Unauthorized", "Authentication required")
-        object GroupInfoUnavailable: BlueCatbirdMlsChatGetGroupStateError("GroupInfoUnavailable", "Group info is not currently available for this conversation")
+        object Unauthorized: BlueCatbirdMlsChatGetGroupStateError("Unauthorized", "Not a current or past member")
+        object GroupInfoUnavailable: BlueCatbirdMlsChatGetGroupStateError("GroupInfoUnavailable", "GroupInfo not yet generated for this conversation")
     }
 
 /**
- * Get the current MLS group state for a conversation, including epoch and group info
+ * Retrieve group state including GroupInfo, epoch, and welcome data (consolidates getGroupInfo + getEpoch + validateWelcome) Fetch MLS group state for a conversation. The 'include' parameter selects which state components to return, reducing multiple round-trips to a single call.
  *
  * Endpoint: blue.catbird.mlsChat.getGroupState
  */

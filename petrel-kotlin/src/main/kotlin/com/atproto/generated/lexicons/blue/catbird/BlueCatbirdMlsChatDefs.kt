@@ -26,10 +26,10 @@ object BlueCatbirdMlsChatDefsDefs {
         val epoch: Int,/** MLS cipher suite used for this conversation */        @SerialName("cipherSuite")
         val cipherSuite: String,/** Conversation creation timestamp */        @SerialName("createdAt")
         val createdAt: ATProtocolDate,/** Timestamp of last message */        @SerialName("lastMessageAt")
-        val lastMessageAt: ATProtocolDate?,/** Optional conversation metadata */        @SerialName("metadata")
-        val metadata: BlueCatbirdMlsChatDefsConvoMetadata?,/** Base64 encoded confirmation tag from the latest commit */        @SerialName("confirmationTag")
-        val confirmationTag: String?,/** Monotonically increasing reset generation counter. Incremented each time the group is reset. */        @SerialName("resetGeneration")
-        val resetGeneration: Int?    ) {
+        val lastMessageAt: ATProtocolDate? = null,/** Optional conversation metadata */        @SerialName("metadata")
+        val metadata: BlueCatbirdMlsChatDefsConvoMetadata? = null,/** Confirmation tag of the server's canonical MLS tree state. */        @SerialName("confirmationTag")
+        val confirmationTag: Bytes? = null,/** Number of times this conversation's MLS group has been reset. Absent or 0 means never reset. */        @SerialName("resetGeneration")
+        val resetGeneration: Int? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#blueCatbirdMlsChatDefsConvoView"
         }
@@ -41,8 +41,8 @@ object BlueCatbirdMlsChatDefsDefs {
     @Serializable
     data class BlueCatbirdMlsChatDefsConvoMetadata(
 /** Conversation display name */        @SerialName("name")
-        val name: String?,/** Conversation description */        @SerialName("description")
-        val description: String?    ) {
+        val name: String? = null,/** Conversation description */        @SerialName("description")
+        val description: String? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#blueCatbirdMlsChatDefsConvoMetadata"
         }
@@ -56,15 +56,15 @@ object BlueCatbirdMlsChatDefsDefs {
 /** Device-specific MLS DID (format: did:plc:user#device-uuid). Used in MLS operations. */        @SerialName("did")
         val did: DID,/** User DID without device suffix (format: did:plc:user). Used for UI grouping and admin status sync. */        @SerialName("userDid")
         val userDid: DID,/** Device identifier (UUID). Unique per device. */        @SerialName("deviceId")
-        val deviceId: String?,/** Human-readable device name (e.g., 'Josh's iPhone'). Optional, may be null for legacy members. */        @SerialName("deviceName")
-        val deviceName: String?,/** When this device joined the conversation */        @SerialName("joinedAt")
+        val deviceId: String? = null,/** Human-readable device name (e.g., 'Josh's iPhone'). Optional, may be null for legacy members. */        @SerialName("deviceName")
+        val deviceName: String? = null,/** When this device joined the conversation */        @SerialName("joinedAt")
         val joinedAt: ATProtocolDate,/** Whether this member (device) has admin privileges. Admin status is synced across all devices of the same user. */        @SerialName("isAdmin")
         val isAdmin: Boolean,/** Whether this member has moderator privileges. Moderators can warn members and view reports but cannot promote/demote others. */        @SerialName("isModerator")
-        val isModerator: Boolean?,/** When member was promoted to admin (if applicable) */        @SerialName("promotedAt")
-        val promotedAt: ATProtocolDate?,/** DID of admin who promoted this member (if applicable) */        @SerialName("promotedBy")
-        val promotedBy: DID?,/** MLS leaf index in ratchet tree structure */        @SerialName("leafIndex")
-        val leafIndex: Int?,/** MLS credential bytes */        @SerialName("credential")
-        val credential: ByteArray?    ) {
+        val isModerator: Boolean? = null,/** When member was promoted to admin (if applicable) */        @SerialName("promotedAt")
+        val promotedAt: ATProtocolDate? = null,/** DID of admin who promoted this member (if applicable) */        @SerialName("promotedBy")
+        val promotedBy: DID? = null,/** MLS leaf index in ratchet tree structure */        @SerialName("leafIndex")
+        val leafIndex: Int? = null,/** MLS credential bytes */        @SerialName("credential")
+        val credential: Bytes? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#blueCatbirdMlsChatDefsMemberView"
         }
@@ -78,11 +78,11 @@ object BlueCatbirdMlsChatDefsDefs {
 /** Message identifier (ULID for deduplication) */        @SerialName("id")
         val id: String,/** Conversation identifier */        @SerialName("convoId")
         val convoId: String,/** MLS encrypted message ciphertext bytes */        @SerialName("ciphertext")
-        val ciphertext: ByteArray,/** MLS epoch when message was sent */        @SerialName("epoch")
+        val ciphertext: Bytes,/** MLS epoch when message was sent */        @SerialName("epoch")
         val epoch: Int,/** Monotonically increasing sequence number within conversation. Server assigns sequentially starting from 1. Gaps may occur when members are removed from the conversation, but seq values are never reused. */        @SerialName("seq")
         val seq: Int,/** Message creation timestamp (bucketed to 2-second intervals for traffic analysis protection) */        @SerialName("createdAt")
         val createdAt: ATProtocolDate,/** Message type discriminator: 'app' for application messages (user content), 'commit' for MLS protocol control messages (epoch changes, membership updates). Clients should process both types for MLS state tracking but only display 'app' messages in the UI. */        @SerialName("messageType")
-        val messageType: String?    ) {
+        val messageType: String? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#blueCatbirdMlsChatDefsMessageView"
         }
@@ -94,9 +94,9 @@ object BlueCatbirdMlsChatDefsDefs {
     @Serializable
     data class BlueCatbirdMlsChatDefsKeyPackageRef(
 /** Owner DID */        @SerialName("did")
-        val did: DID,/** Base64url-encoded MLS key package bytes */        @SerialName("keyPackage")
-        val keyPackage: String,/** Hex-encoded SHA-256 hash of the key package bytes. Clients should use this server-computed hash when creating conversations to ensure hash consistency. */        @SerialName("keyPackageHash")
-        val keyPackageHash: String?,/** Supported cipher suite for this key package */        @SerialName("cipherSuite")
+        val did: DID,/** MLS key package bytes */        @SerialName("keyPackage")
+        val keyPackage: Bytes,/** Hex-encoded SHA-256 hash of the key package bytes. Clients should use this server-computed hash when creating conversations to ensure hash consistency. */        @SerialName("keyPackageHash")
+        val keyPackageHash: String? = null,/** Supported cipher suite for this key package */        @SerialName("cipherSuite")
         val cipherSuite: String    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#blueCatbirdMlsChatDefsKeyPackageRef"

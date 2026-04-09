@@ -21,11 +21,11 @@ object AppBskyNotificationListNotificationsDefs {
         val cid: CID,        @SerialName("author")
         val author: AppBskyActorDefsProfileView,/** The reason why this notification was delivered - e.g. your post was liked, or you received a new follower. */        @SerialName("reason")
         val reason: String,        @SerialName("reasonSubject")
-        val reasonSubject: ATProtocolURI?,        @SerialName("record")
+        val reasonSubject: ATProtocolURI? = null,        @SerialName("record")
         val record: JsonElement,        @SerialName("isRead")
         val isRead: Boolean,        @SerialName("indexedAt")
         val indexedAt: ATProtocolDate,        @SerialName("labels")
-        val labels: List<ComAtprotoLabelDefsLabel>?    ) {
+        val labels: List<ComAtprotoLabelDefsLabel>? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyNotificationListNotificationsNotification"
         }

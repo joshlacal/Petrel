@@ -24,16 +24,16 @@ object PlaceStreamServerDefsDefs {
         val url: URI,/** The types of events this webhook should receive. */        @SerialName("events")
         val events: List<String>,/** Whether this webhook is currently active. */        @SerialName("active")
         val active: Boolean,/** Text to prepend to webhook messages. */        @SerialName("prefix")
-        val prefix: String?,/** Text to append to webhook messages. */        @SerialName("suffix")
-        val suffix: String?,/** Text replacement rules for webhook messages. */        @SerialName("rewrite")
-        val rewrite: List<PlaceStreamServerDefsRewriteRule>?,/** When this webhook was created. */        @SerialName("createdAt")
+        val prefix: String? = null,/** Text to append to webhook messages. */        @SerialName("suffix")
+        val suffix: String? = null,/** Text replacement rules for webhook messages. */        @SerialName("rewrite")
+        val rewrite: List<PlaceStreamServerDefsRewriteRule>? = null,/** When this webhook was created. */        @SerialName("createdAt")
         val createdAt: ATProtocolDate,/** When this webhook was last updated. */        @SerialName("updatedAt")
-        val updatedAt: ATProtocolDate?,/** A user-friendly name for this webhook. */        @SerialName("name")
-        val name: String?,/** A description of what this webhook is used for. */        @SerialName("description")
-        val description: String?,/** When this webhook was last triggered. */        @SerialName("lastTriggered")
-        val lastTriggered: ATProtocolDate?,/** Number of consecutive errors for this webhook. */        @SerialName("errorCount")
-        val errorCount: Int?,/** Words to filter out from chat messages. Messages containing any of these words will not be forwarded. */        @SerialName("muteWords")
-        val muteWords: List<String>?    ) {
+        val updatedAt: ATProtocolDate? = null,/** A user-friendly name for this webhook. */        @SerialName("name")
+        val name: String? = null,/** A description of what this webhook is used for. */        @SerialName("description")
+        val description: String? = null,/** When this webhook was last triggered. */        @SerialName("lastTriggered")
+        val lastTriggered: ATProtocolDate? = null,/** Number of consecutive errors for this webhook. */        @SerialName("errorCount")
+        val errorCount: Int? = null,/** Words to filter out from chat messages. Messages containing any of these words will not be forwarded. */        @SerialName("muteWords")
+        val muteWords: List<String>? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#placeStreamServerDefsWebhook"
         }

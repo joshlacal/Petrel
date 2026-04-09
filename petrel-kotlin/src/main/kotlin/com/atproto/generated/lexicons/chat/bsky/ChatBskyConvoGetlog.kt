@@ -14,51 +14,154 @@ object ChatBskyConvoGetLogDefs {
     const val TYPE_IDENTIFIER = "chat.bsky.convo.getLog"
 }
 
-@Serializable
+@Serializable(with = ChatBskyConvoGetLogOutputLogsUnionSerializer::class)
 sealed interface ChatBskyConvoGetLogOutputLogsUnion {
     @Serializable
-    @SerialName("chat.bsky.convo.getLog#ChatBskyConvoDefsLogBeginConvo")
-    data class ChatBskyConvoDefsLogBeginConvo(val value: ChatBskyConvoDefsLogBeginConvo) : ChatBskyConvoGetLogOutputLogsUnion
+    data class LogBeginConvo(val value: com.atproto.generated.ChatBskyConvoDefsLogBeginConvo) : ChatBskyConvoGetLogOutputLogsUnion
 
     @Serializable
-    @SerialName("chat.bsky.convo.getLog#ChatBskyConvoDefsLogAcceptConvo")
-    data class ChatBskyConvoDefsLogAcceptConvo(val value: ChatBskyConvoDefsLogAcceptConvo) : ChatBskyConvoGetLogOutputLogsUnion
+    data class LogAcceptConvo(val value: com.atproto.generated.ChatBskyConvoDefsLogAcceptConvo) : ChatBskyConvoGetLogOutputLogsUnion
 
     @Serializable
-    @SerialName("chat.bsky.convo.getLog#ChatBskyConvoDefsLogLeaveConvo")
-    data class ChatBskyConvoDefsLogLeaveConvo(val value: ChatBskyConvoDefsLogLeaveConvo) : ChatBskyConvoGetLogOutputLogsUnion
+    data class LogLeaveConvo(val value: com.atproto.generated.ChatBskyConvoDefsLogLeaveConvo) : ChatBskyConvoGetLogOutputLogsUnion
 
     @Serializable
-    @SerialName("chat.bsky.convo.getLog#ChatBskyConvoDefsLogMuteConvo")
-    data class ChatBskyConvoDefsLogMuteConvo(val value: ChatBskyConvoDefsLogMuteConvo) : ChatBskyConvoGetLogOutputLogsUnion
+    data class LogMuteConvo(val value: com.atproto.generated.ChatBskyConvoDefsLogMuteConvo) : ChatBskyConvoGetLogOutputLogsUnion
 
     @Serializable
-    @SerialName("chat.bsky.convo.getLog#ChatBskyConvoDefsLogUnmuteConvo")
-    data class ChatBskyConvoDefsLogUnmuteConvo(val value: ChatBskyConvoDefsLogUnmuteConvo) : ChatBskyConvoGetLogOutputLogsUnion
+    data class LogUnmuteConvo(val value: com.atproto.generated.ChatBskyConvoDefsLogUnmuteConvo) : ChatBskyConvoGetLogOutputLogsUnion
 
     @Serializable
-    @SerialName("chat.bsky.convo.getLog#ChatBskyConvoDefsLogCreateMessage")
-    data class ChatBskyConvoDefsLogCreateMessage(val value: ChatBskyConvoDefsLogCreateMessage) : ChatBskyConvoGetLogOutputLogsUnion
+    data class LogCreateMessage(val value: com.atproto.generated.ChatBskyConvoDefsLogCreateMessage) : ChatBskyConvoGetLogOutputLogsUnion
 
     @Serializable
-    @SerialName("chat.bsky.convo.getLog#ChatBskyConvoDefsLogDeleteMessage")
-    data class ChatBskyConvoDefsLogDeleteMessage(val value: ChatBskyConvoDefsLogDeleteMessage) : ChatBskyConvoGetLogOutputLogsUnion
+    data class LogDeleteMessage(val value: com.atproto.generated.ChatBskyConvoDefsLogDeleteMessage) : ChatBskyConvoGetLogOutputLogsUnion
 
     @Serializable
-    @SerialName("chat.bsky.convo.getLog#ChatBskyConvoDefsLogReadMessage")
-    data class ChatBskyConvoDefsLogReadMessage(val value: ChatBskyConvoDefsLogReadMessage) : ChatBskyConvoGetLogOutputLogsUnion
+    data class LogReadMessage(val value: com.atproto.generated.ChatBskyConvoDefsLogReadMessage) : ChatBskyConvoGetLogOutputLogsUnion
 
     @Serializable
-    @SerialName("chat.bsky.convo.getLog#ChatBskyConvoDefsLogAddReaction")
-    data class ChatBskyConvoDefsLogAddReaction(val value: ChatBskyConvoDefsLogAddReaction) : ChatBskyConvoGetLogOutputLogsUnion
+    data class LogAddReaction(val value: com.atproto.generated.ChatBskyConvoDefsLogAddReaction) : ChatBskyConvoGetLogOutputLogsUnion
 
     @Serializable
-    @SerialName("chat.bsky.convo.getLog#ChatBskyConvoDefsLogRemoveReaction")
-    data class ChatBskyConvoDefsLogRemoveReaction(val value: ChatBskyConvoDefsLogRemoveReaction) : ChatBskyConvoGetLogOutputLogsUnion
+    data class LogRemoveReaction(val value: com.atproto.generated.ChatBskyConvoDefsLogRemoveReaction) : ChatBskyConvoGetLogOutputLogsUnion
 
     @Serializable
-    @SerialName("unknown")
     data class Unexpected(val value: JsonElement) : ChatBskyConvoGetLogOutputLogsUnion
+}
+
+object ChatBskyConvoGetLogOutputLogsUnionSerializer : kotlinx.serialization.KSerializer<ChatBskyConvoGetLogOutputLogsUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("ChatBskyConvoGetLogOutputLogsUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ChatBskyConvoGetLogOutputLogsUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is ChatBskyConvoGetLogOutputLogsUnion.LogBeginConvo -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsLogBeginConvo.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logBeginConvo")
+                })
+            }
+            is ChatBskyConvoGetLogOutputLogsUnion.LogAcceptConvo -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsLogAcceptConvo.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logAcceptConvo")
+                })
+            }
+            is ChatBskyConvoGetLogOutputLogsUnion.LogLeaveConvo -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsLogLeaveConvo.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logLeaveConvo")
+                })
+            }
+            is ChatBskyConvoGetLogOutputLogsUnion.LogMuteConvo -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsLogMuteConvo.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logMuteConvo")
+                })
+            }
+            is ChatBskyConvoGetLogOutputLogsUnion.LogUnmuteConvo -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsLogUnmuteConvo.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logUnmuteConvo")
+                })
+            }
+            is ChatBskyConvoGetLogOutputLogsUnion.LogCreateMessage -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsLogCreateMessage.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logCreateMessage")
+                })
+            }
+            is ChatBskyConvoGetLogOutputLogsUnion.LogDeleteMessage -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsLogDeleteMessage.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logDeleteMessage")
+                })
+            }
+            is ChatBskyConvoGetLogOutputLogsUnion.LogReadMessage -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsLogReadMessage.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logReadMessage")
+                })
+            }
+            is ChatBskyConvoGetLogOutputLogsUnion.LogAddReaction -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsLogAddReaction.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logAddReaction")
+                })
+            }
+            is ChatBskyConvoGetLogOutputLogsUnion.LogRemoveReaction -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsLogRemoveReaction.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logRemoveReaction")
+                })
+            }
+            is ChatBskyConvoGetLogOutputLogsUnion.Unexpected -> value.value
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ChatBskyConvoGetLogOutputLogsUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "chat.bsky.convo.defs#logBeginConvo" -> ChatBskyConvoGetLogOutputLogsUnion.LogBeginConvo(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsLogBeginConvo.serializer(), element)
+            )
+            "chat.bsky.convo.defs#logAcceptConvo" -> ChatBskyConvoGetLogOutputLogsUnion.LogAcceptConvo(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsLogAcceptConvo.serializer(), element)
+            )
+            "chat.bsky.convo.defs#logLeaveConvo" -> ChatBskyConvoGetLogOutputLogsUnion.LogLeaveConvo(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsLogLeaveConvo.serializer(), element)
+            )
+            "chat.bsky.convo.defs#logMuteConvo" -> ChatBskyConvoGetLogOutputLogsUnion.LogMuteConvo(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsLogMuteConvo.serializer(), element)
+            )
+            "chat.bsky.convo.defs#logUnmuteConvo" -> ChatBskyConvoGetLogOutputLogsUnion.LogUnmuteConvo(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsLogUnmuteConvo.serializer(), element)
+            )
+            "chat.bsky.convo.defs#logCreateMessage" -> ChatBskyConvoGetLogOutputLogsUnion.LogCreateMessage(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsLogCreateMessage.serializer(), element)
+            )
+            "chat.bsky.convo.defs#logDeleteMessage" -> ChatBskyConvoGetLogOutputLogsUnion.LogDeleteMessage(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsLogDeleteMessage.serializer(), element)
+            )
+            "chat.bsky.convo.defs#logReadMessage" -> ChatBskyConvoGetLogOutputLogsUnion.LogReadMessage(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsLogReadMessage.serializer(), element)
+            )
+            "chat.bsky.convo.defs#logAddReaction" -> ChatBskyConvoGetLogOutputLogsUnion.LogAddReaction(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsLogAddReaction.serializer(), element)
+            )
+            "chat.bsky.convo.defs#logRemoveReaction" -> ChatBskyConvoGetLogOutputLogsUnion.LogRemoveReaction(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsLogRemoveReaction.serializer(), element)
+            )
+            else -> ChatBskyConvoGetLogOutputLogsUnion.Unexpected(element)
+        }
+    }
 }
 
 @Serializable

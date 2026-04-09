@@ -29,10 +29,10 @@ object AppBskyEmbedVideoDefs {
         @SerialName("cid")
         val cid: CID,        @SerialName("playlist")
         val playlist: URI,        @SerialName("thumbnail")
-        val thumbnail: URI?,        @SerialName("alt")
-        val alt: String?,        @SerialName("aspectRatio")
-        val aspectRatio: AppBskyEmbedDefsAspectRatio?,/** A hint to the client about how to present the video. */        @SerialName("presentation")
-        val presentation: String?    ) {
+        val thumbnail: URI? = null,        @SerialName("alt")
+        val alt: String? = null,        @SerialName("aspectRatio")
+        val aspectRatio: AppBskyEmbedDefsAspectRatio? = null,/** A hint to the client about how to present the video. */        @SerialName("presentation")
+        val presentation: String? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyEmbedVideoView"
         }
@@ -42,7 +42,7 @@ object AppBskyEmbedVideoDefs {
 data class AppBskyEmbedVideo(
 // The mp4 video file. May be up to 100mb, formerly limited to 50mb.    @SerialName("video")
     val video: Blob,    @SerialName("captions")
-    val captions: List<AppBskyEmbedVideoCaption>?,// Alt text description of the video, for accessibility.    @SerialName("alt")
-    val alt: String?,    @SerialName("aspectRatio")
-    val aspectRatio: AppBskyEmbedDefsAspectRatio?,// A hint to the client about how to present the video.    @SerialName("presentation")
-    val presentation: String?)
+    val captions: List<AppBskyEmbedVideoCaption>? = null,// Alt text description of the video, for accessibility.    @SerialName("alt")
+    val alt: String? = null,    @SerialName("aspectRatio")
+    val aspectRatio: AppBskyEmbedDefsAspectRatio? = null,// A hint to the client about how to present the video.    @SerialName("presentation")
+    val presentation: String? = null)

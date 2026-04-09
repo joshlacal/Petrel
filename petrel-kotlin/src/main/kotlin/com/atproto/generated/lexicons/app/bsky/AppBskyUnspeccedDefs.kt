@@ -45,8 +45,8 @@ object AppBskyUnspeccedDefsDefs {
     data class AppBskyUnspeccedDefsTrendingTopic(
         @SerialName("topic")
         val topic: String,        @SerialName("displayName")
-        val displayName: String?,        @SerialName("description")
-        val description: String?,        @SerialName("link")
+        val displayName: String? = null,        @SerialName("description")
+        val description: String? = null,        @SerialName("link")
         val link: String    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyUnspeccedDefsTrendingTopic"
@@ -61,8 +61,8 @@ object AppBskyUnspeccedDefsDefs {
         val link: String,        @SerialName("startedAt")
         val startedAt: ATProtocolDate,        @SerialName("postCount")
         val postCount: Int,        @SerialName("status")
-        val status: String?,        @SerialName("category")
-        val category: String?,        @SerialName("dids")
+        val status: String? = null,        @SerialName("category")
+        val category: String? = null,        @SerialName("dids")
         val dids: List<DID>    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyUnspeccedDefsSkeletonTrend"
@@ -77,8 +77,8 @@ object AppBskyUnspeccedDefsDefs {
         val link: String,        @SerialName("startedAt")
         val startedAt: ATProtocolDate,        @SerialName("postCount")
         val postCount: Int,        @SerialName("status")
-        val status: String?,        @SerialName("category")
-        val category: String?,        @SerialName("actors")
+        val status: String? = null,        @SerialName("category")
+        val category: String? = null,        @SerialName("actors")
         val actors: List<AppBskyActorDefsProfileViewBasic>    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyUnspeccedDefsTrendView"
@@ -128,7 +128,7 @@ object AppBskyUnspeccedDefsDefs {
     @Serializable
     data class AppBskyUnspeccedDefsAgeAssuranceState(
 /** The timestamp when this state was last updated. */        @SerialName("lastInitiatedAt")
-        val lastInitiatedAt: ATProtocolDate?,/** The status of the age assurance process. */        @SerialName("status")
+        val lastInitiatedAt: ATProtocolDate? = null,/** The status of the age assurance process. */        @SerialName("status")
         val status: String    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyUnspeccedDefsAgeAssuranceState"
@@ -144,11 +144,11 @@ object AppBskyUnspeccedDefsDefs {
         val createdAt: ATProtocolDate,/** The status of the age assurance process. */        @SerialName("status")
         val status: String,/** The unique identifier for this instance of the age assurance flow, in UUID format. */        @SerialName("attemptId")
         val attemptId: String,/** The email used for AA. */        @SerialName("email")
-        val email: String?,/** The IP address used when initiating the AA flow. */        @SerialName("initIp")
-        val initIp: String?,/** The user agent used when initiating the AA flow. */        @SerialName("initUa")
-        val initUa: String?,/** The IP address used when completing the AA flow. */        @SerialName("completeIp")
-        val completeIp: String?,/** The user agent used when completing the AA flow. */        @SerialName("completeUa")
-        val completeUa: String?    ) {
+        val email: String? = null,/** The IP address used when initiating the AA flow. */        @SerialName("initIp")
+        val initIp: String? = null,/** The user agent used when initiating the AA flow. */        @SerialName("initUa")
+        val initUa: String? = null,/** The IP address used when completing the AA flow. */        @SerialName("completeIp")
+        val completeIp: String? = null,/** The user agent used when completing the AA flow. */        @SerialName("completeUa")
+        val completeUa: String? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyUnspeccedDefsAgeAssuranceEvent"
         }
