@@ -14,8 +14,9 @@ dependencies {
     // Kotlin Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
 
-    // Kotlin Serialization for JSON
+    // Kotlin Serialization for JSON and CBOR (DAG-CBOR WebSocket frames)
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.7.3")
 
     // Ktor client for HTTP networking
     implementation("io.ktor:ktor-client-core:3.0.2")
@@ -23,6 +24,7 @@ dependencies {
     implementation("io.ktor:ktor-client-content-negotiation:3.0.2")
     implementation("io.ktor:ktor-serialization-kotlinx-json:3.0.2")
     implementation("io.ktor:ktor-client-logging:3.0.2")
+    implementation("io.ktor:ktor-client-websockets:3.0.2")
 
     // Testing
     testImplementation(kotlin("test"))
