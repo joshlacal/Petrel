@@ -13,7 +13,8 @@ import kotlinx.serialization.json.Json
 
 data class ATProtoResponse<T>(
     val responseCode: Int,
-    val data: T?
+    val data: T?,
+    val errorBody: String? = null
 )
 
 class NetworkService(
@@ -52,10 +53,18 @@ class NetworkService(
         endpoint: String,
         queryParams: Map<String, String>? = null,
         headers: Map<String, String> = emptyMap(),
-        body: Any? = null
+        body: Any? = null,
+        queryItems: Any? = null
     ): ATProtoResponse<T> {
+        @Suppress("UNCHECKED_CAST")
+        val resolvedQueryItems = when (queryItems) {
+            is Map<*, *> -> queryItems as? Map<String, String>
+            is List<*> -> (queryItems as? List<Pair<String, String>>)?.toMap()
+            else -> null
+        }
+        val resolvedParams = queryParams ?: resolvedQueryItems
         try {
-            val response: HttpResponse = client.request(buildUrl(endpoint, queryParams)) {
+            val response: HttpResponse = client.request(buildUrl(endpoint, resolvedParams)) {
                 this.method = HttpMethod.parse(method)
 
                 // Inject stored auth header if no explicit Authorization provided
@@ -90,10 +99,13 @@ class NetworkService(
                     val data = response.body<T>()
                     ATProtoResponse(statusCode, data)
                 } catch (e: Exception) {
+                    System.err.println("[NetworkService] Deserialization failed for $endpoint: ${e.message}")
+                    e.printStackTrace()
                     ATProtoResponse(statusCode, null)
                 }
             } else {
-                ATProtoResponse(statusCode, null)
+                val errorText = try { response.bodyAsText() } catch (_: Exception) { null }
+                ATProtoResponse(statusCode, null, errorBody = errorText)
             }
         } catch (e: Exception) {
             // Network error
