@@ -14,137 +14,466 @@ object AppBskyFeedDefsDefs {
     const val TYPE_IDENTIFIER = "app.bsky.feed.defs"
 }
 
-@Serializable
+@Serializable(with = AppBskyFeedDefsPostViewEmbedUnionSerializer::class)
 sealed interface AppBskyFeedDefsPostViewEmbedUnion {
     @Serializable
-    @SerialName("app.bsky.feed.defs#AppBskyEmbedImagesView")
-    data class AppBskyEmbedImagesView(val value: AppBskyEmbedImagesView) : AppBskyFeedDefsPostViewEmbedUnion
+    data class View(val value: com.atproto.generated.AppBskyEmbedImagesView) : AppBskyFeedDefsPostViewEmbedUnion
 
     @Serializable
-    @SerialName("app.bsky.feed.defs#AppBskyEmbedVideoView")
-    data class AppBskyEmbedVideoView(val value: AppBskyEmbedVideoView) : AppBskyFeedDefsPostViewEmbedUnion
+    data class AppBskyEmbedVideoView(val value: com.atproto.generated.AppBskyEmbedVideoView) : AppBskyFeedDefsPostViewEmbedUnion
 
     @Serializable
-    @SerialName("app.bsky.feed.defs#AppBskyEmbedExternalView")
-    data class AppBskyEmbedExternalView(val value: AppBskyEmbedExternalView) : AppBskyFeedDefsPostViewEmbedUnion
+    data class AppBskyEmbedExternalView(val value: com.atproto.generated.AppBskyEmbedExternalView) : AppBskyFeedDefsPostViewEmbedUnion
 
     @Serializable
-    @SerialName("app.bsky.feed.defs#AppBskyEmbedRecordView")
-    data class AppBskyEmbedRecordView(val value: AppBskyEmbedRecordView) : AppBskyFeedDefsPostViewEmbedUnion
+    data class AppBskyEmbedRecordView(val value: com.atproto.generated.AppBskyEmbedRecordView) : AppBskyFeedDefsPostViewEmbedUnion
 
     @Serializable
-    @SerialName("app.bsky.feed.defs#AppBskyEmbedRecordWithMediaView")
-    data class AppBskyEmbedRecordWithMediaView(val value: AppBskyEmbedRecordWithMediaView) : AppBskyFeedDefsPostViewEmbedUnion
+    data class AppBskyEmbedRecordWithMediaView(val value: com.atproto.generated.AppBskyEmbedRecordWithMediaView) : AppBskyFeedDefsPostViewEmbedUnion
 
     @Serializable
-    @SerialName("unknown")
     data class Unexpected(val value: JsonElement) : AppBskyFeedDefsPostViewEmbedUnion
 }
 
-@Serializable
+object AppBskyFeedDefsPostViewEmbedUnionSerializer : kotlinx.serialization.KSerializer<AppBskyFeedDefsPostViewEmbedUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyFeedDefsPostViewEmbedUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyFeedDefsPostViewEmbedUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is AppBskyFeedDefsPostViewEmbedUnion.View -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyEmbedImagesView.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.images#view")
+                })
+            }
+            is AppBskyFeedDefsPostViewEmbedUnion.AppBskyEmbedVideoView -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyEmbedVideoView.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.video#view")
+                })
+            }
+            is AppBskyFeedDefsPostViewEmbedUnion.AppBskyEmbedExternalView -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyEmbedExternalView.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.external#view")
+                })
+            }
+            is AppBskyFeedDefsPostViewEmbedUnion.AppBskyEmbedRecordView -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyEmbedRecordView.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.record#view")
+                })
+            }
+            is AppBskyFeedDefsPostViewEmbedUnion.AppBskyEmbedRecordWithMediaView -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyEmbedRecordWithMediaView.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.recordWithMedia#view")
+                })
+            }
+            is AppBskyFeedDefsPostViewEmbedUnion.Unexpected -> value.value
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyFeedDefsPostViewEmbedUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "app.bsky.embed.images#view" -> AppBskyFeedDefsPostViewEmbedUnion.View(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyEmbedImagesView.serializer(), element)
+            )
+            "app.bsky.embed.video#view" -> AppBskyFeedDefsPostViewEmbedUnion.AppBskyEmbedVideoView(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyEmbedVideoView.serializer(), element)
+            )
+            "app.bsky.embed.external#view" -> AppBskyFeedDefsPostViewEmbedUnion.AppBskyEmbedExternalView(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyEmbedExternalView.serializer(), element)
+            )
+            "app.bsky.embed.record#view" -> AppBskyFeedDefsPostViewEmbedUnion.AppBskyEmbedRecordView(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyEmbedRecordView.serializer(), element)
+            )
+            "app.bsky.embed.recordWithMedia#view" -> AppBskyFeedDefsPostViewEmbedUnion.AppBskyEmbedRecordWithMediaView(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyEmbedRecordWithMediaView.serializer(), element)
+            )
+            else -> AppBskyFeedDefsPostViewEmbedUnion.Unexpected(element)
+        }
+    }
+}
+
+@Serializable(with = AppBskyFeedDefsFeedViewPostReasonUnionSerializer::class)
 sealed interface AppBskyFeedDefsFeedViewPostReasonUnion {
     @Serializable
-    @SerialName("app.bsky.feed.defs#AppBskyFeedDefsReasonRepost")
-    data class AppBskyFeedDefsReasonRepost(val value: AppBskyFeedDefsReasonRepost) : AppBskyFeedDefsFeedViewPostReasonUnion
+    data class ReasonRepost(val value: com.atproto.generated.AppBskyFeedDefsReasonRepost) : AppBskyFeedDefsFeedViewPostReasonUnion
 
     @Serializable
-    @SerialName("app.bsky.feed.defs#AppBskyFeedDefsReasonPin")
-    data class AppBskyFeedDefsReasonPin(val value: AppBskyFeedDefsReasonPin) : AppBskyFeedDefsFeedViewPostReasonUnion
+    data class ReasonPin(val value: com.atproto.generated.AppBskyFeedDefsReasonPin) : AppBskyFeedDefsFeedViewPostReasonUnion
 
     @Serializable
-    @SerialName("unknown")
     data class Unexpected(val value: JsonElement) : AppBskyFeedDefsFeedViewPostReasonUnion
 }
 
-@Serializable
+object AppBskyFeedDefsFeedViewPostReasonUnionSerializer : kotlinx.serialization.KSerializer<AppBskyFeedDefsFeedViewPostReasonUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyFeedDefsFeedViewPostReasonUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyFeedDefsFeedViewPostReasonUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is AppBskyFeedDefsFeedViewPostReasonUnion.ReasonRepost -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyFeedDefsReasonRepost.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#reasonRepost")
+                })
+            }
+            is AppBskyFeedDefsFeedViewPostReasonUnion.ReasonPin -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyFeedDefsReasonPin.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#reasonPin")
+                })
+            }
+            is AppBskyFeedDefsFeedViewPostReasonUnion.Unexpected -> value.value
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyFeedDefsFeedViewPostReasonUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "app.bsky.feed.defs#reasonRepost" -> AppBskyFeedDefsFeedViewPostReasonUnion.ReasonRepost(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyFeedDefsReasonRepost.serializer(), element)
+            )
+            "app.bsky.feed.defs#reasonPin" -> AppBskyFeedDefsFeedViewPostReasonUnion.ReasonPin(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyFeedDefsReasonPin.serializer(), element)
+            )
+            else -> AppBskyFeedDefsFeedViewPostReasonUnion.Unexpected(element)
+        }
+    }
+}
+
+@Serializable(with = AppBskyFeedDefsReplyRefRootUnionSerializer::class)
 sealed interface AppBskyFeedDefsReplyRefRootUnion {
     @Serializable
-    @SerialName("app.bsky.feed.defs#AppBskyFeedDefsPostView")
-    data class AppBskyFeedDefsPostView(val value: AppBskyFeedDefsPostView) : AppBskyFeedDefsReplyRefRootUnion
+    data class PostView(val value: com.atproto.generated.AppBskyFeedDefsPostView) : AppBskyFeedDefsReplyRefRootUnion
 
     @Serializable
-    @SerialName("app.bsky.feed.defs#AppBskyFeedDefsNotFoundPost")
-    data class AppBskyFeedDefsNotFoundPost(val value: AppBskyFeedDefsNotFoundPost) : AppBskyFeedDefsReplyRefRootUnion
+    data class NotFoundPost(val value: com.atproto.generated.AppBskyFeedDefsNotFoundPost) : AppBskyFeedDefsReplyRefRootUnion
 
     @Serializable
-    @SerialName("app.bsky.feed.defs#AppBskyFeedDefsBlockedPost")
-    data class AppBskyFeedDefsBlockedPost(val value: AppBskyFeedDefsBlockedPost) : AppBskyFeedDefsReplyRefRootUnion
+    data class BlockedPost(val value: com.atproto.generated.AppBskyFeedDefsBlockedPost) : AppBskyFeedDefsReplyRefRootUnion
 
     @Serializable
-    @SerialName("unknown")
     data class Unexpected(val value: JsonElement) : AppBskyFeedDefsReplyRefRootUnion
 }
 
-@Serializable
+object AppBskyFeedDefsReplyRefRootUnionSerializer : kotlinx.serialization.KSerializer<AppBskyFeedDefsReplyRefRootUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyFeedDefsReplyRefRootUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyFeedDefsReplyRefRootUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is AppBskyFeedDefsReplyRefRootUnion.PostView -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyFeedDefsPostView.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#postView")
+                })
+            }
+            is AppBskyFeedDefsReplyRefRootUnion.NotFoundPost -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyFeedDefsNotFoundPost.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#notFoundPost")
+                })
+            }
+            is AppBskyFeedDefsReplyRefRootUnion.BlockedPost -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyFeedDefsBlockedPost.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#blockedPost")
+                })
+            }
+            is AppBskyFeedDefsReplyRefRootUnion.Unexpected -> value.value
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyFeedDefsReplyRefRootUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "app.bsky.feed.defs#postView" -> AppBskyFeedDefsReplyRefRootUnion.PostView(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyFeedDefsPostView.serializer(), element)
+            )
+            "app.bsky.feed.defs#notFoundPost" -> AppBskyFeedDefsReplyRefRootUnion.NotFoundPost(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyFeedDefsNotFoundPost.serializer(), element)
+            )
+            "app.bsky.feed.defs#blockedPost" -> AppBskyFeedDefsReplyRefRootUnion.BlockedPost(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyFeedDefsBlockedPost.serializer(), element)
+            )
+            else -> AppBskyFeedDefsReplyRefRootUnion.Unexpected(element)
+        }
+    }
+}
+
+@Serializable(with = AppBskyFeedDefsReplyRefParentUnionSerializer::class)
 sealed interface AppBskyFeedDefsReplyRefParentUnion {
     @Serializable
-    @SerialName("app.bsky.feed.defs#AppBskyFeedDefsPostView")
-    data class AppBskyFeedDefsPostView(val value: AppBskyFeedDefsPostView) : AppBskyFeedDefsReplyRefParentUnion
+    data class PostView(val value: com.atproto.generated.AppBskyFeedDefsPostView) : AppBskyFeedDefsReplyRefParentUnion
 
     @Serializable
-    @SerialName("app.bsky.feed.defs#AppBskyFeedDefsNotFoundPost")
-    data class AppBskyFeedDefsNotFoundPost(val value: AppBskyFeedDefsNotFoundPost) : AppBskyFeedDefsReplyRefParentUnion
+    data class NotFoundPost(val value: com.atproto.generated.AppBskyFeedDefsNotFoundPost) : AppBskyFeedDefsReplyRefParentUnion
 
     @Serializable
-    @SerialName("app.bsky.feed.defs#AppBskyFeedDefsBlockedPost")
-    data class AppBskyFeedDefsBlockedPost(val value: AppBskyFeedDefsBlockedPost) : AppBskyFeedDefsReplyRefParentUnion
+    data class BlockedPost(val value: com.atproto.generated.AppBskyFeedDefsBlockedPost) : AppBskyFeedDefsReplyRefParentUnion
 
     @Serializable
-    @SerialName("unknown")
     data class Unexpected(val value: JsonElement) : AppBskyFeedDefsReplyRefParentUnion
 }
 
-@Serializable
+object AppBskyFeedDefsReplyRefParentUnionSerializer : kotlinx.serialization.KSerializer<AppBskyFeedDefsReplyRefParentUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyFeedDefsReplyRefParentUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyFeedDefsReplyRefParentUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is AppBskyFeedDefsReplyRefParentUnion.PostView -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyFeedDefsPostView.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#postView")
+                })
+            }
+            is AppBskyFeedDefsReplyRefParentUnion.NotFoundPost -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyFeedDefsNotFoundPost.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#notFoundPost")
+                })
+            }
+            is AppBskyFeedDefsReplyRefParentUnion.BlockedPost -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyFeedDefsBlockedPost.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#blockedPost")
+                })
+            }
+            is AppBskyFeedDefsReplyRefParentUnion.Unexpected -> value.value
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyFeedDefsReplyRefParentUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "app.bsky.feed.defs#postView" -> AppBskyFeedDefsReplyRefParentUnion.PostView(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyFeedDefsPostView.serializer(), element)
+            )
+            "app.bsky.feed.defs#notFoundPost" -> AppBskyFeedDefsReplyRefParentUnion.NotFoundPost(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyFeedDefsNotFoundPost.serializer(), element)
+            )
+            "app.bsky.feed.defs#blockedPost" -> AppBskyFeedDefsReplyRefParentUnion.BlockedPost(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyFeedDefsBlockedPost.serializer(), element)
+            )
+            else -> AppBskyFeedDefsReplyRefParentUnion.Unexpected(element)
+        }
+    }
+}
+
+@Serializable(with = AppBskyFeedDefsThreadViewPostParentUnionSerializer::class)
 sealed interface AppBskyFeedDefsThreadViewPostParentUnion {
     @Serializable
-    @SerialName("app.bsky.feed.defs#AppBskyFeedDefsThreadViewPost")
-    data class AppBskyFeedDefsThreadViewPost(val value: AppBskyFeedDefsThreadViewPost) : AppBskyFeedDefsThreadViewPostParentUnion
+    data class ThreadViewPost(val value: com.atproto.generated.AppBskyFeedDefsThreadViewPost) : AppBskyFeedDefsThreadViewPostParentUnion
 
     @Serializable
-    @SerialName("app.bsky.feed.defs#AppBskyFeedDefsNotFoundPost")
-    data class AppBskyFeedDefsNotFoundPost(val value: AppBskyFeedDefsNotFoundPost) : AppBskyFeedDefsThreadViewPostParentUnion
+    data class NotFoundPost(val value: com.atproto.generated.AppBskyFeedDefsNotFoundPost) : AppBskyFeedDefsThreadViewPostParentUnion
 
     @Serializable
-    @SerialName("app.bsky.feed.defs#AppBskyFeedDefsBlockedPost")
-    data class AppBskyFeedDefsBlockedPost(val value: AppBskyFeedDefsBlockedPost) : AppBskyFeedDefsThreadViewPostParentUnion
+    data class BlockedPost(val value: com.atproto.generated.AppBskyFeedDefsBlockedPost) : AppBskyFeedDefsThreadViewPostParentUnion
 
     @Serializable
-    @SerialName("unknown")
     data class Unexpected(val value: JsonElement) : AppBskyFeedDefsThreadViewPostParentUnion
 }
 
-@Serializable
+object AppBskyFeedDefsThreadViewPostParentUnionSerializer : kotlinx.serialization.KSerializer<AppBskyFeedDefsThreadViewPostParentUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyFeedDefsThreadViewPostParentUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyFeedDefsThreadViewPostParentUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is AppBskyFeedDefsThreadViewPostParentUnion.ThreadViewPost -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyFeedDefsThreadViewPost.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#threadViewPost")
+                })
+            }
+            is AppBskyFeedDefsThreadViewPostParentUnion.NotFoundPost -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyFeedDefsNotFoundPost.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#notFoundPost")
+                })
+            }
+            is AppBskyFeedDefsThreadViewPostParentUnion.BlockedPost -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyFeedDefsBlockedPost.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#blockedPost")
+                })
+            }
+            is AppBskyFeedDefsThreadViewPostParentUnion.Unexpected -> value.value
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyFeedDefsThreadViewPostParentUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "app.bsky.feed.defs#threadViewPost" -> AppBskyFeedDefsThreadViewPostParentUnion.ThreadViewPost(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyFeedDefsThreadViewPost.serializer(), element)
+            )
+            "app.bsky.feed.defs#notFoundPost" -> AppBskyFeedDefsThreadViewPostParentUnion.NotFoundPost(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyFeedDefsNotFoundPost.serializer(), element)
+            )
+            "app.bsky.feed.defs#blockedPost" -> AppBskyFeedDefsThreadViewPostParentUnion.BlockedPost(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyFeedDefsBlockedPost.serializer(), element)
+            )
+            else -> AppBskyFeedDefsThreadViewPostParentUnion.Unexpected(element)
+        }
+    }
+}
+
+@Serializable(with = AppBskyFeedDefsThreadViewPostRepliesUnionSerializer::class)
 sealed interface AppBskyFeedDefsThreadViewPostRepliesUnion {
     @Serializable
-    @SerialName("app.bsky.feed.defs#AppBskyFeedDefsThreadViewPost")
-    data class AppBskyFeedDefsThreadViewPost(val value: AppBskyFeedDefsThreadViewPost) : AppBskyFeedDefsThreadViewPostRepliesUnion
+    data class ThreadViewPost(val value: com.atproto.generated.AppBskyFeedDefsThreadViewPost) : AppBskyFeedDefsThreadViewPostRepliesUnion
 
     @Serializable
-    @SerialName("app.bsky.feed.defs#AppBskyFeedDefsNotFoundPost")
-    data class AppBskyFeedDefsNotFoundPost(val value: AppBskyFeedDefsNotFoundPost) : AppBskyFeedDefsThreadViewPostRepliesUnion
+    data class NotFoundPost(val value: com.atproto.generated.AppBskyFeedDefsNotFoundPost) : AppBskyFeedDefsThreadViewPostRepliesUnion
 
     @Serializable
-    @SerialName("app.bsky.feed.defs#AppBskyFeedDefsBlockedPost")
-    data class AppBskyFeedDefsBlockedPost(val value: AppBskyFeedDefsBlockedPost) : AppBskyFeedDefsThreadViewPostRepliesUnion
+    data class BlockedPost(val value: com.atproto.generated.AppBskyFeedDefsBlockedPost) : AppBskyFeedDefsThreadViewPostRepliesUnion
 
     @Serializable
-    @SerialName("unknown")
     data class Unexpected(val value: JsonElement) : AppBskyFeedDefsThreadViewPostRepliesUnion
 }
 
-@Serializable
+object AppBskyFeedDefsThreadViewPostRepliesUnionSerializer : kotlinx.serialization.KSerializer<AppBskyFeedDefsThreadViewPostRepliesUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyFeedDefsThreadViewPostRepliesUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyFeedDefsThreadViewPostRepliesUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is AppBskyFeedDefsThreadViewPostRepliesUnion.ThreadViewPost -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyFeedDefsThreadViewPost.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#threadViewPost")
+                })
+            }
+            is AppBskyFeedDefsThreadViewPostRepliesUnion.NotFoundPost -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyFeedDefsNotFoundPost.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#notFoundPost")
+                })
+            }
+            is AppBskyFeedDefsThreadViewPostRepliesUnion.BlockedPost -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyFeedDefsBlockedPost.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#blockedPost")
+                })
+            }
+            is AppBskyFeedDefsThreadViewPostRepliesUnion.Unexpected -> value.value
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyFeedDefsThreadViewPostRepliesUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "app.bsky.feed.defs#threadViewPost" -> AppBskyFeedDefsThreadViewPostRepliesUnion.ThreadViewPost(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyFeedDefsThreadViewPost.serializer(), element)
+            )
+            "app.bsky.feed.defs#notFoundPost" -> AppBskyFeedDefsThreadViewPostRepliesUnion.NotFoundPost(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyFeedDefsNotFoundPost.serializer(), element)
+            )
+            "app.bsky.feed.defs#blockedPost" -> AppBskyFeedDefsThreadViewPostRepliesUnion.BlockedPost(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyFeedDefsBlockedPost.serializer(), element)
+            )
+            else -> AppBskyFeedDefsThreadViewPostRepliesUnion.Unexpected(element)
+        }
+    }
+}
+
+@Serializable(with = AppBskyFeedDefsSkeletonFeedPostReasonUnionSerializer::class)
 sealed interface AppBskyFeedDefsSkeletonFeedPostReasonUnion {
     @Serializable
-    @SerialName("app.bsky.feed.defs#AppBskyFeedDefsSkeletonReasonRepost")
-    data class AppBskyFeedDefsSkeletonReasonRepost(val value: AppBskyFeedDefsSkeletonReasonRepost) : AppBskyFeedDefsSkeletonFeedPostReasonUnion
+    data class SkeletonReasonRepost(val value: com.atproto.generated.AppBskyFeedDefsSkeletonReasonRepost) : AppBskyFeedDefsSkeletonFeedPostReasonUnion
 
     @Serializable
-    @SerialName("app.bsky.feed.defs#AppBskyFeedDefsSkeletonReasonPin")
-    data class AppBskyFeedDefsSkeletonReasonPin(val value: AppBskyFeedDefsSkeletonReasonPin) : AppBskyFeedDefsSkeletonFeedPostReasonUnion
+    data class SkeletonReasonPin(val value: com.atproto.generated.AppBskyFeedDefsSkeletonReasonPin) : AppBskyFeedDefsSkeletonFeedPostReasonUnion
 
     @Serializable
-    @SerialName("unknown")
     data class Unexpected(val value: JsonElement) : AppBskyFeedDefsSkeletonFeedPostReasonUnion
+}
+
+object AppBskyFeedDefsSkeletonFeedPostReasonUnionSerializer : kotlinx.serialization.KSerializer<AppBskyFeedDefsSkeletonFeedPostReasonUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyFeedDefsSkeletonFeedPostReasonUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyFeedDefsSkeletonFeedPostReasonUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is AppBskyFeedDefsSkeletonFeedPostReasonUnion.SkeletonReasonRepost -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyFeedDefsSkeletonReasonRepost.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#skeletonReasonRepost")
+                })
+            }
+            is AppBskyFeedDefsSkeletonFeedPostReasonUnion.SkeletonReasonPin -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyFeedDefsSkeletonReasonPin.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#skeletonReasonPin")
+                })
+            }
+            is AppBskyFeedDefsSkeletonFeedPostReasonUnion.Unexpected -> value.value
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyFeedDefsSkeletonFeedPostReasonUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "app.bsky.feed.defs#skeletonReasonRepost" -> AppBskyFeedDefsSkeletonFeedPostReasonUnion.SkeletonReasonRepost(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyFeedDefsSkeletonReasonRepost.serializer(), element)
+            )
+            "app.bsky.feed.defs#skeletonReasonPin" -> AppBskyFeedDefsSkeletonFeedPostReasonUnion.SkeletonReasonPin(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyFeedDefsSkeletonReasonPin.serializer(), element)
+            )
+            else -> AppBskyFeedDefsSkeletonFeedPostReasonUnion.Unexpected(element)
+        }
+    }
 }
 
     @Serializable
@@ -154,17 +483,17 @@ sealed interface AppBskyFeedDefsSkeletonFeedPostReasonUnion {
         val cid: CID,        @SerialName("author")
         val author: AppBskyActorDefsProfileViewBasic,        @SerialName("record")
         val record: JsonElement,        @SerialName("embed")
-        val embed: AppBskyFeedDefsPostViewEmbedUnion?,        @SerialName("bookmarkCount")
-        val bookmarkCount: Int?,        @SerialName("replyCount")
-        val replyCount: Int?,        @SerialName("repostCount")
-        val repostCount: Int?,        @SerialName("likeCount")
-        val likeCount: Int?,        @SerialName("quoteCount")
-        val quoteCount: Int?,        @SerialName("indexedAt")
+        val embed: AppBskyFeedDefsPostViewEmbedUnion? = null,        @SerialName("bookmarkCount")
+        val bookmarkCount: Int? = null,        @SerialName("replyCount")
+        val replyCount: Int? = null,        @SerialName("repostCount")
+        val repostCount: Int? = null,        @SerialName("likeCount")
+        val likeCount: Int? = null,        @SerialName("quoteCount")
+        val quoteCount: Int? = null,        @SerialName("indexedAt")
         val indexedAt: ATProtocolDate,        @SerialName("viewer")
-        val viewer: AppBskyFeedDefsViewerState?,        @SerialName("labels")
-        val labels: List<ComAtprotoLabelDefsLabel>?,        @SerialName("threadgate")
-        val threadgate: AppBskyFeedDefsThreadgateView?,/** Debug information for internal development */        @SerialName("debug")
-        val debug: JsonElement?    ) {
+        val viewer: AppBskyFeedDefsViewerState? = null,        @SerialName("labels")
+        val labels: List<ComAtprotoLabelDefsLabel>? = null,        @SerialName("threadgate")
+        val threadgate: AppBskyFeedDefsThreadgateView? = null,/** Debug information for internal development */        @SerialName("debug")
+        val debug: JsonElement? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyFeedDefsPostView"
         }
@@ -176,13 +505,13 @@ sealed interface AppBskyFeedDefsSkeletonFeedPostReasonUnion {
     @Serializable
     data class AppBskyFeedDefsViewerState(
         @SerialName("repost")
-        val repost: ATProtocolURI?,        @SerialName("like")
-        val like: ATProtocolURI?,        @SerialName("bookmarked")
-        val bookmarked: Boolean?,        @SerialName("threadMuted")
-        val threadMuted: Boolean?,        @SerialName("replyDisabled")
-        val replyDisabled: Boolean?,        @SerialName("embeddingDisabled")
-        val embeddingDisabled: Boolean?,        @SerialName("pinned")
-        val pinned: Boolean?    ) {
+        val repost: ATProtocolURI? = null,        @SerialName("like")
+        val like: ATProtocolURI? = null,        @SerialName("bookmarked")
+        val bookmarked: Boolean? = null,        @SerialName("threadMuted")
+        val threadMuted: Boolean? = null,        @SerialName("replyDisabled")
+        val replyDisabled: Boolean? = null,        @SerialName("embeddingDisabled")
+        val embeddingDisabled: Boolean? = null,        @SerialName("pinned")
+        val pinned: Boolean? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyFeedDefsViewerState"
         }
@@ -194,7 +523,7 @@ sealed interface AppBskyFeedDefsSkeletonFeedPostReasonUnion {
     @Serializable
     data class AppBskyFeedDefsThreadContext(
         @SerialName("rootAuthorLike")
-        val rootAuthorLike: ATProtocolURI?    ) {
+        val rootAuthorLike: ATProtocolURI? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyFeedDefsThreadContext"
         }
@@ -204,10 +533,10 @@ sealed interface AppBskyFeedDefsSkeletonFeedPostReasonUnion {
     data class AppBskyFeedDefsFeedViewPost(
         @SerialName("post")
         val post: AppBskyFeedDefsPostView,        @SerialName("reply")
-        val reply: AppBskyFeedDefsReplyRef?,        @SerialName("reason")
-        val reason: AppBskyFeedDefsFeedViewPostReasonUnion?,/** Context provided by feed generator that may be passed back alongside interactions. */        @SerialName("feedContext")
-        val feedContext: String?,/** Unique identifier per request that may be passed back alongside interactions. */        @SerialName("reqId")
-        val reqId: String?    ) {
+        val reply: AppBskyFeedDefsReplyRef? = null,        @SerialName("reason")
+        val reason: AppBskyFeedDefsFeedViewPostReasonUnion? = null,/** Context provided by feed generator that may be passed back alongside interactions. */        @SerialName("feedContext")
+        val feedContext: String? = null,/** Unique identifier per request that may be passed back alongside interactions. */        @SerialName("reqId")
+        val reqId: String? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyFeedDefsFeedViewPost"
         }
@@ -218,7 +547,7 @@ sealed interface AppBskyFeedDefsSkeletonFeedPostReasonUnion {
         @SerialName("root")
         val root: AppBskyFeedDefsReplyRefRootUnion,        @SerialName("parent")
         val parent: AppBskyFeedDefsReplyRefParentUnion,/** When parent is a reply to another post, this is the author of that post. */        @SerialName("grandparentAuthor")
-        val grandparentAuthor: AppBskyActorDefsProfileViewBasic?    ) {
+        val grandparentAuthor: AppBskyActorDefsProfileViewBasic? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyFeedDefsReplyRef"
         }
@@ -228,8 +557,8 @@ sealed interface AppBskyFeedDefsSkeletonFeedPostReasonUnion {
     data class AppBskyFeedDefsReasonRepost(
         @SerialName("by")
         val `by`: AppBskyActorDefsProfileViewBasic,        @SerialName("uri")
-        val uri: ATProtocolURI?,        @SerialName("cid")
-        val cid: CID?,        @SerialName("indexedAt")
+        val uri: ATProtocolURI? = null,        @SerialName("cid")
+        val cid: CID? = null,        @SerialName("indexedAt")
         val indexedAt: ATProtocolDate    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyFeedDefsReasonRepost"
@@ -247,9 +576,9 @@ sealed interface AppBskyFeedDefsSkeletonFeedPostReasonUnion {
     data class AppBskyFeedDefsThreadViewPost(
         @SerialName("post")
         val post: AppBskyFeedDefsPostView,        @SerialName("parent")
-        val parent: AppBskyFeedDefsThreadViewPostParentUnion?,        @SerialName("replies")
-        val replies: List<AppBskyFeedDefsThreadViewPostRepliesUnion>?,        @SerialName("threadContext")
-        val threadContext: AppBskyFeedDefsThreadContext?    ) {
+        val parent: AppBskyFeedDefsThreadViewPostParentUnion? = null,        @SerialName("replies")
+        val replies: List<AppBskyFeedDefsThreadViewPostRepliesUnion>? = null,        @SerialName("threadContext")
+        val threadContext: AppBskyFeedDefsThreadContext? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyFeedDefsThreadViewPost"
         }
@@ -280,7 +609,7 @@ sealed interface AppBskyFeedDefsSkeletonFeedPostReasonUnion {
     data class AppBskyFeedDefsBlockedAuthor(
         @SerialName("did")
         val did: DID,        @SerialName("viewer")
-        val viewer: AppBskyActorDefsViewerState?    ) {
+        val viewer: AppBskyActorDefsViewerState? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyFeedDefsBlockedAuthor"
         }
@@ -294,14 +623,14 @@ sealed interface AppBskyFeedDefsSkeletonFeedPostReasonUnion {
         val did: DID,        @SerialName("creator")
         val creator: AppBskyActorDefsProfileView,        @SerialName("displayName")
         val displayName: String,        @SerialName("description")
-        val description: String?,        @SerialName("descriptionFacets")
-        val descriptionFacets: List<AppBskyRichtextFacet>?,        @SerialName("avatar")
-        val avatar: URI?,        @SerialName("likeCount")
-        val likeCount: Int?,        @SerialName("acceptsInteractions")
-        val acceptsInteractions: Boolean?,        @SerialName("labels")
-        val labels: List<ComAtprotoLabelDefsLabel>?,        @SerialName("viewer")
-        val viewer: AppBskyFeedDefsGeneratorViewerState?,        @SerialName("contentMode")
-        val contentMode: String?,        @SerialName("indexedAt")
+        val description: String? = null,        @SerialName("descriptionFacets")
+        val descriptionFacets: List<AppBskyRichtextFacet>? = null,        @SerialName("avatar")
+        val avatar: URI? = null,        @SerialName("likeCount")
+        val likeCount: Int? = null,        @SerialName("acceptsInteractions")
+        val acceptsInteractions: Boolean? = null,        @SerialName("labels")
+        val labels: List<ComAtprotoLabelDefsLabel>? = null,        @SerialName("viewer")
+        val viewer: AppBskyFeedDefsGeneratorViewerState? = null,        @SerialName("contentMode")
+        val contentMode: String? = null,        @SerialName("indexedAt")
         val indexedAt: ATProtocolDate    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyFeedDefsGeneratorView"
@@ -311,7 +640,7 @@ sealed interface AppBskyFeedDefsSkeletonFeedPostReasonUnion {
     @Serializable
     data class AppBskyFeedDefsGeneratorViewerState(
         @SerialName("like")
-        val like: ATProtocolURI?    ) {
+        val like: ATProtocolURI? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyFeedDefsGeneratorViewerState"
         }
@@ -321,8 +650,8 @@ sealed interface AppBskyFeedDefsSkeletonFeedPostReasonUnion {
     data class AppBskyFeedDefsSkeletonFeedPost(
         @SerialName("post")
         val post: ATProtocolURI,        @SerialName("reason")
-        val reason: AppBskyFeedDefsSkeletonFeedPostReasonUnion?,/** Context that will be passed through to client and may be passed to feed generator back alongside interactions. */        @SerialName("feedContext")
-        val feedContext: String?    ) {
+        val reason: AppBskyFeedDefsSkeletonFeedPostReasonUnion? = null,/** Context that will be passed through to client and may be passed to feed generator back alongside interactions. */        @SerialName("feedContext")
+        val feedContext: String? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyFeedDefsSkeletonFeedPost"
         }
@@ -347,10 +676,10 @@ sealed interface AppBskyFeedDefsSkeletonFeedPostReasonUnion {
     @Serializable
     data class AppBskyFeedDefsThreadgateView(
         @SerialName("uri")
-        val uri: ATProtocolURI?,        @SerialName("cid")
-        val cid: CID?,        @SerialName("record")
-        val record: JsonElement?,        @SerialName("lists")
-        val lists: List<AppBskyGraphDefsListViewBasic>?    ) {
+        val uri: ATProtocolURI? = null,        @SerialName("cid")
+        val cid: CID? = null,        @SerialName("record")
+        val record: JsonElement? = null,        @SerialName("lists")
+        val lists: List<AppBskyGraphDefsListViewBasic>? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyFeedDefsThreadgateView"
         }
@@ -359,10 +688,10 @@ sealed interface AppBskyFeedDefsSkeletonFeedPostReasonUnion {
     @Serializable
     data class AppBskyFeedDefsInteraction(
         @SerialName("item")
-        val item: ATProtocolURI?,        @SerialName("event")
-        val event: String?,/** Context on a feed item that was originally supplied by the feed generator on getFeedSkeleton. */        @SerialName("feedContext")
-        val feedContext: String?,/** Unique identifier per request that may be passed back alongside interactions. */        @SerialName("reqId")
-        val reqId: String?    ) {
+        val item: ATProtocolURI? = null,        @SerialName("event")
+        val event: String? = null,/** Context on a feed item that was originally supplied by the feed generator on getFeedSkeleton. */        @SerialName("feedContext")
+        val feedContext: String? = null,/** Unique identifier per request that may be passed back alongside interactions. */        @SerialName("reqId")
+        val reqId: String? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyFeedDefsInteraction"
         }

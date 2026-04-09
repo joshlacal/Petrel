@@ -1,12 +1,48 @@
-@Serializable
+@Serializable(with = {{ union_name }}Serializer::class)
 sealed interface {{ union_name }} {
     {% for variant in variants %}
     @Serializable
-    @SerialName("{{ variant.lexicon_ref }}")
-    data class {{ variant.name }}(val value: {{ variant.type }}) : {{ union_name }}
+    data class {{ variant.short_name }}(val value: com.atproto.generated.{{ variant.type }}) : {{ union_name }}
 
     {% endfor %}
     @Serializable
-    @SerialName("unknown")
     data class Unexpected(val value: JsonElement) : {{ union_name }}
 }
+
+object {{ union_name }}Serializer : kotlinx.serialization.KSerializer<{{ union_name }}> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("{{ union_name }}")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: {{ union_name }}) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            {% for variant in variants %}
+            is {{ union_name }}.{{ variant.short_name }} -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.{{ variant.type }}.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("{{ variant.lexicon_ref }}")
+                })
+            }
+            {% endfor %}
+            is {{ union_name }}.Unexpected -> value.value
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): {{ union_name }} {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            {% for variant in variants %}
+            "{{ variant.lexicon_ref }}" -> {{ union_name }}.{{ variant.short_name }}(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.{{ variant.type }}.serializer(), element)
+            )
+            {% endfor %}
+            else -> {{ union_name }}.Unexpected(element)
+        }
+    }
+}
+

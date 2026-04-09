@@ -15,6 +15,12 @@ object PlaceStreamPlaybackWhepDefs {
 }
 
 @Serializable
+    data class PlaceStreamPlaybackWhepParameters(
+// The DID of the streamer to play.        @SerialName("streamer")
+        val streamer: String,// The rendition of the stream to play.        @SerialName("rendition")
+        val rendition: String    )
+
+@Serializable
     data class PlaceStreamPlaybackWhepInput(
         @SerialName("data")
         val `data`: ByteArray    )
@@ -34,17 +40,20 @@ sealed class PlaceStreamPlaybackWhepError(val name: String, val description: Str
  * Endpoint: place.stream.playback.whep
  */
 suspend fun ATProtoClient.Place.Stream.Playback.whep(
-input: PlaceStreamPlaybackWhepInput): ATProtoResponse<PlaceStreamPlaybackWhepOutput> {
+input: PlaceStreamPlaybackWhepInput,
+    params: PlaceStreamPlaybackWhepParameters): ATProtoResponse<PlaceStreamPlaybackWhepOutput> {
     val endpoint = "place.stream.playback.whep"
 
     // Blob upload - input.data is ByteArray
     val body = input.data
     val contentType = "*/*"
 
+    val queryParams = params.toQueryParams()
+
     return client.networkService.performRequest(
         method = "POST",
         endpoint = endpoint,
-        queryParams = null,
+        queryParams = queryParams,
         headers = mapOf(
             "Content-Type" to contentType,
             "Accept" to "*/*"

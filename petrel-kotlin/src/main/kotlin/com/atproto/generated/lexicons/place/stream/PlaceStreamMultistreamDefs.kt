@@ -20,7 +20,7 @@ object PlaceStreamMultistreamDefsDefs {
         val uri: ATProtocolURI,        @SerialName("cid")
         val cid: CID,        @SerialName("record")
         val record: JsonElement,        @SerialName("latestEvent")
-        val latestEvent: PlaceStreamMultistreamDefsEvent?    ) {
+        val latestEvent: PlaceStreamMultistreamDefsEvent? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#placeStreamMultistreamDefsTargetView"
         }

@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: blue.catbird.mlsChat.getMessages
-// Retrieve messages from an MLS conversation. Messages are GUARANTEED to be returned in MLS sequential order (epoch ASC, seq ASC). Clients MUST process messages in this order for proper MLS decryption.
+// Retrieve messages from a conversation with type filtering (consolidates getMessages + getCommits) Retrieve messages from an MLS conversation. Messages are GUARANTEED to be returned in MLS sequential order (epoch ASC, seq ASC). Clients MUST process messages in this order for proper MLS decryption. The 'type' filter replaces the separate getCommits endpoint.
 package com.atproto.generated
 
 import kotlinx.serialization.*
@@ -14,14 +14,11 @@ object BlueCatbirdMlsChatGetMessagesDefs {
     const val TYPE_IDENTIFIER = "blue.catbird.mlsChat.getMessages"
 }
 
-    /**
-     * Metadata about missing sequence numbers in a conversation. Gaps can occur when members are removed from the conversation.
-     */
     @Serializable
     data class BlueCatbirdMlsChatGetMessagesGapInfo(
 /** Whether there are gaps in the sequence number range */        @SerialName("hasGaps")
-        val hasGaps: Boolean,/** Array of missing sequence numbers within the conversation's min-max seq range. Empty if hasGaps is false. */        @SerialName("missingSeqs")
-        val missingSeqs: List<Int>,/** Total number of messages in the conversation (including gaps) */        @SerialName("totalMessages")
+        val hasGaps: Boolean,/** Array of missing sequence numbers */        @SerialName("missingSeqs")
+        val missingSeqs: List<Int>,/** Total number of messages in the conversation */        @SerialName("totalMessages")
         val totalMessages: Int    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#blueCatbirdMlsChatGetMessagesGapInfo"
@@ -32,14 +29,15 @@ object BlueCatbirdMlsChatGetMessagesDefs {
     data class BlueCatbirdMlsChatGetMessagesParameters(
 // Conversation identifier        @SerialName("convoId")
         val convoId: String,// Maximum number of messages to return        @SerialName("limit")
-        val limit: Int? = null,// Fetch messages with seq > sinceSeq (pagination cursor). Use lastSeq from previous response.        @SerialName("sinceSeq")
-        val sinceSeq: Int? = null    )
+        val limit: Int? = null,// Fetch messages with seq > sinceSeq (pagination cursor)        @SerialName("sinceSeq")
+        val sinceSeq: Int? = null,// Filter by message type: 'app' for user content only, 'commit' for MLS protocol control messages only, 'all' for both        @SerialName("type")
+        val type: String? = null    )
 
     @Serializable
     data class BlueCatbirdMlsChatGetMessagesOutput(
-// Messages in MLS sequential order (epoch ASC, seq ASC). Clients MUST process in this order.        @SerialName("messages")
-        val messages: List<BlueCatbirdMlsChatDefsMessageView>,// Sequence number of the last message in this response. Use as sinceSeq for next page. Omitted if no messages returned.        @SerialName("lastSeq")
-        val lastSeq: Int? = null,// Gap detection metadata for missing messages. Omitted if no gaps detected or conversation is empty.        @SerialName("gapInfo")
+// Messages in MLS sequential order (epoch ASC, seq ASC)        @SerialName("messages")
+        val messages: List<BlueCatbirdMlsChatDefsMessageView>,// Sequence number of the last message in this response. Use as sinceSeq for next page.        @SerialName("lastSeq")
+        val lastSeq: Int? = null,// Gap detection metadata for missing messages        @SerialName("gapInfo")
         val gapInfo: BlueCatbirdMlsChatGetMessagesGapInfo? = null    )
 
 sealed class BlueCatbirdMlsChatGetMessagesError(val name: String, val description: String?) {
@@ -49,7 +47,7 @@ sealed class BlueCatbirdMlsChatGetMessagesError(val name: String, val descriptio
     }
 
 /**
- * Retrieve messages from an MLS conversation. Messages are GUARANTEED to be returned in MLS sequential order (epoch ASC, seq ASC). Clients MUST process messages in this order for proper MLS decryption.
+ * Retrieve messages from a conversation with type filtering (consolidates getMessages + getCommits) Retrieve messages from an MLS conversation. Messages are GUARANTEED to be returned in MLS sequential order (epoch ASC, seq ASC). Clients MUST process messages in this order for proper MLS decryption. The 'type' filter replaces the separate getCommits endpoint.
  *
  * Endpoint: blue.catbird.mlsChat.getMessages
  */

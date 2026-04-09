@@ -14,191 +14,610 @@ object AppBskyActorDefsDefs {
     const val TYPE_IDENTIFIER = "app.bsky.actor.defs"
 }
 
-@Serializable
+@Serializable(with = AppBskyActorDefsPreferencesPreferencesUnionSerializer::class)
 sealed interface AppBskyActorDefsPreferencesPreferencesUnion {
     @Serializable
-    @SerialName("app.bsky.actor.defs#AppBskyActorDefsAdultContentPref")
-    data class AppBskyActorDefsAdultContentPref(val value: AppBskyActorDefsAdultContentPref) : AppBskyActorDefsPreferencesPreferencesUnion
+    data class AdultContentPref(val value: com.atproto.generated.AppBskyActorDefsAdultContentPref) : AppBskyActorDefsPreferencesPreferencesUnion
 
     @Serializable
-    @SerialName("app.bsky.actor.defs#AppBskyActorDefsContentLabelPref")
-    data class AppBskyActorDefsContentLabelPref(val value: AppBskyActorDefsContentLabelPref) : AppBskyActorDefsPreferencesPreferencesUnion
+    data class ContentLabelPref(val value: com.atproto.generated.AppBskyActorDefsContentLabelPref) : AppBskyActorDefsPreferencesPreferencesUnion
 
     @Serializable
-    @SerialName("app.bsky.actor.defs#AppBskyActorDefsSavedFeedsPref")
-    data class AppBskyActorDefsSavedFeedsPref(val value: AppBskyActorDefsSavedFeedsPref) : AppBskyActorDefsPreferencesPreferencesUnion
+    data class SavedFeedsPref(val value: com.atproto.generated.AppBskyActorDefsSavedFeedsPref) : AppBskyActorDefsPreferencesPreferencesUnion
 
     @Serializable
-    @SerialName("app.bsky.actor.defs#AppBskyActorDefsSavedFeedsPrefV2")
-    data class AppBskyActorDefsSavedFeedsPrefV2(val value: AppBskyActorDefsSavedFeedsPrefV2) : AppBskyActorDefsPreferencesPreferencesUnion
+    data class SavedFeedsPrefV2(val value: com.atproto.generated.AppBskyActorDefsSavedFeedsPrefV2) : AppBskyActorDefsPreferencesPreferencesUnion
 
     @Serializable
-    @SerialName("app.bsky.actor.defs#AppBskyActorDefsPersonalDetailsPref")
-    data class AppBskyActorDefsPersonalDetailsPref(val value: AppBskyActorDefsPersonalDetailsPref) : AppBskyActorDefsPreferencesPreferencesUnion
+    data class PersonalDetailsPref(val value: com.atproto.generated.AppBskyActorDefsPersonalDetailsPref) : AppBskyActorDefsPreferencesPreferencesUnion
 
     @Serializable
-    @SerialName("app.bsky.actor.defs#AppBskyActorDefsDeclaredAgePref")
-    data class AppBskyActorDefsDeclaredAgePref(val value: AppBskyActorDefsDeclaredAgePref) : AppBskyActorDefsPreferencesPreferencesUnion
+    data class DeclaredAgePref(val value: com.atproto.generated.AppBskyActorDefsDeclaredAgePref) : AppBskyActorDefsPreferencesPreferencesUnion
 
     @Serializable
-    @SerialName("app.bsky.actor.defs#AppBskyActorDefsFeedViewPref")
-    data class AppBskyActorDefsFeedViewPref(val value: AppBskyActorDefsFeedViewPref) : AppBskyActorDefsPreferencesPreferencesUnion
+    data class FeedViewPref(val value: com.atproto.generated.AppBskyActorDefsFeedViewPref) : AppBskyActorDefsPreferencesPreferencesUnion
 
     @Serializable
-    @SerialName("app.bsky.actor.defs#AppBskyActorDefsThreadViewPref")
-    data class AppBskyActorDefsThreadViewPref(val value: AppBskyActorDefsThreadViewPref) : AppBskyActorDefsPreferencesPreferencesUnion
+    data class ThreadViewPref(val value: com.atproto.generated.AppBskyActorDefsThreadViewPref) : AppBskyActorDefsPreferencesPreferencesUnion
 
     @Serializable
-    @SerialName("app.bsky.actor.defs#AppBskyActorDefsInterestsPref")
-    data class AppBskyActorDefsInterestsPref(val value: AppBskyActorDefsInterestsPref) : AppBskyActorDefsPreferencesPreferencesUnion
+    data class InterestsPref(val value: com.atproto.generated.AppBskyActorDefsInterestsPref) : AppBskyActorDefsPreferencesPreferencesUnion
 
     @Serializable
-    @SerialName("app.bsky.actor.defs#AppBskyActorDefsMutedWordsPref")
-    data class AppBskyActorDefsMutedWordsPref(val value: AppBskyActorDefsMutedWordsPref) : AppBskyActorDefsPreferencesPreferencesUnion
+    data class MutedWordsPref(val value: com.atproto.generated.AppBskyActorDefsMutedWordsPref) : AppBskyActorDefsPreferencesPreferencesUnion
 
     @Serializable
-    @SerialName("app.bsky.actor.defs#AppBskyActorDefsHiddenPostsPref")
-    data class AppBskyActorDefsHiddenPostsPref(val value: AppBskyActorDefsHiddenPostsPref) : AppBskyActorDefsPreferencesPreferencesUnion
+    data class HiddenPostsPref(val value: com.atproto.generated.AppBskyActorDefsHiddenPostsPref) : AppBskyActorDefsPreferencesPreferencesUnion
 
     @Serializable
-    @SerialName("app.bsky.actor.defs#AppBskyActorDefsBskyAppStatePref")
-    data class AppBskyActorDefsBskyAppStatePref(val value: AppBskyActorDefsBskyAppStatePref) : AppBskyActorDefsPreferencesPreferencesUnion
+    data class BskyAppStatePref(val value: com.atproto.generated.AppBskyActorDefsBskyAppStatePref) : AppBskyActorDefsPreferencesPreferencesUnion
 
     @Serializable
-    @SerialName("app.bsky.actor.defs#AppBskyActorDefsLabelersPref")
-    data class AppBskyActorDefsLabelersPref(val value: AppBskyActorDefsLabelersPref) : AppBskyActorDefsPreferencesPreferencesUnion
+    data class LabelersPref(val value: com.atproto.generated.AppBskyActorDefsLabelersPref) : AppBskyActorDefsPreferencesPreferencesUnion
 
     @Serializable
-    @SerialName("app.bsky.actor.defs#AppBskyActorDefsPostInteractionSettingsPref")
-    data class AppBskyActorDefsPostInteractionSettingsPref(val value: AppBskyActorDefsPostInteractionSettingsPref) : AppBskyActorDefsPreferencesPreferencesUnion
+    data class PostInteractionSettingsPref(val value: com.atproto.generated.AppBskyActorDefsPostInteractionSettingsPref) : AppBskyActorDefsPreferencesPreferencesUnion
 
     @Serializable
-    @SerialName("app.bsky.actor.defs#AppBskyActorDefsVerificationPrefs")
-    data class AppBskyActorDefsVerificationPrefs(val value: AppBskyActorDefsVerificationPrefs) : AppBskyActorDefsPreferencesPreferencesUnion
+    data class VerificationPrefs(val value: com.atproto.generated.AppBskyActorDefsVerificationPrefs) : AppBskyActorDefsPreferencesPreferencesUnion
 
     @Serializable
-    @SerialName("app.bsky.actor.defs#AppBskyActorDefsLiveEventPreferences")
-    data class AppBskyActorDefsLiveEventPreferences(val value: AppBskyActorDefsLiveEventPreferences) : AppBskyActorDefsPreferencesPreferencesUnion
+    data class LiveEventPreferences(val value: com.atproto.generated.AppBskyActorDefsLiveEventPreferences) : AppBskyActorDefsPreferencesPreferencesUnion
 
     @Serializable
-    @SerialName("unknown")
     data class Unexpected(val value: JsonElement) : AppBskyActorDefsPreferencesPreferencesUnion
 }
 
-@Serializable
+object AppBskyActorDefsPreferencesPreferencesUnionSerializer : kotlinx.serialization.KSerializer<AppBskyActorDefsPreferencesPreferencesUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyActorDefsPreferencesPreferencesUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyActorDefsPreferencesPreferencesUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is AppBskyActorDefsPreferencesPreferencesUnion.AdultContentPref -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyActorDefsAdultContentPref.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#adultContentPref")
+                })
+            }
+            is AppBskyActorDefsPreferencesPreferencesUnion.ContentLabelPref -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyActorDefsContentLabelPref.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#contentLabelPref")
+                })
+            }
+            is AppBskyActorDefsPreferencesPreferencesUnion.SavedFeedsPref -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyActorDefsSavedFeedsPref.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#savedFeedsPref")
+                })
+            }
+            is AppBskyActorDefsPreferencesPreferencesUnion.SavedFeedsPrefV2 -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyActorDefsSavedFeedsPrefV2.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#savedFeedsPrefV2")
+                })
+            }
+            is AppBskyActorDefsPreferencesPreferencesUnion.PersonalDetailsPref -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyActorDefsPersonalDetailsPref.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#personalDetailsPref")
+                })
+            }
+            is AppBskyActorDefsPreferencesPreferencesUnion.DeclaredAgePref -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyActorDefsDeclaredAgePref.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#declaredAgePref")
+                })
+            }
+            is AppBskyActorDefsPreferencesPreferencesUnion.FeedViewPref -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyActorDefsFeedViewPref.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#feedViewPref")
+                })
+            }
+            is AppBskyActorDefsPreferencesPreferencesUnion.ThreadViewPref -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyActorDefsThreadViewPref.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#threadViewPref")
+                })
+            }
+            is AppBskyActorDefsPreferencesPreferencesUnion.InterestsPref -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyActorDefsInterestsPref.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#interestsPref")
+                })
+            }
+            is AppBskyActorDefsPreferencesPreferencesUnion.MutedWordsPref -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyActorDefsMutedWordsPref.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#mutedWordsPref")
+                })
+            }
+            is AppBskyActorDefsPreferencesPreferencesUnion.HiddenPostsPref -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyActorDefsHiddenPostsPref.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#hiddenPostsPref")
+                })
+            }
+            is AppBskyActorDefsPreferencesPreferencesUnion.BskyAppStatePref -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyActorDefsBskyAppStatePref.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#bskyAppStatePref")
+                })
+            }
+            is AppBskyActorDefsPreferencesPreferencesUnion.LabelersPref -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyActorDefsLabelersPref.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#labelersPref")
+                })
+            }
+            is AppBskyActorDefsPreferencesPreferencesUnion.PostInteractionSettingsPref -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyActorDefsPostInteractionSettingsPref.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#postInteractionSettingsPref")
+                })
+            }
+            is AppBskyActorDefsPreferencesPreferencesUnion.VerificationPrefs -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyActorDefsVerificationPrefs.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#verificationPrefs")
+                })
+            }
+            is AppBskyActorDefsPreferencesPreferencesUnion.LiveEventPreferences -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyActorDefsLiveEventPreferences.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#liveEventPreferences")
+                })
+            }
+            is AppBskyActorDefsPreferencesPreferencesUnion.Unexpected -> value.value
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyActorDefsPreferencesPreferencesUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "app.bsky.actor.defs#adultContentPref" -> AppBskyActorDefsPreferencesPreferencesUnion.AdultContentPref(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyActorDefsAdultContentPref.serializer(), element)
+            )
+            "app.bsky.actor.defs#contentLabelPref" -> AppBskyActorDefsPreferencesPreferencesUnion.ContentLabelPref(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyActorDefsContentLabelPref.serializer(), element)
+            )
+            "app.bsky.actor.defs#savedFeedsPref" -> AppBskyActorDefsPreferencesPreferencesUnion.SavedFeedsPref(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyActorDefsSavedFeedsPref.serializer(), element)
+            )
+            "app.bsky.actor.defs#savedFeedsPrefV2" -> AppBskyActorDefsPreferencesPreferencesUnion.SavedFeedsPrefV2(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyActorDefsSavedFeedsPrefV2.serializer(), element)
+            )
+            "app.bsky.actor.defs#personalDetailsPref" -> AppBskyActorDefsPreferencesPreferencesUnion.PersonalDetailsPref(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyActorDefsPersonalDetailsPref.serializer(), element)
+            )
+            "app.bsky.actor.defs#declaredAgePref" -> AppBskyActorDefsPreferencesPreferencesUnion.DeclaredAgePref(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyActorDefsDeclaredAgePref.serializer(), element)
+            )
+            "app.bsky.actor.defs#feedViewPref" -> AppBskyActorDefsPreferencesPreferencesUnion.FeedViewPref(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyActorDefsFeedViewPref.serializer(), element)
+            )
+            "app.bsky.actor.defs#threadViewPref" -> AppBskyActorDefsPreferencesPreferencesUnion.ThreadViewPref(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyActorDefsThreadViewPref.serializer(), element)
+            )
+            "app.bsky.actor.defs#interestsPref" -> AppBskyActorDefsPreferencesPreferencesUnion.InterestsPref(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyActorDefsInterestsPref.serializer(), element)
+            )
+            "app.bsky.actor.defs#mutedWordsPref" -> AppBskyActorDefsPreferencesPreferencesUnion.MutedWordsPref(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyActorDefsMutedWordsPref.serializer(), element)
+            )
+            "app.bsky.actor.defs#hiddenPostsPref" -> AppBskyActorDefsPreferencesPreferencesUnion.HiddenPostsPref(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyActorDefsHiddenPostsPref.serializer(), element)
+            )
+            "app.bsky.actor.defs#bskyAppStatePref" -> AppBskyActorDefsPreferencesPreferencesUnion.BskyAppStatePref(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyActorDefsBskyAppStatePref.serializer(), element)
+            )
+            "app.bsky.actor.defs#labelersPref" -> AppBskyActorDefsPreferencesPreferencesUnion.LabelersPref(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyActorDefsLabelersPref.serializer(), element)
+            )
+            "app.bsky.actor.defs#postInteractionSettingsPref" -> AppBskyActorDefsPreferencesPreferencesUnion.PostInteractionSettingsPref(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyActorDefsPostInteractionSettingsPref.serializer(), element)
+            )
+            "app.bsky.actor.defs#verificationPrefs" -> AppBskyActorDefsPreferencesPreferencesUnion.VerificationPrefs(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyActorDefsVerificationPrefs.serializer(), element)
+            )
+            "app.bsky.actor.defs#liveEventPreferences" -> AppBskyActorDefsPreferencesPreferencesUnion.LiveEventPreferences(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyActorDefsLiveEventPreferences.serializer(), element)
+            )
+            else -> AppBskyActorDefsPreferencesPreferencesUnion.Unexpected(element)
+        }
+    }
+}
+
+@Serializable(with = AppBskyActorDefsPreferencesUnionSerializer::class)
 sealed interface AppBskyActorDefsPreferencesUnion {
     @Serializable
-    @SerialName("app.bsky.actor.defs#AppBskyActorDefsAdultContentPref")
-    data class AppBskyActorDefsAdultContentPref(val value: AppBskyActorDefsAdultContentPref) : AppBskyActorDefsPreferencesUnion
+    data class AdultContentPref(val value: com.atproto.generated.AppBskyActorDefsAdultContentPref) : AppBskyActorDefsPreferencesUnion
 
     @Serializable
-    @SerialName("app.bsky.actor.defs#AppBskyActorDefsContentLabelPref")
-    data class AppBskyActorDefsContentLabelPref(val value: AppBskyActorDefsContentLabelPref) : AppBskyActorDefsPreferencesUnion
+    data class ContentLabelPref(val value: com.atproto.generated.AppBskyActorDefsContentLabelPref) : AppBskyActorDefsPreferencesUnion
 
     @Serializable
-    @SerialName("app.bsky.actor.defs#AppBskyActorDefsSavedFeedsPref")
-    data class AppBskyActorDefsSavedFeedsPref(val value: AppBskyActorDefsSavedFeedsPref) : AppBskyActorDefsPreferencesUnion
+    data class SavedFeedsPref(val value: com.atproto.generated.AppBskyActorDefsSavedFeedsPref) : AppBskyActorDefsPreferencesUnion
 
     @Serializable
-    @SerialName("app.bsky.actor.defs#AppBskyActorDefsSavedFeedsPrefV2")
-    data class AppBskyActorDefsSavedFeedsPrefV2(val value: AppBskyActorDefsSavedFeedsPrefV2) : AppBskyActorDefsPreferencesUnion
+    data class SavedFeedsPrefV2(val value: com.atproto.generated.AppBskyActorDefsSavedFeedsPrefV2) : AppBskyActorDefsPreferencesUnion
 
     @Serializable
-    @SerialName("app.bsky.actor.defs#AppBskyActorDefsPersonalDetailsPref")
-    data class AppBskyActorDefsPersonalDetailsPref(val value: AppBskyActorDefsPersonalDetailsPref) : AppBskyActorDefsPreferencesUnion
+    data class PersonalDetailsPref(val value: com.atproto.generated.AppBskyActorDefsPersonalDetailsPref) : AppBskyActorDefsPreferencesUnion
 
     @Serializable
-    @SerialName("app.bsky.actor.defs#AppBskyActorDefsDeclaredAgePref")
-    data class AppBskyActorDefsDeclaredAgePref(val value: AppBskyActorDefsDeclaredAgePref) : AppBskyActorDefsPreferencesUnion
+    data class DeclaredAgePref(val value: com.atproto.generated.AppBskyActorDefsDeclaredAgePref) : AppBskyActorDefsPreferencesUnion
 
     @Serializable
-    @SerialName("app.bsky.actor.defs#AppBskyActorDefsFeedViewPref")
-    data class AppBskyActorDefsFeedViewPref(val value: AppBskyActorDefsFeedViewPref) : AppBskyActorDefsPreferencesUnion
+    data class FeedViewPref(val value: com.atproto.generated.AppBskyActorDefsFeedViewPref) : AppBskyActorDefsPreferencesUnion
 
     @Serializable
-    @SerialName("app.bsky.actor.defs#AppBskyActorDefsThreadViewPref")
-    data class AppBskyActorDefsThreadViewPref(val value: AppBskyActorDefsThreadViewPref) : AppBskyActorDefsPreferencesUnion
+    data class ThreadViewPref(val value: com.atproto.generated.AppBskyActorDefsThreadViewPref) : AppBskyActorDefsPreferencesUnion
 
     @Serializable
-    @SerialName("app.bsky.actor.defs#AppBskyActorDefsInterestsPref")
-    data class AppBskyActorDefsInterestsPref(val value: AppBskyActorDefsInterestsPref) : AppBskyActorDefsPreferencesUnion
+    data class InterestsPref(val value: com.atproto.generated.AppBskyActorDefsInterestsPref) : AppBskyActorDefsPreferencesUnion
 
     @Serializable
-    @SerialName("app.bsky.actor.defs#AppBskyActorDefsMutedWordsPref")
-    data class AppBskyActorDefsMutedWordsPref(val value: AppBskyActorDefsMutedWordsPref) : AppBskyActorDefsPreferencesUnion
+    data class MutedWordsPref(val value: com.atproto.generated.AppBskyActorDefsMutedWordsPref) : AppBskyActorDefsPreferencesUnion
 
     @Serializable
-    @SerialName("app.bsky.actor.defs#AppBskyActorDefsHiddenPostsPref")
-    data class AppBskyActorDefsHiddenPostsPref(val value: AppBskyActorDefsHiddenPostsPref) : AppBskyActorDefsPreferencesUnion
+    data class HiddenPostsPref(val value: com.atproto.generated.AppBskyActorDefsHiddenPostsPref) : AppBskyActorDefsPreferencesUnion
 
     @Serializable
-    @SerialName("app.bsky.actor.defs#AppBskyActorDefsBskyAppStatePref")
-    data class AppBskyActorDefsBskyAppStatePref(val value: AppBskyActorDefsBskyAppStatePref) : AppBskyActorDefsPreferencesUnion
+    data class BskyAppStatePref(val value: com.atproto.generated.AppBskyActorDefsBskyAppStatePref) : AppBskyActorDefsPreferencesUnion
 
     @Serializable
-    @SerialName("app.bsky.actor.defs#AppBskyActorDefsLabelersPref")
-    data class AppBskyActorDefsLabelersPref(val value: AppBskyActorDefsLabelersPref) : AppBskyActorDefsPreferencesUnion
+    data class LabelersPref(val value: com.atproto.generated.AppBskyActorDefsLabelersPref) : AppBskyActorDefsPreferencesUnion
 
     @Serializable
-    @SerialName("app.bsky.actor.defs#AppBskyActorDefsPostInteractionSettingsPref")
-    data class AppBskyActorDefsPostInteractionSettingsPref(val value: AppBskyActorDefsPostInteractionSettingsPref) : AppBskyActorDefsPreferencesUnion
+    data class PostInteractionSettingsPref(val value: com.atproto.generated.AppBskyActorDefsPostInteractionSettingsPref) : AppBskyActorDefsPreferencesUnion
 
     @Serializable
-    @SerialName("app.bsky.actor.defs#AppBskyActorDefsVerificationPrefs")
-    data class AppBskyActorDefsVerificationPrefs(val value: AppBskyActorDefsVerificationPrefs) : AppBskyActorDefsPreferencesUnion
+    data class VerificationPrefs(val value: com.atproto.generated.AppBskyActorDefsVerificationPrefs) : AppBskyActorDefsPreferencesUnion
 
     @Serializable
-    @SerialName("app.bsky.actor.defs#AppBskyActorDefsLiveEventPreferences")
-    data class AppBskyActorDefsLiveEventPreferences(val value: AppBskyActorDefsLiveEventPreferences) : AppBskyActorDefsPreferencesUnion
+    data class LiveEventPreferences(val value: com.atproto.generated.AppBskyActorDefsLiveEventPreferences) : AppBskyActorDefsPreferencesUnion
 
     @Serializable
-    @SerialName("unknown")
     data class Unexpected(val value: JsonElement) : AppBskyActorDefsPreferencesUnion
 }
 
-@Serializable
+object AppBskyActorDefsPreferencesUnionSerializer : kotlinx.serialization.KSerializer<AppBskyActorDefsPreferencesUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyActorDefsPreferencesUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyActorDefsPreferencesUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is AppBskyActorDefsPreferencesUnion.AdultContentPref -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyActorDefsAdultContentPref.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#adultContentPref")
+                })
+            }
+            is AppBskyActorDefsPreferencesUnion.ContentLabelPref -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyActorDefsContentLabelPref.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#contentLabelPref")
+                })
+            }
+            is AppBskyActorDefsPreferencesUnion.SavedFeedsPref -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyActorDefsSavedFeedsPref.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#savedFeedsPref")
+                })
+            }
+            is AppBskyActorDefsPreferencesUnion.SavedFeedsPrefV2 -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyActorDefsSavedFeedsPrefV2.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#savedFeedsPrefV2")
+                })
+            }
+            is AppBskyActorDefsPreferencesUnion.PersonalDetailsPref -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyActorDefsPersonalDetailsPref.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#personalDetailsPref")
+                })
+            }
+            is AppBskyActorDefsPreferencesUnion.DeclaredAgePref -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyActorDefsDeclaredAgePref.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#declaredAgePref")
+                })
+            }
+            is AppBskyActorDefsPreferencesUnion.FeedViewPref -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyActorDefsFeedViewPref.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#feedViewPref")
+                })
+            }
+            is AppBskyActorDefsPreferencesUnion.ThreadViewPref -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyActorDefsThreadViewPref.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#threadViewPref")
+                })
+            }
+            is AppBskyActorDefsPreferencesUnion.InterestsPref -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyActorDefsInterestsPref.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#interestsPref")
+                })
+            }
+            is AppBskyActorDefsPreferencesUnion.MutedWordsPref -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyActorDefsMutedWordsPref.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#mutedWordsPref")
+                })
+            }
+            is AppBskyActorDefsPreferencesUnion.HiddenPostsPref -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyActorDefsHiddenPostsPref.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#hiddenPostsPref")
+                })
+            }
+            is AppBskyActorDefsPreferencesUnion.BskyAppStatePref -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyActorDefsBskyAppStatePref.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#bskyAppStatePref")
+                })
+            }
+            is AppBskyActorDefsPreferencesUnion.LabelersPref -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyActorDefsLabelersPref.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#labelersPref")
+                })
+            }
+            is AppBskyActorDefsPreferencesUnion.PostInteractionSettingsPref -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyActorDefsPostInteractionSettingsPref.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#postInteractionSettingsPref")
+                })
+            }
+            is AppBskyActorDefsPreferencesUnion.VerificationPrefs -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyActorDefsVerificationPrefs.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#verificationPrefs")
+                })
+            }
+            is AppBskyActorDefsPreferencesUnion.LiveEventPreferences -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyActorDefsLiveEventPreferences.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#liveEventPreferences")
+                })
+            }
+            is AppBskyActorDefsPreferencesUnion.Unexpected -> value.value
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyActorDefsPreferencesUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "app.bsky.actor.defs#adultContentPref" -> AppBskyActorDefsPreferencesUnion.AdultContentPref(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyActorDefsAdultContentPref.serializer(), element)
+            )
+            "app.bsky.actor.defs#contentLabelPref" -> AppBskyActorDefsPreferencesUnion.ContentLabelPref(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyActorDefsContentLabelPref.serializer(), element)
+            )
+            "app.bsky.actor.defs#savedFeedsPref" -> AppBskyActorDefsPreferencesUnion.SavedFeedsPref(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyActorDefsSavedFeedsPref.serializer(), element)
+            )
+            "app.bsky.actor.defs#savedFeedsPrefV2" -> AppBskyActorDefsPreferencesUnion.SavedFeedsPrefV2(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyActorDefsSavedFeedsPrefV2.serializer(), element)
+            )
+            "app.bsky.actor.defs#personalDetailsPref" -> AppBskyActorDefsPreferencesUnion.PersonalDetailsPref(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyActorDefsPersonalDetailsPref.serializer(), element)
+            )
+            "app.bsky.actor.defs#declaredAgePref" -> AppBskyActorDefsPreferencesUnion.DeclaredAgePref(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyActorDefsDeclaredAgePref.serializer(), element)
+            )
+            "app.bsky.actor.defs#feedViewPref" -> AppBskyActorDefsPreferencesUnion.FeedViewPref(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyActorDefsFeedViewPref.serializer(), element)
+            )
+            "app.bsky.actor.defs#threadViewPref" -> AppBskyActorDefsPreferencesUnion.ThreadViewPref(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyActorDefsThreadViewPref.serializer(), element)
+            )
+            "app.bsky.actor.defs#interestsPref" -> AppBskyActorDefsPreferencesUnion.InterestsPref(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyActorDefsInterestsPref.serializer(), element)
+            )
+            "app.bsky.actor.defs#mutedWordsPref" -> AppBskyActorDefsPreferencesUnion.MutedWordsPref(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyActorDefsMutedWordsPref.serializer(), element)
+            )
+            "app.bsky.actor.defs#hiddenPostsPref" -> AppBskyActorDefsPreferencesUnion.HiddenPostsPref(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyActorDefsHiddenPostsPref.serializer(), element)
+            )
+            "app.bsky.actor.defs#bskyAppStatePref" -> AppBskyActorDefsPreferencesUnion.BskyAppStatePref(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyActorDefsBskyAppStatePref.serializer(), element)
+            )
+            "app.bsky.actor.defs#labelersPref" -> AppBskyActorDefsPreferencesUnion.LabelersPref(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyActorDefsLabelersPref.serializer(), element)
+            )
+            "app.bsky.actor.defs#postInteractionSettingsPref" -> AppBskyActorDefsPreferencesUnion.PostInteractionSettingsPref(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyActorDefsPostInteractionSettingsPref.serializer(), element)
+            )
+            "app.bsky.actor.defs#verificationPrefs" -> AppBskyActorDefsPreferencesUnion.VerificationPrefs(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyActorDefsVerificationPrefs.serializer(), element)
+            )
+            "app.bsky.actor.defs#liveEventPreferences" -> AppBskyActorDefsPreferencesUnion.LiveEventPreferences(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyActorDefsLiveEventPreferences.serializer(), element)
+            )
+            else -> AppBskyActorDefsPreferencesUnion.Unexpected(element)
+        }
+    }
+}
+
+@Serializable(with = AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnionSerializer::class)
 sealed interface AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnion {
     @Serializable
-    @SerialName("app.bsky.actor.defs#AppBskyFeedThreadgateMentionRule")
-    data class AppBskyFeedThreadgateMentionRule(val value: AppBskyFeedThreadgateMentionRule) : AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnion
+    data class MentionRule(val value: com.atproto.generated.AppBskyFeedThreadgateMentionRule) : AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnion
 
     @Serializable
-    @SerialName("app.bsky.actor.defs#AppBskyFeedThreadgateFollowerRule")
-    data class AppBskyFeedThreadgateFollowerRule(val value: AppBskyFeedThreadgateFollowerRule) : AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnion
+    data class FollowerRule(val value: com.atproto.generated.AppBskyFeedThreadgateFollowerRule) : AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnion
 
     @Serializable
-    @SerialName("app.bsky.actor.defs#AppBskyFeedThreadgateFollowingRule")
-    data class AppBskyFeedThreadgateFollowingRule(val value: AppBskyFeedThreadgateFollowingRule) : AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnion
+    data class FollowingRule(val value: com.atproto.generated.AppBskyFeedThreadgateFollowingRule) : AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnion
 
     @Serializable
-    @SerialName("app.bsky.actor.defs#AppBskyFeedThreadgateListRule")
-    data class AppBskyFeedThreadgateListRule(val value: AppBskyFeedThreadgateListRule) : AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnion
+    data class ListRule(val value: com.atproto.generated.AppBskyFeedThreadgateListRule) : AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnion
 
     @Serializable
-    @SerialName("unknown")
     data class Unexpected(val value: JsonElement) : AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnion
 }
 
-@Serializable
+object AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnionSerializer : kotlinx.serialization.KSerializer<AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnion.MentionRule -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyFeedThreadgateMentionRule.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.threadgate#mentionRule")
+                })
+            }
+            is AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnion.FollowerRule -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyFeedThreadgateFollowerRule.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.threadgate#followerRule")
+                })
+            }
+            is AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnion.FollowingRule -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyFeedThreadgateFollowingRule.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.threadgate#followingRule")
+                })
+            }
+            is AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnion.ListRule -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyFeedThreadgateListRule.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.threadgate#listRule")
+                })
+            }
+            is AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnion.Unexpected -> value.value
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "app.bsky.feed.threadgate#mentionRule" -> AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnion.MentionRule(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyFeedThreadgateMentionRule.serializer(), element)
+            )
+            "app.bsky.feed.threadgate#followerRule" -> AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnion.FollowerRule(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyFeedThreadgateFollowerRule.serializer(), element)
+            )
+            "app.bsky.feed.threadgate#followingRule" -> AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnion.FollowingRule(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyFeedThreadgateFollowingRule.serializer(), element)
+            )
+            "app.bsky.feed.threadgate#listRule" -> AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnion.ListRule(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyFeedThreadgateListRule.serializer(), element)
+            )
+            else -> AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnion.Unexpected(element)
+        }
+    }
+}
+
+@Serializable(with = AppBskyActorDefsPostInteractionSettingsPrefPostgateEmbeddingRulesUnionSerializer::class)
 sealed interface AppBskyActorDefsPostInteractionSettingsPrefPostgateEmbeddingRulesUnion {
     @Serializable
-    @SerialName("app.bsky.actor.defs#AppBskyFeedPostgateDisableRule")
-    data class AppBskyFeedPostgateDisableRule(val value: AppBskyFeedPostgateDisableRule) : AppBskyActorDefsPostInteractionSettingsPrefPostgateEmbeddingRulesUnion
+    data class DisableRule(val value: com.atproto.generated.AppBskyFeedPostgateDisableRule) : AppBskyActorDefsPostInteractionSettingsPrefPostgateEmbeddingRulesUnion
 
     @Serializable
-    @SerialName("unknown")
     data class Unexpected(val value: JsonElement) : AppBskyActorDefsPostInteractionSettingsPrefPostgateEmbeddingRulesUnion
 }
 
-@Serializable
+object AppBskyActorDefsPostInteractionSettingsPrefPostgateEmbeddingRulesUnionSerializer : kotlinx.serialization.KSerializer<AppBskyActorDefsPostInteractionSettingsPrefPostgateEmbeddingRulesUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyActorDefsPostInteractionSettingsPrefPostgateEmbeddingRulesUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyActorDefsPostInteractionSettingsPrefPostgateEmbeddingRulesUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is AppBskyActorDefsPostInteractionSettingsPrefPostgateEmbeddingRulesUnion.DisableRule -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyFeedPostgateDisableRule.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.postgate#disableRule")
+                })
+            }
+            is AppBskyActorDefsPostInteractionSettingsPrefPostgateEmbeddingRulesUnion.Unexpected -> value.value
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyActorDefsPostInteractionSettingsPrefPostgateEmbeddingRulesUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "app.bsky.feed.postgate#disableRule" -> AppBskyActorDefsPostInteractionSettingsPrefPostgateEmbeddingRulesUnion.DisableRule(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyFeedPostgateDisableRule.serializer(), element)
+            )
+            else -> AppBskyActorDefsPostInteractionSettingsPrefPostgateEmbeddingRulesUnion.Unexpected(element)
+        }
+    }
+}
+
+@Serializable(with = AppBskyActorDefsStatusViewEmbedUnionSerializer::class)
 sealed interface AppBskyActorDefsStatusViewEmbedUnion {
     @Serializable
-    @SerialName("app.bsky.actor.defs#AppBskyEmbedExternalView")
-    data class AppBskyEmbedExternalView(val value: AppBskyEmbedExternalView) : AppBskyActorDefsStatusViewEmbedUnion
+    data class View(val value: com.atproto.generated.AppBskyEmbedExternalView) : AppBskyActorDefsStatusViewEmbedUnion
 
     @Serializable
-    @SerialName("unknown")
     data class Unexpected(val value: JsonElement) : AppBskyActorDefsStatusViewEmbedUnion
+}
+
+object AppBskyActorDefsStatusViewEmbedUnionSerializer : kotlinx.serialization.KSerializer<AppBskyActorDefsStatusViewEmbedUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyActorDefsStatusViewEmbedUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyActorDefsStatusViewEmbedUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is AppBskyActorDefsStatusViewEmbedUnion.View -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyEmbedExternalView.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.external#view")
+                })
+            }
+            is AppBskyActorDefsStatusViewEmbedUnion.Unexpected -> value.value
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyActorDefsStatusViewEmbedUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "app.bsky.embed.external#view" -> AppBskyActorDefsStatusViewEmbedUnion.View(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyEmbedExternalView.serializer(), element)
+            )
+            else -> AppBskyActorDefsStatusViewEmbedUnion.Unexpected(element)
+        }
+    }
 }
 
 @Serializable
@@ -213,16 +632,16 @@ enum class AppBskyActorDefsMutedWordTarget {
         @SerialName("did")
         val did: DID,        @SerialName("handle")
         val handle: Handle,        @SerialName("displayName")
-        val displayName: String?,        @SerialName("pronouns")
-        val pronouns: String?,        @SerialName("avatar")
-        val avatar: URI?,        @SerialName("associated")
-        val associated: AppBskyActorDefsProfileAssociated?,        @SerialName("viewer")
-        val viewer: AppBskyActorDefsViewerState?,        @SerialName("labels")
-        val labels: List<ComAtprotoLabelDefsLabel>?,        @SerialName("createdAt")
-        val createdAt: ATProtocolDate?,        @SerialName("verification")
-        val verification: AppBskyActorDefsVerificationState?,        @SerialName("status")
-        val status: AppBskyActorDefsStatusView?,/** Debug information for internal development */        @SerialName("debug")
-        val debug: JsonElement?    ) {
+        val displayName: String? = null,        @SerialName("pronouns")
+        val pronouns: String? = null,        @SerialName("avatar")
+        val avatar: URI? = null,        @SerialName("associated")
+        val associated: AppBskyActorDefsProfileAssociated? = null,        @SerialName("viewer")
+        val viewer: AppBskyActorDefsViewerState? = null,        @SerialName("labels")
+        val labels: List<ComAtprotoLabelDefsLabel>? = null,        @SerialName("createdAt")
+        val createdAt: ATProtocolDate? = null,        @SerialName("verification")
+        val verification: AppBskyActorDefsVerificationState? = null,        @SerialName("status")
+        val status: AppBskyActorDefsStatusView? = null,/** Debug information for internal development */        @SerialName("debug")
+        val debug: JsonElement? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyActorDefsProfileViewBasic"
         }
@@ -233,18 +652,18 @@ enum class AppBskyActorDefsMutedWordTarget {
         @SerialName("did")
         val did: DID,        @SerialName("handle")
         val handle: Handle,        @SerialName("displayName")
-        val displayName: String?,        @SerialName("pronouns")
-        val pronouns: String?,        @SerialName("description")
-        val description: String?,        @SerialName("avatar")
-        val avatar: URI?,        @SerialName("associated")
-        val associated: AppBskyActorDefsProfileAssociated?,        @SerialName("indexedAt")
-        val indexedAt: ATProtocolDate?,        @SerialName("createdAt")
-        val createdAt: ATProtocolDate?,        @SerialName("viewer")
-        val viewer: AppBskyActorDefsViewerState?,        @SerialName("labels")
-        val labels: List<ComAtprotoLabelDefsLabel>?,        @SerialName("verification")
-        val verification: AppBskyActorDefsVerificationState?,        @SerialName("status")
-        val status: AppBskyActorDefsStatusView?,/** Debug information for internal development */        @SerialName("debug")
-        val debug: JsonElement?    ) {
+        val displayName: String? = null,        @SerialName("pronouns")
+        val pronouns: String? = null,        @SerialName("description")
+        val description: String? = null,        @SerialName("avatar")
+        val avatar: URI? = null,        @SerialName("associated")
+        val associated: AppBskyActorDefsProfileAssociated? = null,        @SerialName("indexedAt")
+        val indexedAt: ATProtocolDate? = null,        @SerialName("createdAt")
+        val createdAt: ATProtocolDate? = null,        @SerialName("viewer")
+        val viewer: AppBskyActorDefsViewerState? = null,        @SerialName("labels")
+        val labels: List<ComAtprotoLabelDefsLabel>? = null,        @SerialName("verification")
+        val verification: AppBskyActorDefsVerificationState? = null,        @SerialName("status")
+        val status: AppBskyActorDefsStatusView? = null,/** Debug information for internal development */        @SerialName("debug")
+        val debug: JsonElement? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyActorDefsProfileView"
         }
@@ -255,25 +674,25 @@ enum class AppBskyActorDefsMutedWordTarget {
         @SerialName("did")
         val did: DID,        @SerialName("handle")
         val handle: Handle,        @SerialName("displayName")
-        val displayName: String?,        @SerialName("description")
-        val description: String?,        @SerialName("pronouns")
-        val pronouns: String?,        @SerialName("website")
-        val website: URI?,        @SerialName("avatar")
-        val avatar: URI?,        @SerialName("banner")
-        val banner: URI?,        @SerialName("followersCount")
-        val followersCount: Int?,        @SerialName("followsCount")
-        val followsCount: Int?,        @SerialName("postsCount")
-        val postsCount: Int?,        @SerialName("associated")
-        val associated: AppBskyActorDefsProfileAssociated?,        @SerialName("joinedViaStarterPack")
-        val joinedViaStarterPack: AppBskyGraphDefsStarterPackViewBasic?,        @SerialName("indexedAt")
-        val indexedAt: ATProtocolDate?,        @SerialName("createdAt")
-        val createdAt: ATProtocolDate?,        @SerialName("viewer")
-        val viewer: AppBskyActorDefsViewerState?,        @SerialName("labels")
-        val labels: List<ComAtprotoLabelDefsLabel>?,        @SerialName("pinnedPost")
-        val pinnedPost: ComAtprotoRepoStrongRef?,        @SerialName("verification")
-        val verification: AppBskyActorDefsVerificationState?,        @SerialName("status")
-        val status: AppBskyActorDefsStatusView?,/** Debug information for internal development */        @SerialName("debug")
-        val debug: JsonElement?    ) {
+        val displayName: String? = null,        @SerialName("description")
+        val description: String? = null,        @SerialName("pronouns")
+        val pronouns: String? = null,        @SerialName("website")
+        val website: URI? = null,        @SerialName("avatar")
+        val avatar: URI? = null,        @SerialName("banner")
+        val banner: URI? = null,        @SerialName("followersCount")
+        val followersCount: Int? = null,        @SerialName("followsCount")
+        val followsCount: Int? = null,        @SerialName("postsCount")
+        val postsCount: Int? = null,        @SerialName("associated")
+        val associated: AppBskyActorDefsProfileAssociated? = null,        @SerialName("joinedViaStarterPack")
+        val joinedViaStarterPack: AppBskyGraphDefsStarterPackViewBasic? = null,        @SerialName("indexedAt")
+        val indexedAt: ATProtocolDate? = null,        @SerialName("createdAt")
+        val createdAt: ATProtocolDate? = null,        @SerialName("viewer")
+        val viewer: AppBskyActorDefsViewerState? = null,        @SerialName("labels")
+        val labels: List<ComAtprotoLabelDefsLabel>? = null,        @SerialName("pinnedPost")
+        val pinnedPost: ComAtprotoRepoStrongRef? = null,        @SerialName("verification")
+        val verification: AppBskyActorDefsVerificationState? = null,        @SerialName("status")
+        val status: AppBskyActorDefsStatusView? = null,/** Debug information for internal development */        @SerialName("debug")
+        val debug: JsonElement? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyActorDefsProfileViewDetailed"
         }
@@ -282,13 +701,13 @@ enum class AppBskyActorDefsMutedWordTarget {
     @Serializable
     data class AppBskyActorDefsProfileAssociated(
         @SerialName("lists")
-        val lists: Int?,        @SerialName("feedgens")
-        val feedgens: Int?,        @SerialName("starterPacks")
-        val starterPacks: Int?,        @SerialName("labeler")
-        val labeler: Boolean?,        @SerialName("chat")
-        val chat: AppBskyActorDefsProfileAssociatedChat?,        @SerialName("activitySubscription")
-        val activitySubscription: AppBskyActorDefsProfileAssociatedActivitySubscription?,        @SerialName("germ")
-        val germ: AppBskyActorDefsProfileAssociatedGerm?    ) {
+        val lists: Int? = null,        @SerialName("feedgens")
+        val feedgens: Int? = null,        @SerialName("starterPacks")
+        val starterPacks: Int? = null,        @SerialName("labeler")
+        val labeler: Boolean? = null,        @SerialName("chat")
+        val chat: AppBskyActorDefsProfileAssociatedChat? = null,        @SerialName("activitySubscription")
+        val activitySubscription: AppBskyActorDefsProfileAssociatedActivitySubscription? = null,        @SerialName("germ")
+        val germ: AppBskyActorDefsProfileAssociatedGerm? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyActorDefsProfileAssociated"
         }
@@ -328,15 +747,15 @@ enum class AppBskyActorDefsMutedWordTarget {
     @Serializable
     data class AppBskyActorDefsViewerState(
         @SerialName("muted")
-        val muted: Boolean?,        @SerialName("mutedByList")
-        val mutedByList: AppBskyGraphDefsListViewBasic?,        @SerialName("blockedBy")
-        val blockedBy: Boolean?,        @SerialName("blocking")
-        val blocking: ATProtocolURI?,        @SerialName("blockingByList")
-        val blockingByList: AppBskyGraphDefsListViewBasic?,        @SerialName("following")
-        val following: ATProtocolURI?,        @SerialName("followedBy")
-        val followedBy: ATProtocolURI?,/** This property is present only in selected cases, as an optimization. */        @SerialName("knownFollowers")
-        val knownFollowers: AppBskyActorDefsKnownFollowers?,/** This property is present only in selected cases, as an optimization. */        @SerialName("activitySubscription")
-        val activitySubscription: AppBskyNotificationDefsActivitySubscription?    ) {
+        val muted: Boolean? = null,        @SerialName("mutedByList")
+        val mutedByList: AppBskyGraphDefsListViewBasic? = null,        @SerialName("blockedBy")
+        val blockedBy: Boolean? = null,        @SerialName("blocking")
+        val blocking: ATProtocolURI? = null,        @SerialName("blockingByList")
+        val blockingByList: AppBskyGraphDefsListViewBasic? = null,        @SerialName("following")
+        val following: ATProtocolURI? = null,        @SerialName("followedBy")
+        val followedBy: ATProtocolURI? = null,/** This property is present only in selected cases, as an optimization. */        @SerialName("knownFollowers")
+        val knownFollowers: AppBskyActorDefsKnownFollowers? = null,/** This property is present only in selected cases, as an optimization. */        @SerialName("activitySubscription")
+        val activitySubscription: AppBskyNotificationDefsActivitySubscription? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyActorDefsViewerState"
         }
@@ -398,7 +817,7 @@ enum class AppBskyActorDefsMutedWordTarget {
     @Serializable
     data class AppBskyActorDefsContentLabelPref(
 /** Which labeler does this preference apply to? If undefined, applies globally. */        @SerialName("labelerDid")
-        val labelerDid: DID?,        @SerialName("label")
+        val labelerDid: DID? = null,        @SerialName("label")
         val label: String,        @SerialName("visibility")
         val visibility: String    ) {
         companion object {
@@ -432,7 +851,7 @@ enum class AppBskyActorDefsMutedWordTarget {
         @SerialName("pinned")
         val pinned: List<ATProtocolURI>,        @SerialName("saved")
         val saved: List<ATProtocolURI>,        @SerialName("timelineIndex")
-        val timelineIndex: Int?    ) {
+        val timelineIndex: Int? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyActorDefsSavedFeedsPref"
         }
@@ -441,7 +860,7 @@ enum class AppBskyActorDefsMutedWordTarget {
     @Serializable
     data class AppBskyActorDefsPersonalDetailsPref(
 /** The birth date of account owner. */        @SerialName("birthDate")
-        val birthDate: ATProtocolDate?    ) {
+        val birthDate: ATProtocolDate? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyActorDefsPersonalDetailsPref"
         }
@@ -453,9 +872,9 @@ enum class AppBskyActorDefsMutedWordTarget {
     @Serializable
     data class AppBskyActorDefsDeclaredAgePref(
 /** Indicates if the user has declared that they are over 13 years of age. */        @SerialName("isOverAge13")
-        val isOverAge13: Boolean?,/** Indicates if the user has declared that they are over 16 years of age. */        @SerialName("isOverAge16")
-        val isOverAge16: Boolean?,/** Indicates if the user has declared that they are over 18 years of age. */        @SerialName("isOverAge18")
-        val isOverAge18: Boolean?    ) {
+        val isOverAge13: Boolean? = null,/** Indicates if the user has declared that they are over 16 years of age. */        @SerialName("isOverAge16")
+        val isOverAge16: Boolean? = null,/** Indicates if the user has declared that they are over 18 years of age. */        @SerialName("isOverAge18")
+        val isOverAge18: Boolean? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyActorDefsDeclaredAgePref"
         }
@@ -465,11 +884,11 @@ enum class AppBskyActorDefsMutedWordTarget {
     data class AppBskyActorDefsFeedViewPref(
 /** The URI of the feed, or an identifier which describes the feed. */        @SerialName("feed")
         val feed: String,/** Hide replies in the feed. */        @SerialName("hideReplies")
-        val hideReplies: Boolean?,/** Hide replies in the feed if they are not by followed users. */        @SerialName("hideRepliesByUnfollowed")
-        val hideRepliesByUnfollowed: Boolean?,/** Hide replies in the feed if they do not have this number of likes. */        @SerialName("hideRepliesByLikeCount")
-        val hideRepliesByLikeCount: Int?,/** Hide reposts in the feed. */        @SerialName("hideReposts")
-        val hideReposts: Boolean?,/** Hide quote posts in the feed. */        @SerialName("hideQuotePosts")
-        val hideQuotePosts: Boolean?    ) {
+        val hideReplies: Boolean? = null,/** Hide replies in the feed if they are not by followed users. */        @SerialName("hideRepliesByUnfollowed")
+        val hideRepliesByUnfollowed: Boolean? = null,/** Hide replies in the feed if they do not have this number of likes. */        @SerialName("hideRepliesByLikeCount")
+        val hideRepliesByLikeCount: Int? = null,/** Hide reposts in the feed. */        @SerialName("hideReposts")
+        val hideReposts: Boolean? = null,/** Hide quote posts in the feed. */        @SerialName("hideQuotePosts")
+        val hideQuotePosts: Boolean? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyActorDefsFeedViewPref"
         }
@@ -478,7 +897,7 @@ enum class AppBskyActorDefsMutedWordTarget {
     @Serializable
     data class AppBskyActorDefsThreadViewPref(
 /** Sorting mode for threads. */        @SerialName("sort")
-        val sort: String?    ) {
+        val sort: String? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyActorDefsThreadViewPref"
         }
@@ -499,11 +918,11 @@ enum class AppBskyActorDefsMutedWordTarget {
     @Serializable
     data class AppBskyActorDefsMutedWord(
         @SerialName("id")
-        val id: String?,/** The muted word itself. */        @SerialName("value")
+        val id: String? = null,/** The muted word itself. */        @SerialName("value")
         val value: String,/** The intended targets of the muted word. */        @SerialName("targets")
         val targets: List<AppBskyActorDefsMutedWordTarget>,/** Groups of users to apply the muted word to. If undefined, applies to all users. */        @SerialName("actorTarget")
-        val actorTarget: String?,/** The date and time at which the muted word will expire and no longer be applied. */        @SerialName("expiresAt")
-        val expiresAt: ATProtocolDate?    ) {
+        val actorTarget: String? = null,/** The date and time at which the muted word will expire and no longer be applied. */        @SerialName("expiresAt")
+        val expiresAt: ATProtocolDate? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyActorDefsMutedWord"
         }
@@ -551,9 +970,9 @@ enum class AppBskyActorDefsMutedWordTarget {
     @Serializable
     data class AppBskyActorDefsBskyAppStatePref(
         @SerialName("activeProgressGuide")
-        val activeProgressGuide: AppBskyActorDefsBskyAppProgressGuide?,/** An array of tokens which identify nudges (modals, popups, tours, highlight dots) that should be shown to the user. */        @SerialName("queuedNudges")
-        val queuedNudges: List<String>?,/** Storage for NUXs the user has encountered. */        @SerialName("nuxs")
-        val nuxs: List<AppBskyActorDefsNux>?    ) {
+        val activeProgressGuide: AppBskyActorDefsBskyAppProgressGuide? = null,/** An array of tokens which identify nudges (modals, popups, tours, highlight dots) that should be shown to the user. */        @SerialName("queuedNudges")
+        val queuedNudges: List<String>? = null,/** Storage for NUXs the user has encountered. */        @SerialName("nuxs")
+        val nuxs: List<AppBskyActorDefsNux>? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyActorDefsBskyAppStatePref"
         }
@@ -579,8 +998,8 @@ enum class AppBskyActorDefsMutedWordTarget {
         @SerialName("id")
         val id: String,        @SerialName("completed")
         val completed: Boolean,/** Arbitrary data for the NUX. The structure is defined by the NUX itself. Limited to 300 characters. */        @SerialName("data")
-        val `data`: String?,/** The date and time at which the NUX will expire and should be considered completed. */        @SerialName("expiresAt")
-        val expiresAt: ATProtocolDate?    ) {
+        val `data`: String? = null,/** The date and time at which the NUX will expire and should be considered completed. */        @SerialName("expiresAt")
+        val expiresAt: ATProtocolDate? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyActorDefsNux"
         }
@@ -592,7 +1011,7 @@ enum class AppBskyActorDefsMutedWordTarget {
     @Serializable
     data class AppBskyActorDefsVerificationPrefs(
 /** Hide the blue check badges for verified accounts and trusted verifiers. */        @SerialName("hideBadges")
-        val hideBadges: Boolean?    ) {
+        val hideBadges: Boolean? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyActorDefsVerificationPrefs"
         }
@@ -604,8 +1023,8 @@ enum class AppBskyActorDefsMutedWordTarget {
     @Serializable
     data class AppBskyActorDefsLiveEventPreferences(
 /** A list of feed IDs that the user has hidden from live events. */        @SerialName("hiddenFeedIds")
-        val hiddenFeedIds: List<String>?,/** Whether to hide all feeds from live events. */        @SerialName("hideAllFeeds")
-        val hideAllFeeds: Boolean?    ) {
+        val hiddenFeedIds: List<String>? = null,/** Whether to hide all feeds from live events. */        @SerialName("hideAllFeeds")
+        val hideAllFeeds: Boolean? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyActorDefsLiveEventPreferences"
         }
@@ -617,8 +1036,8 @@ enum class AppBskyActorDefsMutedWordTarget {
     @Serializable
     data class AppBskyActorDefsPostInteractionSettingsPref(
 /** Matches threadgate record. List of rules defining who can reply to this users posts. If value is an empty array, no one can reply. If value is undefined, anyone can reply. */        @SerialName("threadgateAllowRules")
-        val threadgateAllowRules: List<AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnion>?,/** Matches postgate record. List of rules defining who can embed this users posts. If value is an empty array or is undefined, no particular rules apply and anyone can embed. */        @SerialName("postgateEmbeddingRules")
-        val postgateEmbeddingRules: List<AppBskyActorDefsPostInteractionSettingsPrefPostgateEmbeddingRulesUnion>?    ) {
+        val threadgateAllowRules: List<AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnion>? = null,/** Matches postgate record. List of rules defining who can embed this users posts. If value is an empty array or is undefined, no particular rules apply and anyone can embed. */        @SerialName("postgateEmbeddingRules")
+        val postgateEmbeddingRules: List<AppBskyActorDefsPostInteractionSettingsPrefPostgateEmbeddingRulesUnion>? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyActorDefsPostInteractionSettingsPref"
         }
@@ -627,14 +1046,14 @@ enum class AppBskyActorDefsMutedWordTarget {
     @Serializable
     data class AppBskyActorDefsStatusView(
         @SerialName("uri")
-        val uri: ATProtocolURI?,        @SerialName("cid")
-        val cid: CID?,/** The status for the account. */        @SerialName("status")
+        val uri: ATProtocolURI? = null,        @SerialName("cid")
+        val cid: CID? = null,/** The status for the account. */        @SerialName("status")
         val status: String,        @SerialName("record")
         val record: JsonElement,/** An optional embed associated with the status. */        @SerialName("embed")
-        val embed: AppBskyActorDefsStatusViewEmbedUnion?,/** The date when this status will expire. The application might choose to no longer return the status after expiration. */        @SerialName("expiresAt")
-        val expiresAt: ATProtocolDate?,/** True if the status is not expired, false if it is expired. Only present if expiration was set. */        @SerialName("isActive")
-        val isActive: Boolean?,/** True if the user's go-live access has been disabled by a moderator, false otherwise. */        @SerialName("isDisabled")
-        val isDisabled: Boolean?    ) {
+        val embed: AppBskyActorDefsStatusViewEmbedUnion? = null,/** The date when this status will expire. The application might choose to no longer return the status after expiration. */        @SerialName("expiresAt")
+        val expiresAt: ATProtocolDate? = null,/** True if the status is not expired, false if it is expired. Only present if expiration was set. */        @SerialName("isActive")
+        val isActive: Boolean? = null,/** True if the user's go-live access has been disabled by a moderator, false otherwise. */        @SerialName("isDisabled")
+        val isDisabled: Boolean? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyActorDefsStatusView"
         }

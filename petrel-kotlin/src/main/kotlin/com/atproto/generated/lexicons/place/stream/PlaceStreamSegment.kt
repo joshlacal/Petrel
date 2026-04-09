@@ -31,8 +31,8 @@ object PlaceStreamSegmentDefs {
         val codec: String,        @SerialName("width")
         val width: Int,        @SerialName("height")
         val height: Int,        @SerialName("framerate")
-        val framerate: PlaceStreamSegmentFramerate?,        @SerialName("bframes")
-        val bframes: Boolean?    ) {
+        val framerate: PlaceStreamSegmentFramerate? = null,        @SerialName("bframes")
+        val bframes: Boolean? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#placeStreamSegmentVideo"
         }

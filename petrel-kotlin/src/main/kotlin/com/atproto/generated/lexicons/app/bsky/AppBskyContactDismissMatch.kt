@@ -40,10 +40,12 @@ input: AppBskyContactDismissMatchInput): ATProtoResponse<AppBskyContactDismissMa
     val body = Json.encodeToString(input)
     val contentType = "application/json"
 
+    val queryParams: Map<String, String>? = null
+
     return client.networkService.performRequest(
         method = "POST",
         endpoint = endpoint,
-        queryParams = null,
+        queryParams = queryParams,
         headers = mapOf(
             "Content-Type" to contentType,
             "Accept" to "application/json"

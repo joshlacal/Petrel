@@ -21,7 +21,7 @@ object AppBskyGraphGetStarterPacksWithMembershipDefs {
     data class AppBskyGraphGetStarterPacksWithMembershipStarterPackWithMembership(
         @SerialName("starterPack")
         val starterPack: AppBskyGraphDefsStarterPackView,        @SerialName("listItem")
-        val listItem: AppBskyGraphDefsListItemView?    ) {
+        val listItem: AppBskyGraphDefsListItemView? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyGraphGetStarterPacksWithMembershipStarterPackWithMembership"
         }

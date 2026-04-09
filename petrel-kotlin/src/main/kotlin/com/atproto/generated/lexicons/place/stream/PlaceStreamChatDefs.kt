@@ -14,15 +14,46 @@ object PlaceStreamChatDefsDefs {
     const val TYPE_IDENTIFIER = "place.stream.chat.defs"
 }
 
-@Serializable
+@Serializable(with = PlaceStreamChatDefsMessageViewReplyToUnionSerializer::class)
 sealed interface PlaceStreamChatDefsMessageViewReplyToUnion {
     @Serializable
-    @SerialName("place.stream.chat.defs#PlaceStreamChatDefsMessageView")
-    data class PlaceStreamChatDefsMessageView(val value: PlaceStreamChatDefsMessageView) : PlaceStreamChatDefsMessageViewReplyToUnion
+    data class MessageView(val value: com.atproto.generated.PlaceStreamChatDefsMessageView) : PlaceStreamChatDefsMessageViewReplyToUnion
 
     @Serializable
-    @SerialName("unknown")
     data class Unexpected(val value: JsonElement) : PlaceStreamChatDefsMessageViewReplyToUnion
+}
+
+object PlaceStreamChatDefsMessageViewReplyToUnionSerializer : kotlinx.serialization.KSerializer<PlaceStreamChatDefsMessageViewReplyToUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("PlaceStreamChatDefsMessageViewReplyToUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: PlaceStreamChatDefsMessageViewReplyToUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is PlaceStreamChatDefsMessageViewReplyToUnion.MessageView -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.PlaceStreamChatDefsMessageView.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("place.stream.chat.defs#messageView")
+                })
+            }
+            is PlaceStreamChatDefsMessageViewReplyToUnion.Unexpected -> value.value
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): PlaceStreamChatDefsMessageViewReplyToUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "place.stream.chat.defs#messageView" -> PlaceStreamChatDefsMessageViewReplyToUnion.MessageView(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.PlaceStreamChatDefsMessageView.serializer(), element)
+            )
+            else -> PlaceStreamChatDefsMessageViewReplyToUnion.Unexpected(element)
+        }
+    }
 }
 
     @Serializable
@@ -33,10 +64,10 @@ sealed interface PlaceStreamChatDefsMessageViewReplyToUnion {
         val author: AppBskyActorDefsProfileViewBasic,        @SerialName("record")
         val record: JsonElement,        @SerialName("indexedAt")
         val indexedAt: ATProtocolDate,        @SerialName("chatProfile")
-        val chatProfile: PlaceStreamChatProfile?,        @SerialName("replyTo")
-        val replyTo: PlaceStreamChatDefsMessageViewReplyToUnion?,/** If true, this message has been deleted or labeled and should be cleared from the cache */        @SerialName("deleted")
-        val deleted: Boolean?,/** Up to 3 badge tokens to display with the message. First badge is server-controlled, remaining badges are user-settable. Tokens are looked up in badges.json for display info. */        @SerialName("badges")
-        val badges: List<PlaceStreamBadgeDefsBadgeView>?    ) {
+        val chatProfile: PlaceStreamChatProfile? = null,        @SerialName("replyTo")
+        val replyTo: PlaceStreamChatDefsMessageViewReplyToUnion? = null,/** If true, this message has been deleted or labeled and should be cleared from the cache */        @SerialName("deleted")
+        val deleted: Boolean? = null,/** Up to 3 badge tokens to display with the message. First badge is server-controlled, remaining badges are user-settable. Tokens are looked up in badges.json for display info. */        @SerialName("badges")
+        val badges: List<PlaceStreamBadgeDefsBadgeView>? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#placeStreamChatDefsMessageView"
         }
@@ -52,8 +83,8 @@ sealed interface PlaceStreamChatDefsMessageViewReplyToUnion {
         val cid: CID,        @SerialName("record")
         val record: PlaceStreamChatPinnedRecord,        @SerialName("indexedAt")
         val indexedAt: ATProtocolDate,        @SerialName("pinnedBy")
-        val pinnedBy: PlaceStreamChatProfile?,        @SerialName("message")
-        val message: PlaceStreamChatDefsMessageView?    ) {
+        val pinnedBy: PlaceStreamChatProfile? = null,        @SerialName("message")
+        val message: PlaceStreamChatDefsMessageView? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#placeStreamChatDefsPinnedRecordView"
         }

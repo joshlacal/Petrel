@@ -45,15 +45,15 @@ enum class ComAtprotoLabelDefsLabelValue {
     @Serializable
     data class ComAtprotoLabelDefsLabel(
 /** The AT Protocol version of the label object. */        @SerialName("ver")
-        val ver: Int?,/** DID of the actor who created this label. */        @SerialName("src")
+        val ver: Int? = null,/** DID of the actor who created this label. */        @SerialName("src")
         val src: DID,/** AT URI of the record, repository (account), or other resource that this label applies to. */        @SerialName("uri")
         val uri: URI,/** Optionally, CID specifying the specific version of 'uri' resource this label applies to. */        @SerialName("cid")
-        val cid: CID?,/** The short string name of the value or type of this label. */        @SerialName("val")
+        val cid: CID? = null,/** The short string name of the value or type of this label. */        @SerialName("val")
         val `val`: String,/** If true, this is a negation label, overwriting a previous label. */        @SerialName("neg")
-        val neg: Boolean?,/** Timestamp when this label was created. */        @SerialName("cts")
+        val neg: Boolean? = null,/** Timestamp when this label was created. */        @SerialName("cts")
         val cts: ATProtocolDate,/** Timestamp at which this label expires (no longer applies). */        @SerialName("exp")
-        val exp: ATProtocolDate?,/** Signature of dag-cbor encoded label. */        @SerialName("sig")
-        val sig: ByteArray?    ) {
+        val exp: ATProtocolDate? = null,/** Signature of dag-cbor encoded label. */        @SerialName("sig")
+        val sig: Bytes? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#comAtprotoLabelDefsLabel"
         }
@@ -92,8 +92,8 @@ enum class ComAtprotoLabelDefsLabelValue {
         val identifier: String,/** How should a client visually convey this label? 'inform' means neutral and informational; 'alert' means negative and warning; 'none' means show nothing. */        @SerialName("severity")
         val severity: String,/** What should this label hide in the UI, if applied? 'content' hides all of the target; 'media' hides the images/video/audio; 'none' hides nothing. */        @SerialName("blurs")
         val blurs: String,/** The default setting for this label. */        @SerialName("defaultSetting")
-        val defaultSetting: String?,/** Does the user need to have adult content enabled in order to configure this label? */        @SerialName("adultOnly")
-        val adultOnly: Boolean?,        @SerialName("locales")
+        val defaultSetting: String? = null,/** Does the user need to have adult content enabled in order to configure this label? */        @SerialName("adultOnly")
+        val adultOnly: Boolean? = null,        @SerialName("locales")
         val locales: List<ComAtprotoLabelDefsLabelValueDefinitionStrings>    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#comAtprotoLabelDefsLabelValueDefinition"

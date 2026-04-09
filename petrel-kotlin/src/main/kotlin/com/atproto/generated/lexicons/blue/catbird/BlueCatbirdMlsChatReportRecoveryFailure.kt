@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: blue.catbird.mlsChat.reportRecoveryFailure
-// Report that recovery has been exhausted for a conversation (spec §8.6) Report that recovery has been exhausted for a conversation. Server uses these reports for quorum-based auto-reset (>=50% of members must report within 1 hour for auto-reset to trigger).
+// Report that recovery has been exhausted for a conversation Report that a client has exhausted all recovery attempts for a conversation. Any member may report. When >=50% of active members have reported within a 1-hour window, the server auto-resets the group.
 package com.atproto.generated
 
 import kotlinx.serialization.*
@@ -17,14 +17,16 @@ object BlueCatbirdMlsChatReportRecoveryFailureDefs {
 @Serializable
     data class BlueCatbirdMlsChatReportRecoveryFailureInput(
 // Conversation identifier        @SerialName("convoId")
-        val convoId: String,// Type of failure (default: external_commit_exhausted)        @SerialName("failureType")
+        val convoId: String,// Type of failure that was exhausted        @SerialName("failureType")
         val failureType: String? = null    )
 
     @Serializable
     data class BlueCatbirdMlsChatReportRecoveryFailureOutput(
 // Whether the failure report was recorded        @SerialName("recorded")
-        val recorded: Boolean,// Whether quorum-based auto-reset was triggered        @SerialName("autoResetTriggered")
-        val autoResetTriggered: Boolean    )
+        val recorded: Boolean,// Whether the quorum threshold was met and an automatic group reset was triggered        @SerialName("autoResetTriggered")
+        val autoResetTriggered: Boolean,// Number of members who have reported failures within the expiry window        @SerialName("failureCount")
+        val failureCount: Int,// Total number of active members in the conversation        @SerialName("memberCount")
+        val memberCount: Int    )
 
 sealed class BlueCatbirdMlsChatReportRecoveryFailureError(val name: String, val description: String?) {
         object ConvoNotFound: BlueCatbirdMlsChatReportRecoveryFailureError("ConvoNotFound", "Conversation not found")
@@ -32,7 +34,7 @@ sealed class BlueCatbirdMlsChatReportRecoveryFailureError(val name: String, val 
     }
 
 /**
- * Report that recovery has been exhausted for a conversation (spec §8.6) Report that recovery has been exhausted for a conversation. Server uses these reports for quorum-based auto-reset (>=50% of members must report within 1 hour for auto-reset to trigger).
+ * Report that recovery has been exhausted for a conversation Report that a client has exhausted all recovery attempts for a conversation. Any member may report. When >=50% of active members have reported within a 1-hour window, the server auto-resets the group.
  *
  * Endpoint: blue.catbird.mlsChat.reportRecoveryFailure
  */
@@ -44,10 +46,12 @@ input: BlueCatbirdMlsChatReportRecoveryFailureInput): ATProtoResponse<BlueCatbir
     val body = Json.encodeToString(input)
     val contentType = "application/json"
 
+    val queryParams: Map<String, String>? = null
+
     return client.networkService.performRequest(
         method = "POST",
         endpoint = endpoint,
-        queryParams = null,
+        queryParams = queryParams,
         headers = mapOf(
             "Content-Type" to contentType,
             "Accept" to "application/json"

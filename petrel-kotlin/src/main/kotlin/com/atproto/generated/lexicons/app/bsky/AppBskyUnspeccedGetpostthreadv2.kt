@@ -14,27 +14,82 @@ object AppBskyUnspeccedGetPostThreadV2Defs {
     const val TYPE_IDENTIFIER = "app.bsky.unspecced.getPostThreadV2"
 }
 
-@Serializable
+@Serializable(with = AppBskyUnspeccedGetPostThreadV2ThreadItemValueUnionSerializer::class)
 sealed interface AppBskyUnspeccedGetPostThreadV2ThreadItemValueUnion {
     @Serializable
-    @SerialName("app.bsky.unspecced.getPostThreadV2#AppBskyUnspeccedDefsThreadItemPost")
-    data class AppBskyUnspeccedDefsThreadItemPost(val value: AppBskyUnspeccedDefsThreadItemPost) : AppBskyUnspeccedGetPostThreadV2ThreadItemValueUnion
+    data class ThreadItemPost(val value: com.atproto.generated.AppBskyUnspeccedDefsThreadItemPost) : AppBskyUnspeccedGetPostThreadV2ThreadItemValueUnion
 
     @Serializable
-    @SerialName("app.bsky.unspecced.getPostThreadV2#AppBskyUnspeccedDefsThreadItemNoUnauthenticated")
-    data class AppBskyUnspeccedDefsThreadItemNoUnauthenticated(val value: AppBskyUnspeccedDefsThreadItemNoUnauthenticated) : AppBskyUnspeccedGetPostThreadV2ThreadItemValueUnion
+    data class ThreadItemNoUnauthenticated(val value: com.atproto.generated.AppBskyUnspeccedDefsThreadItemNoUnauthenticated) : AppBskyUnspeccedGetPostThreadV2ThreadItemValueUnion
 
     @Serializable
-    @SerialName("app.bsky.unspecced.getPostThreadV2#AppBskyUnspeccedDefsThreadItemNotFound")
-    data class AppBskyUnspeccedDefsThreadItemNotFound(val value: AppBskyUnspeccedDefsThreadItemNotFound) : AppBskyUnspeccedGetPostThreadV2ThreadItemValueUnion
+    data class ThreadItemNotFound(val value: com.atproto.generated.AppBskyUnspeccedDefsThreadItemNotFound) : AppBskyUnspeccedGetPostThreadV2ThreadItemValueUnion
 
     @Serializable
-    @SerialName("app.bsky.unspecced.getPostThreadV2#AppBskyUnspeccedDefsThreadItemBlocked")
-    data class AppBskyUnspeccedDefsThreadItemBlocked(val value: AppBskyUnspeccedDefsThreadItemBlocked) : AppBskyUnspeccedGetPostThreadV2ThreadItemValueUnion
+    data class ThreadItemBlocked(val value: com.atproto.generated.AppBskyUnspeccedDefsThreadItemBlocked) : AppBskyUnspeccedGetPostThreadV2ThreadItemValueUnion
 
     @Serializable
-    @SerialName("unknown")
     data class Unexpected(val value: JsonElement) : AppBskyUnspeccedGetPostThreadV2ThreadItemValueUnion
+}
+
+object AppBskyUnspeccedGetPostThreadV2ThreadItemValueUnionSerializer : kotlinx.serialization.KSerializer<AppBskyUnspeccedGetPostThreadV2ThreadItemValueUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyUnspeccedGetPostThreadV2ThreadItemValueUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyUnspeccedGetPostThreadV2ThreadItemValueUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is AppBskyUnspeccedGetPostThreadV2ThreadItemValueUnion.ThreadItemPost -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyUnspeccedDefsThreadItemPost.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.unspecced.defs#threadItemPost")
+                })
+            }
+            is AppBskyUnspeccedGetPostThreadV2ThreadItemValueUnion.ThreadItemNoUnauthenticated -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyUnspeccedDefsThreadItemNoUnauthenticated.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.unspecced.defs#threadItemNoUnauthenticated")
+                })
+            }
+            is AppBskyUnspeccedGetPostThreadV2ThreadItemValueUnion.ThreadItemNotFound -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyUnspeccedDefsThreadItemNotFound.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.unspecced.defs#threadItemNotFound")
+                })
+            }
+            is AppBskyUnspeccedGetPostThreadV2ThreadItemValueUnion.ThreadItemBlocked -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyUnspeccedDefsThreadItemBlocked.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.unspecced.defs#threadItemBlocked")
+                })
+            }
+            is AppBskyUnspeccedGetPostThreadV2ThreadItemValueUnion.Unexpected -> value.value
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyUnspeccedGetPostThreadV2ThreadItemValueUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "app.bsky.unspecced.defs#threadItemPost" -> AppBskyUnspeccedGetPostThreadV2ThreadItemValueUnion.ThreadItemPost(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyUnspeccedDefsThreadItemPost.serializer(), element)
+            )
+            "app.bsky.unspecced.defs#threadItemNoUnauthenticated" -> AppBskyUnspeccedGetPostThreadV2ThreadItemValueUnion.ThreadItemNoUnauthenticated(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyUnspeccedDefsThreadItemNoUnauthenticated.serializer(), element)
+            )
+            "app.bsky.unspecced.defs#threadItemNotFound" -> AppBskyUnspeccedGetPostThreadV2ThreadItemValueUnion.ThreadItemNotFound(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyUnspeccedDefsThreadItemNotFound.serializer(), element)
+            )
+            "app.bsky.unspecced.defs#threadItemBlocked" -> AppBskyUnspeccedGetPostThreadV2ThreadItemValueUnion.ThreadItemBlocked(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyUnspeccedDefsThreadItemBlocked.serializer(), element)
+            )
+            else -> AppBskyUnspeccedGetPostThreadV2ThreadItemValueUnion.Unexpected(element)
+        }
+    }
 }
 
     @Serializable

@@ -26,8 +26,8 @@ object AppBskyFeedDescribeFeedGeneratorDefs {
     @Serializable
     data class AppBskyFeedDescribeFeedGeneratorLinks(
         @SerialName("privacyPolicy")
-        val privacyPolicy: String?,        @SerialName("termsOfService")
-        val termsOfService: String?    ) {
+        val privacyPolicy: String? = null,        @SerialName("termsOfService")
+        val termsOfService: String? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyFeedDescribeFeedGeneratorLinks"
         }

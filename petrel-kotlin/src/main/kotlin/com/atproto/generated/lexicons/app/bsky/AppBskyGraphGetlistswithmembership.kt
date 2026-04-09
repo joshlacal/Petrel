@@ -21,7 +21,7 @@ object AppBskyGraphGetListsWithMembershipDefs {
     data class AppBskyGraphGetListsWithMembershipListWithMembership(
         @SerialName("list")
         val list: AppBskyGraphDefsListView,        @SerialName("listItem")
-        val listItem: AppBskyGraphDefsListItemView?    ) {
+        val listItem: AppBskyGraphDefsListItemView? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyGraphGetListsWithMembershipListWithMembership"
         }

@@ -19,12 +19,9 @@ object BlueCatbirdMlsChatDeviceDefs {
      */
     @Serializable
     data class BlueCatbirdMlsChatDevice(
-/** Unique device identifier (server-assigned or client-generated UUID) */        @SerialName("deviceId")
-        val deviceId: String,/** Human-readable device name (e.g. 'Josh's iPhone') */        @SerialName("deviceName")
-        val deviceName: String? = null,/** The MLS credential signature public key for this device */        @SerialName("mlsSignaturePublicKey")
-        val mlsSignaturePublicKey: ByteArray,/** Signature algorithm: 'ed25519' or 'p256' */        @SerialName("algorithm")
-        val algorithm: String,/** Device platform: 'ios', 'macos', 'catmos', 'android' */        @SerialName("platform")
-        val platform: String? = null,        @SerialName("createdAt")
+/** The MLS credential signature public key for this device */        @SerialName("mlsSignaturePublicKey")
+        val mlsSignaturePublicKey: Bytes,/** Signature algorithm: 'ed25519' or 'p256' */        @SerialName("algorithm")
+        val algorithm: String,        @SerialName("createdAt")
         val createdAt: ATProtocolDate    ) {
         companion object {
             const val TYPE_IDENTIFIER = ""

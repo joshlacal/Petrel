@@ -19,7 +19,7 @@ object ComAtprotoServerListAppPasswordsDefs {
         @SerialName("name")
         val name: String,        @SerialName("createdAt")
         val createdAt: ATProtocolDate,        @SerialName("privileged")
-        val privileged: Boolean?    ) {
+        val privileged: Boolean? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#comAtprotoServerListAppPasswordsAppPassword"
         }

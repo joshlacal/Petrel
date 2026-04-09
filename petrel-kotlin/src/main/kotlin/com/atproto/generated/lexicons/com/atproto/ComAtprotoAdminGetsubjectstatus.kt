@@ -14,23 +14,70 @@ object ComAtprotoAdminGetSubjectStatusDefs {
     const val TYPE_IDENTIFIER = "com.atproto.admin.getSubjectStatus"
 }
 
-@Serializable
+@Serializable(with = ComAtprotoAdminGetSubjectStatusOutputSubjectUnionSerializer::class)
 sealed interface ComAtprotoAdminGetSubjectStatusOutputSubjectUnion {
     @Serializable
-    @SerialName("com.atproto.admin.getSubjectStatus#ComAtprotoAdminDefsRepoRef")
-    data class ComAtprotoAdminDefsRepoRef(val value: ComAtprotoAdminDefsRepoRef) : ComAtprotoAdminGetSubjectStatusOutputSubjectUnion
+    data class RepoRef(val value: com.atproto.generated.ComAtprotoAdminDefsRepoRef) : ComAtprotoAdminGetSubjectStatusOutputSubjectUnion
 
     @Serializable
-    @SerialName("com.atproto.admin.getSubjectStatus#ComAtprotoRepoStrongRef")
-    data class ComAtprotoRepoStrongRef(val value: ComAtprotoRepoStrongRef) : ComAtprotoAdminGetSubjectStatusOutputSubjectUnion
+    data class StrongRef(val value: com.atproto.generated.ComAtprotoRepoStrongRef) : ComAtprotoAdminGetSubjectStatusOutputSubjectUnion
 
     @Serializable
-    @SerialName("com.atproto.admin.getSubjectStatus#ComAtprotoAdminDefsRepoBlobRef")
-    data class ComAtprotoAdminDefsRepoBlobRef(val value: ComAtprotoAdminDefsRepoBlobRef) : ComAtprotoAdminGetSubjectStatusOutputSubjectUnion
+    data class RepoBlobRef(val value: com.atproto.generated.ComAtprotoAdminDefsRepoBlobRef) : ComAtprotoAdminGetSubjectStatusOutputSubjectUnion
 
     @Serializable
-    @SerialName("unknown")
     data class Unexpected(val value: JsonElement) : ComAtprotoAdminGetSubjectStatusOutputSubjectUnion
+}
+
+object ComAtprotoAdminGetSubjectStatusOutputSubjectUnionSerializer : kotlinx.serialization.KSerializer<ComAtprotoAdminGetSubjectStatusOutputSubjectUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("ComAtprotoAdminGetSubjectStatusOutputSubjectUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ComAtprotoAdminGetSubjectStatusOutputSubjectUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is ComAtprotoAdminGetSubjectStatusOutputSubjectUnion.RepoRef -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ComAtprotoAdminDefsRepoRef.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.admin.defs#repoRef")
+                })
+            }
+            is ComAtprotoAdminGetSubjectStatusOutputSubjectUnion.StrongRef -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ComAtprotoRepoStrongRef.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.repo.strongRef")
+                })
+            }
+            is ComAtprotoAdminGetSubjectStatusOutputSubjectUnion.RepoBlobRef -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ComAtprotoAdminDefsRepoBlobRef.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.admin.defs#repoBlobRef")
+                })
+            }
+            is ComAtprotoAdminGetSubjectStatusOutputSubjectUnion.Unexpected -> value.value
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ComAtprotoAdminGetSubjectStatusOutputSubjectUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "com.atproto.admin.defs#repoRef" -> ComAtprotoAdminGetSubjectStatusOutputSubjectUnion.RepoRef(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ComAtprotoAdminDefsRepoRef.serializer(), element)
+            )
+            "com.atproto.repo.strongRef" -> ComAtprotoAdminGetSubjectStatusOutputSubjectUnion.StrongRef(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ComAtprotoRepoStrongRef.serializer(), element)
+            )
+            "com.atproto.admin.defs#repoBlobRef" -> ComAtprotoAdminGetSubjectStatusOutputSubjectUnion.RepoBlobRef(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ComAtprotoAdminDefsRepoBlobRef.serializer(), element)
+            )
+            else -> ComAtprotoAdminGetSubjectStatusOutputSubjectUnion.Unexpected(element)
+        }
+    }
 }
 
 @Serializable

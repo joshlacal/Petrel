@@ -27,10 +27,10 @@ object ComAtprotoSyncSubscribeReposDefs {
         val commit: JsonElement,/** The rev of the emitted commit. Note that this information is also in the commit object included in blocks, unless this is a tooBig event. */        @SerialName("rev")
         val rev: String,/** The rev of the last emitted commit from this repo (if any). */        @SerialName("since")
         val since: String,/** CAR file containing relevant blocks, as a diff since the previous repo state. The commit must be included as a block, and the commit block CID must be the first entry in the CAR header 'roots' list. */        @SerialName("blocks")
-        val blocks: ByteArray,        @SerialName("ops")
+        val blocks: Bytes,        @SerialName("ops")
         val ops: List<ComAtprotoSyncSubscribeReposRepoOp>,        @SerialName("blobs")
         val blobs: List<JsonElement>,/** The root CID of the MST tree for the previous commit from this repo (indicated by the 'since' revision field in this message). Corresponds to the 'data' field in the repo commit object. NOTE: this field is effectively required for the 'inductive' version of firehose. */        @SerialName("prevData")
-        val prevData: JsonElement?,/** Timestamp of when this message was originally broadcast. */        @SerialName("time")
+        val prevData: JsonElement? = null,/** Timestamp of when this message was originally broadcast. */        @SerialName("time")
         val time: ATProtocolDate    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#comAtprotoSyncSubscribeReposCommit"
@@ -45,7 +45,7 @@ object ComAtprotoSyncSubscribeReposDefs {
 /** The stream sequence number of this message. */        @SerialName("seq")
         val seq: Int,/** The account this repo event corresponds to. Must match that in the commit object. */        @SerialName("did")
         val did: DID,/** CAR file containing the commit, as a block. The CAR header must include the commit block CID as the first 'root'. */        @SerialName("blocks")
-        val blocks: ByteArray,/** The rev of the commit. This value must match that in the commit object. */        @SerialName("rev")
+        val blocks: Bytes,/** The rev of the commit. This value must match that in the commit object. */        @SerialName("rev")
         val rev: String,/** Timestamp of when this message was originally broadcast. */        @SerialName("time")
         val time: ATProtocolDate    ) {
         companion object {
@@ -62,7 +62,7 @@ object ComAtprotoSyncSubscribeReposDefs {
         val seq: Int,        @SerialName("did")
         val did: DID,        @SerialName("time")
         val time: ATProtocolDate,/** The current handle for the account, or 'handle.invalid' if validation fails. This field is optional, might have been validated or passed-through from an upstream source. Semantics and behaviors for PDS vs Relay may evolve in the future; see atproto specs for more details. */        @SerialName("handle")
-        val handle: Handle?    ) {
+        val handle: Handle? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#comAtprotoSyncSubscribeReposIdentity"
         }
@@ -78,7 +78,7 @@ object ComAtprotoSyncSubscribeReposDefs {
         val did: DID,        @SerialName("time")
         val time: ATProtocolDate,/** Indicates that the account has a repository which can be fetched from the host that emitted this event. */        @SerialName("active")
         val active: Boolean,/** If active=false, this optional field indicates a reason for why the account is not active. */        @SerialName("status")
-        val status: String?    ) {
+        val status: String? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#comAtprotoSyncSubscribeReposAccount"
         }
@@ -88,7 +88,7 @@ object ComAtprotoSyncSubscribeReposDefs {
     data class ComAtprotoSyncSubscribeReposInfo(
         @SerialName("name")
         val name: String,        @SerialName("message")
-        val message: String?    ) {
+        val message: String? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#comAtprotoSyncSubscribeReposInfo"
         }
@@ -103,7 +103,7 @@ object ComAtprotoSyncSubscribeReposDefs {
         val action: String,        @SerialName("path")
         val path: String,/** For creates and updates, the new record CID. For deletions, null. */        @SerialName("cid")
         val cid: JsonElement,/** For updates and deletes, the previous record CID (required for inductive firehose). For creations, field should not be defined. */        @SerialName("prev")
-        val prev: JsonElement?    ) {
+        val prev: JsonElement? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#comAtprotoSyncSubscribeReposRepoOp"
         }

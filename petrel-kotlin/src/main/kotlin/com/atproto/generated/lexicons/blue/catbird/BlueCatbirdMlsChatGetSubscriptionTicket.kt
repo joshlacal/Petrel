@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: blue.catbird.mlsChat.getSubscriptionTicket
-// Get a short-lived signed ticket for subscribing to MLS events via WebSocket. The ticket is valid for 30 seconds and must be used to establish a WebSocket connection.
+// Get a short-lived ticket for WebSocket subscription authentication (same as v1, in v2 namespace) Get a short-lived ticket for WebSocket subscription authentication. Call this via PDS proxy, then connect directly to the MLS DS WebSocket endpoint with the ticket.
 package com.atproto.generated
 
 import kotlinx.serialization.*
@@ -16,23 +16,22 @@ object BlueCatbirdMlsChatGetSubscriptionTicketDefs {
 
 @Serializable
     data class BlueCatbirdMlsChatGetSubscriptionTicketInput(
-// Optional: limit subscription to specific conversations. If omitted, subscribes to all conversations the user is a member of.        @SerialName("convoIds")
+// Conversation IDs to subscribe to. If omitted, subscribes to all user conversations.        @SerialName("convoIds")
         val convoIds: List<String>? = null    )
 
     @Serializable
     data class BlueCatbirdMlsChatGetSubscriptionTicketOutput(
-// Signed subscription ticket (JWT) to use as query parameter when connecting to WebSocket        @SerialName("ticket")
-        val ticket: String,// WebSocket endpoint URL to connect to (e.g., wss://mls.catbird.blue/xrpc/blue.catbird.mlsChat.subscribeConvoEvents)        @SerialName("endpoint")
-        val endpoint: String,// When the ticket expires (ISO 8601). Must connect before this time.        @SerialName("expiresAt")
+// Short-lived JWT ticket for WebSocket authentication        @SerialName("ticket")
+        val ticket: String,// WebSocket endpoint URL to connect to        @SerialName("endpoint")
+        val endpoint: URI? = null,// Ticket expiration time (typically 30 seconds from issuance)        @SerialName("expiresAt")
         val expiresAt: ATProtocolDate    )
 
 sealed class BlueCatbirdMlsChatGetSubscriptionTicketError(val name: String, val description: String?) {
-        object Unauthorized: BlueCatbirdMlsChatGetSubscriptionTicketError("Unauthorized", "Authentication required")
-        object Forbidden: BlueCatbirdMlsChatGetSubscriptionTicketError("Forbidden", "User is not a member of the specified conversation")
+        object NotMember: BlueCatbirdMlsChatGetSubscriptionTicketError("NotMember", "User is not a member of one or more specified conversations")
     }
 
 /**
- * Get a short-lived signed ticket for subscribing to MLS events via WebSocket. The ticket is valid for 30 seconds and must be used to establish a WebSocket connection.
+ * Get a short-lived ticket for WebSocket subscription authentication (same as v1, in v2 namespace) Get a short-lived ticket for WebSocket subscription authentication. Call this via PDS proxy, then connect directly to the MLS DS WebSocket endpoint with the ticket.
  *
  * Endpoint: blue.catbird.mlsChat.getSubscriptionTicket
  */
@@ -44,10 +43,12 @@ input: BlueCatbirdMlsChatGetSubscriptionTicketInput): ATProtoResponse<BlueCatbir
     val body = Json.encodeToString(input)
     val contentType = "application/json"
 
+    val queryParams: Map<String, String>? = null
+
     return client.networkService.performRequest(
         method = "POST",
         endpoint = endpoint,
-        queryParams = null,
+        queryParams = queryParams,
         headers = mapOf(
             "Content-Type" to contentType,
             "Accept" to "application/json"

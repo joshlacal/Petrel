@@ -14,15 +14,46 @@ object PlaceStreamIngestGetIngestUrlsDefs {
     const val TYPE_IDENTIFIER = "place.stream.ingest.getIngestUrls"
 }
 
-@Serializable
+@Serializable(with = PlaceStreamIngestGetIngestUrlsOutputIngestsUnionSerializer::class)
 sealed interface PlaceStreamIngestGetIngestUrlsOutputIngestsUnion {
     @Serializable
-    @SerialName("place.stream.ingest.getIngestUrls#PlaceStreamIngestDefsIngest")
-    data class PlaceStreamIngestDefsIngest(val value: PlaceStreamIngestDefsIngest) : PlaceStreamIngestGetIngestUrlsOutputIngestsUnion
+    data class Ingest(val value: com.atproto.generated.PlaceStreamIngestDefsIngest) : PlaceStreamIngestGetIngestUrlsOutputIngestsUnion
 
     @Serializable
-    @SerialName("unknown")
     data class Unexpected(val value: JsonElement) : PlaceStreamIngestGetIngestUrlsOutputIngestsUnion
+}
+
+object PlaceStreamIngestGetIngestUrlsOutputIngestsUnionSerializer : kotlinx.serialization.KSerializer<PlaceStreamIngestGetIngestUrlsOutputIngestsUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("PlaceStreamIngestGetIngestUrlsOutputIngestsUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: PlaceStreamIngestGetIngestUrlsOutputIngestsUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is PlaceStreamIngestGetIngestUrlsOutputIngestsUnion.Ingest -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.PlaceStreamIngestDefsIngest.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("place.stream.ingest.defs#ingest")
+                })
+            }
+            is PlaceStreamIngestGetIngestUrlsOutputIngestsUnion.Unexpected -> value.value
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): PlaceStreamIngestGetIngestUrlsOutputIngestsUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "place.stream.ingest.defs#ingest" -> PlaceStreamIngestGetIngestUrlsOutputIngestsUnion.Ingest(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.PlaceStreamIngestDefsIngest.serializer(), element)
+            )
+            else -> PlaceStreamIngestGetIngestUrlsOutputIngestsUnion.Unexpected(element)
+        }
+    }
 }
 
 @Serializable

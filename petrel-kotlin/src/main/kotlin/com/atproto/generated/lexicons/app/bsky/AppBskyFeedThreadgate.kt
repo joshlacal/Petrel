@@ -14,27 +14,82 @@ object AppBskyFeedThreadgateDefs {
     const val TYPE_IDENTIFIER = "app.bsky.feed.threadgate"
 }
 
-@Serializable
+@Serializable(with = AppBskyFeedThreadgateAllowUnionSerializer::class)
 sealed interface AppBskyFeedThreadgateAllowUnion {
     @Serializable
-    @SerialName("app.bsky.feed.threadgate#AppBskyFeedThreadgateMentionRule")
-    data class AppBskyFeedThreadgateMentionRule(val value: AppBskyFeedThreadgateMentionRule) : AppBskyFeedThreadgateAllowUnion
+    data class MentionRule(val value: com.atproto.generated.AppBskyFeedThreadgateMentionRule) : AppBskyFeedThreadgateAllowUnion
 
     @Serializable
-    @SerialName("app.bsky.feed.threadgate#AppBskyFeedThreadgateFollowerRule")
-    data class AppBskyFeedThreadgateFollowerRule(val value: AppBskyFeedThreadgateFollowerRule) : AppBskyFeedThreadgateAllowUnion
+    data class FollowerRule(val value: com.atproto.generated.AppBskyFeedThreadgateFollowerRule) : AppBskyFeedThreadgateAllowUnion
 
     @Serializable
-    @SerialName("app.bsky.feed.threadgate#AppBskyFeedThreadgateFollowingRule")
-    data class AppBskyFeedThreadgateFollowingRule(val value: AppBskyFeedThreadgateFollowingRule) : AppBskyFeedThreadgateAllowUnion
+    data class FollowingRule(val value: com.atproto.generated.AppBskyFeedThreadgateFollowingRule) : AppBskyFeedThreadgateAllowUnion
 
     @Serializable
-    @SerialName("app.bsky.feed.threadgate#AppBskyFeedThreadgateListRule")
-    data class AppBskyFeedThreadgateListRule(val value: AppBskyFeedThreadgateListRule) : AppBskyFeedThreadgateAllowUnion
+    data class ListRule(val value: com.atproto.generated.AppBskyFeedThreadgateListRule) : AppBskyFeedThreadgateAllowUnion
 
     @Serializable
-    @SerialName("unknown")
     data class Unexpected(val value: JsonElement) : AppBskyFeedThreadgateAllowUnion
+}
+
+object AppBskyFeedThreadgateAllowUnionSerializer : kotlinx.serialization.KSerializer<AppBskyFeedThreadgateAllowUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyFeedThreadgateAllowUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyFeedThreadgateAllowUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is AppBskyFeedThreadgateAllowUnion.MentionRule -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyFeedThreadgateMentionRule.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.threadgate#mentionRule")
+                })
+            }
+            is AppBskyFeedThreadgateAllowUnion.FollowerRule -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyFeedThreadgateFollowerRule.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.threadgate#followerRule")
+                })
+            }
+            is AppBskyFeedThreadgateAllowUnion.FollowingRule -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyFeedThreadgateFollowingRule.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.threadgate#followingRule")
+                })
+            }
+            is AppBskyFeedThreadgateAllowUnion.ListRule -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyFeedThreadgateListRule.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.threadgate#listRule")
+                })
+            }
+            is AppBskyFeedThreadgateAllowUnion.Unexpected -> value.value
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyFeedThreadgateAllowUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "app.bsky.feed.threadgate#mentionRule" -> AppBskyFeedThreadgateAllowUnion.MentionRule(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyFeedThreadgateMentionRule.serializer(), element)
+            )
+            "app.bsky.feed.threadgate#followerRule" -> AppBskyFeedThreadgateAllowUnion.FollowerRule(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyFeedThreadgateFollowerRule.serializer(), element)
+            )
+            "app.bsky.feed.threadgate#followingRule" -> AppBskyFeedThreadgateAllowUnion.FollowingRule(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyFeedThreadgateFollowingRule.serializer(), element)
+            )
+            "app.bsky.feed.threadgate#listRule" -> AppBskyFeedThreadgateAllowUnion.ListRule(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyFeedThreadgateListRule.serializer(), element)
+            )
+            else -> AppBskyFeedThreadgateAllowUnion.Unexpected(element)
+        }
+    }
 }
 
     /**

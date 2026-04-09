@@ -14,34 +14,112 @@ object ComAtprotoModerationCreateReportDefs {
     const val TYPE_IDENTIFIER = "com.atproto.moderation.createReport"
 }
 
-@Serializable
+@Serializable(with = ComAtprotoModerationCreateReportInputSubjectUnionSerializer::class)
 sealed interface ComAtprotoModerationCreateReportInputSubjectUnion {
     @Serializable
-    @SerialName("com.atproto.moderation.createReport#ComAtprotoAdminDefsRepoRef")
-    data class ComAtprotoAdminDefsRepoRef(val value: ComAtprotoAdminDefsRepoRef) : ComAtprotoModerationCreateReportInputSubjectUnion
+    data class RepoRef(val value: com.atproto.generated.ComAtprotoAdminDefsRepoRef) : ComAtprotoModerationCreateReportInputSubjectUnion
 
     @Serializable
-    @SerialName("com.atproto.moderation.createReport#ComAtprotoRepoStrongRef")
-    data class ComAtprotoRepoStrongRef(val value: ComAtprotoRepoStrongRef) : ComAtprotoModerationCreateReportInputSubjectUnion
+    data class StrongRef(val value: com.atproto.generated.ComAtprotoRepoStrongRef) : ComAtprotoModerationCreateReportInputSubjectUnion
 
     @Serializable
-    @SerialName("unknown")
     data class Unexpected(val value: JsonElement) : ComAtprotoModerationCreateReportInputSubjectUnion
 }
 
-@Serializable
+object ComAtprotoModerationCreateReportInputSubjectUnionSerializer : kotlinx.serialization.KSerializer<ComAtprotoModerationCreateReportInputSubjectUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("ComAtprotoModerationCreateReportInputSubjectUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ComAtprotoModerationCreateReportInputSubjectUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is ComAtprotoModerationCreateReportInputSubjectUnion.RepoRef -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ComAtprotoAdminDefsRepoRef.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.admin.defs#repoRef")
+                })
+            }
+            is ComAtprotoModerationCreateReportInputSubjectUnion.StrongRef -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ComAtprotoRepoStrongRef.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.repo.strongRef")
+                })
+            }
+            is ComAtprotoModerationCreateReportInputSubjectUnion.Unexpected -> value.value
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ComAtprotoModerationCreateReportInputSubjectUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "com.atproto.admin.defs#repoRef" -> ComAtprotoModerationCreateReportInputSubjectUnion.RepoRef(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ComAtprotoAdminDefsRepoRef.serializer(), element)
+            )
+            "com.atproto.repo.strongRef" -> ComAtprotoModerationCreateReportInputSubjectUnion.StrongRef(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ComAtprotoRepoStrongRef.serializer(), element)
+            )
+            else -> ComAtprotoModerationCreateReportInputSubjectUnion.Unexpected(element)
+        }
+    }
+}
+
+@Serializable(with = ComAtprotoModerationCreateReportOutputSubjectUnionSerializer::class)
 sealed interface ComAtprotoModerationCreateReportOutputSubjectUnion {
     @Serializable
-    @SerialName("com.atproto.moderation.createReport#ComAtprotoAdminDefsRepoRef")
-    data class ComAtprotoAdminDefsRepoRef(val value: ComAtprotoAdminDefsRepoRef) : ComAtprotoModerationCreateReportOutputSubjectUnion
+    data class RepoRef(val value: com.atproto.generated.ComAtprotoAdminDefsRepoRef) : ComAtprotoModerationCreateReportOutputSubjectUnion
 
     @Serializable
-    @SerialName("com.atproto.moderation.createReport#ComAtprotoRepoStrongRef")
-    data class ComAtprotoRepoStrongRef(val value: ComAtprotoRepoStrongRef) : ComAtprotoModerationCreateReportOutputSubjectUnion
+    data class StrongRef(val value: com.atproto.generated.ComAtprotoRepoStrongRef) : ComAtprotoModerationCreateReportOutputSubjectUnion
 
     @Serializable
-    @SerialName("unknown")
     data class Unexpected(val value: JsonElement) : ComAtprotoModerationCreateReportOutputSubjectUnion
+}
+
+object ComAtprotoModerationCreateReportOutputSubjectUnionSerializer : kotlinx.serialization.KSerializer<ComAtprotoModerationCreateReportOutputSubjectUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("ComAtprotoModerationCreateReportOutputSubjectUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ComAtprotoModerationCreateReportOutputSubjectUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is ComAtprotoModerationCreateReportOutputSubjectUnion.RepoRef -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ComAtprotoAdminDefsRepoRef.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.admin.defs#repoRef")
+                })
+            }
+            is ComAtprotoModerationCreateReportOutputSubjectUnion.StrongRef -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ComAtprotoRepoStrongRef.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.repo.strongRef")
+                })
+            }
+            is ComAtprotoModerationCreateReportOutputSubjectUnion.Unexpected -> value.value
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ComAtprotoModerationCreateReportOutputSubjectUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "com.atproto.admin.defs#repoRef" -> ComAtprotoModerationCreateReportOutputSubjectUnion.RepoRef(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ComAtprotoAdminDefsRepoRef.serializer(), element)
+            )
+            "com.atproto.repo.strongRef" -> ComAtprotoModerationCreateReportOutputSubjectUnion.StrongRef(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ComAtprotoRepoStrongRef.serializer(), element)
+            )
+            else -> ComAtprotoModerationCreateReportOutputSubjectUnion.Unexpected(element)
+        }
+    }
 }
 
     /**
@@ -51,7 +129,7 @@ sealed interface ComAtprotoModerationCreateReportOutputSubjectUnion {
     data class ComAtprotoModerationCreateReportModTool(
 /** Name/identifier of the source (e.g., 'bsky-app/android', 'bsky-web/chrome') */        @SerialName("name")
         val name: String,/** Additional arbitrary metadata about the source */        @SerialName("meta")
-        val meta: JsonElement?    ) {
+        val meta: JsonElement? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#comAtprotoModerationCreateReportModTool"
         }
@@ -88,10 +166,12 @@ input: ComAtprotoModerationCreateReportInput): ATProtoResponse<ComAtprotoModerat
     val body = Json.encodeToString(input)
     val contentType = "application/json"
 
+    val queryParams: Map<String, String>? = null
+
     return client.networkService.performRequest(
         method = "POST",
         endpoint = endpoint,
-        queryParams = null,
+        queryParams = queryParams,
         headers = mapOf(
             "Content-Type" to contentType,
             "Accept" to "application/json"

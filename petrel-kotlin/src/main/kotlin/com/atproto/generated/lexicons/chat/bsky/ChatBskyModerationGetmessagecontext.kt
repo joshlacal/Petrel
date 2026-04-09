@@ -14,19 +14,58 @@ object ChatBskyModerationGetMessageContextDefs {
     const val TYPE_IDENTIFIER = "chat.bsky.moderation.getMessageContext"
 }
 
-@Serializable
+@Serializable(with = ChatBskyModerationGetMessageContextOutputMessagesUnionSerializer::class)
 sealed interface ChatBskyModerationGetMessageContextOutputMessagesUnion {
     @Serializable
-    @SerialName("chat.bsky.moderation.getMessageContext#ChatBskyConvoDefsMessageView")
-    data class ChatBskyConvoDefsMessageView(val value: ChatBskyConvoDefsMessageView) : ChatBskyModerationGetMessageContextOutputMessagesUnion
+    data class MessageView(val value: com.atproto.generated.ChatBskyConvoDefsMessageView) : ChatBskyModerationGetMessageContextOutputMessagesUnion
 
     @Serializable
-    @SerialName("chat.bsky.moderation.getMessageContext#ChatBskyConvoDefsDeletedMessageView")
-    data class ChatBskyConvoDefsDeletedMessageView(val value: ChatBskyConvoDefsDeletedMessageView) : ChatBskyModerationGetMessageContextOutputMessagesUnion
+    data class DeletedMessageView(val value: com.atproto.generated.ChatBskyConvoDefsDeletedMessageView) : ChatBskyModerationGetMessageContextOutputMessagesUnion
 
     @Serializable
-    @SerialName("unknown")
     data class Unexpected(val value: JsonElement) : ChatBskyModerationGetMessageContextOutputMessagesUnion
+}
+
+object ChatBskyModerationGetMessageContextOutputMessagesUnionSerializer : kotlinx.serialization.KSerializer<ChatBskyModerationGetMessageContextOutputMessagesUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("ChatBskyModerationGetMessageContextOutputMessagesUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ChatBskyModerationGetMessageContextOutputMessagesUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is ChatBskyModerationGetMessageContextOutputMessagesUnion.MessageView -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsMessageView.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#messageView")
+                })
+            }
+            is ChatBskyModerationGetMessageContextOutputMessagesUnion.DeletedMessageView -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsDeletedMessageView.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#deletedMessageView")
+                })
+            }
+            is ChatBskyModerationGetMessageContextOutputMessagesUnion.Unexpected -> value.value
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ChatBskyModerationGetMessageContextOutputMessagesUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "chat.bsky.convo.defs#messageView" -> ChatBskyModerationGetMessageContextOutputMessagesUnion.MessageView(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsMessageView.serializer(), element)
+            )
+            "chat.bsky.convo.defs#deletedMessageView" -> ChatBskyModerationGetMessageContextOutputMessagesUnion.DeletedMessageView(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsDeletedMessageView.serializer(), element)
+            )
+            else -> ChatBskyModerationGetMessageContextOutputMessagesUnion.Unexpected(element)
+        }
+    }
 }
 
 @Serializable

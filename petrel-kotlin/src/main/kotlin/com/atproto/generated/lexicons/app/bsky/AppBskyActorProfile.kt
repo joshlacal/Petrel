@@ -14,15 +14,46 @@ object AppBskyActorProfileDefs {
     const val TYPE_IDENTIFIER = "app.bsky.actor.profile"
 }
 
-@Serializable
+@Serializable(with = AppBskyActorProfileLabelsUnionSerializer::class)
 sealed interface AppBskyActorProfileLabelsUnion {
     @Serializable
-    @SerialName("app.bsky.actor.profile#ComAtprotoLabelDefsSelfLabels")
-    data class ComAtprotoLabelDefsSelfLabels(val value: ComAtprotoLabelDefsSelfLabels) : AppBskyActorProfileLabelsUnion
+    data class SelfLabels(val value: com.atproto.generated.ComAtprotoLabelDefsSelfLabels) : AppBskyActorProfileLabelsUnion
 
     @Serializable
-    @SerialName("unknown")
     data class Unexpected(val value: JsonElement) : AppBskyActorProfileLabelsUnion
+}
+
+object AppBskyActorProfileLabelsUnionSerializer : kotlinx.serialization.KSerializer<AppBskyActorProfileLabelsUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyActorProfileLabelsUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyActorProfileLabelsUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is AppBskyActorProfileLabelsUnion.SelfLabels -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ComAtprotoLabelDefsSelfLabels.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.label.defs#selfLabels")
+                })
+            }
+            is AppBskyActorProfileLabelsUnion.Unexpected -> value.value
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyActorProfileLabelsUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "com.atproto.label.defs#selfLabels" -> AppBskyActorProfileLabelsUnion.SelfLabels(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ComAtprotoLabelDefsSelfLabels.serializer(), element)
+            )
+            else -> AppBskyActorProfileLabelsUnion.Unexpected(element)
+        }
+    }
 }
 
     /**

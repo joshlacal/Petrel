@@ -62,6 +62,7 @@ class KotlinCodeGenerator(BaseCodeGenerator):
                 lex_definitions_code = self.generate_lex_definitions()
                 query_code = self.generate_query_function()
             elif main_def_type == 'procedure':
+                parameters_code = self.generate_parameters(self.main_def.get('parameters'))
                 input_code = self.generate_input(self.main_def.get('input'))
                 output_code = self.generate_output(self.main_def.get('output'))
                 errors_code = self.generate_errors(self.main_def.get('errors'))
@@ -179,9 +180,9 @@ class KotlinCodeGenerator(BaseCodeGenerator):
                 
                 # Also handle union items if present
                 if def_schema.get('items', {}).get('type') == 'union':
-                    refs = def_schema['items'].get('refs', [])
-                    converted_refs = [self.type_converter.convert_ref(r) for r in refs]
-                    self.enum_generator.generate_sealed_interface_for_union_array(self.class_name, name, converted_refs)
+                    raw_refs = def_schema['items'].get('refs', [])
+                    converted_refs = [self.type_converter.convert_ref(r) for r in raw_refs]
+                    self.enum_generator.generate_sealed_interface_for_union_array(self.class_name, name, converted_refs, raw_refs=raw_refs)
 
             elif def_type == 'array' and def_schema.get('items', {}).get('type') == 'union':
                 # This block is now redundant or covered above
@@ -371,10 +372,15 @@ class KotlinCodeGenerator(BaseCodeGenerator):
         is_blob_upload = self.is_blob_upload()
         is_binary_data = has_input and input_encoding and input_encoding not in ['', 'application/json', '*/*']
 
+        has_parameters = 'parameters' in self.main_def
+        parameters_type = f"{self.class_name}Parameters" if has_parameters else None
+
         return self.template_manager.procedure_template.render(
             namespace_path=namespace_path,
             function_name=function_name,
             has_input=has_input,
+            has_parameters=has_parameters,
+            parameters_type=parameters_type,
             input_type=input_type,
             output_type=output_type,
             endpoint=self.lexicon_id,
@@ -416,13 +422,15 @@ class KotlinCodeGenerator(BaseCodeGenerator):
         properties = main_def.get('properties', {})
         for prop_name, prop_schema in properties.items():
             if prop_schema.get('type') == 'union':
-                refs = [self.type_converter.convert_ref(r) for r in prop_schema.get('refs', [])]
-                self.enum_generator.generate_sealed_interface_for_union(self.class_name, prop_name, refs)
+                raw_refs = prop_schema.get('refs', [])
+                refs = [self.type_converter.convert_ref(r) for r in raw_refs]
+                self.enum_generator.generate_sealed_interface_for_union(self.class_name, prop_name, refs, raw_refs=raw_refs)
             elif prop_schema.get('type') == 'array':
                 item_schema = prop_schema.get('items', {})
                 if item_schema.get('type') == 'union':
-                    refs = [self.type_converter.convert_ref(r) for r in item_schema.get('refs', [])]
-                    self.enum_generator.generate_sealed_interface_for_union_array(self.class_name, prop_name, refs)
+                    raw_refs = item_schema.get('refs', [])
+                    refs = [self.type_converter.convert_ref(r) for r in raw_refs]
+                    self.enum_generator.generate_sealed_interface_for_union_array(self.class_name, prop_name, refs, raw_refs=raw_refs)
 
     def _to_camel_case(self, s: str) -> str:
         """Convert to camelCase."""

@@ -19,7 +19,7 @@ object AppBskyEmbedImagesDefs {
         @SerialName("image")
         val image: Blob,/** Alt text description of the image, for accessibility. */        @SerialName("alt")
         val alt: String,        @SerialName("aspectRatio")
-        val aspectRatio: AppBskyEmbedDefsAspectRatio?    ) {
+        val aspectRatio: AppBskyEmbedDefsAspectRatio? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyEmbedImagesImage"
         }
@@ -40,7 +40,7 @@ object AppBskyEmbedImagesDefs {
         val thumb: URI,/** Fully-qualified URL where a large version of the image can be fetched. May or may not be the exact original blob. For example, CDN location provided by the App View. */        @SerialName("fullsize")
         val fullsize: URI,/** Alt text description of the image, for accessibility. */        @SerialName("alt")
         val alt: String,        @SerialName("aspectRatio")
-        val aspectRatio: AppBskyEmbedDefsAspectRatio?    ) {
+        val aspectRatio: AppBskyEmbedDefsAspectRatio? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyEmbedImagesViewImage"
         }

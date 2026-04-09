@@ -7,10 +7,15 @@ extension ATProtoClient.{{ template_namespace_name }} {
     ///   - data: The binary data to upload
     ///   - mimeType: The MIME type of the data being uploaded
     ///   - stripMetadata: Whether to strip metadata from images (default: true)
+    {% if parameters_struct_name %}///   - params: The query parameters for the request{% endif %}
     /// {% elif is_binary_data %}
     /// - Parameter data: The binary data to upload
+    {% if parameters_struct_name %}/// - Parameter params: The query parameters for the request{% endif %}
     /// {% elif input_struct_name %}
     /// - Parameter input: The input parameters for the request
+    {% if parameters_struct_name %}/// - Parameter params: The query parameters for the request{% endif %}
+    /// {% elif parameters_struct_name %}
+    /// - Parameter params: The query parameters for the request
     /// {% endif %}
     /// - Returns: {% if output_type %}A tuple containing the HTTP response code and the decoded response data{% else %}The HTTP response code{% endif %}
     /// - Throws: NetworkError if the request fails or the response cannot be processed
@@ -18,11 +23,16 @@ extension ATProtoClient.{{ template_namespace_name }} {
         {% if is_blob_upload %}
         data: Data,
         mimeType: String,
-        stripMetadata: Bool = true
+        stripMetadata: Bool = true{% if parameters_struct_name %},
+        params: {{ parameters_struct_name }}{% endif %}
         {% elif is_binary_data %}
-        data: Data
+        data: Data{% if parameters_struct_name %},
+        params: {{ parameters_struct_name }}{% endif %}
         {% elif input_struct_name %}
-        input: {{ input_struct_name }}
+        input: {{ input_struct_name }}{% if parameters_struct_name %},
+        params: {{ parameters_struct_name }}{% endif %}
+        {% elif parameters_struct_name %}
+        params: {{ parameters_struct_name }}
         {% endif %}
     ) async throws -> {% if output_type %}(responseCode: Int, data: {{ output_type }}?){% else %}Int{% endif %} {
         let endpoint = "{{ endpoint }}"
@@ -54,13 +64,20 @@ extension ATProtoClient.{{ template_namespace_name }} {
         headers["Accept"] = "{{ output_encoding }}"
         {% endif %}
 
+        {% if not is_blob_upload and not is_binary_data %}
         let requestData: Data? = {% if input_struct_name %}try JSONEncoder().encode(input){% else %}nil{% endif %}
+        {% endif %}
+        {% if parameters_struct_name %}
+        let queryItems = params.asQueryItems()
+        {% else %}
+        let queryItems: [URLQueryItem]? = nil
+        {% endif %}
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
             headers: headers,
             body: {% if is_blob_upload or is_binary_data %}dataToUpload{% else %}requestData{% endif %},
-            queryItems: nil
+            queryItems: queryItems
         )
 
         // Determine service DID for this endpoint

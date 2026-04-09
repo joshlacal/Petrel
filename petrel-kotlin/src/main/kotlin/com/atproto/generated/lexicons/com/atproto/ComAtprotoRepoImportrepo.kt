@@ -32,10 +32,12 @@ input: ComAtprotoRepoImportRepoInput): ATProtoResponse<Unit> {
     val body = input.data
     val contentType = "application/vnd.ipld.car"
 
+    val queryParams: Map<String, String>? = null
+
     return client.networkService.performRequest(
         method = "POST",
         endpoint = endpoint,
-        queryParams = null,
+        queryParams = queryParams,
         headers = mapOf(
             "Content-Type" to contentType,
             "Accept" to "None"

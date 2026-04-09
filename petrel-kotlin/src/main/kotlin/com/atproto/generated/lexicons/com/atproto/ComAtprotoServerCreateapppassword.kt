@@ -20,7 +20,7 @@ object ComAtprotoServerCreateAppPasswordDefs {
         val name: String,        @SerialName("password")
         val password: String,        @SerialName("createdAt")
         val createdAt: ATProtocolDate,        @SerialName("privileged")
-        val privileged: Boolean?    ) {
+        val privileged: Boolean? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#comAtprotoServerCreateAppPasswordAppPassword"
         }
@@ -51,10 +51,12 @@ input: ComAtprotoServerCreateAppPasswordInput): ATProtoResponse<ComAtprotoServer
     val body = Json.encodeToString(input)
     val contentType = "application/json"
 
+    val queryParams: Map<String, String>? = null
+
     return client.networkService.performRequest(
         method = "POST",
         endpoint = endpoint,
-        queryParams = null,
+        queryParams = queryParams,
         headers = mapOf(
             "Content-Type" to contentType,
             "Accept" to "application/json"

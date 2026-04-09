@@ -30,11 +30,11 @@ enum class AppBskyGraphDefsListPurpose {
         val cid: CID,        @SerialName("name")
         val name: String,        @SerialName("purpose")
         val purpose: AppBskyGraphDefsListPurpose,        @SerialName("avatar")
-        val avatar: URI?,        @SerialName("listItemCount")
-        val listItemCount: Int?,        @SerialName("labels")
-        val labels: List<ComAtprotoLabelDefsLabel>?,        @SerialName("viewer")
-        val viewer: AppBskyGraphDefsListViewerState?,        @SerialName("indexedAt")
-        val indexedAt: ATProtocolDate?    ) {
+        val avatar: URI? = null,        @SerialName("listItemCount")
+        val listItemCount: Int? = null,        @SerialName("labels")
+        val labels: List<ComAtprotoLabelDefsLabel>? = null,        @SerialName("viewer")
+        val viewer: AppBskyGraphDefsListViewerState? = null,        @SerialName("indexedAt")
+        val indexedAt: ATProtocolDate? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyGraphDefsListViewBasic"
         }
@@ -48,12 +48,12 @@ enum class AppBskyGraphDefsListPurpose {
         val creator: AppBskyActorDefsProfileView,        @SerialName("name")
         val name: String,        @SerialName("purpose")
         val purpose: AppBskyGraphDefsListPurpose,        @SerialName("description")
-        val description: String?,        @SerialName("descriptionFacets")
-        val descriptionFacets: List<AppBskyRichtextFacet>?,        @SerialName("avatar")
-        val avatar: URI?,        @SerialName("listItemCount")
-        val listItemCount: Int?,        @SerialName("labels")
-        val labels: List<ComAtprotoLabelDefsLabel>?,        @SerialName("viewer")
-        val viewer: AppBskyGraphDefsListViewerState?,        @SerialName("indexedAt")
+        val description: String? = null,        @SerialName("descriptionFacets")
+        val descriptionFacets: List<AppBskyRichtextFacet>? = null,        @SerialName("avatar")
+        val avatar: URI? = null,        @SerialName("listItemCount")
+        val listItemCount: Int? = null,        @SerialName("labels")
+        val labels: List<ComAtprotoLabelDefsLabel>? = null,        @SerialName("viewer")
+        val viewer: AppBskyGraphDefsListViewerState? = null,        @SerialName("indexedAt")
         val indexedAt: ATProtocolDate    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyGraphDefsListView"
@@ -77,12 +77,12 @@ enum class AppBskyGraphDefsListPurpose {
         val cid: CID,        @SerialName("record")
         val record: JsonElement,        @SerialName("creator")
         val creator: AppBskyActorDefsProfileViewBasic,        @SerialName("list")
-        val list: AppBskyGraphDefsListViewBasic?,        @SerialName("listItemsSample")
-        val listItemsSample: List<AppBskyGraphDefsListItemView>?,        @SerialName("feeds")
-        val feeds: List<AppBskyFeedDefsGeneratorView>?,        @SerialName("joinedWeekCount")
-        val joinedWeekCount: Int?,        @SerialName("joinedAllTimeCount")
-        val joinedAllTimeCount: Int?,        @SerialName("labels")
-        val labels: List<ComAtprotoLabelDefsLabel>?,        @SerialName("indexedAt")
+        val list: AppBskyGraphDefsListViewBasic? = null,        @SerialName("listItemsSample")
+        val listItemsSample: List<AppBskyGraphDefsListItemView>? = null,        @SerialName("feeds")
+        val feeds: List<AppBskyFeedDefsGeneratorView>? = null,        @SerialName("joinedWeekCount")
+        val joinedWeekCount: Int? = null,        @SerialName("joinedAllTimeCount")
+        val joinedAllTimeCount: Int? = null,        @SerialName("labels")
+        val labels: List<ComAtprotoLabelDefsLabel>? = null,        @SerialName("indexedAt")
         val indexedAt: ATProtocolDate    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyGraphDefsStarterPackView"
@@ -96,10 +96,10 @@ enum class AppBskyGraphDefsListPurpose {
         val cid: CID,        @SerialName("record")
         val record: JsonElement,        @SerialName("creator")
         val creator: AppBskyActorDefsProfileViewBasic,        @SerialName("listItemCount")
-        val listItemCount: Int?,        @SerialName("joinedWeekCount")
-        val joinedWeekCount: Int?,        @SerialName("joinedAllTimeCount")
-        val joinedAllTimeCount: Int?,        @SerialName("labels")
-        val labels: List<ComAtprotoLabelDefsLabel>?,        @SerialName("indexedAt")
+        val listItemCount: Int? = null,        @SerialName("joinedWeekCount")
+        val joinedWeekCount: Int? = null,        @SerialName("joinedAllTimeCount")
+        val joinedAllTimeCount: Int? = null,        @SerialName("labels")
+        val labels: List<ComAtprotoLabelDefsLabel>? = null,        @SerialName("indexedAt")
         val indexedAt: ATProtocolDate    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyGraphDefsStarterPackViewBasic"
@@ -109,8 +109,8 @@ enum class AppBskyGraphDefsListPurpose {
     @Serializable
     data class AppBskyGraphDefsListViewerState(
         @SerialName("muted")
-        val muted: Boolean?,        @SerialName("blocked")
-        val blocked: ATProtocolURI?    ) {
+        val muted: Boolean? = null,        @SerialName("blocked")
+        val blocked: ATProtocolURI? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyGraphDefsListViewerState"
         }
@@ -136,12 +136,12 @@ enum class AppBskyGraphDefsListPurpose {
     data class AppBskyGraphDefsRelationship(
         @SerialName("did")
         val did: DID,/** if the actor follows this DID, this is the AT-URI of the follow record */        @SerialName("following")
-        val following: ATProtocolURI?,/** if the actor is followed by this DID, contains the AT-URI of the follow record */        @SerialName("followedBy")
-        val followedBy: ATProtocolURI?,/** if the actor blocks this DID, this is the AT-URI of the block record */        @SerialName("blocking")
-        val blocking: ATProtocolURI?,/** if the actor is blocked by this DID, contains the AT-URI of the block record */        @SerialName("blockedBy")
-        val blockedBy: ATProtocolURI?,/** if the actor blocks this DID via a block list, this is the AT-URI of the listblock record */        @SerialName("blockingByList")
-        val blockingByList: ATProtocolURI?,/** if the actor is blocked by this DID via a block list, contains the AT-URI of the listblock record */        @SerialName("blockedByList")
-        val blockedByList: ATProtocolURI?    ) {
+        val following: ATProtocolURI? = null,/** if the actor is followed by this DID, contains the AT-URI of the follow record */        @SerialName("followedBy")
+        val followedBy: ATProtocolURI? = null,/** if the actor blocks this DID, this is the AT-URI of the block record */        @SerialName("blocking")
+        val blocking: ATProtocolURI? = null,/** if the actor is blocked by this DID, contains the AT-URI of the block record */        @SerialName("blockedBy")
+        val blockedBy: ATProtocolURI? = null,/** if the actor blocks this DID via a block list, this is the AT-URI of the listblock record */        @SerialName("blockingByList")
+        val blockingByList: ATProtocolURI? = null,/** if the actor is blocked by this DID via a block list, contains the AT-URI of the listblock record */        @SerialName("blockedByList")
+        val blockedByList: ATProtocolURI? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyGraphDefsRelationship"
         }

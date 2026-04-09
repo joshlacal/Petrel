@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: blue.catbird.mlsChat.reportSpam
-// Report a conversation member for spam
+// Report an account as spam in an MLS conversation.
 package com.atproto.generated
 
 import kotlinx.serialization.*
@@ -16,25 +16,25 @@ object BlueCatbirdMlsChatReportSpamDefs {
 
 @Serializable
     data class BlueCatbirdMlsChatReportSpamInput(
-// Conversation identifier        @SerialName("convoId")
-        val convoId: String,// DID of the member being reported for spam        @SerialName("reportedDid")
+// The conversation ID        @SerialName("convoId")
+        val convoId: String,// DID of the account being reported        @SerialName("reportedDid")
         val reportedDid: DID,// Optional reason for the report        @SerialName("reason")
         val reason: String? = null    )
 
     @Serializable
     data class BlueCatbirdMlsChatReportSpamOutput(
-// Unique identifier for the spam report        @SerialName("id")
-        val id: String,// When the report was created        @SerialName("createdAt")
+        @SerialName("id")
+        val id: String,        @SerialName("createdAt")
         val createdAt: ATProtocolDate    )
 
 sealed class BlueCatbirdMlsChatReportSpamError(val name: String, val description: String?) {
-        object Unauthorized: BlueCatbirdMlsChatReportSpamError("Unauthorized", "Authentication required")
-        object NotFound: BlueCatbirdMlsChatReportSpamError("NotFound", "Conversation or member not found")
-        object DuplicateReport: BlueCatbirdMlsChatReportSpamError("DuplicateReport", "A report for this member in this conversation already exists")
+        object ConversationNotFound: BlueCatbirdMlsChatReportSpamError("ConversationNotFound", "")
+        object NotAMember: BlueCatbirdMlsChatReportSpamError("NotAMember", "")
+        object AlreadyReported: BlueCatbirdMlsChatReportSpamError("AlreadyReported", "")
     }
 
 /**
- * Report a conversation member for spam
+ * Report an account as spam in an MLS conversation.
  *
  * Endpoint: blue.catbird.mlsChat.reportSpam
  */
@@ -46,10 +46,12 @@ input: BlueCatbirdMlsChatReportSpamInput): ATProtoResponse<BlueCatbirdMlsChatRep
     val body = Json.encodeToString(input)
     val contentType = "application/json"
 
+    val queryParams: Map<String, String>? = null
+
     return client.networkService.performRequest(
         method = "POST",
         endpoint = endpoint,
-        queryParams = null,
+        queryParams = queryParams,
         headers = mapOf(
             "Content-Type" to contentType,
             "Accept" to "application/json"

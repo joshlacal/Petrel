@@ -14,15 +14,46 @@ object AppBskyFeedPostgateDefs {
     const val TYPE_IDENTIFIER = "app.bsky.feed.postgate"
 }
 
-@Serializable
+@Serializable(with = AppBskyFeedPostgateEmbeddingRulesUnionSerializer::class)
 sealed interface AppBskyFeedPostgateEmbeddingRulesUnion {
     @Serializable
-    @SerialName("app.bsky.feed.postgate#AppBskyFeedPostgateDisableRule")
-    data class AppBskyFeedPostgateDisableRule(val value: AppBskyFeedPostgateDisableRule) : AppBskyFeedPostgateEmbeddingRulesUnion
+    data class DisableRule(val value: com.atproto.generated.AppBskyFeedPostgateDisableRule) : AppBskyFeedPostgateEmbeddingRulesUnion
 
     @Serializable
-    @SerialName("unknown")
     data class Unexpected(val value: JsonElement) : AppBskyFeedPostgateEmbeddingRulesUnion
+}
+
+object AppBskyFeedPostgateEmbeddingRulesUnionSerializer : kotlinx.serialization.KSerializer<AppBskyFeedPostgateEmbeddingRulesUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyFeedPostgateEmbeddingRulesUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyFeedPostgateEmbeddingRulesUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is AppBskyFeedPostgateEmbeddingRulesUnion.DisableRule -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyFeedPostgateDisableRule.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.postgate#disableRule")
+                })
+            }
+            is AppBskyFeedPostgateEmbeddingRulesUnion.Unexpected -> value.value
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyFeedPostgateEmbeddingRulesUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "app.bsky.feed.postgate#disableRule" -> AppBskyFeedPostgateEmbeddingRulesUnion.DisableRule(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyFeedPostgateDisableRule.serializer(), element)
+            )
+            else -> AppBskyFeedPostgateEmbeddingRulesUnion.Unexpected(element)
+        }
+    }
 }
 
     /**
