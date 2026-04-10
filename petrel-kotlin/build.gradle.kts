@@ -1,6 +1,7 @@
 plugins {
     kotlin("jvm")
     kotlin("plugin.serialization")
+    id("org.jetbrains.kotlin.plugin.compose")
     `maven-publish`
 }
 
@@ -10,6 +11,9 @@ version = "0.1.0"
 dependencies {
     // Kotlin standard library
     implementation(kotlin("stdlib"))
+
+    // Compose runtime (required for Compose compiler stability metadata)
+    implementation("androidx.compose.runtime:runtime:1.8.3")
 
     // Kotlin Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
