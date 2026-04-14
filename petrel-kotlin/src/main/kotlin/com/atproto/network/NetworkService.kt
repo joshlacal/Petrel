@@ -56,13 +56,20 @@ class NetworkService(
         body: Any? = null,
         queryItems: Any? = null
     ): ATProtoResponse<T> {
+        // Canonical shape: List<Pair<String, String>> preserves repeated keys
+        // (needed for ATProto query params like `actors=did:plc:aaa&actors=did:plc:bbb`
+        // used by getProfiles, getKeyPackages, etc.). Previously this was collapsed
+        // via List.toMap() which silently dropped all but the last repeat — leading
+        // to empty/partial responses for any XRPC method with a list parameter.
         @Suppress("UNCHECKED_CAST")
-        val resolvedQueryItems = when (queryItems) {
-            is Map<*, *> -> queryItems as? Map<String, String>
-            is List<*> -> (queryItems as? List<Pair<String, String>>)?.toMap()
+        val resolvedQueryItems: List<Pair<String, String>>? = when (queryItems) {
+            is List<*> -> queryItems as? List<Pair<String, String>>
+            is Map<*, *> -> (queryItems as? Map<String, String>)?.map { (k, v) -> k to v }
             else -> null
         }
-        val resolvedParams = queryParams ?: resolvedQueryItems
+        val resolvedParams: List<Pair<String, String>>? = queryParams
+            ?.map { (k, v) -> k to v }
+            ?: resolvedQueryItems
         try {
             val response: HttpResponse = client.request(buildUrl(endpoint, resolvedParams)) {
                 this.method = HttpMethod.parse(method)
@@ -119,9 +126,10 @@ class NetworkService(
     }
 
     @PublishedApi
-    internal fun buildUrl(endpoint: String, queryParams: Map<String, String>?): String {
+    internal fun buildUrl(endpoint: String, queryParams: List<Pair<String, String>>?): String {
         val url = URLBuilder(baseUrl).apply {
             path("xrpc", endpoint)
+            // parameters.append preserves repeated keys (e.g., `actors=a&actors=b`).
             queryParams?.forEach { (key, value) ->
                 parameters.append(key, value)
             }
