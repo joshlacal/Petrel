@@ -39,12 +39,14 @@ suspend fun ATProtoClient.App.Bsky.Unspecced.getSuggestionsSkeleton(
 parameters: AppBskyUnspeccedGetSuggestionsSkeletonParameters): ATProtoResponse<AppBskyUnspeccedGetSuggestionsSkeletonOutput> {
     val endpoint = "app.bsky.unspecced.getSuggestionsSkeleton"
 
-    val queryParams = parameters.toQueryParams()
+    // List<Pair<String, String>> preserves repeated keys, which ATProto
+    // array-valued query params rely on (e.g. `?actors=a&actors=b`).
+    val queryItems = parameters.toQueryItems()
 
     return client.networkService.performRequest(
         method = "GET",
         endpoint = endpoint,
-        queryParams = queryParams,
+        queryItems = queryItems,
         headers = mapOf("Accept" to "application/json"),
         body = null
     )

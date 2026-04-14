@@ -30,12 +30,12 @@ suspend fun ATProtoClient.Com.Atproto.Temp.checkSignupQueue(
 ): ATProtoResponse<ComAtprotoTempCheckSignupQueueOutput> {
     val endpoint = "com.atproto.temp.checkSignupQueue"
 
-    val queryParams: Map<String, String>? = null
+    val queryItems: List<Pair<String, String>>? = null
 
     return client.networkService.performRequest(
         method = "GET",
         endpoint = endpoint,
-        queryParams = queryParams,
+        queryItems = queryItems,
         headers = mapOf("Accept" to "application/json"),
         body = null
     )

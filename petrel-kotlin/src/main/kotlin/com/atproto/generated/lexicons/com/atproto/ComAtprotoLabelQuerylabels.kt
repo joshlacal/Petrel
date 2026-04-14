@@ -37,12 +37,14 @@ suspend fun ATProtoClient.Com.Atproto.Label.queryLabels(
 parameters: ComAtprotoLabelQueryLabelsParameters): ATProtoResponse<ComAtprotoLabelQueryLabelsOutput> {
     val endpoint = "com.atproto.label.queryLabels"
 
-    val queryParams = parameters.toQueryParams()
+    // List<Pair<String, String>> preserves repeated keys, which ATProto
+    // array-valued query params rely on (e.g. `?actors=a&actors=b`).
+    val queryItems = parameters.toQueryItems()
 
     return client.networkService.performRequest(
         method = "GET",
         endpoint = endpoint,
-        queryParams = queryParams,
+        queryItems = queryItems,
         headers = mapOf("Accept" to "application/json"),
         body = null
     )

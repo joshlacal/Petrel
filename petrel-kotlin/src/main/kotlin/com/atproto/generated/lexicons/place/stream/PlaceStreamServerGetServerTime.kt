@@ -31,12 +31,14 @@ suspend fun ATProtoClient.Place.Stream.Server.getServerTime(
 parameters: PlaceStreamServerGetServerTimeParameters): ATProtoResponse<PlaceStreamServerGetServerTimeOutput> {
     val endpoint = "place.stream.server.getServerTime"
 
-    val queryParams = parameters.toQueryParams()
+    // List<Pair<String, String>> preserves repeated keys, which ATProto
+    // array-valued query params rely on (e.g. `?actors=a&actors=b`).
+    val queryItems = parameters.toQueryItems()
 
     return client.networkService.performRequest(
         method = "GET",
         endpoint = endpoint,
-        queryParams = queryParams,
+        queryItems = queryItems,
         headers = mapOf("Accept" to "application/json"),
         body = null
     )

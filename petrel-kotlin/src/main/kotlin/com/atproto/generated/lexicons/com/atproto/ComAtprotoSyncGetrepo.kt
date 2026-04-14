@@ -41,12 +41,14 @@ suspend fun ATProtoClient.Com.Atproto.Sync.getRepo(
 parameters: ComAtprotoSyncGetRepoParameters): ATProtoResponse<ComAtprotoSyncGetRepoOutput> {
     val endpoint = "com.atproto.sync.getRepo"
 
-    val queryParams = parameters.toQueryParams()
+    // List<Pair<String, String>> preserves repeated keys, which ATProto
+    // array-valued query params rely on (e.g. `?actors=a&actors=b`).
+    val queryItems = parameters.toQueryItems()
 
     return client.networkService.performRequest(
         method = "GET",
         endpoint = endpoint,
-        queryParams = queryParams,
+        queryItems = queryItems,
         headers = mapOf("Accept" to "application/vnd.ipld.car"),
         body = null
     )

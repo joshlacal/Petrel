@@ -29,15 +29,17 @@ suspend fun ATProtoClient.{{ namespace_path }}.{{ function_name }}(
     {% endif %}
 
     {% if has_parameters %}
-    val queryParams = params.toQueryParams()
+    // List<Pair<String, String>> preserves repeated keys, which ATProto
+    // array-valued query params rely on (e.g. `?actors=a&actors=b`).
+    val queryItems = params.toQueryItems()
     {% else %}
-    val queryParams: Map<String, String>? = null
+    val queryItems: List<Pair<String, String>>? = null
     {% endif %}
 
     return client.networkService.performRequest(
         method = "POST",
         endpoint = endpoint,
-        queryParams = queryParams,
+        queryItems = queryItems,
         headers = mapOf(
             "Content-Type" to contentType,
             "Accept" to "{{ output_encoding }}"

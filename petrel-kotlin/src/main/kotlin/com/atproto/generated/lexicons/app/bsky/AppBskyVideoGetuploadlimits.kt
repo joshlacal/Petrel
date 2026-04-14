@@ -32,12 +32,12 @@ suspend fun ATProtoClient.App.Bsky.Video.getUploadLimits(
 ): ATProtoResponse<AppBskyVideoGetUploadLimitsOutput> {
     val endpoint = "app.bsky.video.getUploadLimits"
 
-    val queryParams: Map<String, String>? = null
+    val queryItems: List<Pair<String, String>>? = null
 
     return client.networkService.performRequest(
         method = "GET",
         endpoint = endpoint,
-        queryParams = queryParams,
+        queryItems = queryItems,
         headers = mapOf("Accept" to "application/json"),
         body = null
     )

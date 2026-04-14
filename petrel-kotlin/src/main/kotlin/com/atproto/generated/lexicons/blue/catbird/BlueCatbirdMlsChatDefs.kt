@@ -19,7 +19,8 @@ object BlueCatbirdMlsChatDefsDefs {
      */
     @Serializable
     data class BlueCatbirdMlsChatDefsConvoView(
-/** MLS group identifier (hex-encoded) - canonical conversation ID */        @SerialName("groupId")
+/** Stable conversation identifier (survives group resets) */        @SerialName("conversationId")
+        val conversationId: String,/** Current MLS group identifier (hex-encoded). Changes on group reset. */        @SerialName("groupId")
         val groupId: String,/** DID of the conversation creator */        @SerialName("creator")
         val creator: DID,/** Current conversation members */        @SerialName("members")
         val members: List<BlueCatbirdMlsChatDefsMemberView>,/** Current MLS epoch number */        @SerialName("epoch")

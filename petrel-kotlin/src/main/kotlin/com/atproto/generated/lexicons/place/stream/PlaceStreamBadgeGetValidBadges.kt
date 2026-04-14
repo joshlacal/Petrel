@@ -33,12 +33,14 @@ suspend fun ATProtoClient.Place.Stream.Badge.getValidBadges(
 parameters: PlaceStreamBadgeGetValidBadgesParameters): ATProtoResponse<PlaceStreamBadgeGetValidBadgesOutput> {
     val endpoint = "place.stream.badge.getValidBadges"
 
-    val queryParams = parameters.toQueryParams()
+    // List<Pair<String, String>> preserves repeated keys, which ATProto
+    // array-valued query params rely on (e.g. `?actors=a&actors=b`).
+    val queryItems = parameters.toQueryItems()
 
     return client.networkService.performRequest(
         method = "GET",
         endpoint = endpoint,
-        queryParams = queryParams,
+        queryItems = queryItems,
         headers = mapOf("Accept" to "application/json"),
         body = null
     )
