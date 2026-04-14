@@ -50,12 +50,14 @@ input: BlueCatbirdMlsChatUploadBlobInput,
     val body = input.data
     val contentType = "*/*"
 
-    val queryParams = params.toQueryParams()
+    // List<Pair<String, String>> preserves repeated keys, which ATProto
+    // array-valued query params rely on (e.g. `?actors=a&actors=b`).
+    val queryItems = params.toQueryItems()
 
     return client.networkService.performRequest(
         method = "POST",
         endpoint = endpoint,
-        queryParams = queryParams,
+        queryItems = queryItems,
         headers = mapOf(
             "Content-Type" to contentType,
             "Accept" to "application/json"

@@ -46,12 +46,14 @@ suspend fun ATProtoClient.Place.Stream.Multistream.listTargets(
 parameters: PlaceStreamMultistreamListTargetsParameters): ATProtoResponse<PlaceStreamMultistreamListTargetsOutput> {
     val endpoint = "place.stream.multistream.listTargets"
 
-    val queryParams = parameters.toQueryParams()
+    // List<Pair<String, String>> preserves repeated keys, which ATProto
+    // array-valued query params rely on (e.g. `?actors=a&actors=b`).
+    val queryItems = parameters.toQueryItems()
 
     return client.networkService.performRequest(
         method = "GET",
         endpoint = endpoint,
-        queryParams = queryParams,
+        queryItems = queryItems,
         headers = mapOf("Accept" to "application/json"),
         body = null
     )

@@ -308,16 +308,32 @@ def generate_kotlin_namespace_classes(namespace_hierarchy, depth=0):
     return kotlin_code
 
 
+def _resolve_kotlin_output():
+    """Resolve the petrel-kotlin generated source root.
+
+    run.py is always invoked from the Petrel/ repo root (e.g.
+    ``python run.py Generator/lexicons Sources/Petrel/Generated --language both``),
+    so we anchor the Kotlin output at CWD + petrel-kotlin/src/main/kotlin/com/atproto/generated
+    rather than deriving it from output_dir (which used to produce stray
+    Sources/Petrel/petrel-kotlin/ trees when dirname() didn't walk up far enough).
+    """
+    return os.path.join(
+        os.getcwd(),
+        'petrel-kotlin', 'src', 'main', 'kotlin', 'com', 'atproto', 'generated',
+    )
+
+
 async def main(input_dir, output_dir, language='swift'):
     """Main entry point supporting multiple languages."""
     if language == 'swift':
         await generate_swift_from_lexicons_recursive(input_dir, output_dir)
     elif language == 'kotlin':
-        await generate_kotlin_from_lexicons_recursive(input_dir, output_dir)
+        kotlin_output = _resolve_kotlin_output()
+        await generate_kotlin_from_lexicons_recursive(input_dir, kotlin_output)
     elif language == 'both':
         # Swift goes directly to output_dir (same as --language swift)
-        # Kotlin goes to a kotlin/ subdirectory
-        kotlin_output = os.path.join(output_dir, 'kotlin')
+        # Kotlin goes to petrel-kotlin/ package directory
+        kotlin_output = _resolve_kotlin_output()
 
         await asyncio.gather(
             generate_swift_from_lexicons_recursive(input_dir, output_dir),

@@ -31,12 +31,14 @@ suspend fun ATProtoClient.App.Bsky.Actor.getPreferences(
 parameters: AppBskyActorGetPreferencesParameters): ATProtoResponse<AppBskyActorGetPreferencesOutput> {
     val endpoint = "app.bsky.actor.getPreferences"
 
-    val queryParams = parameters.toQueryParams()
+    // List<Pair<String, String>> preserves repeated keys, which ATProto
+    // array-valued query params rely on (e.g. `?actors=a&actors=b`).
+    val queryItems = parameters.toQueryItems()
 
     return client.networkService.performRequest(
         method = "GET",
         endpoint = endpoint,
-        queryParams = queryParams,
+        queryItems = queryItems,
         headers = mapOf("Accept" to "application/json"),
         body = null
     )

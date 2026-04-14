@@ -266,16 +266,18 @@ fun ATProtoClient.Blue.Catbird.MlsChat.subscribeEvents(
 parameters: BlueCatbirdMlsChatSubscribeEventsParameters): Flow<BlueCatbirdMlsChatSubscribeEventsMessage> = flow {
     val endpoint = "blue.catbird.mlsChat.subscribeEvents"
 
-    val queryParams = parameters.toQueryParams()
+    // List<Pair<String, String>> preserves repeated keys, which ATProto
+    // array-valued query params rely on (e.g. `?collections=a&collections=b`).
+    val queryItems = parameters.toQueryItems()
 
     // TODO: Implement WebSocket connection using a WebSocket library (e.g., Ktor WebSockets)
     // The implementation should:
-    // 1. Establish WebSocket connection to endpoint with queryParams
+    // 1. Establish WebSocket connection to endpoint with queryItems
     // 2. Listen for incoming messages
     // 3. Deserialize each message as BlueCatbirdMlsChatSubscribeEventsMessage
     // 4. Emit each message to the Flow
     // Example skeleton:
-    // webSocketClient.connect(endpoint, queryParams) { message ->
+    // webSocketClient.connect(endpoint, queryItems) { message ->
     //     val decoded = Json.decodeFromString<BlueCatbirdMlsChatSubscribeEventsMessage>(message)
     //     emit(decoded)
     // }

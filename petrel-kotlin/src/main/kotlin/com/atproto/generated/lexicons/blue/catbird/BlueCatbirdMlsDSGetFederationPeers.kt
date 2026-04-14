@@ -56,12 +56,14 @@ suspend fun ATProtoClient.Blue.Catbird.MlsDS.getFederationPeers(
 parameters: BlueCatbirdMlsDSGetFederationPeersParameters): ATProtoResponse<BlueCatbirdMlsDSGetFederationPeersOutput> {
     val endpoint = "blue.catbird.mlsDS.getFederationPeers"
 
-    val queryParams = parameters.toQueryParams()
+    // List<Pair<String, String>> preserves repeated keys, which ATProto
+    // array-valued query params rely on (e.g. `?actors=a&actors=b`).
+    val queryItems = parameters.toQueryItems()
 
     return client.networkService.performRequest(
         method = "GET",
         endpoint = endpoint,
-        queryParams = queryParams,
+        queryItems = queryItems,
         headers = mapOf("Accept" to "application/json"),
         body = null
     )

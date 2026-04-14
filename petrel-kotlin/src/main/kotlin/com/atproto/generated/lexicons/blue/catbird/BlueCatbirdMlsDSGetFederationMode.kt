@@ -30,12 +30,12 @@ suspend fun ATProtoClient.Blue.Catbird.MlsDS.getFederationMode(
 ): ATProtoResponse<BlueCatbirdMlsDSGetFederationModeOutput> {
     val endpoint = "blue.catbird.mlsDS.getFederationMode"
 
-    val queryParams: Map<String, String>? = null
+    val queryItems: List<Pair<String, String>>? = null
 
     return client.networkService.performRequest(
         method = "GET",
         endpoint = endpoint,
-        queryParams = queryParams,
+        queryItems = queryItems,
         headers = mapOf("Accept" to "application/json"),
         body = null
     )

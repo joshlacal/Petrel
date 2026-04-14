@@ -93,12 +93,14 @@ suspend fun ATProtoClient.App.Bsky.Graph.getRelationships(
 parameters: AppBskyGraphGetRelationshipsParameters): ATProtoResponse<AppBskyGraphGetRelationshipsOutput> {
     val endpoint = "app.bsky.graph.getRelationships"
 
-    val queryParams = parameters.toQueryParams()
+    // List<Pair<String, String>> preserves repeated keys, which ATProto
+    // array-valued query params rely on (e.g. `?actors=a&actors=b`).
+    val queryItems = parameters.toQueryItems()
 
     return client.networkService.performRequest(
         method = "GET",
         endpoint = endpoint,
-        queryParams = queryParams,
+        queryItems = queryItems,
         headers = mapOf("Accept" to "application/json"),
         body = null
     )

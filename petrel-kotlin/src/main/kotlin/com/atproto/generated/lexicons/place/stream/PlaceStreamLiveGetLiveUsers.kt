@@ -34,12 +34,14 @@ suspend fun ATProtoClient.Place.Stream.Live.getLiveUsers(
 parameters: PlaceStreamLiveGetLiveUsersParameters): ATProtoResponse<PlaceStreamLiveGetLiveUsersOutput> {
     val endpoint = "place.stream.live.getLiveUsers"
 
-    val queryParams = parameters.toQueryParams()
+    // List<Pair<String, String>> preserves repeated keys, which ATProto
+    // array-valued query params rely on (e.g. `?actors=a&actors=b`).
+    val queryItems = parameters.toQueryItems()
 
     return client.networkService.performRequest(
         method = "GET",
         endpoint = endpoint,
-        queryParams = queryParams,
+        queryItems = queryItems,
         headers = mapOf("Accept" to "application/json"),
         body = null
     )

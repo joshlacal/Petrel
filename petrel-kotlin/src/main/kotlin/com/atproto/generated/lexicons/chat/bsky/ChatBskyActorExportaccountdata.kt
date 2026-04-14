@@ -28,12 +28,12 @@ suspend fun ATProtoClient.Chat.Bsky.Actor.exportAccountData(
 ): ATProtoResponse<ChatBskyActorExportAccountDataOutput> {
     val endpoint = "chat.bsky.actor.exportAccountData"
 
-    val queryParams: Map<String, String>? = null
+    val queryItems: List<Pair<String, String>>? = null
 
     return client.networkService.performRequest(
         method = "GET",
         endpoint = endpoint,
-        queryParams = queryParams,
+        queryItems = queryItems,
         headers = mapOf("Accept" to "application/jsonl"),
         body = null
     )

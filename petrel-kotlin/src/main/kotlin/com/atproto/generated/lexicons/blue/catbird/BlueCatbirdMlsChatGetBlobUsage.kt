@@ -30,12 +30,12 @@ suspend fun ATProtoClient.Blue.Catbird.MlsChat.getBlobUsage(
 ): ATProtoResponse<BlueCatbirdMlsChatGetBlobUsageOutput> {
     val endpoint = "blue.catbird.mlsChat.getBlobUsage"
 
-    val queryParams: Map<String, String>? = null
+    val queryItems: List<Pair<String, String>>? = null
 
     return client.networkService.performRequest(
         method = "GET",
         endpoint = endpoint,
-        queryParams = queryParams,
+        queryItems = queryItems,
         headers = mapOf("Accept" to "application/json"),
         body = null
     )
