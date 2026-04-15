@@ -2111,43 +2111,13 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
             
-            decoders["blue.catbird.mlsChat.blocks#blockRelationship"] = { decoder in
+            decoders["blue.catbird.mlsChat.checkBlocks#blockRelationship"] = { decoder in
                 do {
-                    let decodedObject = try BlueCatbirdMlsChatBlocks.BlockRelationship(from: decoder)
+                    let decodedObject = try BlueCatbirdMlsChatCheckBlocks.BlockRelationship(from: decoder)
                     return .knownType(decodedObject)
                 } catch {
-                    LogManager.logDebug("Error decoding BlueCatbirdMlsChatBlocks.BlockRelationship: \(error)")
-                    return .decodeError("Error decoding BlueCatbirdMlsChatBlocks.BlockRelationship: \(error)")
-                }
-            }
-            
-            decoders["blue.catbird.mlsChat.blocks#blockChangeRecord"] = { decoder in
-                do {
-                    let decodedObject = try BlueCatbirdMlsChatBlocks.BlockChangeRecord(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logDebug("Error decoding BlueCatbirdMlsChatBlocks.BlockChangeRecord: \(error)")
-                    return .decodeError("Error decoding BlueCatbirdMlsChatBlocks.BlockChangeRecord: \(error)")
-                }
-            }
-            
-            decoders["blue.catbird.mlsChat.blocks#blockChangeResult"] = { decoder in
-                do {
-                    let decodedObject = try BlueCatbirdMlsChatBlocks.BlockChangeResult(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logDebug("Error decoding BlueCatbirdMlsChatBlocks.BlockChangeResult: \(error)")
-                    return .decodeError("Error decoding BlueCatbirdMlsChatBlocks.BlockChangeResult: \(error)")
-                }
-            }
-            
-            decoders["blue.catbird.mlsChat.blocks#conversationBlockStatus"] = { decoder in
-                do {
-                    let decodedObject = try BlueCatbirdMlsChatBlocks.ConversationBlockStatus(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logDebug("Error decoding BlueCatbirdMlsChatBlocks.ConversationBlockStatus: \(error)")
-                    return .decodeError("Error decoding BlueCatbirdMlsChatBlocks.ConversationBlockStatus: \(error)")
+                    LogManager.logDebug("Error decoding BlueCatbirdMlsChatCheckBlocks.BlockRelationship: \(error)")
+                    return .decodeError("Error decoding BlueCatbirdMlsChatCheckBlocks.BlockRelationship: \(error)")
                 }
             }
             
@@ -2188,6 +2158,26 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 } catch {
                     LogManager.logDebug("Error decoding BlueCatbirdMlsChatGetKeyPackageStatus.KeyPackageHistoryItem: \(error)")
                     return .decodeError("Error decoding BlueCatbirdMlsChatGetKeyPackageStatus.KeyPackageHistoryItem: \(error)")
+                }
+            }
+            
+            decoders["blue.catbird.mlsChat.getBlockStatus#blockRelationship"] = { decoder in
+                do {
+                    let decodedObject = try BlueCatbirdMlsChatGetBlockStatus.BlockRelationship(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding BlueCatbirdMlsChatGetBlockStatus.BlockRelationship: \(error)")
+                    return .decodeError("Error decoding BlueCatbirdMlsChatGetBlockStatus.BlockRelationship: \(error)")
+                }
+            }
+            
+            decoders["blue.catbird.mlsChat.getBlockStatus#conversationBlockStatus"] = { decoder in
+                do {
+                    let decodedObject = try BlueCatbirdMlsChatGetBlockStatus.ConversationBlockStatus(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding BlueCatbirdMlsChatGetBlockStatus.ConversationBlockStatus: \(error)")
+                    return .decodeError("Error decoding BlueCatbirdMlsChatGetBlockStatus.ConversationBlockStatus: \(error)")
                 }
             }
             
