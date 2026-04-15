@@ -33,8 +33,22 @@ class ATProtoClient(val networkService: NetworkService) {
 
     fun getAuthMode(): AuthMode = authMode
 
-    // -- Gateway session management --
+    // -- Gateway session management (LEGACY) --
+    //
+    // These inline helpers pre-date `ConfidentialGatewayStrategy`. They are
+    // preserved for source compatibility only; new code should call
+    // `ATProtoClient.configureGateway(...)` and use the strategy-backed
+    // extensions in `ATProtoClientGatewayExt.kt` instead.
+    //
+    // In particular, `handleGatewayCallback` here parses `did`/`handle` out
+    // of the URL fragment — but nest only puts `session_id` in the fragment,
+    // so those values end up empty. The strategy fetches the canonical
+    // `did`/`handle` via `GET {gateway}/auth/session` and is the correct path.
 
+    @Deprecated(
+        "Use ATProtoClient.configureGateway(...) and the strategy API in ATProtoClientGatewayExt.kt",
+        ReplaceWith("gatewayRestoreSession(did)"),
+    )
     fun restoreGatewaySession(
         sessionId: String,
         did: String,
@@ -54,20 +68,30 @@ class ATProtoClient(val networkService: NetworkService) {
         return session
     }
 
+    @Deprecated(
+        "Use ATProtoClient.configureGateway(...) and the strategy API in ATProtoClientGatewayExt.kt",
+    )
     fun clearGatewaySession() {
         gatewaySession = null
         networkService.authenticatedDID = null
         networkService.authorizationHeader = null
     }
 
+    @Deprecated(
+        "Use ATProtoClient.configureGateway(...) and the strategy API in ATProtoClientGatewayExt.kt",
+    )
     fun currentGatewaySessionId(): String? = gatewaySession?.sessionId
 
     fun getActiveDid(): String? {
         return gatewaySession?.did ?: authService?.getActiveDid()
     }
 
-    // -- Gateway login flow --
+    // -- Gateway login flow (LEGACY) --
 
+    @Deprecated(
+        "Use ConfidentialGatewayStrategy.startOAuthFlow via ATProtoClient.configureGateway(...)",
+        ReplaceWith("gatewayStartOAuthFlow(identifier)"),
+    )
     fun createGatewayLoginUrl(identifier: String? = null): String {
         val base = "${networkService.getBaseUrl()}/auth/login"
         return if (identifier != null) {
@@ -77,6 +101,12 @@ class ATProtoClient(val networkService: NetworkService) {
         }
     }
 
+    @Deprecated(
+        "Broken: parses did/handle from fragment but nest only sends session_id. " +
+            "Use ATProtoClient.configureGateway(...) + gatewayHandleCallback(url) which " +
+            "fetches canonical session info from GET /auth/session.",
+        ReplaceWith("gatewayHandleCallback(callbackUrl)"),
+    )
     fun handleGatewayCallback(callbackUrl: String): GatewaySessionInfo {
         val fragment = callbackUrl.substringAfter("#", "")
         val params = fragment.split("&").associate { part ->
@@ -99,6 +129,11 @@ class ATProtoClient(val networkService: NetworkService) {
         return session
     }
 
+    @Deprecated(
+        "Wrong endpoint: hits /xrpc//auth/logout because NetworkService prepends /xrpc. " +
+            "Use ATProtoClient.configureGateway(...) + gatewayLogoutViaStrategy().",
+        ReplaceWith("gatewayLogoutViaStrategy()"),
+    )
     suspend fun gatewayLogout() {
         val sessionId = gatewaySession?.sessionId ?: return
         networkService.performRequest<Unit>(
