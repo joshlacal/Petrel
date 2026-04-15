@@ -330,12 +330,54 @@ object BytesSerializer : KSerializer<Bytes> {
         }
 
     override fun serialize(encoder: Encoder, value: Bytes) {
+        // JSON encoder: emit {"$bytes": "base64..."} matching the AT Protocol
+        // convention used by Swift's Bytes and Jacquard's serde_bytes_helper.
+        // Non-JSON encoders (CBOR, etc.) fall through to the structured path,
+        // which is what Jacquard's DAG-CBOR encoding expects.
+        if (encoder is JsonEncoder) {
+            val obj = buildJsonObject {
+                put("\$bytes", JsonPrimitive(Base64.encode(value.data)))
+            }
+            encoder.encodeJsonElement(obj)
+            return
+        }
         encoder.encodeStructure(descriptor) {
             encodeStringElement(descriptor, 0, Base64.encode(value.data))
         }
     }
 
     override fun deserialize(decoder: Decoder): Bytes {
+        // The canonical JSON wire format for ATProto `bytes` is
+        // `{"$bytes": "<base64>"}` — confirmed against Swift Petrel's Bytes
+        // and Jacquard's `serde_bytes_helper` (human-readable serialize
+        // branch). Earlier versions of this deserializer used
+        // `decodeStructure`; on kotlinx-serialization + ktor-json that path
+        // silently returned the base64 bytes un-decoded (as ASCII) for some
+        // payload shapes, so every XRPC call that returned a `bytes`-typed
+        // field handed callers the ASCII of the base64 string instead of
+        // the decoded payload. Use JsonDecoder's raw-element peek so we can
+        // reliably unwrap the `$bytes` key (and accept a plain base64
+        // string as a defensive legacy form).
+        if (decoder is JsonDecoder) {
+            val element = decoder.decodeJsonElement()
+            val base64 = when (element) {
+                is JsonPrimitive ->
+                    if (element.isString) element.content
+                    else throw SerializationException(
+                        "Bytes expects \$bytes-wrapped object or base64 string, got $element"
+                    )
+                is JsonObject -> element["\$bytes"]?.jsonPrimitive?.contentOrNull
+                    ?: throw SerializationException(
+                        "Bytes JSON object missing \$bytes field: $element"
+                    )
+                else -> throw SerializationException(
+                    "Unexpected JSON shape for Bytes: $element"
+                )
+            }
+            return Bytes(Base64.decode(base64))
+        }
+
+        // Non-JSON (CBOR, etc.) — keep the structured decoding path.
         return decoder.decodeStructure(descriptor) {
             var base64String = ""
             while (true) {
