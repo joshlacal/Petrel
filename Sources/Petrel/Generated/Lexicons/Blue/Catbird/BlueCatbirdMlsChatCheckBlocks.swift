@@ -117,20 +117,42 @@ public struct BlockRelationship: ATProtocolCodable, ATProtocolValue {
             case createdAt
             case blockUri
         }
-    }    
-public struct Parameters: Parametrizable {
+    }
+public struct Input: ATProtocolCodable {
         public let dids: [DID]
-        
-        public init(
-            dids: [DID]
-            ) {
+
+        /// Standard public initializer
+        public init(dids: [DID]) {
             self.dids = dids
-            
+        }
+        
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self.dids = try container.decode([DID].self, forKey: .dids)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(dids, forKey: .dids)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            let didsValue = try dids.toCBORValue()
+            map = map.adding(key: "dids", value: didsValue)
+            return map
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case dids
         }
     }
     
 public struct Output: ATProtocolCodable {
         
+        
+        public let blocked: Bool
         
         public let blocks: [BlockRelationship]
         
@@ -142,6 +164,8 @@ public struct Output: ATProtocolCodable {
         public init(
             
             
+            blocked: Bool,
+            
             blocks: [BlockRelationship],
             
             checkedAt: ATProtocolDate
@@ -149,6 +173,8 @@ public struct Output: ATProtocolCodable {
             
         ) {
             
+            
+            self.blocked = blocked
             
             self.blocks = blocks
             
@@ -160,6 +186,9 @@ public struct Output: ATProtocolCodable {
         public init(from decoder: Decoder) throws {
             
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            
+            self.blocked = try container.decode(Bool.self, forKey: .blocked)
+            
             
             self.blocks = try container.decode([BlockRelationship].self, forKey: .blocks)
             
@@ -173,6 +202,9 @@ public struct Output: ATProtocolCodable {
             
             var container = encoder.container(keyedBy: CodingKeys.self)
             
+            try container.encode(blocked, forKey: .blocked)
+            
+            
             try container.encode(blocks, forKey: .blocks)
             
             
@@ -185,6 +217,11 @@ public struct Output: ATProtocolCodable {
             
             var map = OrderedCBORMap()
 
+            
+            
+            let blockedValue = try blocked.toCBORValue()
+            map = map.adding(key: "blocked", value: blockedValue)
+            
             
             
             let blocksValue = try blocks.toCBORValue()
@@ -203,6 +240,7 @@ public struct Output: ATProtocolCodable {
         
         
         private enum CodingKeys: String, CodingKey {
+            case blocked
             case blocks
             case checkedAt
         }
@@ -210,8 +248,9 @@ public struct Output: ATProtocolCodable {
     }
         
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case tooManyDids = "TooManyDids.Too many DIDs provided (max 100)"
-                case blueskyServiceUnavailable = "BlueskyServiceUnavailable.Could not reach Bluesky service to check blocks"
+                case tooFewDids = "TooFewDids.At least two DIDs are required."
+                case tooManyDids = "TooManyDids.Maximum 100 DIDs per request."
+                case blueskyServiceUnavailable = "BlueskyServiceUnavailable.Upstream PDS query failed and local cache is empty."
             public var description: String {
                 return self.rawValue
             }
@@ -227,28 +266,43 @@ public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertibl
 
 }
 
-
-
 extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - checkBlocks
 
-    /// Check Bluesky block relationships between users for MLS conversation moderation Query Bluesky social graph to check block status between users. Returns block relationships relevant to MLS conversation membership. Server queries Bluesky PDS for current block state. Used before adding members to prevent blocked users from joining the same conversation.
+    /// Check whether any Bluesky block relationships exist between the given DIDs. Used by clients before creating a group or adding a member to warn the user that a block edge would force auto-leave.
     /// 
     /// - Parameter input: The input parameters for the request
+    
     /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func checkBlocks(input: BlueCatbirdMlsChatCheckBlocks.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatCheckBlocks.Output?) {
+    public func checkBlocks(
+        
+        input: BlueCatbirdMlsChatCheckBlocks.Input
+        
+    ) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatCheckBlocks.Output?) {
         let endpoint = "blue.catbird.mlsChat.checkBlocks"
+        
+        var headers: [String: String] = [:]
+        
+        headers["Content-Type"] = "application/json"
+        
+        
+        
+        headers["Accept"] = "application/json"
+        
 
         
-        let queryItems = input.asQueryItems()
+        let requestData: Data? = try JSONEncoder().encode(input)
+        
+        
+        let queryItems: [URLQueryItem]? = nil
         
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
-            method: "GET",
-            headers: ["Accept": "application/json"],
-            body: nil,
+            method: "POST",
+            headers: headers,
+            body: requestData,
             queryItems: queryItems
         )
 
@@ -258,6 +312,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
+        
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
@@ -280,12 +335,12 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
                 return (responseCode, nil)
             }
         } else {
-            
-            // If we can't parse a structured error, return the response code
-            // (maintains backward compatibility for endpoints without defined errors)
+            // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
+        
     }
+    
 }
                            
 
