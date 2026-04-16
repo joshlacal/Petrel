@@ -1,0 +1,58 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mlsChat.getBlockStatus",
+  "description": "Return the current block-edge status for an MLS conversation (which pairs of members block each other). Diagnostic; not used for enforcement.",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["convoId"],
+          "properties": {
+            "convoId": { "type": "string" }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["status", "blocks", "checkedAt"],
+          "properties": {
+            "status": { "type": "ref", "ref": "#conversationBlockStatus" },
+            "blocks": {
+              "type": "array",
+              "items": { "type": "ref", "ref": "#blockRelationship" }
+            },
+            "checkedAt": { "type": "string", "format": "datetime" }
+          }
+        }
+      },
+      "errors": [
+        { "name": "ConvoNotFound", "description": "No conversation with the given ID." },
+        { "name": "NotMember", "description": "Caller is not a member of this conversation." }
+      ]
+    },
+    "blockRelationship": {
+      "type": "object",
+      "required": ["blockerDid", "blockedDid", "createdAt"],
+      "properties": {
+        "blockerDid": { "type": "string", "format": "did" },
+        "blockedDid": { "type": "string", "format": "did" },
+        "createdAt": { "type": "string", "format": "datetime" },
+        "blockUri": { "type": "string", "format": "at-uri" }
+      }
+    },
+    "conversationBlockStatus": {
+      "type": "object",
+      "required": ["convoId", "hasConflicts", "memberCount"],
+      "properties": {
+        "convoId": { "type": "string" },
+        "hasConflicts": { "type": "boolean" },
+        "memberCount": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

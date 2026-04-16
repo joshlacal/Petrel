@@ -1,0 +1,60 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mlsChat.checkBlocks",
+  "description": "Check whether any Bluesky block relationships exist between the given DIDs. Used by clients before creating a group or adding a member to warn the user that a block edge would force auto-leave.",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["dids"],
+          "properties": {
+            "dids": {
+              "type": "array",
+              "description": "DIDs to check for mutual blocks (2–100 users).",
+              "items": { "type": "string", "format": "did" },
+              "minLength": 2,
+              "maxLength": 100
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["blocked", "blocks", "checkedAt"],
+          "properties": {
+            "blocked": {
+              "type": "boolean",
+              "description": "True if any block edge exists between any pair in the input."
+            },
+            "blocks": {
+              "type": "array",
+              "items": { "type": "ref", "ref": "#blockRelationship" },
+              "description": "Every block edge found among the input DIDs."
+            },
+            "checkedAt": { "type": "string", "format": "datetime" }
+          }
+        }
+      },
+      "errors": [
+        { "name": "TooFewDids", "description": "At least two DIDs are required." },
+        { "name": "TooManyDids", "description": "Maximum 100 DIDs per request." },
+        { "name": "BlueskyServiceUnavailable", "description": "Upstream PDS query failed and local cache is empty." }
+      ]
+    },
+    "blockRelationship": {
+      "type": "object",
+      "required": ["blockerDid", "blockedDid", "createdAt"],
+      "properties": {
+        "blockerDid": { "type": "string", "format": "did" },
+        "blockedDid": { "type": "string", "format": "did" },
+        "createdAt": { "type": "string", "format": "datetime" },
+        "blockUri": { "type": "string", "format": "at-uri" }
+      }
+    }
+  }
+}
