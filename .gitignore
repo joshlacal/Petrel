@@ -18,3 +18,9 @@ __pycache__/
 venv/
 Examples/PostCLIDemo/.build/PetrelTemplate/.build/
 .build/
+.gradle/
+petrel-kotlin/.build/
+petrel-kotlin/build/
+petrel-kotlin/.gradle/
+petrel-kotlin/.idea/
+
