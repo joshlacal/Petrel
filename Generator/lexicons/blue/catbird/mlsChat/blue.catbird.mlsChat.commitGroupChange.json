@@ -40,16 +40,16 @@
               "maxLength": 50
             },
             "commit": {
-              "type": "bytes",
-              "description": "MLS Commit message (used by addMembers, processExternalCommit, rejoin)"
+              "type": "string",
+              "description": "Base64url-encoded MLS Commit message (used by addMembers, processExternalCommit, rejoin)"
             },
             "welcome": {
-              "type": "bytes",
-              "description": "MLS Welcome message (used by addMembers, completePendingDeviceAddition)"
+              "type": "string",
+              "description": "Base64url-encoded MLS Welcome message (used by addMembers, completePendingDeviceAddition)"
             },
             "groupInfo": {
-              "type": "bytes",
-              "description": "GroupInfo to update after commit (used by processExternalCommit, addMembers)"
+              "type": "string",
+              "description": "Base64-encoded GroupInfo to update after commit (used by processExternalCommit, addMembers)"
             },
             "keyPackageHashes": {
               "type": "array",
@@ -72,8 +72,13 @@
               "description": "Client-generated UUID for idempotent retries"
             },
             "confirmationTag": {
-              "type": "bytes",
-              "description": "MLS confirmation tag from the client's post-commit group state."
+              "type": "string",
+              "maxLength": 64,
+              "description": "Base64-encoded MLS confirmation tag from the client's post-commit group state."
+            },
+            "epochAuthenticator": {
+              "type": "string",
+              "description": "Hex-encoded epoch_authenticator (RFC 9420 §8.7) for the post-commit epoch. Optional. When present on an epoch-advancing action (addMembers, processExternalCommit, rejoin, commit, updateMetadata), the server records it in the epoch_authenticators table and uses it to validate future reportRecoveryFailure votes for quorum auto-reset (see ADR-002)."
             }
           }
         }
@@ -112,8 +117,9 @@
               "description": "The claimed pending addition (for claimPendingDeviceAddition)"
             },
             "confirmationTag": {
-              "type": "bytes",
-              "description": "Confirmation tag of the new canonical tree state."
+              "type": "string",
+              "maxLength": 64,
+              "description": "Base64-encoded confirmation tag of the new canonical tree state."
             }
           }
         }
@@ -130,11 +136,7 @@
         {"name": "InvalidGroupInfo", "description": "The provided GroupInfo is invalid"},
         {"name": "PendingAdditionNotFound", "description": "The specified pending addition does not exist"},
         {"name": "PendingAdditionAlreadyClaimed", "description": "The pending addition was already claimed by another member"},
-        {"name": "Unauthorized", "description": "Insufficient privileges for this operation"},
-        {"name": "InvalidRequest", "description": "The request is malformed or missing required fields"},
-        {"name": "AuthRequired", "description": "Authentication is required for this operation"},
-        {"name": "Forbidden", "description": "The caller does not have permission for this operation"},
-        {"name": "Conflict", "description": "The operation conflicts with the current group state (e.g., epoch mismatch)"}
+        {"name": "Unauthorized", "description": "Insufficient privileges for this operation"}
       ]
     },
     "keyPackageHashEntry": {

@@ -11,11 +11,13 @@ public struct BlueCatbirdMlsChatReportRecoveryFailure {
 public struct Input: ATProtocolCodable {
         public let convoId: String
         public let failureType: String?
+        public let epochAuthenticator: String?
 
         /// Standard public initializer
-        public init(convoId: String, failureType: String? = nil) {
+        public init(convoId: String, failureType: String? = nil, epochAuthenticator: String? = nil) {
             self.convoId = convoId
             self.failureType = failureType
+            self.epochAuthenticator = epochAuthenticator
         }
         
 
@@ -23,12 +25,14 @@ public struct Input: ATProtocolCodable {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             self.convoId = try container.decode(String.self, forKey: .convoId)
             self.failureType = try container.decodeIfPresent(String.self, forKey: .failureType)
+            self.epochAuthenticator = try container.decodeIfPresent(String.self, forKey: .epochAuthenticator)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(convoId, forKey: .convoId)
             try container.encodeIfPresent(failureType, forKey: .failureType)
+            try container.encodeIfPresent(epochAuthenticator, forKey: .epochAuthenticator)
         }
 
         public func toCBORValue() throws -> Any {
@@ -39,12 +43,17 @@ public struct Input: ATProtocolCodable {
                 let failureTypeValue = try value.toCBORValue()
                 map = map.adding(key: "failureType", value: failureTypeValue)
             }
+            if let value = epochAuthenticator {
+                let epochAuthenticatorValue = try value.toCBORValue()
+                map = map.adding(key: "epochAuthenticator", value: epochAuthenticatorValue)
+            }
             return map
         }
 
         private enum CodingKeys: String, CodingKey {
             case convoId
             case failureType
+            case epochAuthenticator
         }
     }
     
@@ -59,6 +68,8 @@ public struct Output: ATProtocolCodable {
         
         public let memberCount: Int
         
+        public let reason: String?
+        
         
         
         // Standard public initializer
@@ -71,7 +82,9 @@ public struct Output: ATProtocolCodable {
             
             failureCount: Int,
             
-            memberCount: Int
+            memberCount: Int,
+            
+            reason: String? = nil
             
             
         ) {
@@ -84,6 +97,8 @@ public struct Output: ATProtocolCodable {
             self.failureCount = failureCount
             
             self.memberCount = memberCount
+            
+            self.reason = reason
             
             
         }
@@ -104,6 +119,9 @@ public struct Output: ATProtocolCodable {
             self.memberCount = try container.decode(Int.self, forKey: .memberCount)
             
             
+            self.reason = try container.decodeIfPresent(String.self, forKey: .reason)
+            
+            
         }
         
         public func encode(to encoder: Encoder) throws {
@@ -120,6 +138,10 @@ public struct Output: ATProtocolCodable {
             
             
             try container.encode(memberCount, forKey: .memberCount)
+            
+            
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(reason, forKey: .reason)
             
             
         }
@@ -149,6 +171,14 @@ public struct Output: ATProtocolCodable {
             map = map.adding(key: "memberCount", value: memberCountValue)
             
             
+            
+            if let value = reason {
+                // Encode optional property even if it's an empty array for CBOR
+                let reasonValue = try value.toCBORValue()
+                map = map.adding(key: "reason", value: reasonValue)
+            }
+            
+            
 
             return map
             
@@ -160,6 +190,7 @@ public struct Output: ATProtocolCodable {
             case autoResetTriggered
             case failureCount
             case memberCount
+            case reason
         }
         
     }
@@ -185,7 +216,7 @@ public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertibl
 extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - reportRecoveryFailure
 
-    /// Report that recovery has been exhausted for a conversation Report that a client has exhausted all recovery attempts for a conversation. Any member may report. When >=50% of active members have reported within a 1-hour window, the server auto-resets the group.
+    /// Report that recovery has been exhausted for a conversation Report that a client has exhausted all recovery attempts for a conversation. Any member may report. When votes from at least ceil(2/3) of the active identity DIDs carry a valid epoch_authenticator within the 1-hour expiry window, the server auto-resets the group (see ADR-002).
     /// 
     /// - Parameter input: The input parameters for the request
     

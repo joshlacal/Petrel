@@ -280,17 +280,18 @@ public struct Input: ATProtocolCodable {
         public let convoId: String
         public let action: String
         public let memberDids: [DID]?
-        public let commit: Bytes?
-        public let welcome: Bytes?
-        public let groupInfo: Bytes?
+        public let commit: String?
+        public let welcome: String?
+        public let groupInfo: String?
         public let keyPackageHashes: [KeyPackageHashEntry]?
         public let deviceId: String?
         public let pendingAdditionId: String?
         public let idempotencyKey: String?
-        public let confirmationTag: Bytes?
+        public let confirmationTag: String?
+        public let epochAuthenticator: String?
 
         /// Standard public initializer
-        public init(convoId: String, action: String, memberDids: [DID]? = nil, commit: Bytes? = nil, welcome: Bytes? = nil, groupInfo: Bytes? = nil, keyPackageHashes: [KeyPackageHashEntry]? = nil, deviceId: String? = nil, pendingAdditionId: String? = nil, idempotencyKey: String? = nil, confirmationTag: Bytes? = nil) {
+        public init(convoId: String, action: String, memberDids: [DID]? = nil, commit: String? = nil, welcome: String? = nil, groupInfo: String? = nil, keyPackageHashes: [KeyPackageHashEntry]? = nil, deviceId: String? = nil, pendingAdditionId: String? = nil, idempotencyKey: String? = nil, confirmationTag: String? = nil, epochAuthenticator: String? = nil) {
             self.convoId = convoId
             self.action = action
             self.memberDids = memberDids
@@ -302,6 +303,7 @@ public struct Input: ATProtocolCodable {
             self.pendingAdditionId = pendingAdditionId
             self.idempotencyKey = idempotencyKey
             self.confirmationTag = confirmationTag
+            self.epochAuthenticator = epochAuthenticator
         }
         
 
@@ -310,14 +312,15 @@ public struct Input: ATProtocolCodable {
             self.convoId = try container.decode(String.self, forKey: .convoId)
             self.action = try container.decode(String.self, forKey: .action)
             self.memberDids = try container.decodeIfPresent([DID].self, forKey: .memberDids)
-            self.commit = try container.decodeIfPresent(Bytes.self, forKey: .commit)
-            self.welcome = try container.decodeIfPresent(Bytes.self, forKey: .welcome)
-            self.groupInfo = try container.decodeIfPresent(Bytes.self, forKey: .groupInfo)
+            self.commit = try container.decodeIfPresent(String.self, forKey: .commit)
+            self.welcome = try container.decodeIfPresent(String.self, forKey: .welcome)
+            self.groupInfo = try container.decodeIfPresent(String.self, forKey: .groupInfo)
             self.keyPackageHashes = try container.decodeIfPresent([KeyPackageHashEntry].self, forKey: .keyPackageHashes)
             self.deviceId = try container.decodeIfPresent(String.self, forKey: .deviceId)
             self.pendingAdditionId = try container.decodeIfPresent(String.self, forKey: .pendingAdditionId)
             self.idempotencyKey = try container.decodeIfPresent(String.self, forKey: .idempotencyKey)
-            self.confirmationTag = try container.decodeIfPresent(Bytes.self, forKey: .confirmationTag)
+            self.confirmationTag = try container.decodeIfPresent(String.self, forKey: .confirmationTag)
+            self.epochAuthenticator = try container.decodeIfPresent(String.self, forKey: .epochAuthenticator)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -333,6 +336,7 @@ public struct Input: ATProtocolCodable {
             try container.encodeIfPresent(pendingAdditionId, forKey: .pendingAdditionId)
             try container.encodeIfPresent(idempotencyKey, forKey: .idempotencyKey)
             try container.encodeIfPresent(confirmationTag, forKey: .confirmationTag)
+            try container.encodeIfPresent(epochAuthenticator, forKey: .epochAuthenticator)
         }
 
         public func toCBORValue() throws -> Any {
@@ -377,6 +381,10 @@ public struct Input: ATProtocolCodable {
                 let confirmationTagValue = try value.toCBORValue()
                 map = map.adding(key: "confirmationTag", value: confirmationTagValue)
             }
+            if let value = epochAuthenticator {
+                let epochAuthenticatorValue = try value.toCBORValue()
+                map = map.adding(key: "epochAuthenticator", value: epochAuthenticatorValue)
+            }
             return map
         }
 
@@ -392,6 +400,7 @@ public struct Input: ATProtocolCodable {
             case pendingAdditionId
             case idempotencyKey
             case confirmationTag
+            case epochAuthenticator
         }
     }
     
@@ -408,7 +417,7 @@ public struct Output: ATProtocolCodable {
         
         public let claimedAddition: PendingDeviceAddition?
         
-        public let confirmationTag: Bytes?
+        public let confirmationTag: String?
         
         
         
@@ -426,7 +435,7 @@ public struct Output: ATProtocolCodable {
             
             claimedAddition: PendingDeviceAddition? = nil,
             
-            confirmationTag: Bytes? = nil
+            confirmationTag: String? = nil
             
             
         ) {
@@ -466,7 +475,7 @@ public struct Output: ATProtocolCodable {
             self.claimedAddition = try container.decodeIfPresent(PendingDeviceAddition.self, forKey: .claimedAddition)
             
             
-            self.confirmationTag = try container.decodeIfPresent(Bytes.self, forKey: .confirmationTag)
+            self.confirmationTag = try container.decodeIfPresent(String.self, forKey: .confirmationTag)
             
             
         }
@@ -580,10 +589,6 @@ public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertibl
                 case pendingAdditionNotFound = "PendingAdditionNotFound.The specified pending addition does not exist"
                 case pendingAdditionAlreadyClaimed = "PendingAdditionAlreadyClaimed.The pending addition was already claimed by another member"
                 case unauthorized = "Unauthorized.Insufficient privileges for this operation"
-                case invalidRequest = "InvalidRequest.The request is malformed or missing required fields"
-                case authRequired = "AuthRequired.Authentication is required for this operation"
-                case forbidden = "Forbidden.The caller does not have permission for this operation"
-                case conflict = "Conflict.The operation conflicts with the current group state (e.g., epoch mismatch)"
             public var description: String {
                 return self.rawValue
             }
