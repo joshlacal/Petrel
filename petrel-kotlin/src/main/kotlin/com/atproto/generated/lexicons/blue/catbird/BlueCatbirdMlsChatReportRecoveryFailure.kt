@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: blue.catbird.mlsChat.reportRecoveryFailure
-// Report that recovery has been exhausted for a conversation Report that a client has exhausted all recovery attempts for a conversation. Any member may report. When >=50% of active members have reported within a 1-hour window, the server auto-resets the group.
+// Report that recovery has been exhausted for a conversation Report that a client has exhausted all recovery attempts for a conversation. Any member may report. When votes from at least ceil(2/3) of the active identity DIDs carry a valid epoch_authenticator within the 1-hour expiry window, the server auto-resets the group (see ADR-002).
 package com.atproto.generated
 
 import kotlinx.serialization.*
@@ -18,15 +18,17 @@ object BlueCatbirdMlsChatReportRecoveryFailureDefs {
     data class BlueCatbirdMlsChatReportRecoveryFailureInput(
 // Conversation identifier        @SerialName("convoId")
         val convoId: String,// Type of failure that was exhausted        @SerialName("failureType")
-        val failureType: String? = null    )
+        val failureType: String? = null,// Hex-encoded epoch_authenticator (RFC 9420 §8.7) for the reporter's current epoch. Optional at the schema layer but REQUIRED for the report to count toward quorum auto-reset. Clients that omit this field will have their report accepted (HTTP 200) with reason="missing_authenticator" but not counted.        @SerialName("epochAuthenticator")
+        val epochAuthenticator: String? = null    )
 
     @Serializable
     data class BlueCatbirdMlsChatReportRecoveryFailureOutput(
-// Whether the failure report was recorded        @SerialName("recorded")
+// Whether the failure report was recorded as a counted quorum vote        @SerialName("recorded")
         val recorded: Boolean,// Whether the quorum threshold was met and an automatic group reset was triggered        @SerialName("autoResetTriggered")
-        val autoResetTriggered: Boolean,// Number of members who have reported failures within the expiry window        @SerialName("failureCount")
-        val failureCount: Int,// Total number of active members in the conversation        @SerialName("memberCount")
-        val memberCount: Int    )
+        val autoResetTriggered: Boolean,// Number of distinct identity DIDs whose full active device set has filed valid votes within the expiry window        @SerialName("failureCount")
+        val failureCount: Int,// Total number of distinct identity DIDs in the conversation's active member roster        @SerialName("memberCount")
+        val memberCount: Int,// Discriminator for why the vote was not counted (if any). Omitted on a successful vote.        @SerialName("reason")
+        val reason: String? = null    )
 
 sealed class BlueCatbirdMlsChatReportRecoveryFailureError(val name: String, val description: String?) {
         object ConvoNotFound: BlueCatbirdMlsChatReportRecoveryFailureError("ConvoNotFound", "Conversation not found")
@@ -34,7 +36,7 @@ sealed class BlueCatbirdMlsChatReportRecoveryFailureError(val name: String, val 
     }
 
 /**
- * Report that recovery has been exhausted for a conversation Report that a client has exhausted all recovery attempts for a conversation. Any member may report. When >=50% of active members have reported within a 1-hour window, the server auto-resets the group.
+ * Report that recovery has been exhausted for a conversation Report that a client has exhausted all recovery attempts for a conversation. Any member may report. When votes from at least ceil(2/3) of the active identity DIDs carry a valid epoch_authenticator within the 1-hour expiry window, the server auto-resets the group (see ADR-002).
  *
  * Endpoint: blue.catbird.mlsChat.reportRecoveryFailure
  */
