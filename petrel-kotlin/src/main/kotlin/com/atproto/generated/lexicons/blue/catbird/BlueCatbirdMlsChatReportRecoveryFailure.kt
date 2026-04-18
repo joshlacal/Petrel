@@ -28,7 +28,9 @@ object BlueCatbirdMlsChatReportRecoveryFailureDefs {
         val autoResetTriggered: Boolean,// Number of distinct identity DIDs whose full active device set has filed valid votes within the expiry window        @SerialName("failureCount")
         val failureCount: Int,// Total number of distinct identity DIDs in the conversation's active member roster        @SerialName("memberCount")
         val memberCount: Int,// Discriminator for why the vote was not counted (if any). Omitted on a successful vote.        @SerialName("reason")
-        val reason: String? = null    )
+        val reason: String? = null,// When autoResetTriggered is true, the new group_id assigned to the conversation. Clients can begin rejoining under this identifier immediately without polling.        @SerialName("newGroupId")
+        val newGroupId: String? = null,// When autoResetTriggered is true, the lifetime reset_count after this reset. Matches the resetGeneration on the GroupResetEvent SSE event for this same reset.        @SerialName("resetGeneration")
+        val resetGeneration: Int? = null    )
 
 sealed class BlueCatbirdMlsChatReportRecoveryFailureError(val name: String, val description: String?) {
         object ConvoNotFound: BlueCatbirdMlsChatReportRecoveryFailureError("ConvoNotFound", "Conversation not found")
