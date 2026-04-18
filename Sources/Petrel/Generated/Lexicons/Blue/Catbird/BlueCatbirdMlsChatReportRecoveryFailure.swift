@@ -70,6 +70,10 @@ public struct Output: ATProtocolCodable {
         
         public let reason: String?
         
+        public let newGroupId: String?
+        
+        public let resetGeneration: Int?
+        
         
         
         // Standard public initializer
@@ -84,7 +88,11 @@ public struct Output: ATProtocolCodable {
             
             memberCount: Int,
             
-            reason: String? = nil
+            reason: String? = nil,
+            
+            newGroupId: String? = nil,
+            
+            resetGeneration: Int? = nil
             
             
         ) {
@@ -99,6 +107,10 @@ public struct Output: ATProtocolCodable {
             self.memberCount = memberCount
             
             self.reason = reason
+            
+            self.newGroupId = newGroupId
+            
+            self.resetGeneration = resetGeneration
             
             
         }
@@ -122,6 +134,12 @@ public struct Output: ATProtocolCodable {
             self.reason = try container.decodeIfPresent(String.self, forKey: .reason)
             
             
+            self.newGroupId = try container.decodeIfPresent(String.self, forKey: .newGroupId)
+            
+            
+            self.resetGeneration = try container.decodeIfPresent(Int.self, forKey: .resetGeneration)
+            
+            
         }
         
         public func encode(to encoder: Encoder) throws {
@@ -142,6 +160,14 @@ public struct Output: ATProtocolCodable {
             
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(reason, forKey: .reason)
+            
+            
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(newGroupId, forKey: .newGroupId)
+            
+            
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(resetGeneration, forKey: .resetGeneration)
             
             
         }
@@ -179,6 +205,22 @@ public struct Output: ATProtocolCodable {
             }
             
             
+            
+            if let value = newGroupId {
+                // Encode optional property even if it's an empty array for CBOR
+                let newGroupIdValue = try value.toCBORValue()
+                map = map.adding(key: "newGroupId", value: newGroupIdValue)
+            }
+            
+            
+            
+            if let value = resetGeneration {
+                // Encode optional property even if it's an empty array for CBOR
+                let resetGenerationValue = try value.toCBORValue()
+                map = map.adding(key: "resetGeneration", value: resetGenerationValue)
+            }
+            
+            
 
             return map
             
@@ -191,6 +233,8 @@ public struct Output: ATProtocolCodable {
             case failureCount
             case memberCount
             case reason
+            case newGroupId
+            case resetGeneration
         }
         
     }

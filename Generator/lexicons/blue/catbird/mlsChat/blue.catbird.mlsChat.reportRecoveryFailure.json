@@ -10,7 +10,9 @@
         "encoding": "application/json",
         "schema": {
           "type": "object",
-          "required": ["convoId"],
+          "required": [
+            "convoId"
+          ],
           "properties": {
             "convoId": {
               "type": "string",
@@ -20,11 +22,13 @@
               "type": "string",
               "description": "Type of failure that was exhausted",
               "default": "external_commit_exhausted",
-              "knownValues": ["external_commit_exhausted"]
+              "knownValues": [
+                "external_commit_exhausted"
+              ]
             },
             "epochAuthenticator": {
               "type": "string",
-              "description": "Hex-encoded epoch_authenticator (RFC 9420 §8.7) for the reporter's current epoch. Optional at the schema layer but REQUIRED for the report to count toward quorum auto-reset. Clients that omit this field will have their report accepted (HTTP 200) with reason=\"missing_authenticator\" but not counted."
+              "description": "Hex-encoded epoch_authenticator (RFC 9420 \u00a78.7) for the reporter's current epoch. Optional at the schema layer but REQUIRED for the report to count toward quorum auto-reset. Clients that omit this field will have their report accepted (HTTP 200) with reason=\"missing_authenticator\" but not counted."
             }
           }
         }
@@ -33,7 +37,12 @@
         "encoding": "application/json",
         "schema": {
           "type": "object",
-          "required": ["recorded", "autoResetTriggered", "failureCount", "memberCount"],
+          "required": [
+            "recorded",
+            "autoResetTriggered",
+            "failureCount",
+            "memberCount"
+          ],
           "properties": {
             "recorded": {
               "type": "boolean",
@@ -64,13 +73,28 @@
                 "not_member",
                 "convo_not_found"
               ]
+            },
+            "newGroupId": {
+              "type": "string",
+              "description": "When autoResetTriggered is true, the new group_id assigned to the conversation. Clients can begin rejoining under this identifier immediately without polling."
+            },
+            "resetGeneration": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "When autoResetTriggered is true, the lifetime reset_count after this reset. Matches the resetGeneration on the GroupResetEvent SSE event for this same reset."
             }
           }
         }
       },
       "errors": [
-        {"name": "ConvoNotFound", "description": "Conversation not found"},
-        {"name": "NotMember", "description": "Caller is not a member of the conversation"}
+        {
+          "name": "ConvoNotFound",
+          "description": "Conversation not found"
+        },
+        {
+          "name": "NotMember",
+          "description": "Caller is not a member of the conversation"
+        }
       ]
     }
   }
