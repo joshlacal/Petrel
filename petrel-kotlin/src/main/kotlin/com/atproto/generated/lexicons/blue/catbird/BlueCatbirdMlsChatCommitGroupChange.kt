@@ -46,15 +46,15 @@ object BlueCatbirdMlsChatCommitGroupChangeDefs {
 // Conversation identifier        @SerialName("convoId")
         val convoId: String,// Membership action to perform        @SerialName("action")
         val action: String,// DIDs of members to add (required for 'addMembers')        @SerialName("memberDids")
-        val memberDids: List<DID>? = null,// Base64url-encoded MLS Commit message (used by addMembers, processExternalCommit, rejoin)        @SerialName("commit")
-        val commit: String? = null,// Base64url-encoded MLS Welcome message (used by addMembers, completePendingDeviceAddition)        @SerialName("welcome")
-        val welcome: String? = null,// Base64-encoded GroupInfo to update after commit (used by processExternalCommit, addMembers)        @SerialName("groupInfo")
-        val groupInfo: String? = null,// Key package hash mappings for new members (used by addMembers, completePendingDeviceAddition)        @SerialName("keyPackageHashes")
+        val memberDids: List<DID>? = null,// MLS Commit message (used by addMembers, processExternalCommit, rejoin)        @SerialName("commit")
+        val commit: Bytes? = null,// MLS Welcome message (used by addMembers, completePendingDeviceAddition)        @SerialName("welcome")
+        val welcome: Bytes? = null,// GroupInfo to update after commit (used by processExternalCommit, addMembers)        @SerialName("groupInfo")
+        val groupInfo: Bytes? = null,// Key package hash mappings for new members (used by addMembers, completePendingDeviceAddition)        @SerialName("keyPackageHashes")
         val keyPackageHashes: List<BlueCatbirdMlsChatCommitGroupChangeKeyPackageHashEntry>? = null,// Device ID for pending device addition operations (used by claimPendingDeviceAddition)        @SerialName("deviceId")
         val deviceId: String? = null,// ID of the pending addition to claim or complete        @SerialName("pendingAdditionId")
         val pendingAdditionId: String? = null,// Client-generated UUID for idempotent retries        @SerialName("idempotencyKey")
-        val idempotencyKey: String? = null,// Base64-encoded MLS confirmation tag from the client's post-commit group state.        @SerialName("confirmationTag")
-        val confirmationTag: String? = null,// Hex-encoded epoch_authenticator (RFC 9420 §8.7) for the post-commit epoch. Optional. When present on an epoch-advancing action (addMembers, processExternalCommit, rejoin, commit, updateMetadata), the server records it in the epoch_authenticators table and uses it to validate future reportRecoveryFailure votes for quorum auto-reset (see ADR-002).        @SerialName("epochAuthenticator")
+        val idempotencyKey: String? = null,// MLS confirmation tag from the client's post-commit group state.        @SerialName("confirmationTag")
+        val confirmationTag: Bytes? = null,// Hex-encoded epoch_authenticator (RFC 9420 §8.7) for the post-commit epoch. Optional. When present on an epoch-advancing action (addMembers, processExternalCommit, rejoin, commit, updateMetadata), the server records it in the epoch_authenticators table and uses it to validate future reportRecoveryFailure votes for quorum auto-reset (see ADR-002).        @SerialName("epochAuthenticator")
         val epochAuthenticator: String? = null    )
 
     @Serializable
@@ -64,8 +64,8 @@ object BlueCatbirdMlsChatCommitGroupChangeDefs {
         val newEpoch: Int? = null,// Timestamp of rejoin (for processExternalCommit, rejoin)        @SerialName("rejoinedAt")
         val rejoinedAt: ATProtocolDate? = null,// List of pending device additions (for getPendingDeviceAdditions)        @SerialName("pendingAdditions")
         val pendingAdditions: List<BlueCatbirdMlsChatCommitGroupChangePendingDeviceAddition>? = null,// The claimed pending addition (for claimPendingDeviceAddition)        @SerialName("claimedAddition")
-        val claimedAddition: BlueCatbirdMlsChatCommitGroupChangePendingDeviceAddition? = null,// Base64-encoded confirmation tag of the new canonical tree state.        @SerialName("confirmationTag")
-        val confirmationTag: String? = null    )
+        val claimedAddition: BlueCatbirdMlsChatCommitGroupChangePendingDeviceAddition? = null,// confirmation tag of the new canonical tree state.        @SerialName("confirmationTag")
+        val confirmationTag: Bytes? = null    )
 
 sealed class BlueCatbirdMlsChatCommitGroupChangeError(val name: String, val description: String?) {
         object ConvoNotFound: BlueCatbirdMlsChatCommitGroupChangeError("ConvoNotFound", "Conversation not found")

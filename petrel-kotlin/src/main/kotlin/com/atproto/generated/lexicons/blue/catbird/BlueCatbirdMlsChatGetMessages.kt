@@ -31,7 +31,9 @@ object BlueCatbirdMlsChatGetMessagesDefs {
         val convoId: String,// Maximum number of messages to return        @SerialName("limit")
         val limit: Int? = null,// Fetch messages with seq > sinceSeq (pagination cursor)        @SerialName("sinceSeq")
         val sinceSeq: Int? = null,// Filter by message type: 'app' for user content only, 'commit' for MLS protocol control messages only, 'all' for both        @SerialName("type")
-        val type: String? = null    )
+        val type: String? = null,// Lower bound (inclusive) on MLS epoch. Only honored for type='commit' or type='all' — narrows the commit-catchup range so LIMIT reaches the commits a lagging client actually needs. Defaults to 0 (start of history) when omitted.        @SerialName("fromEpoch")
+        val fromEpoch: Int? = null,// Upper bound (inclusive) on MLS epoch. Only honored for type='commit' or type='all'. Defaults to the conversation's current_epoch when omitted.        @SerialName("toEpoch")
+        val toEpoch: Int? = null    )
 
     @Serializable
     data class BlueCatbirdMlsChatGetMessagesOutput(
