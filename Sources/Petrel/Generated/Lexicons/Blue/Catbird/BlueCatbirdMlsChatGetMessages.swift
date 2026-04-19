@@ -101,17 +101,23 @@ public struct Parameters: Parametrizable {
         public let limit: Int?
         public let sinceSeq: Int?
         public let type: String?
+        public let fromEpoch: Int?
+        public let toEpoch: Int?
         
         public init(
             convoId: String, 
             limit: Int? = nil, 
             sinceSeq: Int? = nil, 
-            type: String? = nil
+            type: String? = nil, 
+            fromEpoch: Int? = nil, 
+            toEpoch: Int? = nil
             ) {
             self.convoId = convoId
             self.limit = limit
             self.sinceSeq = sinceSeq
             self.type = type
+            self.fromEpoch = fromEpoch
+            self.toEpoch = toEpoch
             
         }
     }

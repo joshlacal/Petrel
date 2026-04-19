@@ -31,6 +31,16 @@
             "description": "Filter by message type: 'app' for user content only, 'commit' for MLS protocol control messages only, 'all' for both",
             "knownValues": ["app", "commit", "all"],
             "default": "all"
+          },
+          "fromEpoch": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Lower bound (inclusive) on MLS epoch. Only honored for type='commit' or type='all' — narrows the commit-catchup range so LIMIT reaches the commits a lagging client actually needs. Defaults to 0 (start of history) when omitted."
+          },
+          "toEpoch": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Upper bound (inclusive) on MLS epoch. Only honored for type='commit' or type='all'. Defaults to the conversation's current_epoch when omitted."
           }
         }
       },

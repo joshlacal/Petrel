@@ -280,18 +280,18 @@ public struct Input: ATProtocolCodable {
         public let convoId: String
         public let action: String
         public let memberDids: [DID]?
-        public let commit: String?
-        public let welcome: String?
-        public let groupInfo: String?
+        public let commit: Bytes?
+        public let welcome: Bytes?
+        public let groupInfo: Bytes?
         public let keyPackageHashes: [KeyPackageHashEntry]?
         public let deviceId: String?
         public let pendingAdditionId: String?
         public let idempotencyKey: String?
-        public let confirmationTag: String?
+        public let confirmationTag: Bytes?
         public let epochAuthenticator: String?
 
         /// Standard public initializer
-        public init(convoId: String, action: String, memberDids: [DID]? = nil, commit: String? = nil, welcome: String? = nil, groupInfo: String? = nil, keyPackageHashes: [KeyPackageHashEntry]? = nil, deviceId: String? = nil, pendingAdditionId: String? = nil, idempotencyKey: String? = nil, confirmationTag: String? = nil, epochAuthenticator: String? = nil) {
+        public init(convoId: String, action: String, memberDids: [DID]? = nil, commit: Bytes? = nil, welcome: Bytes? = nil, groupInfo: Bytes? = nil, keyPackageHashes: [KeyPackageHashEntry]? = nil, deviceId: String? = nil, pendingAdditionId: String? = nil, idempotencyKey: String? = nil, confirmationTag: Bytes? = nil, epochAuthenticator: String? = nil) {
             self.convoId = convoId
             self.action = action
             self.memberDids = memberDids
@@ -312,14 +312,14 @@ public struct Input: ATProtocolCodable {
             self.convoId = try container.decode(String.self, forKey: .convoId)
             self.action = try container.decode(String.self, forKey: .action)
             self.memberDids = try container.decodeIfPresent([DID].self, forKey: .memberDids)
-            self.commit = try container.decodeIfPresent(String.self, forKey: .commit)
-            self.welcome = try container.decodeIfPresent(String.self, forKey: .welcome)
-            self.groupInfo = try container.decodeIfPresent(String.self, forKey: .groupInfo)
+            self.commit = try container.decodeIfPresent(Bytes.self, forKey: .commit)
+            self.welcome = try container.decodeIfPresent(Bytes.self, forKey: .welcome)
+            self.groupInfo = try container.decodeIfPresent(Bytes.self, forKey: .groupInfo)
             self.keyPackageHashes = try container.decodeIfPresent([KeyPackageHashEntry].self, forKey: .keyPackageHashes)
             self.deviceId = try container.decodeIfPresent(String.self, forKey: .deviceId)
             self.pendingAdditionId = try container.decodeIfPresent(String.self, forKey: .pendingAdditionId)
             self.idempotencyKey = try container.decodeIfPresent(String.self, forKey: .idempotencyKey)
-            self.confirmationTag = try container.decodeIfPresent(String.self, forKey: .confirmationTag)
+            self.confirmationTag = try container.decodeIfPresent(Bytes.self, forKey: .confirmationTag)
             self.epochAuthenticator = try container.decodeIfPresent(String.self, forKey: .epochAuthenticator)
         }
 
@@ -417,7 +417,7 @@ public struct Output: ATProtocolCodable {
         
         public let claimedAddition: PendingDeviceAddition?
         
-        public let confirmationTag: String?
+        public let confirmationTag: Bytes?
         
         
         
@@ -435,7 +435,7 @@ public struct Output: ATProtocolCodable {
             
             claimedAddition: PendingDeviceAddition? = nil,
             
-            confirmationTag: String? = nil
+            confirmationTag: Bytes? = nil
             
             
         ) {
@@ -475,7 +475,7 @@ public struct Output: ATProtocolCodable {
             self.claimedAddition = try container.decodeIfPresent(PendingDeviceAddition.self, forKey: .claimedAddition)
             
             
-            self.confirmationTag = try container.decodeIfPresent(String.self, forKey: .confirmationTag)
+            self.confirmationTag = try container.decodeIfPresent(Bytes.self, forKey: .confirmationTag)
             
             
         }

@@ -10,7 +10,10 @@
         "encoding": "application/json",
         "schema": {
           "type": "object",
-          "required": ["convoId", "action"],
+          "required": [
+            "convoId",
+            "action"
+          ],
           "properties": {
             "convoId": {
               "type": "string",
@@ -40,16 +43,16 @@
               "maxLength": 50
             },
             "commit": {
-              "type": "string",
-              "description": "Base64url-encoded MLS Commit message (used by addMembers, processExternalCommit, rejoin)"
+              "type": "bytes",
+              "description": "MLS Commit message (used by addMembers, processExternalCommit, rejoin)"
             },
             "welcome": {
-              "type": "string",
-              "description": "Base64url-encoded MLS Welcome message (used by addMembers, completePendingDeviceAddition)"
+              "type": "bytes",
+              "description": "MLS Welcome message (used by addMembers, completePendingDeviceAddition)"
             },
             "groupInfo": {
-              "type": "string",
-              "description": "Base64-encoded GroupInfo to update after commit (used by processExternalCommit, addMembers)"
+              "type": "bytes",
+              "description": "GroupInfo to update after commit (used by processExternalCommit, addMembers)"
             },
             "keyPackageHashes": {
               "type": "array",
@@ -72,13 +75,13 @@
               "description": "Client-generated UUID for idempotent retries"
             },
             "confirmationTag": {
-              "type": "string",
+              "type": "bytes",
               "maxLength": 64,
-              "description": "Base64-encoded MLS confirmation tag from the client's post-commit group state."
+              "description": "MLS confirmation tag from the client's post-commit group state."
             },
             "epochAuthenticator": {
               "type": "string",
-              "description": "Hex-encoded epoch_authenticator (RFC 9420 §8.7) for the post-commit epoch. Optional. When present on an epoch-advancing action (addMembers, processExternalCommit, rejoin, commit, updateMetadata), the server records it in the epoch_authenticators table and uses it to validate future reportRecoveryFailure votes for quorum auto-reset (see ADR-002)."
+              "description": "Hex-encoded epoch_authenticator (RFC 9420 \u00a78.7) for the post-commit epoch. Optional. When present on an epoch-advancing action (addMembers, processExternalCommit, rejoin, commit, updateMetadata), the server records it in the epoch_authenticators table and uses it to validate future reportRecoveryFailure votes for quorum auto-reset (see ADR-002)."
             }
           }
         }
@@ -87,7 +90,9 @@
         "encoding": "application/json",
         "schema": {
           "type": "object",
-          "required": ["success"],
+          "required": [
+            "success"
+          ],
           "properties": {
             "success": {
               "type": "boolean",
@@ -117,31 +122,70 @@
               "description": "The claimed pending addition (for claimPendingDeviceAddition)"
             },
             "confirmationTag": {
-              "type": "string",
+              "type": "bytes",
               "maxLength": 64,
-              "description": "Base64-encoded confirmation tag of the new canonical tree state."
+              "description": "confirmation tag of the new canonical tree state."
             }
           }
         }
       },
       "errors": [
-        {"name": "ConvoNotFound", "description": "Conversation not found"},
-        {"name": "NotMember", "description": "Caller is not a member of the conversation"},
-        {"name": "InvalidAction", "description": "Unknown action value"},
-        {"name": "KeyPackageNotFound", "description": "Key package not found for one or more members"},
-        {"name": "AlreadyMember", "description": "One or more DIDs are already members"},
-        {"name": "TooManyMembers", "description": "Would exceed maximum member count"},
-        {"name": "BlockedByMember", "description": "Cannot add user who has blocked or been blocked by an existing member"},
-        {"name": "InvalidCommit", "description": "The provided MLS Commit message is invalid"},
-        {"name": "InvalidGroupInfo", "description": "The provided GroupInfo is invalid"},
-        {"name": "PendingAdditionNotFound", "description": "The specified pending addition does not exist"},
-        {"name": "PendingAdditionAlreadyClaimed", "description": "The pending addition was already claimed by another member"},
-        {"name": "Unauthorized", "description": "Insufficient privileges for this operation"}
+        {
+          "name": "ConvoNotFound",
+          "description": "Conversation not found"
+        },
+        {
+          "name": "NotMember",
+          "description": "Caller is not a member of the conversation"
+        },
+        {
+          "name": "InvalidAction",
+          "description": "Unknown action value"
+        },
+        {
+          "name": "KeyPackageNotFound",
+          "description": "Key package not found for one or more members"
+        },
+        {
+          "name": "AlreadyMember",
+          "description": "One or more DIDs are already members"
+        },
+        {
+          "name": "TooManyMembers",
+          "description": "Would exceed maximum member count"
+        },
+        {
+          "name": "BlockedByMember",
+          "description": "Cannot add user who has blocked or been blocked by an existing member"
+        },
+        {
+          "name": "InvalidCommit",
+          "description": "The provided MLS Commit message is invalid"
+        },
+        {
+          "name": "InvalidGroupInfo",
+          "description": "The provided GroupInfo is invalid"
+        },
+        {
+          "name": "PendingAdditionNotFound",
+          "description": "The specified pending addition does not exist"
+        },
+        {
+          "name": "PendingAdditionAlreadyClaimed",
+          "description": "The pending addition was already claimed by another member"
+        },
+        {
+          "name": "Unauthorized",
+          "description": "Insufficient privileges for this operation"
+        }
       ]
     },
     "keyPackageHashEntry": {
       "type": "object",
-      "required": ["did", "hash"],
+      "required": [
+        "did",
+        "hash"
+      ],
       "properties": {
         "did": {
           "type": "string",
@@ -156,7 +200,15 @@
     },
     "pendingDeviceAddition": {
       "type": "object",
-      "required": ["id", "convoId", "userDid", "deviceId", "deviceCredentialDid", "status", "createdAt"],
+      "required": [
+        "id",
+        "convoId",
+        "userDid",
+        "deviceId",
+        "deviceCredentialDid",
+        "status",
+        "createdAt"
+      ],
       "properties": {
         "id": {
           "type": "string",
@@ -186,7 +238,10 @@
         "status": {
           "type": "string",
           "description": "Current status of the pending addition",
-          "knownValues": ["pending", "in_progress"]
+          "knownValues": [
+            "pending",
+            "in_progress"
+          ]
         },
         "claimedBy": {
           "type": "string",
