@@ -24,10 +24,6 @@
           "type": "union",
           "refs": [
             "#messageEvent",
-            "#memberJoined",
-            "#memberLeft",
-            "#epochAdvanced",
-            "#conversationUpdated",
             "#reactionEvent",
             "#typingEvent",
             "#newDeviceEvent",
@@ -35,9 +31,9 @@
             "#treeChanged",
             "#groupResetEvent",
             "#membershipChangeEvent",
-            "#readEvent",
             "#groupInfoRefreshRequestedEvent",
-            "#readditionRequestedEvent"
+            "#readditionRequestedEvent",
+            "#circuitBreakerTrippedEvent"
           ]
         }
       }
@@ -48,72 +44,11 @@
       "required": ["cursor", "message"],
       "properties": {
         "cursor": { "type": "string", "description": "Resume cursor for this event position" },
-        "message": { "type": "ref", "ref": "blue.catbird.mlsChat.defs#messageView" }
-      }
-    },
-    "memberJoined": {
-      "type": "object",
-      "description": "A member joined the conversation (via Welcome, ExternalCommit, or re-addition)",
-      "required": ["cursor", "convoId", "did", "epoch"],
-      "properties": {
-        "cursor": { "type": "string", "description": "Resume cursor" },
-        "convoId": { "type": "string", "description": "Conversation identifier" },
-        "did": { "type": "string", "format": "did", "description": "DID of the member who joined" },
-        "deviceId": { "type": "string", "description": "Device ID if this was a device addition" },
-        "epoch": { "type": "integer", "description": "New epoch after join" },
-        "method": {
-          "type": "string",
-          "description": "How the member joined",
-          "knownValues": ["welcome", "externalCommit", "readdition", "deviceAddition"]
+        "message": { "type": "ref", "ref": "blue.catbird.mlsChat.defs#messageView" },
+        "ephemeral": {
+          "type": "boolean",
+          "description": "When true, this is an ephemeral signal (typing, read receipt, presence) that should NOT be shown in chat history. Omitted (defaults to false) for regular persistent messages."
         }
-      }
-    },
-    "memberLeft": {
-      "type": "object",
-      "description": "A member left or was removed from the conversation",
-      "required": ["cursor", "convoId", "did", "action", "epoch"],
-      "properties": {
-        "cursor": { "type": "string", "description": "Resume cursor" },
-        "convoId": { "type": "string", "description": "Conversation identifier" },
-        "did": { "type": "string", "format": "did", "description": "DID of the member who left/was removed" },
-        "action": {
-          "type": "string",
-          "description": "How the member departed",
-          "knownValues": ["left", "removed", "kicked"]
-        },
-        "actor": { "type": "string", "format": "did", "description": "DID of the admin who removed (for removed/kicked)" },
-        "reason": { "type": "string", "description": "Optional reason for removal" },
-        "epoch": { "type": "integer", "description": "New epoch after departure" }
-      }
-    },
-    "epochAdvanced": {
-      "type": "object",
-      "description": "The MLS epoch advanced (group state change)",
-      "required": ["cursor", "convoId", "epoch"],
-      "properties": {
-        "cursor": { "type": "string", "description": "Resume cursor" },
-        "convoId": { "type": "string", "description": "Conversation identifier" },
-        "epoch": { "type": "integer", "description": "New epoch number" },
-        "reason": {
-          "type": "string",
-          "description": "Why the epoch advanced",
-          "knownValues": ["memberAdd", "memberRemove", "commit", "externalCommit", "update"]
-        }
-      }
-    },
-    "conversationUpdated": {
-      "type": "object",
-      "description": "Conversation metadata or policy was updated",
-      "required": ["cursor", "convoId"],
-      "properties": {
-        "cursor": { "type": "string", "description": "Resume cursor" },
-        "convoId": { "type": "string", "description": "Conversation identifier" },
-        "updatedFields": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "List of fields that changed (e.g., 'name', 'policy', 'groupInfo')"
-        },
-        "updatedBy": { "type": "string", "format": "did", "description": "DID of the member who made the update" }
       }
     },
     "reactionEvent": {
@@ -191,6 +126,18 @@
         "newGroupId": { "type": "string", "description": "New MLS group ID after reset" },
         "resetGeneration": { "type": "integer", "description": "Cumulative reset count for this conversation" },
         "resetBy": { "type": "string", "format": "did", "description": "DID of the admin who initiated the reset" },
+        "cipherSuite": {
+          "type": "string",
+          "description": "MLS cipher suite used for the new group after reset.",
+          "knownValues": [
+            "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
+            "MLS_128_DHKEMP256_AES128GCM_SHA256_P256",
+            "MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519",
+            "MLS_256_DHKEMX448_AES256GCM_SHA512_Ed448",
+            "MLS_256_DHKEMP521_AES256GCM_SHA512_P521",
+            "MLS_256_DHKEMX448_CHACHA20POLY1305_SHA512_Ed448"
+          ]
+        },
         "reason": { "type": "string", "description": "Optional reason for the reset" }
       }
     },
@@ -209,17 +156,6 @@
         }
       }
     },
-    "readEvent": {
-      "type": "object",
-      "description": "A read receipt or read frontier update",
-      "required": ["cursor", "convoId"],
-      "properties": {
-        "cursor": { "type": "string", "description": "Resume cursor" },
-        "convoId": { "type": "string", "description": "Conversation identifier" },
-        "did": { "type": "string", "format": "did", "description": "DID of the reader" },
-        "messageId": { "type": "string", "description": "Message ID that was read up to" }
-      }
-    },
     "groupInfoRefreshRequestedEvent": {
       "type": "object",
       "description": "A GroupInfo refresh was requested for a conversation",
@@ -227,7 +163,8 @@
       "properties": {
         "cursor": { "type": "string", "description": "Resume cursor" },
         "convoId": { "type": "string", "description": "Conversation identifier" },
-        "requestedBy": { "type": "string", "format": "did", "description": "DID of the requester" }
+        "requestedBy": { "type": "string", "format": "did", "description": "DID of the requester" },
+        "requestedAt": { "type": "string", "format": "datetime", "description": "When the refresh was requested (RFC3339)" }
       }
     },
     "readditionRequestedEvent": {
@@ -237,7 +174,19 @@
       "properties": {
         "cursor": { "type": "string", "description": "Resume cursor" },
         "convoId": { "type": "string", "description": "Conversation identifier" },
-        "requestedBy": { "type": "string", "format": "did", "description": "DID of the requester" }
+        "requestedBy": { "type": "string", "format": "did", "description": "DID of the member requesting re-addition" },
+        "requestedAt": { "type": "string", "format": "datetime", "description": "When the re-addition was requested (RFC3339)" }
+      }
+    },
+    "circuitBreakerTrippedEvent": {
+      "type": "object",
+      "description": "The automatic group-reset circuit breaker tripped for this conversation. Auto-reset is disabled; an admin must intervene.",
+      "required": ["cursor", "convoId", "resetCount", "trippedAt"],
+      "properties": {
+        "cursor": { "type": "string", "description": "Resume cursor" },
+        "convoId": { "type": "string", "description": "Conversation identifier" },
+        "resetCount": { "type": "integer", "description": "Recent reset count that triggered the trip" },
+        "trippedAt": { "type": "string", "format": "datetime", "description": "When the breaker tripped (RFC3339)" }
       }
     }
   }

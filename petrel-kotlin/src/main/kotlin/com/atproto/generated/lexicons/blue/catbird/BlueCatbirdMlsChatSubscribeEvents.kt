@@ -21,74 +21,10 @@ object BlueCatbirdMlsChatSubscribeEventsDefs {
     data class BlueCatbirdMlsChatSubscribeEventsMessageEvent(
 /** Resume cursor for this event position */        @SerialName("cursor")
         val cursor: String,        @SerialName("message")
-        val message: BlueCatbirdMlsChatDefsMessageView    ) {
+        val message: BlueCatbirdMlsChatDefsMessageView,/** When true, this is an ephemeral signal (typing, read receipt, presence) that should NOT be shown in chat history. Omitted (defaults to false) for regular persistent messages. */        @SerialName("ephemeral")
+        val ephemeral: Boolean? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#blueCatbirdMlsChatSubscribeEventsMessageEvent"
-        }
-    }
-
-    /**
-     * A member joined the conversation (via Welcome, ExternalCommit, or re-addition)
-     */
-    @Serializable
-    data class BlueCatbirdMlsChatSubscribeEventsMemberJoined(
-/** Resume cursor */        @SerialName("cursor")
-        val cursor: String,/** Conversation identifier */        @SerialName("convoId")
-        val convoId: String,/** DID of the member who joined */        @SerialName("did")
-        val did: DID,/** Device ID if this was a device addition */        @SerialName("deviceId")
-        val deviceId: String? = null,/** New epoch after join */        @SerialName("epoch")
-        val epoch: Int,/** How the member joined */        @SerialName("method")
-        val method: String? = null    ) {
-        companion object {
-            const val TYPE_IDENTIFIER = "#blueCatbirdMlsChatSubscribeEventsMemberJoined"
-        }
-    }
-
-    /**
-     * A member left or was removed from the conversation
-     */
-    @Serializable
-    data class BlueCatbirdMlsChatSubscribeEventsMemberLeft(
-/** Resume cursor */        @SerialName("cursor")
-        val cursor: String,/** Conversation identifier */        @SerialName("convoId")
-        val convoId: String,/** DID of the member who left/was removed */        @SerialName("did")
-        val did: DID,/** How the member departed */        @SerialName("action")
-        val action: String,/** DID of the admin who removed (for removed/kicked) */        @SerialName("actor")
-        val actor: DID? = null,/** Optional reason for removal */        @SerialName("reason")
-        val reason: String? = null,/** New epoch after departure */        @SerialName("epoch")
-        val epoch: Int    ) {
-        companion object {
-            const val TYPE_IDENTIFIER = "#blueCatbirdMlsChatSubscribeEventsMemberLeft"
-        }
-    }
-
-    /**
-     * The MLS epoch advanced (group state change)
-     */
-    @Serializable
-    data class BlueCatbirdMlsChatSubscribeEventsEpochAdvanced(
-/** Resume cursor */        @SerialName("cursor")
-        val cursor: String,/** Conversation identifier */        @SerialName("convoId")
-        val convoId: String,/** New epoch number */        @SerialName("epoch")
-        val epoch: Int,/** Why the epoch advanced */        @SerialName("reason")
-        val reason: String? = null    ) {
-        companion object {
-            const val TYPE_IDENTIFIER = "#blueCatbirdMlsChatSubscribeEventsEpochAdvanced"
-        }
-    }
-
-    /**
-     * Conversation metadata or policy was updated
-     */
-    @Serializable
-    data class BlueCatbirdMlsChatSubscribeEventsConversationUpdated(
-/** Resume cursor */        @SerialName("cursor")
-        val cursor: String,/** Conversation identifier */        @SerialName("convoId")
-        val convoId: String,/** List of fields that changed (e.g., 'name', 'policy', 'groupInfo') */        @SerialName("updatedFields")
-        val updatedFields: List<String>? = null,/** DID of the member who made the update */        @SerialName("updatedBy")
-        val updatedBy: DID? = null    ) {
-        companion object {
-            const val TYPE_IDENTIFIER = "#blueCatbirdMlsChatSubscribeEventsConversationUpdated"
         }
     }
 
@@ -183,7 +119,8 @@ object BlueCatbirdMlsChatSubscribeEventsDefs {
         val convoId: String,/** New MLS group ID after reset */        @SerialName("newGroupId")
         val newGroupId: String,/** Cumulative reset count for this conversation */        @SerialName("resetGeneration")
         val resetGeneration: Int,/** DID of the admin who initiated the reset */        @SerialName("resetBy")
-        val resetBy: DID? = null,/** Optional reason for the reset */        @SerialName("reason")
+        val resetBy: DID? = null,/** MLS cipher suite used for the new group after reset. */        @SerialName("cipherSuite")
+        val cipherSuite: String? = null,/** Optional reason for the reset */        @SerialName("reason")
         val reason: String? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#blueCatbirdMlsChatSubscribeEventsGroupResetEvent"
@@ -206,21 +143,6 @@ object BlueCatbirdMlsChatSubscribeEventsDefs {
     }
 
     /**
-     * A read receipt or read frontier update
-     */
-    @Serializable
-    data class BlueCatbirdMlsChatSubscribeEventsReadEvent(
-/** Resume cursor */        @SerialName("cursor")
-        val cursor: String,/** Conversation identifier */        @SerialName("convoId")
-        val convoId: String,/** DID of the reader */        @SerialName("did")
-        val did: DID? = null,/** Message ID that was read up to */        @SerialName("messageId")
-        val messageId: String? = null    ) {
-        companion object {
-            const val TYPE_IDENTIFIER = "#blueCatbirdMlsChatSubscribeEventsReadEvent"
-        }
-    }
-
-    /**
      * A GroupInfo refresh was requested for a conversation
      */
     @Serializable
@@ -228,7 +150,8 @@ object BlueCatbirdMlsChatSubscribeEventsDefs {
 /** Resume cursor */        @SerialName("cursor")
         val cursor: String,/** Conversation identifier */        @SerialName("convoId")
         val convoId: String,/** DID of the requester */        @SerialName("requestedBy")
-        val requestedBy: DID? = null    ) {
+        val requestedBy: DID? = null,/** When the refresh was requested (RFC3339) */        @SerialName("requestedAt")
+        val requestedAt: ATProtocolDate? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#blueCatbirdMlsChatSubscribeEventsGroupInfoRefreshRequestedEvent"
         }
@@ -241,10 +164,26 @@ object BlueCatbirdMlsChatSubscribeEventsDefs {
     data class BlueCatbirdMlsChatSubscribeEventsReadditionRequestedEvent(
 /** Resume cursor */        @SerialName("cursor")
         val cursor: String,/** Conversation identifier */        @SerialName("convoId")
-        val convoId: String,/** DID of the requester */        @SerialName("requestedBy")
-        val requestedBy: DID? = null    ) {
+        val convoId: String,/** DID of the member requesting re-addition */        @SerialName("requestedBy")
+        val requestedBy: DID? = null,/** When the re-addition was requested (RFC3339) */        @SerialName("requestedAt")
+        val requestedAt: ATProtocolDate? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#blueCatbirdMlsChatSubscribeEventsReadditionRequestedEvent"
+        }
+    }
+
+    /**
+     * The automatic group-reset circuit breaker tripped for this conversation. Auto-reset is disabled; an admin must intervene.
+     */
+    @Serializable
+    data class BlueCatbirdMlsChatSubscribeEventsCircuitBreakerTrippedEvent(
+/** Resume cursor */        @SerialName("cursor")
+        val cursor: String,/** Conversation identifier */        @SerialName("convoId")
+        val convoId: String,/** Recent reset count that triggered the trip */        @SerialName("resetCount")
+        val resetCount: Int,/** When the breaker tripped (RFC3339) */        @SerialName("trippedAt")
+        val trippedAt: ATProtocolDate    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#blueCatbirdMlsChatSubscribeEventsCircuitBreakerTrippedEvent"
         }
     }
 
