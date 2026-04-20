@@ -8,10 +8,180 @@ import com.atproto.core.types.*
 import com.atproto.core.*
 import com.atproto.client.*
 import com.atproto.network.*
+import com.atproto.runtime.subscription.openSubscription
 import kotlinx.coroutines.flow.*
 
 object BlueCatbirdMlsChatSubscribeEventsDefs {
     const val TYPE_IDENTIFIER = "blue.catbird.mlsChat.subscribeEvents"
+}
+
+@Serializable(with = BlueCatbirdMlsChatSubscribeEventsMessageUnionSerializer::class)
+sealed interface BlueCatbirdMlsChatSubscribeEventsMessageUnion {
+    @Serializable
+    data class MessageEvent(val value: com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsMessageEvent) : BlueCatbirdMlsChatSubscribeEventsMessageUnion
+
+    @Serializable
+    data class ReactionEvent(val value: com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsReactionEvent) : BlueCatbirdMlsChatSubscribeEventsMessageUnion
+
+    @Serializable
+    data class TypingEvent(val value: com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsTypingEvent) : BlueCatbirdMlsChatSubscribeEventsMessageUnion
+
+    @Serializable
+    data class NewDeviceEvent(val value: com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsNewDeviceEvent) : BlueCatbirdMlsChatSubscribeEventsMessageUnion
+
+    @Serializable
+    data class InfoEvent(val value: com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsInfoEvent) : BlueCatbirdMlsChatSubscribeEventsMessageUnion
+
+    @Serializable
+    data class TreeChanged(val value: com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsTreeChanged) : BlueCatbirdMlsChatSubscribeEventsMessageUnion
+
+    @Serializable
+    data class GroupResetEvent(val value: com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsGroupResetEvent) : BlueCatbirdMlsChatSubscribeEventsMessageUnion
+
+    @Serializable
+    data class MembershipChangeEvent(val value: com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsMembershipChangeEvent) : BlueCatbirdMlsChatSubscribeEventsMessageUnion
+
+    @Serializable
+    data class GroupInfoRefreshRequestedEvent(val value: com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsGroupInfoRefreshRequestedEvent) : BlueCatbirdMlsChatSubscribeEventsMessageUnion
+
+    @Serializable
+    data class ReadditionRequestedEvent(val value: com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsReadditionRequestedEvent) : BlueCatbirdMlsChatSubscribeEventsMessageUnion
+
+    @Serializable
+    data class CircuitBreakerTrippedEvent(val value: com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsCircuitBreakerTrippedEvent) : BlueCatbirdMlsChatSubscribeEventsMessageUnion
+
+    @Serializable
+    data class Unexpected(val value: JsonElement) : BlueCatbirdMlsChatSubscribeEventsMessageUnion
+}
+
+object BlueCatbirdMlsChatSubscribeEventsMessageUnionSerializer : kotlinx.serialization.KSerializer<BlueCatbirdMlsChatSubscribeEventsMessageUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("BlueCatbirdMlsChatSubscribeEventsMessageUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: BlueCatbirdMlsChatSubscribeEventsMessageUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is BlueCatbirdMlsChatSubscribeEventsMessageUnion.MessageEvent -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsMessageEvent.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("blue.catbird.mlsChat.subscribeEvents#messageEvent")
+                })
+            }
+            is BlueCatbirdMlsChatSubscribeEventsMessageUnion.ReactionEvent -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsReactionEvent.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("blue.catbird.mlsChat.subscribeEvents#reactionEvent")
+                })
+            }
+            is BlueCatbirdMlsChatSubscribeEventsMessageUnion.TypingEvent -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsTypingEvent.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("blue.catbird.mlsChat.subscribeEvents#typingEvent")
+                })
+            }
+            is BlueCatbirdMlsChatSubscribeEventsMessageUnion.NewDeviceEvent -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsNewDeviceEvent.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("blue.catbird.mlsChat.subscribeEvents#newDeviceEvent")
+                })
+            }
+            is BlueCatbirdMlsChatSubscribeEventsMessageUnion.InfoEvent -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsInfoEvent.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("blue.catbird.mlsChat.subscribeEvents#infoEvent")
+                })
+            }
+            is BlueCatbirdMlsChatSubscribeEventsMessageUnion.TreeChanged -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsTreeChanged.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("blue.catbird.mlsChat.subscribeEvents#treeChanged")
+                })
+            }
+            is BlueCatbirdMlsChatSubscribeEventsMessageUnion.GroupResetEvent -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsGroupResetEvent.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("blue.catbird.mlsChat.subscribeEvents#groupResetEvent")
+                })
+            }
+            is BlueCatbirdMlsChatSubscribeEventsMessageUnion.MembershipChangeEvent -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsMembershipChangeEvent.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("blue.catbird.mlsChat.subscribeEvents#membershipChangeEvent")
+                })
+            }
+            is BlueCatbirdMlsChatSubscribeEventsMessageUnion.GroupInfoRefreshRequestedEvent -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsGroupInfoRefreshRequestedEvent.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("blue.catbird.mlsChat.subscribeEvents#groupInfoRefreshRequestedEvent")
+                })
+            }
+            is BlueCatbirdMlsChatSubscribeEventsMessageUnion.ReadditionRequestedEvent -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsReadditionRequestedEvent.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("blue.catbird.mlsChat.subscribeEvents#readditionRequestedEvent")
+                })
+            }
+            is BlueCatbirdMlsChatSubscribeEventsMessageUnion.CircuitBreakerTrippedEvent -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsCircuitBreakerTrippedEvent.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("blue.catbird.mlsChat.subscribeEvents#circuitBreakerTrippedEvent")
+                })
+            }
+            is BlueCatbirdMlsChatSubscribeEventsMessageUnion.Unexpected -> value.value
+            // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
+            // subscription codegen) are runtime-only sentinels; JSON round-trip
+            // serialises them as an empty object tagged with the variant class
+            // name. Consumers should filter these before JSON serialisation.
+            else -> kotlinx.serialization.json.buildJsonObject {
+                put("\$type", kotlinx.serialization.json.JsonPrimitive(value::class.simpleName ?: "Unknown"))
+            }
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): BlueCatbirdMlsChatSubscribeEventsMessageUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "blue.catbird.mlsChat.subscribeEvents#messageEvent" -> BlueCatbirdMlsChatSubscribeEventsMessageUnion.MessageEvent(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsMessageEvent.serializer(), element)
+            )
+            "blue.catbird.mlsChat.subscribeEvents#reactionEvent" -> BlueCatbirdMlsChatSubscribeEventsMessageUnion.ReactionEvent(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsReactionEvent.serializer(), element)
+            )
+            "blue.catbird.mlsChat.subscribeEvents#typingEvent" -> BlueCatbirdMlsChatSubscribeEventsMessageUnion.TypingEvent(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsTypingEvent.serializer(), element)
+            )
+            "blue.catbird.mlsChat.subscribeEvents#newDeviceEvent" -> BlueCatbirdMlsChatSubscribeEventsMessageUnion.NewDeviceEvent(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsNewDeviceEvent.serializer(), element)
+            )
+            "blue.catbird.mlsChat.subscribeEvents#infoEvent" -> BlueCatbirdMlsChatSubscribeEventsMessageUnion.InfoEvent(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsInfoEvent.serializer(), element)
+            )
+            "blue.catbird.mlsChat.subscribeEvents#treeChanged" -> BlueCatbirdMlsChatSubscribeEventsMessageUnion.TreeChanged(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsTreeChanged.serializer(), element)
+            )
+            "blue.catbird.mlsChat.subscribeEvents#groupResetEvent" -> BlueCatbirdMlsChatSubscribeEventsMessageUnion.GroupResetEvent(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsGroupResetEvent.serializer(), element)
+            )
+            "blue.catbird.mlsChat.subscribeEvents#membershipChangeEvent" -> BlueCatbirdMlsChatSubscribeEventsMessageUnion.MembershipChangeEvent(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsMembershipChangeEvent.serializer(), element)
+            )
+            "blue.catbird.mlsChat.subscribeEvents#groupInfoRefreshRequestedEvent" -> BlueCatbirdMlsChatSubscribeEventsMessageUnion.GroupInfoRefreshRequestedEvent(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsGroupInfoRefreshRequestedEvent.serializer(), element)
+            )
+            "blue.catbird.mlsChat.subscribeEvents#readditionRequestedEvent" -> BlueCatbirdMlsChatSubscribeEventsMessageUnion.ReadditionRequestedEvent(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsReadditionRequestedEvent.serializer(), element)
+            )
+            "blue.catbird.mlsChat.subscribeEvents#circuitBreakerTrippedEvent" -> BlueCatbirdMlsChatSubscribeEventsMessageUnion.CircuitBreakerTrippedEvent(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsCircuitBreakerTrippedEvent.serializer(), element)
+            )
+            else -> BlueCatbirdMlsChatSubscribeEventsMessageUnion.Unexpected(element)
+        }
+    }
 }
 
     /**
@@ -197,28 +367,119 @@ object BlueCatbirdMlsChatSubscribeEventsDefs {
     class BlueCatbirdMlsChatSubscribeEventsMessage
 
 /**
+ * Synthetic variants augmenting the generated BlueCatbirdMlsChatSubscribeEventsMessageUnion sealed interface.
+ *
+ * `Error` surfaces ATProto `op == -1` server error frames; `Unexpected` wraps
+ * frames whose header tag did not match any known variant (e.g. new event types
+ * added server-side before client regen). Kept as extensions so the lexicon-
+ * driven sealed interface stays mechanically faithful to the schema.
+ */
+data class BlueCatbirdMlsChatSubscribeEventsMessageUnionError(val name: String, val message: String?) : BlueCatbirdMlsChatSubscribeEventsMessageUnion
+data class BlueCatbirdMlsChatSubscribeEventsMessageUnionUnexpected(val type: String, val payload: kotlinx.serialization.json.JsonObject) : BlueCatbirdMlsChatSubscribeEventsMessageUnion
+
+/**
  * Subscribe to live conversation events via WebSocket (consolidates subscribeConvoEvents with streamlined event types) Subscribe to live events (messages, membership changes, epoch advances, conversation updates) via firehose-style DAG-CBOR framing. Requires a valid ticket from getSubscriptionTicket.
  *
  * Endpoint: blue.catbird.mlsChat.subscribeEvents
+ *
+ * The returned [kotlinx.coroutines.flow.Flow] completes (or throws) when the
+ * underlying WebSocket disconnects. Reconnect / cursor-resume is the caller's
+ * responsibility — wrap in `retryWhen { ... }` with backoff as needed.
  */
 fun ATProtoClient.Blue.Catbird.MlsChat.subscribeEvents(
-parameters: BlueCatbirdMlsChatSubscribeEventsParameters): Flow<BlueCatbirdMlsChatSubscribeEventsMessage> = flow {
+parameters: BlueCatbirdMlsChatSubscribeEventsParameters? = null,
+hostOverride: String? = null,
+    websocketClient: io.ktor.client.HttpClient? = null,
+): kotlinx.coroutines.flow.Flow<BlueCatbirdMlsChatSubscribeEventsMessageUnion> = kotlinx.coroutines.flow.flow {
     val endpoint = "blue.catbird.mlsChat.subscribeEvents"
-
     // List<Pair<String, String>> preserves repeated keys, which ATProto
     // array-valued query params rely on (e.g. `?collections=a&collections=b`).
-    val queryItems = parameters.toQueryItems()
+    val queryItems = parameters?.toQueryItems().orEmpty()
 
-    // TODO: Implement WebSocket connection using a WebSocket library (e.g., Ktor WebSockets)
-    // The implementation should:
-    // 1. Establish WebSocket connection to endpoint with queryItems
-    // 2. Listen for incoming messages
-    // 3. Deserialize each message as BlueCatbirdMlsChatSubscribeEventsMessage
-    // 4. Emit each message to the Flow
-    // Example skeleton:
-    // webSocketClient.connect(endpoint, queryItems) { message ->
-    //     val decoded = Json.decodeFromString<BlueCatbirdMlsChatSubscribeEventsMessage>(message)
-    //     emit(decoded)
-    // }
-    throw NotImplementedError("WebSocket subscription support requires a WebSocket client implementation")
+    client.openSubscription(endpoint, queryItems, hostOverride, websocketClient) { frame ->
+        val decoded: BlueCatbirdMlsChatSubscribeEventsMessageUnion = when (frame) {
+            is com.atproto.runtime.subscription.CborFrame.Error ->
+                BlueCatbirdMlsChatSubscribeEventsMessageUnionError(frame.name, frame.message)
+            is com.atproto.runtime.subscription.CborFrame.Message -> {
+                val json = kotlinx.serialization.json.Json {
+                    ignoreUnknownKeys = true
+                    isLenient = true
+                }
+                try {
+                    when (frame.header.t) {
+                        "#messageEvent" -> BlueCatbirdMlsChatSubscribeEventsMessageUnion.MessageEvent(
+                            json.decodeFromJsonElement(
+                                com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsMessageEvent.serializer(),
+                                frame.payload
+                            )
+                        )
+                        "#reactionEvent" -> BlueCatbirdMlsChatSubscribeEventsMessageUnion.ReactionEvent(
+                            json.decodeFromJsonElement(
+                                com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsReactionEvent.serializer(),
+                                frame.payload
+                            )
+                        )
+                        "#typingEvent" -> BlueCatbirdMlsChatSubscribeEventsMessageUnion.TypingEvent(
+                            json.decodeFromJsonElement(
+                                com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsTypingEvent.serializer(),
+                                frame.payload
+                            )
+                        )
+                        "#newDeviceEvent" -> BlueCatbirdMlsChatSubscribeEventsMessageUnion.NewDeviceEvent(
+                            json.decodeFromJsonElement(
+                                com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsNewDeviceEvent.serializer(),
+                                frame.payload
+                            )
+                        )
+                        "#infoEvent" -> BlueCatbirdMlsChatSubscribeEventsMessageUnion.InfoEvent(
+                            json.decodeFromJsonElement(
+                                com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsInfoEvent.serializer(),
+                                frame.payload
+                            )
+                        )
+                        "#treeChanged" -> BlueCatbirdMlsChatSubscribeEventsMessageUnion.TreeChanged(
+                            json.decodeFromJsonElement(
+                                com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsTreeChanged.serializer(),
+                                frame.payload
+                            )
+                        )
+                        "#groupResetEvent" -> BlueCatbirdMlsChatSubscribeEventsMessageUnion.GroupResetEvent(
+                            json.decodeFromJsonElement(
+                                com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsGroupResetEvent.serializer(),
+                                frame.payload
+                            )
+                        )
+                        "#membershipChangeEvent" -> BlueCatbirdMlsChatSubscribeEventsMessageUnion.MembershipChangeEvent(
+                            json.decodeFromJsonElement(
+                                com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsMembershipChangeEvent.serializer(),
+                                frame.payload
+                            )
+                        )
+                        "#groupInfoRefreshRequestedEvent" -> BlueCatbirdMlsChatSubscribeEventsMessageUnion.GroupInfoRefreshRequestedEvent(
+                            json.decodeFromJsonElement(
+                                com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsGroupInfoRefreshRequestedEvent.serializer(),
+                                frame.payload
+                            )
+                        )
+                        "#readditionRequestedEvent" -> BlueCatbirdMlsChatSubscribeEventsMessageUnion.ReadditionRequestedEvent(
+                            json.decodeFromJsonElement(
+                                com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsReadditionRequestedEvent.serializer(),
+                                frame.payload
+                            )
+                        )
+                        "#circuitBreakerTrippedEvent" -> BlueCatbirdMlsChatSubscribeEventsMessageUnion.CircuitBreakerTrippedEvent(
+                            json.decodeFromJsonElement(
+                                com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsCircuitBreakerTrippedEvent.serializer(),
+                                frame.payload
+                            )
+                        )
+                        else -> BlueCatbirdMlsChatSubscribeEventsMessageUnionUnexpected(frame.header.t, frame.payload)
+                    }
+                } catch (e: Throwable) {
+                    BlueCatbirdMlsChatSubscribeEventsMessageUnionUnexpected(frame.header.t, frame.payload)
+                }
+            }
+        }
+        emit(decoded)
+    }
 }
