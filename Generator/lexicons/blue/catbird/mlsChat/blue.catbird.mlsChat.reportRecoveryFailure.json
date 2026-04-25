@@ -23,7 +23,16 @@
               "description": "Type of failure that was exhausted",
               "default": "external_commit_exhausted",
               "knownValues": [
-                "external_commit_exhausted"
+                "external_commit_exhausted",
+                "remote_data_error"
+              ]
+            },
+            "failureMode": {
+              "type": "string",
+              "description": "Per ADR-008 D1: distinguishes local state loss (Mode A) from group state unrecoverable (Mode B). Only Mode B reports SHOULD count toward server-side quorum auto-reset; Mode A reports indicate that this client lost local state and should self-heal via §6.6 / §8.4 External Commit + self-Remove rather than triggering a global reset. Optional during interim deployment; servers that don't yet enforce the distinction MUST count any vote that satisfies the §8.6 / ADR-002 invariants.",
+              "knownValues": [
+                "local_state_loss",
+                "group_state_unrecoverable"
               ]
             },
             "epochAuthenticator": {
