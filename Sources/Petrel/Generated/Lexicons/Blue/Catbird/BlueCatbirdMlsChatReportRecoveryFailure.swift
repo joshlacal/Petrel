@@ -11,12 +11,14 @@ public struct BlueCatbirdMlsChatReportRecoveryFailure {
 public struct Input: ATProtocolCodable {
         public let convoId: String
         public let failureType: String?
+        public let failureMode: String?
         public let epochAuthenticator: String?
 
         /// Standard public initializer
-        public init(convoId: String, failureType: String? = nil, epochAuthenticator: String? = nil) {
+        public init(convoId: String, failureType: String? = nil, failureMode: String? = nil, epochAuthenticator: String? = nil) {
             self.convoId = convoId
             self.failureType = failureType
+            self.failureMode = failureMode
             self.epochAuthenticator = epochAuthenticator
         }
         
@@ -25,6 +27,7 @@ public struct Input: ATProtocolCodable {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             self.convoId = try container.decode(String.self, forKey: .convoId)
             self.failureType = try container.decodeIfPresent(String.self, forKey: .failureType)
+            self.failureMode = try container.decodeIfPresent(String.self, forKey: .failureMode)
             self.epochAuthenticator = try container.decodeIfPresent(String.self, forKey: .epochAuthenticator)
         }
 
@@ -32,6 +35,7 @@ public struct Input: ATProtocolCodable {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(convoId, forKey: .convoId)
             try container.encodeIfPresent(failureType, forKey: .failureType)
+            try container.encodeIfPresent(failureMode, forKey: .failureMode)
             try container.encodeIfPresent(epochAuthenticator, forKey: .epochAuthenticator)
         }
 
@@ -43,6 +47,10 @@ public struct Input: ATProtocolCodable {
                 let failureTypeValue = try value.toCBORValue()
                 map = map.adding(key: "failureType", value: failureTypeValue)
             }
+            if let value = failureMode {
+                let failureModeValue = try value.toCBORValue()
+                map = map.adding(key: "failureMode", value: failureModeValue)
+            }
             if let value = epochAuthenticator {
                 let epochAuthenticatorValue = try value.toCBORValue()
                 map = map.adding(key: "epochAuthenticator", value: epochAuthenticatorValue)
@@ -53,6 +61,7 @@ public struct Input: ATProtocolCodable {
         private enum CodingKeys: String, CodingKey {
             case convoId
             case failureType
+            case failureMode
             case epochAuthenticator
         }
     }
@@ -304,16 +313,18 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         let responseCode = response.statusCode
 
         
-        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-        }
-
-        if !contentType.lowercased().contains("application/json") {
-            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-        }
-
-        // Only decode response data if request was successful
+        // Only validate Content-Type and decode on success. Error responses
+        // (4xx/5xx) may have missing or different Content-Type headers and
+        // are handled by the caller via the status code.
         if (200...299).contains(responseCode) {
+            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+            }
+
+            if !contentType.lowercased().contains("application/json") {
+                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+            }
+
             do {
                 
                 let decoder = JSONDecoder()
