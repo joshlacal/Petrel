@@ -5,10 +5,12 @@
   "defs": {
     "main": {
       "type": "query",
-      "description": "Download an encrypted metadata blob. Returns raw encrypted bytes. The blob is opaque — decryption requires the MLS epoch key derived by group members.",
+      "description": "Download an encrypted metadata blob. Returns raw encrypted bytes. The blob is opaque \u2014 decryption requires the MLS epoch key derived by group members.",
       "parameters": {
         "type": "params",
-        "required": ["groupId"],
+        "required": [
+          "groupId"
+        ],
         "properties": {
           "blobLocator": {
             "type": "string",
@@ -21,14 +23,13 @@
         }
       },
       "output": {
-        "encoding": "*/*",
-        "schema": {
-          "type": "bytes",
-          "description": "Raw encrypted blob bytes"
-        }
+        "encoding": "*/*"
       },
       "errors": [
-        {"name": "BlobNotFound", "description": "Metadata blob does not exist or has been garbage collected"}
+        {
+          "name": "BlobNotFound",
+          "description": "Metadata blob does not exist or has been garbage collected"
+        }
       ]
     }
   }

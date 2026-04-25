@@ -8,7 +8,9 @@
       "description": "Fetch an encrypted blob from the blob store. Returns raw encrypted bytes (application/octet-stream). Only active members of the blob's conversation can download it.",
       "parameters": {
         "type": "params",
-        "required": ["blobId"],
+        "required": [
+          "blobId"
+        ],
         "properties": {
           "blobId": {
             "type": "string",
@@ -17,15 +19,17 @@
         }
       },
       "output": {
-        "encoding": "*/*",
-        "schema": {
-          "type": "bytes",
-          "description": "Raw encrypted blob bytes"
-        }
+        "encoding": "*/*"
       },
       "errors": [
-        {"name": "BlobNotFound", "description": "Blob does not exist or has expired/been deleted"},
-        {"name": "NotAMember", "description": "Requester is not an active member of the blob's conversation"}
+        {
+          "name": "BlobNotFound",
+          "description": "Blob does not exist or has expired/been deleted"
+        },
+        {
+          "name": "NotAMember",
+          "description": "Requester is not an active member of the blob's conversation"
+        }
       ]
     }
   }
