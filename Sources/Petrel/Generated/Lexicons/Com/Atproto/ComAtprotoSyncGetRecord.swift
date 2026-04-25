@@ -139,16 +139,18 @@ extension ATProtoClient.Com.Atproto.Sync {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-            throw NetworkError.invalidContentType(expected: "application/vnd.ipld.car", actual: "nil")
-        }
-
-        if !contentType.lowercased().contains("application/vnd.ipld.car") {
-            throw NetworkError.invalidContentType(expected: "application/vnd.ipld.car", actual: contentType)
-        }
-
-        // Only decode response data if request was successful
+        // Only validate Content-Type and decode on success. Error responses
+        // (4xx/5xx) may have missing or different Content-Type headers and
+        // are handled via the status code / structured error parser below.
         if (200...299).contains(responseCode) {
+            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+                throw NetworkError.invalidContentType(expected: "application/vnd.ipld.car", actual: "nil")
+            }
+
+            if !contentType.lowercased().contains("application/vnd.ipld.car") {
+                throw NetworkError.invalidContentType(expected: "application/vnd.ipld.car", actual: contentType)
+            }
+
             do {
                 
                 let decodedData = ComAtprotoSyncGetRecord.Output(data: responseData)
