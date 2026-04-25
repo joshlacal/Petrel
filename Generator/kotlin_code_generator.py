@@ -299,11 +299,44 @@ class KotlinCodeGenerator(BaseCodeGenerator):
         )
 
     def generate_message(self, message_obj: Optional[Dict[str, Any]]) -> str:
-        """Generate message data class for subscriptions."""
+        """Generate message data class (or register a union sealed interface) for subscriptions."""
         if not message_obj:
             return ""
 
         schema = message_obj.get('schema', {})
+        schema_type = schema.get('type', '')
+
+        if schema_type == 'union':
+            # For union messages the "type" is a sealed interface that the enum
+            # generator emits into self.sealed_interfaces. We still render an
+            # (empty) Message placeholder so the main template's {% if message %}
+            # block keeps emitting something familiar, but the real flow element
+            # type is the union — tracked via self.subscription_message_union.
+            #
+            # Filter out refs that resolve to non-object lexicon defs (e.g.
+            # `type: "bytes"` targets like `place.stream.live.subscribeSegments`'s
+            # `#segment`). The codegen doesn't emit data classes for those, so
+            # including them as sealed-interface variants produces an
+            # unresolved-type compile error. They're surfaced via the synthetic
+            # `Unexpected` variant at runtime until the generator grows
+            # primitive-ref support (see subscription.jinja).
+            raw_refs = schema.get('refs', [])
+            filtered_raw_refs = [
+                r for r in raw_refs
+                if self._resolve_ref_def_type(r) in ('object', None)
+            ]
+            refs = [self.type_converter.convert_ref(r) for r in filtered_raw_refs]
+            self.enum_generator.generate_sealed_interface_for_union(
+                self.class_name, "Message", refs, raw_refs=filtered_raw_refs
+            )
+            # Empty Message class is still rendered so existing callers that
+            # reference <Class>Message by name don't break. The real element
+            # type is <Class>MessageUnion.
+            return self.template_manager.message_template.render(
+                properties=[],
+                class_name=self.class_name
+            )
+
         properties = self.generate_properties(
             schema.get('properties', {}),
             schema.get('required', []),
@@ -401,7 +434,63 @@ class KotlinCodeGenerator(BaseCodeGenerator):
 
         has_parameters = 'parameters' in self.main_def
         parameters_type = f"{self.class_name}Parameters" if has_parameters else None
-        message_type = f"{self.class_name}Message"
+
+        message_schema = self.main_def.get('message', {}).get('schema', {}) or {}
+        is_union = message_schema.get('type') == 'union'
+
+        # When the schema is a union, the Flow element is the generated sealed
+        # interface <Class>MessageUnion. Otherwise fall back to the (often empty)
+        # <Class>Message data class so the emitted file compiles.
+        message_union = f"{self.class_name}MessageUnion"
+        message_type = message_union if is_union else f"{self.class_name}Message"
+
+        # Build variant metadata for the CBOR header dispatch. Each ref becomes
+        # a `when (header.t)` branch that decodes the payload into the matching
+        # sealed-interface variant. Non-object refs (e.g. `type: bytes` targets)
+        # resolve to a variant whose payload type isn't a @Serializable data
+        # class — we fall through to Unexpected for those by omitting them from
+        # variants (and a comment is emitted in the template).
+        variants = []
+        if is_union:
+            raw_refs = message_schema.get('refs', [])
+            short_names_seen = set()
+            for raw_ref in raw_refs:
+                if '#' in raw_ref:
+                    base, fragment = raw_ref.split('#', 1)
+                    short_name = convert_to_pascal_case(fragment)
+                    header_tag = f"#{fragment}"
+                else:
+                    parts_ref = raw_ref.split('.')
+                    short_name = convert_to_pascal_case(parts_ref[-1])
+                    header_tag = raw_ref
+
+                # Dedupe short names by falling back to the full type name
+                variant_type = self.type_converter.convert_ref(raw_ref)
+                if short_name in short_names_seen:
+                    short_name = variant_type
+                short_names_seen.add(short_name)
+
+                # Skip refs whose target isn't an object (no @Serializable class
+                # available). The sealed-interface generator already includes
+                # them as variants, but the CBOR dispatch can't decode them
+                # generically — leave them to the Unexpected branch.
+                target_def = self._resolve_ref_def_type(raw_ref)
+                if target_def not in ('object', None):
+                    # Still include the variant (sealed interface carries it)
+                    # but flag it so the template knows to skip decoding.
+                    variants.append({
+                        'header_tag': header_tag,
+                        'short_name': short_name,
+                        'payload_type': variant_type,
+                        'decodable': False,
+                    })
+                else:
+                    variants.append({
+                        'header_tag': header_tag,
+                        'short_name': short_name,
+                        'payload_type': variant_type,
+                        'decodable': True,
+                    })
 
         return self.template_manager.subscription_template.render(
             namespace_path=namespace_path,
@@ -409,9 +498,23 @@ class KotlinCodeGenerator(BaseCodeGenerator):
             has_parameters=has_parameters,
             parameters_type=parameters_type,
             message_type=message_type,
+            message_union=message_union,
+            is_union=is_union,
+            variants=variants,
             endpoint=self.lexicon_id,
             description=self.description
         )
+
+    def _resolve_ref_def_type(self, ref: str) -> Optional[str]:
+        """Return the lexicon def `type` for a ref, or None if unresolved."""
+        if ref.startswith('#'):
+            # Local ref — look up in self.defs
+            name = ref[1:]
+            target = self.defs.get(name)
+            if isinstance(target, dict):
+                return target.get('type')
+        # External refs aren't resolved here; assume object.
+        return 'object'
 
     def generate_all_unions(self):
         """Process all union types in the lexicon."""
