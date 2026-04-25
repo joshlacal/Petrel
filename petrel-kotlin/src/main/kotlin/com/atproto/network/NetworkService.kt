@@ -25,6 +25,24 @@ class NetworkService(
     var authenticatedDID: String? = null
     var authorizationHeader: String? = null
 
+    /**
+     * Host of [baseUrl], cached once so [performRequest] can cheaply tag every
+     * response with the origin it came from. Used by gateway auth strategies
+     * that only want to invalidate sessions on 401s from the gateway itself.
+     */
+    @PublishedApi
+    internal val baseUrlHost: String? = runCatching { Url(baseUrl).host }.getOrNull()
+
+    /**
+     * Called on every non-2xx response with HTTP 401. Lets an attached auth
+     * strategy (e.g. `ConfidentialGatewayStrategy.handleUnauthorizedResponse`)
+     * classify the 401, optionally clear its local session, and throw a typed
+     * exception. `performRequest` swallows any exception this throws and
+     * continues to return the 401 to the caller — the handler's only job is
+     * to keep persistent auth state consistent with the server's verdict.
+     */
+    var unauthorizedHandler: (suspend (host: String?, body: ByteArray) -> Unit)? = null
+
     fun setServiceDID(did: String, namespace: String) {
         serviceDIDs[namespace] = did
     }
@@ -112,6 +130,20 @@ class NetworkService(
                 }
             } else {
                 val errorText = try { response.bodyAsText() } catch (_: Exception) { null }
+                if (statusCode == 401) {
+                    unauthorizedHandler?.let { handler ->
+                        // The strategy throws GatewayException.SessionExpired or
+                        // AuthenticationRequired to signal classification. Swallow
+                        // either — the 401 response body is still the source of
+                        // truth returned below; the handler's side-effect of
+                        // clearing the stale session is what we actually care about.
+                        try {
+                            handler(baseUrlHost, errorText?.toByteArray() ?: ByteArray(0))
+                        } catch (_: Throwable) {
+                            // no-op; classifier always throws, that's the contract
+                        }
+                    }
+                }
                 ATProtoResponse(statusCode, null, errorBody = errorText)
             }
         } catch (e: Exception) {

@@ -55,6 +55,15 @@ fun ATProtoClient.configureGateway(
     )
     strategies[this] = strategy
     setAuthMode(AuthMode.Gateway)
+
+    // Route XRPC 401s through the strategy's classifier so terminal failures
+    // (InvalidToken, session_expired, …) drop the stale session from the
+    // encrypted store. Without this hook, a UUID that Redis has evicted
+    // produces an infinite stream of 401s because the client keeps re-sending
+    // the same dead bearer on every XRPC call.
+    networkService.unauthorizedHandler = { host, body ->
+        strategy.handleUnauthorizedResponse(host, body)
+    }
     return strategy
 }
 

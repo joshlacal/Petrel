@@ -8,10 +8,72 @@ import com.atproto.core.types.*
 import com.atproto.core.*
 import com.atproto.client.*
 import com.atproto.network.*
+import com.atproto.runtime.subscription.openSubscription
 import kotlinx.coroutines.flow.*
 
 object ComAtprotoLabelSubscribeLabelsDefs {
     const val TYPE_IDENTIFIER = "com.atproto.label.subscribeLabels"
+}
+
+@Serializable(with = ComAtprotoLabelSubscribeLabelsMessageUnionSerializer::class)
+sealed interface ComAtprotoLabelSubscribeLabelsMessageUnion {
+    @Serializable
+    data class Labels(val value: com.atproto.generated.ComAtprotoLabelSubscribeLabelsLabels) : ComAtprotoLabelSubscribeLabelsMessageUnion
+
+    @Serializable
+    data class Info(val value: com.atproto.generated.ComAtprotoLabelSubscribeLabelsInfo) : ComAtprotoLabelSubscribeLabelsMessageUnion
+
+    @Serializable
+    data class Unexpected(val value: JsonElement) : ComAtprotoLabelSubscribeLabelsMessageUnion
+}
+
+object ComAtprotoLabelSubscribeLabelsMessageUnionSerializer : kotlinx.serialization.KSerializer<ComAtprotoLabelSubscribeLabelsMessageUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("ComAtprotoLabelSubscribeLabelsMessageUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ComAtprotoLabelSubscribeLabelsMessageUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is ComAtprotoLabelSubscribeLabelsMessageUnion.Labels -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ComAtprotoLabelSubscribeLabelsLabels.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.label.subscribeLabels#labels")
+                })
+            }
+            is ComAtprotoLabelSubscribeLabelsMessageUnion.Info -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ComAtprotoLabelSubscribeLabelsInfo.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.label.subscribeLabels#info")
+                })
+            }
+            is ComAtprotoLabelSubscribeLabelsMessageUnion.Unexpected -> value.value
+            // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
+            // subscription codegen) are runtime-only sentinels; JSON round-trip
+            // serialises them as an empty object tagged with the variant class
+            // name. Consumers should filter these before JSON serialisation.
+            else -> kotlinx.serialization.json.buildJsonObject {
+                put("\$type", kotlinx.serialization.json.JsonPrimitive(value::class.simpleName ?: "Unknown"))
+            }
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ComAtprotoLabelSubscribeLabelsMessageUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "com.atproto.label.subscribeLabels#labels" -> ComAtprotoLabelSubscribeLabelsMessageUnion.Labels(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ComAtprotoLabelSubscribeLabelsLabels.serializer(), element)
+            )
+            "com.atproto.label.subscribeLabels#info" -> ComAtprotoLabelSubscribeLabelsMessageUnion.Info(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ComAtprotoLabelSubscribeLabelsInfo.serializer(), element)
+            )
+            else -> ComAtprotoLabelSubscribeLabelsMessageUnion.Unexpected(element)
+        }
+    }
 }
 
     @Serializable
@@ -47,28 +109,65 @@ sealed class ComAtprotoLabelSubscribeLabelsError(val name: String, val descripti
     }
 
 /**
+ * Synthetic variants augmenting the generated ComAtprotoLabelSubscribeLabelsMessageUnion sealed interface.
+ *
+ * `Error` surfaces ATProto `op == -1` server error frames; `Unexpected` wraps
+ * frames whose header tag did not match any known variant (e.g. new event types
+ * added server-side before client regen). Kept as extensions so the lexicon-
+ * driven sealed interface stays mechanically faithful to the schema.
+ */
+data class ComAtprotoLabelSubscribeLabelsMessageUnionError(val name: String, val message: String?) : ComAtprotoLabelSubscribeLabelsMessageUnion
+data class ComAtprotoLabelSubscribeLabelsMessageUnionUnexpected(val type: String, val payload: kotlinx.serialization.json.JsonObject) : ComAtprotoLabelSubscribeLabelsMessageUnion
+
+/**
  * Subscribe to stream of labels (and negations). Public endpoint implemented by mod services. Uses same sequencing scheme as repo event stream.
  *
  * Endpoint: com.atproto.label.subscribeLabels
+ *
+ * The returned [kotlinx.coroutines.flow.Flow] completes (or throws) when the
+ * underlying WebSocket disconnects. Reconnect / cursor-resume is the caller's
+ * responsibility — wrap in `retryWhen { ... }` with backoff as needed.
  */
 fun ATProtoClient.Com.Atproto.Label.subscribeLabels(
-parameters: ComAtprotoLabelSubscribeLabelsParameters): Flow<ComAtprotoLabelSubscribeLabelsMessage> = flow {
+parameters: ComAtprotoLabelSubscribeLabelsParameters? = null,
+hostOverride: String? = null,
+    websocketClient: io.ktor.client.HttpClient? = null,
+): kotlinx.coroutines.flow.Flow<ComAtprotoLabelSubscribeLabelsMessageUnion> = kotlinx.coroutines.flow.flow {
     val endpoint = "com.atproto.label.subscribeLabels"
-
     // List<Pair<String, String>> preserves repeated keys, which ATProto
     // array-valued query params rely on (e.g. `?collections=a&collections=b`).
-    val queryItems = parameters.toQueryItems()
+    val queryItems = parameters?.toQueryItems().orEmpty()
 
-    // TODO: Implement WebSocket connection using a WebSocket library (e.g., Ktor WebSockets)
-    // The implementation should:
-    // 1. Establish WebSocket connection to endpoint with queryItems
-    // 2. Listen for incoming messages
-    // 3. Deserialize each message as ComAtprotoLabelSubscribeLabelsMessage
-    // 4. Emit each message to the Flow
-    // Example skeleton:
-    // webSocketClient.connect(endpoint, queryItems) { message ->
-    //     val decoded = Json.decodeFromString<ComAtprotoLabelSubscribeLabelsMessage>(message)
-    //     emit(decoded)
-    // }
-    throw NotImplementedError("WebSocket subscription support requires a WebSocket client implementation")
+    client.openSubscription(endpoint, queryItems, hostOverride, websocketClient) { frame ->
+        val decoded: ComAtprotoLabelSubscribeLabelsMessageUnion = when (frame) {
+            is com.atproto.runtime.subscription.CborFrame.Error ->
+                ComAtprotoLabelSubscribeLabelsMessageUnionError(frame.name, frame.message)
+            is com.atproto.runtime.subscription.CborFrame.Message -> {
+                val json = kotlinx.serialization.json.Json {
+                    ignoreUnknownKeys = true
+                    isLenient = true
+                }
+                try {
+                    when (frame.header.t) {
+                        "#labels" -> ComAtprotoLabelSubscribeLabelsMessageUnion.Labels(
+                            json.decodeFromJsonElement(
+                                com.atproto.generated.ComAtprotoLabelSubscribeLabelsLabels.serializer(),
+                                frame.payload
+                            )
+                        )
+                        "#info" -> ComAtprotoLabelSubscribeLabelsMessageUnion.Info(
+                            json.decodeFromJsonElement(
+                                com.atproto.generated.ComAtprotoLabelSubscribeLabelsInfo.serializer(),
+                                frame.payload
+                            )
+                        )
+                        else -> ComAtprotoLabelSubscribeLabelsMessageUnionUnexpected(frame.header.t, frame.payload)
+                    }
+                } catch (e: Throwable) {
+                    ComAtprotoLabelSubscribeLabelsMessageUnionUnexpected(frame.header.t, frame.payload)
+                }
+            }
+        }
+        emit(decoded)
+    }
 }

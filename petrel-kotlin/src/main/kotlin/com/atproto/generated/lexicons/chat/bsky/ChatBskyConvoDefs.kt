@@ -8,6 +8,7 @@ import com.atproto.core.types.*
 import com.atproto.core.*
 import com.atproto.client.*
 import com.atproto.network.*
+import com.atproto.runtime.subscription.openSubscription
 import kotlinx.coroutines.flow.*
 
 object ChatBskyConvoDefsDefs {
@@ -37,6 +38,13 @@ object ChatBskyConvoDefsMessageInputEmbedUnionSerializer : kotlinx.serialization
                 })
             }
             is ChatBskyConvoDefsMessageInputEmbedUnion.Unexpected -> value.value
+            // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
+            // subscription codegen) are runtime-only sentinels; JSON round-trip
+            // serialises them as an empty object tagged with the variant class
+            // name. Consumers should filter these before JSON serialisation.
+            else -> kotlinx.serialization.json.buildJsonObject {
+                put("\$type", kotlinx.serialization.json.JsonPrimitive(value::class.simpleName ?: "Unknown"))
+            }
         }
         jsonEncoder.encodeJsonElement(element)
     }
@@ -79,6 +87,13 @@ object ChatBskyConvoDefsMessageViewEmbedUnionSerializer : kotlinx.serialization.
                 })
             }
             is ChatBskyConvoDefsMessageViewEmbedUnion.Unexpected -> value.value
+            // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
+            // subscription codegen) are runtime-only sentinels; JSON round-trip
+            // serialises them as an empty object tagged with the variant class
+            // name. Consumers should filter these before JSON serialisation.
+            else -> kotlinx.serialization.json.buildJsonObject {
+                put("\$type", kotlinx.serialization.json.JsonPrimitive(value::class.simpleName ?: "Unknown"))
+            }
         }
         jsonEncoder.encodeJsonElement(element)
     }
@@ -130,6 +145,13 @@ object ChatBskyConvoDefsConvoViewLastMessageUnionSerializer : kotlinx.serializat
                 })
             }
             is ChatBskyConvoDefsConvoViewLastMessageUnion.Unexpected -> value.value
+            // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
+            // subscription codegen) are runtime-only sentinels; JSON round-trip
+            // serialises them as an empty object tagged with the variant class
+            // name. Consumers should filter these before JSON serialisation.
+            else -> kotlinx.serialization.json.buildJsonObject {
+                put("\$type", kotlinx.serialization.json.JsonPrimitive(value::class.simpleName ?: "Unknown"))
+            }
         }
         jsonEncoder.encodeJsonElement(element)
     }
@@ -175,6 +197,13 @@ object ChatBskyConvoDefsConvoViewLastReactionUnionSerializer : kotlinx.serializa
                 })
             }
             is ChatBskyConvoDefsConvoViewLastReactionUnion.Unexpected -> value.value
+            // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
+            // subscription codegen) are runtime-only sentinels; JSON round-trip
+            // serialises them as an empty object tagged with the variant class
+            // name. Consumers should filter these before JSON serialisation.
+            else -> kotlinx.serialization.json.buildJsonObject {
+                put("\$type", kotlinx.serialization.json.JsonPrimitive(value::class.simpleName ?: "Unknown"))
+            }
         }
         jsonEncoder.encodeJsonElement(element)
     }
@@ -226,6 +255,13 @@ object ChatBskyConvoDefsLogCreateMessageMessageUnionSerializer : kotlinx.seriali
                 })
             }
             is ChatBskyConvoDefsLogCreateMessageMessageUnion.Unexpected -> value.value
+            // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
+            // subscription codegen) are runtime-only sentinels; JSON round-trip
+            // serialises them as an empty object tagged with the variant class
+            // name. Consumers should filter these before JSON serialisation.
+            else -> kotlinx.serialization.json.buildJsonObject {
+                put("\$type", kotlinx.serialization.json.JsonPrimitive(value::class.simpleName ?: "Unknown"))
+            }
         }
         jsonEncoder.encodeJsonElement(element)
     }
@@ -280,6 +316,13 @@ object ChatBskyConvoDefsLogDeleteMessageMessageUnionSerializer : kotlinx.seriali
                 })
             }
             is ChatBskyConvoDefsLogDeleteMessageMessageUnion.Unexpected -> value.value
+            // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
+            // subscription codegen) are runtime-only sentinels; JSON round-trip
+            // serialises them as an empty object tagged with the variant class
+            // name. Consumers should filter these before JSON serialisation.
+            else -> kotlinx.serialization.json.buildJsonObject {
+                put("\$type", kotlinx.serialization.json.JsonPrimitive(value::class.simpleName ?: "Unknown"))
+            }
         }
         jsonEncoder.encodeJsonElement(element)
     }
@@ -334,6 +377,13 @@ object ChatBskyConvoDefsLogReadMessageMessageUnionSerializer : kotlinx.serializa
                 })
             }
             is ChatBskyConvoDefsLogReadMessageMessageUnion.Unexpected -> value.value
+            // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
+            // subscription codegen) are runtime-only sentinels; JSON round-trip
+            // serialises them as an empty object tagged with the variant class
+            // name. Consumers should filter these before JSON serialisation.
+            else -> kotlinx.serialization.json.buildJsonObject {
+                put("\$type", kotlinx.serialization.json.JsonPrimitive(value::class.simpleName ?: "Unknown"))
+            }
         }
         jsonEncoder.encodeJsonElement(element)
     }
@@ -388,6 +438,13 @@ object ChatBskyConvoDefsLogAddReactionMessageUnionSerializer : kotlinx.serializa
                 })
             }
             is ChatBskyConvoDefsLogAddReactionMessageUnion.Unexpected -> value.value
+            // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
+            // subscription codegen) are runtime-only sentinels; JSON round-trip
+            // serialises them as an empty object tagged with the variant class
+            // name. Consumers should filter these before JSON serialisation.
+            else -> kotlinx.serialization.json.buildJsonObject {
+                put("\$type", kotlinx.serialization.json.JsonPrimitive(value::class.simpleName ?: "Unknown"))
+            }
         }
         jsonEncoder.encodeJsonElement(element)
     }
@@ -442,6 +499,13 @@ object ChatBskyConvoDefsLogRemoveReactionMessageUnionSerializer : kotlinx.serial
                 })
             }
             is ChatBskyConvoDefsLogRemoveReactionMessageUnion.Unexpected -> value.value
+            // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
+            // subscription codegen) are runtime-only sentinels; JSON round-trip
+            // serialises them as an empty object tagged with the variant class
+            // name. Consumers should filter these before JSON serialisation.
+            else -> kotlinx.serialization.json.buildJsonObject {
+                put("\$type", kotlinx.serialization.json.JsonPrimitive(value::class.simpleName ?: "Unknown"))
+            }
         }
         jsonEncoder.encodeJsonElement(element)
     }

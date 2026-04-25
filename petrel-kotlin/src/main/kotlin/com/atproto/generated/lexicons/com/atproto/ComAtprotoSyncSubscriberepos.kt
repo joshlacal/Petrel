@@ -8,10 +8,108 @@ import com.atproto.core.types.*
 import com.atproto.core.*
 import com.atproto.client.*
 import com.atproto.network.*
+import com.atproto.runtime.subscription.openSubscription
 import kotlinx.coroutines.flow.*
 
 object ComAtprotoSyncSubscribeReposDefs {
     const val TYPE_IDENTIFIER = "com.atproto.sync.subscribeRepos"
+}
+
+@Serializable(with = ComAtprotoSyncSubscribeReposMessageUnionSerializer::class)
+sealed interface ComAtprotoSyncSubscribeReposMessageUnion {
+    @Serializable
+    data class Commit(val value: com.atproto.generated.ComAtprotoSyncSubscribeReposCommit) : ComAtprotoSyncSubscribeReposMessageUnion
+
+    @Serializable
+    data class Sync(val value: com.atproto.generated.ComAtprotoSyncSubscribeReposSync) : ComAtprotoSyncSubscribeReposMessageUnion
+
+    @Serializable
+    data class Identity(val value: com.atproto.generated.ComAtprotoSyncSubscribeReposIdentity) : ComAtprotoSyncSubscribeReposMessageUnion
+
+    @Serializable
+    data class Account(val value: com.atproto.generated.ComAtprotoSyncSubscribeReposAccount) : ComAtprotoSyncSubscribeReposMessageUnion
+
+    @Serializable
+    data class Info(val value: com.atproto.generated.ComAtprotoSyncSubscribeReposInfo) : ComAtprotoSyncSubscribeReposMessageUnion
+
+    @Serializable
+    data class Unexpected(val value: JsonElement) : ComAtprotoSyncSubscribeReposMessageUnion
+}
+
+object ComAtprotoSyncSubscribeReposMessageUnionSerializer : kotlinx.serialization.KSerializer<ComAtprotoSyncSubscribeReposMessageUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("ComAtprotoSyncSubscribeReposMessageUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ComAtprotoSyncSubscribeReposMessageUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is ComAtprotoSyncSubscribeReposMessageUnion.Commit -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ComAtprotoSyncSubscribeReposCommit.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.sync.subscribeRepos#commit")
+                })
+            }
+            is ComAtprotoSyncSubscribeReposMessageUnion.Sync -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ComAtprotoSyncSubscribeReposSync.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.sync.subscribeRepos#sync")
+                })
+            }
+            is ComAtprotoSyncSubscribeReposMessageUnion.Identity -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ComAtprotoSyncSubscribeReposIdentity.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.sync.subscribeRepos#identity")
+                })
+            }
+            is ComAtprotoSyncSubscribeReposMessageUnion.Account -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ComAtprotoSyncSubscribeReposAccount.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.sync.subscribeRepos#account")
+                })
+            }
+            is ComAtprotoSyncSubscribeReposMessageUnion.Info -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ComAtprotoSyncSubscribeReposInfo.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.sync.subscribeRepos#info")
+                })
+            }
+            is ComAtprotoSyncSubscribeReposMessageUnion.Unexpected -> value.value
+            // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
+            // subscription codegen) are runtime-only sentinels; JSON round-trip
+            // serialises them as an empty object tagged with the variant class
+            // name. Consumers should filter these before JSON serialisation.
+            else -> kotlinx.serialization.json.buildJsonObject {
+                put("\$type", kotlinx.serialization.json.JsonPrimitive(value::class.simpleName ?: "Unknown"))
+            }
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ComAtprotoSyncSubscribeReposMessageUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "com.atproto.sync.subscribeRepos#commit" -> ComAtprotoSyncSubscribeReposMessageUnion.Commit(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ComAtprotoSyncSubscribeReposCommit.serializer(), element)
+            )
+            "com.atproto.sync.subscribeRepos#sync" -> ComAtprotoSyncSubscribeReposMessageUnion.Sync(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ComAtprotoSyncSubscribeReposSync.serializer(), element)
+            )
+            "com.atproto.sync.subscribeRepos#identity" -> ComAtprotoSyncSubscribeReposMessageUnion.Identity(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ComAtprotoSyncSubscribeReposIdentity.serializer(), element)
+            )
+            "com.atproto.sync.subscribeRepos#account" -> ComAtprotoSyncSubscribeReposMessageUnion.Account(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ComAtprotoSyncSubscribeReposAccount.serializer(), element)
+            )
+            "com.atproto.sync.subscribeRepos#info" -> ComAtprotoSyncSubscribeReposMessageUnion.Info(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ComAtprotoSyncSubscribeReposInfo.serializer(), element)
+            )
+            else -> ComAtprotoSyncSubscribeReposMessageUnion.Unexpected(element)
+        }
+    }
 }
 
     /**
@@ -123,28 +221,83 @@ sealed class ComAtprotoSyncSubscribeReposError(val name: String, val description
     }
 
 /**
+ * Synthetic variants augmenting the generated ComAtprotoSyncSubscribeReposMessageUnion sealed interface.
+ *
+ * `Error` surfaces ATProto `op == -1` server error frames; `Unexpected` wraps
+ * frames whose header tag did not match any known variant (e.g. new event types
+ * added server-side before client regen). Kept as extensions so the lexicon-
+ * driven sealed interface stays mechanically faithful to the schema.
+ */
+data class ComAtprotoSyncSubscribeReposMessageUnionError(val name: String, val message: String?) : ComAtprotoSyncSubscribeReposMessageUnion
+data class ComAtprotoSyncSubscribeReposMessageUnionUnexpected(val type: String, val payload: kotlinx.serialization.json.JsonObject) : ComAtprotoSyncSubscribeReposMessageUnion
+
+/**
  * Repository event stream, aka Firehose endpoint. Outputs repo commits with diff data, and identity update events, for all repositories on the current server. See the atproto specifications for details around stream sequencing, repo versioning, CAR diff format, and more. Public and does not require auth; implemented by PDS and Relay.
  *
  * Endpoint: com.atproto.sync.subscribeRepos
+ *
+ * The returned [kotlinx.coroutines.flow.Flow] completes (or throws) when the
+ * underlying WebSocket disconnects. Reconnect / cursor-resume is the caller's
+ * responsibility — wrap in `retryWhen { ... }` with backoff as needed.
  */
 fun ATProtoClient.Com.Atproto.Sync.subscribeRepos(
-parameters: ComAtprotoSyncSubscribeReposParameters): Flow<ComAtprotoSyncSubscribeReposMessage> = flow {
+parameters: ComAtprotoSyncSubscribeReposParameters? = null,
+hostOverride: String? = null,
+    websocketClient: io.ktor.client.HttpClient? = null,
+): kotlinx.coroutines.flow.Flow<ComAtprotoSyncSubscribeReposMessageUnion> = kotlinx.coroutines.flow.flow {
     val endpoint = "com.atproto.sync.subscribeRepos"
-
     // List<Pair<String, String>> preserves repeated keys, which ATProto
     // array-valued query params rely on (e.g. `?collections=a&collections=b`).
-    val queryItems = parameters.toQueryItems()
+    val queryItems = parameters?.toQueryItems().orEmpty()
 
-    // TODO: Implement WebSocket connection using a WebSocket library (e.g., Ktor WebSockets)
-    // The implementation should:
-    // 1. Establish WebSocket connection to endpoint with queryItems
-    // 2. Listen for incoming messages
-    // 3. Deserialize each message as ComAtprotoSyncSubscribeReposMessage
-    // 4. Emit each message to the Flow
-    // Example skeleton:
-    // webSocketClient.connect(endpoint, queryItems) { message ->
-    //     val decoded = Json.decodeFromString<ComAtprotoSyncSubscribeReposMessage>(message)
-    //     emit(decoded)
-    // }
-    throw NotImplementedError("WebSocket subscription support requires a WebSocket client implementation")
+    client.openSubscription(endpoint, queryItems, hostOverride, websocketClient) { frame ->
+        val decoded: ComAtprotoSyncSubscribeReposMessageUnion = when (frame) {
+            is com.atproto.runtime.subscription.CborFrame.Error ->
+                ComAtprotoSyncSubscribeReposMessageUnionError(frame.name, frame.message)
+            is com.atproto.runtime.subscription.CborFrame.Message -> {
+                val json = kotlinx.serialization.json.Json {
+                    ignoreUnknownKeys = true
+                    isLenient = true
+                }
+                try {
+                    when (frame.header.t) {
+                        "#commit" -> ComAtprotoSyncSubscribeReposMessageUnion.Commit(
+                            json.decodeFromJsonElement(
+                                com.atproto.generated.ComAtprotoSyncSubscribeReposCommit.serializer(),
+                                frame.payload
+                            )
+                        )
+                        "#sync" -> ComAtprotoSyncSubscribeReposMessageUnion.Sync(
+                            json.decodeFromJsonElement(
+                                com.atproto.generated.ComAtprotoSyncSubscribeReposSync.serializer(),
+                                frame.payload
+                            )
+                        )
+                        "#identity" -> ComAtprotoSyncSubscribeReposMessageUnion.Identity(
+                            json.decodeFromJsonElement(
+                                com.atproto.generated.ComAtprotoSyncSubscribeReposIdentity.serializer(),
+                                frame.payload
+                            )
+                        )
+                        "#account" -> ComAtprotoSyncSubscribeReposMessageUnion.Account(
+                            json.decodeFromJsonElement(
+                                com.atproto.generated.ComAtprotoSyncSubscribeReposAccount.serializer(),
+                                frame.payload
+                            )
+                        )
+                        "#info" -> ComAtprotoSyncSubscribeReposMessageUnion.Info(
+                            json.decodeFromJsonElement(
+                                com.atproto.generated.ComAtprotoSyncSubscribeReposInfo.serializer(),
+                                frame.payload
+                            )
+                        )
+                        else -> ComAtprotoSyncSubscribeReposMessageUnionUnexpected(frame.header.t, frame.payload)
+                    }
+                } catch (e: Throwable) {
+                    ComAtprotoSyncSubscribeReposMessageUnionUnexpected(frame.header.t, frame.payload)
+                }
+            }
+        }
+        emit(decoded)
+    }
 }
