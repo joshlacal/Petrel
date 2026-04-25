@@ -8,6 +8,7 @@ import com.atproto.core.types.*
 import com.atproto.core.*
 import com.atproto.client.*
 import com.atproto.network.*
+import com.atproto.runtime.subscription.openSubscription
 import kotlinx.coroutines.flow.*
 
 object BlueCatbirdMlsChatReportRecoveryFailureDefs {
@@ -18,7 +19,8 @@ object BlueCatbirdMlsChatReportRecoveryFailureDefs {
     data class BlueCatbirdMlsChatReportRecoveryFailureInput(
 // Conversation identifier        @SerialName("convoId")
         val convoId: String,// Type of failure that was exhausted        @SerialName("failureType")
-        val failureType: String? = null,// Hex-encoded epoch_authenticator (RFC 9420 §8.7) for the reporter's current epoch. Optional at the schema layer but REQUIRED for the report to count toward quorum auto-reset. Clients that omit this field will have their report accepted (HTTP 200) with reason="missing_authenticator" but not counted.        @SerialName("epochAuthenticator")
+        val failureType: String? = null,// Per ADR-008 D1: distinguishes local state loss (Mode A) from group state unrecoverable (Mode B). Only Mode B reports SHOULD count toward server-side quorum auto-reset; Mode A reports indicate that this client lost local state and should self-heal via §6.6 / §8.4 External Commit + self-Remove rather than triggering a global reset. Optional during interim deployment; servers that don't yet enforce the distinction MUST count any vote that satisfies the §8.6 / ADR-002 invariants.        @SerialName("failureMode")
+        val failureMode: String? = null,// Hex-encoded epoch_authenticator (RFC 9420 §8.7) for the reporter's current epoch. Optional at the schema layer but REQUIRED for the report to count toward quorum auto-reset. Clients that omit this field will have their report accepted (HTTP 200) with reason="missing_authenticator" but not counted.        @SerialName("epochAuthenticator")
         val epochAuthenticator: String? = null    )
 
     @Serializable
