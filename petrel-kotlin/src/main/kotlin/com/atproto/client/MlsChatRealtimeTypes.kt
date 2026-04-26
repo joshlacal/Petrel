@@ -135,7 +135,10 @@ data class MlsChatReadditionRequestedEvent(
 data class MlsChatGroupResetEvent(
     val cursor: String,
     val convoId: String,
-    val newGroupId: String? = null,
+    val newGroupId: String,
+    val resetGeneration: Int,
+    val resetBy: String? = null,
+    val cipherSuite: String? = null,
     val reason: String? = null
 ) : MlsChatRealtimeEvent
 
