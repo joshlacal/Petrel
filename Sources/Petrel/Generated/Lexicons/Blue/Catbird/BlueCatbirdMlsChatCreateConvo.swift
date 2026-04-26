@@ -445,6 +445,7 @@ public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertibl
                 case keyPackageNotFound = "KeyPackageNotFound.Key package not found for one or more initial members"
                 case tooManyMembers = "TooManyMembers.Too many initial members specified"
                 case mutualBlockDetected = "MutualBlockDetected.Cannot create conversation with users who have blocked each other"
+                case convoAlreadyExists = "ConvoAlreadyExists.A conversation already exists at this groupId, created by a different DID. The caller lost a first-responder race; fall back to receiving the Welcome from the winner."
             public var description: String {
                 return self.rawValue
             }

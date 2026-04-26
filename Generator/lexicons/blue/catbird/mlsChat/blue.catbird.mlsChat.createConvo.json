@@ -96,7 +96,8 @@
         {"name": "InvalidCipherSuite", "description": "The specified cipher suite is not supported"},
         {"name": "KeyPackageNotFound", "description": "Key package not found for one or more initial members"},
         {"name": "TooManyMembers", "description": "Too many initial members specified"},
-        {"name": "MutualBlockDetected", "description": "Cannot create conversation with users who have blocked each other"}
+        {"name": "MutualBlockDetected", "description": "Cannot create conversation with users who have blocked each other"},
+        {"name": "ConvoAlreadyExists", "description": "A conversation already exists at this groupId, created by a different DID. The caller lost a first-responder race; fall back to receiving the Welcome from the winner."}
       ]
     },
     "metadataInput": {
