@@ -2241,6 +2241,16 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
             
+            decoders["blue.catbird.mlsChat.bootstrapResetGroup#keyPackageHashEntry"] = { decoder in
+                do {
+                    let decodedObject = try BlueCatbirdMlsChatBootstrapResetGroup.KeyPackageHashEntry(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding BlueCatbirdMlsChatBootstrapResetGroup.KeyPackageHashEntry: \(error)")
+                    return .decodeError("Error decoding BlueCatbirdMlsChatBootstrapResetGroup.KeyPackageHashEntry: \(error)")
+                }
+            }
+            
             decoders["blue.catbird.mlsChat.listDevices#deviceInfo"] = { decoder in
                 do {
                     let decodedObject = try BlueCatbirdMlsChatListDevices.DeviceInfo(from: decoder)
