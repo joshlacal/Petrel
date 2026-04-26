@@ -75,6 +75,7 @@ sealed class BlueCatbirdMlsChatCreateConvoError(val name: String, val descriptio
         object KeyPackageNotFound: BlueCatbirdMlsChatCreateConvoError("KeyPackageNotFound", "Key package not found for one or more initial members")
         object TooManyMembers: BlueCatbirdMlsChatCreateConvoError("TooManyMembers", "Too many initial members specified")
         object MutualBlockDetected: BlueCatbirdMlsChatCreateConvoError("MutualBlockDetected", "Cannot create conversation with users who have blocked each other")
+        object ConvoAlreadyExists: BlueCatbirdMlsChatCreateConvoError("ConvoAlreadyExists", "A conversation already exists at this groupId, created by a different DID. The caller lost a first-responder race; fall back to receiving the Welcome from the winner.")
     }
 
 /**
