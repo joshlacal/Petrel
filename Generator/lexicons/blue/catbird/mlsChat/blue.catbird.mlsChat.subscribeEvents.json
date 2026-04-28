@@ -33,7 +33,8 @@
             "#membershipChangeEvent",
             "#groupInfoRefreshRequestedEvent",
             "#readditionRequestedEvent",
-            "#circuitBreakerTrippedEvent"
+            "#circuitBreakerTrippedEvent",
+            "#resetRequestedEvent"
           ]
         }
       }
@@ -187,6 +188,26 @@
         "convoId": { "type": "string", "description": "Conversation identifier" },
         "resetCount": { "type": "integer", "description": "Recent reset count that triggered the trip" },
         "trippedAt": { "type": "string", "format": "datetime", "description": "When the breaker tripped (RFC3339)" }
+      }
+    },
+    "resetRequestedEvent": {
+      "type": "object",
+      "description": "Phase 2.5: an indirect trigger (quorum vote, system sweep, inline 409/404) has requested a crypto session reset. Active members are invited to respond by submitting new MLS group material via bootstrapResetGroup or commitGroupChange. First commit wins via UNIQUE (conversation_id, generation) tie-break. The previous groupResetEvent is also emitted for backward compatibility during Stage 1.",
+      "required": ["cursor", "convoId", "cryptoSessionId", "generation", "trigger", "requestEventId"],
+      "properties": {
+        "cursor": { "type": "string", "description": "Resume cursor for this event position" },
+        "convoId": { "type": "string", "description": "Conversation identifier" },
+        "cryptoSessionId": { "type": "string", "description": "Server-side opaque id of the crypto_session whose reset was requested (the prior session, now in state='reset_requested')" },
+        "generation": { "type": "integer", "description": "Generation number of the prior session — clients should activate at generation+1" },
+        "trigger": {
+          "type": "string",
+          "description": "Which subsystem produced the reset request",
+          "knownValues": ["quorum_vote", "system_sweep", "inline_commit_409", "inline_groupinfo_404"]
+        },
+        "requestEventId": { "type": "string", "description": "Server-side opaque id of the crypto_session_reset_requested delivery_event for correlation" },
+        "expectedNewMlsGroupId": { "type": "string", "description": "If non-null, only this mls_group_id may activate. Phase 2.5 indirect triggers always emit null here; admin/bootstrap direct flows always provide a value." },
+        "reason": { "type": "string", "description": "Human-readable reason for the reset" },
+        "requestedAt": { "type": "string", "format": "datetime", "description": "When the reset was requested (RFC3339)" }
       }
     }
   }
