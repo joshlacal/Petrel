@@ -15,6 +15,8 @@ import io.ktor.websocket.readBytes
 import io.ktor.websocket.readText
 import kotlinx.coroutines.flow.*
 import kotlinx.serialization.*
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import java.util.logging.Logger
 
@@ -140,6 +142,42 @@ data class MlsChatGroupResetEvent(
     val resetBy: String? = null,
     val cipherSuite: String? = null,
     val reason: String? = null
+) : MlsChatRealtimeEvent
+
+/**
+ * Phase 2.5: an indirect trigger (quorum vote, system sweep, inline 409/404)
+ * has requested a crypto-session reset. Active members are invited to respond
+ * by submitting fresh MLS group material via `bootstrapResetGroup` /
+ * `commitGroupChange`; first commit wins via UNIQUE (conversation_id, generation).
+ *
+ * Mirrors `BlueCatbirdMlsChatSubscribeEventsResetRequestedEvent` from the
+ * generated lexicon code (the schema source of truth) and the server-side
+ * `StreamEvent::ResetRequestedEvent` wire emission in
+ * `mls-ds/server/src/realtime/sse.rs`.
+ *
+ * Note: `requestedAt` is exposed as a raw `String?` (RFC3339) to stay
+ * consistent with the other hand-written bridge types in this file, which
+ * use plain Kotlin types instead of codegen's `ATProtocolDate`. The server
+ * always emits this field; we tolerate absence to match the lexicon's
+ * nullable definition.
+ *
+ * Note: this class is `@Serializable` so that [realtimeJson]'s
+ * `decodeFromJsonElement` can construct it. The other hand-written bridge
+ * classes in this file are NOT annotated, which leaves them latently
+ * unable to decode at runtime — pre-existing issue, out of scope for this
+ * PR (see PR description).
+ */
+@Serializable
+data class MlsChatResetRequestedEvent(
+    @SerialName("cursor") val cursor: String,
+    @SerialName("convoId") val convoId: String,
+    @SerialName("cryptoSessionId") val cryptoSessionId: String,
+    @SerialName("generation") val generation: Int,
+    @SerialName("trigger") val trigger: String,
+    @SerialName("requestEventId") val requestEventId: String,
+    @SerialName("expectedNewMlsGroupId") val expectedNewMlsGroupId: String? = null,
+    @SerialName("reason") val reason: String? = null,
+    @SerialName("requestedAt") val requestedAt: String? = null
 ) : MlsChatRealtimeEvent
 
 // MARK: - subscribeEvents extension function
@@ -311,6 +349,10 @@ internal fun parseRealtimeEvent(json: JsonObject): MlsChatRealtimeEvent? {
             eventType.contains("groupResetEvent", ignoreCase = true) ||
             eventType.contains("#groupReset") -> {
                 realtimeJson.decodeFromJsonElement<MlsChatGroupResetEvent>(payload)
+            }
+            eventType.contains("resetRequestedEvent", ignoreCase = true) ||
+            eventType.contains("#resetRequestedEvent") -> {
+                realtimeJson.decodeFromJsonElement<MlsChatResetRequestedEvent>(payload)
             }
             else -> null
         }
