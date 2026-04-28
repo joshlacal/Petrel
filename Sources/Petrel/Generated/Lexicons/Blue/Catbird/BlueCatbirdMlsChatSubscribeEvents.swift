@@ -1351,6 +1351,208 @@ public struct CircuitBreakerTrippedEvent: ATProtocolCodable, ATProtocolValue {
             case resetCount
             case trippedAt
         }
+    }
+        
+public struct ResetRequestedEvent: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#resetRequestedEvent"
+            public let cursor: String
+            public let convoId: String
+            public let cryptoSessionId: String
+            public let generation: Int
+            public let trigger: String
+            public let requestEventId: String
+            public let expectedNewMlsGroupId: String?
+            public let reason: String?
+            public let requestedAt: ATProtocolDate?
+
+        public init(
+            cursor: String, convoId: String, cryptoSessionId: String, generation: Int, trigger: String, requestEventId: String, expectedNewMlsGroupId: String?, reason: String?, requestedAt: ATProtocolDate?
+        ) {
+            self.cursor = cursor
+            self.convoId = convoId
+            self.cryptoSessionId = cryptoSessionId
+            self.generation = generation
+            self.trigger = trigger
+            self.requestEventId = requestEventId
+            self.expectedNewMlsGroupId = expectedNewMlsGroupId
+            self.reason = reason
+            self.requestedAt = requestedAt
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                self.cursor = try container.decode(String.self, forKey: .cursor)
+            } catch {
+                LogManager.logError("Decoding error for required property 'cursor': \(error)")
+                throw error
+            }
+            do {
+                self.convoId = try container.decode(String.self, forKey: .convoId)
+            } catch {
+                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                throw error
+            }
+            do {
+                self.cryptoSessionId = try container.decode(String.self, forKey: .cryptoSessionId)
+            } catch {
+                LogManager.logError("Decoding error for required property 'cryptoSessionId': \(error)")
+                throw error
+            }
+            do {
+                self.generation = try container.decode(Int.self, forKey: .generation)
+            } catch {
+                LogManager.logError("Decoding error for required property 'generation': \(error)")
+                throw error
+            }
+            do {
+                self.trigger = try container.decode(String.self, forKey: .trigger)
+            } catch {
+                LogManager.logError("Decoding error for required property 'trigger': \(error)")
+                throw error
+            }
+            do {
+                self.requestEventId = try container.decode(String.self, forKey: .requestEventId)
+            } catch {
+                LogManager.logError("Decoding error for required property 'requestEventId': \(error)")
+                throw error
+            }
+            do {
+                self.expectedNewMlsGroupId = try container.decodeIfPresent(String.self, forKey: .expectedNewMlsGroupId)
+            } catch {
+                LogManager.logDebug("Decoding error for optional property 'expectedNewMlsGroupId': \(error)")
+                throw error
+            }
+            do {
+                self.reason = try container.decodeIfPresent(String.self, forKey: .reason)
+            } catch {
+                LogManager.logDebug("Decoding error for optional property 'reason': \(error)")
+                throw error
+            }
+            do {
+                self.requestedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .requestedAt)
+            } catch {
+                LogManager.logDebug("Decoding error for optional property 'requestedAt': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            try container.encode(cursor, forKey: .cursor)
+            try container.encode(convoId, forKey: .convoId)
+            try container.encode(cryptoSessionId, forKey: .cryptoSessionId)
+            try container.encode(generation, forKey: .generation)
+            try container.encode(trigger, forKey: .trigger)
+            try container.encode(requestEventId, forKey: .requestEventId)
+            try container.encodeIfPresent(expectedNewMlsGroupId, forKey: .expectedNewMlsGroupId)
+            try container.encodeIfPresent(reason, forKey: .reason)
+            try container.encodeIfPresent(requestedAt, forKey: .requestedAt)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(cursor)
+            hasher.combine(convoId)
+            hasher.combine(cryptoSessionId)
+            hasher.combine(generation)
+            hasher.combine(trigger)
+            hasher.combine(requestEventId)
+            if let value = expectedNewMlsGroupId {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = reason {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = requestedAt {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+            if cursor != other.cursor {
+                return false
+            }
+            if convoId != other.convoId {
+                return false
+            }
+            if cryptoSessionId != other.cryptoSessionId {
+                return false
+            }
+            if generation != other.generation {
+                return false
+            }
+            if trigger != other.trigger {
+                return false
+            }
+            if requestEventId != other.requestEventId {
+                return false
+            }
+            if expectedNewMlsGroupId != other.expectedNewMlsGroupId {
+                return false
+            }
+            if reason != other.reason {
+                return false
+            }
+            if requestedAt != other.requestedAt {
+                return false
+            }
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            let cursorValue = try cursor.toCBORValue()
+            map = map.adding(key: "cursor", value: cursorValue)
+            let convoIdValue = try convoId.toCBORValue()
+            map = map.adding(key: "convoId", value: convoIdValue)
+            let cryptoSessionIdValue = try cryptoSessionId.toCBORValue()
+            map = map.adding(key: "cryptoSessionId", value: cryptoSessionIdValue)
+            let generationValue = try generation.toCBORValue()
+            map = map.adding(key: "generation", value: generationValue)
+            let triggerValue = try trigger.toCBORValue()
+            map = map.adding(key: "trigger", value: triggerValue)
+            let requestEventIdValue = try requestEventId.toCBORValue()
+            map = map.adding(key: "requestEventId", value: requestEventIdValue)
+            if let value = expectedNewMlsGroupId {
+                let expectedNewMlsGroupIdValue = try value.toCBORValue()
+                map = map.adding(key: "expectedNewMlsGroupId", value: expectedNewMlsGroupIdValue)
+            }
+            if let value = reason {
+                let reasonValue = try value.toCBORValue()
+                map = map.adding(key: "reason", value: reasonValue)
+            }
+            if let value = requestedAt {
+                let requestedAtValue = try value.toCBORValue()
+                map = map.adding(key: "requestedAt", value: requestedAtValue)
+            }
+            return map
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case cursor
+            case convoId
+            case cryptoSessionId
+            case generation
+            case trigger
+            case requestEventId
+            case expectedNewMlsGroupId
+            case reason
+            case requestedAt
+        }
     }    
 public struct Parameters: Parametrizable {
         public let ticket: String?
@@ -1388,6 +1590,8 @@ public enum Message: Codable, Sendable {
     case readditionRequestedEvent(ReadditionRequestedEvent)
 
     case circuitBreakerTrippedEvent(CircuitBreakerTrippedEvent)
+
+    case resetRequestedEvent(ResetRequestedEvent)
 
 
     enum CodingKeys: String, CodingKey {
@@ -1444,6 +1648,10 @@ public enum Message: Codable, Sendable {
             let value = try CircuitBreakerTrippedEvent(from: decoder)
             self = .circuitBreakerTrippedEvent(value)
 
+        case "blue.catbird.mlsChat.subscribeEvents#resetRequestedEvent":
+            let value = try ResetRequestedEvent(from: decoder)
+            self = .resetRequestedEvent(value)
+
         default:
             throw DecodingError.dataCorruptedError(
                 forKey: .type,
@@ -1487,6 +1695,9 @@ public enum Message: Codable, Sendable {
             try value.encode(to: encoder)
 
         case .circuitBreakerTrippedEvent(let value):
+            try value.encode(to: encoder)
+
+        case .resetRequestedEvent(let value):
             try value.encode(to: encoder)
 
         }
