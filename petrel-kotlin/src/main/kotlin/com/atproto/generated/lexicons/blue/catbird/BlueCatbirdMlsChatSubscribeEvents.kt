@@ -51,6 +51,9 @@ sealed interface BlueCatbirdMlsChatSubscribeEventsMessageUnion {
     data class CircuitBreakerTrippedEvent(val value: com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsCircuitBreakerTrippedEvent) : BlueCatbirdMlsChatSubscribeEventsMessageUnion
 
     @Serializable
+    data class ResetRequestedEvent(val value: com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsResetRequestedEvent) : BlueCatbirdMlsChatSubscribeEventsMessageUnion
+
+    @Serializable
     data class Unexpected(val value: JsonElement) : BlueCatbirdMlsChatSubscribeEventsMessageUnion
 }
 
@@ -127,6 +130,12 @@ object BlueCatbirdMlsChatSubscribeEventsMessageUnionSerializer : kotlinx.seriali
                     it["\$type"] = kotlinx.serialization.json.JsonPrimitive("blue.catbird.mlsChat.subscribeEvents#circuitBreakerTrippedEvent")
                 })
             }
+            is BlueCatbirdMlsChatSubscribeEventsMessageUnion.ResetRequestedEvent -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsResetRequestedEvent.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("blue.catbird.mlsChat.subscribeEvents#resetRequestedEvent")
+                })
+            }
             is BlueCatbirdMlsChatSubscribeEventsMessageUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
             // subscription codegen) are runtime-only sentinels; JSON round-trip
@@ -178,6 +187,9 @@ object BlueCatbirdMlsChatSubscribeEventsMessageUnionSerializer : kotlinx.seriali
             )
             "blue.catbird.mlsChat.subscribeEvents#circuitBreakerTrippedEvent" -> BlueCatbirdMlsChatSubscribeEventsMessageUnion.CircuitBreakerTrippedEvent(
                 jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsCircuitBreakerTrippedEvent.serializer(), element)
+            )
+            "blue.catbird.mlsChat.subscribeEvents#resetRequestedEvent" -> BlueCatbirdMlsChatSubscribeEventsMessageUnion.ResetRequestedEvent(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsResetRequestedEvent.serializer(), element)
             )
             else -> BlueCatbirdMlsChatSubscribeEventsMessageUnion.Unexpected(element)
         }
@@ -357,6 +369,26 @@ object BlueCatbirdMlsChatSubscribeEventsMessageUnionSerializer : kotlinx.seriali
         }
     }
 
+    /**
+     * Phase 2.5: an indirect trigger (quorum vote, system sweep, inline 409/404) has requested a crypto session reset. Active members are invited to respond by submitting new MLS group material via bootstrapResetGroup or commitGroupChange. First commit wins via UNIQUE (conversation_id, generation) tie-break. The previous groupResetEvent is also emitted for backward compatibility during Stage 1.
+     */
+    @Serializable
+    data class BlueCatbirdMlsChatSubscribeEventsResetRequestedEvent(
+/** Resume cursor for this event position */        @SerialName("cursor")
+        val cursor: String,/** Conversation identifier */        @SerialName("convoId")
+        val convoId: String,/** Server-side opaque id of the crypto_session whose reset was requested (the prior session, now in state='reset_requested') */        @SerialName("cryptoSessionId")
+        val cryptoSessionId: String,/** Generation number of the prior session — clients should activate at generation+1 */        @SerialName("generation")
+        val generation: Int,/** Which subsystem produced the reset request */        @SerialName("trigger")
+        val trigger: String,/** Server-side opaque id of the crypto_session_reset_requested delivery_event for correlation */        @SerialName("requestEventId")
+        val requestEventId: String,/** If non-null, only this mls_group_id may activate. Phase 2.5 indirect triggers always emit null here; admin/bootstrap direct flows always provide a value. */        @SerialName("expectedNewMlsGroupId")
+        val expectedNewMlsGroupId: String? = null,/** Human-readable reason for the reset */        @SerialName("reason")
+        val reason: String? = null,/** When the reset was requested (RFC3339) */        @SerialName("requestedAt")
+        val requestedAt: ATProtocolDate? = null    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#blueCatbirdMlsChatSubscribeEventsResetRequestedEvent"
+        }
+    }
+
 @Serializable
     data class BlueCatbirdMlsChatSubscribeEventsParameters(
 // JWT ticket from getSubscriptionTicket for authentication        @SerialName("ticket")
@@ -470,6 +502,12 @@ hostOverride: String? = null,
                         "#circuitBreakerTrippedEvent" -> BlueCatbirdMlsChatSubscribeEventsMessageUnion.CircuitBreakerTrippedEvent(
                             json.decodeFromJsonElement(
                                 com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsCircuitBreakerTrippedEvent.serializer(),
+                                frame.payload
+                            )
+                        )
+                        "#resetRequestedEvent" -> BlueCatbirdMlsChatSubscribeEventsMessageUnion.ResetRequestedEvent(
+                            json.decodeFromJsonElement(
+                                com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsResetRequestedEvent.serializer(),
                                 frame.payload
                             )
                         )

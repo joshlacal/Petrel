@@ -2411,6 +2411,16 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
             
+            decoders["blue.catbird.mlsChat.subscribeEvents#resetRequestedEvent"] = { decoder in
+                do {
+                    let decodedObject = try BlueCatbirdMlsChatSubscribeEvents.ResetRequestedEvent(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding BlueCatbirdMlsChatSubscribeEvents.ResetRequestedEvent: \(error)")
+                    return .decodeError("Error decoding BlueCatbirdMlsChatSubscribeEvents.ResetRequestedEvent: \(error)")
+                }
+            }
+            
             decoders["blue.catbird.mlsDS.getFederationPeers#peerRecord"] = { decoder in
                 do {
                     let decodedObject = try BlueCatbirdMlsDSGetFederationPeers.PeerRecord(from: decoder)
