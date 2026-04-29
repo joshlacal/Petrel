@@ -171,19 +171,25 @@ public struct Output: ATProtocolCodable {
         
         public let convo: BlueCatbirdMlsChatDefs.ConvoView
         
+        public let generation: Int?
+        
         
         
         // Standard public initializer
         public init(
             
             
-            convo: BlueCatbirdMlsChatDefs.ConvoView
+            convo: BlueCatbirdMlsChatDefs.ConvoView,
+            
+            generation: Int? = nil
             
             
         ) {
             
             
             self.convo = convo
+            
+            self.generation = generation
             
             
         }
@@ -195,6 +201,9 @@ public struct Output: ATProtocolCodable {
             self.convo = try container.decode(BlueCatbirdMlsChatDefs.ConvoView.self, forKey: .convo)
             
             
+            self.generation = try container.decodeIfPresent(Int.self, forKey: .generation)
+            
+            
         }
         
         public func encode(to encoder: Encoder) throws {
@@ -202,6 +211,10 @@ public struct Output: ATProtocolCodable {
             var container = encoder.container(keyedBy: CodingKeys.self)
             
             try container.encode(convo, forKey: .convo)
+            
+            
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(generation, forKey: .generation)
             
             
         }
@@ -216,6 +229,14 @@ public struct Output: ATProtocolCodable {
             map = map.adding(key: "convo", value: convoValue)
             
             
+            
+            if let value = generation {
+                // Encode optional property even if it's an empty array for CBOR
+                let generationValue = try value.toCBORValue()
+                map = map.adding(key: "generation", value: generationValue)
+            }
+            
+            
 
             return map
             
@@ -224,6 +245,7 @@ public struct Output: ATProtocolCodable {
         
         private enum CodingKeys: String, CodingKey {
             case convo
+            case generation
         }
         
     }
