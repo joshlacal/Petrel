@@ -113,11 +113,12 @@ class MlsChatRealtimeTypesTest {
     @Test
     fun groupResetEventDoesNotRouteToResetRequestedEvent() {
         // Cross-contamination gate: the existing `#groupResetEvent` discriminator
-        // must NOT be claimed by the new resetRequestedEvent dispatch case. (The
-        // existing groupResetEvent decode path has a pre-existing latent issue —
-        // missing `@Serializable` on the bridge class — so it falls through to
-        // Unknown rather than producing a typed payload. The point of THIS test
-        // is to ensure the new dispatch case did not steal the routing.)
+        // must NOT be claimed by the new resetRequestedEvent dispatch case.
+        //
+        // PRE-FIX: this test tolerated `Unknown` because `MlsChatGroupResetEvent`
+        // was missing `@Serializable` and silently fell through. POST-FIX (this
+        // PR): the bridge class is annotated, so the assertion is inverted —
+        // `MlsChatGroupResetEvent` must be produced, not Unknown.
         val frame = """
             {
               "t": "event",
@@ -132,15 +133,310 @@ class MlsChatRealtimeTypesTest {
         """.trimIndent()
 
         val msg = parseRealtimeMessage(frame)
-        // Must not be the new event, regardless of whether it parses to
-        // MlsChatGroupResetEvent or falls through to Unknown.
-        when (msg) {
-            is MlsChatRealtimeMessage.Event -> assertTrue(
-                msg.payload !is MlsChatResetRequestedEvent,
-                "groupResetEvent payload must not be routed to MlsChatResetRequestedEvent"
-            )
-            is MlsChatRealtimeMessage.Unknown -> { /* acceptable: pre-existing latent bug */ }
-            is MlsChatRealtimeMessage.Error -> error("Unexpected Error: ${msg.error} ${msg.message}")
-        }
+        assertIs<MlsChatRealtimeMessage.Event>(msg)
+        val payload = msg.payload
+        // assertIs alone is sufficient cross-contamination evidence — once the
+        // payload is statically `MlsChatGroupResetEvent`, it provably is not
+        // `MlsChatResetRequestedEvent`.
+        assertIs<MlsChatGroupResetEvent>(payload)
+    }
+
+    // MARK: - Bridge-class @Serializable regression tests
+    //
+    // These tests guard the PR-#7 follow-up cleanup that added `@Serializable`
+    // to every hand-written bridge class. Before that fix, every event below
+    // silently fell through to `MlsChatRealtimeMessage.Unknown` because
+    // `realtimeJson.decodeFromJsonElement<T>` cannot synthesize a serializer
+    // for a non-`@Serializable` data class — the runtime exception was caught
+    // by `parseRealtimeEvent`'s broad `catch` and the event was dropped.
+    //
+    // `MlsChatGroupResetEvent` is the highest-priority case (epoch-spiral
+    // recovery on Android) and gets the deepest coverage; the rest get a
+    // single positive parse to confirm the annotation took effect.
+
+    @Test
+    fun groupResetEventFullPayloadParses() {
+        val frame = """
+            {
+              "t": "event",
+              "seq": 99,
+              "payload": {
+                "${'$'}type": "blue.catbird.mlsChat.subscribeEvents#groupResetEvent",
+                "cursor": "501",
+                "convoId": "convo-reset",
+                "newGroupId": "grp-new-id",
+                "resetGeneration": 3,
+                "resetBy": "did:plc:resetter",
+                "cipherSuite": "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
+                "reason": "epoch spiral recovery"
+              }
+            }
+        """.trimIndent()
+
+        val msg = parseRealtimeMessage(frame)
+        assertIs<MlsChatRealtimeMessage.Event>(msg)
+        assertEquals(99L, msg.seq)
+        val payload = msg.payload
+        assertIs<MlsChatGroupResetEvent>(payload)
+        assertEquals("501", payload.cursor)
+        assertEquals("convo-reset", payload.convoId)
+        assertEquals("grp-new-id", payload.newGroupId)
+        assertEquals(3, payload.resetGeneration)
+        assertEquals("did:plc:resetter", payload.resetBy)
+        assertEquals(
+            "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
+            payload.cipherSuite
+        )
+        assertEquals("epoch spiral recovery", payload.reason)
+    }
+
+    @Test
+    fun groupResetEventMinimalPayloadParses() {
+        // resetBy / cipherSuite / reason are optional in the lexicon.
+        val frame = """
+            {
+              "t": "event",
+              "payload": {
+                "${'$'}type": "blue.catbird.mlsChat.subscribeEvents#groupResetEvent",
+                "cursor": "502",
+                "convoId": "convo-min",
+                "newGroupId": "grp-min",
+                "resetGeneration": 1
+              }
+            }
+        """.trimIndent()
+
+        val msg = parseRealtimeMessage(frame)
+        assertIs<MlsChatRealtimeMessage.Event>(msg)
+        val payload = msg.payload
+        assertIs<MlsChatGroupResetEvent>(payload)
+        assertEquals("convo-min", payload.convoId)
+        assertEquals("grp-min", payload.newGroupId)
+        assertEquals(1, payload.resetGeneration)
+        assertNull(payload.resetBy)
+        assertNull(payload.cipherSuite)
+        assertNull(payload.reason)
+    }
+
+    @Test
+    fun groupResetEventDoesNotRouteToResetRequestedEventInverse() {
+        // Inverse of `resetRequestedEventFullPayloadParses` — the new
+        // `#resetRequestedEvent` dispatch must not catch `groupResetEvent`
+        // payloads, even now that both decode through `decodeFromJsonElement`.
+        val frame = """
+            {
+              "t": "event",
+              "payload": {
+                "${'$'}type": "blue.catbird.mlsChat.subscribeEvents#resetRequestedEvent",
+                "cursor": "503",
+                "convoId": "convo-x",
+                "cryptoSessionId": "csess-x",
+                "generation": 4,
+                "trigger": "inline_409",
+                "requestEventId": "evt-x"
+              }
+            }
+        """.trimIndent()
+
+        val msg = parseRealtimeMessage(frame)
+        assertIs<MlsChatRealtimeMessage.Event>(msg)
+        assertTrue(
+            msg.payload !is MlsChatGroupResetEvent,
+            "resetRequestedEvent payload must not be routed to MlsChatGroupResetEvent"
+        )
+    }
+
+    @Test
+    fun reactionEventParses() {
+        val frame = """
+            {
+              "t": "event",
+              "payload": {
+                "${'$'}type": "blue.catbird.mlsChat.subscribeEvents#reactionEvent",
+                "cursor": "601",
+                "convoId": "convo-r",
+                "messageId": "msg-r",
+                "did": "did:plc:reactor",
+                "emoji": "U+1F44D",
+                "reaction": "thumbs_up",
+                "action": "added"
+              }
+            }
+        """.trimIndent()
+
+        val msg = parseRealtimeMessage(frame)
+        assertIs<MlsChatRealtimeMessage.Event>(msg)
+        val payload = msg.payload
+        assertIs<MlsChatReactionEvent>(payload)
+        assertEquals("convo-r", payload.convoId)
+        assertEquals("msg-r", payload.messageId)
+        assertEquals("thumbs_up", payload.reaction)
+        assertEquals("added", payload.action)
+    }
+
+    @Test
+    fun typingEventParses() {
+        val frame = """
+            {
+              "t": "event",
+              "payload": {
+                "${'$'}type": "blue.catbird.mlsChat.subscribeEvents#typingEvent",
+                "cursor": "701",
+                "convoId": "convo-t",
+                "did": "did:plc:typer",
+                "isTyping": true
+              }
+            }
+        """.trimIndent()
+
+        val msg = parseRealtimeMessage(frame)
+        assertIs<MlsChatRealtimeMessage.Event>(msg)
+        val payload = msg.payload
+        assertIs<MlsChatTypingEvent>(payload)
+        assertEquals("convo-t", payload.convoId)
+        assertEquals(true, payload.isTyping)
+    }
+
+    @Test
+    fun infoEventParses() {
+        val frame = """
+            {
+              "t": "event",
+              "payload": {
+                "${'$'}type": "blue.catbird.mlsChat.subscribeEvents#infoEvent",
+                "cursor": "801",
+                "info": "heartbeat",
+                "convoId": "convo-i",
+                "infoType": "system",
+                "requestedBy": "did:plc:requester"
+              }
+            }
+        """.trimIndent()
+
+        val msg = parseRealtimeMessage(frame)
+        assertIs<MlsChatRealtimeMessage.Event>(msg)
+        val payload = msg.payload
+        assertIs<MlsChatInfoEvent>(payload)
+        assertEquals("heartbeat", payload.info)
+        assertEquals("convo-i", payload.convoId)
+        assertEquals("system", payload.infoType)
+        assertEquals("did:plc:requester", payload.requestedBy)
+    }
+
+    @Test
+    fun readEventParses() {
+        val frame = """
+            {
+              "t": "event",
+              "payload": {
+                "${'$'}type": "blue.catbird.mlsChat.subscribeEvents#readEvent",
+                "cursor": "901",
+                "convoId": "convo-rd",
+                "did": "did:plc:reader",
+                "messageId": "msg-rd"
+              }
+            }
+        """.trimIndent()
+
+        val msg = parseRealtimeMessage(frame)
+        assertIs<MlsChatRealtimeMessage.Event>(msg)
+        val payload = msg.payload
+        assertIs<MlsChatReadEvent>(payload)
+        assertEquals("convo-rd", payload.convoId)
+        assertEquals("msg-rd", payload.messageId)
+    }
+
+    @Test
+    fun newDeviceEventParses() {
+        val frame = """
+            {
+              "t": "event",
+              "payload": {
+                "${'$'}type": "blue.catbird.mlsChat.subscribeEvents#newDeviceEvent",
+                "cursor": "1001",
+                "convoId": "convo-nd",
+                "userDid": "did:plc:owner",
+                "deviceId": "dev-1",
+                "deviceName": "iPhone"
+              }
+            }
+        """.trimIndent()
+
+        val msg = parseRealtimeMessage(frame)
+        assertIs<MlsChatRealtimeMessage.Event>(msg)
+        val payload = msg.payload
+        assertIs<MlsChatNewDeviceEvent>(payload)
+        assertEquals("convo-nd", payload.convoId)
+        assertEquals("did:plc:owner", payload.userDid)
+        assertEquals("dev-1", payload.deviceId)
+        assertEquals("iPhone", payload.deviceName)
+    }
+
+    @Test
+    fun membershipChangeEventParses() {
+        val frame = """
+            {
+              "t": "event",
+              "payload": {
+                "${'$'}type": "blue.catbird.mlsChat.subscribeEvents#membershipChangeEvent",
+                "cursor": "1101",
+                "convoId": "convo-mc",
+                "did": "did:plc:newcomer",
+                "action": "joined"
+              }
+            }
+        """.trimIndent()
+
+        val msg = parseRealtimeMessage(frame)
+        assertIs<MlsChatRealtimeMessage.Event>(msg)
+        val payload = msg.payload
+        assertIs<MlsChatMembershipChangeEvent>(payload)
+        assertEquals("convo-mc", payload.convoId)
+        assertEquals("did:plc:newcomer", payload.did)
+        assertEquals("joined", payload.action)
+    }
+
+    @Test
+    fun groupInfoRefreshRequestedEventParses() {
+        // Lexicon-canonical discriminator is `#groupInfoRefreshRequestedEvent`.
+        val frame = """
+            {
+              "t": "event",
+              "payload": {
+                "${'$'}type": "blue.catbird.mlsChat.subscribeEvents#groupInfoRefreshRequestedEvent",
+                "cursor": "1201",
+                "convoId": "convo-gi"
+              }
+            }
+        """.trimIndent()
+
+        val msg = parseRealtimeMessage(frame)
+        assertIs<MlsChatRealtimeMessage.Event>(msg)
+        val payload = msg.payload
+        assertIs<MlsChatGroupInfoRefreshRequestedEvent>(payload)
+        assertEquals("convo-gi", payload.convoId)
+    }
+
+    @Test
+    fun readditionRequestedEventParses() {
+        // Lexicon-canonical discriminator is `#readditionRequestedEvent`.
+        val frame = """
+            {
+              "t": "event",
+              "payload": {
+                "${'$'}type": "blue.catbird.mlsChat.subscribeEvents#readditionRequestedEvent",
+                "cursor": "1301",
+                "convoId": "convo-rr",
+                "userDid": "did:plc:rejoiner"
+              }
+            }
+        """.trimIndent()
+
+        val msg = parseRealtimeMessage(frame)
+        assertIs<MlsChatRealtimeMessage.Event>(msg)
+        val payload = msg.payload
+        assertIs<MlsChatReadditionRequestedEvent>(payload)
+        assertEquals("convo-rr", payload.convoId)
+        assertEquals("did:plc:rejoiner", payload.userDid)
     }
 }

@@ -42,6 +42,7 @@ sealed class MlsChatRealtimeMessage {
 /**
  * A new message was received in a conversation.
  */
+@Serializable
 data class MlsChatMessageEvent(
     val cursor: String,
     val message: BlueCatbirdMlsChatDefsMessageView,
@@ -51,6 +52,7 @@ data class MlsChatMessageEvent(
 /**
  * A reaction was added or removed on a message.
  */
+@Serializable
 data class MlsChatReactionEvent(
     val cursor: String,
     val convoId: String,
@@ -64,6 +66,7 @@ data class MlsChatReactionEvent(
 /**
  * A user started or stopped typing.
  */
+@Serializable
 data class MlsChatTypingEvent(
     val cursor: String,
     val convoId: String,
@@ -74,6 +77,7 @@ data class MlsChatTypingEvent(
 /**
  * An informational event (heartbeat, system notice, or synthesized from other events).
  */
+@Serializable
 data class MlsChatInfoEvent(
     val cursor: String,
     val info: String,
@@ -85,6 +89,7 @@ data class MlsChatInfoEvent(
 /**
  * A user has read messages in a conversation.
  */
+@Serializable
 data class MlsChatReadEvent(
     val cursor: String,
     val convoId: String,
@@ -95,6 +100,7 @@ data class MlsChatReadEvent(
 /**
  * A new device was registered and needs to be added to conversations.
  */
+@Serializable
 data class MlsChatNewDeviceEvent(
     val cursor: String,
     val convoId: String,
@@ -106,6 +112,7 @@ data class MlsChatNewDeviceEvent(
 /**
  * A member joined, left, or was removed from a conversation.
  */
+@Serializable
 data class MlsChatMembershipChangeEvent(
     val cursor: String,
     val convoId: String,
@@ -116,6 +123,7 @@ data class MlsChatMembershipChangeEvent(
 /**
  * An active member should publish fresh GroupInfo for external commit joins.
  */
+@Serializable
 data class MlsChatGroupInfoRefreshRequestedEvent(
     val cursor: String,
     val convoId: String
@@ -124,6 +132,7 @@ data class MlsChatGroupInfoRefreshRequestedEvent(
 /**
  * A member needs to be re-added to the conversation.
  */
+@Serializable
 data class MlsChatReadditionRequestedEvent(
     val cursor: String,
     val convoId: String,
@@ -134,6 +143,7 @@ data class MlsChatReadditionRequestedEvent(
  * A group has been reset by the server (epoch spiral recovery).
  * Clients should set resetPending=true and prepare for External Commit rejoin.
  */
+@Serializable
 data class MlsChatGroupResetEvent(
     val cursor: String,
     val convoId: String,
@@ -162,10 +172,11 @@ data class MlsChatGroupResetEvent(
  * nullable definition.
  *
  * Note: this class is `@Serializable` so that [realtimeJson]'s
- * `decodeFromJsonElement` can construct it. The other hand-written bridge
- * classes in this file are NOT annotated, which leaves them latently
- * unable to decode at runtime — pre-existing issue, out of scope for this
- * PR (see PR description).
+ * `decodeFromJsonElement` can construct it. All other hand-written bridge
+ * classes in this file are also `@Serializable` (added in the
+ * `kotlin/serializable-cleanup-bridge-classes` follow-up PR; before that,
+ * silent fallthrough to `MlsChatRealtimeMessage.Unknown` was the latent
+ * pre-existing issue noted on PR #7).
  */
 @Serializable
 data class MlsChatResetRequestedEvent(
@@ -327,7 +338,10 @@ internal fun parseRealtimeEvent(json: JsonObject): MlsChatRealtimeEvent? {
                 realtimeJson.decodeFromJsonElement<MlsChatInfoEvent>(payload)
             }
             eventType.contains("readEvent", ignoreCase = true) ||
-            eventType.contains("#read") -> {
+            eventType.contains("#readEvent") -> {
+                // Note: was `#read` originally; that prefix shadowed
+                // `#readditionRequestedEvent` and routed it here, where the
+                // wrong-shape decode threw and silently fell through to Unknown.
                 realtimeJson.decodeFromJsonElement<MlsChatReadEvent>(payload)
             }
             eventType.contains("newDeviceEvent", ignoreCase = true) ||
