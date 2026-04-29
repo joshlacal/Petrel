@@ -43,7 +43,8 @@ object BlueCatbirdMlsChatBootstrapResetGroupDefs {
     @Serializable
     data class BlueCatbirdMlsChatBootstrapResetGroupOutput(
 // The now-bootstrapped conversation view, including the preserved member roster        @SerialName("convo")
-        val convo: BlueCatbirdMlsChatDefsConvoView    )
+        val convo: BlueCatbirdMlsChatDefsConvoView,// Generation number of the now-active crypto_session (preserved across self-heal; freshly minted across activate). Clients seed pendingResetGeneration with this value on bootstrap success so subsequent SSE replay events carrying a stale `gen` are short-circuited before destructive recovery (e.g. deleteGroup) fires. Optional for backward compatibility — older clients that miss the field fall back to fetching it via getConversation/getGroupState.        @SerialName("generation")
+        val generation: Int? = null    )
 
 sealed class BlueCatbirdMlsChatBootstrapResetGroupError(val name: String, val description: String?) {
         object BootstrapTargetNotFound: BlueCatbirdMlsChatBootstrapResetGroupError("BootstrapTargetNotFound", "No conversation row matches (originalConvoId, newGroupId). Either the convo doesn't exist, or the post-reset group_id has already been overwritten by a subsequent reset.")

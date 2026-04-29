@@ -72,6 +72,11 @@
               "type": "ref",
               "ref": "blue.catbird.mlsChat.defs#convoView",
               "description": "The now-bootstrapped conversation view, including the preserved member roster"
+            },
+            "generation": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Generation number of the now-active crypto_session (preserved across self-heal; freshly minted across activate). Clients seed pendingResetGeneration with this value on bootstrap success so subsequent SSE replay events carrying a stale `gen` are short-circuited before destructive recovery (e.g. deleteGroup) fires. Optional for backward compatibility — older clients that miss the field fall back to fetching it via getConversation/getGroupState."
             }
           }
         }
