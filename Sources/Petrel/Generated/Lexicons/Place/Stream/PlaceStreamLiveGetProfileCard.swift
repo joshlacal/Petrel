@@ -133,13 +133,9 @@ extension ATProtoClient.Place.Stream.Live {
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
         if (200...299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "*/*", actual: "nil")
-            }
-
-            if !contentType.lowercased().contains("*/*") {
-                throw NetworkError.invalidContentType(expected: "*/*", actual: contentType)
-            }
+            
+            // Wildcard encoding ("*/*") — accept any Content-Type, including a missing one.
+            
 
             do {
                 
