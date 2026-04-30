@@ -10,14 +10,26 @@ public struct BlueCatbirdMlsChatGetGroupMetadataBlob {
     public static let typeIdentifier = "blue.catbird.mlsChat.getGroupMetadataBlob"    
 public struct Parameters: Parametrizable {
         public let blobLocator: String?
-        public let groupId: String
+        public let convoId: String?
+        public let groupId: String?
+        public let resetGeneration: Int?
+        public let metadataVersion: Int?
+        public let kind: String?
         
         public init(
             blobLocator: String? = nil, 
-            groupId: String
+            convoId: String? = nil, 
+            groupId: String? = nil, 
+            resetGeneration: Int? = nil, 
+            metadataVersion: Int? = nil, 
+            kind: String? = nil
             ) {
             self.blobLocator = blobLocator
+            self.convoId = convoId
             self.groupId = groupId
+            self.resetGeneration = resetGeneration
+            self.metadataVersion = metadataVersion
+            self.kind = kind
             
         }
     }
@@ -106,7 +118,7 @@ public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertibl
 extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - getGroupMetadataBlob
 
-    /// Fetch an encrypted group metadata blob by locator Download an encrypted metadata blob. Returns raw encrypted bytes. The blob is opaque — decryption requires the MLS epoch key derived by group members.
+    /// Fetch an encrypted group metadata blob by locator Download an encrypted metadata blob. Returns raw encrypted bytes. The blob is opaque — decryption requires the MLS epoch key derived by group members. Clients should pass both convoId (stable application conversation) and groupId (MLS crypto context) when available; older clients may pass groupId only.
     /// 
     /// - Parameter input: The input parameters for the request
     /// 
@@ -136,13 +148,9 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
         if (200...299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "*/*", actual: "nil")
-            }
-
-            if !contentType.lowercased().contains("*/*") {
-                throw NetworkError.invalidContentType(expected: "*/*", actual: contentType)
-            }
+            
+            // Wildcard encoding ("*/*") — accept any Content-Type, including a missing one.
+            
 
             do {
                 

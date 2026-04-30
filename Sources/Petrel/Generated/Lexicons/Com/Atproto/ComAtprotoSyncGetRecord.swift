@@ -143,6 +143,7 @@ extension ATProtoClient.Com.Atproto.Sync {
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
         if (200...299).contains(responseCode) {
+            
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/vnd.ipld.car", actual: "nil")
             }
@@ -150,6 +151,7 @@ extension ATProtoClient.Com.Atproto.Sync {
             if !contentType.lowercased().contains("application/vnd.ipld.car") {
                 throw NetworkError.invalidContentType(expected: "application/vnd.ipld.car", actual: contentType)
             }
+            
 
             do {
                 

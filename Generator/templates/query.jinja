@@ -144,6 +144,9 @@ extension ATProtoClient.{{ template_namespace_name }} {
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
         if (200...299).contains(responseCode) {
+            {% if output_encoding == "*/*" %}
+            // Wildcard encoding ("*/*") — accept any Content-Type, including a missing one.
+            {% else %}
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "{{ output_encoding }}", actual: "nil")
             }
@@ -151,6 +154,7 @@ extension ATProtoClient.{{ template_namespace_name }} {
             if !contentType.lowercased().contains("{{ output_encoding.lower() }}") {
                 throw NetworkError.invalidContentType(expected: "{{ output_encoding }}", actual: contentType)
             }
+            {% endif %}
 
             do {
                 {% if output_encoding == "application/json" %}
