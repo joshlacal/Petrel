@@ -21,12 +21,7 @@
               "type": "string",
               "description": "MLS cipher suite to use for this conversation",
               "knownValues": [
-                "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
-                "MLS_128_DHKEMP256_AES128GCM_SHA256_P256",
-                "MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519",
-                "MLS_256_DHKEMX448_AES256GCM_SHA512_Ed448",
-                "MLS_256_DHKEMP521_AES256GCM_SHA512_P521",
-                "MLS_256_DHKEMX448_CHACHA20POLY1305_SHA512_Ed448"
+                "MLS_256_XWING_CHACHA20POLY1305_SHA256_Ed25519"
               ]
             },
             "initialMembers": {
