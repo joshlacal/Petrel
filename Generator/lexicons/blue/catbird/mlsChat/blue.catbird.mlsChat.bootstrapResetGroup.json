@@ -53,6 +53,15 @@
               "description": "Bootstrap epoch (always 1 — fresh group at epoch 1). Sent for telemetry; server hard-sets current_epoch = 1.",
               "minimum": 1,
               "default": 1
+            },
+            "metadataBlobLocator": {
+              "type": "string",
+              "description": "Optional locator for encrypted group metadata re-published for newGroupId. The blob itself is uploaded through putGroupMetadataBlob; this field lets clients declare the locator used by the reset winner."
+            },
+            "metadataVersion": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Optional encrypted metadata version associated with metadataBlobLocator."
             }
           }
         }

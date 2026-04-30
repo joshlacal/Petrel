@@ -2211,6 +2211,16 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
             
+            decoders["blue.catbird.mlsChat.publishKeyPackages#replenishResult"] = { decoder in
+                do {
+                    let decodedObject = try BlueCatbirdMlsChatPublishKeyPackages.ReplenishResult(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding BlueCatbirdMlsChatPublishKeyPackages.ReplenishResult: \(error)")
+                    return .decodeError("Error decoding BlueCatbirdMlsChatPublishKeyPackages.ReplenishResult: \(error)")
+                }
+            }
+            
             decoders["blue.catbird.mlsChat.publishKeyPackages#batchError"] = { decoder in
                 do {
                     let decodedObject = try BlueCatbirdMlsChatPublishKeyPackages.BatchError(from: decoder)
