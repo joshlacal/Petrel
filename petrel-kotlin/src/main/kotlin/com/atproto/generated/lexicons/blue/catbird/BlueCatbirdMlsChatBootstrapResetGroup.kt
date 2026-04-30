@@ -38,7 +38,9 @@ object BlueCatbirdMlsChatBootstrapResetGroupDefs {
         val members: List<DID>,// MLS Welcome envelope for ALL members. Stored per-recipient based on keyPackageHashes.        @SerialName("welcomeMessage")
         val welcomeMessage: Bytes? = null,// Per-member key package hashes used in the Welcome        @SerialName("keyPackageHashes")
         val keyPackageHashes: List<BlueCatbirdMlsChatBootstrapResetGroupKeyPackageHashEntry>? = null,// Bootstrap epoch (always 1 — fresh group at epoch 1). Sent for telemetry; server hard-sets current_epoch = 1.        @SerialName("currentEpoch")
-        val currentEpoch: Int? = null    )
+        val currentEpoch: Int? = null,// Optional locator for encrypted group metadata re-published for newGroupId. The blob itself is uploaded through putGroupMetadataBlob; this field lets clients declare the locator used by the reset winner.        @SerialName("metadataBlobLocator")
+        val metadataBlobLocator: String? = null,// Optional encrypted metadata version associated with metadataBlobLocator.        @SerialName("metadataVersion")
+        val metadataVersion: Int? = null    )
 
     @Serializable
     data class BlueCatbirdMlsChatBootstrapResetGroupOutput(

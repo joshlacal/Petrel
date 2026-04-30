@@ -5,7 +5,7 @@
   "defs": {
     "main": {
       "type": "procedure",
-      "description": "Manage key packages for the authenticated user's device. Supports two actions: 'publish' uploads new key packages, 'sync' compares local hashes against server to clean up orphaned packages. Both actions return current stats.",
+      "description": "Manage key packages for the authenticated user's device. Supports 'publish' to upload key packages, 'sync' to compare local hashes against server, 'stats' to fetch current counts, and 'requestReplenish' to ask peer devices to replenish missing key packages.",
       "input": {
         "encoding": "application/json",
         "schema": {
@@ -14,8 +14,8 @@
           "properties": {
             "action": {
               "type": "string",
-              "description": "Action to perform: 'publish' to upload new key packages, 'sync' to reconcile local/server state",
-              "knownValues": ["publish", "sync"]
+              "description": "Action to perform: 'publish' to upload new key packages, 'sync' to reconcile local/server state, 'stats' to fetch counts, or 'requestReplenish' to ask peers to refresh device keys",
+              "knownValues": ["publish", "publishBatch", "sync", "stats", "requestReplenish"]
             },
             "keyPackages": {
               "type": "array",
@@ -35,6 +35,26 @@
             "deviceId": {
               "type": "string",
               "description": "Device ID to scope the operation. Required for 'sync', recommended for 'publish'."
+            },
+            "targetDids": {
+              "type": "array",
+              "description": "Peer DIDs to notify for 'requestReplenish' action",
+              "minLength": 1,
+              "maxLength": 100,
+              "items": {
+                "type": "string",
+                "format": "did"
+              }
+            },
+            "reason": {
+              "type": "string",
+              "description": "Optional reason included in replenish notifications",
+              "maxLength": 120
+            },
+            "convoId": {
+              "type": "string",
+              "description": "Optional conversation context for peer replenish notifications",
+              "maxLength": 255
             }
           }
         }
@@ -59,15 +79,21 @@
               "type": "ref",
               "ref": "#publishResult",
               "description": "Detailed publish results (only present when action is 'publish')"
+            },
+            "replenishResult": {
+              "type": "ref",
+              "ref": "#replenishResult",
+              "description": "Detailed replenish notification result (only present when action is 'requestReplenish')"
             }
           }
         }
       },
       "errors": [
-        {"name": "InvalidAction", "description": "Action must be 'publish' or 'sync'"},
+        {"name": "InvalidAction", "description": "Action must be 'publish', 'publishBatch', 'sync', 'stats', or 'requestReplenish'"},
         {"name": "MissingKeyPackages", "description": "keyPackages required for 'publish' action"},
         {"name": "MissingLocalHashes", "description": "localHashes required for 'sync' action"},
         {"name": "MissingDeviceId", "description": "deviceId required for 'sync' action"},
+        {"name": "MissingTargetDids", "description": "targetDids required for 'requestReplenish' action"},
         {"name": "BatchTooLarge", "description": "Batch size exceeds maximum of 100 key packages"},
         {"name": "InvalidBatch", "description": "Batch validation failed"}
       ]
@@ -171,6 +197,31 @@
             "type": "ref",
             "ref": "#batchError"
           }
+        }
+      }
+    },
+    "replenishResult": {
+      "type": "object",
+      "required": ["requested", "targetCount", "deviceCount", "deliveredCount"],
+      "properties": {
+        "requested": {
+          "type": "boolean",
+          "description": "Whether the replenish request was accepted"
+        },
+        "targetCount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of target DIDs requested"
+        },
+        "deviceCount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of target devices with registered push tokens"
+        },
+        "deliveredCount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of replenish notifications accepted by the push provider"
         }
       }
     },

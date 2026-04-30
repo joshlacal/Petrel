@@ -89,9 +89,11 @@ public struct Input: ATProtocolCodable {
         public let welcomeMessage: Bytes?
         public let keyPackageHashes: [KeyPackageHashEntry]?
         public let currentEpoch: Int?
+        public let metadataBlobLocator: String?
+        public let metadataVersion: Int?
 
         /// Standard public initializer
-        public init(originalConvoId: String, newGroupId: String, cipherSuite: String, groupInfo: Bytes, members: [DID], welcomeMessage: Bytes? = nil, keyPackageHashes: [KeyPackageHashEntry]? = nil, currentEpoch: Int? = nil) {
+        public init(originalConvoId: String, newGroupId: String, cipherSuite: String, groupInfo: Bytes, members: [DID], welcomeMessage: Bytes? = nil, keyPackageHashes: [KeyPackageHashEntry]? = nil, currentEpoch: Int? = nil, metadataBlobLocator: String? = nil, metadataVersion: Int? = nil) {
             self.originalConvoId = originalConvoId
             self.newGroupId = newGroupId
             self.cipherSuite = cipherSuite
@@ -100,6 +102,8 @@ public struct Input: ATProtocolCodable {
             self.welcomeMessage = welcomeMessage
             self.keyPackageHashes = keyPackageHashes
             self.currentEpoch = currentEpoch
+            self.metadataBlobLocator = metadataBlobLocator
+            self.metadataVersion = metadataVersion
         }
         
 
@@ -113,6 +117,8 @@ public struct Input: ATProtocolCodable {
             self.welcomeMessage = try container.decodeIfPresent(Bytes.self, forKey: .welcomeMessage)
             self.keyPackageHashes = try container.decodeIfPresent([KeyPackageHashEntry].self, forKey: .keyPackageHashes)
             self.currentEpoch = try container.decodeIfPresent(Int.self, forKey: .currentEpoch)
+            self.metadataBlobLocator = try container.decodeIfPresent(String.self, forKey: .metadataBlobLocator)
+            self.metadataVersion = try container.decodeIfPresent(Int.self, forKey: .metadataVersion)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -125,6 +131,8 @@ public struct Input: ATProtocolCodable {
             try container.encodeIfPresent(welcomeMessage, forKey: .welcomeMessage)
             try container.encodeIfPresent(keyPackageHashes, forKey: .keyPackageHashes)
             try container.encodeIfPresent(currentEpoch, forKey: .currentEpoch)
+            try container.encodeIfPresent(metadataBlobLocator, forKey: .metadataBlobLocator)
+            try container.encodeIfPresent(metadataVersion, forKey: .metadataVersion)
         }
 
         public func toCBORValue() throws -> Any {
@@ -151,6 +159,14 @@ public struct Input: ATProtocolCodable {
                 let currentEpochValue = try value.toCBORValue()
                 map = map.adding(key: "currentEpoch", value: currentEpochValue)
             }
+            if let value = metadataBlobLocator {
+                let metadataBlobLocatorValue = try value.toCBORValue()
+                map = map.adding(key: "metadataBlobLocator", value: metadataBlobLocatorValue)
+            }
+            if let value = metadataVersion {
+                let metadataVersionValue = try value.toCBORValue()
+                map = map.adding(key: "metadataVersion", value: metadataVersionValue)
+            }
             return map
         }
 
@@ -163,6 +179,8 @@ public struct Input: ATProtocolCodable {
             case welcomeMessage
             case keyPackageHashes
             case currentEpoch
+            case metadataBlobLocator
+            case metadataVersion
         }
     }
     

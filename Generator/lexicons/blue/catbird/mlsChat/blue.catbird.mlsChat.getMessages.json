@@ -5,7 +5,7 @@
   "defs": {
     "main": {
       "type": "query",
-      "description": "Retrieve messages from an MLS conversation. Messages are GUARANTEED to be returned in MLS sequential order (epoch ASC, seq ASC). Clients MUST process messages in this order for proper MLS decryption. The 'type' filter replaces the separate getCommits endpoint.",
+      "description": "Retrieve messages from an MLS conversation. Messages are GUARANTEED to be returned in conversation timeline order (seq ASC). Clients MUST use seq for display/pagination/read cursors and use epoch only as the MLS decryptability gate. The 'type' filter replaces the separate getCommits endpoint.",
       "parameters": {
         "type": "params",
         "required": ["convoId"],
@@ -56,7 +56,7 @@
                 "type": "ref",
                 "ref": "blue.catbird.mlsChat.defs#messageView"
               },
-              "description": "Messages in MLS sequential order (epoch ASC, seq ASC)"
+              "description": "Messages in stable conversation timeline order (seq ASC)"
             },
             "lastSeq": {
               "type": "integer",
