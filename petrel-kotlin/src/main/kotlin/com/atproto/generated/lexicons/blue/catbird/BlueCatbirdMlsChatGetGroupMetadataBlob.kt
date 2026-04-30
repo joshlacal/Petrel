@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: blue.catbird.mlsChat.getGroupMetadataBlob
-// Fetch an encrypted group metadata blob by locator Download an encrypted metadata blob. Returns raw encrypted bytes. The blob is opaque — decryption requires the MLS epoch key derived by group members. Clients should pass both convoId (stable application conversation) and groupId (MLS crypto context) when available; older clients may pass groupId only.
+// Fetch an encrypted group metadata blob by locator Download an encrypted metadata blob. Returns raw encrypted bytes. The blob is opaque — decryption requires the MLS epoch key derived by group members.
 package com.atproto.generated
 
 import kotlinx.serialization.*
@@ -18,12 +18,8 @@ object BlueCatbirdMlsChatGetGroupMetadataBlobDefs {
 @Serializable
     data class BlueCatbirdMlsChatGetGroupMetadataBlobParameters(
 // Optional blob locator. When omitted or empty, returns the latest blob for the group.        @SerialName("blobLocator")
-        val blobLocator: String? = null,// Stable conversation identifier. When provided, membership is checked against the conversation and latest-blob lookup is scoped to the conversation, surviving MLS group rotations.        @SerialName("convoId")
-        val convoId: String? = null,// Hex-encoded MLS group ID for the blob's crypto context. Required for legacy group-scoped lookups; recommended with convoId so clients fetch metadata encrypted for the expected MLS group.        @SerialName("groupId")
-        val groupId: String? = null,// Optional conversation reset generation to disambiguate metadata after MLS group rotations.        @SerialName("resetGeneration")
-        val resetGeneration: Int? = null,// Optional encrypted metadata version from the MLS MetadataReference.        @SerialName("metadataVersion")
-        val metadataVersion: Int? = null,// Blob kind. Defaults to 'metadata'. Avatar blobs use 'avatar'.        @SerialName("kind")
-        val kind: String? = null    )
+        val blobLocator: String? = null,// Hex-encoded MLS group ID (for server-side membership check)        @SerialName("groupId")
+        val groupId: String    )
 
     @Serializable
     data class BlueCatbirdMlsChatGetGroupMetadataBlobOutput(
@@ -35,7 +31,7 @@ sealed class BlueCatbirdMlsChatGetGroupMetadataBlobError(val name: String, val d
     }
 
 /**
- * Fetch an encrypted group metadata blob by locator Download an encrypted metadata blob. Returns raw encrypted bytes. The blob is opaque — decryption requires the MLS epoch key derived by group members. Clients should pass both convoId (stable application conversation) and groupId (MLS crypto context) when available; older clients may pass groupId only.
+ * Fetch an encrypted group metadata blob by locator Download an encrypted metadata blob. Returns raw encrypted bytes. The blob is opaque — decryption requires the MLS epoch key derived by group members.
  *
  * Endpoint: blue.catbird.mlsChat.getGroupMetadataBlob
  */

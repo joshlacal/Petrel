@@ -18,7 +18,7 @@ object BlueCatbirdMlsChatRegisterDeviceDefs {
     @Serializable
     data class BlueCatbirdMlsChatRegisterDeviceKeyPackageItem(
 /** MLS key package */        @SerialName("keyPackage")
-        val keyPackage: Bytes,/** MLS cipher suite (e.g., 'MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519') */        @SerialName("cipherSuite")
+        val keyPackage: Bytes,/** MLS cipher suite (post-quantum hybrid; only 'MLS_256_XWING_CHACHA20POLY1305_SHA256_Ed25519' is supported) */        @SerialName("cipherSuite")
         val cipherSuite: String,/** Key package expiration time */        @SerialName("expires")
         val expires: ATProtocolDate    ) {
         companion object {

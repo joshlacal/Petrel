@@ -28,25 +28,11 @@ object BlueCatbirdMlsChatDefsDefs {
         val epoch: Int,/** MLS cipher suite used for this conversation */        @SerialName("cipherSuite")
         val cipherSuite: String,/** Conversation creation timestamp */        @SerialName("createdAt")
         val createdAt: ATProtocolDate,/** Timestamp of last message */        @SerialName("lastMessageAt")
-        val lastMessageAt: ATProtocolDate? = null,/** Optional conversation metadata */        @SerialName("metadata")
-        val metadata: BlueCatbirdMlsChatDefsConvoMetadata? = null,/** Confirmation tag of the server's canonical MLS tree state. */        @SerialName("confirmationTag")
+        val lastMessageAt: ATProtocolDate? = null,/** Confirmation tag of the server's canonical MLS tree state. */        @SerialName("confirmationTag")
         val confirmationTag: Bytes? = null,/** Number of times this conversation's MLS group has been reset. Absent or 0 means never reset. */        @SerialName("resetGeneration")
         val resetGeneration: Int? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#blueCatbirdMlsChatDefsConvoView"
-        }
-    }
-
-    /**
-     * Server-visible conversation metadata cache (name, description). Encrypted title/avatar metadata is authoritative for group UI and is stored as opaque blobs through getGroupMetadataBlob/putGroupMetadataBlob.
-     */
-    @Serializable
-    data class BlueCatbirdMlsChatDefsConvoMetadata(
-/** Conversation display name */        @SerialName("name")
-        val name: String? = null,/** Conversation description */        @SerialName("description")
-        val description: String? = null    ) {
-        companion object {
-            const val TYPE_IDENTIFIER = "#blueCatbirdMlsChatDefsConvoMetadata"
         }
     }
 

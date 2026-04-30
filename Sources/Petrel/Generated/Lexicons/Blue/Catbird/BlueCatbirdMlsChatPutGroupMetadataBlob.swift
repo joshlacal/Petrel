@@ -18,25 +18,13 @@ public struct BlueCatbirdMlsChatPutGroupMetadataBlob {
 public struct Parameters: Parametrizable {
         public let blobLocator: String
         public let groupId: String
-        public let convoId: String?
-        public let resetGeneration: Int?
-        public let metadataVersion: Int?
-        public let kind: String?
         
         public init(
             blobLocator: String, 
-            groupId: String, 
-            convoId: String? = nil, 
-            resetGeneration: Int? = nil, 
-            metadataVersion: Int? = nil, 
-            kind: String? = nil
+            groupId: String
             ) {
             self.blobLocator = blobLocator
             self.groupId = groupId
-            self.convoId = convoId
-            self.resetGeneration = resetGeneration
-            self.metadataVersion = metadataVersion
-            self.kind = kind
             
         }
     }
@@ -173,7 +161,7 @@ public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertibl
 extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - putGroupMetadataBlob
 
-    /// Store an encrypted group metadata blob Upload an encrypted metadata blob. The blobLocator is client-generated (UUIDv4) and serves as the idempotency key. The server stores opaque bytes — it never sees plaintext metadata. Used for both metadata JSON blobs and encrypted avatar images. Clients should include convoId, resetGeneration, and metadataVersion when available so the server can scope metadata to the stable conversation across MLS group rotations.
+    /// Store an encrypted group metadata blob Upload an encrypted metadata blob. The blobLocator is client-generated (UUIDv4) and serves as the idempotency key. The server stores opaque bytes — it never sees plaintext metadata. Used for both metadata JSON blobs and encrypted avatar images.
     /// 
     /// - Parameters:
     ///   - data: The binary data to upload
