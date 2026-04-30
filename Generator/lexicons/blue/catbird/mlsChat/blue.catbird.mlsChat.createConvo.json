@@ -50,11 +50,6 @@
               },
               "description": "Array of {did, hash} objects mapping each initial member to their key package hash"
             },
-            "metadata": {
-              "type": "ref",
-              "ref": "#metadataInput",
-              "description": "Optional conversation metadata (name, description)"
-            },
             "invite": {
               "type": "ref",
               "ref": "#inviteAction",
@@ -99,22 +94,6 @@
         {"name": "MutualBlockDetected", "description": "Cannot create conversation with users who have blocked each other"},
         {"name": "ConvoAlreadyExists", "description": "A conversation already exists at this groupId, created by a different DID. The caller lost a first-responder race; fall back to receiving the Welcome from the winner."}
       ]
-    },
-    "metadataInput": {
-      "type": "object",
-      "description": "Input metadata for conversation creation",
-      "properties": {
-        "name": {
-          "type": "string",
-          "maxLength": 128,
-          "description": "Conversation display name"
-        },
-        "description": {
-          "type": "string",
-          "maxLength": 512,
-          "description": "Conversation description"
-        }
-      }
     },
     "keyPackageHashEntry": {
       "type": "object",
