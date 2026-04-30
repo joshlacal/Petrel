@@ -95,7 +95,7 @@
         },
         "cipherSuite": {
           "type": "string",
-          "description": "MLS cipher suite (e.g., 'MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519')"
+          "description": "MLS cipher suite (post-quantum hybrid; only 'MLS_256_XWING_CHACHA20POLY1305_SHA256_Ed25519' is supported)"
         },
         "expires": {
           "type": "string",
