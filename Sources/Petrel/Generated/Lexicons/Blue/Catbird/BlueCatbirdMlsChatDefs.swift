@@ -19,12 +19,11 @@ public struct ConvoView: ATProtocolCodable, ATProtocolValue {
             public let cipherSuite: String
             public let createdAt: ATProtocolDate
             public let lastMessageAt: ATProtocolDate?
-            public let metadata: ConvoMetadata?
             public let confirmationTag: Bytes?
             public let resetGeneration: Int?
 
         public init(
-            conversationId: String, groupId: String, creator: DID, members: [MemberView], epoch: Int, cipherSuite: String, createdAt: ATProtocolDate, lastMessageAt: ATProtocolDate?, metadata: ConvoMetadata?, confirmationTag: Bytes?, resetGeneration: Int?
+            conversationId: String, groupId: String, creator: DID, members: [MemberView], epoch: Int, cipherSuite: String, createdAt: ATProtocolDate, lastMessageAt: ATProtocolDate?, confirmationTag: Bytes?, resetGeneration: Int?
         ) {
             self.conversationId = conversationId
             self.groupId = groupId
@@ -34,7 +33,6 @@ public struct ConvoView: ATProtocolCodable, ATProtocolValue {
             self.cipherSuite = cipherSuite
             self.createdAt = createdAt
             self.lastMessageAt = lastMessageAt
-            self.metadata = metadata
             self.confirmationTag = confirmationTag
             self.resetGeneration = resetGeneration
         }
@@ -90,12 +88,6 @@ public struct ConvoView: ATProtocolCodable, ATProtocolValue {
                 throw error
             }
             do {
-                self.metadata = try container.decodeIfPresent(ConvoMetadata.self, forKey: .metadata)
-            } catch {
-                LogManager.logDebug("Decoding error for optional property 'metadata': \(error)")
-                throw error
-            }
-            do {
                 self.confirmationTag = try container.decodeIfPresent(Bytes.self, forKey: .confirmationTag)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'confirmationTag': \(error)")
@@ -120,7 +112,6 @@ public struct ConvoView: ATProtocolCodable, ATProtocolValue {
             try container.encode(cipherSuite, forKey: .cipherSuite)
             try container.encode(createdAt, forKey: .createdAt)
             try container.encodeIfPresent(lastMessageAt, forKey: .lastMessageAt)
-            try container.encodeIfPresent(metadata, forKey: .metadata)
             try container.encodeIfPresent(confirmationTag, forKey: .confirmationTag)
             try container.encodeIfPresent(resetGeneration, forKey: .resetGeneration)
         }
@@ -134,11 +125,6 @@ public struct ConvoView: ATProtocolCodable, ATProtocolValue {
             hasher.combine(cipherSuite)
             hasher.combine(createdAt)
             if let value = lastMessageAt {
-                hasher.combine(value)
-            } else {
-                hasher.combine(nil as Int?)
-            }
-            if let value = metadata {
                 hasher.combine(value)
             } else {
                 hasher.combine(nil as Int?)
@@ -181,9 +167,6 @@ public struct ConvoView: ATProtocolCodable, ATProtocolValue {
             if lastMessageAt != other.lastMessageAt {
                 return false
             }
-            if metadata != other.metadata {
-                return false
-            }
             if confirmationTag != other.confirmationTag {
                 return false
             }
@@ -218,10 +201,6 @@ public struct ConvoView: ATProtocolCodable, ATProtocolValue {
                 let lastMessageAtValue = try value.toCBORValue()
                 map = map.adding(key: "lastMessageAt", value: lastMessageAtValue)
             }
-            if let value = metadata {
-                let metadataValue = try value.toCBORValue()
-                map = map.adding(key: "metadata", value: metadataValue)
-            }
             if let value = confirmationTag {
                 let confirmationTagValue = try value.toCBORValue()
                 map = map.adding(key: "confirmationTag", value: confirmationTagValue)
@@ -243,93 +222,8 @@ public struct ConvoView: ATProtocolCodable, ATProtocolValue {
             case cipherSuite
             case createdAt
             case lastMessageAt
-            case metadata
             case confirmationTag
             case resetGeneration
-        }
-    }
-        
-public struct ConvoMetadata: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "blue.catbird.mlsChat.defs#convoMetadata"
-            public let name: String?
-            public let description: String?
-
-        public init(
-            name: String?, description: String?
-        ) {
-            self.name = name
-            self.description = description
-        }
-
-        public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                self.name = try container.decodeIfPresent(String.self, forKey: .name)
-            } catch {
-                LogManager.logDebug("Decoding error for optional property 'name': \(error)")
-                throw error
-            }
-            do {
-                self.description = try container.decodeIfPresent(String.self, forKey: .description)
-            } catch {
-                LogManager.logDebug("Decoding error for optional property 'description': \(error)")
-                throw error
-            }
-        }
-
-        public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            try container.encodeIfPresent(name, forKey: .name)
-            try container.encodeIfPresent(description, forKey: .description)
-        }
-
-        public func hash(into hasher: inout Hasher) {
-            if let value = name {
-                hasher.combine(value)
-            } else {
-                hasher.combine(nil as Int?)
-            }
-            if let value = description {
-                hasher.combine(value)
-            } else {
-                hasher.combine(nil as Int?)
-            }
-        }
-
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let other = other as? Self else { return false }
-            if name != other.name {
-                return false
-            }
-            if description != other.description {
-                return false
-            }
-            return true
-        }
-
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
-        public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
-            if let value = name {
-                let nameValue = try value.toCBORValue()
-                map = map.adding(key: "name", value: nameValue)
-            }
-            if let value = description {
-                let descriptionValue = try value.toCBORValue()
-                map = map.adding(key: "description", value: descriptionValue)
-            }
-            return map
-        }
-
-        private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
-            case name
-            case description
         }
     }
         

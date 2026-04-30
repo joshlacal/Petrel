@@ -2031,16 +2031,6 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
             
-            decoders["blue.catbird.mlsChat.defs#convoMetadata"] = { decoder in
-                do {
-                    let decodedObject = try BlueCatbirdMlsChatDefs.ConvoMetadata(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logDebug("Error decoding BlueCatbirdMlsChatDefs.ConvoMetadata: \(error)")
-                    return .decodeError("Error decoding BlueCatbirdMlsChatDefs.ConvoMetadata: \(error)")
-                }
-            }
-            
             decoders["blue.catbird.mlsChat.defs#memberView"] = { decoder in
                 do {
                     let decodedObject = try BlueCatbirdMlsChatDefs.MemberView(from: decoder)
@@ -2221,16 +2211,6 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
             
-            decoders["blue.catbird.mlsChat.publishKeyPackages#replenishResult"] = { decoder in
-                do {
-                    let decodedObject = try BlueCatbirdMlsChatPublishKeyPackages.ReplenishResult(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logDebug("Error decoding BlueCatbirdMlsChatPublishKeyPackages.ReplenishResult: \(error)")
-                    return .decodeError("Error decoding BlueCatbirdMlsChatPublishKeyPackages.ReplenishResult: \(error)")
-                }
-            }
-            
             decoders["blue.catbird.mlsChat.publishKeyPackages#batchError"] = { decoder in
                 do {
                     let decodedObject = try BlueCatbirdMlsChatPublishKeyPackages.BatchError(from: decoder)
@@ -2278,16 +2258,6 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 } catch {
                     LogManager.logDebug("Error decoding BlueCatbirdMlsChatPolicy: \(error)")
                     return .decodeError("Error decoding BlueCatbirdMlsChatPolicy: \(error)")
-                }
-            }
-            
-            decoders["blue.catbird.mlsChat.createConvo#metadataInput"] = { decoder in
-                do {
-                    let decodedObject = try BlueCatbirdMlsChatCreateConvo.MetadataInput(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logDebug("Error decoding BlueCatbirdMlsChatCreateConvo.MetadataInput: \(error)")
-                    return .decodeError("Error decoding BlueCatbirdMlsChatCreateConvo.MetadataInput: \(error)")
                 }
             }
             

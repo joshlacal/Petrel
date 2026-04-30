@@ -9,90 +9,6 @@ public struct BlueCatbirdMlsChatCreateConvo {
 
     public static let typeIdentifier = "blue.catbird.mlsChat.createConvo"
         
-public struct MetadataInput: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "blue.catbird.mlsChat.createConvo#metadataInput"
-            public let name: String?
-            public let description: String?
-
-        public init(
-            name: String?, description: String?
-        ) {
-            self.name = name
-            self.description = description
-        }
-
-        public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                self.name = try container.decodeIfPresent(String.self, forKey: .name)
-            } catch {
-                LogManager.logDebug("Decoding error for optional property 'name': \(error)")
-                throw error
-            }
-            do {
-                self.description = try container.decodeIfPresent(String.self, forKey: .description)
-            } catch {
-                LogManager.logDebug("Decoding error for optional property 'description': \(error)")
-                throw error
-            }
-        }
-
-        public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            try container.encodeIfPresent(name, forKey: .name)
-            try container.encodeIfPresent(description, forKey: .description)
-        }
-
-        public func hash(into hasher: inout Hasher) {
-            if let value = name {
-                hasher.combine(value)
-            } else {
-                hasher.combine(nil as Int?)
-            }
-            if let value = description {
-                hasher.combine(value)
-            } else {
-                hasher.combine(nil as Int?)
-            }
-        }
-
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let other = other as? Self else { return false }
-            if name != other.name {
-                return false
-            }
-            if description != other.description {
-                return false
-            }
-            return true
-        }
-
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
-        public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
-            if let value = name {
-                let nameValue = try value.toCBORValue()
-                map = map.adding(key: "name", value: nameValue)
-            }
-            if let value = description {
-                let descriptionValue = try value.toCBORValue()
-                map = map.adding(key: "description", value: descriptionValue)
-            }
-            return map
-        }
-
-        private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
-            case name
-            case description
-        }
-    }
-        
 public struct KeyPackageHashEntry: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.createConvo#keyPackageHashEntry"
             public let did: DID
@@ -248,18 +164,16 @@ public struct Input: ATProtocolCodable {
         public let initialMembers: [DID]?
         public let welcomeMessage: Bytes?
         public let keyPackageHashes: [KeyPackageHashEntry]?
-        public let metadata: MetadataInput?
         public let invite: InviteAction?
         public let currentEpoch: Int?
 
         /// Standard public initializer
-        public init(groupId: String, cipherSuite: String, initialMembers: [DID]? = nil, welcomeMessage: Bytes? = nil, keyPackageHashes: [KeyPackageHashEntry]? = nil, metadata: MetadataInput? = nil, invite: InviteAction? = nil, currentEpoch: Int? = nil) {
+        public init(groupId: String, cipherSuite: String, initialMembers: [DID]? = nil, welcomeMessage: Bytes? = nil, keyPackageHashes: [KeyPackageHashEntry]? = nil, invite: InviteAction? = nil, currentEpoch: Int? = nil) {
             self.groupId = groupId
             self.cipherSuite = cipherSuite
             self.initialMembers = initialMembers
             self.welcomeMessage = welcomeMessage
             self.keyPackageHashes = keyPackageHashes
-            self.metadata = metadata
             self.invite = invite
             self.currentEpoch = currentEpoch
         }
@@ -272,7 +186,6 @@ public struct Input: ATProtocolCodable {
             self.initialMembers = try container.decodeIfPresent([DID].self, forKey: .initialMembers)
             self.welcomeMessage = try container.decodeIfPresent(Bytes.self, forKey: .welcomeMessage)
             self.keyPackageHashes = try container.decodeIfPresent([KeyPackageHashEntry].self, forKey: .keyPackageHashes)
-            self.metadata = try container.decodeIfPresent(MetadataInput.self, forKey: .metadata)
             self.invite = try container.decodeIfPresent(InviteAction.self, forKey: .invite)
             self.currentEpoch = try container.decodeIfPresent(Int.self, forKey: .currentEpoch)
         }
@@ -284,7 +197,6 @@ public struct Input: ATProtocolCodable {
             try container.encodeIfPresent(initialMembers, forKey: .initialMembers)
             try container.encodeIfPresent(welcomeMessage, forKey: .welcomeMessage)
             try container.encodeIfPresent(keyPackageHashes, forKey: .keyPackageHashes)
-            try container.encodeIfPresent(metadata, forKey: .metadata)
             try container.encodeIfPresent(invite, forKey: .invite)
             try container.encodeIfPresent(currentEpoch, forKey: .currentEpoch)
         }
@@ -307,10 +219,6 @@ public struct Input: ATProtocolCodable {
                 let keyPackageHashesValue = try value.toCBORValue()
                 map = map.adding(key: "keyPackageHashes", value: keyPackageHashesValue)
             }
-            if let value = metadata {
-                let metadataValue = try value.toCBORValue()
-                map = map.adding(key: "metadata", value: metadataValue)
-            }
             if let value = invite {
                 let inviteValue = try value.toCBORValue()
                 map = map.adding(key: "invite", value: inviteValue)
@@ -328,7 +236,6 @@ public struct Input: ATProtocolCodable {
             case initialMembers
             case welcomeMessage
             case keyPackageHashes
-            case metadata
             case invite
             case currentEpoch
         }

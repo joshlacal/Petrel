@@ -15,19 +15,6 @@ object BlueCatbirdMlsChatCreateConvoDefs {
     const val TYPE_IDENTIFIER = "blue.catbird.mlsChat.createConvo"
 }
 
-    /**
-     * Input metadata for conversation creation
-     */
-    @Serializable
-    data class BlueCatbirdMlsChatCreateConvoMetadataInput(
-/** Conversation display name */        @SerialName("name")
-        val name: String? = null,/** Conversation description */        @SerialName("description")
-        val description: String? = null    ) {
-        companion object {
-            const val TYPE_IDENTIFIER = "#blueCatbirdMlsChatCreateConvoMetadataInput"
-        }
-    }
-
     @Serializable
     data class BlueCatbirdMlsChatCreateConvoKeyPackageHashEntry(
 /** DID of the member */        @SerialName("did")
@@ -58,8 +45,7 @@ object BlueCatbirdMlsChatCreateConvoDefs {
         val cipherSuite: String,// DIDs of initial members to add (max 999 excluding creator)        @SerialName("initialMembers")
         val initialMembers: List<DID>? = null,// MLS Welcome message for ALL initial members        @SerialName("welcomeMessage")
         val welcomeMessage: Bytes? = null,// Array of {did, hash} objects mapping each initial member to their key package hash        @SerialName("keyPackageHashes")
-        val keyPackageHashes: List<BlueCatbirdMlsChatCreateConvoKeyPackageHashEntry>? = null,// Optional conversation metadata (name, description)        @SerialName("metadata")
-        val metadata: BlueCatbirdMlsChatCreateConvoMetadataInput? = null,// Optional invite link management: create or revoke invite codes at conversation creation time        @SerialName("invite")
+        val keyPackageHashes: List<BlueCatbirdMlsChatCreateConvoKeyPackageHashEntry>? = null,// Optional invite link management: create or revoke invite codes at conversation creation time        @SerialName("invite")
         val invite: BlueCatbirdMlsChatCreateConvoInviteAction? = null,// Client's current MLS epoch after group creation (for server telemetry only)        @SerialName("currentEpoch")
         val currentEpoch: Int? = null    )
 

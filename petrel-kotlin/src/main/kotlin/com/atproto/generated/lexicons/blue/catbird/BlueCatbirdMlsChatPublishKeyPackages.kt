@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: blue.catbird.mlsChat.publishKeyPackages
-// Unified key package management: publish new packages or sync with server (consolidates publishKeyPackages + syncKeyPackages + getKeyPackageStats) Manage key packages for the authenticated user's device. Supports 'publish' to upload key packages, 'sync' to compare local hashes against server, 'stats' to fetch current counts, and 'requestReplenish' to ask peer devices to replenish missing key packages.
+// Unified key package management: publish new packages or sync with server (consolidates publishKeyPackages + syncKeyPackages + getKeyPackageStats) Manage key packages for the authenticated user's device. Supports two actions: 'publish' uploads new key packages, 'sync' compares local hashes against server to clean up orphaned packages. Both actions return current stats.
 package com.atproto.generated
 
 import kotlinx.serialization.*
@@ -63,18 +63,6 @@ object BlueCatbirdMlsChatPublishKeyPackagesDefs {
     }
 
     @Serializable
-    data class BlueCatbirdMlsChatPublishKeyPackagesReplenishResult(
-/** Whether the replenish request was accepted */        @SerialName("requested")
-        val requested: Boolean,/** Number of target DIDs requested */        @SerialName("targetCount")
-        val targetCount: Int,/** Number of target devices with registered push tokens */        @SerialName("deviceCount")
-        val deviceCount: Int,/** Number of replenish notifications accepted by the push provider */        @SerialName("deliveredCount")
-        val deliveredCount: Int    ) {
-        companion object {
-            const val TYPE_IDENTIFIER = "#blueCatbirdMlsChatPublishKeyPackagesReplenishResult"
-        }
-    }
-
-    @Serializable
     data class BlueCatbirdMlsChatPublishKeyPackagesBatchError(
 /** Zero-based index of the key package that failed */        @SerialName("index")
         val index: Int,/** Human-readable error message */        @SerialName("error")
@@ -86,35 +74,30 @@ object BlueCatbirdMlsChatPublishKeyPackagesDefs {
 
 @Serializable
     data class BlueCatbirdMlsChatPublishKeyPackagesInput(
-// Action to perform: 'publish' to upload new key packages, 'sync' to reconcile local/server state, 'stats' to fetch counts, or 'requestReplenish' to ask peers to refresh device keys        @SerialName("action")
+// Action to perform: 'publish' to upload new key packages, 'sync' to reconcile local/server state        @SerialName("action")
         val action: String,// Key packages to upload (required for 'publish' action, max 100)        @SerialName("keyPackages")
         val keyPackages: List<BlueCatbirdMlsChatPublishKeyPackagesKeyPackageItem>? = null,// SHA256 hex hashes of key packages that exist in local storage (required for 'sync' action)        @SerialName("localHashes")
         val localHashes: List<String>? = null,// Device ID to scope the operation. Required for 'sync', recommended for 'publish'.        @SerialName("deviceId")
-        val deviceId: String? = null,// Peer DIDs to notify for 'requestReplenish' action        @SerialName("targetDids")
-        val targetDids: List<DID>? = null,// Optional reason included in replenish notifications        @SerialName("reason")
-        val reason: String? = null,// Optional conversation context for peer replenish notifications        @SerialName("convoId")
-        val convoId: String? = null    )
+        val deviceId: String? = null    )
 
     @Serializable
     data class BlueCatbirdMlsChatPublishKeyPackagesOutput(
 // Current key package statistics after the operation        @SerialName("stats")
         val stats: BlueCatbirdMlsChatPublishKeyPackagesKeyPackageStats,// Detailed sync results (only present when action is 'sync')        @SerialName("syncResult")
         val syncResult: BlueCatbirdMlsChatPublishKeyPackagesSyncResult? = null,// Detailed publish results (only present when action is 'publish')        @SerialName("publishResult")
-        val publishResult: BlueCatbirdMlsChatPublishKeyPackagesPublishResult? = null,// Detailed replenish notification result (only present when action is 'requestReplenish')        @SerialName("replenishResult")
-        val replenishResult: BlueCatbirdMlsChatPublishKeyPackagesReplenishResult? = null    )
+        val publishResult: BlueCatbirdMlsChatPublishKeyPackagesPublishResult? = null    )
 
 sealed class BlueCatbirdMlsChatPublishKeyPackagesError(val name: String, val description: String?) {
-        object InvalidAction: BlueCatbirdMlsChatPublishKeyPackagesError("InvalidAction", "Action must be 'publish', 'publishBatch', 'sync', 'stats', or 'requestReplenish'")
+        object InvalidAction: BlueCatbirdMlsChatPublishKeyPackagesError("InvalidAction", "Action must be 'publish' or 'sync'")
         object MissingKeyPackages: BlueCatbirdMlsChatPublishKeyPackagesError("MissingKeyPackages", "keyPackages required for 'publish' action")
         object MissingLocalHashes: BlueCatbirdMlsChatPublishKeyPackagesError("MissingLocalHashes", "localHashes required for 'sync' action")
         object MissingDeviceId: BlueCatbirdMlsChatPublishKeyPackagesError("MissingDeviceId", "deviceId required for 'sync' action")
-        object MissingTargetDids: BlueCatbirdMlsChatPublishKeyPackagesError("MissingTargetDids", "targetDids required for 'requestReplenish' action")
         object BatchTooLarge: BlueCatbirdMlsChatPublishKeyPackagesError("BatchTooLarge", "Batch size exceeds maximum of 100 key packages")
         object InvalidBatch: BlueCatbirdMlsChatPublishKeyPackagesError("InvalidBatch", "Batch validation failed")
     }
 
 /**
- * Unified key package management: publish new packages or sync with server (consolidates publishKeyPackages + syncKeyPackages + getKeyPackageStats) Manage key packages for the authenticated user's device. Supports 'publish' to upload key packages, 'sync' to compare local hashes against server, 'stats' to fetch current counts, and 'requestReplenish' to ask peer devices to replenish missing key packages.
+ * Unified key package management: publish new packages or sync with server (consolidates publishKeyPackages + syncKeyPackages + getKeyPackageStats) Manage key packages for the authenticated user's device. Supports two actions: 'publish' uploads new key packages, 'sync' compares local hashes against server to clean up orphaned packages. Both actions return current stats.
  *
  * Endpoint: blue.catbird.mlsChat.publishKeyPackages
  */
