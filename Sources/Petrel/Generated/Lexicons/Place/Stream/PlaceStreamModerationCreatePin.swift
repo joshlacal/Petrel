@@ -205,6 +205,7 @@ extension ATProtoClient.Place.Stream.Moderation {
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
         if (200...299).contains(responseCode) {
+            
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -212,6 +213,7 @@ extension ATProtoClient.Place.Stream.Moderation {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
+            
 
             do {
                 

@@ -38,7 +38,7 @@ object BlueCatbirdMlsChatDefsDefs {
     }
 
     /**
-     * Metadata for a conversation (name, description)
+     * Server-visible conversation metadata cache (name, description). Encrypted title/avatar metadata is authoritative for group UI and is stored as opaque blobs through getGroupMetadataBlob/putGroupMetadataBlob.
      */
     @Serializable
     data class BlueCatbirdMlsChatDefsConvoMetadata(
@@ -73,7 +73,7 @@ object BlueCatbirdMlsChatDefsDefs {
     }
 
     /**
-     * View of an encrypted MLS message. Server follows 'dumb delivery service' model - sender identity must be derived by clients from decrypted MLS content for metadata privacy. Server GUARANTEES: (1) Sequential (epoch, seq) assignment per conversation, (2) Monotonic seq increment, (3) No seq reuse. Clients MUST process messages in (epoch ASC, seq ASC) order for correct MLS decryption.
+     * View of an encrypted MLS message. Server follows 'dumb delivery service' model - sender identity must be derived by clients from decrypted MLS content for metadata privacy. Server GUARANTEES: (1) Monotonic seq assignment per stable conversation, (2) No seq reuse across MLS epoch changes or group resets. Clients MUST use seq as the conversation timeline order and use epoch only as the MLS decryptability gate.
      */
     @Serializable
     data class BlueCatbirdMlsChatDefsMessageView(
