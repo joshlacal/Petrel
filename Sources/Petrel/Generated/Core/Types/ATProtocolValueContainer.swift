@@ -2001,6 +2001,16 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
             
+            decoders["blue.catbird.mlsChat.commitGroupChange#rateLimitedBody"] = { decoder in
+                do {
+                    let decodedObject = try BlueCatbirdMlsChatCommitGroupChange.RateLimitedBody(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding BlueCatbirdMlsChatCommitGroupChange.RateLimitedBody: \(error)")
+                    return .decodeError("Error decoding BlueCatbirdMlsChatCommitGroupChange.RateLimitedBody: \(error)")
+                }
+            }
+            
             decoders["blue.catbird.mlsChat.commitGroupChange#keyPackageHashEntry"] = { decoder in
                 do {
                     let decodedObject = try BlueCatbirdMlsChatCommitGroupChange.KeyPackageHashEntry(from: decoder)

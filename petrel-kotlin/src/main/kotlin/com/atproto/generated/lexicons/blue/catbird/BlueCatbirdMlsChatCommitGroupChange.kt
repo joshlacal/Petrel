@@ -15,6 +15,21 @@ object BlueCatbirdMlsChatCommitGroupChangeDefs {
     const val TYPE_IDENTIFIER = "blue.catbird.mlsChat.commitGroupChange"
 }
 
+    /**
+     * Structured 429 response body for External-Commit rate-limit rejections. Wire shape locked with clients so retryAfterSeconds is parseable without scraping the message string. Sent for both per-conversation (30s) and per-(device, group) (60s) limits, distinguished by `scope`.
+     */
+    @Serializable
+    data class BlueCatbirdMlsChatCommitGroupChangeRateLimitedBody(
+/** Always 'RateLimited'. */        @SerialName("error")
+        val error: String,/** Human-readable explanation. */        @SerialName("message")
+        val message: String,/** Seconds the client should wait before retrying. Mirrors the HTTP Retry-After header. */        @SerialName("retryAfterSeconds")
+        val retryAfterSeconds: Int,/** 'convo' = per-conversation 30s limit. 'device-convo' = per-(device, group) 60s cooldown. */        @SerialName("scope")
+        val scope: String    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#blueCatbirdMlsChatCommitGroupChangeRateLimitedBody"
+        }
+    }
+
     @Serializable
     data class BlueCatbirdMlsChatCommitGroupChangeKeyPackageHashEntry(
 /** DID of the member */        @SerialName("did")
@@ -81,6 +96,9 @@ sealed class BlueCatbirdMlsChatCommitGroupChangeError(val name: String, val desc
         object PendingAdditionNotFound: BlueCatbirdMlsChatCommitGroupChangeError("PendingAdditionNotFound", "The specified pending addition does not exist")
         object PendingAdditionAlreadyClaimed: BlueCatbirdMlsChatCommitGroupChangeError("PendingAdditionAlreadyClaimed", "The pending addition was already claimed by another member")
         object Unauthorized: BlueCatbirdMlsChatCommitGroupChangeError("Unauthorized", "Insufficient privileges for this operation")
+        object NoKeyPackagesPublished: BlueCatbirdMlsChatCommitGroupChangeError("NoKeyPackagesPublished", "Layer 1 robustness gate: the calling device has zero published key packages and is therefore not eligible to issue an External Commit. The device must call publishKeyPackages and successfully publish at least one available, non-expired key package before retrying. Returned as HTTP 412 Precondition Failed.")
+        object GroupFrozen: BlueCatbirdMlsChatCommitGroupChangeError("GroupFrozen", "Layer 1 robustness circuit breaker: the conversation has been temporarily frozen because the server detected an epoch-storm pattern (too many epoch advances within a short window). All epoch-advancing commits are rejected until the freeze auto-thaws. Returned as HTTP 423 Locked.")
+        object RateLimited: BlueCatbirdMlsChatCommitGroupChangeError("RateLimited", "Rate limit exceeded. Two cases: (a) per-conversation 30s External-Commit limit (existing). (b) per-(device, group) 60s External-Commit cooldown (Layer 1 §1.2). Both return HTTP 429 with body shaped per #rateLimitedBody (retryAfterSeconds + scope discriminator).")
     }
 
 /**

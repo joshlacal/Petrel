@@ -9,6 +9,110 @@ public struct BlueCatbirdMlsChatCommitGroupChange {
 
     public static let typeIdentifier = "blue.catbird.mlsChat.commitGroupChange"
         
+public struct RateLimitedBody: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "blue.catbird.mlsChat.commitGroupChange#rateLimitedBody"
+            public let error: String
+            public let message: String
+            public let retryAfterSeconds: Int
+            public let scope: String
+
+        public init(
+            error: String, message: String, retryAfterSeconds: Int, scope: String
+        ) {
+            self.error = error
+            self.message = message
+            self.retryAfterSeconds = retryAfterSeconds
+            self.scope = scope
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                self.error = try container.decode(String.self, forKey: .error)
+            } catch {
+                LogManager.logError("Decoding error for required property 'error': \(error)")
+                throw error
+            }
+            do {
+                self.message = try container.decode(String.self, forKey: .message)
+            } catch {
+                LogManager.logError("Decoding error for required property 'message': \(error)")
+                throw error
+            }
+            do {
+                self.retryAfterSeconds = try container.decode(Int.self, forKey: .retryAfterSeconds)
+            } catch {
+                LogManager.logError("Decoding error for required property 'retryAfterSeconds': \(error)")
+                throw error
+            }
+            do {
+                self.scope = try container.decode(String.self, forKey: .scope)
+            } catch {
+                LogManager.logError("Decoding error for required property 'scope': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            try container.encode(error, forKey: .error)
+            try container.encode(message, forKey: .message)
+            try container.encode(retryAfterSeconds, forKey: .retryAfterSeconds)
+            try container.encode(scope, forKey: .scope)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(error)
+            hasher.combine(message)
+            hasher.combine(retryAfterSeconds)
+            hasher.combine(scope)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+            if error != other.error {
+                return false
+            }
+            if message != other.message {
+                return false
+            }
+            if retryAfterSeconds != other.retryAfterSeconds {
+                return false
+            }
+            if scope != other.scope {
+                return false
+            }
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            let errorValue = try error.toCBORValue()
+            map = map.adding(key: "error", value: errorValue)
+            let messageValue = try message.toCBORValue()
+            map = map.adding(key: "message", value: messageValue)
+            let retryAfterSecondsValue = try retryAfterSeconds.toCBORValue()
+            map = map.adding(key: "retryAfterSeconds", value: retryAfterSecondsValue)
+            let scopeValue = try scope.toCBORValue()
+            map = map.adding(key: "scope", value: scopeValue)
+            return map
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case error
+            case message
+            case retryAfterSeconds
+            case scope
+        }
+    }
+        
 public struct KeyPackageHashEntry: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.commitGroupChange#keyPackageHashEntry"
             public let did: DID
@@ -589,6 +693,9 @@ public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertibl
                 case pendingAdditionNotFound = "PendingAdditionNotFound.The specified pending addition does not exist"
                 case pendingAdditionAlreadyClaimed = "PendingAdditionAlreadyClaimed.The pending addition was already claimed by another member"
                 case unauthorized = "Unauthorized.Insufficient privileges for this operation"
+                case noKeyPackagesPublished = "NoKeyPackagesPublished.Layer 1 robustness gate: the calling device has zero published key packages and is therefore not eligible to issue an External Commit. The device must call publishKeyPackages and successfully publish at least one available, non-expired key package before retrying. Returned as HTTP 412 Precondition Failed."
+                case groupFrozen = "GroupFrozen.Layer 1 robustness circuit breaker: the conversation has been temporarily frozen because the server detected an epoch-storm pattern (too many epoch advances within a short window). All epoch-advancing commits are rejected until the freeze auto-thaws. Returned as HTTP 423 Locked."
+                case rateLimited = "RateLimited.Rate limit exceeded. Two cases: (a) per-conversation 30s External-Commit limit (existing). (b) per-(device, group) 60s External-Commit cooldown (Layer 1 §1.2). Both return HTTP 429 with body shaped per #rateLimitedBody (retryAfterSeconds + scope discriminator)."
             public var description: String {
                 return self.rawValue
             }
