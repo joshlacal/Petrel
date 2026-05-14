@@ -41,6 +41,11 @@
             "type": "integer",
             "minimum": 0,
             "description": "Upper bound (inclusive) on MLS epoch. Only honored for type='commit' or type='all'. Defaults to the conversation's current_epoch when omitted."
+          },
+          "joinEpoch": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Recipient's join epoch for this convo. Server MUST suppress application messages with epoch < joinEpoch in the response. Commits are NOT suppressed (recipients need them for tree state). Optional; when omitted, server falls back to per-recipient join-epoch lookup."
           }
         }
       },
@@ -66,6 +71,11 @@
               "type": "ref",
               "ref": "#gapInfo",
               "description": "Gap detection metadata for missing messages"
+            },
+            "suppressedBeforeJoin": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Count of pre-join messages suppressed from this response."
             }
           }
         }
