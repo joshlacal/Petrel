@@ -5,82 +5,82 @@ import Foundation
 // lexicon: 1, id: chat.bsky.convo.getConvoForMembers
 
 
-public struct ChatBskyConvoGetConvoForMembers {
+public struct ChatBskyConvoGetConvoForMembers { 
 
-    public static let typeIdentifier = "chat.bsky.convo.getConvoForMembers"
+    public static let typeIdentifier = "chat.bsky.convo.getConvoForMembers"    
 public struct Parameters: Parametrizable {
         public let members: [DID]
-
+        
         public init(
             members: [DID]
             ) {
             self.members = members
-
+            
         }
     }
-
+    
 public struct Output: ATProtocolCodable {
-
-
+        
+        
         public let convo: ChatBskyConvoDefs.ConvoView
-
-
-
+        
+        
+        
         // Standard public initializer
         public init(
-
-
+            
+            
             convo: ChatBskyConvoDefs.ConvoView
-
-
+            
+            
         ) {
-
-
+            
+            
             self.convo = convo
-
-
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
-
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            
             self.convo = try container.decode(ChatBskyConvoDefs.ConvoView.self, forKey: .convo)
-
-
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
-
+            
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
             try container.encode(convo, forKey: .convo)
-
-
+            
+            
         }
 
         public func toCBORValue() throws -> Any {
-
+            
             var map = OrderedCBORMap()
 
-
-
+            
+            
             let convoValue = try convo.toCBORValue()
             map = map.adding(key: "convo", value: convoValue)
-
-
+            
+            
 
             return map
-
+            
         }
-
-
+        
+        
         private enum CodingKeys: String, CodingKey {
             case convo
         }
-
+        
     }
-
+        
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case accountSuspended = "AccountSuspended."
                 case blockedActor = "BlockedActor."
@@ -108,17 +108,17 @@ extension ATProtoClient.Chat.Bsky.Convo {
     // MARK: - getConvoForMembers
 
     /// Get or create a 1-1 conversation for the given members. Always returns the same direct (non-group) conversation. To create a group conversation, use createGroup.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-    ///
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func getConvoForMembers(input: ChatBskyConvoGetConvoForMembers.Parameters) async throws -> (responseCode: Int, data: ChatBskyConvoGetConvoForMembers.Output?) {
         let endpoint = "chat.bsky.convo.getConvoForMembers"
 
-
+        
         let queryItems = input.asQueryItems()
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -137,7 +137,7 @@ extension ATProtoClient.Chat.Bsky.Convo {
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
         if (200...299).contains(responseCode) {
-
+            
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -145,13 +145,13 @@ extension ATProtoClient.Chat.Bsky.Convo {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-
+            
 
             do {
-
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(ChatBskyConvoGetConvoForMembers.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -159,12 +159,12 @@ extension ATProtoClient.Chat.Bsky.Convo {
                 return (responseCode, nil)
             }
         } else {
-
+            
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
+                           
 

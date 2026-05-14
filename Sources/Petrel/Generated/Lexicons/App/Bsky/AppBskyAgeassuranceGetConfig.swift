@@ -5,11 +5,11 @@ import Foundation
 // lexicon: 1, id: app.bsky.ageassurance.getConfig
 
 
-public struct AppBskyAgeassuranceGetConfig {
+public struct AppBskyAgeassuranceGetConfig { 
 
     public static let typeIdentifier = "app.bsky.ageassurance.getConfig"
     public typealias Output = AppBskyAgeassuranceDefs.Config
-
+    
 
 
 
@@ -21,15 +21,15 @@ extension ATProtoClient.App.Bsky.Ageassurance {
     // MARK: - getConfig
 
     /// Returns Age Assurance configuration for use on the client.
-    ///
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func getConfig() async throws -> (responseCode: Int, data: AppBskyAgeassuranceGetConfig.Output?) {
         let endpoint = "app.bsky.ageassurance.getConfig"
 
-
+        
         let queryItems: [URLQueryItem]? = nil
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -48,7 +48,7 @@ extension ATProtoClient.App.Bsky.Ageassurance {
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
         if (200...299).contains(responseCode) {
-
+            
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -56,13 +56,13 @@ extension ATProtoClient.App.Bsky.Ageassurance {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-
+            
 
             do {
-
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(AppBskyAgeassuranceGetConfig.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -70,12 +70,12 @@ extension ATProtoClient.App.Bsky.Ageassurance {
                 return (responseCode, nil)
             }
         } else {
-
+            
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
+                           
 

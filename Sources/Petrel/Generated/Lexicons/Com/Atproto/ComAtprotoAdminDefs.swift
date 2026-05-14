@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: com.atproto.admin.defs
 
 
-public struct ComAtprotoAdminDefs {
+public struct ComAtprotoAdminDefs { 
 
     public static let typeIdentifier = "com.atproto.admin.defs"
-
+        
 public struct StatusAttr: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "com.atproto.admin.defs#statusAttr"
             public let applied: Bool
@@ -86,7 +86,7 @@ public struct StatusAttr: ATProtocolCodable, ATProtocolValue {
             case ref
         }
     }
-
+        
 public struct AccountView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "com.atproto.admin.defs#accountView"
             public let did: DID
@@ -372,7 +372,7 @@ public struct AccountView: ATProtocolCodable, ATProtocolValue {
             case threatSignatures
         }
     }
-
+        
 public struct RepoRef: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "com.atproto.admin.defs#repoRef"
             public let did: DID
@@ -428,7 +428,7 @@ public struct RepoRef: ATProtocolCodable, ATProtocolValue {
             case did
         }
     }
-
+        
 public struct RepoBlobRef: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "com.atproto.admin.defs#repoBlobRef"
             public let did: DID
@@ -522,7 +522,7 @@ public struct RepoBlobRef: ATProtocolCodable, ATProtocolValue {
             case recordUri
         }
     }
-
+        
 public struct ThreatSignature: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "com.atproto.admin.defs#threatSignature"
             public let property: String
@@ -600,5 +600,5 @@ public struct ThreatSignature: ATProtocolCodable, ATProtocolValue {
 }
 
 
-
+                           
 

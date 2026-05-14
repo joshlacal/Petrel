@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: place.stream.moderation.permission
 
 
-public struct PlaceStreamModerationPermission: ATProtocolCodable, ATProtocolValue {
+public struct PlaceStreamModerationPermission: ATProtocolCodable, ATProtocolValue { 
 
     public static let typeIdentifier = "place.stream.moderation.permission"
         public let moderator: DID
@@ -98,5 +98,5 @@ public struct PlaceStreamModerationPermission: ATProtocolCodable, ATProtocolValu
 }
 
 
-
+                           
 

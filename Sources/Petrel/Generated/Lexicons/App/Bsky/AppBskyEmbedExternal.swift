@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: app.bsky.embed.external
 
 
-public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
+public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue { 
 
     public static let typeIdentifier = "app.bsky.embed.external"
         public let external: External
@@ -50,7 +50,7 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
         private enum CodingKeys: String, CodingKey {
             case external
         }
-
+        
 public struct External: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.embed.external#external"
             public let uri: URI
@@ -160,7 +160,7 @@ public struct External: ATProtocolCodable, ATProtocolValue {
             case thumb
         }
     }
-
+        
 public struct View: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.embed.external#view"
             public let external: ViewExternal
@@ -216,7 +216,7 @@ public struct View: ATProtocolCodable, ATProtocolValue {
             case external
         }
     }
-
+        
 public struct ViewExternal: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.embed.external#viewExternal"
             public let uri: URI
@@ -332,5 +332,5 @@ public struct ViewExternal: ATProtocolCodable, ATProtocolValue {
 }
 
 
-
+                           
 

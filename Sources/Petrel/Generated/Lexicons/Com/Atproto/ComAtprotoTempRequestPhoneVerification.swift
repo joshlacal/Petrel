@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: com.atproto.temp.requestPhoneVerification
 
 
-public struct ComAtprotoTempRequestPhoneVerification {
+public struct ComAtprotoTempRequestPhoneVerification { 
 
     public static let typeIdentifier = "com.atproto.temp.requestPhoneVerification"
 public struct Input: ATProtocolCodable {
@@ -15,7 +15,7 @@ public struct Input: ATProtocolCodable {
         public init(phoneNumber: String) {
             self.phoneNumber = phoneNumber
         }
-
+        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -47,32 +47,32 @@ extension ATProtoClient.Com.Atproto.Temp {
     // MARK: - requestPhoneVerification
 
     /// Request a verification code to be sent to the supplied phone number
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-
-    ///
+    
+    /// 
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func requestPhoneVerification(
-
+        
         input: ComAtprotoTempRequestPhoneVerification.Input
-
+        
     ) async throws -> Int {
         let endpoint = "com.atproto.temp.requestPhoneVerification"
-
+        
         var headers: [String: String] = [:]
-
+        
         headers["Content-Type"] = "application/json"
+        
+        
+        
 
-
-
-
-
+        
         let requestData: Data? = try JSONEncoder().encode(input)
-
-
+        
+        
         let queryItems: [URLQueryItem]? = nil
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
@@ -87,11 +87,11 @@ extension ATProtoClient.Com.Atproto.Temp {
         let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
+        
         return responseCode
-
+        
     }
-
+    
 }
-
+                           
 

@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: app.bsky.draft.defs
 
 
-public struct AppBskyDraftDefs {
+public struct AppBskyDraftDefs { 
 
     public static let typeIdentifier = "app.bsky.draft.defs"
-
+        
 public struct DraftWithId: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.draft.defs#draftWithId"
             public let id: TID
@@ -80,7 +80,7 @@ public struct DraftWithId: ATProtocolCodable, ATProtocolValue {
             case draft
         }
     }
-
+        
 public struct Draft: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.draft.defs#draft"
             public let deviceId: String?
@@ -246,7 +246,7 @@ public struct Draft: ATProtocolCodable, ATProtocolValue {
             case threadgateAllow
         }
     }
-
+        
 public struct DraftPost: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.draft.defs#draftPost"
             public let text: String
@@ -412,7 +412,7 @@ public struct DraftPost: ATProtocolCodable, ATProtocolValue {
             case embedRecords
         }
     }
-
+        
 public struct DraftView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.draft.defs#draftView"
             public let id: TID
@@ -516,7 +516,7 @@ public struct DraftView: ATProtocolCodable, ATProtocolValue {
             case updatedAt
         }
     }
-
+        
 public struct DraftEmbedLocalRef: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.draft.defs#draftEmbedLocalRef"
             public let path: String
@@ -572,7 +572,7 @@ public struct DraftEmbedLocalRef: ATProtocolCodable, ATProtocolValue {
             case path
         }
     }
-
+        
 public struct DraftEmbedCaption: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.draft.defs#draftEmbedCaption"
             public let lang: LanguageCodeContainer
@@ -644,7 +644,7 @@ public struct DraftEmbedCaption: ATProtocolCodable, ATProtocolValue {
             case content
         }
     }
-
+        
 public struct DraftEmbedImage: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.draft.defs#draftEmbedImage"
             public let localRef: DraftEmbedLocalRef
@@ -722,7 +722,7 @@ public struct DraftEmbedImage: ATProtocolCodable, ATProtocolValue {
             case alt
         }
     }
-
+        
 public struct DraftEmbedVideo: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.draft.defs#draftEmbedVideo"
             public let localRef: DraftEmbedLocalRef
@@ -822,7 +822,7 @@ public struct DraftEmbedVideo: ATProtocolCodable, ATProtocolValue {
             case captions
         }
     }
-
+        
 public struct DraftEmbedExternal: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.draft.defs#draftEmbedExternal"
             public let uri: URI
@@ -878,7 +878,7 @@ public struct DraftEmbedExternal: ATProtocolCodable, ATProtocolValue {
             case uri
         }
     }
-
+        
 public struct DraftEmbedRecord: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.draft.defs#draftEmbedRecord"
             public let record: ComAtprotoRepoStrongRef
@@ -986,7 +986,7 @@ public enum DraftPostgateEmbeddingRulesUnion: Codable, ATProtocolCodable, ATProt
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-
+    
     public static func == (lhs: DraftPostgateEmbeddingRulesUnion, rhs: DraftPostgateEmbeddingRulesUnion) -> Bool {
         switch (lhs, rhs) {
         case (.appBskyFeedPostgateDisableRule(let lhsValue),
@@ -998,21 +998,21 @@ public enum DraftPostgateEmbeddingRulesUnion: Codable, ATProtocolCodable, ATProt
             return false
         }
     }
-
+    
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? DraftPostgateEmbeddingRulesUnion else { return false }
         return self == other
     }
-
+    
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-
+        
         switch self {
         case .appBskyFeedPostgateDisableRule(let value):
             map = map.adding(key: "$type", value: "app.bsky.feed.postgate#disableRule")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -1122,7 +1122,7 @@ public enum DraftThreadgateAllowUnion: Codable, ATProtocolCodable, ATProtocolVal
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-
+    
     public static func == (lhs: DraftThreadgateAllowUnion, rhs: DraftThreadgateAllowUnion) -> Bool {
         switch (lhs, rhs) {
         case (.appBskyFeedThreadgateMentionRule(let lhsValue),
@@ -1143,21 +1143,21 @@ public enum DraftThreadgateAllowUnion: Codable, ATProtocolCodable, ATProtocolVal
             return false
         }
     }
-
+    
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? DraftThreadgateAllowUnion else { return false }
         return self == other
     }
-
+    
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-
+        
         switch self {
         case .appBskyFeedThreadgateMentionRule(let value):
             map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#mentionRule")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -1174,7 +1174,7 @@ public enum DraftThreadgateAllowUnion: Codable, ATProtocolCodable, ATProtocolVal
             return map
         case .appBskyFeedThreadgateFollowerRule(let value):
             map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#followerRule")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -1191,7 +1191,7 @@ public enum DraftThreadgateAllowUnion: Codable, ATProtocolCodable, ATProtocolVal
             return map
         case .appBskyFeedThreadgateFollowingRule(let value):
             map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#followingRule")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -1208,7 +1208,7 @@ public enum DraftThreadgateAllowUnion: Codable, ATProtocolCodable, ATProtocolVal
             return map
         case .appBskyFeedThreadgateListRule(let value):
             map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#listRule")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -1279,7 +1279,7 @@ public enum DraftPostLabelsUnion: Codable, ATProtocolCodable, ATProtocolValue, S
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-
+    
     public static func == (lhs: DraftPostLabelsUnion, rhs: DraftPostLabelsUnion) -> Bool {
         switch (lhs, rhs) {
         case (.comAtprotoLabelDefsSelfLabels(let lhsValue),
@@ -1291,21 +1291,21 @@ public enum DraftPostLabelsUnion: Codable, ATProtocolCodable, ATProtocolValue, S
             return false
         }
     }
-
+    
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? DraftPostLabelsUnion else { return false }
         return self == other
     }
-
+    
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-
+        
         switch self {
         case .comAtprotoLabelDefsSelfLabels(let value):
             map = map.adding(key: "$type", value: "com.atproto.label.defs#selfLabels")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -1330,5 +1330,5 @@ public enum DraftPostLabelsUnion: Codable, ATProtocolCodable, ATProtocolValue, S
 }
 
 
-
+                           
 

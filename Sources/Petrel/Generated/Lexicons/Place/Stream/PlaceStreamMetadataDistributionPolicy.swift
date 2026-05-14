@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: place.stream.metadata.distributionPolicy
 
 
-public struct PlaceStreamMetadataDistributionPolicy: ATProtocolCodable, ATProtocolValue {
+public struct PlaceStreamMetadataDistributionPolicy: ATProtocolCodable, ATProtocolValue { 
 
     public static let typeIdentifier = "place.stream.metadata.distributionPolicy"
         public let deleteAfter: Int?
@@ -79,5 +79,5 @@ public struct PlaceStreamMetadataDistributionPolicy: ATProtocolCodable, ATProtoc
 }
 
 
-
+                           
 

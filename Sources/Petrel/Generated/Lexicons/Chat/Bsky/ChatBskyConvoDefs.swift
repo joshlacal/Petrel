@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: chat.bsky.convo.defs
 
 
-public struct ChatBskyConvoDefs {
+public struct ChatBskyConvoDefs { 
 
     public static let typeIdentifier = "chat.bsky.convo.defs"
-
+        
 public struct MessageRef: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#messageRef"
             public let did: DID
@@ -96,7 +96,7 @@ public struct MessageRef: ATProtocolCodable, ATProtocolValue {
             case messageId
         }
     }
-
+        
 public struct MessageInput: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#messageInput"
             public let text: String
@@ -196,7 +196,7 @@ public struct MessageInput: ATProtocolCodable, ATProtocolValue {
             case embed
         }
     }
-
+        
 public struct MessageView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#messageView"
             public let id: String
@@ -382,7 +382,7 @@ public struct MessageView: ATProtocolCodable, ATProtocolValue {
             case sentAt
         }
     }
-
+        
 public struct SystemMessageReferredUser: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#systemMessageReferredUser"
             public let did: DID
@@ -438,7 +438,7 @@ public struct SystemMessageReferredUser: ATProtocolCodable, ATProtocolValue {
             case did
         }
     }
-
+        
 public struct SystemMessageView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#systemMessageView"
             public let id: String
@@ -542,7 +542,7 @@ public struct SystemMessageView: ATProtocolCodable, ATProtocolValue {
             case data
         }
     }
-
+        
 public struct SystemMessageDataAddMember: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#systemMessageDataAddMember"
             public let member: SystemMessageReferredUser
@@ -630,7 +630,7 @@ public struct SystemMessageDataAddMember: ATProtocolCodable, ATProtocolValue {
             case addedBy
         }
     }
-
+        
 public struct SystemMessageDataRemoveMember: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#systemMessageDataRemoveMember"
             public let member: SystemMessageReferredUser
@@ -702,7 +702,7 @@ public struct SystemMessageDataRemoveMember: ATProtocolCodable, ATProtocolValue 
             case removedBy
         }
     }
-
+        
 public struct SystemMessageDataMemberJoin: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#systemMessageDataMemberJoin"
             public let member: SystemMessageReferredUser
@@ -796,7 +796,7 @@ public struct SystemMessageDataMemberJoin: ATProtocolCodable, ATProtocolValue {
             case approvedBy
         }
     }
-
+        
 public struct SystemMessageDataMemberLeave: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#systemMessageDataMemberLeave"
             public let member: SystemMessageReferredUser
@@ -852,7 +852,7 @@ public struct SystemMessageDataMemberLeave: ATProtocolCodable, ATProtocolValue {
             case member
         }
     }
-
+        
 public struct SystemMessageDataLockConvo: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#systemMessageDataLockConvo"
             public let lockedBy: SystemMessageReferredUser
@@ -908,7 +908,7 @@ public struct SystemMessageDataLockConvo: ATProtocolCodable, ATProtocolValue {
             case lockedBy
         }
     }
-
+        
 public struct SystemMessageDataUnlockConvo: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#systemMessageDataUnlockConvo"
             public let unlockedBy: SystemMessageReferredUser
@@ -964,7 +964,7 @@ public struct SystemMessageDataUnlockConvo: ATProtocolCodable, ATProtocolValue {
             case unlockedBy
         }
     }
-
+        
 public struct SystemMessageDataLockConvoPermanently: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#systemMessageDataLockConvoPermanently"
             public let lockedBy: SystemMessageReferredUser
@@ -1020,7 +1020,7 @@ public struct SystemMessageDataLockConvoPermanently: ATProtocolCodable, ATProtoc
             case lockedBy
         }
     }
-
+        
 public struct SystemMessageDataEditGroup: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#systemMessageDataEditGroup"
             public let oldName: String?
@@ -1104,17 +1104,17 @@ public struct SystemMessageDataEditGroup: ATProtocolCodable, ATProtocolValue {
             case newName
         }
     }
-
+        
 public struct SystemMessageDataCreateJoinLink: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#systemMessageDataCreateJoinLink"
 
         public init(
-
+            
         ) {
         }
 
         public init(from decoder: Decoder) throws {
-
+            
             let _ = decoder
         }
 
@@ -1127,7 +1127,7 @@ public struct SystemMessageDataCreateJoinLink: ATProtocolCodable, ATProtocolValu
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-
+            
             return other is Self
         }
 
@@ -1145,17 +1145,17 @@ public struct SystemMessageDataCreateJoinLink: ATProtocolCodable, ATProtocolValu
             case typeIdentifier = "$type"
         }
     }
-
+        
 public struct SystemMessageDataEditJoinLink: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#systemMessageDataEditJoinLink"
 
         public init(
-
+            
         ) {
         }
 
         public init(from decoder: Decoder) throws {
-
+            
             let _ = decoder
         }
 
@@ -1168,7 +1168,7 @@ public struct SystemMessageDataEditJoinLink: ATProtocolCodable, ATProtocolValue 
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-
+            
             return other is Self
         }
 
@@ -1186,17 +1186,17 @@ public struct SystemMessageDataEditJoinLink: ATProtocolCodable, ATProtocolValue 
             case typeIdentifier = "$type"
         }
     }
-
+        
 public struct SystemMessageDataEnableJoinLink: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#systemMessageDataEnableJoinLink"
 
         public init(
-
+            
         ) {
         }
 
         public init(from decoder: Decoder) throws {
-
+            
             let _ = decoder
         }
 
@@ -1209,7 +1209,7 @@ public struct SystemMessageDataEnableJoinLink: ATProtocolCodable, ATProtocolValu
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-
+            
             return other is Self
         }
 
@@ -1227,17 +1227,17 @@ public struct SystemMessageDataEnableJoinLink: ATProtocolCodable, ATProtocolValu
             case typeIdentifier = "$type"
         }
     }
-
+        
 public struct SystemMessageDataDisableJoinLink: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#systemMessageDataDisableJoinLink"
 
         public init(
-
+            
         ) {
         }
 
         public init(from decoder: Decoder) throws {
-
+            
             let _ = decoder
         }
 
@@ -1250,7 +1250,7 @@ public struct SystemMessageDataDisableJoinLink: ATProtocolCodable, ATProtocolVal
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-
+            
             return other is Self
         }
 
@@ -1268,7 +1268,7 @@ public struct SystemMessageDataDisableJoinLink: ATProtocolCodable, ATProtocolVal
             case typeIdentifier = "$type"
         }
     }
-
+        
 public struct DeletedMessageView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#deletedMessageView"
             public let id: String
@@ -1372,7 +1372,7 @@ public struct DeletedMessageView: ATProtocolCodable, ATProtocolValue {
             case sentAt
         }
     }
-
+        
 public struct MessageViewSender: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#messageViewSender"
             public let did: DID
@@ -1428,7 +1428,7 @@ public struct MessageViewSender: ATProtocolCodable, ATProtocolValue {
             case did
         }
     }
-
+        
 public struct ReactionView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#reactionView"
             public let value: String
@@ -1516,7 +1516,7 @@ public struct ReactionView: ATProtocolCodable, ATProtocolValue {
             case createdAt
         }
     }
-
+        
 public struct ReactionViewSender: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#reactionViewSender"
             public let did: DID
@@ -1572,7 +1572,7 @@ public struct ReactionViewSender: ATProtocolCodable, ATProtocolValue {
             case did
         }
     }
-
+        
 public struct MessageAndReactionView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#messageAndReactionView"
             public let message: MessageView
@@ -1644,7 +1644,7 @@ public struct MessageAndReactionView: ATProtocolCodable, ATProtocolValue {
             case reaction
         }
     }
-
+        
 public struct ConvoView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#convoView"
             public let id: String
@@ -1852,17 +1852,17 @@ public struct ConvoView: ATProtocolCodable, ATProtocolValue {
             case kind
         }
     }
-
+        
 public struct DirectConvo: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#directConvo"
 
         public init(
-
+            
         ) {
         }
 
         public init(from decoder: Decoder) throws {
-
+            
             let _ = decoder
         }
 
@@ -1875,7 +1875,7 @@ public struct DirectConvo: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-
+            
             return other is Self
         }
 
@@ -1893,7 +1893,7 @@ public struct DirectConvo: ATProtocolCodable, ATProtocolValue {
             case typeIdentifier = "$type"
         }
     }
-
+        
 public struct GroupConvo: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#groupConvo"
             public let name: String
@@ -2019,7 +2019,7 @@ public struct GroupConvo: ATProtocolCodable, ATProtocolValue {
             case lockStatus
         }
     }
-
+        
 public struct LogBeginConvo: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#logBeginConvo"
             public let rev: String
@@ -2091,7 +2091,7 @@ public struct LogBeginConvo: ATProtocolCodable, ATProtocolValue {
             case convoId
         }
     }
-
+        
 public struct LogAcceptConvo: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#logAcceptConvo"
             public let rev: String
@@ -2163,7 +2163,7 @@ public struct LogAcceptConvo: ATProtocolCodable, ATProtocolValue {
             case convoId
         }
     }
-
+        
 public struct LogLeaveConvo: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#logLeaveConvo"
             public let rev: String
@@ -2235,7 +2235,7 @@ public struct LogLeaveConvo: ATProtocolCodable, ATProtocolValue {
             case convoId
         }
     }
-
+        
 public struct LogMuteConvo: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#logMuteConvo"
             public let rev: String
@@ -2307,7 +2307,7 @@ public struct LogMuteConvo: ATProtocolCodable, ATProtocolValue {
             case convoId
         }
     }
-
+        
 public struct LogUnmuteConvo: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#logUnmuteConvo"
             public let rev: String
@@ -2379,7 +2379,7 @@ public struct LogUnmuteConvo: ATProtocolCodable, ATProtocolValue {
             case convoId
         }
     }
-
+        
 public struct LogCreateMessage: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#logCreateMessage"
             public let rev: String
@@ -2489,7 +2489,7 @@ public struct LogCreateMessage: ATProtocolCodable, ATProtocolValue {
             case relatedProfiles
         }
     }
-
+        
 public struct LogDeleteMessage: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#logDeleteMessage"
             public let rev: String
@@ -2577,7 +2577,7 @@ public struct LogDeleteMessage: ATProtocolCodable, ATProtocolValue {
             case message
         }
     }
-
+        
 public struct LogReadMessage: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#logReadMessage"
             public let rev: String
@@ -2665,7 +2665,7 @@ public struct LogReadMessage: ATProtocolCodable, ATProtocolValue {
             case message
         }
     }
-
+        
 public struct LogAddReaction: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#logAddReaction"
             public let rev: String
@@ -2791,7 +2791,7 @@ public struct LogAddReaction: ATProtocolCodable, ATProtocolValue {
             case relatedProfiles
         }
     }
-
+        
 public struct LogRemoveReaction: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#logRemoveReaction"
             public let rev: String
@@ -2917,7 +2917,7 @@ public struct LogRemoveReaction: ATProtocolCodable, ATProtocolValue {
             case relatedProfiles
         }
     }
-
+        
 public struct LogReadConvo: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#logReadConvo"
             public let rev: String
@@ -3005,7 +3005,7 @@ public struct LogReadConvo: ATProtocolCodable, ATProtocolValue {
             case message
         }
     }
-
+        
 public struct LogAddMember: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#logAddMember"
             public let rev: String
@@ -3109,7 +3109,7 @@ public struct LogAddMember: ATProtocolCodable, ATProtocolValue {
             case relatedProfiles
         }
     }
-
+        
 public struct LogRemoveMember: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#logRemoveMember"
             public let rev: String
@@ -3213,7 +3213,7 @@ public struct LogRemoveMember: ATProtocolCodable, ATProtocolValue {
             case relatedProfiles
         }
     }
-
+        
 public struct LogMemberJoin: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#logMemberJoin"
             public let rev: String
@@ -3317,7 +3317,7 @@ public struct LogMemberJoin: ATProtocolCodable, ATProtocolValue {
             case relatedProfiles
         }
     }
-
+        
 public struct LogMemberLeave: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#logMemberLeave"
             public let rev: String
@@ -3421,7 +3421,7 @@ public struct LogMemberLeave: ATProtocolCodable, ATProtocolValue {
             case relatedProfiles
         }
     }
-
+        
 public struct LogLockConvo: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#logLockConvo"
             public let rev: String
@@ -3525,7 +3525,7 @@ public struct LogLockConvo: ATProtocolCodable, ATProtocolValue {
             case relatedProfiles
         }
     }
-
+        
 public struct LogUnlockConvo: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#logUnlockConvo"
             public let rev: String
@@ -3629,7 +3629,7 @@ public struct LogUnlockConvo: ATProtocolCodable, ATProtocolValue {
             case relatedProfiles
         }
     }
-
+        
 public struct LogLockConvoPermanently: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#logLockConvoPermanently"
             public let rev: String
@@ -3733,7 +3733,7 @@ public struct LogLockConvoPermanently: ATProtocolCodable, ATProtocolValue {
             case relatedProfiles
         }
     }
-
+        
 public struct LogEditGroup: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#logEditGroup"
             public let rev: String
@@ -3821,7 +3821,7 @@ public struct LogEditGroup: ATProtocolCodable, ATProtocolValue {
             case message
         }
     }
-
+        
 public struct LogCreateJoinLink: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#logCreateJoinLink"
             public let rev: String
@@ -3909,7 +3909,7 @@ public struct LogCreateJoinLink: ATProtocolCodable, ATProtocolValue {
             case message
         }
     }
-
+        
 public struct LogEditJoinLink: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#logEditJoinLink"
             public let rev: String
@@ -3997,7 +3997,7 @@ public struct LogEditJoinLink: ATProtocolCodable, ATProtocolValue {
             case message
         }
     }
-
+        
 public struct LogEnableJoinLink: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#logEnableJoinLink"
             public let rev: String
@@ -4085,7 +4085,7 @@ public struct LogEnableJoinLink: ATProtocolCodable, ATProtocolValue {
             case message
         }
     }
-
+        
 public struct LogDisableJoinLink: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#logDisableJoinLink"
             public let rev: String
@@ -4173,7 +4173,7 @@ public struct LogDisableJoinLink: ATProtocolCodable, ATProtocolValue {
             case message
         }
     }
-
+        
 public struct LogIncomingJoinRequest: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#logIncomingJoinRequest"
             public let rev: String
@@ -4261,7 +4261,7 @@ public struct LogIncomingJoinRequest: ATProtocolCodable, ATProtocolValue {
             case member
         }
     }
-
+        
 public struct LogApproveJoinRequest: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#logApproveJoinRequest"
             public let rev: String
@@ -4349,7 +4349,7 @@ public struct LogApproveJoinRequest: ATProtocolCodable, ATProtocolValue {
             case member
         }
     }
-
+        
 public struct LogRejectJoinRequest: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#logRejectJoinRequest"
             public let rev: String
@@ -4437,7 +4437,7 @@ public struct LogRejectJoinRequest: ATProtocolCodable, ATProtocolValue {
             case member
         }
     }
-
+        
 public struct LogOutgoingJoinRequest: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.convo.defs#logOutgoingJoinRequest"
             public let rev: String
@@ -4514,38 +4514,38 @@ public struct LogOutgoingJoinRequest: ATProtocolCodable, ATProtocolValue {
 
 public struct ConvoKind: Codable, ATProtocolCodable, ATProtocolValue {
             public let rawValue: String
-
+            
             // Predefined constants
-            //
+            // 
             public static let direct = ConvoKind(rawValue: "direct")
-            //
+            // 
             public static let group = ConvoKind(rawValue: "group")
-
+            
             public init(rawValue: String) {
                 self.rawValue = rawValue
             }
-
+            
             public init(from decoder: Decoder) throws {
                 let container = try decoder.singleValueContainer()
                 rawValue = try container.decode(String.self)
             }
-
+            
             public func encode(to encoder: Encoder) throws {
                 var container = encoder.singleValueContainer()
                 try container.encode(rawValue)
             }
-
+            
             public func isEqual(to other: any ATProtocolValue) -> Bool {
                 guard let otherValue = other as? ConvoKind else { return false }
                 return self.rawValue == otherValue.rawValue
             }
-
+            
             // DAGCBOR encoding with field ordering
             public func toCBORValue() throws -> Any {
                 // For string-based enum types, we return the raw string value directly
                 return rawValue
             }
-
+            
             // Provide allCases-like functionality
             public static var predefinedValues: [ConvoKind] {
                 return [
@@ -4558,40 +4558,40 @@ public struct ConvoKind: Codable, ATProtocolCodable, ATProtocolValue {
 
 public struct ConvoLockStatus: Codable, ATProtocolCodable, ATProtocolValue {
             public let rawValue: String
-
+            
             // Predefined constants
-            //
+            // 
             public static let unlocked = ConvoLockStatus(rawValue: "unlocked")
-            //
+            // 
             public static let locked = ConvoLockStatus(rawValue: "locked")
-            //
+            // 
             public static let lockeddashpermanently = ConvoLockStatus(rawValue: "locked-permanently")
-
+            
             public init(rawValue: String) {
                 self.rawValue = rawValue
             }
-
+            
             public init(from decoder: Decoder) throws {
                 let container = try decoder.singleValueContainer()
                 rawValue = try container.decode(String.self)
             }
-
+            
             public func encode(to encoder: Encoder) throws {
                 var container = encoder.singleValueContainer()
                 try container.encode(rawValue)
             }
-
+            
             public func isEqual(to other: any ATProtocolValue) -> Bool {
                 guard let otherValue = other as? ConvoLockStatus else { return false }
                 return self.rawValue == otherValue.rawValue
             }
-
+            
             // DAGCBOR encoding with field ordering
             public func toCBORValue() throws -> Any {
                 // For string-based enum types, we return the raw string value directly
                 return rawValue
             }
-
+            
             // Provide allCases-like functionality
             public static var predefinedValues: [ConvoLockStatus] {
                 return [
@@ -4605,38 +4605,38 @@ public struct ConvoLockStatus: Codable, ATProtocolCodable, ATProtocolValue {
 
 public struct ConvoStatus: Codable, ATProtocolCodable, ATProtocolValue {
             public let rawValue: String
-
+            
             // Predefined constants
-            //
+            // 
             public static let request = ConvoStatus(rawValue: "request")
-            //
+            // 
             public static let accepted = ConvoStatus(rawValue: "accepted")
-
+            
             public init(rawValue: String) {
                 self.rawValue = rawValue
             }
-
+            
             public init(from decoder: Decoder) throws {
                 let container = try decoder.singleValueContainer()
                 rawValue = try container.decode(String.self)
             }
-
+            
             public func encode(to encoder: Encoder) throws {
                 var container = encoder.singleValueContainer()
                 try container.encode(rawValue)
             }
-
+            
             public func isEqual(to other: any ATProtocolValue) -> Bool {
                 guard let otherValue = other as? ConvoStatus else { return false }
                 return self.rawValue == otherValue.rawValue
             }
-
+            
             // DAGCBOR encoding with field ordering
             public func toCBORValue() throws -> Any {
                 // For string-based enum types, we return the raw string value directly
                 return rawValue
             }
-
+            
             // Provide allCases-like functionality
             public static var predefinedValues: [ConvoStatus] {
                 return [
@@ -4696,7 +4696,7 @@ public enum MessageInputEmbedUnion: Codable, ATProtocolCodable, ATProtocolValue,
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-
+    
     public static func == (lhs: MessageInputEmbedUnion, rhs: MessageInputEmbedUnion) -> Bool {
         switch (lhs, rhs) {
         case (.appBskyEmbedRecord(let lhsValue),
@@ -4708,21 +4708,21 @@ public enum MessageInputEmbedUnion: Codable, ATProtocolCodable, ATProtocolValue,
             return false
         }
     }
-
+    
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? MessageInputEmbedUnion else { return false }
         return self == other
     }
-
+    
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-
+        
         switch self {
         case .appBskyEmbedRecord(let value):
             map = map.adding(key: "$type", value: "app.bsky.embed.record")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -4792,7 +4792,7 @@ public indirect enum MessageViewEmbedUnion: Codable, ATProtocolCodable, ATProtoc
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-
+    
     public static func == (lhs: MessageViewEmbedUnion, rhs: MessageViewEmbedUnion) -> Bool {
         switch (lhs, rhs) {
         case (.appBskyEmbedRecordView(let lhsValue),
@@ -4804,21 +4804,21 @@ public indirect enum MessageViewEmbedUnion: Codable, ATProtocolCodable, ATProtoc
             return false
         }
     }
-
+    
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? MessageViewEmbedUnion else { return false }
         return self == other
     }
-
+    
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-
+        
         switch self {
         case .appBskyEmbedRecordView(let value):
             map = map.adding(key: "$type", value: "app.bsky.embed.record#view")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -5032,7 +5032,7 @@ public enum SystemMessageViewDataUnion: Codable, ATProtocolCodable, ATProtocolVa
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-
+    
     public static func == (lhs: SystemMessageViewDataUnion, rhs: SystemMessageViewDataUnion) -> Bool {
         switch (lhs, rhs) {
         case (.chatBskyConvoDefsSystemMessageDataAddMember(let lhsValue),
@@ -5077,21 +5077,21 @@ public enum SystemMessageViewDataUnion: Codable, ATProtocolCodable, ATProtocolVa
             return false
         }
     }
-
+    
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? SystemMessageViewDataUnion else { return false }
         return self == other
     }
-
+    
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-
+        
         switch self {
         case .chatBskyConvoDefsSystemMessageDataAddMember(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#systemMessageDataAddMember")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -5108,7 +5108,7 @@ public enum SystemMessageViewDataUnion: Codable, ATProtocolCodable, ATProtocolVa
             return map
         case .chatBskyConvoDefsSystemMessageDataRemoveMember(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#systemMessageDataRemoveMember")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -5125,7 +5125,7 @@ public enum SystemMessageViewDataUnion: Codable, ATProtocolCodable, ATProtocolVa
             return map
         case .chatBskyConvoDefsSystemMessageDataMemberJoin(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#systemMessageDataMemberJoin")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -5142,7 +5142,7 @@ public enum SystemMessageViewDataUnion: Codable, ATProtocolCodable, ATProtocolVa
             return map
         case .chatBskyConvoDefsSystemMessageDataMemberLeave(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#systemMessageDataMemberLeave")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -5159,7 +5159,7 @@ public enum SystemMessageViewDataUnion: Codable, ATProtocolCodable, ATProtocolVa
             return map
         case .chatBskyConvoDefsSystemMessageDataLockConvo(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#systemMessageDataLockConvo")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -5176,7 +5176,7 @@ public enum SystemMessageViewDataUnion: Codable, ATProtocolCodable, ATProtocolVa
             return map
         case .chatBskyConvoDefsSystemMessageDataUnlockConvo(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#systemMessageDataUnlockConvo")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -5193,7 +5193,7 @@ public enum SystemMessageViewDataUnion: Codable, ATProtocolCodable, ATProtocolVa
             return map
         case .chatBskyConvoDefsSystemMessageDataLockConvoPermanently(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#systemMessageDataLockConvoPermanently")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -5210,7 +5210,7 @@ public enum SystemMessageViewDataUnion: Codable, ATProtocolCodable, ATProtocolVa
             return map
         case .chatBskyConvoDefsSystemMessageDataEditGroup(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#systemMessageDataEditGroup")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -5227,7 +5227,7 @@ public enum SystemMessageViewDataUnion: Codable, ATProtocolCodable, ATProtocolVa
             return map
         case .chatBskyConvoDefsSystemMessageDataCreateJoinLink(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#systemMessageDataCreateJoinLink")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -5244,7 +5244,7 @@ public enum SystemMessageViewDataUnion: Codable, ATProtocolCodable, ATProtocolVa
             return map
         case .chatBskyConvoDefsSystemMessageDataEditJoinLink(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#systemMessageDataEditJoinLink")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -5261,7 +5261,7 @@ public enum SystemMessageViewDataUnion: Codable, ATProtocolCodable, ATProtocolVa
             return map
         case .chatBskyConvoDefsSystemMessageDataEnableJoinLink(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#systemMessageDataEnableJoinLink")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -5278,7 +5278,7 @@ public enum SystemMessageViewDataUnion: Codable, ATProtocolCodable, ATProtocolVa
             return map
         case .chatBskyConvoDefsSystemMessageDataDisableJoinLink(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#systemMessageDataDisableJoinLink")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -5374,7 +5374,7 @@ public indirect enum ConvoViewLastMessageUnion: Codable, ATProtocolCodable, ATPr
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-
+    
     public static func == (lhs: ConvoViewLastMessageUnion, rhs: ConvoViewLastMessageUnion) -> Bool {
         switch (lhs, rhs) {
         case (.chatBskyConvoDefsMessageView(let lhsValue),
@@ -5392,21 +5392,21 @@ public indirect enum ConvoViewLastMessageUnion: Codable, ATProtocolCodable, ATPr
             return false
         }
     }
-
+    
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? ConvoViewLastMessageUnion else { return false }
         return self == other
     }
-
+    
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-
+        
         switch self {
         case .chatBskyConvoDefsMessageView(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#messageView")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -5423,7 +5423,7 @@ public indirect enum ConvoViewLastMessageUnion: Codable, ATProtocolCodable, ATPr
             return map
         case .chatBskyConvoDefsDeletedMessageView(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#deletedMessageView")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -5440,7 +5440,7 @@ public indirect enum ConvoViewLastMessageUnion: Codable, ATProtocolCodable, ATPr
             return map
         case .chatBskyConvoDefsSystemMessageView(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#systemMessageView")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -5511,7 +5511,7 @@ public enum ConvoViewLastReactionUnion: Codable, ATProtocolCodable, ATProtocolVa
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-
+    
     public static func == (lhs: ConvoViewLastReactionUnion, rhs: ConvoViewLastReactionUnion) -> Bool {
         switch (lhs, rhs) {
         case (.chatBskyConvoDefsMessageAndReactionView(let lhsValue),
@@ -5523,21 +5523,21 @@ public enum ConvoViewLastReactionUnion: Codable, ATProtocolCodable, ATProtocolVa
             return false
         }
     }
-
+    
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? ConvoViewLastReactionUnion else { return false }
         return self == other
     }
-
+    
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-
+        
         switch self {
         case .chatBskyConvoDefsMessageAndReactionView(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#messageAndReactionView")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -5621,7 +5621,7 @@ public enum ConvoViewKindUnion: Codable, ATProtocolCodable, ATProtocolValue, Sen
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-
+    
     public static func == (lhs: ConvoViewKindUnion, rhs: ConvoViewKindUnion) -> Bool {
         switch (lhs, rhs) {
         case (.chatBskyConvoDefsDirectConvo(let lhsValue),
@@ -5636,21 +5636,21 @@ public enum ConvoViewKindUnion: Codable, ATProtocolCodable, ATProtocolValue, Sen
             return false
         }
     }
-
+    
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? ConvoViewKindUnion else { return false }
         return self == other
     }
-
+    
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-
+        
         switch self {
         case .chatBskyConvoDefsDirectConvo(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#directConvo")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -5667,7 +5667,7 @@ public enum ConvoViewKindUnion: Codable, ATProtocolCodable, ATProtocolValue, Sen
             return map
         case .chatBskyConvoDefsGroupConvo(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#groupConvo")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -5750,7 +5750,7 @@ public indirect enum LogCreateMessageMessageUnion: Codable, ATProtocolCodable, A
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-
+    
     public static func == (lhs: LogCreateMessageMessageUnion, rhs: LogCreateMessageMessageUnion) -> Bool {
         switch (lhs, rhs) {
         case (.chatBskyConvoDefsMessageView(let lhsValue),
@@ -5765,21 +5765,21 @@ public indirect enum LogCreateMessageMessageUnion: Codable, ATProtocolCodable, A
             return false
         }
     }
-
+    
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? LogCreateMessageMessageUnion else { return false }
         return self == other
     }
-
+    
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-
+        
         switch self {
         case .chatBskyConvoDefsMessageView(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#messageView")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -5796,7 +5796,7 @@ public indirect enum LogCreateMessageMessageUnion: Codable, ATProtocolCodable, A
             return map
         case .chatBskyConvoDefsDeletedMessageView(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#deletedMessageView")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -5879,7 +5879,7 @@ public indirect enum LogDeleteMessageMessageUnion: Codable, ATProtocolCodable, A
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-
+    
     public static func == (lhs: LogDeleteMessageMessageUnion, rhs: LogDeleteMessageMessageUnion) -> Bool {
         switch (lhs, rhs) {
         case (.chatBskyConvoDefsMessageView(let lhsValue),
@@ -5894,21 +5894,21 @@ public indirect enum LogDeleteMessageMessageUnion: Codable, ATProtocolCodable, A
             return false
         }
     }
-
+    
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? LogDeleteMessageMessageUnion else { return false }
         return self == other
     }
-
+    
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-
+        
         switch self {
         case .chatBskyConvoDefsMessageView(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#messageView")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -5925,7 +5925,7 @@ public indirect enum LogDeleteMessageMessageUnion: Codable, ATProtocolCodable, A
             return map
         case .chatBskyConvoDefsDeletedMessageView(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#deletedMessageView")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -6021,7 +6021,7 @@ public indirect enum LogReadMessageMessageUnion: Codable, ATProtocolCodable, ATP
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-
+    
     public static func == (lhs: LogReadMessageMessageUnion, rhs: LogReadMessageMessageUnion) -> Bool {
         switch (lhs, rhs) {
         case (.chatBskyConvoDefsMessageView(let lhsValue),
@@ -6039,21 +6039,21 @@ public indirect enum LogReadMessageMessageUnion: Codable, ATProtocolCodable, ATP
             return false
         }
     }
-
+    
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? LogReadMessageMessageUnion else { return false }
         return self == other
     }
-
+    
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-
+        
         switch self {
         case .chatBskyConvoDefsMessageView(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#messageView")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -6070,7 +6070,7 @@ public indirect enum LogReadMessageMessageUnion: Codable, ATProtocolCodable, ATP
             return map
         case .chatBskyConvoDefsDeletedMessageView(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#deletedMessageView")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -6087,7 +6087,7 @@ public indirect enum LogReadMessageMessageUnion: Codable, ATProtocolCodable, ATP
             return map
         case .chatBskyConvoDefsSystemMessageView(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#systemMessageView")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -6170,7 +6170,7 @@ public indirect enum LogAddReactionMessageUnion: Codable, ATProtocolCodable, ATP
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-
+    
     public static func == (lhs: LogAddReactionMessageUnion, rhs: LogAddReactionMessageUnion) -> Bool {
         switch (lhs, rhs) {
         case (.chatBskyConvoDefsMessageView(let lhsValue),
@@ -6185,21 +6185,21 @@ public indirect enum LogAddReactionMessageUnion: Codable, ATProtocolCodable, ATP
             return false
         }
     }
-
+    
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? LogAddReactionMessageUnion else { return false }
         return self == other
     }
-
+    
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-
+        
         switch self {
         case .chatBskyConvoDefsMessageView(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#messageView")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -6216,7 +6216,7 @@ public indirect enum LogAddReactionMessageUnion: Codable, ATProtocolCodable, ATP
             return map
         case .chatBskyConvoDefsDeletedMessageView(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#deletedMessageView")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -6299,7 +6299,7 @@ public indirect enum LogRemoveReactionMessageUnion: Codable, ATProtocolCodable, 
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-
+    
     public static func == (lhs: LogRemoveReactionMessageUnion, rhs: LogRemoveReactionMessageUnion) -> Bool {
         switch (lhs, rhs) {
         case (.chatBskyConvoDefsMessageView(let lhsValue),
@@ -6314,21 +6314,21 @@ public indirect enum LogRemoveReactionMessageUnion: Codable, ATProtocolCodable, 
             return false
         }
     }
-
+    
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? LogRemoveReactionMessageUnion else { return false }
         return self == other
     }
-
+    
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-
+        
         switch self {
         case .chatBskyConvoDefsMessageView(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#messageView")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -6345,7 +6345,7 @@ public indirect enum LogRemoveReactionMessageUnion: Codable, ATProtocolCodable, 
             return map
         case .chatBskyConvoDefsDeletedMessageView(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#deletedMessageView")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -6441,7 +6441,7 @@ public indirect enum LogReadConvoMessageUnion: Codable, ATProtocolCodable, ATPro
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-
+    
     public static func == (lhs: LogReadConvoMessageUnion, rhs: LogReadConvoMessageUnion) -> Bool {
         switch (lhs, rhs) {
         case (.chatBskyConvoDefsMessageView(let lhsValue),
@@ -6459,21 +6459,21 @@ public indirect enum LogReadConvoMessageUnion: Codable, ATProtocolCodable, ATPro
             return false
         }
     }
-
+    
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? LogReadConvoMessageUnion else { return false }
         return self == other
     }
-
+    
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-
+        
         switch self {
         case .chatBskyConvoDefsMessageView(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#messageView")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -6490,7 +6490,7 @@ public indirect enum LogReadConvoMessageUnion: Codable, ATProtocolCodable, ATPro
             return map
         case .chatBskyConvoDefsDeletedMessageView(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#deletedMessageView")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -6507,7 +6507,7 @@ public indirect enum LogReadConvoMessageUnion: Codable, ATProtocolCodable, ATPro
             return map
         case .chatBskyConvoDefsSystemMessageView(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#systemMessageView")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -6532,5 +6532,5 @@ public indirect enum LogReadConvoMessageUnion: Codable, ATProtocolCodable, ATPro
 }
 
 
-
+                           
 

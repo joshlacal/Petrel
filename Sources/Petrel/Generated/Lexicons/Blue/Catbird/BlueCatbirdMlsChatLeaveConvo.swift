@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: blue.catbird.mlsChat.leaveConvo
 
 
-public struct BlueCatbirdMlsChatLeaveConvo {
+public struct BlueCatbirdMlsChatLeaveConvo { 
 
     public static let typeIdentifier = "blue.catbird.mlsChat.leaveConvo"
 public struct Input: ATProtocolCodable {
@@ -19,7 +19,7 @@ public struct Input: ATProtocolCodable {
             self.targetDid = targetDid
             self.commit = commit
         }
-
+        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -56,87 +56,87 @@ public struct Input: ATProtocolCodable {
             case commit
         }
     }
-
+    
 public struct Output: ATProtocolCodable {
-
-
+        
+        
         public let success: Bool
-
+        
         public let newEpoch: Int
-
-
-
+        
+        
+        
         // Standard public initializer
         public init(
-
-
+            
+            
             success: Bool,
-
+            
             newEpoch: Int
-
-
+            
+            
         ) {
-
-
+            
+            
             self.success = success
-
+            
             self.newEpoch = newEpoch
-
-
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
-
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            
             self.success = try container.decode(Bool.self, forKey: .success)
-
-
+            
+            
             self.newEpoch = try container.decode(Int.self, forKey: .newEpoch)
-
-
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
-
+            
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
             try container.encode(success, forKey: .success)
-
-
+            
+            
             try container.encode(newEpoch, forKey: .newEpoch)
-
-
+            
+            
         }
 
         public func toCBORValue() throws -> Any {
-
+            
             var map = OrderedCBORMap()
 
-
-
+            
+            
             let successValue = try success.toCBORValue()
             map = map.adding(key: "success", value: successValue)
-
-
-
+            
+            
+            
             let newEpochValue = try newEpoch.toCBORValue()
             map = map.adding(key: "newEpoch", value: newEpochValue)
-
-
+            
+            
 
             return map
-
+            
         }
-
-
+        
+        
         private enum CodingKeys: String, CodingKey {
             case success
             case newEpoch
         }
-
+        
     }
-
+        
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case convoNotFound = "ConvoNotFound.Conversation not found"
                 case notMember = "NotMember.Caller is not a member of the conversation"
@@ -162,34 +162,34 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - leaveConvo
 
     /// Leave or remove a member from an MLS conversation (consolidates leaveConvo + removeMember) Leave an MLS conversation or remove another member (admin only). When targetDid is omitted, the caller leaves. When targetDid is provided, the caller must be an admin to remove that member.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-
-    ///
+    
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func leaveConvo(
-
+        
         input: BlueCatbirdMlsChatLeaveConvo.Input
-
+        
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatLeaveConvo.Output?) {
         let endpoint = "blue.catbird.mlsChat.leaveConvo"
-
+        
         var headers: [String: String] = [:]
-
+        
         headers["Content-Type"] = "application/json"
-
-
-
+        
+        
+        
         headers["Accept"] = "application/json"
+        
 
-
-
+        
         let requestData: Data? = try JSONEncoder().encode(input)
-
-
+        
+        
         let queryItems: [URLQueryItem]? = nil
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
@@ -204,12 +204,12 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
+        
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
         if (200...299).contains(responseCode) {
-
+            
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -217,13 +217,13 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-
+            
 
             do {
-
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatLeaveConvo.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -234,9 +234,9 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-
+        
     }
-
+    
 }
-
+                           
 

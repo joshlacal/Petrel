@@ -5,17 +5,17 @@ import Foundation
 // lexicon: 1, id: place.stream.live.subscribeSegments
 
 
-public struct PlaceStreamLiveSubscribeSegments {
+public struct PlaceStreamLiveSubscribeSegments { 
 
-    public static let typeIdentifier = "place.stream.live.subscribeSegments"
+    public static let typeIdentifier = "place.stream.live.subscribeSegments"    
 public struct Parameters: Parametrizable {
         public let streamer: String
-
+        
         public init(
             streamer: String
             ) {
             self.streamer = streamer
-
+            
         }
     }
 public enum Message: Codable, Sendable {
@@ -30,7 +30,7 @@ public enum Message: Codable, Sendable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let type = try container.decode(String.self, forKey: .type)
-
+        
         switch type {
 
         case "place.stream.live.subscribeSegments#segment":
@@ -61,12 +61,12 @@ public enum Message: Codable, Sendable {
 }
 
 
-
+                           
 
 /// Subscribe to a stream's new segments as they come in!
 
 extension ATProtoClient.Place.Stream.Live {
-
+    
     public func subscribeSegments(
         streamer: String
     ) async throws -> AsyncThrowingStream<PlaceStreamLiveSubscribeSegments.Message, Error> {
@@ -84,5 +84,5 @@ extension ATProtoClient.Place.Stream.Live {
             parameters: input
         )
     }
-
+    
 }

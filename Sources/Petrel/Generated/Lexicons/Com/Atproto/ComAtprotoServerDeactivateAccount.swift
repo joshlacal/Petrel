@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: com.atproto.server.deactivateAccount
 
 
-public struct ComAtprotoServerDeactivateAccount {
+public struct ComAtprotoServerDeactivateAccount { 
 
     public static let typeIdentifier = "com.atproto.server.deactivateAccount"
 public struct Input: ATProtocolCodable {
@@ -15,7 +15,7 @@ public struct Input: ATProtocolCodable {
         public init(deleteAfter: ATProtocolDate? = nil) {
             self.deleteAfter = deleteAfter
         }
-
+        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -49,32 +49,32 @@ extension ATProtoClient.Com.Atproto.Server {
     // MARK: - deactivateAccount
 
     /// Deactivates a currently active account. Stops serving of repo, and future writes to repo until reactivated. Used to finalize account migration with the old host after the account has been activated on the new host.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-
-    ///
+    
+    /// 
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func deactivateAccount(
-
+        
         input: ComAtprotoServerDeactivateAccount.Input
-
+        
     ) async throws -> Int {
         let endpoint = "com.atproto.server.deactivateAccount"
-
+        
         var headers: [String: String] = [:]
-
+        
         headers["Content-Type"] = "application/json"
+        
+        
+        
 
-
-
-
-
+        
         let requestData: Data? = try JSONEncoder().encode(input)
-
-
+        
+        
         let queryItems: [URLQueryItem]? = nil
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
@@ -89,11 +89,11 @@ extension ATProtoClient.Com.Atproto.Server {
         let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
+        
         return responseCode
-
+        
     }
-
+    
 }
-
+                           
 

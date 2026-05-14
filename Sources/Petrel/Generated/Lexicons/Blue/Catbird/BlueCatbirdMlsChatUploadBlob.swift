@@ -12,17 +12,17 @@ import AppKit
 // lexicon: 1, id: blue.catbird.mlsChat.uploadBlob
 
 
-public struct BlueCatbirdMlsChatUploadBlob {
+public struct BlueCatbirdMlsChatUploadBlob { 
 
-    public static let typeIdentifier = "blue.catbird.mlsChat.uploadBlob"
+    public static let typeIdentifier = "blue.catbird.mlsChat.uploadBlob"    
 public struct Parameters: Parametrizable {
         public let convoId: String
-
+        
         public init(
             convoId: String
             ) {
             self.convoId = convoId
-
+            
         }
     }
 public struct Input: ATProtocolCodable {
@@ -32,7 +32,7 @@ public struct Input: ATProtocolCodable {
         public init(data: Data) {
             self.data = data
         }
-
+        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -55,87 +55,87 @@ public struct Input: ATProtocolCodable {
             case data
         }
     }
-
+    
 public struct Output: ATProtocolCodable {
-
-
+        
+        
         public let blobId: String
-
+        
         public let size: Int
-
-
-
+        
+        
+        
         // Standard public initializer
         public init(
-
-
+            
+            
             blobId: String,
-
+            
             size: Int
-
-
+            
+            
         ) {
-
-
+            
+            
             self.blobId = blobId
-
+            
             self.size = size
-
-
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
-
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            
             self.blobId = try container.decode(String.self, forKey: .blobId)
-
-
+            
+            
             self.size = try container.decode(Int.self, forKey: .size)
-
-
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
-
+            
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
             try container.encode(blobId, forKey: .blobId)
-
-
+            
+            
             try container.encode(size, forKey: .size)
-
-
+            
+            
         }
 
         public func toCBORValue() throws -> Any {
-
+            
             var map = OrderedCBORMap()
 
-
-
+            
+            
             let blobIdValue = try blobId.toCBORValue()
             map = map.adding(key: "blobId", value: blobIdValue)
-
-
-
+            
+            
+            
             let sizeValue = try size.toCBORValue()
             map = map.adding(key: "size", value: sizeValue)
-
-
+            
+            
 
             return map
-
+            
         }
-
-
+        
+        
         private enum CodingKeys: String, CodingKey {
             case blobId
             case size
         }
-
+        
     }
-
+        
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case quotaExceeded = "QuotaExceeded.User's blob storage quota has been exceeded (500MB per user)"
                 case blobTooLarge = "BlobTooLarge.Blob exceeds maximum size (10MB)"
@@ -159,25 +159,25 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - uploadBlob
 
     /// Upload an encrypted blob for image DM attachments Upload an encrypted blob to the blob store. The server assigns a blobId (UUIDv4) on success. Content-Type must be application/octet-stream. The blob bytes are opaque encrypted data — the server never sees plaintext. The uploader must be an active member of the target conversation.
-    ///
+    /// 
     /// - Parameters:
     ///   - data: The binary data to upload
     ///   - mimeType: The MIME type of the data being uploaded
     ///   - stripMetadata: Whether to strip metadata from images (default: true)
     ///   - params: The query parameters for the request
-    ///
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func uploadBlob(
-
+        
         data: Data,
         mimeType: String,
         stripMetadata: Bool = true,
         params: BlueCatbirdMlsChatUploadBlob.Parameters
-
+        
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatUploadBlob.Output?) {
         let endpoint = "blue.catbird.mlsChat.uploadBlob"
-
+        
         var dataToUpload = data
         if stripMetadata, let strippedData = ImageMetadataStripper.stripMetadata(from: dataToUpload) {
             dataToUpload = strippedData
@@ -189,15 +189,15 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             "Content-Type": mimeType,
             "Content-Length": "\(dataToUpload.count)"
         ]
-
-
+        
+        
         headers["Accept"] = "application/json"
+        
 
-
-
-
+        
+        
         let queryItems = params.asQueryItems()
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
@@ -212,12 +212,12 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
+        
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
         if (200...299).contains(responseCode) {
-
+            
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -225,13 +225,13 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-
+            
 
             do {
-
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatUploadBlob.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -242,9 +242,9 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-
+        
     }
-
+    
     /// Compresses an image while maintaining reasonable quality
     /// - Parameters:
     ///   - imageData: The original image data
@@ -277,7 +277,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         return nil
         #endif
     }
-
+    
 }
-
+                           
 

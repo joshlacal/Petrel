@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: app.bsky.graph.verification
 
 
-public struct AppBskyGraphVerification: ATProtocolCodable, ATProtocolValue {
+public struct AppBskyGraphVerification: ATProtocolCodable, ATProtocolValue { 
 
     public static let typeIdentifier = "app.bsky.graph.verification"
         public let subject: DID
@@ -92,5 +92,5 @@ public struct AppBskyGraphVerification: ATProtocolCodable, ATProtocolValue {
 }
 
 
-
+                           
 

@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: com.atproto.sync.subscribeRepos
 
 
-public struct ComAtprotoSyncSubscribeRepos {
+public struct ComAtprotoSyncSubscribeRepos { 
 
     public static let typeIdentifier = "com.atproto.sync.subscribeRepos"
-
+        
 public struct Commit: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "com.atproto.sync.subscribeRepos#commit"
             public let seq: Int
@@ -246,7 +246,7 @@ public struct Commit: ATProtocolCodable, ATProtocolValue {
             case time
         }
     }
-
+        
 public struct Sync: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "com.atproto.sync.subscribeRepos#sync"
             public let seq: Int
@@ -366,7 +366,7 @@ public struct Sync: ATProtocolCodable, ATProtocolValue {
             case time
         }
     }
-
+        
 public struct Identity: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "com.atproto.sync.subscribeRepos#identity"
             public let seq: Int
@@ -476,7 +476,7 @@ public struct Identity: ATProtocolCodable, ATProtocolValue {
             case handle
         }
     }
-
+        
 public struct Account: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "com.atproto.sync.subscribeRepos#account"
             public let seq: Int
@@ -602,7 +602,7 @@ public struct Account: ATProtocolCodable, ATProtocolValue {
             case status
         }
     }
-
+        
 public struct Info: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "com.atproto.sync.subscribeRepos#info"
             public let name: String
@@ -680,7 +680,7 @@ public struct Info: ATProtocolCodable, ATProtocolValue {
             case message
         }
     }
-
+        
 public struct RepoOp: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "com.atproto.sync.subscribeRepos#repoOp"
             public let action: String
@@ -789,15 +789,15 @@ public struct RepoOp: ATProtocolCodable, ATProtocolValue {
             case cid
             case prev
         }
-    }
+    }    
 public struct Parameters: Parametrizable {
         public let cursor: Int?
-
+        
         public init(
             cursor: Int? = nil
             ) {
             self.cursor = cursor
-
+            
         }
     }
 public enum Message: Codable, Sendable {
@@ -820,7 +820,7 @@ public enum Message: Codable, Sendable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let type = try container.decode(String.self, forKey: .type)
-
+        
         switch type {
 
         case "com.atproto.sync.subscribeRepos#commit":
@@ -872,7 +872,7 @@ public enum Message: Codable, Sendable {
 
         }
     }
-}
+}        
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case futureCursor = "FutureCursor."
                 case consumerTooSlow = "ConsumerTooSlow.If the consumer of the stream can not keep up with events, and a backlog gets too large, the server will drop the connection."
@@ -892,12 +892,12 @@ public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertibl
 }
 
 
-
+                           
 
 /// Repository event stream, aka Firehose endpoint. Outputs repo commits with diff data, and identity update events, for all repositories on the current server. See the atproto specifications for details around stream sequencing, repo versioning, CAR diff format, and more. Public and does not require auth; implemented by PDS and Relay.
 
 extension ATProtoClient.Com.Atproto.Sync {
-
+    
     public func subscribeRepos(
         cursor: Int? = nil
     ) async throws -> AsyncThrowingStream<ComAtprotoSyncSubscribeRepos.Message, Error> {
@@ -915,5 +915,5 @@ extension ATProtoClient.Com.Atproto.Sync {
             parameters: input
         )
     }
-
+    
 }

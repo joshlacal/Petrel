@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: app.bsky.draft.updateDraft
 
 
-public struct AppBskyDraftUpdateDraft {
+public struct AppBskyDraftUpdateDraft { 
 
     public static let typeIdentifier = "app.bsky.draft.updateDraft"
 public struct Input: ATProtocolCodable {
@@ -15,7 +15,7 @@ public struct Input: ATProtocolCodable {
         public init(draft: AppBskyDraftDefs.DraftWithId) {
             self.draft = draft
         }
-
+        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -47,32 +47,32 @@ extension ATProtoClient.App.Bsky.Draft {
     // MARK: - updateDraft
 
     /// Updates a draft using private storage (stash). If the draft ID points to a non-existing ID, the update will be silently ignored. This is done because updates don't enforce draft limit, so it accepts all writes, but will ignore invalid ones. Requires authentication.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-
-    ///
+    
+    /// 
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func updateDraft(
-
+        
         input: AppBskyDraftUpdateDraft.Input
-
+        
     ) async throws -> Int {
         let endpoint = "app.bsky.draft.updateDraft"
-
+        
         var headers: [String: String] = [:]
-
+        
         headers["Content-Type"] = "application/json"
+        
+        
+        
 
-
-
-
-
+        
         let requestData: Data? = try JSONEncoder().encode(input)
-
-
+        
+        
         let queryItems: [URLQueryItem]? = nil
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
@@ -87,11 +87,11 @@ extension ATProtoClient.App.Bsky.Draft {
         let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
+        
         return responseCode
-
+        
     }
-
+    
 }
-
+                           
 

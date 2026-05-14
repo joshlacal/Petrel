@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: com.atproto.label.defs
 
 
-public struct ComAtprotoLabelDefs {
+public struct ComAtprotoLabelDefs { 
 
     public static let typeIdentifier = "com.atproto.label.defs"
-
+        
 public struct Label: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "com.atproto.label.defs#label"
             public let ver: Int?
@@ -222,7 +222,7 @@ public struct Label: ATProtocolCodable, ATProtocolValue {
             case sig
         }
     }
-
+        
 public struct SelfLabels: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "com.atproto.label.defs#selfLabels"
             public let values: [SelfLabel]
@@ -278,7 +278,7 @@ public struct SelfLabels: ATProtocolCodable, ATProtocolValue {
             case values
         }
     }
-
+        
 public struct SelfLabel: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "com.atproto.label.defs#selfLabel"
             public let val: String
@@ -334,7 +334,7 @@ public struct SelfLabel: ATProtocolCodable, ATProtocolValue {
             case val
         }
     }
-
+        
 public struct LabelValueDefinition: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "com.atproto.label.defs#labelValueDefinition"
             public let identifier: String
@@ -482,7 +482,7 @@ public struct LabelValueDefinition: ATProtocolCodable, ATProtocolValue {
             case locales
         }
     }
-
+        
 public struct LabelValueDefinitionStrings: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "com.atproto.label.defs#labelValueDefinitionStrings"
             public let lang: LanguageCodeContainer
@@ -575,56 +575,56 @@ public struct LabelValueDefinitionStrings: ATProtocolCodable, ATProtocolValue {
 
 public struct LabelValue: Codable, ATProtocolCodable, ATProtocolValue {
             public let rawValue: String
-
+            
             // Predefined constants
-            //
+            // 
             public static let exclamationhide = LabelValue(rawValue: "!hide")
-            //
+            // 
             public static let exclamationnodashpromote = LabelValue(rawValue: "!no-promote")
-            //
+            // 
             public static let exclamationwarn = LabelValue(rawValue: "!warn")
-            //
+            // 
             public static let exclamationnodashunauthenticated = LabelValue(rawValue: "!no-unauthenticated")
-            //
+            // 
             public static let dmcadashviolation = LabelValue(rawValue: "dmca-violation")
-            //
+            // 
             public static let doxxing = LabelValue(rawValue: "doxxing")
-            //
+            // 
             public static let porn = LabelValue(rawValue: "porn")
-            //
+            // 
             public static let sexual = LabelValue(rawValue: "sexual")
-            //
+            // 
             public static let nudity = LabelValue(rawValue: "nudity")
-            //
+            // 
             public static let nsfl = LabelValue(rawValue: "nsfl")
-            //
+            // 
             public static let gore = LabelValue(rawValue: "gore")
-
+            
             public init(rawValue: String) {
                 self.rawValue = rawValue
             }
-
+            
             public init(from decoder: Decoder) throws {
                 let container = try decoder.singleValueContainer()
                 rawValue = try container.decode(String.self)
             }
-
+            
             public func encode(to encoder: Encoder) throws {
                 var container = encoder.singleValueContainer()
                 try container.encode(rawValue)
             }
-
+            
             public func isEqual(to other: any ATProtocolValue) -> Bool {
                 guard let otherValue = other as? LabelValue else { return false }
                 return self.rawValue == otherValue.rawValue
             }
-
+            
             // DAGCBOR encoding with field ordering
             public func toCBORValue() throws -> Any {
                 // For string-based enum types, we return the raw string value directly
                 return rawValue
             }
-
+            
             // Provide allCases-like functionality
             public static var predefinedValues: [LabelValue] {
                 return [
@@ -647,5 +647,5 @@ public struct LabelValue: Codable, ATProtocolCodable, ATProtocolValue {
 }
 
 
-
+                           
 

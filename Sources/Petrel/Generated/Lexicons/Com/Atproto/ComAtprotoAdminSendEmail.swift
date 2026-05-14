@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: com.atproto.admin.sendEmail
 
 
-public struct ComAtprotoAdminSendEmail {
+public struct ComAtprotoAdminSendEmail { 
 
     public static let typeIdentifier = "com.atproto.admin.sendEmail"
 public struct Input: ATProtocolCodable {
@@ -23,7 +23,7 @@ public struct Input: ATProtocolCodable {
             self.senderDid = senderDid
             self.comment = comment
         }
-
+        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -70,67 +70,67 @@ public struct Input: ATProtocolCodable {
             case comment
         }
     }
-
+    
 public struct Output: ATProtocolCodable {
-
-
+        
+        
         public let sent: Bool
-
-
-
+        
+        
+        
         // Standard public initializer
         public init(
-
-
+            
+            
             sent: Bool
-
-
+            
+            
         ) {
-
-
+            
+            
             self.sent = sent
-
-
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
-
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            
             self.sent = try container.decode(Bool.self, forKey: .sent)
-
-
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
-
+            
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
             try container.encode(sent, forKey: .sent)
-
-
+            
+            
         }
 
         public func toCBORValue() throws -> Any {
-
+            
             var map = OrderedCBORMap()
 
-
-
+            
+            
             let sentValue = try sent.toCBORValue()
             map = map.adding(key: "sent", value: sentValue)
-
-
+            
+            
 
             return map
-
+            
         }
-
-
+        
+        
         private enum CodingKeys: String, CodingKey {
             case sent
         }
-
+        
     }
 
 
@@ -142,34 +142,34 @@ extension ATProtoClient.Com.Atproto.Admin {
     // MARK: - sendEmail
 
     /// Send email to a user's account email address.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-
-    ///
+    
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func sendEmail(
-
+        
         input: ComAtprotoAdminSendEmail.Input
-
+        
     ) async throws -> (responseCode: Int, data: ComAtprotoAdminSendEmail.Output?) {
         let endpoint = "com.atproto.admin.sendEmail"
-
+        
         var headers: [String: String] = [:]
-
+        
         headers["Content-Type"] = "application/json"
-
-
-
+        
+        
+        
         headers["Accept"] = "application/json"
+        
 
-
-
+        
         let requestData: Data? = try JSONEncoder().encode(input)
-
-
+        
+        
         let queryItems: [URLQueryItem]? = nil
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
@@ -184,12 +184,12 @@ extension ATProtoClient.Com.Atproto.Admin {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
+        
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
         if (200...299).contains(responseCode) {
-
+            
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -197,13 +197,13 @@ extension ATProtoClient.Com.Atproto.Admin {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-
+            
 
             do {
-
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(ComAtprotoAdminSendEmail.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -214,9 +214,9 @@ extension ATProtoClient.Com.Atproto.Admin {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-
+        
     }
-
+    
 }
-
+                           
 

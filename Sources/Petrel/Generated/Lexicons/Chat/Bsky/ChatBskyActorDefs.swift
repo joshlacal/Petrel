@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: chat.bsky.actor.defs
 
 
-public struct ChatBskyActorDefs {
+public struct ChatBskyActorDefs { 
 
     public static let typeIdentifier = "chat.bsky.actor.defs"
-
+        
 public struct ProfileViewBasic: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.actor.defs#profileViewBasic"
             public let did: DID
@@ -278,17 +278,17 @@ public struct ProfileViewBasic: ATProtocolCodable, ATProtocolValue {
             case kind
         }
     }
-
+        
 public struct DirectConvoMember: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.actor.defs#directConvoMember"
 
         public init(
-
+            
         ) {
         }
 
         public init(from decoder: Decoder) throws {
-
+            
             let _ = decoder
         }
 
@@ -301,7 +301,7 @@ public struct DirectConvoMember: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-
+            
             return other is Self
         }
 
@@ -319,7 +319,7 @@ public struct DirectConvoMember: ATProtocolCodable, ATProtocolValue {
             case typeIdentifier = "$type"
         }
     }
-
+        
 public struct GroupConvoMember: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.actor.defs#groupConvoMember"
             public let addedBy: ProfileViewBasic?
@@ -397,17 +397,17 @@ public struct GroupConvoMember: ATProtocolCodable, ATProtocolValue {
             case role
         }
     }
-
+        
 public struct PastGroupConvoMember: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.actor.defs#pastGroupConvoMember"
 
         public init(
-
+            
         ) {
         }
 
         public init(from decoder: Decoder) throws {
-
+            
             let _ = decoder
         }
 
@@ -420,7 +420,7 @@ public struct PastGroupConvoMember: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-
+            
             return other is Self
         }
 
@@ -443,38 +443,38 @@ public struct PastGroupConvoMember: ATProtocolCodable, ATProtocolValue {
 
 public struct MemberRole: Codable, ATProtocolCodable, ATProtocolValue {
             public let rawValue: String
-
+            
             // Predefined constants
-            //
+            // 
             public static let owner = MemberRole(rawValue: "owner")
-            //
+            // 
             public static let standard = MemberRole(rawValue: "standard")
-
+            
             public init(rawValue: String) {
                 self.rawValue = rawValue
             }
-
+            
             public init(from decoder: Decoder) throws {
                 let container = try decoder.singleValueContainer()
                 rawValue = try container.decode(String.self)
             }
-
+            
             public func encode(to encoder: Encoder) throws {
                 var container = encoder.singleValueContainer()
                 try container.encode(rawValue)
             }
-
+            
             public func isEqual(to other: any ATProtocolValue) -> Bool {
                 guard let otherValue = other as? MemberRole else { return false }
                 return self.rawValue == otherValue.rawValue
             }
-
+            
             // DAGCBOR encoding with field ordering
             public func toCBORValue() throws -> Any {
                 // For string-based enum types, we return the raw string value directly
                 return rawValue
             }
-
+            
             // Provide allCases-like functionality
             public static var predefinedValues: [MemberRole] {
                 return [
@@ -559,7 +559,7 @@ public indirect enum ProfileViewBasicKindUnion: Codable, ATProtocolCodable, ATPr
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-
+    
     public static func == (lhs: ProfileViewBasicKindUnion, rhs: ProfileViewBasicKindUnion) -> Bool {
         switch (lhs, rhs) {
         case (.chatBskyActorDefsDirectConvoMember(let lhsValue),
@@ -577,21 +577,21 @@ public indirect enum ProfileViewBasicKindUnion: Codable, ATProtocolCodable, ATPr
             return false
         }
     }
-
+    
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? ProfileViewBasicKindUnion else { return false }
         return self == other
     }
-
+    
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-
+        
         switch self {
         case .chatBskyActorDefsDirectConvoMember(let value):
             map = map.adding(key: "$type", value: "chat.bsky.actor.defs#directConvoMember")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -608,7 +608,7 @@ public indirect enum ProfileViewBasicKindUnion: Codable, ATProtocolCodable, ATPr
             return map
         case .chatBskyActorDefsGroupConvoMember(let value):
             map = map.adding(key: "$type", value: "chat.bsky.actor.defs#groupConvoMember")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -625,7 +625,7 @@ public indirect enum ProfileViewBasicKindUnion: Codable, ATProtocolCodable, ATPr
             return map
         case .chatBskyActorDefsPastGroupConvoMember(let value):
             map = map.adding(key: "$type", value: "chat.bsky.actor.defs#pastGroupConvoMember")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -650,5 +650,5 @@ public indirect enum ProfileViewBasicKindUnion: Codable, ATProtocolCodable, ATPr
 }
 
 
-
+                           
 

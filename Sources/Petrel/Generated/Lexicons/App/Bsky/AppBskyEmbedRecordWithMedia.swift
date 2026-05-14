@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: app.bsky.embed.recordWithMedia
 
 
-public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
+public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue { 
 
     public static let typeIdentifier = "app.bsky.embed.recordWithMedia"
         public let record: AppBskyEmbedRecord
@@ -61,7 +61,7 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
             case record
             case media
         }
-
+        
 public struct View: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.embed.recordWithMedia#view"
             public let record: AppBskyEmbedRecord.View
@@ -211,7 +211,7 @@ public enum ViewMediaUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendabl
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-
+    
     public static func == (lhs: ViewMediaUnion, rhs: ViewMediaUnion) -> Bool {
         switch (lhs, rhs) {
         case (.appBskyEmbedImagesView(let lhsValue),
@@ -229,21 +229,21 @@ public enum ViewMediaUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendabl
             return false
         }
     }
-
+    
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? ViewMediaUnion else { return false }
         return self == other
     }
-
+    
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-
+        
         switch self {
         case .appBskyEmbedImagesView(let value):
             map = map.adding(key: "$type", value: "app.bsky.embed.images#view")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -260,7 +260,7 @@ public enum ViewMediaUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendabl
             return map
         case .appBskyEmbedVideoView(let value):
             map = map.adding(key: "$type", value: "app.bsky.embed.video#view")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -277,7 +277,7 @@ public enum ViewMediaUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendabl
             return map
         case .appBskyEmbedExternalView(let value):
             map = map.adding(key: "$type", value: "app.bsky.embed.external#view")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -374,7 +374,7 @@ public enum AppBskyEmbedRecordWithMediaMediaUnion: Codable, ATProtocolCodable, A
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-
+    
     public static func == (lhs: AppBskyEmbedRecordWithMediaMediaUnion, rhs: AppBskyEmbedRecordWithMediaMediaUnion) -> Bool {
         switch (lhs, rhs) {
         case (.appBskyEmbedImages(let lhsValue),
@@ -392,21 +392,21 @@ public enum AppBskyEmbedRecordWithMediaMediaUnion: Codable, ATProtocolCodable, A
             return false
         }
     }
-
+    
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? AppBskyEmbedRecordWithMediaMediaUnion else { return false }
         return self == other
     }
-
+    
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-
+        
         switch self {
         case .appBskyEmbedImages(let value):
             map = map.adding(key: "$type", value: "app.bsky.embed.images")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -423,7 +423,7 @@ public enum AppBskyEmbedRecordWithMediaMediaUnion: Codable, ATProtocolCodable, A
             return map
         case .appBskyEmbedVideo(let value):
             map = map.adding(key: "$type", value: "app.bsky.embed.video")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -440,7 +440,7 @@ public enum AppBskyEmbedRecordWithMediaMediaUnion: Codable, ATProtocolCodable, A
             return map
         case .appBskyEmbedExternal(let value):
             map = map.adding(key: "$type", value: "app.bsky.embed.external")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -465,5 +465,5 @@ public enum AppBskyEmbedRecordWithMediaMediaUnion: Codable, ATProtocolCodable, A
 }
 
 
-
+                           
 

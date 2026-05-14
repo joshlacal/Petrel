@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: app.bsky.embed.images
 
 
-public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
+public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue { 
 
     public static let typeIdentifier = "app.bsky.embed.images"
         public let images: [Image]
@@ -50,7 +50,7 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
         private enum CodingKeys: String, CodingKey {
             case images
         }
-
+        
 public struct Image: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.embed.images#image"
             public let image: Blob
@@ -144,7 +144,7 @@ public struct Image: ATProtocolCodable, ATProtocolValue {
             case aspectRatio
         }
     }
-
+        
 public struct View: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.embed.images#view"
             public let images: [ViewImage]
@@ -200,7 +200,7 @@ public struct View: ATProtocolCodable, ATProtocolValue {
             case images
         }
     }
-
+        
 public struct ViewImage: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.embed.images#viewImage"
             public let thumb: URI
@@ -316,5 +316,5 @@ public struct ViewImage: ATProtocolCodable, ATProtocolValue {
 }
 
 
-
+                           
 

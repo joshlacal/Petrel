@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: com.atproto.repo.applyWrites
 
 
-public struct ComAtprotoRepoApplyWrites {
+public struct ComAtprotoRepoApplyWrites { 
 
     public static let typeIdentifier = "com.atproto.repo.applyWrites"
-
+        
 public struct Create: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "com.atproto.repo.applyWrites#create"
             public let collection: NSID
@@ -102,7 +102,7 @@ public struct Create: ATProtocolCodable, ATProtocolValue {
             case value
         }
     }
-
+        
 public struct Update: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "com.atproto.repo.applyWrites#update"
             public let collection: NSID
@@ -190,7 +190,7 @@ public struct Update: ATProtocolCodable, ATProtocolValue {
             case value
         }
     }
-
+        
 public struct Delete: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "com.atproto.repo.applyWrites#delete"
             public let collection: NSID
@@ -262,7 +262,7 @@ public struct Delete: ATProtocolCodable, ATProtocolValue {
             case rkey
         }
     }
-
+        
 public struct CreateResult: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "com.atproto.repo.applyWrites#createResult"
             public let uri: ATProtocolURI
@@ -356,7 +356,7 @@ public struct CreateResult: ATProtocolCodable, ATProtocolValue {
             case validationStatus
         }
     }
-
+        
 public struct UpdateResult: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "com.atproto.repo.applyWrites#updateResult"
             public let uri: ATProtocolURI
@@ -450,17 +450,17 @@ public struct UpdateResult: ATProtocolCodable, ATProtocolValue {
             case validationStatus
         }
     }
-
+        
 public struct DeleteResult: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "com.atproto.repo.applyWrites#deleteResult"
 
         public init(
-
+            
         ) {
         }
 
         public init(from decoder: Decoder) throws {
-
+            
             let _ = decoder
         }
 
@@ -473,7 +473,7 @@ public struct DeleteResult: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-
+            
             return other is Self
         }
 
@@ -504,7 +504,7 @@ public struct Input: ATProtocolCodable {
             self.writes = writes
             self.swapCommit = swapCommit
         }
-
+        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -546,95 +546,95 @@ public struct Input: ATProtocolCodable {
             case swapCommit
         }
     }
-
+    
 public struct Output: ATProtocolCodable {
-
-
+        
+        
         public let commit: ComAtprotoRepoDefs.CommitMeta?
-
+        
         public let results: [OutputResultsUnion]?
-
-
-
+        
+        
+        
         // Standard public initializer
         public init(
-
-
+            
+            
             commit: ComAtprotoRepoDefs.CommitMeta? = nil,
-
+            
             results: [OutputResultsUnion]? = nil
-
-
+            
+            
         ) {
-
-
+            
+            
             self.commit = commit
-
+            
             self.results = results
-
-
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
-
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            
             self.commit = try container.decodeIfPresent(ComAtprotoRepoDefs.CommitMeta.self, forKey: .commit)
-
-
+            
+            
             self.results = try container.decodeIfPresent([OutputResultsUnion].self, forKey: .results)
-
-
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
-
+            
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(commit, forKey: .commit)
-
-
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(results, forKey: .results)
-
-
+            
+            
         }
 
         public func toCBORValue() throws -> Any {
-
+            
             var map = OrderedCBORMap()
 
-
-
+            
+            
             if let value = commit {
                 // Encode optional property even if it's an empty array for CBOR
                 let commitValue = try value.toCBORValue()
                 map = map.adding(key: "commit", value: commitValue)
             }
-
-
-
+            
+            
+            
             if let value = results {
                 // Encode optional property even if it's an empty array for CBOR
                 let resultsValue = try value.toCBORValue()
                 map = map.adding(key: "results", value: resultsValue)
             }
-
-
+            
+            
 
             return map
-
+            
         }
-
-
+        
+        
         private enum CodingKeys: String, CodingKey {
             case commit
             case results
         }
-
+        
     }
-
+        
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case invalidSwap = "InvalidSwap.Indicates that the 'swapCommit' parameter did not match current commit."
             public var description: String {
@@ -725,7 +725,7 @@ public enum InputWritesUnion: Codable, ATProtocolCodable, ATProtocolValue, Senda
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-
+    
     public static func == (lhs: InputWritesUnion, rhs: InputWritesUnion) -> Bool {
         switch (lhs, rhs) {
         case (.comAtprotoRepoApplyWritesCreate(let lhsValue),
@@ -743,21 +743,21 @@ public enum InputWritesUnion: Codable, ATProtocolCodable, ATProtocolValue, Senda
             return false
         }
     }
-
+    
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? InputWritesUnion else { return false }
         return self == other
     }
-
+    
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-
+        
         switch self {
         case .comAtprotoRepoApplyWritesCreate(let value):
             map = map.adding(key: "$type", value: "com.atproto.repo.applyWrites#create")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -774,7 +774,7 @@ public enum InputWritesUnion: Codable, ATProtocolCodable, ATProtocolValue, Senda
             return map
         case .comAtprotoRepoApplyWritesUpdate(let value):
             map = map.adding(key: "$type", value: "com.atproto.repo.applyWrites#update")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -791,7 +791,7 @@ public enum InputWritesUnion: Codable, ATProtocolCodable, ATProtocolValue, Senda
             return map
         case .comAtprotoRepoApplyWritesDelete(let value):
             map = map.adding(key: "$type", value: "com.atproto.repo.applyWrites#delete")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -888,7 +888,7 @@ public enum OutputResultsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sen
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-
+    
     public static func == (lhs: OutputResultsUnion, rhs: OutputResultsUnion) -> Bool {
         switch (lhs, rhs) {
         case (.comAtprotoRepoApplyWritesCreateResult(let lhsValue),
@@ -906,21 +906,21 @@ public enum OutputResultsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sen
             return false
         }
     }
-
+    
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? OutputResultsUnion else { return false }
         return self == other
     }
-
+    
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-
+        
         switch self {
         case .comAtprotoRepoApplyWritesCreateResult(let value):
             map = map.adding(key: "$type", value: "com.atproto.repo.applyWrites#createResult")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -937,7 +937,7 @@ public enum OutputResultsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sen
             return map
         case .comAtprotoRepoApplyWritesUpdateResult(let value):
             map = map.adding(key: "$type", value: "com.atproto.repo.applyWrites#updateResult")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -954,7 +954,7 @@ public enum OutputResultsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sen
             return map
         case .comAtprotoRepoApplyWritesDeleteResult(let value):
             map = map.adding(key: "$type", value: "com.atproto.repo.applyWrites#deleteResult")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -1051,7 +1051,7 @@ public enum ComAtprotoRepoApplyWritesWritesUnion: Codable, ATProtocolCodable, AT
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-
+    
     public static func == (lhs: ComAtprotoRepoApplyWritesWritesUnion, rhs: ComAtprotoRepoApplyWritesWritesUnion) -> Bool {
         switch (lhs, rhs) {
         case (.comAtprotoRepoApplyWritesCreate(let lhsValue),
@@ -1069,21 +1069,21 @@ public enum ComAtprotoRepoApplyWritesWritesUnion: Codable, ATProtocolCodable, AT
             return false
         }
     }
-
+    
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? ComAtprotoRepoApplyWritesWritesUnion else { return false }
         return self == other
     }
-
+    
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-
+        
         switch self {
         case .comAtprotoRepoApplyWritesCreate(let value):
             map = map.adding(key: "$type", value: "com.atproto.repo.applyWrites#create")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -1100,7 +1100,7 @@ public enum ComAtprotoRepoApplyWritesWritesUnion: Codable, ATProtocolCodable, AT
             return map
         case .comAtprotoRepoApplyWritesUpdate(let value):
             map = map.adding(key: "$type", value: "com.atproto.repo.applyWrites#update")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -1117,7 +1117,7 @@ public enum ComAtprotoRepoApplyWritesWritesUnion: Codable, ATProtocolCodable, AT
             return map
         case .comAtprotoRepoApplyWritesDelete(let value):
             map = map.adding(key: "$type", value: "com.atproto.repo.applyWrites#delete")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -1145,34 +1145,34 @@ extension ATProtoClient.Com.Atproto.Repo {
     // MARK: - applyWrites
 
     /// Apply a batch transaction of repository creates, updates, and deletes. Requires auth, implemented by PDS.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-
-    ///
+    
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func applyWrites(
-
+        
         input: ComAtprotoRepoApplyWrites.Input
-
+        
     ) async throws -> (responseCode: Int, data: ComAtprotoRepoApplyWrites.Output?) {
         let endpoint = "com.atproto.repo.applyWrites"
-
+        
         var headers: [String: String] = [:]
-
+        
         headers["Content-Type"] = "application/json"
-
-
-
+        
+        
+        
         headers["Accept"] = "application/json"
+        
 
-
-
+        
         let requestData: Data? = try JSONEncoder().encode(input)
-
-
+        
+        
         let queryItems: [URLQueryItem]? = nil
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
@@ -1187,12 +1187,12 @@ extension ATProtoClient.Com.Atproto.Repo {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
+        
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
         if (200...299).contains(responseCode) {
-
+            
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -1200,13 +1200,13 @@ extension ATProtoClient.Com.Atproto.Repo {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-
+            
 
             do {
-
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(ComAtprotoRepoApplyWrites.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -1217,9 +1217,9 @@ extension ATProtoClient.Com.Atproto.Repo {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-
+        
     }
-
+    
 }
-
+                           
 

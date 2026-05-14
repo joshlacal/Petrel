@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: com.atproto.sync.listRepos
 
 
-public struct ComAtprotoSyncListRepos {
+public struct ComAtprotoSyncListRepos { 
 
     public static let typeIdentifier = "com.atproto.sync.listRepos"
-
+        
 public struct Repo: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "com.atproto.sync.listRepos#repo"
             public let did: DID
@@ -139,103 +139,103 @@ public struct Repo: ATProtocolCodable, ATProtocolValue {
             case active
             case status
         }
-    }
+    }    
 public struct Parameters: Parametrizable {
         public let limit: Int?
         public let cursor: String?
-
+        
         public init(
-            limit: Int? = nil,
+            limit: Int? = nil, 
             cursor: String? = nil
             ) {
             self.limit = limit
             self.cursor = cursor
-
+            
         }
     }
-
+    
 public struct Output: ATProtocolCodable {
-
-
+        
+        
         public let cursor: String?
-
+        
         public let repos: [Repo]
-
-
-
+        
+        
+        
         // Standard public initializer
         public init(
-
-
+            
+            
             cursor: String? = nil,
-
+            
             repos: [Repo]
-
-
+            
+            
         ) {
-
-
+            
+            
             self.cursor = cursor
-
+            
             self.repos = repos
-
-
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
-
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            
             self.cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
-
-
+            
+            
             self.repos = try container.decode([Repo].self, forKey: .repos)
-
-
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
-
+            
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(cursor, forKey: .cursor)
-
-
+            
+            
             try container.encode(repos, forKey: .repos)
-
-
+            
+            
         }
 
         public func toCBORValue() throws -> Any {
-
+            
             var map = OrderedCBORMap()
 
-
-
+            
+            
             if let value = cursor {
                 // Encode optional property even if it's an empty array for CBOR
                 let cursorValue = try value.toCBORValue()
                 map = map.adding(key: "cursor", value: cursorValue)
             }
-
-
-
+            
+            
+            
             let reposValue = try repos.toCBORValue()
             map = map.adding(key: "repos", value: reposValue)
-
-
+            
+            
 
             return map
-
+            
         }
-
-
+        
+        
         private enum CodingKeys: String, CodingKey {
             case cursor
             case repos
         }
-
+        
     }
 
 
@@ -249,17 +249,17 @@ extension ATProtoClient.Com.Atproto.Sync {
     // MARK: - listRepos
 
     /// Enumerates all the DID, rev, and commit CID for all repos hosted by this service. Does not require auth; implemented by PDS and Relay.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-    ///
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func listRepos(input: ComAtprotoSyncListRepos.Parameters) async throws -> (responseCode: Int, data: ComAtprotoSyncListRepos.Output?) {
         let endpoint = "com.atproto.sync.listRepos"
 
-
+        
         let queryItems = input.asQueryItems()
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -278,7 +278,7 @@ extension ATProtoClient.Com.Atproto.Sync {
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
         if (200...299).contains(responseCode) {
-
+            
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -286,13 +286,13 @@ extension ATProtoClient.Com.Atproto.Sync {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-
+            
 
             do {
-
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(ComAtprotoSyncListRepos.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -300,12 +300,12 @@ extension ATProtoClient.Com.Atproto.Sync {
                 return (responseCode, nil)
             }
         } else {
-
+            
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
+                           
 

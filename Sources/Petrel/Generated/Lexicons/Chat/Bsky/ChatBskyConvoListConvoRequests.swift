@@ -5,105 +5,105 @@ import Foundation
 // lexicon: 1, id: chat.bsky.convo.listConvoRequests
 
 
-public struct ChatBskyConvoListConvoRequests {
+public struct ChatBskyConvoListConvoRequests { 
 
-    public static let typeIdentifier = "chat.bsky.convo.listConvoRequests"
+    public static let typeIdentifier = "chat.bsky.convo.listConvoRequests"    
 public struct Parameters: Parametrizable {
         public let limit: Int?
         public let cursor: String?
-
+        
         public init(
-            limit: Int? = nil,
+            limit: Int? = nil, 
             cursor: String? = nil
             ) {
             self.limit = limit
             self.cursor = cursor
-
+            
         }
     }
-
+    
 public struct Output: ATProtocolCodable {
-
-
+        
+        
         public let cursor: String?
-
+        
         public let requests: [OutputRequestsUnion]
-
-
-
+        
+        
+        
         // Standard public initializer
         public init(
-
-
+            
+            
             cursor: String? = nil,
-
+            
             requests: [OutputRequestsUnion]
-
-
+            
+            
         ) {
-
-
+            
+            
             self.cursor = cursor
-
+            
             self.requests = requests
-
-
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
-
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            
             self.cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
-
-
+            
+            
             self.requests = try container.decode([OutputRequestsUnion].self, forKey: .requests)
-
-
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
-
+            
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(cursor, forKey: .cursor)
-
-
+            
+            
             try container.encode(requests, forKey: .requests)
-
-
+            
+            
         }
 
         public func toCBORValue() throws -> Any {
-
+            
             var map = OrderedCBORMap()
 
-
-
+            
+            
             if let value = cursor {
                 // Encode optional property even if it's an empty array for CBOR
                 let cursorValue = try value.toCBORValue()
                 map = map.adding(key: "cursor", value: cursorValue)
             }
-
-
-
+            
+            
+            
             let requestsValue = try requests.toCBORValue()
             map = map.adding(key: "requests", value: requestsValue)
-
-
+            
+            
 
             return map
-
+            
         }
-
-
+        
+        
         private enum CodingKeys: String, CodingKey {
             case cursor
             case requests
         }
-
+        
     }
 
 
@@ -171,7 +171,7 @@ public enum OutputRequestsUnion: Codable, ATProtocolCodable, ATProtocolValue, Se
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-
+    
     public static func == (lhs: OutputRequestsUnion, rhs: OutputRequestsUnion) -> Bool {
         switch (lhs, rhs) {
         case (.chatBskyConvoDefsConvoView(let lhsValue),
@@ -186,21 +186,21 @@ public enum OutputRequestsUnion: Codable, ATProtocolCodable, ATProtocolValue, Se
             return false
         }
     }
-
+    
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? OutputRequestsUnion else { return false }
         return self == other
     }
-
+    
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-
+        
         switch self {
         case .chatBskyConvoDefsConvoView(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#convoView")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -217,7 +217,7 @@ public enum OutputRequestsUnion: Codable, ATProtocolCodable, ATProtocolValue, Se
             return map
         case .chatBskyGroupDefsJoinRequestView(let value):
             map = map.adding(key: "$type", value: "chat.bsky.group.defs#joinRequestView")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -247,17 +247,17 @@ extension ATProtoClient.Chat.Bsky.Convo {
     // MARK: - listConvoRequests
 
     /// [NOTE: This is under active development and should be considered unstable while this note is here]. Returns a page of incoming conversation requests for the user. Direct convo requests are returned as convoView; group join requests are returned as joinRequestView.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-    ///
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func listConvoRequests(input: ChatBskyConvoListConvoRequests.Parameters) async throws -> (responseCode: Int, data: ChatBskyConvoListConvoRequests.Output?) {
         let endpoint = "chat.bsky.convo.listConvoRequests"
 
-
+        
         let queryItems = input.asQueryItems()
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -276,7 +276,7 @@ extension ATProtoClient.Chat.Bsky.Convo {
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
         if (200...299).contains(responseCode) {
-
+            
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -284,13 +284,13 @@ extension ATProtoClient.Chat.Bsky.Convo {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-
+            
 
             do {
-
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(ChatBskyConvoListConvoRequests.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -298,12 +298,12 @@ extension ATProtoClient.Chat.Bsky.Convo {
                 return (responseCode, nil)
             }
         } else {
-
+            
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
+                           
 

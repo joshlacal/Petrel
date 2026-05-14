@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: app.bsky.feed.like
 
 
-public struct AppBskyFeedLike: ATProtocolCodable, ATProtocolValue {
+public struct AppBskyFeedLike: ATProtocolCodable, ATProtocolValue { 
 
     public static let typeIdentifier = "app.bsky.feed.like"
         public let subject: ComAtprotoRepoStrongRef
@@ -87,5 +87,5 @@ public struct AppBskyFeedLike: ATProtocolCodable, ATProtocolValue {
 }
 
 
-
+                           
 

@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: app.bsky.video.defs
 
 
-public struct AppBskyVideoDefs {
+public struct AppBskyVideoDefs { 
 
     public static let typeIdentifier = "app.bsky.video.defs"
-
+        
 public struct JobStatus: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.video.defs#jobStatus"
             public let jobId: String
@@ -190,5 +190,5 @@ public struct JobStatus: ATProtocolCodable, ATProtocolValue {
 }
 
 
-
+                           
 

@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: place.stream.live.teleport
 
 
-public struct PlaceStreamLiveTeleport: ATProtocolCodable, ATProtocolValue {
+public struct PlaceStreamLiveTeleport: ATProtocolCodable, ATProtocolValue { 
 
     public static let typeIdentifier = "place.stream.live.teleport"
         public let streamer: DID
@@ -87,5 +87,5 @@ public struct PlaceStreamLiveTeleport: ATProtocolCodable, ATProtocolValue {
 }
 
 
-
+                           
 

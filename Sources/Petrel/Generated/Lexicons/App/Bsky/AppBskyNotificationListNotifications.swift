@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: app.bsky.notification.listNotifications
 
 
-public struct AppBskyNotificationListNotifications {
+public struct AppBskyNotificationListNotifications { 
 
     public static let typeIdentifier = "app.bsky.notification.listNotifications"
-
+        
 public struct Notification: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.notification.listNotifications#notification"
             public let uri: ATProtocolURI
@@ -203,19 +203,19 @@ public struct Notification: ATProtocolCodable, ATProtocolValue {
             case indexedAt
             case labels
         }
-    }
+    }    
 public struct Parameters: Parametrizable {
         public let reasons: [String]?
         public let limit: Int?
         public let priority: Bool?
         public let cursor: String?
         public let seenAt: ATProtocolDate?
-
+        
         public init(
-            reasons: [String]? = nil,
-            limit: Int? = nil,
-            priority: Bool? = nil,
-            cursor: String? = nil,
+            reasons: [String]? = nil, 
+            limit: Int? = nil, 
+            priority: Bool? = nil, 
+            cursor: String? = nil, 
             seenAt: ATProtocolDate? = nil
             ) {
             self.reasons = reasons
@@ -223,136 +223,136 @@ public struct Parameters: Parametrizable {
             self.priority = priority
             self.cursor = cursor
             self.seenAt = seenAt
-
+            
         }
     }
-
+    
 public struct Output: ATProtocolCodable {
-
-
+        
+        
         public let cursor: String?
-
+        
         public let notifications: [Notification]
-
+        
         public let priority: Bool?
-
+        
         public let seenAt: ATProtocolDate?
-
-
-
+        
+        
+        
         // Standard public initializer
         public init(
-
-
+            
+            
             cursor: String? = nil,
-
+            
             notifications: [Notification],
-
+            
             priority: Bool? = nil,
-
+            
             seenAt: ATProtocolDate? = nil
-
-
+            
+            
         ) {
-
-
+            
+            
             self.cursor = cursor
-
+            
             self.notifications = notifications
-
+            
             self.priority = priority
-
+            
             self.seenAt = seenAt
-
-
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
-
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            
             self.cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
-
-
+            
+            
             self.notifications = try container.decode([Notification].self, forKey: .notifications)
-
-
+            
+            
             self.priority = try container.decodeIfPresent(Bool.self, forKey: .priority)
-
-
+            
+            
             self.seenAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .seenAt)
-
-
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
-
+            
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(cursor, forKey: .cursor)
-
-
+            
+            
             try container.encode(notifications, forKey: .notifications)
-
-
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(priority, forKey: .priority)
-
-
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(seenAt, forKey: .seenAt)
-
-
+            
+            
         }
 
         public func toCBORValue() throws -> Any {
-
+            
             var map = OrderedCBORMap()
 
-
-
+            
+            
             if let value = cursor {
                 // Encode optional property even if it's an empty array for CBOR
                 let cursorValue = try value.toCBORValue()
                 map = map.adding(key: "cursor", value: cursorValue)
             }
-
-
-
+            
+            
+            
             let notificationsValue = try notifications.toCBORValue()
             map = map.adding(key: "notifications", value: notificationsValue)
-
-
-
+            
+            
+            
             if let value = priority {
                 // Encode optional property even if it's an empty array for CBOR
                 let priorityValue = try value.toCBORValue()
                 map = map.adding(key: "priority", value: priorityValue)
             }
-
-
-
+            
+            
+            
             if let value = seenAt {
                 // Encode optional property even if it's an empty array for CBOR
                 let seenAtValue = try value.toCBORValue()
                 map = map.adding(key: "seenAt", value: seenAtValue)
             }
-
-
+            
+            
 
             return map
-
+            
         }
-
-
+        
+        
         private enum CodingKeys: String, CodingKey {
             case cursor
             case notifications
             case priority
             case seenAt
         }
-
+        
     }
 
 
@@ -366,17 +366,17 @@ extension ATProtoClient.App.Bsky.Notification {
     // MARK: - listNotifications
 
     /// Enumerate notifications for the requesting account. Requires auth.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-    ///
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func listNotifications(input: AppBskyNotificationListNotifications.Parameters) async throws -> (responseCode: Int, data: AppBskyNotificationListNotifications.Output?) {
         let endpoint = "app.bsky.notification.listNotifications"
 
-
+        
         let queryItems = input.asQueryItems()
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -395,7 +395,7 @@ extension ATProtoClient.App.Bsky.Notification {
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
         if (200...299).contains(responseCode) {
-
+            
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -403,13 +403,13 @@ extension ATProtoClient.App.Bsky.Notification {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-
+            
 
             do {
-
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(AppBskyNotificationListNotifications.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -417,12 +417,12 @@ extension ATProtoClient.App.Bsky.Notification {
                 return (responseCode, nil)
             }
         } else {
-
+            
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
+                           
 

@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: app.bsky.embed.video
 
 
-public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue {
+public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue { 
 
     public static let typeIdentifier = "app.bsky.embed.video"
         public let video: Blob
@@ -118,7 +118,7 @@ public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue {
             case aspectRatio
             case presentation
         }
-
+        
 public struct Caption: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.embed.video#caption"
             public let lang: LanguageCodeContainer
@@ -190,7 +190,7 @@ public struct Caption: ATProtocolCodable, ATProtocolValue {
             case file
         }
     }
-
+        
 public struct View: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.embed.video#view"
             public let cid: CID
@@ -356,5 +356,5 @@ public struct View: ATProtocolCodable, ATProtocolValue {
 }
 
 
-
+                           
 

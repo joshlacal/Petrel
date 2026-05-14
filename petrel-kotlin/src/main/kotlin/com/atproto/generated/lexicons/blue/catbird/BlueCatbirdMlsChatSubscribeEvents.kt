@@ -54,6 +54,9 @@ sealed interface BlueCatbirdMlsChatSubscribeEventsMessageUnion {
     data class ResetRequestedEvent(val value: com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsResetRequestedEvent) : BlueCatbirdMlsChatSubscribeEventsMessageUnion
 
     @Serializable
+    data class WelcomeReissueRequestedEvent(val value: com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsWelcomeReissueRequestedEvent) : BlueCatbirdMlsChatSubscribeEventsMessageUnion
+
+    @Serializable
     data class Unexpected(val value: JsonElement) : BlueCatbirdMlsChatSubscribeEventsMessageUnion
 }
 
@@ -136,6 +139,12 @@ object BlueCatbirdMlsChatSubscribeEventsMessageUnionSerializer : kotlinx.seriali
                     it["\$type"] = kotlinx.serialization.json.JsonPrimitive("blue.catbird.mlsChat.subscribeEvents#resetRequestedEvent")
                 })
             }
+            is BlueCatbirdMlsChatSubscribeEventsMessageUnion.WelcomeReissueRequestedEvent -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsWelcomeReissueRequestedEvent.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("blue.catbird.mlsChat.subscribeEvents#welcomeReissueRequestedEvent")
+                })
+            }
             is BlueCatbirdMlsChatSubscribeEventsMessageUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
             // subscription codegen) are runtime-only sentinels; JSON round-trip
@@ -191,6 +200,9 @@ object BlueCatbirdMlsChatSubscribeEventsMessageUnionSerializer : kotlinx.seriali
             "blue.catbird.mlsChat.subscribeEvents#resetRequestedEvent" -> BlueCatbirdMlsChatSubscribeEventsMessageUnion.ResetRequestedEvent(
                 jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsResetRequestedEvent.serializer(), element)
             )
+            "blue.catbird.mlsChat.subscribeEvents#welcomeReissueRequestedEvent" -> BlueCatbirdMlsChatSubscribeEventsMessageUnion.WelcomeReissueRequestedEvent(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsWelcomeReissueRequestedEvent.serializer(), element)
+            )
             else -> BlueCatbirdMlsChatSubscribeEventsMessageUnion.Unexpected(element)
         }
     }
@@ -204,7 +216,8 @@ object BlueCatbirdMlsChatSubscribeEventsMessageUnionSerializer : kotlinx.seriali
 /** Resume cursor for this event position */        @SerialName("cursor")
         val cursor: String,        @SerialName("message")
         val message: BlueCatbirdMlsChatDefsMessageView,/** When true, this is an ephemeral signal (typing, read receipt, presence) that should NOT be shown in chat history. Omitted (defaults to false) for regular persistent messages. */        @SerialName("ephemeral")
-        val ephemeral: Boolean? = null    ) {
+        val ephemeral: Boolean? = null,/** MLS epoch this message was encrypted at. Recipient SHOULD reject events where epoch < localJoinEpoch BEFORE feeding to unprotect_message. */        @SerialName("epoch")
+        val epoch: Int? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#blueCatbirdMlsChatSubscribeEventsMessageEvent"
         }
@@ -389,6 +402,22 @@ object BlueCatbirdMlsChatSubscribeEventsMessageUnionSerializer : kotlinx.seriali
         }
     }
 
+    /**
+     * A recipient device called reissueWelcome because it cannot decrypt the original Welcome. Server pushes this event to the inviter, who is expected to re-stage a new commit with a fresh KP. Body fields mirror blue.catbird.mlsChat.defs#welcomeReissueRequest.
+     */
+    @Serializable
+    data class BlueCatbirdMlsChatSubscribeEventsWelcomeReissueRequestedEvent(
+/** Resume cursor for this event position */        @SerialName("cursor")
+        val cursor: String,/** Conversation needing a reissued Welcome. */        @SerialName("convoId")
+        val convoId: String,/** Recipient device that cannot decrypt the original Welcome. */        @SerialName("recipientDeviceDid")
+        val recipientDeviceDid: DID,/** When the reissue was requested (RFC3339). */        @SerialName("requestedAt")
+        val requestedAt: ATProtocolDate,/** Server-generated request identifier. Inviter echoes this in the replacement commit's idempotencyKey. */        @SerialName("requestId")
+        val requestId: String    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#blueCatbirdMlsChatSubscribeEventsWelcomeReissueRequestedEvent"
+        }
+    }
+
 @Serializable
     data class BlueCatbirdMlsChatSubscribeEventsParameters(
 // JWT ticket from getSubscriptionTicket for authentication        @SerialName("ticket")
@@ -508,6 +537,12 @@ hostOverride: String? = null,
                         "#resetRequestedEvent" -> BlueCatbirdMlsChatSubscribeEventsMessageUnion.ResetRequestedEvent(
                             json.decodeFromJsonElement(
                                 com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsResetRequestedEvent.serializer(),
+                                frame.payload
+                            )
+                        )
+                        "#welcomeReissueRequestedEvent" -> BlueCatbirdMlsChatSubscribeEventsMessageUnion.WelcomeReissueRequestedEvent(
+                            json.decodeFromJsonElement(
+                                com.atproto.generated.BlueCatbirdMlsChatSubscribeEventsWelcomeReissueRequestedEvent.serializer(),
                                 frame.payload
                             )
                         )

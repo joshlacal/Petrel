@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: blue.catbird.mlsChat.listDevices
 
 
-public struct BlueCatbirdMlsChatListDevices {
+public struct BlueCatbirdMlsChatListDevices { 
 
     public static let typeIdentifier = "blue.catbird.mlsChat.listDevices"
-
+        
 public struct DeviceInfo: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.listDevices#deviceInfo"
             public let deviceId: String
@@ -187,78 +187,78 @@ public struct DeviceInfo: ATProtocolCodable, ATProtocolValue {
             case keyPackageCount
             case pushTokenRegistered
         }
-    }
+    }    
 public struct Parameters: Parametrizable {
         public let deviceId: String?
-
+        
         public init(
             deviceId: String? = nil
             ) {
             self.deviceId = deviceId
-
+            
         }
     }
-
+    
 public struct Output: ATProtocolCodable {
-
-
+        
+        
         public let devices: [DeviceInfo]
-
-
-
+        
+        
+        
         // Standard public initializer
         public init(
-
-
+            
+            
             devices: [DeviceInfo]
-
-
+            
+            
         ) {
-
-
+            
+            
             self.devices = devices
-
-
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
-
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            
             self.devices = try container.decode([DeviceInfo].self, forKey: .devices)
-
-
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
-
+            
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
             try container.encode(devices, forKey: .devices)
-
-
+            
+            
         }
 
         public func toCBORValue() throws -> Any {
-
+            
             var map = OrderedCBORMap()
 
-
-
+            
+            
             let devicesValue = try devices.toCBORValue()
             map = map.adding(key: "devices", value: devicesValue)
-
-
+            
+            
 
             return map
-
+            
         }
-
-
+        
+        
         private enum CodingKeys: String, CodingKey {
             case devices
         }
-
+        
     }
 
 
@@ -272,17 +272,17 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - listDevices
 
     /// List and manage registered devices (consolidates listDevices + deleteDevice) List all registered devices for the authenticated user with key package counts and last seen timestamps. To remove a device, use the blue.catbird.mlsChat.registerDevice endpoint with the same deviceUUID (server handles cleanup), or call this endpoint with a DELETE method and deviceId parameter.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-    ///
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func listDevices(input: BlueCatbirdMlsChatListDevices.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatListDevices.Output?) {
         let endpoint = "blue.catbird.mlsChat.listDevices"
 
-
+        
         let queryItems = input.asQueryItems()
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -301,7 +301,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
         if (200...299).contains(responseCode) {
-
+            
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -309,13 +309,13 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-
+            
 
             do {
-
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatListDevices.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -323,12 +323,12 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
                 return (responseCode, nil)
             }
         } else {
-
+            
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
+                           
 

@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: com.atproto.server.deleteAccount
 
 
-public struct ComAtprotoServerDeleteAccount {
+public struct ComAtprotoServerDeleteAccount { 
 
     public static let typeIdentifier = "com.atproto.server.deleteAccount"
 public struct Input: ATProtocolCodable {
@@ -19,7 +19,7 @@ public struct Input: ATProtocolCodable {
             self.password = password
             self.token = token
         }
-
+        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -51,7 +51,7 @@ public struct Input: ATProtocolCodable {
             case password
             case token
         }
-    }
+    }        
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case expiredToken = "ExpiredToken."
                 case invalidToken = "InvalidToken."
@@ -74,32 +74,32 @@ extension ATProtoClient.Com.Atproto.Server {
     // MARK: - deleteAccount
 
     /// Delete an actor's account with a token and password. Can only be called after requesting a deletion token. Requires auth.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-
-    ///
+    
+    /// 
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func deleteAccount(
-
+        
         input: ComAtprotoServerDeleteAccount.Input
-
+        
     ) async throws -> Int {
         let endpoint = "com.atproto.server.deleteAccount"
-
+        
         var headers: [String: String] = [:]
-
+        
         headers["Content-Type"] = "application/json"
+        
+        
+        
 
-
-
-
-
+        
         let requestData: Data? = try JSONEncoder().encode(input)
-
-
+        
+        
         let queryItems: [URLQueryItem]? = nil
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
@@ -114,11 +114,11 @@ extension ATProtoClient.Com.Atproto.Server {
         let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
+        
         return responseCode
-
+        
     }
-
+    
 }
-
+                           
 

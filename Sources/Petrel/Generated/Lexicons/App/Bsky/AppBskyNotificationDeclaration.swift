@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: app.bsky.notification.declaration
 
 
-public struct AppBskyNotificationDeclaration: ATProtocolCodable, ATProtocolValue {
+public struct AppBskyNotificationDeclaration: ATProtocolCodable, ATProtocolValue { 
 
     public static let typeIdentifier = "app.bsky.notification.declaration"
         public let allowSubscriptions: String
@@ -59,5 +59,5 @@ public struct AppBskyNotificationDeclaration: ATProtocolCodable, ATProtocolValue
 }
 
 
-
+                           
 

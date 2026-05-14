@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: blue.catbird.mlsDS.deliverWelcome
 
 
-public struct BlueCatbirdMlsDSDeliverWelcome {
+public struct BlueCatbirdMlsDSDeliverWelcome { 
 
     public static let typeIdentifier = "blue.catbird.mlsDS.deliverWelcome"
 public struct Input: ATProtocolCodable {
@@ -25,7 +25,7 @@ public struct Input: ATProtocolCodable {
             self.welcomeData = welcomeData
             self.initialEpoch = initialEpoch
         }
-
+        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -73,91 +73,91 @@ public struct Input: ATProtocolCodable {
             case initialEpoch
         }
     }
-
+    
 public struct Output: ATProtocolCodable {
-
-
+        
+        
         public let accepted: Bool
-
+        
         public let ack: BlueCatbirdMlsDSDeliverMessage.DeliveryAck?
-
-
-
+        
+        
+        
         // Standard public initializer
         public init(
-
-
+            
+            
             accepted: Bool,
-
+            
             ack: BlueCatbirdMlsDSDeliverMessage.DeliveryAck? = nil
-
-
+            
+            
         ) {
-
-
+            
+            
             self.accepted = accepted
-
+            
             self.ack = ack
-
-
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
-
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            
             self.accepted = try container.decode(Bool.self, forKey: .accepted)
-
-
+            
+            
             self.ack = try container.decodeIfPresent(BlueCatbirdMlsDSDeliverMessage.DeliveryAck.self, forKey: .ack)
-
-
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
-
+            
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
             try container.encode(accepted, forKey: .accepted)
-
-
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(ack, forKey: .ack)
-
-
+            
+            
         }
 
         public func toCBORValue() throws -> Any {
-
+            
             var map = OrderedCBORMap()
 
-
-
+            
+            
             let acceptedValue = try accepted.toCBORValue()
             map = map.adding(key: "accepted", value: acceptedValue)
-
-
-
+            
+            
+            
             if let value = ack {
                 // Encode optional property even if it's an empty array for CBOR
                 let ackValue = try value.toCBORValue()
                 map = map.adding(key: "ack", value: ackValue)
             }
-
-
+            
+            
 
             return map
-
+            
         }
-
-
+        
+        
         private enum CodingKeys: String, CodingKey {
             case accepted
             case ack
         }
-
+        
     }
-
+        
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case recipientNotFound = "RecipientNotFound."
                 case notSequencer = "NotSequencer."
@@ -180,34 +180,34 @@ extension ATProtoClient.Blue.Catbird.MlsDS {
     // MARK: - deliverWelcome
 
     /// Accept a Welcome message for a new member from a remote DS. Deliver a federated MLS Welcome message to add a user to a group on the local DS.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-
-    ///
+    
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func deliverWelcome(
-
+        
         input: BlueCatbirdMlsDSDeliverWelcome.Input
-
+        
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsDSDeliverWelcome.Output?) {
         let endpoint = "blue.catbird.mlsDS.deliverWelcome"
-
+        
         var headers: [String: String] = [:]
-
+        
         headers["Content-Type"] = "application/json"
-
-
-
+        
+        
+        
         headers["Accept"] = "application/json"
+        
 
-
-
+        
         let requestData: Data? = try JSONEncoder().encode(input)
-
-
+        
+        
         let queryItems: [URLQueryItem]? = nil
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
@@ -222,12 +222,12 @@ extension ATProtoClient.Blue.Catbird.MlsDS {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
+        
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
         if (200...299).contains(responseCode) {
-
+            
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -235,13 +235,13 @@ extension ATProtoClient.Blue.Catbird.MlsDS {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-
+            
 
             do {
-
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsDSDeliverWelcome.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -252,9 +252,9 @@ extension ATProtoClient.Blue.Catbird.MlsDS {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-
+        
     }
-
+    
 }
-
+                           
 

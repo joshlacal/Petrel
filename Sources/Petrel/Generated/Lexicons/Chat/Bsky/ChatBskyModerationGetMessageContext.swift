@@ -5,89 +5,89 @@ import Foundation
 // lexicon: 1, id: chat.bsky.moderation.getMessageContext
 
 
-public struct ChatBskyModerationGetMessageContext {
+public struct ChatBskyModerationGetMessageContext { 
 
-    public static let typeIdentifier = "chat.bsky.moderation.getMessageContext"
+    public static let typeIdentifier = "chat.bsky.moderation.getMessageContext"    
 public struct Parameters: Parametrizable {
         public let convoId: String?
         public let messageId: String
         public let before: Int?
         public let after: Int?
-
+        
         public init(
-            convoId: String? = nil,
-            messageId: String,
-            before: Int? = nil,
+            convoId: String? = nil, 
+            messageId: String, 
+            before: Int? = nil, 
             after: Int? = nil
             ) {
             self.convoId = convoId
             self.messageId = messageId
             self.before = before
             self.after = after
-
+            
         }
     }
-
+    
 public struct Output: ATProtocolCodable {
-
-
+        
+        
         public let messages: [OutputMessagesUnion]
-
-
-
+        
+        
+        
         // Standard public initializer
         public init(
-
-
+            
+            
             messages: [OutputMessagesUnion]
-
-
+            
+            
         ) {
-
-
+            
+            
             self.messages = messages
-
-
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
-
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            
             self.messages = try container.decode([OutputMessagesUnion].self, forKey: .messages)
-
-
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
-
+            
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
             try container.encode(messages, forKey: .messages)
-
-
+            
+            
         }
 
         public func toCBORValue() throws -> Any {
-
+            
             var map = OrderedCBORMap()
 
-
-
+            
+            
             let messagesValue = try messages.toCBORValue()
             map = map.adding(key: "messages", value: messagesValue)
-
-
+            
+            
 
             return map
-
+            
         }
-
-
+        
+        
         private enum CodingKeys: String, CodingKey {
             case messages
         }
-
+        
     }
 
 
@@ -168,7 +168,7 @@ public enum OutputMessagesUnion: Codable, ATProtocolCodable, ATProtocolValue, Se
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-
+    
     public static func == (lhs: OutputMessagesUnion, rhs: OutputMessagesUnion) -> Bool {
         switch (lhs, rhs) {
         case (.chatBskyConvoDefsMessageView(let lhsValue),
@@ -186,21 +186,21 @@ public enum OutputMessagesUnion: Codable, ATProtocolCodable, ATProtocolValue, Se
             return false
         }
     }
-
+    
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? OutputMessagesUnion else { return false }
         return self == other
     }
-
+    
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-
+        
         switch self {
         case .chatBskyConvoDefsMessageView(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#messageView")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -217,7 +217,7 @@ public enum OutputMessagesUnion: Codable, ATProtocolCodable, ATProtocolValue, Se
             return map
         case .chatBskyConvoDefsDeletedMessageView(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#deletedMessageView")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -234,7 +234,7 @@ public enum OutputMessagesUnion: Codable, ATProtocolCodable, ATProtocolValue, Se
             return map
         case .chatBskyConvoDefsSystemMessageView(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#systemMessageView")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -263,18 +263,18 @@ public enum OutputMessagesUnion: Codable, ATProtocolCodable, ATProtocolValue, Se
 extension ATProtoClient.Chat.Bsky.Moderation {
     // MARK: - getMessageContext
 
-    ///
-    ///
+    /// 
+    /// 
     /// - Parameter input: The input parameters for the request
-    ///
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func getMessageContext(input: ChatBskyModerationGetMessageContext.Parameters) async throws -> (responseCode: Int, data: ChatBskyModerationGetMessageContext.Output?) {
         let endpoint = "chat.bsky.moderation.getMessageContext"
 
-
+        
         let queryItems = input.asQueryItems()
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -293,7 +293,7 @@ extension ATProtoClient.Chat.Bsky.Moderation {
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
         if (200...299).contains(responseCode) {
-
+            
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -301,13 +301,13 @@ extension ATProtoClient.Chat.Bsky.Moderation {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-
+            
 
             do {
-
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(ChatBskyModerationGetMessageContext.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -315,12 +315,12 @@ extension ATProtoClient.Chat.Bsky.Moderation {
                 return (responseCode, nil)
             }
         } else {
-
+            
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
+                           
 

@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: com.atproto.repo.deleteRecord
 
 
-public struct ComAtprotoRepoDeleteRecord {
+public struct ComAtprotoRepoDeleteRecord { 
 
     public static let typeIdentifier = "com.atproto.repo.deleteRecord"
 public struct Input: ATProtocolCodable {
@@ -23,7 +23,7 @@ public struct Input: ATProtocolCodable {
             self.swapRecord = swapRecord
             self.swapCommit = swapCommit
         }
-
+        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -70,73 +70,73 @@ public struct Input: ATProtocolCodable {
             case swapCommit
         }
     }
-
+    
 public struct Output: ATProtocolCodable {
-
-
+        
+        
         public let commit: ComAtprotoRepoDefs.CommitMeta?
-
-
-
+        
+        
+        
         // Standard public initializer
         public init(
-
-
+            
+            
             commit: ComAtprotoRepoDefs.CommitMeta? = nil
-
-
+            
+            
         ) {
-
-
+            
+            
             self.commit = commit
-
-
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
-
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            
             self.commit = try container.decodeIfPresent(ComAtprotoRepoDefs.CommitMeta.self, forKey: .commit)
-
-
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
-
+            
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(commit, forKey: .commit)
-
-
+            
+            
         }
 
         public func toCBORValue() throws -> Any {
-
+            
             var map = OrderedCBORMap()
 
-
-
+            
+            
             if let value = commit {
                 // Encode optional property even if it's an empty array for CBOR
                 let commitValue = try value.toCBORValue()
                 map = map.adding(key: "commit", value: commitValue)
             }
-
-
+            
+            
 
             return map
-
+            
         }
-
-
+        
+        
         private enum CodingKeys: String, CodingKey {
             case commit
         }
-
+        
     }
-
+        
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case invalidSwap = "InvalidSwap."
             public var description: String {
@@ -158,34 +158,34 @@ extension ATProtoClient.Com.Atproto.Repo {
     // MARK: - deleteRecord
 
     /// Delete a repository record, or ensure it doesn't exist. Requires auth, implemented by PDS.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-
-    ///
+    
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func deleteRecord(
-
+        
         input: ComAtprotoRepoDeleteRecord.Input
-
+        
     ) async throws -> (responseCode: Int, data: ComAtprotoRepoDeleteRecord.Output?) {
         let endpoint = "com.atproto.repo.deleteRecord"
-
+        
         var headers: [String: String] = [:]
-
+        
         headers["Content-Type"] = "application/json"
-
-
-
+        
+        
+        
         headers["Accept"] = "application/json"
+        
 
-
-
+        
         let requestData: Data? = try JSONEncoder().encode(input)
-
-
+        
+        
         let queryItems: [URLQueryItem]? = nil
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
@@ -200,12 +200,12 @@ extension ATProtoClient.Com.Atproto.Repo {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
+        
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
         if (200...299).contains(responseCode) {
-
+            
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -213,13 +213,13 @@ extension ATProtoClient.Com.Atproto.Repo {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-
+            
 
             do {
-
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(ComAtprotoRepoDeleteRecord.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -230,9 +230,9 @@ extension ATProtoClient.Com.Atproto.Repo {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-
+        
     }
-
+    
 }
-
+                           
 

@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: place.stream.livestream
 
 
-public struct PlaceStreamLivestream: ATProtocolCodable, ATProtocolValue {
+public struct PlaceStreamLivestream: ATProtocolCodable, ATProtocolValue { 
 
     public static let typeIdentifier = "place.stream.livestream"
         public let title: String
@@ -217,7 +217,7 @@ public struct PlaceStreamLivestream: ATProtocolCodable, ATProtocolValue {
             case thumb
             case notificationSettings
         }
-
+        
 public struct NotificationSettings: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "place.stream.livestream#notificationSettings"
             public let pushNotification: Bool?
@@ -279,7 +279,7 @@ public struct NotificationSettings: ATProtocolCodable, ATProtocolValue {
             case pushNotification
         }
     }
-
+        
 public struct LivestreamView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "place.stream.livestream#livestreamView"
             public let uri: ATProtocolURI
@@ -421,7 +421,7 @@ public struct LivestreamView: ATProtocolCodable, ATProtocolValue {
             case viewerCount
         }
     }
-
+        
 public struct ViewerCount: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "place.stream.livestream#viewerCount"
             public let count: Int
@@ -477,7 +477,7 @@ public struct ViewerCount: ATProtocolCodable, ATProtocolValue {
             case count
         }
     }
-
+        
 public struct TeleportArrival: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "place.stream.livestream#teleportArrival"
             public let teleportUri: ATProtocolURI
@@ -603,7 +603,7 @@ public struct TeleportArrival: ATProtocolCodable, ATProtocolValue {
             case startsAt
         }
     }
-
+        
 public struct TeleportCanceled: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "place.stream.livestream#teleportCanceled"
             public let teleportUri: ATProtocolURI
@@ -675,7 +675,7 @@ public struct TeleportCanceled: ATProtocolCodable, ATProtocolValue {
             case reason
         }
     }
-
+        
 public struct StreamplaceAnything: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "place.stream.livestream#streamplaceAnything"
             public let livestream: StreamplaceAnythingLivestreamUnion
@@ -886,7 +886,7 @@ public indirect enum StreamplaceAnythingLivestreamUnion: Codable, ATProtocolCoda
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-
+    
     public static func == (lhs: StreamplaceAnythingLivestreamUnion, rhs: StreamplaceAnythingLivestreamUnion) -> Bool {
         switch (lhs, rhs) {
         case (.placeStreamLivestreamLivestreamView(let lhsValue),
@@ -922,21 +922,21 @@ public indirect enum StreamplaceAnythingLivestreamUnion: Codable, ATProtocolCoda
             return false
         }
     }
-
+    
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? StreamplaceAnythingLivestreamUnion else { return false }
         return self == other
     }
-
+    
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-
+        
         switch self {
         case .placeStreamLivestreamLivestreamView(let value):
             map = map.adding(key: "$type", value: "place.stream.livestream#livestreamView")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -953,7 +953,7 @@ public indirect enum StreamplaceAnythingLivestreamUnion: Codable, ATProtocolCoda
             return map
         case .placeStreamLivestreamViewerCount(let value):
             map = map.adding(key: "$type", value: "place.stream.livestream#viewerCount")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -970,7 +970,7 @@ public indirect enum StreamplaceAnythingLivestreamUnion: Codable, ATProtocolCoda
             return map
         case .placeStreamLivestreamTeleportArrival(let value):
             map = map.adding(key: "$type", value: "place.stream.livestream#teleportArrival")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -987,7 +987,7 @@ public indirect enum StreamplaceAnythingLivestreamUnion: Codable, ATProtocolCoda
             return map
         case .placeStreamLivestreamTeleportCanceled(let value):
             map = map.adding(key: "$type", value: "place.stream.livestream#teleportCanceled")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -1004,7 +1004,7 @@ public indirect enum StreamplaceAnythingLivestreamUnion: Codable, ATProtocolCoda
             return map
         case .placeStreamDefsBlockView(let value):
             map = map.adding(key: "$type", value: "place.stream.defs#blockView")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -1021,7 +1021,7 @@ public indirect enum StreamplaceAnythingLivestreamUnion: Codable, ATProtocolCoda
             return map
         case .placeStreamDefsRenditions(let value):
             map = map.adding(key: "$type", value: "place.stream.defs#renditions")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -1038,7 +1038,7 @@ public indirect enum StreamplaceAnythingLivestreamUnion: Codable, ATProtocolCoda
             return map
         case .placeStreamDefsRendition(let value):
             map = map.adding(key: "$type", value: "place.stream.defs#rendition")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -1055,7 +1055,7 @@ public indirect enum StreamplaceAnythingLivestreamUnion: Codable, ATProtocolCoda
             return map
         case .placeStreamChatDefsMessageView(let value):
             map = map.adding(key: "$type", value: "place.stream.chat.defs#messageView")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -1072,7 +1072,7 @@ public indirect enum StreamplaceAnythingLivestreamUnion: Codable, ATProtocolCoda
             return map
         case .placeStreamChatDefsPinnedRecordView(let value):
             map = map.adding(key: "$type", value: "place.stream.chat.defs#pinnedRecordView")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -1097,5 +1097,5 @@ public indirect enum StreamplaceAnythingLivestreamUnion: Codable, ATProtocolCoda
 }
 
 
-
+                           
 

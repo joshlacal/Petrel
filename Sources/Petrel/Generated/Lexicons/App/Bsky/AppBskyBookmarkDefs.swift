@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: app.bsky.bookmark.defs
 
 
-public struct AppBskyBookmarkDefs {
+public struct AppBskyBookmarkDefs { 
 
     public static let typeIdentifier = "app.bsky.bookmark.defs"
-
+        
 public struct Bookmark: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.bookmark.defs#bookmark"
             public let subject: ComAtprotoRepoStrongRef
@@ -64,7 +64,7 @@ public struct Bookmark: ATProtocolCodable, ATProtocolValue {
             case subject
         }
     }
-
+        
 public struct BookmarkView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.bookmark.defs#bookmarkView"
             public let subject: ComAtprotoRepoStrongRef
@@ -235,7 +235,7 @@ public indirect enum BookmarkViewItemUnion: Codable, ATProtocolCodable, ATProtoc
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-
+    
     public static func == (lhs: BookmarkViewItemUnion, rhs: BookmarkViewItemUnion) -> Bool {
         switch (lhs, rhs) {
         case (.appBskyFeedDefsBlockedPost(let lhsValue),
@@ -253,21 +253,21 @@ public indirect enum BookmarkViewItemUnion: Codable, ATProtocolCodable, ATProtoc
             return false
         }
     }
-
+    
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? BookmarkViewItemUnion else { return false }
         return self == other
     }
-
+    
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-
+        
         switch self {
         case .appBskyFeedDefsBlockedPost(let value):
             map = map.adding(key: "$type", value: "app.bsky.feed.defs#blockedPost")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -284,7 +284,7 @@ public indirect enum BookmarkViewItemUnion: Codable, ATProtocolCodable, ATProtoc
             return map
         case .appBskyFeedDefsNotFoundPost(let value):
             map = map.adding(key: "$type", value: "app.bsky.feed.defs#notFoundPost")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -301,7 +301,7 @@ public indirect enum BookmarkViewItemUnion: Codable, ATProtocolCodable, ATProtoc
             return map
         case .appBskyFeedDefsPostView(let value):
             map = map.adding(key: "$type", value: "app.bsky.feed.defs#postView")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -326,5 +326,5 @@ public indirect enum BookmarkViewItemUnion: Codable, ATProtocolCodable, ATProtoc
 }
 
 
-
+                           
 

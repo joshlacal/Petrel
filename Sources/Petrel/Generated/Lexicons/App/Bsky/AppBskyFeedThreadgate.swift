@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: app.bsky.feed.threadgate
 
 
-public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
+public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue { 
 
     public static let typeIdentifier = "app.bsky.feed.threadgate"
         public let post: ATProtocolURI
@@ -98,17 +98,17 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
             case createdAt
             case hiddenReplies
         }
-
+        
 public struct MentionRule: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.feed.threadgate#mentionRule"
 
         public init(
-
+            
         ) {
         }
 
         public init(from decoder: Decoder) throws {
-
+            
             let _ = decoder
         }
 
@@ -121,7 +121,7 @@ public struct MentionRule: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-
+            
             return other is Self
         }
 
@@ -139,17 +139,17 @@ public struct MentionRule: ATProtocolCodable, ATProtocolValue {
             case typeIdentifier = "$type"
         }
     }
-
+        
 public struct FollowerRule: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.feed.threadgate#followerRule"
 
         public init(
-
+            
         ) {
         }
 
         public init(from decoder: Decoder) throws {
-
+            
             let _ = decoder
         }
 
@@ -162,7 +162,7 @@ public struct FollowerRule: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-
+            
             return other is Self
         }
 
@@ -180,17 +180,17 @@ public struct FollowerRule: ATProtocolCodable, ATProtocolValue {
             case typeIdentifier = "$type"
         }
     }
-
+        
 public struct FollowingRule: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.feed.threadgate#followingRule"
 
         public init(
-
+            
         ) {
         }
 
         public init(from decoder: Decoder) throws {
-
+            
             let _ = decoder
         }
 
@@ -203,7 +203,7 @@ public struct FollowingRule: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-
+            
             return other is Self
         }
 
@@ -221,7 +221,7 @@ public struct FollowingRule: ATProtocolCodable, ATProtocolValue {
             case typeIdentifier = "$type"
         }
     }
-
+        
 public struct ListRule: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.feed.threadgate#listRule"
             public let list: ATProtocolURI
@@ -368,7 +368,7 @@ public enum AppBskyFeedThreadgateAllowUnion: Codable, ATProtocolCodable, ATProto
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-
+    
     public static func == (lhs: AppBskyFeedThreadgateAllowUnion, rhs: AppBskyFeedThreadgateAllowUnion) -> Bool {
         switch (lhs, rhs) {
         case (.appBskyFeedThreadgateMentionRule(let lhsValue),
@@ -389,21 +389,21 @@ public enum AppBskyFeedThreadgateAllowUnion: Codable, ATProtocolCodable, ATProto
             return false
         }
     }
-
+    
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? AppBskyFeedThreadgateAllowUnion else { return false }
         return self == other
     }
-
+    
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-
+        
         switch self {
         case .appBskyFeedThreadgateMentionRule(let value):
             map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#mentionRule")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -420,7 +420,7 @@ public enum AppBskyFeedThreadgateAllowUnion: Codable, ATProtocolCodable, ATProto
             return map
         case .appBskyFeedThreadgateFollowerRule(let value):
             map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#followerRule")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -437,7 +437,7 @@ public enum AppBskyFeedThreadgateAllowUnion: Codable, ATProtocolCodable, ATProto
             return map
         case .appBskyFeedThreadgateFollowingRule(let value):
             map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#followingRule")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -454,7 +454,7 @@ public enum AppBskyFeedThreadgateAllowUnion: Codable, ATProtocolCodable, ATProto
             return map
         case .appBskyFeedThreadgateListRule(let value):
             map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#listRule")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -479,5 +479,5 @@ public enum AppBskyFeedThreadgateAllowUnion: Codable, ATProtocolCodable, ATProto
 }
 
 
-
+                           
 

@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: com.germnetwork.declaration
 
 
-public struct ComGermnetworkDeclaration: ATProtocolCodable, ATProtocolValue {
+public struct ComGermnetworkDeclaration: ATProtocolCodable, ATProtocolValue { 
 
     public static let typeIdentifier = "com.germnetwork.declaration"
         public let version: String
@@ -115,7 +115,7 @@ public struct ComGermnetworkDeclaration: ATProtocolCodable, ATProtocolValue {
             case keyPackage
             case continuityProofs
         }
-
+        
 public struct MessageMe: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "com.germnetwork.declaration#messageMe"
             public let messageMeUrl: URI
@@ -193,5 +193,5 @@ public struct MessageMe: ATProtocolCodable, ATProtocolValue {
 }
 
 
-
+                           
 
