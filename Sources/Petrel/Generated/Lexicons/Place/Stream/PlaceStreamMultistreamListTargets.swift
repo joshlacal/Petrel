@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: place.stream.multistream.listTargets
 
 
-public struct PlaceStreamMultistreamListTargets { 
+public struct PlaceStreamMultistreamListTargets {
 
     public static let typeIdentifier = "place.stream.multistream.listTargets"
-        
+
 public struct Record: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "place.stream.multistream.listTargets#record"
             public let uri: ATProtocolURI
@@ -95,103 +95,103 @@ public struct Record: ATProtocolCodable, ATProtocolValue {
             case cid
             case value
         }
-    }    
+    }
 public struct Parameters: Parametrizable {
         public let limit: Int?
         public let cursor: String?
-        
+
         public init(
-            limit: Int? = nil, 
+            limit: Int? = nil,
             cursor: String? = nil
             ) {
             self.limit = limit
             self.cursor = cursor
-            
+
         }
     }
-    
+
 public struct Output: ATProtocolCodable {
-        
-        
+
+
         public let targets: [PlaceStreamMultistreamDefs.TargetView]
-        
+
         public let cursor: String?
-        
-        
-        
+
+
+
         // Standard public initializer
         public init(
-            
-            
+
+
             targets: [PlaceStreamMultistreamDefs.TargetView],
-            
+
             cursor: String? = nil
-            
-            
+
+
         ) {
-            
-            
+
+
             self.targets = targets
-            
+
             self.cursor = cursor
-            
-            
+
+
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
+
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
+
             self.targets = try container.decode([PlaceStreamMultistreamDefs.TargetView].self, forKey: .targets)
-            
-            
+
+
             self.cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
-            
-            
+
+
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
+
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(targets, forKey: .targets)
-            
-            
+
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(cursor, forKey: .cursor)
-            
-            
+
+
         }
 
         public func toCBORValue() throws -> Any {
-            
+
             var map = OrderedCBORMap()
 
-            
-            
+
+
             let targetsValue = try targets.toCBORValue()
             map = map.adding(key: "targets", value: targetsValue)
-            
-            
-            
+
+
+
             if let value = cursor {
                 // Encode optional property even if it's an empty array for CBOR
                 let cursorValue = try value.toCBORValue()
                 map = map.adding(key: "cursor", value: cursorValue)
             }
-            
-            
+
+
 
             return map
-            
+
         }
-        
-        
+
+
         private enum CodingKeys: String, CodingKey {
             case targets
             case cursor
         }
-        
+
     }
 
 
@@ -205,17 +205,17 @@ extension ATProtoClient.Place.Stream.Multistream {
     // MARK: - listTargets
 
     /// List a range of targets for rebroadcasting a Streamplace stream.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func listTargets(input: PlaceStreamMultistreamListTargets.Parameters) async throws -> (responseCode: Int, data: PlaceStreamMultistreamListTargets.Output?) {
         let endpoint = "place.stream.multistream.listTargets"
 
-        
+
         let queryItems = input.asQueryItems()
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -234,7 +234,7 @@ extension ATProtoClient.Place.Stream.Multistream {
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
         if (200...299).contains(responseCode) {
-            
+
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -242,13 +242,13 @@ extension ATProtoClient.Place.Stream.Multistream {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-            
+
 
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(PlaceStreamMultistreamListTargets.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -256,12 +256,12 @@ extension ATProtoClient.Place.Stream.Multistream {
                 return (responseCode, nil)
             }
         } else {
-            
+
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-                           
+
 

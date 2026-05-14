@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: app.bsky.labeler.service
 
 
-public struct AppBskyLabelerService: ATProtocolCodable, ATProtocolValue { 
+public struct AppBskyLabelerService: ATProtocolCodable, ATProtocolValue {
 
     public static let typeIdentifier = "app.bsky.labeler.service"
         public let policies: AppBskyLabelerDefs.LabelerPolicies
@@ -184,7 +184,7 @@ public enum AppBskyLabelerServiceLabelsUnion: Codable, ATProtocolCodable, ATProt
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-    
+
     public static func == (lhs: AppBskyLabelerServiceLabelsUnion, rhs: AppBskyLabelerServiceLabelsUnion) -> Bool {
         switch (lhs, rhs) {
         case (.comAtprotoLabelDefsSelfLabels(let lhsValue),
@@ -196,21 +196,21 @@ public enum AppBskyLabelerServiceLabelsUnion: Codable, ATProtocolCodable, ATProt
             return false
         }
     }
-    
+
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? AppBskyLabelerServiceLabelsUnion else { return false }
         return self == other
     }
-    
+
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-        
+
         switch self {
         case .comAtprotoLabelDefsSelfLabels(let value):
             map = map.adding(key: "$type", value: "com.atproto.label.defs#selfLabels")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -235,5 +235,5 @@ public enum AppBskyLabelerServiceLabelsUnion: Codable, ATProtocolCodable, ATProt
 }
 
 
-                           
+
 

@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: blue.catbird.mlsChat.reportSpam
 
 
-public struct BlueCatbirdMlsChatReportSpam { 
+public struct BlueCatbirdMlsChatReportSpam {
 
     public static let typeIdentifier = "blue.catbird.mlsChat.reportSpam"
 public struct Input: ATProtocolCodable {
@@ -19,7 +19,7 @@ public struct Input: ATProtocolCodable {
             self.reportedDid = reportedDid
             self.reason = reason
         }
-        
+
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -54,87 +54,87 @@ public struct Input: ATProtocolCodable {
             case reason
         }
     }
-    
+
 public struct Output: ATProtocolCodable {
-        
-        
+
+
         public let id: String
-        
+
         public let createdAt: ATProtocolDate
-        
-        
-        
+
+
+
         // Standard public initializer
         public init(
-            
-            
+
+
             id: String,
-            
+
             createdAt: ATProtocolDate
-            
-            
+
+
         ) {
-            
-            
+
+
             self.id = id
-            
+
             self.createdAt = createdAt
-            
-            
+
+
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
+
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
+
             self.id = try container.decode(String.self, forKey: .id)
-            
-            
+
+
             self.createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
-            
-            
+
+
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
+
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(id, forKey: .id)
-            
-            
+
+
             try container.encode(createdAt, forKey: .createdAt)
-            
-            
+
+
         }
 
         public func toCBORValue() throws -> Any {
-            
+
             var map = OrderedCBORMap()
 
-            
-            
+
+
             let idValue = try id.toCBORValue()
             map = map.adding(key: "id", value: idValue)
-            
-            
-            
+
+
+
             let createdAtValue = try createdAt.toCBORValue()
             map = map.adding(key: "createdAt", value: createdAtValue)
-            
-            
+
+
 
             return map
-            
+
         }
-        
-        
+
+
         private enum CodingKeys: String, CodingKey {
             case id
             case createdAt
         }
-        
+
     }
-        
+
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case conversationNotFound = "ConversationNotFound."
                 case notAMember = "NotAMember."
@@ -158,34 +158,34 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - reportSpam
 
     /// Report an account as spam in an MLS conversation.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    
-    /// 
+
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func reportSpam(
-        
+
         input: BlueCatbirdMlsChatReportSpam.Input
-        
+
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatReportSpam.Output?) {
         let endpoint = "blue.catbird.mlsChat.reportSpam"
-        
-        var headers: [String: String] = [:]
-        
-        headers["Content-Type"] = "application/json"
-        
-        
-        
-        headers["Accept"] = "application/json"
-        
 
-        
+        var headers: [String: String] = [:]
+
+        headers["Content-Type"] = "application/json"
+
+
+
+        headers["Accept"] = "application/json"
+
+
+
         let requestData: Data? = try JSONEncoder().encode(input)
-        
-        
+
+
         let queryItems: [URLQueryItem]? = nil
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
@@ -200,12 +200,12 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        
+
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
         if (200...299).contains(responseCode) {
-            
+
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -213,13 +213,13 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-            
+
 
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatReportSpam.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -230,9 +230,9 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-        
+
     }
-    
+
 }
-                           
+
 

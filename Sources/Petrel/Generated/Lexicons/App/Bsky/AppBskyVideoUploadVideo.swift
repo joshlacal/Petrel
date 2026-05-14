@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: app.bsky.video.uploadVideo
 
 
-public struct AppBskyVideoUploadVideo { 
+public struct AppBskyVideoUploadVideo {
 
     public static let typeIdentifier = "app.bsky.video.uploadVideo"
 public struct Input: ATProtocolCodable {
@@ -15,7 +15,7 @@ public struct Input: ATProtocolCodable {
         public init(data: Data) {
             self.data = data
         }
-        
+
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -38,67 +38,67 @@ public struct Input: ATProtocolCodable {
             case data
         }
     }
-    
+
 public struct Output: ATProtocolCodable {
-        
-        
+
+
         public let jobStatus: AppBskyVideoDefs.JobStatus
-        
-        
-        
+
+
+
         // Standard public initializer
         public init(
-            
-            
+
+
             jobStatus: AppBskyVideoDefs.JobStatus
-            
-            
+
+
         ) {
-            
-            
+
+
             self.jobStatus = jobStatus
-            
-            
+
+
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
+
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
+
             self.jobStatus = try container.decode(AppBskyVideoDefs.JobStatus.self, forKey: .jobStatus)
-            
-            
+
+
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
+
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(jobStatus, forKey: .jobStatus)
-            
-            
+
+
         }
 
         public func toCBORValue() throws -> Any {
-            
+
             var map = OrderedCBORMap()
 
-            
-            
+
+
             let jobStatusValue = try jobStatus.toCBORValue()
             map = map.adding(key: "jobStatus", value: jobStatusValue)
-            
-            
+
+
 
             return map
-            
+
         }
-        
-        
+
+
         private enum CodingKeys: String, CodingKey {
             case jobStatus
         }
-        
+
     }
 
 
@@ -110,33 +110,33 @@ extension ATProtoClient.App.Bsky.Video {
     // MARK: - uploadVideo
 
     /// Upload a video to be processed then stored on the PDS.
-    /// 
+    ///
     /// - Parameter data: The binary data to upload
-    
-    /// 
+
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func uploadVideo(
-        
+
         data: Data
-        
+
     ) async throws -> (responseCode: Int, data: AppBskyVideoUploadVideo.Output?) {
         let endpoint = "app.bsky.video.uploadVideo"
-        
+
         let dataToUpload = data
         var headers: [String: String] = [
             "Content-Type": "video/mp4",
             "Content-Length": "\(dataToUpload.count)"
         ]
-        
-        
-        headers["Accept"] = "application/json"
-        
 
-        
-        
+
+        headers["Accept"] = "application/json"
+
+
+
+
         let queryItems: [URLQueryItem]? = nil
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
@@ -151,12 +151,12 @@ extension ATProtoClient.App.Bsky.Video {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        
+
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
         if (200...299).contains(responseCode) {
-            
+
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -164,13 +164,13 @@ extension ATProtoClient.App.Bsky.Video {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-            
+
 
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(AppBskyVideoUploadVideo.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -181,9 +181,9 @@ extension ATProtoClient.App.Bsky.Video {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-        
+
     }
-    
+
 }
-                           
+
 

@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: blue.catbird.mlsChat.subscribeEvents
 
 
-public struct BlueCatbirdMlsChatSubscribeEvents { 
+public struct BlueCatbirdMlsChatSubscribeEvents {
 
     public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents"
-        
+
 public struct MessageEvent: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#messageEvent"
             public let cursor: String
@@ -102,7 +102,7 @@ public struct MessageEvent: ATProtocolCodable, ATProtocolValue {
             case ephemeral
         }
     }
-        
+
 public struct ReactionEvent: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#reactionEvent"
             public let cursor: String
@@ -238,7 +238,7 @@ public struct ReactionEvent: ATProtocolCodable, ATProtocolValue {
             case action
         }
     }
-        
+
 public struct TypingEvent: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#typingEvent"
             public let cursor: String
@@ -342,7 +342,7 @@ public struct TypingEvent: ATProtocolCodable, ATProtocolValue {
             case isTyping
         }
     }
-        
+
 public struct NewDeviceEvent: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#newDeviceEvent"
             public let cursor: String
@@ -500,7 +500,7 @@ public struct NewDeviceEvent: ATProtocolCodable, ATProtocolValue {
             case pendingAdditionId
         }
     }
-        
+
 public struct TreeChanged: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#treeChanged"
             public let cursor: String
@@ -604,7 +604,7 @@ public struct TreeChanged: ATProtocolCodable, ATProtocolValue {
             case epoch
         }
     }
-        
+
 public struct InfoEvent: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#infoEvent"
             public let cursor: String
@@ -742,7 +742,7 @@ public struct InfoEvent: ATProtocolCodable, ATProtocolValue {
             case requestedBy
         }
     }
-        
+
 public struct GroupResetEvent: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#groupResetEvent"
             public let cursor: String
@@ -912,7 +912,7 @@ public struct GroupResetEvent: ATProtocolCodable, ATProtocolValue {
             case reason
         }
     }
-        
+
 public struct MembershipChangeEvent: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#membershipChangeEvent"
             public let cursor: String
@@ -1016,7 +1016,7 @@ public struct MembershipChangeEvent: ATProtocolCodable, ATProtocolValue {
             case action
         }
     }
-        
+
 public struct GroupInfoRefreshRequestedEvent: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#groupInfoRefreshRequestedEvent"
             public let cursor: String
@@ -1132,7 +1132,7 @@ public struct GroupInfoRefreshRequestedEvent: ATProtocolCodable, ATProtocolValue
             case requestedAt
         }
     }
-        
+
 public struct ReadditionRequestedEvent: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#readditionRequestedEvent"
             public let cursor: String
@@ -1248,7 +1248,7 @@ public struct ReadditionRequestedEvent: ATProtocolCodable, ATProtocolValue {
             case requestedAt
         }
     }
-        
+
 public struct CircuitBreakerTrippedEvent: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#circuitBreakerTrippedEvent"
             public let cursor: String
@@ -1352,7 +1352,7 @@ public struct CircuitBreakerTrippedEvent: ATProtocolCodable, ATProtocolValue {
             case trippedAt
         }
     }
-        
+
 public struct ResetRequestedEvent: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#resetRequestedEvent"
             public let cursor: String
@@ -1553,18 +1553,18 @@ public struct ResetRequestedEvent: ATProtocolCodable, ATProtocolValue {
             case reason
             case requestedAt
         }
-    }    
+    }
 public struct Parameters: Parametrizable {
         public let ticket: String?
         public let cursor: String?
-        
+
         public init(
-            ticket: String? = nil, 
+            ticket: String? = nil,
             cursor: String? = nil
             ) {
             self.ticket = ticket
             self.cursor = cursor
-            
+
         }
     }
 public enum Message: Codable, Sendable {
@@ -1601,7 +1601,7 @@ public enum Message: Codable, Sendable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let type = try container.decode(String.self, forKey: .type)
-        
+
         switch type {
 
         case "blue.catbird.mlsChat.subscribeEvents#messageEvent":
@@ -1709,12 +1709,12 @@ public enum Message: Codable, Sendable {
 }
 
 
-                           
+
 
 /// Subscribe to live conversation events via WebSocket (consolidates subscribeConvoEvents with streamlined event types) Subscribe to live events (messages, membership changes, epoch advances, conversation updates) via firehose-style DAG-CBOR framing. Requires a valid ticket from getSubscriptionTicket.
 
 extension ATProtoClient.Blue.Catbird.MlsChat {
-    
+
     public func subscribeEvents(
         ticket: String? = nil, cursor: String? = nil
     ) async throws -> AsyncThrowingStream<BlueCatbirdMlsChatSubscribeEvents.Message, Error> {
@@ -1732,5 +1732,5 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             parameters: input
         )
     }
-    
+
 }

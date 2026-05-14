@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: app.bsky.unspecced.getPostThreadOtherV2
 
 
-public struct AppBskyUnspeccedGetPostThreadOtherV2 { 
+public struct AppBskyUnspeccedGetPostThreadOtherV2 {
 
     public static let typeIdentifier = "app.bsky.unspecced.getPostThreadOtherV2"
-        
+
 public struct ThreadItem: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.unspecced.getPostThreadOtherV2#threadItem"
             public let uri: ATProtocolURI
@@ -95,78 +95,78 @@ public struct ThreadItem: ATProtocolCodable, ATProtocolValue {
             case depth
             case value
         }
-    }    
+    }
 public struct Parameters: Parametrizable {
         public let anchor: ATProtocolURI
-        
+
         public init(
             anchor: ATProtocolURI
             ) {
             self.anchor = anchor
-            
+
         }
     }
-    
+
 public struct Output: ATProtocolCodable {
-        
-        
+
+
         public let thread: [ThreadItem]
-        
-        
-        
+
+
+
         // Standard public initializer
         public init(
-            
-            
+
+
             thread: [ThreadItem]
-            
-            
+
+
         ) {
-            
-            
+
+
             self.thread = thread
-            
-            
+
+
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
+
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
+
             self.thread = try container.decode([ThreadItem].self, forKey: .thread)
-            
-            
+
+
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
+
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(thread, forKey: .thread)
-            
-            
+
+
         }
 
         public func toCBORValue() throws -> Any {
-            
+
             var map = OrderedCBORMap()
 
-            
-            
+
+
             let threadValue = try thread.toCBORValue()
             map = map.adding(key: "thread", value: threadValue)
-            
-            
+
+
 
             return map
-            
+
         }
-        
-        
+
+
         private enum CodingKeys: String, CodingKey {
             case thread
         }
-        
+
     }
 
 
@@ -221,7 +221,7 @@ public enum ThreadItemValueUnion: Codable, ATProtocolCodable, ATProtocolValue, S
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-    
+
     public static func == (lhs: ThreadItemValueUnion, rhs: ThreadItemValueUnion) -> Bool {
         switch (lhs, rhs) {
         case (.appBskyUnspeccedDefsThreadItemPost(let lhsValue),
@@ -233,21 +233,21 @@ public enum ThreadItemValueUnion: Codable, ATProtocolCodable, ATProtocolValue, S
             return false
         }
     }
-    
+
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? ThreadItemValueUnion else { return false }
         return self == other
     }
-    
+
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-        
+
         switch self {
         case .appBskyUnspeccedDefsThreadItemPost(let value):
             map = map.adding(key: "$type", value: "app.bsky.unspecced.defs#threadItemPost")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -277,17 +277,17 @@ extension ATProtoClient.App.Bsky.Unspecced {
     // MARK: - getPostThreadOtherV2
 
     /// (NOTE: this endpoint is under development and WILL change without notice. Don't use it until it is moved out of `unspecced` or your application WILL break) Get additional posts under a thread e.g. replies hidden by threadgate. Based on an anchor post at any depth of the tree, returns top-level replies below that anchor. It does not include ancestors nor the anchor itself. This should be called after exhausting `app.bsky.unspecced.getPostThreadV2`. Does not require auth, but additional metadata and filtering will be applied for authed requests.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func getPostThreadOtherV2(input: AppBskyUnspeccedGetPostThreadOtherV2.Parameters) async throws -> (responseCode: Int, data: AppBskyUnspeccedGetPostThreadOtherV2.Output?) {
         let endpoint = "app.bsky.unspecced.getPostThreadOtherV2"
 
-        
+
         let queryItems = input.asQueryItems()
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -306,7 +306,7 @@ extension ATProtoClient.App.Bsky.Unspecced {
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
         if (200...299).contains(responseCode) {
-            
+
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -314,13 +314,13 @@ extension ATProtoClient.App.Bsky.Unspecced {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-            
+
 
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(AppBskyUnspeccedGetPostThreadOtherV2.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -328,12 +328,12 @@ extension ATProtoClient.App.Bsky.Unspecced {
                 return (responseCode, nil)
             }
         } else {
-            
+
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-                           
+
 

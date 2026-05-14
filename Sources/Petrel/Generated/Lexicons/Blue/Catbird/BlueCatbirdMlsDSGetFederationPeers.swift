@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: blue.catbird.mlsDS.getFederationPeers
 
 
-public struct BlueCatbirdMlsDSGetFederationPeers { 
+public struct BlueCatbirdMlsDSGetFederationPeers {
 
     public static let typeIdentifier = "blue.catbird.mlsDS.getFederationPeers"
-        
+
 public struct PeerRecord: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsDS.getFederationPeers#peerRecord"
             public let dsDid: String
@@ -277,81 +277,81 @@ public struct PeerRecord: ATProtocolCodable, ATProtocolValue {
             case createdAt
             case updatedAt
         }
-    }    
+    }
 public struct Parameters: Parametrizable {
         public let status: String?
         public let limit: Int?
-        
+
         public init(
-            status: String? = nil, 
+            status: String? = nil,
             limit: Int? = nil
             ) {
             self.status = status
             self.limit = limit
-            
+
         }
     }
-    
+
 public struct Output: ATProtocolCodable {
-        
-        
+
+
         public let peers: [PeerRecord]
-        
-        
-        
+
+
+
         // Standard public initializer
         public init(
-            
-            
+
+
             peers: [PeerRecord]
-            
-            
+
+
         ) {
-            
-            
+
+
             self.peers = peers
-            
-            
+
+
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
+
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
+
             self.peers = try container.decode([PeerRecord].self, forKey: .peers)
-            
-            
+
+
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
+
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(peers, forKey: .peers)
-            
-            
+
+
         }
 
         public func toCBORValue() throws -> Any {
-            
+
             var map = OrderedCBORMap()
 
-            
-            
+
+
             let peersValue = try peers.toCBORValue()
             map = map.adding(key: "peers", value: peersValue)
-            
-            
+
+
 
             return map
-            
+
         }
-        
-        
+
+
         private enum CodingKeys: String, CodingKey {
             case peers
         }
-        
+
     }
 
 
@@ -365,17 +365,17 @@ extension ATProtoClient.Blue.Catbird.MlsDS {
     // MARK: - getFederationPeers
 
     /// List federation peer policies (admin only). Return a list of known federation peer DS policies, optionally filtered by status.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func getFederationPeers(input: BlueCatbirdMlsDSGetFederationPeers.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsDSGetFederationPeers.Output?) {
         let endpoint = "blue.catbird.mlsDS.getFederationPeers"
 
-        
+
         let queryItems = input.asQueryItems()
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -394,7 +394,7 @@ extension ATProtoClient.Blue.Catbird.MlsDS {
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
         if (200...299).contains(responseCode) {
-            
+
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -402,13 +402,13 @@ extension ATProtoClient.Blue.Catbird.MlsDS {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-            
+
 
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsDSGetFederationPeers.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -416,12 +416,12 @@ extension ATProtoClient.Blue.Catbird.MlsDS {
                 return (responseCode, nil)
             }
         } else {
-            
+
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-                           
+
 

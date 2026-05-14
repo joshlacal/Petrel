@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: chat.bsky.convo.updateAllRead
-
+// Sets conversations from a user as read to the latest message, with filters.
 package com.atproto.generated
 
 import kotlinx.serialization.*
@@ -26,7 +26,7 @@ object ChatBskyConvoUpdateAllReadDefs {
         val updatedCount: Int    )
 
 /**
- * 
+ * Sets conversations from a user as read to the latest message, with filters.
  *
  * Endpoint: chat.bsky.convo.updateAllRead
  */

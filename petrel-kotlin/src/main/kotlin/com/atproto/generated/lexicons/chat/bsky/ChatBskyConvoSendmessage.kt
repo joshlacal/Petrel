@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: chat.bsky.convo.sendMessage
-
+// Sends a message to a conversation.
 package com.atproto.generated
 
 import kotlinx.serialization.*
@@ -23,8 +23,13 @@ object ChatBskyConvoSendMessageDefs {
 
     typealias ChatBskyConvoSendMessageOutput = ChatBskyConvoDefsMessageView
 
+sealed class ChatBskyConvoSendMessageError(val name: String, val description: String?) {
+        object ConvoLocked: ChatBskyConvoSendMessageError("ConvoLocked", "")
+        object InvalidConvo: ChatBskyConvoSendMessageError("InvalidConvo", "")
+    }
+
 /**
- * 
+ * Sends a message to a conversation.
  *
  * Endpoint: chat.bsky.convo.sendMessage
  */

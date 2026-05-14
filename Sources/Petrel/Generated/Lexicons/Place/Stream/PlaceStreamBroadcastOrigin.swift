@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: place.stream.broadcast.origin
 
 
-public struct PlaceStreamBroadcastOrigin: ATProtocolCodable, ATProtocolValue { 
+public struct PlaceStreamBroadcastOrigin: ATProtocolCodable, ATProtocolValue {
 
     public static let typeIdentifier = "place.stream.broadcast.origin"
         public let streamer: DID
@@ -132,5 +132,5 @@ public struct PlaceStreamBroadcastOrigin: ATProtocolCodable, ATProtocolValue {
 }
 
 
-                           
+
 

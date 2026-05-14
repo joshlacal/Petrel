@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: blue.catbird.mlsChat.publishKeyPackages
 
 
-public struct BlueCatbirdMlsChatPublishKeyPackages { 
+public struct BlueCatbirdMlsChatPublishKeyPackages {
 
     public static let typeIdentifier = "blue.catbird.mlsChat.publishKeyPackages"
-        
+
 public struct KeyPackageItem: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.publishKeyPackages#keyPackageItem"
             public let keyPackage: Bytes
@@ -96,7 +96,7 @@ public struct KeyPackageItem: ATProtocolCodable, ATProtocolValue {
             case expires
         }
     }
-        
+
 public struct KeyPackageStats: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.publishKeyPackages#keyPackageStats"
             public let published: Int
@@ -184,7 +184,7 @@ public struct KeyPackageStats: ATProtocolCodable, ATProtocolValue {
             case expired
         }
     }
-        
+
 public struct SyncResult: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.publishKeyPackages#syncResult"
             public let serverHashes: [String]
@@ -332,7 +332,7 @@ public struct SyncResult: ATProtocolCodable, ATProtocolValue {
             case deviceId
         }
     }
-        
+
 public struct PublishResult: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.publishKeyPackages#publishResult"
             public let succeeded: Int
@@ -426,7 +426,7 @@ public struct PublishResult: ATProtocolCodable, ATProtocolValue {
             case errors
         }
     }
-        
+
 public struct ReplenishResult: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.publishKeyPackages#replenishResult"
             public let requested: Bool
@@ -530,7 +530,7 @@ public struct ReplenishResult: ATProtocolCodable, ATProtocolValue {
             case deliveredCount
         }
     }
-        
+
 public struct BatchError: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.publishKeyPackages#batchError"
             public let index: Int
@@ -621,7 +621,7 @@ public struct Input: ATProtocolCodable {
             self.reason = reason
             self.convoId = convoId
         }
-        
+
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -686,135 +686,135 @@ public struct Input: ATProtocolCodable {
             case convoId
         }
     }
-    
+
 public struct Output: ATProtocolCodable {
-        
-        
+
+
         public let stats: KeyPackageStats
-        
+
         public let syncResult: SyncResult?
-        
+
         public let publishResult: PublishResult?
-        
+
         public let replenishResult: ReplenishResult?
-        
-        
-        
+
+
+
         // Standard public initializer
         public init(
-            
-            
+
+
             stats: KeyPackageStats,
-            
+
             syncResult: SyncResult? = nil,
-            
+
             publishResult: PublishResult? = nil,
-            
+
             replenishResult: ReplenishResult? = nil
-            
-            
+
+
         ) {
-            
-            
+
+
             self.stats = stats
-            
+
             self.syncResult = syncResult
-            
+
             self.publishResult = publishResult
-            
+
             self.replenishResult = replenishResult
-            
-            
+
+
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
+
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
+
             self.stats = try container.decode(KeyPackageStats.self, forKey: .stats)
-            
-            
+
+
             self.syncResult = try container.decodeIfPresent(SyncResult.self, forKey: .syncResult)
-            
-            
+
+
             self.publishResult = try container.decodeIfPresent(PublishResult.self, forKey: .publishResult)
-            
-            
+
+
             self.replenishResult = try container.decodeIfPresent(ReplenishResult.self, forKey: .replenishResult)
-            
-            
+
+
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
+
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(stats, forKey: .stats)
-            
-            
+
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(syncResult, forKey: .syncResult)
-            
-            
+
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(publishResult, forKey: .publishResult)
-            
-            
+
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(replenishResult, forKey: .replenishResult)
-            
-            
+
+
         }
 
         public func toCBORValue() throws -> Any {
-            
+
             var map = OrderedCBORMap()
 
-            
-            
+
+
             let statsValue = try stats.toCBORValue()
             map = map.adding(key: "stats", value: statsValue)
-            
-            
-            
+
+
+
             if let value = syncResult {
                 // Encode optional property even if it's an empty array for CBOR
                 let syncResultValue = try value.toCBORValue()
                 map = map.adding(key: "syncResult", value: syncResultValue)
             }
-            
-            
-            
+
+
+
             if let value = publishResult {
                 // Encode optional property even if it's an empty array for CBOR
                 let publishResultValue = try value.toCBORValue()
                 map = map.adding(key: "publishResult", value: publishResultValue)
             }
-            
-            
-            
+
+
+
             if let value = replenishResult {
                 // Encode optional property even if it's an empty array for CBOR
                 let replenishResultValue = try value.toCBORValue()
                 map = map.adding(key: "replenishResult", value: replenishResultValue)
             }
-            
-            
+
+
 
             return map
-            
+
         }
-        
-        
+
+
         private enum CodingKeys: String, CodingKey {
             case stats
             case syncResult
             case publishResult
             case replenishResult
         }
-        
+
     }
-        
+
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case invalidAction = "InvalidAction.Action must be 'publish', 'publishBatch', 'sync', 'stats', or 'requestReplenish'"
                 case missingKeyPackages = "MissingKeyPackages.keyPackages required for 'publish' action"
@@ -842,34 +842,34 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - publishKeyPackages
 
     /// Unified key package management: publish new packages or sync with server (consolidates publishKeyPackages + syncKeyPackages + getKeyPackageStats) Manage key packages for the authenticated user's device. Supports 'publish' to upload key packages, 'sync' to compare local hashes against server, 'stats' to fetch current counts, and 'requestReplenish' to ask peer devices to replenish missing key packages.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    
-    /// 
+
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func publishKeyPackages(
-        
+
         input: BlueCatbirdMlsChatPublishKeyPackages.Input
-        
+
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatPublishKeyPackages.Output?) {
         let endpoint = "blue.catbird.mlsChat.publishKeyPackages"
-        
-        var headers: [String: String] = [:]
-        
-        headers["Content-Type"] = "application/json"
-        
-        
-        
-        headers["Accept"] = "application/json"
-        
 
-        
+        var headers: [String: String] = [:]
+
+        headers["Content-Type"] = "application/json"
+
+
+
+        headers["Accept"] = "application/json"
+
+
+
         let requestData: Data? = try JSONEncoder().encode(input)
-        
-        
+
+
         let queryItems: [URLQueryItem]? = nil
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
@@ -884,12 +884,12 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        
+
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
         if (200...299).contains(responseCode) {
-            
+
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -897,13 +897,13 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-            
+
 
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatPublishKeyPackages.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -914,9 +914,9 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-        
+
     }
-    
+
 }
-                           
+
 

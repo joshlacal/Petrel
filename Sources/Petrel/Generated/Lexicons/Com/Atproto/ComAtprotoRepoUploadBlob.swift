@@ -12,7 +12,7 @@ import AppKit
 // lexicon: 1, id: com.atproto.repo.uploadBlob
 
 
-public struct ComAtprotoRepoUploadBlob { 
+public struct ComAtprotoRepoUploadBlob {
 
     public static let typeIdentifier = "com.atproto.repo.uploadBlob"
 public struct Input: ATProtocolCodable {
@@ -22,7 +22,7 @@ public struct Input: ATProtocolCodable {
         public init(data: Data) {
             self.data = data
         }
-        
+
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -45,67 +45,67 @@ public struct Input: ATProtocolCodable {
             case data
         }
     }
-    
+
 public struct Output: ATProtocolCodable {
-        
-        
+
+
         public let blob: Blob
-        
-        
-        
+
+
+
         // Standard public initializer
         public init(
-            
-            
+
+
             blob: Blob
-            
-            
+
+
         ) {
-            
-            
+
+
             self.blob = blob
-            
-            
+
+
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
+
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
+
             self.blob = try container.decode(Blob.self, forKey: .blob)
-            
-            
+
+
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
+
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(blob, forKey: .blob)
-            
-            
+
+
         }
 
         public func toCBORValue() throws -> Any {
-            
+
             var map = OrderedCBORMap()
 
-            
-            
+
+
             let blobValue = try blob.toCBORValue()
             map = map.adding(key: "blob", value: blobValue)
-            
-            
+
+
 
             return map
-            
+
         }
-        
-        
+
+
         private enum CodingKeys: String, CodingKey {
             case blob
         }
-        
+
     }
 
 
@@ -117,24 +117,24 @@ extension ATProtoClient.Com.Atproto.Repo {
     // MARK: - uploadBlob
 
     /// Upload a new blob, to be referenced from a repository record. The blob will be deleted if it is not referenced within a time window (eg, minutes). Blob restrictions (mimetype, size, etc) are enforced when the reference is created. Requires auth, implemented by PDS.
-    /// 
+    ///
     /// - Parameters:
     ///   - data: The binary data to upload
     ///   - mimeType: The MIME type of the data being uploaded
     ///   - stripMetadata: Whether to strip metadata from images (default: true)
-    
-    /// 
+
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func uploadBlob(
-        
+
         data: Data,
         mimeType: String,
         stripMetadata: Bool = true
-        
+
     ) async throws -> (responseCode: Int, data: ComAtprotoRepoUploadBlob.Output?) {
         let endpoint = "com.atproto.repo.uploadBlob"
-        
+
         var dataToUpload = data
         if stripMetadata, let strippedData = ImageMetadataStripper.stripMetadata(from: dataToUpload) {
             dataToUpload = strippedData
@@ -146,15 +146,15 @@ extension ATProtoClient.Com.Atproto.Repo {
             "Content-Type": mimeType,
             "Content-Length": "\(dataToUpload.count)"
         ]
-        
-        
-        headers["Accept"] = "application/json"
-        
 
-        
-        
+
+        headers["Accept"] = "application/json"
+
+
+
+
         let queryItems: [URLQueryItem]? = nil
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
@@ -169,12 +169,12 @@ extension ATProtoClient.Com.Atproto.Repo {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        
+
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
         if (200...299).contains(responseCode) {
-            
+
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -182,13 +182,13 @@ extension ATProtoClient.Com.Atproto.Repo {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-            
+
 
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(ComAtprotoRepoUploadBlob.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -199,9 +199,9 @@ extension ATProtoClient.Com.Atproto.Repo {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-        
+
     }
-    
+
     /// Compresses an image while maintaining reasonable quality
     /// - Parameters:
     ///   - imageData: The original image data
@@ -234,7 +234,7 @@ extension ATProtoClient.Com.Atproto.Repo {
         return nil
         #endif
     }
-    
+
 }
-                           
+
 

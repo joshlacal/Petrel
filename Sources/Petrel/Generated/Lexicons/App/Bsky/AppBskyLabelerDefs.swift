@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: app.bsky.labeler.defs
 
 
-public struct AppBskyLabelerDefs { 
+public struct AppBskyLabelerDefs {
 
     public static let typeIdentifier = "app.bsky.labeler.defs"
-        
+
 public struct LabelerView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.labeler.defs#labelerView"
             public let uri: ATProtocolURI
@@ -178,7 +178,7 @@ public struct LabelerView: ATProtocolCodable, ATProtocolValue {
             case labels
         }
     }
-        
+
 public struct LabelerViewDetailed: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.labeler.defs#labelerViewDetailed"
             public let uri: ATProtocolURI
@@ -430,7 +430,7 @@ public struct LabelerViewDetailed: ATProtocolCodable, ATProtocolValue {
             case subjectCollections
         }
     }
-        
+
 public struct LabelerViewerState: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.labeler.defs#labelerViewerState"
             public let like: ATProtocolURI?
@@ -492,7 +492,7 @@ public struct LabelerViewerState: ATProtocolCodable, ATProtocolValue {
             case like
         }
     }
-        
+
 public struct LabelerPolicies: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.labeler.defs#labelerPolicies"
             public let labelValues: [ComAtprotoLabelDefs.LabelValue]
@@ -576,5 +576,5 @@ public struct LabelerPolicies: ATProtocolCodable, ATProtocolValue {
 }
 
 
-                           
+
 

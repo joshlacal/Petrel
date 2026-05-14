@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: app.bsky.unspecced.getPostThreadV2
 
 
-public struct AppBskyUnspeccedGetPostThreadV2 { 
+public struct AppBskyUnspeccedGetPostThreadV2 {
 
     public static let typeIdentifier = "app.bsky.unspecced.getPostThreadV2"
-        
+
 public struct ThreadItem: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.unspecced.getPostThreadV2#threadItem"
             public let uri: ATProtocolURI
@@ -95,19 +95,19 @@ public struct ThreadItem: ATProtocolCodable, ATProtocolValue {
             case depth
             case value
         }
-    }    
+    }
 public struct Parameters: Parametrizable {
         public let anchor: ATProtocolURI
         public let above: Bool?
         public let below: Int?
         public let branchingFactor: Int?
         public let sort: String?
-        
+
         public init(
-            anchor: ATProtocolURI, 
-            above: Bool? = nil, 
-            below: Int? = nil, 
-            branchingFactor: Int? = nil, 
+            anchor: ATProtocolURI,
+            above: Bool? = nil,
+            below: Int? = nil,
+            branchingFactor: Int? = nil,
             sort: String? = nil
             ) {
             self.anchor = anchor
@@ -115,110 +115,110 @@ public struct Parameters: Parametrizable {
             self.below = below
             self.branchingFactor = branchingFactor
             self.sort = sort
-            
+
         }
     }
-    
+
 public struct Output: ATProtocolCodable {
-        
-        
+
+
         public let thread: [ThreadItem]
-        
+
         public let threadgate: AppBskyFeedDefs.ThreadgateView?
-        
+
         public let hasOtherReplies: Bool
-        
-        
-        
+
+
+
         // Standard public initializer
         public init(
-            
-            
+
+
             thread: [ThreadItem],
-            
+
             threadgate: AppBskyFeedDefs.ThreadgateView? = nil,
-            
+
             hasOtherReplies: Bool
-            
-            
+
+
         ) {
-            
-            
+
+
             self.thread = thread
-            
+
             self.threadgate = threadgate
-            
+
             self.hasOtherReplies = hasOtherReplies
-            
-            
+
+
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
+
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
+
             self.thread = try container.decode([ThreadItem].self, forKey: .thread)
-            
-            
+
+
             self.threadgate = try container.decodeIfPresent(AppBskyFeedDefs.ThreadgateView.self, forKey: .threadgate)
-            
-            
+
+
             self.hasOtherReplies = try container.decode(Bool.self, forKey: .hasOtherReplies)
-            
-            
+
+
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
+
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(thread, forKey: .thread)
-            
-            
+
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(threadgate, forKey: .threadgate)
-            
-            
+
+
             try container.encode(hasOtherReplies, forKey: .hasOtherReplies)
-            
-            
+
+
         }
 
         public func toCBORValue() throws -> Any {
-            
+
             var map = OrderedCBORMap()
 
-            
-            
+
+
             let threadValue = try thread.toCBORValue()
             map = map.adding(key: "thread", value: threadValue)
-            
-            
-            
+
+
+
             if let value = threadgate {
                 // Encode optional property even if it's an empty array for CBOR
                 let threadgateValue = try value.toCBORValue()
                 map = map.adding(key: "threadgate", value: threadgateValue)
             }
-            
-            
-            
+
+
+
             let hasOtherRepliesValue = try hasOtherReplies.toCBORValue()
             map = map.adding(key: "hasOtherReplies", value: hasOtherRepliesValue)
-            
-            
+
+
 
             return map
-            
+
         }
-        
-        
+
+
         private enum CodingKeys: String, CodingKey {
             case thread
             case threadgate
             case hasOtherReplies
         }
-        
+
     }
 
 
@@ -312,7 +312,7 @@ public enum ThreadItemValueUnion: Codable, ATProtocolCodable, ATProtocolValue, S
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-    
+
     public static func == (lhs: ThreadItemValueUnion, rhs: ThreadItemValueUnion) -> Bool {
         switch (lhs, rhs) {
         case (.appBskyUnspeccedDefsThreadItemPost(let lhsValue),
@@ -333,21 +333,21 @@ public enum ThreadItemValueUnion: Codable, ATProtocolCodable, ATProtocolValue, S
             return false
         }
     }
-    
+
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? ThreadItemValueUnion else { return false }
         return self == other
     }
-    
+
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-        
+
         switch self {
         case .appBskyUnspeccedDefsThreadItemPost(let value):
             map = map.adding(key: "$type", value: "app.bsky.unspecced.defs#threadItemPost")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -364,7 +364,7 @@ public enum ThreadItemValueUnion: Codable, ATProtocolCodable, ATProtocolValue, S
             return map
         case .appBskyUnspeccedDefsThreadItemNoUnauthenticated(let value):
             map = map.adding(key: "$type", value: "app.bsky.unspecced.defs#threadItemNoUnauthenticated")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -381,7 +381,7 @@ public enum ThreadItemValueUnion: Codable, ATProtocolCodable, ATProtocolValue, S
             return map
         case .appBskyUnspeccedDefsThreadItemNotFound(let value):
             map = map.adding(key: "$type", value: "app.bsky.unspecced.defs#threadItemNotFound")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -398,7 +398,7 @@ public enum ThreadItemValueUnion: Codable, ATProtocolCodable, ATProtocolValue, S
             return map
         case .appBskyUnspeccedDefsThreadItemBlocked(let value):
             map = map.adding(key: "$type", value: "app.bsky.unspecced.defs#threadItemBlocked")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -428,17 +428,17 @@ extension ATProtoClient.App.Bsky.Unspecced {
     // MARK: - getPostThreadV2
 
     /// (NOTE: this endpoint is under development and WILL change without notice. Don't use it until it is moved out of `unspecced` or your application WILL break) Get posts in a thread. It is based in an anchor post at any depth of the tree, and returns posts above it (recursively resolving the parent, without further branching to their replies) and below it (recursive replies, with branching to their replies). Does not require auth, but additional metadata and filtering will be applied for authed requests.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func getPostThreadV2(input: AppBskyUnspeccedGetPostThreadV2.Parameters) async throws -> (responseCode: Int, data: AppBskyUnspeccedGetPostThreadV2.Output?) {
         let endpoint = "app.bsky.unspecced.getPostThreadV2"
 
-        
+
         let queryItems = input.asQueryItems()
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -457,7 +457,7 @@ extension ATProtoClient.App.Bsky.Unspecced {
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
         if (200...299).contains(responseCode) {
-            
+
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -465,13 +465,13 @@ extension ATProtoClient.App.Bsky.Unspecced {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-            
+
 
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(AppBskyUnspeccedGetPostThreadV2.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -479,12 +479,12 @@ extension ATProtoClient.App.Bsky.Unspecced {
                 return (responseCode, nil)
             }
         } else {
-            
+
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-                           
+
 

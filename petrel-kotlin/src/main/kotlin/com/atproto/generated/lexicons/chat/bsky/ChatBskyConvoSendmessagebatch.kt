@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: chat.bsky.convo.sendMessageBatch
-
+// Sends a batch of messages to a conversation.
 package com.atproto.generated
 
 import kotlinx.serialization.*
@@ -35,8 +35,13 @@ object ChatBskyConvoSendMessageBatchDefs {
         @SerialName("items")
         val items: List<ChatBskyConvoDefsMessageView>    )
 
+sealed class ChatBskyConvoSendMessageBatchError(val name: String, val description: String?) {
+        object ConvoLocked: ChatBskyConvoSendMessageBatchError("ConvoLocked", "")
+        object InvalidConvo: ChatBskyConvoSendMessageBatchError("InvalidConvo", "")
+    }
+
 /**
- * 
+ * Sends a batch of messages to a conversation.
  *
  * Endpoint: chat.bsky.convo.sendMessageBatch
  */

@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: blue.catbird.mlsChat.handleBlockChange
 
 
-public struct BlueCatbirdMlsChatHandleBlockChange { 
+public struct BlueCatbirdMlsChatHandleBlockChange {
 
     public static let typeIdentifier = "blue.catbird.mlsChat.handleBlockChange"
-        
+
 public struct AffectedConvo: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.handleBlockChange#affectedConvo"
             public let convoId: String
@@ -131,7 +131,7 @@ public struct Input: ATProtocolCodable {
             self.action = action
             self.blockUri = blockUri
         }
-        
+
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -171,69 +171,69 @@ public struct Input: ATProtocolCodable {
             case blockUri
         }
     }
-    
+
 public struct Output: ATProtocolCodable {
-        
-        
+
+
         public let affectedConvos: [AffectedConvo]
-        
-        
-        
+
+
+
         // Standard public initializer
         public init(
-            
-            
+
+
             affectedConvos: [AffectedConvo]
-            
-            
+
+
         ) {
-            
-            
+
+
             self.affectedConvos = affectedConvos
-            
-            
+
+
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
+
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
+
             self.affectedConvos = try container.decode([AffectedConvo].self, forKey: .affectedConvos)
-            
-            
+
+
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
+
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(affectedConvos, forKey: .affectedConvos)
-            
-            
+
+
         }
 
         public func toCBORValue() throws -> Any {
-            
+
             var map = OrderedCBORMap()
 
-            
-            
+
+
             let affectedConvosValue = try affectedConvos.toCBORValue()
             map = map.adding(key: "affectedConvos", value: affectedConvosValue)
-            
-            
+
+
 
             return map
-            
+
         }
-        
-        
+
+
         private enum CodingKeys: String, CodingKey {
             case affectedConvos
         }
-        
+
     }
-        
+
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case blockNotVerified = "BlockNotVerified.Could not verify block status with Bluesky"
             public var description: String {
@@ -255,26 +255,26 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - handleBlockChange
 
     /// Notify server of Bluesky block change affecting conversation membership Client notifies server when a Bluesky block is created or removed that affects MLS conversations. Server checks if both users are in any conversations together and notifies admins of conflicts. Enables reactive moderation when blocks occur after users have already joined conversations.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func handleBlockChange(
-        
+
         input: BlueCatbirdMlsChatHandleBlockChange.Input
-        
+
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatHandleBlockChange.Output?) {
         let endpoint = "blue.catbird.mlsChat.handleBlockChange"
-        
+
         var headers: [String: String] = [:]
-        
+
         headers["Content-Type"] = "application/json"
-        
-        
-        
+
+
+
         headers["Accept"] = "application/json"
-        
+
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -291,7 +291,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        
+
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
@@ -303,10 +303,10 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         // Only decode response data if request was successful
         if (200...299).contains(responseCode) {
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatHandleBlockChange.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -317,9 +317,9 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-        
+
     }
-    
+
 }
-                           
+
 

@@ -5,94 +5,94 @@ import Foundation
 // lexicon: 1, id: blue.catbird.mlsChat.getRequestCount
 
 
-public struct BlueCatbirdMlsChatGetRequestCount { 
+public struct BlueCatbirdMlsChatGetRequestCount {
 
     public static let typeIdentifier = "blue.catbird.mlsChat.getRequestCount"
-    
+
 public struct Output: ATProtocolCodable {
-        
-        
+
+
         public let pendingCount: Int
-        
+
         public let lastRequestAt: ATProtocolDate?
-        
-        
-        
+
+
+
         // Standard public initializer
         public init(
-            
-            
+
+
             pendingCount: Int,
-            
+
             lastRequestAt: ATProtocolDate? = nil
-            
-            
+
+
         ) {
-            
-            
+
+
             self.pendingCount = pendingCount
-            
+
             self.lastRequestAt = lastRequestAt
-            
-            
+
+
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
+
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
+
             self.pendingCount = try container.decode(Int.self, forKey: .pendingCount)
-            
-            
+
+
             self.lastRequestAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .lastRequestAt)
-            
-            
+
+
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
+
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(pendingCount, forKey: .pendingCount)
-            
-            
+
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(lastRequestAt, forKey: .lastRequestAt)
-            
-            
+
+
         }
 
         public func toCBORValue() throws -> Any {
-            
+
             var map = OrderedCBORMap()
 
-            
-            
+
+
             let pendingCountValue = try pendingCount.toCBORValue()
             map = map.adding(key: "pendingCount", value: pendingCountValue)
-            
-            
-            
+
+
+
             if let value = lastRequestAt {
                 // Encode optional property even if it's an empty array for CBOR
                 let lastRequestAtValue = try value.toCBORValue()
                 map = map.adding(key: "lastRequestAt", value: lastRequestAtValue)
             }
-            
-            
+
+
 
             return map
-            
+
         }
-        
-        
+
+
         private enum CodingKeys: String, CodingKey {
             case pendingCount
             case lastRequestAt
         }
-        
+
     }
-        
+
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case unauthorized = "Unauthorized.Authentication required"
             public var description: String {
@@ -116,15 +116,15 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - getRequestCount
 
     /// Get count of pending chat requests for badge display Returns the count of pending chat requests. Lightweight endpoint for badge updates.
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func getRequestCount() async throws -> (responseCode: Int, data: BlueCatbirdMlsChatGetRequestCount.Output?) {
         let endpoint = "blue.catbird.mlsChat.getRequestCount"
 
-        
+
         let queryItems: [URLQueryItem]? = nil
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -150,10 +150,10 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         // Only decode response data if request was successful
         if (200...299).contains(responseCode) {
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatGetRequestCount.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -161,12 +161,12 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
                 return (responseCode, nil)
             }
         } else {
-            
+
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-                           
+
 

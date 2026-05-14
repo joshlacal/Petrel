@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: place.stream.metadata.contentWarnings
 
 
-public struct PlaceStreamMetadataContentWarnings: ATProtocolCodable, ATProtocolValue { 
+public struct PlaceStreamMetadataContentWarnings: ATProtocolCodable, ATProtocolValue {
 
     public static let typeIdentifier = "place.stream.metadata.contentWarnings"
         public let warnings: [String]?
@@ -62,5 +62,5 @@ public struct PlaceStreamMetadataContentWarnings: ATProtocolCodable, ATProtocolV
 }
 
 
-                           
+
 

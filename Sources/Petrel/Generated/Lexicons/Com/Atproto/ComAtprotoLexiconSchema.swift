@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: com.atproto.lexicon.schema
 
 
-public struct ComAtprotoLexiconSchema: ATProtocolCodable, ATProtocolValue { 
+public struct ComAtprotoLexiconSchema: ATProtocolCodable, ATProtocolValue {
 
     public static let typeIdentifier = "com.atproto.lexicon.schema"
         public let lexicon: Int
@@ -59,5 +59,5 @@ public struct ComAtprotoLexiconSchema: ATProtocolCodable, ATProtocolValue {
 }
 
 
-                           
+
 

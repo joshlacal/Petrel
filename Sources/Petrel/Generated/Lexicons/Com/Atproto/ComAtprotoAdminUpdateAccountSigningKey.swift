@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: com.atproto.admin.updateAccountSigningKey
 
 
-public struct ComAtprotoAdminUpdateAccountSigningKey { 
+public struct ComAtprotoAdminUpdateAccountSigningKey {
 
     public static let typeIdentifier = "com.atproto.admin.updateAccountSigningKey"
 public struct Input: ATProtocolCodable {
@@ -17,7 +17,7 @@ public struct Input: ATProtocolCodable {
             self.did = did
             self.signingKey = signingKey
         }
-        
+
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -54,32 +54,32 @@ extension ATProtoClient.Com.Atproto.Admin {
     // MARK: - updateAccountSigningKey
 
     /// Administrative action to update an account's signing key in their Did document.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    
-    /// 
+
+    ///
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func updateAccountSigningKey(
-        
+
         input: ComAtprotoAdminUpdateAccountSigningKey.Input
-        
+
     ) async throws -> Int {
         let endpoint = "com.atproto.admin.updateAccountSigningKey"
-        
-        var headers: [String: String] = [:]
-        
-        headers["Content-Type"] = "application/json"
-        
-        
-        
 
-        
+        var headers: [String: String] = [:]
+
+        headers["Content-Type"] = "application/json"
+
+
+
+
+
         let requestData: Data? = try JSONEncoder().encode(input)
-        
-        
+
+
         let queryItems: [URLQueryItem]? = nil
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
@@ -94,11 +94,11 @@ extension ATProtoClient.Com.Atproto.Admin {
         let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        
+
         return responseCode
-        
+
     }
-    
+
 }
-                           
+
 

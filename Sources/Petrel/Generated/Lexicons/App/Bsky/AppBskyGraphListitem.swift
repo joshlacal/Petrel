@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: app.bsky.graph.listitem
 
 
-public struct AppBskyGraphListitem: ATProtocolCodable, ATProtocolValue { 
+public struct AppBskyGraphListitem: ATProtocolCodable, ATProtocolValue {
 
     public static let typeIdentifier = "app.bsky.graph.listitem"
         public let subject: DID
@@ -81,5 +81,5 @@ public struct AppBskyGraphListitem: ATProtocolCodable, ATProtocolValue {
 }
 
 
-                           
+
 

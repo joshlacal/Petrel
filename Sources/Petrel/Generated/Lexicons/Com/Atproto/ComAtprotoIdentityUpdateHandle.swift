@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: com.atproto.identity.updateHandle
 
 
-public struct ComAtprotoIdentityUpdateHandle { 
+public struct ComAtprotoIdentityUpdateHandle {
 
     public static let typeIdentifier = "com.atproto.identity.updateHandle"
 public struct Input: ATProtocolCodable {
@@ -15,7 +15,7 @@ public struct Input: ATProtocolCodable {
         public init(handle: Handle) {
             self.handle = handle
         }
-        
+
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -47,32 +47,32 @@ extension ATProtoClient.Com.Atproto.Identity {
     // MARK: - updateHandle
 
     /// Updates the current account's handle. Verifies handle validity, and updates did:plc document if necessary. Implemented by PDS, and requires auth.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    
-    /// 
+
+    ///
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func updateHandle(
-        
+
         input: ComAtprotoIdentityUpdateHandle.Input
-        
+
     ) async throws -> Int {
         let endpoint = "com.atproto.identity.updateHandle"
-        
-        var headers: [String: String] = [:]
-        
-        headers["Content-Type"] = "application/json"
-        
-        
-        
 
-        
+        var headers: [String: String] = [:]
+
+        headers["Content-Type"] = "application/json"
+
+
+
+
+
         let requestData: Data? = try JSONEncoder().encode(input)
-        
-        
+
+
         let queryItems: [URLQueryItem]? = nil
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
@@ -87,11 +87,11 @@ extension ATProtoClient.Com.Atproto.Identity {
         let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        
+
         return responseCode
-        
+
     }
-    
+
 }
-                           
+
 

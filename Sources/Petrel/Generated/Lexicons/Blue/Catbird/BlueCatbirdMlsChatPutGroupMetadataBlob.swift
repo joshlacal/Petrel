@@ -12,9 +12,9 @@ import AppKit
 // lexicon: 1, id: blue.catbird.mlsChat.putGroupMetadataBlob
 
 
-public struct BlueCatbirdMlsChatPutGroupMetadataBlob { 
+public struct BlueCatbirdMlsChatPutGroupMetadataBlob {
 
-    public static let typeIdentifier = "blue.catbird.mlsChat.putGroupMetadataBlob"    
+    public static let typeIdentifier = "blue.catbird.mlsChat.putGroupMetadataBlob"
 public struct Parameters: Parametrizable {
         public let blobLocator: String
         public let groupId: String
@@ -22,13 +22,13 @@ public struct Parameters: Parametrizable {
         public let resetGeneration: Int?
         public let metadataVersion: Int?
         public let kind: String?
-        
+
         public init(
-            blobLocator: String, 
-            groupId: String, 
-            convoId: String? = nil, 
-            resetGeneration: Int? = nil, 
-            metadataVersion: Int? = nil, 
+            blobLocator: String,
+            groupId: String,
+            convoId: String? = nil,
+            resetGeneration: Int? = nil,
+            metadataVersion: Int? = nil,
             kind: String? = nil
             ) {
             self.blobLocator = blobLocator
@@ -37,7 +37,7 @@ public struct Parameters: Parametrizable {
             self.resetGeneration = resetGeneration
             self.metadataVersion = metadataVersion
             self.kind = kind
-            
+
         }
     }
 public struct Input: ATProtocolCodable {
@@ -47,7 +47,7 @@ public struct Input: ATProtocolCodable {
         public init(data: Data) {
             self.data = data
         }
-        
+
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -70,87 +70,87 @@ public struct Input: ATProtocolCodable {
             case data
         }
     }
-    
+
 public struct Output: ATProtocolCodable {
-        
-        
+
+
         public let blobLocator: String
-        
+
         public let size: Int
-        
-        
-        
+
+
+
         // Standard public initializer
         public init(
-            
-            
+
+
             blobLocator: String,
-            
+
             size: Int
-            
-            
+
+
         ) {
-            
-            
+
+
             self.blobLocator = blobLocator
-            
+
             self.size = size
-            
-            
+
+
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
+
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
+
             self.blobLocator = try container.decode(String.self, forKey: .blobLocator)
-            
-            
+
+
             self.size = try container.decode(Int.self, forKey: .size)
-            
-            
+
+
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
+
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(blobLocator, forKey: .blobLocator)
-            
-            
+
+
             try container.encode(size, forKey: .size)
-            
-            
+
+
         }
 
         public func toCBORValue() throws -> Any {
-            
+
             var map = OrderedCBORMap()
 
-            
-            
+
+
             let blobLocatorValue = try blobLocator.toCBORValue()
             map = map.adding(key: "blobLocator", value: blobLocatorValue)
-            
-            
-            
+
+
+
             let sizeValue = try size.toCBORValue()
             map = map.adding(key: "size", value: sizeValue)
-            
-            
+
+
 
             return map
-            
+
         }
-        
-        
+
+
         private enum CodingKeys: String, CodingKey {
             case blobLocator
             case size
         }
-        
+
     }
-        
+
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case blobTooLarge = "BlobTooLarge.Metadata blob exceeds maximum size (1MB)"
                 case invalidBlobLocator = "InvalidBlobLocator.blobLocator is not a valid UUIDv4"
@@ -174,25 +174,25 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - putGroupMetadataBlob
 
     /// Store an encrypted group metadata blob Upload an encrypted metadata blob. The blobLocator is client-generated (UUIDv4) and serves as the idempotency key. The server stores opaque bytes — it never sees plaintext metadata. Used for both metadata JSON blobs and encrypted avatar images. Clients should include convoId, resetGeneration, and metadataVersion when available so the server can scope metadata to the stable conversation across MLS group rotations.
-    /// 
+    ///
     /// - Parameters:
     ///   - data: The binary data to upload
     ///   - mimeType: The MIME type of the data being uploaded
     ///   - stripMetadata: Whether to strip metadata from images (default: true)
     ///   - params: The query parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func putGroupMetadataBlob(
-        
+
         data: Data,
         mimeType: String,
         stripMetadata: Bool = true,
         params: BlueCatbirdMlsChatPutGroupMetadataBlob.Parameters
-        
+
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatPutGroupMetadataBlob.Output?) {
         let endpoint = "blue.catbird.mlsChat.putGroupMetadataBlob"
-        
+
         var dataToUpload = data
         if stripMetadata, let strippedData = ImageMetadataStripper.stripMetadata(from: dataToUpload) {
             dataToUpload = strippedData
@@ -204,15 +204,15 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             "Content-Type": mimeType,
             "Content-Length": "\(dataToUpload.count)"
         ]
-        
-        
-        headers["Accept"] = "application/json"
-        
 
-        
-        
+
+        headers["Accept"] = "application/json"
+
+
+
+
         let queryItems = params.asQueryItems()
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
@@ -227,12 +227,12 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        
+
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
         if (200...299).contains(responseCode) {
-            
+
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -240,13 +240,13 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-            
+
 
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatPutGroupMetadataBlob.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -257,9 +257,9 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-        
+
     }
-    
+
     /// Compresses an image while maintaining reasonable quality
     /// - Parameters:
     ///   - imageData: The original image data
@@ -292,7 +292,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         return nil
         #endif
     }
-    
+
 }
-                           
+
 

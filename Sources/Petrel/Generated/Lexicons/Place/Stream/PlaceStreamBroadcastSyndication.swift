@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: place.stream.broadcast.syndication
 
 
-public struct PlaceStreamBroadcastSyndication: ATProtocolCodable, ATProtocolValue { 
+public struct PlaceStreamBroadcastSyndication: ATProtocolCodable, ATProtocolValue {
 
     public static let typeIdentifier = "place.stream.broadcast.syndication"
         public let broadcaster: DID
@@ -81,5 +81,5 @@ public struct PlaceStreamBroadcastSyndication: ATProtocolCodable, ATProtocolValu
 }
 
 
-                           
+
 

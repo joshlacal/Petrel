@@ -5,83 +5,83 @@ import Foundation
 // lexicon: 1, id: app.bsky.labeler.getServices
 
 
-public struct AppBskyLabelerGetServices { 
+public struct AppBskyLabelerGetServices {
 
-    public static let typeIdentifier = "app.bsky.labeler.getServices"    
+    public static let typeIdentifier = "app.bsky.labeler.getServices"
 public struct Parameters: Parametrizable {
         public let dids: [DID]
         public let detailed: Bool?
-        
+
         public init(
-            dids: [DID], 
+            dids: [DID],
             detailed: Bool? = nil
             ) {
             self.dids = dids
             self.detailed = detailed
-            
+
         }
     }
-    
+
 public struct Output: ATProtocolCodable {
-        
-        
+
+
         public let views: [OutputViewsUnion]
-        
-        
-        
+
+
+
         // Standard public initializer
         public init(
-            
-            
+
+
             views: [OutputViewsUnion]
-            
-            
+
+
         ) {
-            
-            
+
+
             self.views = views
-            
-            
+
+
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
+
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
+
             self.views = try container.decode([OutputViewsUnion].self, forKey: .views)
-            
-            
+
+
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
+
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(views, forKey: .views)
-            
-            
+
+
         }
 
         public func toCBORValue() throws -> Any {
-            
+
             var map = OrderedCBORMap()
 
-            
-            
+
+
             let viewsValue = try views.toCBORValue()
             map = map.adding(key: "views", value: viewsValue)
-            
-            
+
+
 
             return map
-            
+
         }
-        
-        
+
+
         private enum CodingKeys: String, CodingKey {
             case views
         }
-        
+
     }
 
 
@@ -149,7 +149,7 @@ public enum OutputViewsUnion: Codable, ATProtocolCodable, ATProtocolValue, Senda
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-    
+
     public static func == (lhs: OutputViewsUnion, rhs: OutputViewsUnion) -> Bool {
         switch (lhs, rhs) {
         case (.appBskyLabelerDefsLabelerView(let lhsValue),
@@ -164,21 +164,21 @@ public enum OutputViewsUnion: Codable, ATProtocolCodable, ATProtocolValue, Senda
             return false
         }
     }
-    
+
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? OutputViewsUnion else { return false }
         return self == other
     }
-    
+
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-        
+
         switch self {
         case .appBskyLabelerDefsLabelerView(let value):
             map = map.adding(key: "$type", value: "app.bsky.labeler.defs#labelerView")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -195,7 +195,7 @@ public enum OutputViewsUnion: Codable, ATProtocolCodable, ATProtocolValue, Senda
             return map
         case .appBskyLabelerDefsLabelerViewDetailed(let value):
             map = map.adding(key: "$type", value: "app.bsky.labeler.defs#labelerViewDetailed")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -225,17 +225,17 @@ extension ATProtoClient.App.Bsky.Labeler {
     // MARK: - getServices
 
     /// Get information about a list of labeler services.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func getServices(input: AppBskyLabelerGetServices.Parameters) async throws -> (responseCode: Int, data: AppBskyLabelerGetServices.Output?) {
         let endpoint = "app.bsky.labeler.getServices"
 
-        
+
         let queryItems = input.asQueryItems()
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -254,7 +254,7 @@ extension ATProtoClient.App.Bsky.Labeler {
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
         if (200...299).contains(responseCode) {
-            
+
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -262,13 +262,13 @@ extension ATProtoClient.App.Bsky.Labeler {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-            
+
 
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(AppBskyLabelerGetServices.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -276,12 +276,12 @@ extension ATProtoClient.App.Bsky.Labeler {
                 return (responseCode, nil)
             }
         } else {
-            
+
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-                           
+
 

@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: com.atproto.server.confirmEmail
 
 
-public struct ComAtprotoServerConfirmEmail { 
+public struct ComAtprotoServerConfirmEmail {
 
     public static let typeIdentifier = "com.atproto.server.confirmEmail"
 public struct Input: ATProtocolCodable {
@@ -17,7 +17,7 @@ public struct Input: ATProtocolCodable {
             self.email = email
             self.token = token
         }
-        
+
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -44,7 +44,7 @@ public struct Input: ATProtocolCodable {
             case email
             case token
         }
-    }        
+    }
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case accountNotFound = "AccountNotFound."
                 case expiredToken = "ExpiredToken."
@@ -69,32 +69,32 @@ extension ATProtoClient.Com.Atproto.Server {
     // MARK: - confirmEmail
 
     /// Confirm an email using a token from com.atproto.server.requestEmailConfirmation.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    
-    /// 
+
+    ///
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func confirmEmail(
-        
+
         input: ComAtprotoServerConfirmEmail.Input
-        
+
     ) async throws -> Int {
         let endpoint = "com.atproto.server.confirmEmail"
-        
-        var headers: [String: String] = [:]
-        
-        headers["Content-Type"] = "application/json"
-        
-        
-        
 
-        
+        var headers: [String: String] = [:]
+
+        headers["Content-Type"] = "application/json"
+
+
+
+
+
         let requestData: Data? = try JSONEncoder().encode(input)
-        
-        
+
+
         let queryItems: [URLQueryItem]? = nil
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
@@ -109,11 +109,11 @@ extension ATProtoClient.Com.Atproto.Server {
         let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        
+
         return responseCode
-        
+
     }
-    
+
 }
-                           
+
 

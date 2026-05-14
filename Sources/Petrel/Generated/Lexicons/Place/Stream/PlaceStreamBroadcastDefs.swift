@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: place.stream.broadcast.defs
 
 
-public struct PlaceStreamBroadcastDefs { 
+public struct PlaceStreamBroadcastDefs {
 
     public static let typeIdentifier = "place.stream.broadcast.defs"
-        
+
 public struct BroadcastOriginView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "place.stream.broadcast.defs#broadcastOriginView"
             public let uri: ATProtocolURI
@@ -118,5 +118,5 @@ public struct BroadcastOriginView: ATProtocolCodable, ATProtocolValue {
 }
 
 
-                           
+
 

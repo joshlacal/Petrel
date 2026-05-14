@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: blue.catbird.mlsChat.policy
 
 
-public struct BlueCatbirdMlsChatPolicy: ATProtocolCodable, ATProtocolValue { 
+public struct BlueCatbirdMlsChatPolicy: ATProtocolCodable, ATProtocolValue {
 
     public static let typeIdentifier = "blue.catbird.mlsChat.policy"
         public let whoCanMessageMe: String?
@@ -127,5 +127,5 @@ public struct BlueCatbirdMlsChatPolicy: ATProtocolCodable, ATProtocolValue {
 }
 
 
-                           
+
 

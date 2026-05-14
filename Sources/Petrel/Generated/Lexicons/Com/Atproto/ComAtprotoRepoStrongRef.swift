@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: com.atproto.repo.strongRef
 
 
-public struct ComAtprotoRepoStrongRef: ATProtocolCodable, ATProtocolValue { 
+public struct ComAtprotoRepoStrongRef: ATProtocolCodable, ATProtocolValue {
 
     public static let typeIdentifier = "com.atproto.repo.strongRef"
         public let uri: ATProtocolURI
@@ -67,5 +67,5 @@ public struct ComAtprotoRepoStrongRef: ATProtocolCodable, ATProtocolValue {
 }
 
 
-                           
+
 

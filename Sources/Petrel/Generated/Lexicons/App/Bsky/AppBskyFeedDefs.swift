@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: app.bsky.feed.defs
 
 
-public struct AppBskyFeedDefs { 
+public struct AppBskyFeedDefs {
 
     public static let typeIdentifier = "app.bsky.feed.defs"
-        
+
 public struct PostView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.feed.defs#postView"
             public let uri: ATProtocolURI
@@ -348,7 +348,7 @@ public struct PostView: ATProtocolCodable, ATProtocolValue {
             case debug
         }
     }
-        
+
 public struct ViewerState: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.feed.defs#viewerState"
             public let repost: ATProtocolURI?
@@ -542,7 +542,7 @@ public struct ViewerState: ATProtocolCodable, ATProtocolValue {
             case pinned
         }
     }
-        
+
 public struct ThreadContext: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.feed.defs#threadContext"
             public let rootAuthorLike: ATProtocolURI?
@@ -604,7 +604,7 @@ public struct ThreadContext: ATProtocolCodable, ATProtocolValue {
             case rootAuthorLike
         }
     }
-        
+
 public struct FeedViewPost: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.feed.defs#feedViewPost"
             public let post: PostView
@@ -748,7 +748,7 @@ public struct FeedViewPost: ATProtocolCodable, ATProtocolValue {
             case reqId
         }
     }
-        
+
 public struct ReplyRef: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.feed.defs#replyRef"
             public let root: ReplyRefRootUnion
@@ -842,7 +842,7 @@ public struct ReplyRef: ATProtocolCodable, ATProtocolValue {
             case grandparentAuthor
         }
     }
-        
+
 public struct ReasonRepost: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.feed.defs#reasonRepost"
             public let by: AppBskyActorDefs.ProfileViewBasic
@@ -958,17 +958,17 @@ public struct ReasonRepost: ATProtocolCodable, ATProtocolValue {
             case indexedAt
         }
     }
-        
+
 public struct ReasonPin: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.feed.defs#reasonPin"
 
         public init(
-            
+
         ) {
         }
 
         public init(from decoder: Decoder) throws {
-            
+
             let _ = decoder
         }
 
@@ -981,7 +981,7 @@ public struct ReasonPin: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            
+
             return other is Self
         }
 
@@ -999,7 +999,7 @@ public struct ReasonPin: ATProtocolCodable, ATProtocolValue {
             case typeIdentifier = "$type"
         }
     }
-        
+
 public struct ThreadViewPost: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.feed.defs#threadViewPost"
             public let post: PostView
@@ -1121,7 +1121,7 @@ public struct ThreadViewPost: ATProtocolCodable, ATProtocolValue {
             case threadContext
         }
     }
-        
+
 public struct NotFoundPost: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.feed.defs#notFoundPost"
             public let uri: ATProtocolURI
@@ -1193,7 +1193,7 @@ public struct NotFoundPost: ATProtocolCodable, ATProtocolValue {
             case notFound
         }
     }
-        
+
 public struct BlockedPost: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.feed.defs#blockedPost"
             public let uri: ATProtocolURI
@@ -1281,7 +1281,7 @@ public struct BlockedPost: ATProtocolCodable, ATProtocolValue {
             case author
         }
     }
-        
+
 public struct BlockedAuthor: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.feed.defs#blockedAuthor"
             public let did: DID
@@ -1359,7 +1359,7 @@ public struct BlockedAuthor: ATProtocolCodable, ATProtocolValue {
             case viewer
         }
     }
-        
+
 public struct GeneratorView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.feed.defs#generatorView"
             public let uri: ATProtocolURI
@@ -1671,7 +1671,7 @@ public struct GeneratorView: ATProtocolCodable, ATProtocolValue {
             case indexedAt
         }
     }
-        
+
 public struct GeneratorViewerState: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.feed.defs#generatorViewerState"
             public let like: ATProtocolURI?
@@ -1733,7 +1733,7 @@ public struct GeneratorViewerState: ATProtocolCodable, ATProtocolValue {
             case like
         }
     }
-        
+
 public struct SkeletonFeedPost: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.feed.defs#skeletonFeedPost"
             public let post: ATProtocolURI
@@ -1833,7 +1833,7 @@ public struct SkeletonFeedPost: ATProtocolCodable, ATProtocolValue {
             case feedContext
         }
     }
-        
+
 public struct SkeletonReasonRepost: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.feed.defs#skeletonReasonRepost"
             public let repost: ATProtocolURI
@@ -1889,17 +1889,17 @@ public struct SkeletonReasonRepost: ATProtocolCodable, ATProtocolValue {
             case repost
         }
     }
-        
+
 public struct SkeletonReasonPin: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.feed.defs#skeletonReasonPin"
 
         public init(
-            
+
         ) {
         }
 
         public init(from decoder: Decoder) throws {
-            
+
             let _ = decoder
         }
 
@@ -1912,7 +1912,7 @@ public struct SkeletonReasonPin: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            
+
             return other is Self
         }
 
@@ -1930,7 +1930,7 @@ public struct SkeletonReasonPin: ATProtocolCodable, ATProtocolValue {
             case typeIdentifier = "$type"
         }
     }
-        
+
 public struct ThreadgateView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.feed.defs#threadgateView"
             public let uri: ATProtocolURI?
@@ -2058,7 +2058,7 @@ public struct ThreadgateView: ATProtocolCodable, ATProtocolValue {
             case lists
         }
     }
-        
+
 public struct Interaction: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.feed.defs#interaction"
             public let item: ATProtocolURI?
@@ -2289,7 +2289,7 @@ public indirect enum PostViewEmbedUnion: Codable, ATProtocolCodable, ATProtocolV
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-    
+
     public static func == (lhs: PostViewEmbedUnion, rhs: PostViewEmbedUnion) -> Bool {
         switch (lhs, rhs) {
         case (.appBskyEmbedImagesView(let lhsValue),
@@ -2313,21 +2313,21 @@ public indirect enum PostViewEmbedUnion: Codable, ATProtocolCodable, ATProtocolV
             return false
         }
     }
-    
+
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? PostViewEmbedUnion else { return false }
         return self == other
     }
-    
+
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-        
+
         switch self {
         case .appBskyEmbedImagesView(let value):
             map = map.adding(key: "$type", value: "app.bsky.embed.images#view")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -2344,7 +2344,7 @@ public indirect enum PostViewEmbedUnion: Codable, ATProtocolCodable, ATProtocolV
             return map
         case .appBskyEmbedVideoView(let value):
             map = map.adding(key: "$type", value: "app.bsky.embed.video#view")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -2361,7 +2361,7 @@ public indirect enum PostViewEmbedUnion: Codable, ATProtocolCodable, ATProtocolV
             return map
         case .appBskyEmbedExternalView(let value):
             map = map.adding(key: "$type", value: "app.bsky.embed.external#view")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -2378,7 +2378,7 @@ public indirect enum PostViewEmbedUnion: Codable, ATProtocolCodable, ATProtocolV
             return map
         case .appBskyEmbedRecordView(let value):
             map = map.adding(key: "$type", value: "app.bsky.embed.record#view")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -2395,7 +2395,7 @@ public indirect enum PostViewEmbedUnion: Codable, ATProtocolCodable, ATProtocolV
             return map
         case .appBskyEmbedRecordWithMediaView(let value):
             map = map.adding(key: "$type", value: "app.bsky.embed.recordWithMedia#view")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -2479,7 +2479,7 @@ public enum FeedViewPostReasonUnion: Codable, ATProtocolCodable, ATProtocolValue
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-    
+
     public static func == (lhs: FeedViewPostReasonUnion, rhs: FeedViewPostReasonUnion) -> Bool {
         switch (lhs, rhs) {
         case (.appBskyFeedDefsReasonRepost(let lhsValue),
@@ -2494,21 +2494,21 @@ public enum FeedViewPostReasonUnion: Codable, ATProtocolCodable, ATProtocolValue
             return false
         }
     }
-    
+
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? FeedViewPostReasonUnion else { return false }
         return self == other
     }
-    
+
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-        
+
         switch self {
         case .appBskyFeedDefsReasonRepost(let value):
             map = map.adding(key: "$type", value: "app.bsky.feed.defs#reasonRepost")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -2525,7 +2525,7 @@ public enum FeedViewPostReasonUnion: Codable, ATProtocolCodable, ATProtocolValue
             return map
         case .appBskyFeedDefsReasonPin(let value):
             map = map.adding(key: "$type", value: "app.bsky.feed.defs#reasonPin")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -2621,7 +2621,7 @@ public indirect enum ReplyRefRootUnion: Codable, ATProtocolCodable, ATProtocolVa
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-    
+
     public static func == (lhs: ReplyRefRootUnion, rhs: ReplyRefRootUnion) -> Bool {
         switch (lhs, rhs) {
         case (.appBskyFeedDefsPostView(let lhsValue),
@@ -2639,21 +2639,21 @@ public indirect enum ReplyRefRootUnion: Codable, ATProtocolCodable, ATProtocolVa
             return false
         }
     }
-    
+
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? ReplyRefRootUnion else { return false }
         return self == other
     }
-    
+
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-        
+
         switch self {
         case .appBskyFeedDefsPostView(let value):
             map = map.adding(key: "$type", value: "app.bsky.feed.defs#postView")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -2670,7 +2670,7 @@ public indirect enum ReplyRefRootUnion: Codable, ATProtocolCodable, ATProtocolVa
             return map
         case .appBskyFeedDefsNotFoundPost(let value):
             map = map.adding(key: "$type", value: "app.bsky.feed.defs#notFoundPost")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -2687,7 +2687,7 @@ public indirect enum ReplyRefRootUnion: Codable, ATProtocolCodable, ATProtocolVa
             return map
         case .appBskyFeedDefsBlockedPost(let value):
             map = map.adding(key: "$type", value: "app.bsky.feed.defs#blockedPost")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -2783,7 +2783,7 @@ public indirect enum ReplyRefParentUnion: Codable, ATProtocolCodable, ATProtocol
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-    
+
     public static func == (lhs: ReplyRefParentUnion, rhs: ReplyRefParentUnion) -> Bool {
         switch (lhs, rhs) {
         case (.appBskyFeedDefsPostView(let lhsValue),
@@ -2801,21 +2801,21 @@ public indirect enum ReplyRefParentUnion: Codable, ATProtocolCodable, ATProtocol
             return false
         }
     }
-    
+
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? ReplyRefParentUnion else { return false }
         return self == other
     }
-    
+
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-        
+
         switch self {
         case .appBskyFeedDefsPostView(let value):
             map = map.adding(key: "$type", value: "app.bsky.feed.defs#postView")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -2832,7 +2832,7 @@ public indirect enum ReplyRefParentUnion: Codable, ATProtocolCodable, ATProtocol
             return map
         case .appBskyFeedDefsNotFoundPost(let value):
             map = map.adding(key: "$type", value: "app.bsky.feed.defs#notFoundPost")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -2849,7 +2849,7 @@ public indirect enum ReplyRefParentUnion: Codable, ATProtocolCodable, ATProtocol
             return map
         case .appBskyFeedDefsBlockedPost(let value):
             map = map.adding(key: "$type", value: "app.bsky.feed.defs#blockedPost")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -2945,7 +2945,7 @@ public indirect enum ThreadViewPostParentUnion: Codable, ATProtocolCodable, ATPr
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-    
+
     public static func == (lhs: ThreadViewPostParentUnion, rhs: ThreadViewPostParentUnion) -> Bool {
         switch (lhs, rhs) {
         case (.appBskyFeedDefsThreadViewPost(let lhsValue),
@@ -2963,21 +2963,21 @@ public indirect enum ThreadViewPostParentUnion: Codable, ATProtocolCodable, ATPr
             return false
         }
     }
-    
+
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? ThreadViewPostParentUnion else { return false }
         return self == other
     }
-    
+
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-        
+
         switch self {
         case .appBskyFeedDefsThreadViewPost(let value):
             map = map.adding(key: "$type", value: "app.bsky.feed.defs#threadViewPost")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -2994,7 +2994,7 @@ public indirect enum ThreadViewPostParentUnion: Codable, ATProtocolCodable, ATPr
             return map
         case .appBskyFeedDefsNotFoundPost(let value):
             map = map.adding(key: "$type", value: "app.bsky.feed.defs#notFoundPost")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -3011,7 +3011,7 @@ public indirect enum ThreadViewPostParentUnion: Codable, ATProtocolCodable, ATPr
             return map
         case .appBskyFeedDefsBlockedPost(let value):
             map = map.adding(key: "$type", value: "app.bsky.feed.defs#blockedPost")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -3107,7 +3107,7 @@ public indirect enum ThreadViewPostRepliesUnion: Codable, ATProtocolCodable, ATP
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-    
+
     public static func == (lhs: ThreadViewPostRepliesUnion, rhs: ThreadViewPostRepliesUnion) -> Bool {
         switch (lhs, rhs) {
         case (.appBskyFeedDefsThreadViewPost(let lhsValue),
@@ -3125,21 +3125,21 @@ public indirect enum ThreadViewPostRepliesUnion: Codable, ATProtocolCodable, ATP
             return false
         }
     }
-    
+
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? ThreadViewPostRepliesUnion else { return false }
         return self == other
     }
-    
+
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-        
+
         switch self {
         case .appBskyFeedDefsThreadViewPost(let value):
             map = map.adding(key: "$type", value: "app.bsky.feed.defs#threadViewPost")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -3156,7 +3156,7 @@ public indirect enum ThreadViewPostRepliesUnion: Codable, ATProtocolCodable, ATP
             return map
         case .appBskyFeedDefsNotFoundPost(let value):
             map = map.adding(key: "$type", value: "app.bsky.feed.defs#notFoundPost")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -3173,7 +3173,7 @@ public indirect enum ThreadViewPostRepliesUnion: Codable, ATProtocolCodable, ATP
             return map
         case .appBskyFeedDefsBlockedPost(let value):
             map = map.adding(key: "$type", value: "app.bsky.feed.defs#blockedPost")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -3257,7 +3257,7 @@ public enum SkeletonFeedPostReasonUnion: Codable, ATProtocolCodable, ATProtocolV
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-    
+
     public static func == (lhs: SkeletonFeedPostReasonUnion, rhs: SkeletonFeedPostReasonUnion) -> Bool {
         switch (lhs, rhs) {
         case (.appBskyFeedDefsSkeletonReasonRepost(let lhsValue),
@@ -3272,21 +3272,21 @@ public enum SkeletonFeedPostReasonUnion: Codable, ATProtocolCodable, ATProtocolV
             return false
         }
     }
-    
+
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? SkeletonFeedPostReasonUnion else { return false }
         return self == other
     }
-    
+
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-        
+
         switch self {
         case .appBskyFeedDefsSkeletonReasonRepost(let value):
             map = map.adding(key: "$type", value: "app.bsky.feed.defs#skeletonReasonRepost")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -3303,7 +3303,7 @@ public enum SkeletonFeedPostReasonUnion: Codable, ATProtocolCodable, ATProtocolV
             return map
         case .appBskyFeedDefsSkeletonReasonPin(let value):
             map = map.adding(key: "$type", value: "app.bsky.feed.defs#skeletonReasonPin")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -3328,5 +3328,5 @@ public enum SkeletonFeedPostReasonUnion: Codable, ATProtocolCodable, ATProtocolV
 }
 
 
-                           
+
 

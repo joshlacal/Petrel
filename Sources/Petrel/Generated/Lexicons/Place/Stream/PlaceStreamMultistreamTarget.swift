@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: place.stream.multistream.target
 
 
-public struct PlaceStreamMultistreamTarget: ATProtocolCodable, ATProtocolValue { 
+public struct PlaceStreamMultistreamTarget: ATProtocolCodable, ATProtocolValue {
 
     public static let typeIdentifier = "place.stream.multistream.target"
         public let url: URI
@@ -98,5 +98,5 @@ public struct PlaceStreamMultistreamTarget: ATProtocolCodable, ATProtocolValue {
 }
 
 
-                           
+
 

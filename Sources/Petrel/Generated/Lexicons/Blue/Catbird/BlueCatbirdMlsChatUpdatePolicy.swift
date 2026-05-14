@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: blue.catbird.mlsChat.updatePolicy
 
 
-public struct BlueCatbirdMlsChatUpdatePolicy { 
+public struct BlueCatbirdMlsChatUpdatePolicy {
 
     public static let typeIdentifier = "blue.catbird.mlsChat.updatePolicy"
-        
+
 public struct PolicyView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.updatePolicy#policyView"
             public let convoId: String
@@ -217,7 +217,7 @@ public struct Input: ATProtocolCodable {
             self.requireAdminApproval = requireAdminApproval
             self.maxMembers = maxMembers
         }
-        
+
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -282,69 +282,69 @@ public struct Input: ATProtocolCodable {
             case maxMembers
         }
     }
-    
+
 public struct Output: ATProtocolCodable {
-        
-        
+
+
         public let policy: PolicyView
-        
-        
-        
+
+
+
         // Standard public initializer
         public init(
-            
-            
+
+
             policy: PolicyView
-            
-            
+
+
         ) {
-            
-            
+
+
             self.policy = policy
-            
-            
+
+
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
+
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
+
             self.policy = try container.decode(PolicyView.self, forKey: .policy)
-            
-            
+
+
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
+
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(policy, forKey: .policy)
-            
-            
+
+
         }
 
         public func toCBORValue() throws -> Any {
-            
+
             var map = OrderedCBORMap()
 
-            
-            
+
+
             let policyValue = try policy.toCBORValue()
             map = map.adding(key: "policy", value: policyValue)
-            
-            
+
+
 
             return map
-            
+
         }
-        
-        
+
+
         private enum CodingKeys: String, CodingKey {
             case policy
         }
-        
+
     }
-        
+
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case unauthorized = "Unauthorized.Caller is not an admin of this conversation"
                 case convoNotFound = "ConvoNotFound.Conversation not found"
@@ -370,26 +370,26 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - updatePolicy
 
     /// Update conversation policy settings Update policy settings for a conversation. Only admins can update policies. At least one policy field must be provided.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func updatePolicy(
-        
+
         input: BlueCatbirdMlsChatUpdatePolicy.Input
-        
+
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatUpdatePolicy.Output?) {
         let endpoint = "blue.catbird.mlsChat.updatePolicy"
-        
+
         var headers: [String: String] = [:]
-        
+
         headers["Content-Type"] = "application/json"
-        
-        
-        
+
+
+
         headers["Accept"] = "application/json"
-        
+
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -406,7 +406,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        
+
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
@@ -418,10 +418,10 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         // Only decode response data if request was successful
         if (200...299).contains(responseCode) {
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatUpdatePolicy.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -432,9 +432,9 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-        
+
     }
-    
+
 }
-                           
+
 

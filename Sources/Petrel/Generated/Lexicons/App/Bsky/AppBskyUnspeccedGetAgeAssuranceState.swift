@@ -5,11 +5,11 @@ import Foundation
 // lexicon: 1, id: app.bsky.unspecced.getAgeAssuranceState
 
 
-public struct AppBskyUnspeccedGetAgeAssuranceState { 
+public struct AppBskyUnspeccedGetAgeAssuranceState {
 
     public static let typeIdentifier = "app.bsky.unspecced.getAgeAssuranceState"
     public typealias Output = AppBskyUnspeccedDefs.AgeAssuranceState
-    
+
 
 
 
@@ -21,15 +21,15 @@ extension ATProtoClient.App.Bsky.Unspecced {
     // MARK: - getAgeAssuranceState
 
     /// Returns the current state of the age assurance process for an account. This is used to check if the user has completed age assurance or if further action is required.
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func getAgeAssuranceState() async throws -> (responseCode: Int, data: AppBskyUnspeccedGetAgeAssuranceState.Output?) {
         let endpoint = "app.bsky.unspecced.getAgeAssuranceState"
 
-        
+
         let queryItems: [URLQueryItem]? = nil
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -48,7 +48,7 @@ extension ATProtoClient.App.Bsky.Unspecced {
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
         if (200...299).contains(responseCode) {
-            
+
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -56,13 +56,13 @@ extension ATProtoClient.App.Bsky.Unspecced {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-            
+
 
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(AppBskyUnspeccedGetAgeAssuranceState.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -70,12 +70,12 @@ extension ATProtoClient.App.Bsky.Unspecced {
                 return (responseCode, nil)
             }
         } else {
-            
+
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-                           
+
 

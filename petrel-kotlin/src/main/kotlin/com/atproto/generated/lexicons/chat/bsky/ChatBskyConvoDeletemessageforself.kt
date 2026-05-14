@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: chat.bsky.convo.deleteMessageForSelf
-
+// Marks a message as deleted for the viewer, so they won't see that message in future enumerations.
 package com.atproto.generated
 
 import kotlinx.serialization.*
@@ -23,8 +23,13 @@ object ChatBskyConvoDeleteMessageForSelfDefs {
 
     typealias ChatBskyConvoDeleteMessageForSelfOutput = ChatBskyConvoDefsDeletedMessageView
 
+sealed class ChatBskyConvoDeleteMessageForSelfError(val name: String, val description: String?) {
+        object InvalidConvo: ChatBskyConvoDeleteMessageForSelfError("InvalidConvo", "")
+        object MessageDeleteNotAllowed: ChatBskyConvoDeleteMessageForSelfError("MessageDeleteNotAllowed", "Indicates that this message cannot be deleted, e.g. because it is a system message.")
+    }
+
 /**
- * 
+ * Marks a message as deleted for the viewer, so they won't see that message in future enumerations.
  *
  * Endpoint: chat.bsky.convo.deleteMessageForSelf
  */

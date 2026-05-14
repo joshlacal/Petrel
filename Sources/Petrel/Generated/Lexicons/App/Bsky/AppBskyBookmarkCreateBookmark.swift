@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: app.bsky.bookmark.createBookmark
 
 
-public struct AppBskyBookmarkCreateBookmark { 
+public struct AppBskyBookmarkCreateBookmark {
 
     public static let typeIdentifier = "app.bsky.bookmark.createBookmark"
 public struct Input: ATProtocolCodable {
@@ -17,7 +17,7 @@ public struct Input: ATProtocolCodable {
             self.uri = uri
             self.cid = cid
         }
-        
+
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -44,7 +44,7 @@ public struct Input: ATProtocolCodable {
             case uri
             case cid
         }
-    }        
+    }
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case unsupportedCollection = "UnsupportedCollection.The URI to be bookmarked is for an unsupported collection."
             public var description: String {
@@ -66,32 +66,32 @@ extension ATProtoClient.App.Bsky.Bookmark {
     // MARK: - createBookmark
 
     /// Creates a private bookmark for the specified record. Currently, only `app.bsky.feed.post` records are supported. Requires authentication.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    
-    /// 
+
+    ///
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func createBookmark(
-        
+
         input: AppBskyBookmarkCreateBookmark.Input
-        
+
     ) async throws -> Int {
         let endpoint = "app.bsky.bookmark.createBookmark"
-        
-        var headers: [String: String] = [:]
-        
-        headers["Content-Type"] = "application/json"
-        
-        
-        
 
-        
+        var headers: [String: String] = [:]
+
+        headers["Content-Type"] = "application/json"
+
+
+
+
+
         let requestData: Data? = try JSONEncoder().encode(input)
-        
-        
+
+
         let queryItems: [URLQueryItem]? = nil
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
@@ -106,11 +106,11 @@ extension ATProtoClient.App.Bsky.Bookmark {
         let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        
+
         return responseCode
-        
+
     }
-    
+
 }
-                           
+
 

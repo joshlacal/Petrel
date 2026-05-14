@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: com.atproto.server.describeServer
 
 
-public struct ComAtprotoServerDescribeServer { 
+public struct ComAtprotoServerDescribeServer {
 
     public static let typeIdentifier = "com.atproto.server.describeServer"
-        
+
 public struct Links: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "com.atproto.server.describeServer#links"
             public let privacyPolicy: URI?
@@ -92,7 +92,7 @@ public struct Links: ATProtocolCodable, ATProtocolValue {
             case termsOfService
         }
     }
-        
+
 public struct Contact: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "com.atproto.server.describeServer#contact"
             public let email: String?
@@ -154,164 +154,164 @@ public struct Contact: ATProtocolCodable, ATProtocolValue {
             case email
         }
     }
-    
+
 public struct Output: ATProtocolCodable {
-        
-        
+
+
         public let inviteCodeRequired: Bool?
-        
+
         public let phoneVerificationRequired: Bool?
-        
+
         public let availableUserDomains: [String]
-        
+
         public let links: Links?
-        
+
         public let contact: Contact?
-        
+
         public let did: DID
-        
-        
-        
+
+
+
         // Standard public initializer
         public init(
-            
-            
+
+
             inviteCodeRequired: Bool? = nil,
-            
+
             phoneVerificationRequired: Bool? = nil,
-            
+
             availableUserDomains: [String],
-            
+
             links: Links? = nil,
-            
+
             contact: Contact? = nil,
-            
+
             did: DID
-            
-            
+
+
         ) {
-            
-            
+
+
             self.inviteCodeRequired = inviteCodeRequired
-            
+
             self.phoneVerificationRequired = phoneVerificationRequired
-            
+
             self.availableUserDomains = availableUserDomains
-            
+
             self.links = links
-            
+
             self.contact = contact
-            
+
             self.did = did
-            
-            
+
+
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
+
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
+
             self.inviteCodeRequired = try container.decodeIfPresent(Bool.self, forKey: .inviteCodeRequired)
-            
-            
+
+
             self.phoneVerificationRequired = try container.decodeIfPresent(Bool.self, forKey: .phoneVerificationRequired)
-            
-            
+
+
             self.availableUserDomains = try container.decode([String].self, forKey: .availableUserDomains)
-            
-            
+
+
             self.links = try container.decodeIfPresent(Links.self, forKey: .links)
-            
-            
+
+
             self.contact = try container.decodeIfPresent(Contact.self, forKey: .contact)
-            
-            
+
+
             self.did = try container.decode(DID.self, forKey: .did)
-            
-            
+
+
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
+
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(inviteCodeRequired, forKey: .inviteCodeRequired)
-            
-            
+
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(phoneVerificationRequired, forKey: .phoneVerificationRequired)
-            
-            
+
+
             try container.encode(availableUserDomains, forKey: .availableUserDomains)
-            
-            
+
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(links, forKey: .links)
-            
-            
+
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(contact, forKey: .contact)
-            
-            
+
+
             try container.encode(did, forKey: .did)
-            
-            
+
+
         }
 
         public func toCBORValue() throws -> Any {
-            
+
             var map = OrderedCBORMap()
 
-            
-            
+
+
             if let value = inviteCodeRequired {
                 // Encode optional property even if it's an empty array for CBOR
                 let inviteCodeRequiredValue = try value.toCBORValue()
                 map = map.adding(key: "inviteCodeRequired", value: inviteCodeRequiredValue)
             }
-            
-            
-            
+
+
+
             if let value = phoneVerificationRequired {
                 // Encode optional property even if it's an empty array for CBOR
                 let phoneVerificationRequiredValue = try value.toCBORValue()
                 map = map.adding(key: "phoneVerificationRequired", value: phoneVerificationRequiredValue)
             }
-            
-            
-            
+
+
+
             let availableUserDomainsValue = try availableUserDomains.toCBORValue()
             map = map.adding(key: "availableUserDomains", value: availableUserDomainsValue)
-            
-            
-            
+
+
+
             if let value = links {
                 // Encode optional property even if it's an empty array for CBOR
                 let linksValue = try value.toCBORValue()
                 map = map.adding(key: "links", value: linksValue)
             }
-            
-            
-            
+
+
+
             if let value = contact {
                 // Encode optional property even if it's an empty array for CBOR
                 let contactValue = try value.toCBORValue()
                 map = map.adding(key: "contact", value: contactValue)
             }
-            
-            
-            
+
+
+
             let didValue = try did.toCBORValue()
             map = map.adding(key: "did", value: didValue)
-            
-            
+
+
 
             return map
-            
+
         }
-        
-        
+
+
         private enum CodingKeys: String, CodingKey {
             case inviteCodeRequired
             case phoneVerificationRequired
@@ -320,7 +320,7 @@ public struct Output: ATProtocolCodable {
             case contact
             case did
         }
-        
+
     }
 
 
@@ -334,15 +334,15 @@ extension ATProtoClient.Com.Atproto.Server {
     // MARK: - describeServer
 
     /// Describes the server's account creation requirements and capabilities. Implemented by PDS.
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func describeServer() async throws -> (responseCode: Int, data: ComAtprotoServerDescribeServer.Output?) {
         let endpoint = "com.atproto.server.describeServer"
 
-        
+
         let queryItems: [URLQueryItem]? = nil
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -361,7 +361,7 @@ extension ATProtoClient.Com.Atproto.Server {
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
         if (200...299).contains(responseCode) {
-            
+
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -369,13 +369,13 @@ extension ATProtoClient.Com.Atproto.Server {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-            
+
 
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(ComAtprotoServerDescribeServer.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -383,12 +383,12 @@ extension ATProtoClient.Com.Atproto.Server {
                 return (responseCode, nil)
             }
         } else {
-            
+
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-                           
+
 

@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: app.bsky.richtext.facet
 
 
-public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue { 
+public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
 
     public static let typeIdentifier = "app.bsky.richtext.facet"
         public let index: ByteSlice
@@ -61,7 +61,7 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
             case index
             case features
         }
-        
+
 public struct Mention: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.richtext.facet#mention"
             public let did: DID
@@ -117,7 +117,7 @@ public struct Mention: ATProtocolCodable, ATProtocolValue {
             case did
         }
     }
-        
+
 public struct Link: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.richtext.facet#link"
             public let uri: URI
@@ -173,7 +173,7 @@ public struct Link: ATProtocolCodable, ATProtocolValue {
             case uri
         }
     }
-        
+
 public struct Tag: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.richtext.facet#tag"
             public let tag: String
@@ -229,7 +229,7 @@ public struct Tag: ATProtocolCodable, ATProtocolValue {
             case tag
         }
     }
-        
+
 public struct ByteSlice: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.richtext.facet#byteSlice"
             public let byteStart: Int
@@ -379,7 +379,7 @@ public enum AppBskyRichtextFacetFeaturesUnion: Codable, ATProtocolCodable, ATPro
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-    
+
     public static func == (lhs: AppBskyRichtextFacetFeaturesUnion, rhs: AppBskyRichtextFacetFeaturesUnion) -> Bool {
         switch (lhs, rhs) {
         case (.appBskyRichtextFacetMention(let lhsValue),
@@ -397,21 +397,21 @@ public enum AppBskyRichtextFacetFeaturesUnion: Codable, ATProtocolCodable, ATPro
             return false
         }
     }
-    
+
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? AppBskyRichtextFacetFeaturesUnion else { return false }
         return self == other
     }
-    
+
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-        
+
         switch self {
         case .appBskyRichtextFacetMention(let value):
             map = map.adding(key: "$type", value: "app.bsky.richtext.facet#mention")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -428,7 +428,7 @@ public enum AppBskyRichtextFacetFeaturesUnion: Codable, ATProtocolCodable, ATPro
             return map
         case .appBskyRichtextFacetLink(let value):
             map = map.adding(key: "$type", value: "app.bsky.richtext.facet#link")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -445,7 +445,7 @@ public enum AppBskyRichtextFacetFeaturesUnion: Codable, ATProtocolCodable, ATPro
             return map
         case .appBskyRichtextFacetTag(let value):
             map = map.adding(key: "$type", value: "app.bsky.richtext.facet#tag")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -471,7 +471,7 @@ public enum AppBskyRichtextFacetFeaturesUnion: Codable, ATProtocolCodable, ATPro
 
 public struct Features: Codable, ATProtocolCodable, ATProtocolValue {
     public let items: [FeaturesForUnionArray]
-    
+
     public init(items: [FeaturesForUnionArray]) {
         self.items = items
     }
@@ -496,24 +496,24 @@ public struct Features: Codable, ATProtocolCodable, ATProtocolValue {
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? Features else { return false }
-        
+
         if self.items != other.items {
             return false
         }
 
         return true
     }
-    
+
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // For union arrays, we need to encode each item while preserving its order
         var itemsArray = [Any]()
-        
+
         for item in items {
             let itemValue = try item.toCBORValue()
             itemsArray.append(itemValue)
         }
-        
+
         return itemsArray
     }
 
@@ -594,13 +594,13 @@ public enum FeaturesForUnionArray: Codable, ATProtocolCodable, ATProtocolValue {
         guard let otherValue = other as? FeaturesForUnionArray else { return false }
 
         switch (self, otherValue) {
-        case (.mention(let selfValue), 
+        case (.mention(let selfValue),
               .mention(let otherValue)):
             return selfValue == otherValue
-        case (.link(let selfValue), 
+        case (.link(let selfValue),
               .link(let otherValue)):
             return selfValue == otherValue
-        case (.tag(let selfValue), 
+        case (.tag(let selfValue),
               .tag(let otherValue)):
             return selfValue == otherValue
         case (.unexpected(let selfValue), .unexpected(let otherValue)):
@@ -613,15 +613,15 @@ public enum FeaturesForUnionArray: Codable, ATProtocolCodable, ATProtocolValue {
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-    
+
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         var map = OrderedCBORMap()
-        
+
         switch self {
         case .mention(let value):
             map = map.adding(key: "$type", value: "Mention")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -638,7 +638,7 @@ public enum FeaturesForUnionArray: Codable, ATProtocolCodable, ATProtocolValue {
             return map
         case .link(let value):
             map = map.adding(key: "$type", value: "Link")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -655,7 +655,7 @@ public enum FeaturesForUnionArray: Codable, ATProtocolCodable, ATProtocolValue {
             return map
         case .tag(let value):
             map = map.adding(key: "$type", value: "Tag")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -680,5 +680,5 @@ public enum FeaturesForUnionArray: Codable, ATProtocolCodable, ATProtocolValue {
 }
 
 
-                           
+
 

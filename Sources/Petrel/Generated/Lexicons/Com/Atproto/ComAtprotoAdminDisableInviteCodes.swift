@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: com.atproto.admin.disableInviteCodes
 
 
-public struct ComAtprotoAdminDisableInviteCodes { 
+public struct ComAtprotoAdminDisableInviteCodes {
 
     public static let typeIdentifier = "com.atproto.admin.disableInviteCodes"
 public struct Input: ATProtocolCodable {
@@ -17,7 +17,7 @@ public struct Input: ATProtocolCodable {
             self.codes = codes
             self.accounts = accounts
         }
-        
+
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -58,32 +58,32 @@ extension ATProtoClient.Com.Atproto.Admin {
     // MARK: - disableInviteCodes
 
     /// Disable some set of codes and/or all codes associated with a set of users.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    
-    /// 
+
+    ///
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func disableInviteCodes(
-        
+
         input: ComAtprotoAdminDisableInviteCodes.Input
-        
+
     ) async throws -> Int {
         let endpoint = "com.atproto.admin.disableInviteCodes"
-        
-        var headers: [String: String] = [:]
-        
-        headers["Content-Type"] = "application/json"
-        
-        
-        
 
-        
+        var headers: [String: String] = [:]
+
+        headers["Content-Type"] = "application/json"
+
+
+
+
+
         let requestData: Data? = try JSONEncoder().encode(input)
-        
-        
+
+
         let queryItems: [URLQueryItem]? = nil
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
@@ -98,11 +98,11 @@ extension ATProtoClient.Com.Atproto.Admin {
         let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        
+
         return responseCode
-        
+
     }
-    
+
 }
-                           
+
 

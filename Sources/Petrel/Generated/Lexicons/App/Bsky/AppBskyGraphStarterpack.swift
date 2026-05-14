@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: app.bsky.graph.starterpack
 
 
-public struct AppBskyGraphStarterpack: ATProtocolCodable, ATProtocolValue { 
+public struct AppBskyGraphStarterpack: ATProtocolCodable, ATProtocolValue {
 
     public static let typeIdentifier = "app.bsky.graph.starterpack"
         public let name: String
@@ -126,7 +126,7 @@ public struct AppBskyGraphStarterpack: ATProtocolCodable, ATProtocolValue {
             case feeds
             case createdAt
         }
-        
+
 public struct FeedItem: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.graph.starterpack#feedItem"
             public let uri: ATProtocolURI
@@ -188,5 +188,5 @@ public struct FeedItem: ATProtocolCodable, ATProtocolValue {
 }
 
 
-                           
+
 

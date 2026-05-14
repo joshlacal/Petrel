@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: blue.catbird.mlsChat.deleteBlob
 
 
-public struct BlueCatbirdMlsChatDeleteBlob { 
+public struct BlueCatbirdMlsChatDeleteBlob {
 
     public static let typeIdentifier = "blue.catbird.mlsChat.deleteBlob"
 public struct Input: ATProtocolCodable {
@@ -15,7 +15,7 @@ public struct Input: ATProtocolCodable {
         public init(blobId: String) {
             self.blobId = blobId
         }
-        
+
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -37,7 +37,7 @@ public struct Input: ATProtocolCodable {
         private enum CodingKeys: String, CodingKey {
             case blobId
         }
-    }        
+    }
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case blobNotFound = "BlobNotFound.Blob does not exist or is not owned by the authenticated user"
             public var description: String {
@@ -59,32 +59,32 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - deleteBlob
 
     /// Delete an encrypted blob (owner only) Soft-delete an encrypted blob. Only the blob owner can delete it. The MLS message still contains the embed reference, but blob download will return 404 (same UX as expired blobs). Allows users to free quota space before the 90-day TTL.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    
-    /// 
+
+    ///
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func deleteBlob(
-        
+
         input: BlueCatbirdMlsChatDeleteBlob.Input
-        
+
     ) async throws -> Int {
         let endpoint = "blue.catbird.mlsChat.deleteBlob"
-        
-        var headers: [String: String] = [:]
-        
-        headers["Content-Type"] = "application/json"
-        
-        
-        
 
-        
+        var headers: [String: String] = [:]
+
+        headers["Content-Type"] = "application/json"
+
+
+
+
+
         let requestData: Data? = try JSONEncoder().encode(input)
-        
-        
+
+
         let queryItems: [URLQueryItem]? = nil
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
@@ -99,11 +99,11 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        
+
         return responseCode
-        
+
     }
-    
+
 }
-                           
+
 

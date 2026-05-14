@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: blue.catbird.mlsChat.getKeyPackageStatus
 
 
-public struct BlueCatbirdMlsChatGetKeyPackageStatus { 
+public struct BlueCatbirdMlsChatGetKeyPackageStatus {
 
     public static let typeIdentifier = "blue.catbird.mlsChat.getKeyPackageStatus"
-        
+
 public struct KeyPackageStats: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.getKeyPackageStatus#keyPackageStats"
             public let totalAvailable: Int
@@ -102,7 +102,7 @@ public struct KeyPackageStats: ATProtocolCodable, ATProtocolValue {
             case byDevice
         }
     }
-        
+
 public struct DeviceKeyPackageCount: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.getKeyPackageStatus#deviceKeyPackageCount"
             public let deviceId: String
@@ -174,7 +174,7 @@ public struct DeviceKeyPackageCount: ATProtocolCodable, ATProtocolValue {
             case available
         }
     }
-        
+
 public struct KeyPackageStatusItem: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.getKeyPackageStatus#keyPackageStatusItem"
             public let id: String
@@ -316,7 +316,7 @@ public struct KeyPackageStatusItem: ATProtocolCodable, ATProtocolValue {
             case consumed
         }
     }
-        
+
 public struct KeyPackageHistoryItem: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.getKeyPackageStatus#keyPackageHistoryItem"
             public let id: String
@@ -425,19 +425,19 @@ public struct KeyPackageHistoryItem: ATProtocolCodable, ATProtocolValue {
             case createdAt
             case consumedByDid
         }
-    }    
+    }
 public struct Parameters: Parametrizable {
         public let did: DID?
         public let cipherSuite: String?
         public let include: String?
         public let limit: Int?
         public let cursor: String?
-        
+
         public init(
-            did: DID? = nil, 
-            cipherSuite: String? = nil, 
-            include: String? = nil, 
-            limit: Int? = nil, 
+            did: DID? = nil,
+            cipherSuite: String? = nil,
+            include: String? = nil,
+            limit: Int? = nil,
             cursor: String? = nil
             ) {
             self.did = did
@@ -445,140 +445,140 @@ public struct Parameters: Parametrizable {
             self.include = include
             self.limit = limit
             self.cursor = cursor
-            
+
         }
     }
-    
+
 public struct Output: ATProtocolCodable {
-        
-        
+
+
         public let stats: KeyPackageStats?
-        
+
         public let status: [KeyPackageStatusItem]?
-        
+
         public let history: [KeyPackageHistoryItem]?
-        
+
         public let cursor: String?
-        
-        
-        
+
+
+
         // Standard public initializer
         public init(
-            
-            
+
+
             stats: KeyPackageStats? = nil,
-            
+
             status: [KeyPackageStatusItem]? = nil,
-            
+
             history: [KeyPackageHistoryItem]? = nil,
-            
+
             cursor: String? = nil
-            
-            
+
+
         ) {
-            
-            
+
+
             self.stats = stats
-            
+
             self.status = status
-            
+
             self.history = history
-            
+
             self.cursor = cursor
-            
-            
+
+
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
+
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
+
             self.stats = try container.decodeIfPresent(KeyPackageStats.self, forKey: .stats)
-            
-            
+
+
             self.status = try container.decodeIfPresent([KeyPackageStatusItem].self, forKey: .status)
-            
-            
+
+
             self.history = try container.decodeIfPresent([KeyPackageHistoryItem].self, forKey: .history)
-            
-            
+
+
             self.cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
-            
-            
+
+
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
+
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(stats, forKey: .stats)
-            
-            
+
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(status, forKey: .status)
-            
-            
+
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(history, forKey: .history)
-            
-            
+
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(cursor, forKey: .cursor)
-            
-            
+
+
         }
 
         public func toCBORValue() throws -> Any {
-            
+
             var map = OrderedCBORMap()
 
-            
-            
+
+
             if let value = stats {
                 // Encode optional property even if it's an empty array for CBOR
                 let statsValue = try value.toCBORValue()
                 map = map.adding(key: "stats", value: statsValue)
             }
-            
-            
-            
+
+
+
             if let value = status {
                 // Encode optional property even if it's an empty array for CBOR
                 let statusValue = try value.toCBORValue()
                 map = map.adding(key: "status", value: statusValue)
             }
-            
-            
-            
+
+
+
             if let value = history {
                 // Encode optional property even if it's an empty array for CBOR
                 let historyValue = try value.toCBORValue()
                 map = map.adding(key: "history", value: historyValue)
             }
-            
-            
-            
+
+
+
             if let value = cursor {
                 // Encode optional property even if it's an empty array for CBOR
                 let cursorValue = try value.toCBORValue()
                 map = map.adding(key: "cursor", value: cursorValue)
             }
-            
-            
+
+
 
             return map
-            
+
         }
-        
-        
+
+
         private enum CodingKeys: String, CodingKey {
             case stats
             case status
             case history
             case cursor
         }
-        
+
     }
 
 
@@ -592,17 +592,17 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - getKeyPackageStatus
 
     /// Get key package statistics and status for the authenticated user's devices Retrieve key package counts, status, and history for the authenticated user. Useful for clients to know when to replenish key packages.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func getKeyPackageStatus(input: BlueCatbirdMlsChatGetKeyPackageStatus.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatGetKeyPackageStatus.Output?) {
         let endpoint = "blue.catbird.mlsChat.getKeyPackageStatus"
 
-        
+
         let queryItems = input.asQueryItems()
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -621,7 +621,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
         if (200...299).contains(responseCode) {
-            
+
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -629,13 +629,13 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-            
+
 
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatGetKeyPackageStatus.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -643,12 +643,12 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
                 return (responseCode, nil)
             }
         } else {
-            
+
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-                           
+
 

@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: com.atproto.admin.updateSubjectStatus
 
 
-public struct ComAtprotoAdminUpdateSubjectStatus { 
+public struct ComAtprotoAdminUpdateSubjectStatus {
 
     public static let typeIdentifier = "com.atproto.admin.updateSubjectStatus"
 public struct Input: ATProtocolCodable {
@@ -19,7 +19,7 @@ public struct Input: ATProtocolCodable {
             self.takedown = takedown
             self.deactivated = deactivated
         }
-        
+
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -56,89 +56,89 @@ public struct Input: ATProtocolCodable {
             case deactivated
         }
     }
-    
+
 public struct Output: ATProtocolCodable {
-        
-        
+
+
         public let subject: OutputSubjectUnion
-        
+
         public let takedown: ComAtprotoAdminDefs.StatusAttr?
-        
-        
-        
+
+
+
         // Standard public initializer
         public init(
-            
-            
+
+
             subject: OutputSubjectUnion,
-            
+
             takedown: ComAtprotoAdminDefs.StatusAttr? = nil
-            
-            
+
+
         ) {
-            
-            
+
+
             self.subject = subject
-            
+
             self.takedown = takedown
-            
-            
+
+
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
+
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
+
             self.subject = try container.decode(OutputSubjectUnion.self, forKey: .subject)
-            
-            
+
+
             self.takedown = try container.decodeIfPresent(ComAtprotoAdminDefs.StatusAttr.self, forKey: .takedown)
-            
-            
+
+
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
+
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(subject, forKey: .subject)
-            
-            
+
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(takedown, forKey: .takedown)
-            
-            
+
+
         }
 
         public func toCBORValue() throws -> Any {
-            
+
             var map = OrderedCBORMap()
 
-            
-            
+
+
             let subjectValue = try subject.toCBORValue()
             map = map.adding(key: "subject", value: subjectValue)
-            
-            
-            
+
+
+
             if let value = takedown {
                 // Encode optional property even if it's an empty array for CBOR
                 let takedownValue = try value.toCBORValue()
                 map = map.adding(key: "takedown", value: takedownValue)
             }
-            
-            
+
+
 
             return map
-            
+
         }
-        
-        
+
+
         private enum CodingKeys: String, CodingKey {
             case subject
             case takedown
         }
-        
+
     }
 
 
@@ -219,7 +219,7 @@ public enum InputSubjectUnion: Codable, ATProtocolCodable, ATProtocolValue, Send
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-    
+
     public static func == (lhs: InputSubjectUnion, rhs: InputSubjectUnion) -> Bool {
         switch (lhs, rhs) {
         case (.comAtprotoAdminDefsRepoRef(let lhsValue),
@@ -237,21 +237,21 @@ public enum InputSubjectUnion: Codable, ATProtocolCodable, ATProtocolValue, Send
             return false
         }
     }
-    
+
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? InputSubjectUnion else { return false }
         return self == other
     }
-    
+
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-        
+
         switch self {
         case .comAtprotoAdminDefsRepoRef(let value):
             map = map.adding(key: "$type", value: "com.atproto.admin.defs#repoRef")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -268,7 +268,7 @@ public enum InputSubjectUnion: Codable, ATProtocolCodable, ATProtocolValue, Send
             return map
         case .comAtprotoRepoStrongRef(let value):
             map = map.adding(key: "$type", value: "com.atproto.repo.strongRef")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -285,7 +285,7 @@ public enum InputSubjectUnion: Codable, ATProtocolCodable, ATProtocolValue, Send
             return map
         case .comAtprotoAdminDefsRepoBlobRef(let value):
             map = map.adding(key: "$type", value: "com.atproto.admin.defs#repoBlobRef")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -382,7 +382,7 @@ public enum OutputSubjectUnion: Codable, ATProtocolCodable, ATProtocolValue, Sen
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-    
+
     public static func == (lhs: OutputSubjectUnion, rhs: OutputSubjectUnion) -> Bool {
         switch (lhs, rhs) {
         case (.comAtprotoAdminDefsRepoRef(let lhsValue),
@@ -400,21 +400,21 @@ public enum OutputSubjectUnion: Codable, ATProtocolCodable, ATProtocolValue, Sen
             return false
         }
     }
-    
+
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? OutputSubjectUnion else { return false }
         return self == other
     }
-    
+
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-        
+
         switch self {
         case .comAtprotoAdminDefsRepoRef(let value):
             map = map.adding(key: "$type", value: "com.atproto.admin.defs#repoRef")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -431,7 +431,7 @@ public enum OutputSubjectUnion: Codable, ATProtocolCodable, ATProtocolValue, Sen
             return map
         case .comAtprotoRepoStrongRef(let value):
             map = map.adding(key: "$type", value: "com.atproto.repo.strongRef")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -448,7 +448,7 @@ public enum OutputSubjectUnion: Codable, ATProtocolCodable, ATProtocolValue, Sen
             return map
         case .comAtprotoAdminDefsRepoBlobRef(let value):
             map = map.adding(key: "$type", value: "com.atproto.admin.defs#repoBlobRef")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -545,7 +545,7 @@ public enum ComAtprotoAdminUpdateSubjectStatusSubjectUnion: Codable, ATProtocolC
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-    
+
     public static func == (lhs: ComAtprotoAdminUpdateSubjectStatusSubjectUnion, rhs: ComAtprotoAdminUpdateSubjectStatusSubjectUnion) -> Bool {
         switch (lhs, rhs) {
         case (.comAtprotoAdminDefsRepoRef(let lhsValue),
@@ -563,21 +563,21 @@ public enum ComAtprotoAdminUpdateSubjectStatusSubjectUnion: Codable, ATProtocolC
             return false
         }
     }
-    
+
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? ComAtprotoAdminUpdateSubjectStatusSubjectUnion else { return false }
         return self == other
     }
-    
+
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-        
+
         switch self {
         case .comAtprotoAdminDefsRepoRef(let value):
             map = map.adding(key: "$type", value: "com.atproto.admin.defs#repoRef")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -594,7 +594,7 @@ public enum ComAtprotoAdminUpdateSubjectStatusSubjectUnion: Codable, ATProtocolC
             return map
         case .comAtprotoRepoStrongRef(let value):
             map = map.adding(key: "$type", value: "com.atproto.repo.strongRef")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -611,7 +611,7 @@ public enum ComAtprotoAdminUpdateSubjectStatusSubjectUnion: Codable, ATProtocolC
             return map
         case .comAtprotoAdminDefsRepoBlobRef(let value):
             map = map.adding(key: "$type", value: "com.atproto.admin.defs#repoBlobRef")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -639,34 +639,34 @@ extension ATProtoClient.Com.Atproto.Admin {
     // MARK: - updateSubjectStatus
 
     /// Update the service-specific admin status of a subject (account, record, or blob).
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    
-    /// 
+
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func updateSubjectStatus(
-        
+
         input: ComAtprotoAdminUpdateSubjectStatus.Input
-        
+
     ) async throws -> (responseCode: Int, data: ComAtprotoAdminUpdateSubjectStatus.Output?) {
         let endpoint = "com.atproto.admin.updateSubjectStatus"
-        
-        var headers: [String: String] = [:]
-        
-        headers["Content-Type"] = "application/json"
-        
-        
-        
-        headers["Accept"] = "application/json"
-        
 
-        
+        var headers: [String: String] = [:]
+
+        headers["Content-Type"] = "application/json"
+
+
+
+        headers["Accept"] = "application/json"
+
+
+
         let requestData: Data? = try JSONEncoder().encode(input)
-        
-        
+
+
         let queryItems: [URLQueryItem]? = nil
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
@@ -681,12 +681,12 @@ extension ATProtoClient.Com.Atproto.Admin {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        
+
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
         if (200...299).contains(responseCode) {
-            
+
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -694,13 +694,13 @@ extension ATProtoClient.Com.Atproto.Admin {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-            
+
 
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(ComAtprotoAdminUpdateSubjectStatus.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -711,9 +711,9 @@ extension ATProtoClient.Com.Atproto.Admin {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-        
+
     }
-    
+
 }
-                           
+
 

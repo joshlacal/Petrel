@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: app.bsky.unspecced.defs
 
 
-public struct AppBskyUnspeccedDefs { 
+public struct AppBskyUnspeccedDefs {
 
     public static let typeIdentifier = "app.bsky.unspecced.defs"
-        
+
 public struct SkeletonSearchPost: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.unspecced.defs#skeletonSearchPost"
             public let uri: ATProtocolURI
@@ -64,7 +64,7 @@ public struct SkeletonSearchPost: ATProtocolCodable, ATProtocolValue {
             case uri
         }
     }
-        
+
 public struct SkeletonSearchActor: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.unspecced.defs#skeletonSearchActor"
             public let did: DID
@@ -120,7 +120,7 @@ public struct SkeletonSearchActor: ATProtocolCodable, ATProtocolValue {
             case did
         }
     }
-        
+
 public struct SkeletonSearchStarterPack: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.unspecced.defs#skeletonSearchStarterPack"
             public let uri: ATProtocolURI
@@ -176,7 +176,7 @@ public struct SkeletonSearchStarterPack: ATProtocolCodable, ATProtocolValue {
             case uri
         }
     }
-        
+
 public struct TrendingTopic: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.unspecced.defs#trendingTopic"
             public let topic: String
@@ -292,7 +292,7 @@ public struct TrendingTopic: ATProtocolCodable, ATProtocolValue {
             case link
         }
     }
-        
+
 public struct SkeletonTrend: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.unspecced.defs#skeletonTrend"
             public let topic: String
@@ -472,7 +472,7 @@ public struct SkeletonTrend: ATProtocolCodable, ATProtocolValue {
             case dids
         }
     }
-        
+
 public struct TrendView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.unspecced.defs#trendView"
             public let topic: String
@@ -652,7 +652,7 @@ public struct TrendView: ATProtocolCodable, ATProtocolValue {
             case actors
         }
     }
-        
+
 public struct ThreadItemPost: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.unspecced.defs#threadItemPost"
             public let post: AppBskyFeedDefs.PostView
@@ -788,17 +788,17 @@ public struct ThreadItemPost: ATProtocolCodable, ATProtocolValue {
             case mutedByViewer
         }
     }
-        
+
 public struct ThreadItemNoUnauthenticated: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.unspecced.defs#threadItemNoUnauthenticated"
 
         public init(
-            
+
         ) {
         }
 
         public init(from decoder: Decoder) throws {
-            
+
             let _ = decoder
         }
 
@@ -811,7 +811,7 @@ public struct ThreadItemNoUnauthenticated: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            
+
             return other is Self
         }
 
@@ -829,17 +829,17 @@ public struct ThreadItemNoUnauthenticated: ATProtocolCodable, ATProtocolValue {
             case typeIdentifier = "$type"
         }
     }
-        
+
 public struct ThreadItemNotFound: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.unspecced.defs#threadItemNotFound"
 
         public init(
-            
+
         ) {
         }
 
         public init(from decoder: Decoder) throws {
-            
+
             let _ = decoder
         }
 
@@ -852,7 +852,7 @@ public struct ThreadItemNotFound: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            
+
             return other is Self
         }
 
@@ -870,7 +870,7 @@ public struct ThreadItemNotFound: ATProtocolCodable, ATProtocolValue {
             case typeIdentifier = "$type"
         }
     }
-        
+
 public struct ThreadItemBlocked: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.unspecced.defs#threadItemBlocked"
             public let author: AppBskyFeedDefs.BlockedAuthor
@@ -926,7 +926,7 @@ public struct ThreadItemBlocked: ATProtocolCodable, ATProtocolValue {
             case author
         }
     }
-        
+
 public struct AgeAssuranceState: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.unspecced.defs#ageAssuranceState"
             public let lastInitiatedAt: ATProtocolDate?
@@ -1004,7 +1004,7 @@ public struct AgeAssuranceState: ATProtocolCodable, ATProtocolValue {
             case status
         }
     }
-        
+
 public struct AgeAssuranceEvent: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.unspecced.defs#ageAssuranceEvent"
             public let createdAt: ATProtocolDate
@@ -1208,5 +1208,5 @@ public struct AgeAssuranceEvent: ATProtocolCodable, ATProtocolValue {
 }
 
 
-                           
+
 

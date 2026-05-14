@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: chat.bsky.convo.deleteMessageForSelf
 
 
-public struct ChatBskyConvoDeleteMessageForSelf { 
+public struct ChatBskyConvoDeleteMessageForSelf {
 
     public static let typeIdentifier = "chat.bsky.convo.deleteMessageForSelf"
 public struct Input: ATProtocolCodable {
@@ -17,7 +17,7 @@ public struct Input: ATProtocolCodable {
             self.convoId = convoId
             self.messageId = messageId
         }
-        
+
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -46,7 +46,20 @@ public struct Input: ATProtocolCodable {
         }
     }
     public typealias Output = ChatBskyConvoDefs.DeletedMessageView
-    
+
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                case invalidConvo = "InvalidConvo."
+                case messageDeleteNotAllowed = "MessageDeleteNotAllowed.Indicates that this message cannot be deleted, e.g. because it is a system message."
+            public var description: String {
+                return self.rawValue
+            }
+
+            public var errorName: String {
+                // Extract just the error name from the raw value
+                let parts = self.rawValue.split(separator: ".")
+                return String(parts.first ?? "")
+            }
+        }
 
 
 
@@ -55,35 +68,35 @@ public struct Input: ATProtocolCodable {
 extension ATProtoClient.Chat.Bsky.Convo {
     // MARK: - deleteMessageForSelf
 
-    /// 
-    /// 
+    /// Marks a message as deleted for the viewer, so they won't see that message in future enumerations.
+    ///
     /// - Parameter input: The input parameters for the request
-    
-    /// 
+
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func deleteMessageForSelf(
-        
+
         input: ChatBskyConvoDeleteMessageForSelf.Input
-        
+
     ) async throws -> (responseCode: Int, data: ChatBskyConvoDeleteMessageForSelf.Output?) {
         let endpoint = "chat.bsky.convo.deleteMessageForSelf"
-        
-        var headers: [String: String] = [:]
-        
-        headers["Content-Type"] = "application/json"
-        
-        
-        
-        headers["Accept"] = "application/json"
-        
 
-        
+        var headers: [String: String] = [:]
+
+        headers["Content-Type"] = "application/json"
+
+
+
+        headers["Accept"] = "application/json"
+
+
+
         let requestData: Data? = try JSONEncoder().encode(input)
-        
-        
+
+
         let queryItems: [URLQueryItem]? = nil
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
@@ -98,12 +111,12 @@ extension ATProtoClient.Chat.Bsky.Convo {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        
+
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
         if (200...299).contains(responseCode) {
-            
+
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -111,13 +124,13 @@ extension ATProtoClient.Chat.Bsky.Convo {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-            
+
 
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(ChatBskyConvoDeleteMessageForSelf.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -128,9 +141,9 @@ extension ATProtoClient.Chat.Bsky.Convo {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-        
+
     }
-    
+
 }
-                           
+
 
