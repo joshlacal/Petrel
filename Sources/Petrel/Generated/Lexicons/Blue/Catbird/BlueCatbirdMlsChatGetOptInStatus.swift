@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: blue.catbird.mlsChat.getOptInStatus
 
 
-public struct BlueCatbirdMlsChatGetOptInStatus { 
+public struct BlueCatbirdMlsChatGetOptInStatus {
 
     public static let typeIdentifier = "blue.catbird.mlsChat.getOptInStatus"
-        
+
 public struct OptInStatus: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.getOptInStatus#optInStatus"
             public let did: DID
@@ -101,78 +101,78 @@ public struct OptInStatus: ATProtocolCodable, ATProtocolValue {
             case optedIn
             case optedInAt
         }
-    }    
+    }
 public struct Parameters: Parametrizable {
         public let dids: [DID]
-        
+
         public init(
             dids: [DID]
             ) {
             self.dids = dids
-            
+
         }
     }
-    
+
 public struct Output: ATProtocolCodable {
-        
-        
+
+
         public let statuses: [OptInStatus]
-        
-        
-        
+
+
+
         // Standard public initializer
         public init(
-            
-            
+
+
             statuses: [OptInStatus]
-            
-            
+
+
         ) {
-            
-            
+
+
             self.statuses = statuses
-            
-            
+
+
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
+
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
+
             self.statuses = try container.decode([OptInStatus].self, forKey: .statuses)
-            
-            
+
+
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
+
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(statuses, forKey: .statuses)
-            
-            
+
+
         }
 
         public func toCBORValue() throws -> Any {
-            
+
             var map = OrderedCBORMap()
 
-            
-            
+
+
             let statusesValue = try statuses.toCBORValue()
             map = map.adding(key: "statuses", value: statusesValue)
-            
-            
+
+
 
             return map
-            
+
         }
-        
-        
+
+
         private enum CodingKeys: String, CodingKey {
             case statuses
         }
-        
+
     }
 
 
@@ -186,17 +186,17 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - getOptInStatus
 
     /// Check if users have opted into MLS chat Query opt-in status for a list of users. Returns array of status objects with DID, opt-in boolean, and optional timestamp.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func getOptInStatus(input: BlueCatbirdMlsChatGetOptInStatus.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatGetOptInStatus.Output?) {
         let endpoint = "blue.catbird.mlsChat.getOptInStatus"
 
-        
+
         let queryItems = input.asQueryItems()
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -222,10 +222,10 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         // Only decode response data if request was successful
         if (200...299).contains(responseCode) {
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatGetOptInStatus.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -233,12 +233,12 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
                 return (responseCode, nil)
             }
         } else {
-            
+
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-                           
+
 

@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: chat.bsky.convo.getMessages
-
+// Returns a page of messages from a conversation.
 package com.atproto.generated
 
 import kotlinx.serialization.*
@@ -24,6 +24,9 @@ sealed interface ChatBskyConvoGetMessagesOutputMessagesUnion {
     data class DeletedMessageView(val value: com.atproto.generated.ChatBskyConvoDefsDeletedMessageView) : ChatBskyConvoGetMessagesOutputMessagesUnion
 
     @Serializable
+    data class SystemMessageView(val value: com.atproto.generated.ChatBskyConvoDefsSystemMessageView) : ChatBskyConvoGetMessagesOutputMessagesUnion
+
+    @Serializable
     data class Unexpected(val value: JsonElement) : ChatBskyConvoGetMessagesOutputMessagesUnion
 }
 
@@ -44,6 +47,12 @@ object ChatBskyConvoGetMessagesOutputMessagesUnionSerializer : kotlinx.serializa
                 val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsDeletedMessageView.serializer(), value.value)
                 kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
                     it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#deletedMessageView")
+                })
+            }
+            is ChatBskyConvoGetMessagesOutputMessagesUnion.SystemMessageView -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsSystemMessageView.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#systemMessageView")
                 })
             }
             is ChatBskyConvoGetMessagesOutputMessagesUnion.Unexpected -> value.value
@@ -71,6 +80,9 @@ object ChatBskyConvoGetMessagesOutputMessagesUnionSerializer : kotlinx.serializa
             "chat.bsky.convo.defs#deletedMessageView" -> ChatBskyConvoGetMessagesOutputMessagesUnion.DeletedMessageView(
                 jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsDeletedMessageView.serializer(), element)
             )
+            "chat.bsky.convo.defs#systemMessageView" -> ChatBskyConvoGetMessagesOutputMessagesUnion.SystemMessageView(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsSystemMessageView.serializer(), element)
+            )
             else -> ChatBskyConvoGetMessagesOutputMessagesUnion.Unexpected(element)
         }
     }
@@ -87,10 +99,15 @@ object ChatBskyConvoGetMessagesOutputMessagesUnionSerializer : kotlinx.serializa
     data class ChatBskyConvoGetMessagesOutput(
         @SerialName("cursor")
         val cursor: String? = null,        @SerialName("messages")
-        val messages: List<ChatBskyConvoGetMessagesOutputMessagesUnion>    )
+        val messages: List<ChatBskyConvoGetMessagesOutputMessagesUnion>,// Set of all members who authored or reacted to the returned messages. Members referred to by system messages are also included.        @SerialName("relatedProfiles")
+        val relatedProfiles: List<ChatBskyActorDefsProfileViewBasic>? = null    )
+
+sealed class ChatBskyConvoGetMessagesError(val name: String, val description: String?) {
+        object InvalidConvo: ChatBskyConvoGetMessagesError("InvalidConvo", "")
+    }
 
 /**
- * 
+ * Returns a page of messages from a conversation.
  *
  * Endpoint: chat.bsky.convo.getMessages
  */

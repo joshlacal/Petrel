@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: blue.catbird.mlsChat.defs
 
 
-public struct BlueCatbirdMlsChatDefs { 
+public struct BlueCatbirdMlsChatDefs {
 
     public static let typeIdentifier = "blue.catbird.mlsChat.defs"
-        
+
 public struct ConvoView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.defs#convoView"
             public let conversationId: String
@@ -226,7 +226,7 @@ public struct ConvoView: ATProtocolCodable, ATProtocolValue {
             case resetGeneration
         }
     }
-        
+
 public struct MemberView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.defs#memberView"
             public let did: DID
@@ -484,7 +484,7 @@ public struct MemberView: ATProtocolCodable, ATProtocolValue {
             case credential
         }
     }
-        
+
 public struct MessageView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.defs#messageView"
             public let id: String
@@ -642,7 +642,7 @@ public struct MessageView: ATProtocolCodable, ATProtocolValue {
             case messageType
         }
     }
-        
+
 public struct KeyPackageRef: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.defs#keyPackageRef"
             public let did: DID
@@ -758,5 +758,5 @@ public struct KeyPackageRef: ATProtocolCodable, ATProtocolValue {
 }
 
 
-                           
+
 

@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: place.stream.live.viewerCount
 
 
-public struct PlaceStreamLiveViewerCount: ATProtocolCodable, ATProtocolValue { 
+public struct PlaceStreamLiveViewerCount: ATProtocolCodable, ATProtocolValue {
 
     public static let typeIdentifier = "place.stream.live.viewerCount"
         public let streamer: DID
@@ -98,5 +98,5 @@ public struct PlaceStreamLiveViewerCount: ATProtocolCodable, ATProtocolValue {
 }
 
 
-                           
+
 

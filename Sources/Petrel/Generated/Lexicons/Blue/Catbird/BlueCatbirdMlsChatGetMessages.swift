@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: blue.catbird.mlsChat.getMessages
 
 
-public struct BlueCatbirdMlsChatGetMessages { 
+public struct BlueCatbirdMlsChatGetMessages {
 
     public static let typeIdentifier = "blue.catbird.mlsChat.getMessages"
-        
+
 public struct GapInfo: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.getMessages#gapInfo"
             public let hasGaps: Bool
@@ -95,7 +95,7 @@ public struct GapInfo: ATProtocolCodable, ATProtocolValue {
             case missingSeqs
             case totalMessages
         }
-    }    
+    }
 public struct Parameters: Parametrizable {
         public let convoId: String
         public let limit: Int?
@@ -103,13 +103,13 @@ public struct Parameters: Parametrizable {
         public let type: String?
         public let fromEpoch: Int?
         public let toEpoch: Int?
-        
+
         public init(
-            convoId: String, 
-            limit: Int? = nil, 
-            sinceSeq: Int? = nil, 
-            type: String? = nil, 
-            fromEpoch: Int? = nil, 
+            convoId: String,
+            limit: Int? = nil,
+            sinceSeq: Int? = nil,
+            type: String? = nil,
+            fromEpoch: Int? = nil,
             toEpoch: Int? = nil
             ) {
             self.convoId = convoId
@@ -118,116 +118,116 @@ public struct Parameters: Parametrizable {
             self.type = type
             self.fromEpoch = fromEpoch
             self.toEpoch = toEpoch
-            
+
         }
     }
-    
+
 public struct Output: ATProtocolCodable {
-        
-        
+
+
         public let messages: [BlueCatbirdMlsChatDefs.MessageView]
-        
+
         public let lastSeq: Int?
-        
+
         public let gapInfo: GapInfo?
-        
-        
-        
+
+
+
         // Standard public initializer
         public init(
-            
-            
+
+
             messages: [BlueCatbirdMlsChatDefs.MessageView],
-            
+
             lastSeq: Int? = nil,
-            
+
             gapInfo: GapInfo? = nil
-            
-            
+
+
         ) {
-            
-            
+
+
             self.messages = messages
-            
+
             self.lastSeq = lastSeq
-            
+
             self.gapInfo = gapInfo
-            
-            
+
+
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
+
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
+
             self.messages = try container.decode([BlueCatbirdMlsChatDefs.MessageView].self, forKey: .messages)
-            
-            
+
+
             self.lastSeq = try container.decodeIfPresent(Int.self, forKey: .lastSeq)
-            
-            
+
+
             self.gapInfo = try container.decodeIfPresent(GapInfo.self, forKey: .gapInfo)
-            
-            
+
+
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
+
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(messages, forKey: .messages)
-            
-            
+
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(lastSeq, forKey: .lastSeq)
-            
-            
+
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(gapInfo, forKey: .gapInfo)
-            
-            
+
+
         }
 
         public func toCBORValue() throws -> Any {
-            
+
             var map = OrderedCBORMap()
 
-            
-            
+
+
             let messagesValue = try messages.toCBORValue()
             map = map.adding(key: "messages", value: messagesValue)
-            
-            
-            
+
+
+
             if let value = lastSeq {
                 // Encode optional property even if it's an empty array for CBOR
                 let lastSeqValue = try value.toCBORValue()
                 map = map.adding(key: "lastSeq", value: lastSeqValue)
             }
-            
-            
-            
+
+
+
             if let value = gapInfo {
                 // Encode optional property even if it's an empty array for CBOR
                 let gapInfoValue = try value.toCBORValue()
                 map = map.adding(key: "gapInfo", value: gapInfoValue)
             }
-            
-            
+
+
 
             return map
-            
+
         }
-        
-        
+
+
         private enum CodingKeys: String, CodingKey {
             case messages
             case lastSeq
             case gapInfo
         }
-        
+
     }
-        
+
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case convoNotFound = "ConvoNotFound.Conversation not found"
                 case notMember = "NotMember.Caller is not a member of the conversation"
@@ -253,17 +253,17 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - getMessages
 
     /// Retrieve messages from a conversation with type filtering (consolidates getMessages + getCommits) Retrieve messages from an MLS conversation. Messages are GUARANTEED to be returned in conversation timeline order (seq ASC). Clients MUST use seq for display/pagination/read cursors and use epoch only as the MLS decryptability gate. The 'type' filter replaces the separate getCommits endpoint.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func getMessages(input: BlueCatbirdMlsChatGetMessages.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatGetMessages.Output?) {
         let endpoint = "blue.catbird.mlsChat.getMessages"
 
-        
+
         let queryItems = input.asQueryItems()
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -282,7 +282,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
         if (200...299).contains(responseCode) {
-            
+
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -290,13 +290,13 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-            
+
 
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatGetMessages.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -304,12 +304,12 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
                 return (responseCode, nil)
             }
         } else {
-            
+
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-                           
+
 

@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: chat.bsky.convo.getConvo
-
+// Gets an existing conversation by its ID.
 package com.atproto.generated
 
 import kotlinx.serialization.*
@@ -25,8 +25,12 @@ object ChatBskyConvoGetConvoDefs {
         @SerialName("convo")
         val convo: ChatBskyConvoDefsConvoView    )
 
+sealed class ChatBskyConvoGetConvoError(val name: String, val description: String?) {
+        object InvalidConvo: ChatBskyConvoGetConvoError("InvalidConvo", "")
+    }
+
 /**
- * 
+ * Gets an existing conversation by its ID.
  *
  * Endpoint: chat.bsky.convo.getConvo
  */

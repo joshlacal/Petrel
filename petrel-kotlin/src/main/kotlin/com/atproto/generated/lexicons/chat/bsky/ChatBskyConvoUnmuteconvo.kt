@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: chat.bsky.convo.unmuteConvo
-
+// Unmutes a conversation, allowing notifications related to it.
 package com.atproto.generated
 
 import kotlinx.serialization.*
@@ -25,8 +25,12 @@ object ChatBskyConvoUnmuteConvoDefs {
         @SerialName("convo")
         val convo: ChatBskyConvoDefsConvoView    )
 
+sealed class ChatBskyConvoUnmuteConvoError(val name: String, val description: String?) {
+        object InvalidConvo: ChatBskyConvoUnmuteConvoError("InvalidConvo", "")
+    }
+
 /**
- * 
+ * Unmutes a conversation, allowing notifications related to it.
  *
  * Endpoint: chat.bsky.convo.unmuteConvo
  */

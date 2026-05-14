@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: com.atproto.repo.defs
 
 
-public struct ComAtprotoRepoDefs { 
+public struct ComAtprotoRepoDefs {
 
     public static let typeIdentifier = "com.atproto.repo.defs"
-        
+
 public struct CommitMeta: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "com.atproto.repo.defs#commitMeta"
             public let cid: CID
@@ -86,5 +86,5 @@ public struct CommitMeta: ATProtocolCodable, ATProtocolValue {
 }
 
 
-                           
+
 

@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: place.stream.chat.profile
 
 
-public struct PlaceStreamChatProfile: ATProtocolCodable, ATProtocolValue { 
+public struct PlaceStreamChatProfile: ATProtocolCodable, ATProtocolValue {
 
     public static let typeIdentifier = "place.stream.chat.profile"
         public let color: Color?
@@ -59,7 +59,7 @@ public struct PlaceStreamChatProfile: ATProtocolCodable, ATProtocolValue {
             case typeIdentifier = "$type"
             case color
         }
-        
+
 public struct Color: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "place.stream.chat.profile#color"
             public let red: Int
@@ -153,5 +153,5 @@ public struct Color: ATProtocolCodable, ATProtocolValue {
 }
 
 
-                           
+
 

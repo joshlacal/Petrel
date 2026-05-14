@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: app.bsky.graph.block
 
 
-public struct AppBskyGraphBlock: ATProtocolCodable, ATProtocolValue { 
+public struct AppBskyGraphBlock: ATProtocolCodable, ATProtocolValue {
 
     public static let typeIdentifier = "app.bsky.graph.block"
         public let subject: DID
@@ -70,5 +70,5 @@ public struct AppBskyGraphBlock: ATProtocolCodable, ATProtocolValue {
 }
 
 
-                           
+
 

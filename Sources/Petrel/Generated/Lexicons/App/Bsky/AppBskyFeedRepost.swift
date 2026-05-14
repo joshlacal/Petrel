@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: app.bsky.feed.repost
 
 
-public struct AppBskyFeedRepost: ATProtocolCodable, ATProtocolValue { 
+public struct AppBskyFeedRepost: ATProtocolCodable, ATProtocolValue {
 
     public static let typeIdentifier = "app.bsky.feed.repost"
         public let subject: ComAtprotoRepoStrongRef
@@ -87,5 +87,5 @@ public struct AppBskyFeedRepost: ATProtocolCodable, ATProtocolValue {
 }
 
 
-                           
+
 

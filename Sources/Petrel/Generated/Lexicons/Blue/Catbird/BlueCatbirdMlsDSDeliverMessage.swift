@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: blue.catbird.mlsDS.deliverMessage
 
 
-public struct BlueCatbirdMlsDSDeliverMessage { 
+public struct BlueCatbirdMlsDSDeliverMessage {
 
     public static let typeIdentifier = "blue.catbird.mlsDS.deliverMessage"
-        
+
 public struct DeliveryAck: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsDS.deliverMessage#deliveryAck"
             public let sig: String
@@ -175,7 +175,7 @@ public struct Input: ATProtocolCodable {
             self.deliveryId = deliveryId
             self.sequencerTerm = sequencerTerm
         }
-        
+
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -240,127 +240,127 @@ public struct Input: ATProtocolCodable {
             case sequencerTerm
         }
     }
-    
+
 public struct Output: ATProtocolCodable {
-        
-        
+
+
         public let accepted: Bool
-        
+
         public let seq: Int
-        
+
         public let deliveryId: String
-        
+
         public let ack: DeliveryAck?
-        
-        
-        
+
+
+
         // Standard public initializer
         public init(
-            
-            
+
+
             accepted: Bool,
-            
+
             seq: Int,
-            
+
             deliveryId: String,
-            
+
             ack: DeliveryAck? = nil
-            
-            
+
+
         ) {
-            
-            
+
+
             self.accepted = accepted
-            
+
             self.seq = seq
-            
+
             self.deliveryId = deliveryId
-            
+
             self.ack = ack
-            
-            
+
+
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
+
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
+
             self.accepted = try container.decode(Bool.self, forKey: .accepted)
-            
-            
+
+
             self.seq = try container.decode(Int.self, forKey: .seq)
-            
-            
+
+
             self.deliveryId = try container.decode(String.self, forKey: .deliveryId)
-            
-            
+
+
             self.ack = try container.decodeIfPresent(DeliveryAck.self, forKey: .ack)
-            
-            
+
+
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
+
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(accepted, forKey: .accepted)
-            
-            
+
+
             try container.encode(seq, forKey: .seq)
-            
-            
+
+
             try container.encode(deliveryId, forKey: .deliveryId)
-            
-            
+
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(ack, forKey: .ack)
-            
-            
+
+
         }
 
         public func toCBORValue() throws -> Any {
-            
+
             var map = OrderedCBORMap()
 
-            
-            
+
+
             let acceptedValue = try accepted.toCBORValue()
             map = map.adding(key: "accepted", value: acceptedValue)
-            
-            
-            
+
+
+
             let seqValue = try seq.toCBORValue()
             map = map.adding(key: "seq", value: seqValue)
-            
-            
-            
+
+
+
             let deliveryIdValue = try deliveryId.toCBORValue()
             map = map.adding(key: "deliveryId", value: deliveryIdValue)
-            
-            
-            
+
+
+
             if let value = ack {
                 // Encode optional property even if it's an empty array for CBOR
                 let ackValue = try value.toCBORValue()
                 map = map.adding(key: "ack", value: ackValue)
             }
-            
-            
+
+
 
             return map
-            
+
         }
-        
-        
+
+
         private enum CodingKeys: String, CodingKey {
             case accepted
             case seq
             case deliveryId
             case ack
         }
-        
+
     }
-        
+
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case conversationNotFound = "ConversationNotFound."
                 case notSequencer = "NotSequencer."
@@ -384,34 +384,34 @@ extension ATProtoClient.Blue.Catbird.MlsDS {
     // MARK: - deliverMessage
 
     /// Accept an inbound MLS message from a remote DS and store it for local subscribers. Deliver a federated MLS message to a local DS for storage and SSE fanout.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    
-    /// 
+
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func deliverMessage(
-        
+
         input: BlueCatbirdMlsDSDeliverMessage.Input
-        
+
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsDSDeliverMessage.Output?) {
         let endpoint = "blue.catbird.mlsDS.deliverMessage"
-        
-        var headers: [String: String] = [:]
-        
-        headers["Content-Type"] = "application/json"
-        
-        
-        
-        headers["Accept"] = "application/json"
-        
 
-        
+        var headers: [String: String] = [:]
+
+        headers["Content-Type"] = "application/json"
+
+
+
+        headers["Accept"] = "application/json"
+
+
+
         let requestData: Data? = try JSONEncoder().encode(input)
-        
-        
+
+
         let queryItems: [URLQueryItem]? = nil
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
@@ -426,12 +426,12 @@ extension ATProtoClient.Blue.Catbird.MlsDS {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        
+
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
         if (200...299).contains(responseCode) {
-            
+
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -439,13 +439,13 @@ extension ATProtoClient.Blue.Catbird.MlsDS {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-            
+
 
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsDSDeliverMessage.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -456,9 +456,9 @@ extension ATProtoClient.Blue.Catbird.MlsDS {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-        
+
     }
-    
+
 }
-                           
+
 

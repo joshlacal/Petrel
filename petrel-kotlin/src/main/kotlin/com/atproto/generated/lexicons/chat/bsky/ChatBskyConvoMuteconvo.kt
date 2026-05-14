@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: chat.bsky.convo.muteConvo
-
+// Mutes a conversation, preventing notifications related to it.
 package com.atproto.generated
 
 import kotlinx.serialization.*
@@ -25,8 +25,12 @@ object ChatBskyConvoMuteConvoDefs {
         @SerialName("convo")
         val convo: ChatBskyConvoDefsConvoView    )
 
+sealed class ChatBskyConvoMuteConvoError(val name: String, val description: String?) {
+        object InvalidConvo: ChatBskyConvoMuteConvoError("InvalidConvo", "")
+    }
+
 /**
- * 
+ * Mutes a conversation, preventing notifications related to it.
  *
  * Endpoint: chat.bsky.convo.muteConvo
  */

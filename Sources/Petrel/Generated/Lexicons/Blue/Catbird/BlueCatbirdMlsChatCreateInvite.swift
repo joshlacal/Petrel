@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: blue.catbird.mlsChat.createInvite
 
 
-public struct BlueCatbirdMlsChatCreateInvite { 
+public struct BlueCatbirdMlsChatCreateInvite {
 
     public static let typeIdentifier = "blue.catbird.mlsChat.createInvite"
-        
+
 public struct InviteView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.createInvite#inviteView"
             public let inviteId: String
@@ -285,7 +285,7 @@ public struct Input: ATProtocolCodable {
             self.expiresAt = expiresAt
             self.maxUses = maxUses
         }
-        
+
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -334,87 +334,87 @@ public struct Input: ATProtocolCodable {
             case maxUses
         }
     }
-    
+
 public struct Output: ATProtocolCodable {
-        
-        
+
+
         public let inviteId: String
-        
+
         public let invite: InviteView
-        
-        
-        
+
+
+
         // Standard public initializer
         public init(
-            
-            
+
+
             inviteId: String,
-            
+
             invite: InviteView
-            
-            
+
+
         ) {
-            
-            
+
+
             self.inviteId = inviteId
-            
+
             self.invite = invite
-            
-            
+
+
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
+
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
+
             self.inviteId = try container.decode(String.self, forKey: .inviteId)
-            
-            
+
+
             self.invite = try container.decode(InviteView.self, forKey: .invite)
-            
-            
+
+
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
+
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(inviteId, forKey: .inviteId)
-            
-            
+
+
             try container.encode(invite, forKey: .invite)
-            
-            
+
+
         }
 
         public func toCBORValue() throws -> Any {
-            
+
             var map = OrderedCBORMap()
 
-            
-            
+
+
             let inviteIdValue = try inviteId.toCBORValue()
             map = map.adding(key: "inviteId", value: inviteIdValue)
-            
-            
-            
+
+
+
             let inviteValue = try invite.toCBORValue()
             map = map.adding(key: "invite", value: inviteValue)
-            
-            
+
+
 
             return map
-            
+
         }
-        
-        
+
+
         private enum CodingKeys: String, CodingKey {
             case inviteId
             case invite
         }
-        
+
     }
-        
+
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case unauthorized = "Unauthorized.Caller is not an admin of this conversation"
                 case invalidPSKHash = "InvalidPSKHash.PSK hash is invalid or malformed"
@@ -439,26 +439,26 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - createInvite
 
     /// Create a new invite link for a conversation Create an invite link with optional PSK hash, expiration, and usage limits. Only admins can create invites.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func createInvite(
-        
+
         input: BlueCatbirdMlsChatCreateInvite.Input
-        
+
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatCreateInvite.Output?) {
         let endpoint = "blue.catbird.mlsChat.createInvite"
-        
+
         var headers: [String: String] = [:]
-        
+
         headers["Content-Type"] = "application/json"
-        
-        
-        
+
+
+
         headers["Accept"] = "application/json"
-        
+
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -475,7 +475,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        
+
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
@@ -487,10 +487,10 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         // Only decode response data if request was successful
         if (200...299).contains(responseCode) {
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatCreateInvite.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -501,9 +501,9 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-        
+
     }
-    
+
 }
-                           
+
 

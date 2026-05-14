@@ -5,107 +5,107 @@ import Foundation
 // lexicon: 1, id: blue.catbird.mlsChat.getKeyPackages
 
 
-public struct BlueCatbirdMlsChatGetKeyPackages { 
+public struct BlueCatbirdMlsChatGetKeyPackages {
 
-    public static let typeIdentifier = "blue.catbird.mlsChat.getKeyPackages"    
+    public static let typeIdentifier = "blue.catbird.mlsChat.getKeyPackages"
 public struct Parameters: Parametrizable {
         public let dids: [DID]
         public let cipherSuite: String?
-        
+
         public init(
-            dids: [DID], 
+            dids: [DID],
             cipherSuite: String? = nil
             ) {
             self.dids = dids
             self.cipherSuite = cipherSuite
-            
+
         }
     }
-    
+
 public struct Output: ATProtocolCodable {
-        
-        
+
+
         public let keyPackages: [BlueCatbirdMlsChatDefs.KeyPackageRef]
-        
+
         public let missing: [DID]?
-        
-        
-        
+
+
+
         // Standard public initializer
         public init(
-            
-            
+
+
             keyPackages: [BlueCatbirdMlsChatDefs.KeyPackageRef],
-            
+
             missing: [DID]? = nil
-            
-            
+
+
         ) {
-            
-            
+
+
             self.keyPackages = keyPackages
-            
+
             self.missing = missing
-            
-            
+
+
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
+
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
+
             self.keyPackages = try container.decode([BlueCatbirdMlsChatDefs.KeyPackageRef].self, forKey: .keyPackages)
-            
-            
+
+
             self.missing = try container.decodeIfPresent([DID].self, forKey: .missing)
-            
-            
+
+
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
+
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(keyPackages, forKey: .keyPackages)
-            
-            
+
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(missing, forKey: .missing)
-            
-            
+
+
         }
 
         public func toCBORValue() throws -> Any {
-            
+
             var map = OrderedCBORMap()
 
-            
-            
+
+
             let keyPackagesValue = try keyPackages.toCBORValue()
             map = map.adding(key: "keyPackages", value: keyPackagesValue)
-            
-            
-            
+
+
+
             if let value = missing {
                 // Encode optional property even if it's an empty array for CBOR
                 let missingValue = try value.toCBORValue()
                 map = map.adding(key: "missing", value: missingValue)
             }
-            
-            
+
+
 
             return map
-            
+
         }
-        
-        
+
+
         private enum CodingKeys: String, CodingKey {
             case keyPackages
             case missing
         }
-        
+
     }
-        
+
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case tooManyDids = "TooManyDids.Too many DIDs requested (max 100)"
                 case invalidDid = "InvalidDid.One or more DIDs are invalid"
@@ -130,17 +130,17 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - getKeyPackages
 
     /// Retrieve key packages for one or more DIDs (same as v1, in v2 namespace for consistency) Retrieve key packages for one or more DIDs to add them to conversations. Returns one key package per device per DID.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func getKeyPackages(input: BlueCatbirdMlsChatGetKeyPackages.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatGetKeyPackages.Output?) {
         let endpoint = "blue.catbird.mlsChat.getKeyPackages"
 
-        
+
         let queryItems = input.asQueryItems()
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -159,7 +159,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
         if (200...299).contains(responseCode) {
-            
+
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -167,13 +167,13 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-            
+
 
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatGetKeyPackages.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -181,12 +181,12 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
                 return (responseCode, nil)
             }
         } else {
-            
+
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-                           
+
 

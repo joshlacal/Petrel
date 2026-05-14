@@ -24,6 +24,9 @@ sealed interface ChatBskyModerationGetMessageContextOutputMessagesUnion {
     data class DeletedMessageView(val value: com.atproto.generated.ChatBskyConvoDefsDeletedMessageView) : ChatBskyModerationGetMessageContextOutputMessagesUnion
 
     @Serializable
+    data class SystemMessageView(val value: com.atproto.generated.ChatBskyConvoDefsSystemMessageView) : ChatBskyModerationGetMessageContextOutputMessagesUnion
+
+    @Serializable
     data class Unexpected(val value: JsonElement) : ChatBskyModerationGetMessageContextOutputMessagesUnion
 }
 
@@ -44,6 +47,12 @@ object ChatBskyModerationGetMessageContextOutputMessagesUnionSerializer : kotlin
                 val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsDeletedMessageView.serializer(), value.value)
                 kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
                     it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#deletedMessageView")
+                })
+            }
+            is ChatBskyModerationGetMessageContextOutputMessagesUnion.SystemMessageView -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsSystemMessageView.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#systemMessageView")
                 })
             }
             is ChatBskyModerationGetMessageContextOutputMessagesUnion.Unexpected -> value.value
@@ -70,6 +79,9 @@ object ChatBskyModerationGetMessageContextOutputMessagesUnionSerializer : kotlin
             )
             "chat.bsky.convo.defs#deletedMessageView" -> ChatBskyModerationGetMessageContextOutputMessagesUnion.DeletedMessageView(
                 jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsDeletedMessageView.serializer(), element)
+            )
+            "chat.bsky.convo.defs#systemMessageView" -> ChatBskyModerationGetMessageContextOutputMessagesUnion.SystemMessageView(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsSystemMessageView.serializer(), element)
             )
             else -> ChatBskyModerationGetMessageContextOutputMessagesUnion.Unexpected(element)
         }

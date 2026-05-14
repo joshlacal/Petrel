@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: app.bsky.actor.defs
 
 
-public struct AppBskyActorDefs { 
+public struct AppBskyActorDefs {
 
     public static let typeIdentifier = "app.bsky.actor.defs"
-        
+
 public struct ProfileViewBasic: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.actor.defs#profileViewBasic"
             public let did: DID
@@ -300,7 +300,7 @@ public struct ProfileViewBasic: ATProtocolCodable, ATProtocolValue {
             case debug
         }
     }
-        
+
 public struct ProfileView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.actor.defs#profileView"
             public let did: DID
@@ -636,7 +636,7 @@ public struct ProfileView: ATProtocolCodable, ATProtocolValue {
             case debug
         }
     }
-        
+
 public struct ProfileViewDetailed: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.actor.defs#profileViewDetailed"
             public let did: DID
@@ -1126,7 +1126,7 @@ public struct ProfileViewDetailed: ATProtocolCodable, ATProtocolValue {
             case debug
         }
     }
-        
+
 public struct ProfileAssociated: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.actor.defs#profileAssociated"
             public let lists: Int?
@@ -1320,7 +1320,7 @@ public struct ProfileAssociated: ATProtocolCodable, ATProtocolValue {
             case germ
         }
     }
-        
+
 public struct ProfileAssociatedChat: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.actor.defs#profileAssociatedChat"
             public let allowIncoming: String
@@ -1376,7 +1376,7 @@ public struct ProfileAssociatedChat: ATProtocolCodable, ATProtocolValue {
             case allowIncoming
         }
     }
-        
+
 public struct ProfileAssociatedGerm: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.actor.defs#profileAssociatedGerm"
             public let messageMeUrl: URI
@@ -1448,7 +1448,7 @@ public struct ProfileAssociatedGerm: ATProtocolCodable, ATProtocolValue {
             case showButtonTo
         }
     }
-        
+
 public struct ProfileAssociatedActivitySubscription: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.actor.defs#profileAssociatedActivitySubscription"
             public let allowSubscriptions: String
@@ -1504,7 +1504,7 @@ public struct ProfileAssociatedActivitySubscription: ATProtocolCodable, ATProtoc
             case allowSubscriptions
         }
     }
-        
+
 public struct ViewerState: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.actor.defs#viewerState"
             public let muted: Bool?
@@ -1742,13 +1742,13 @@ public struct ViewerState: ATProtocolCodable, ATProtocolValue {
             case activitySubscription
         }
     }
-        
+
 public struct KnownFollowers: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.actor.defs#knownFollowers"
             public let count: Int
             private let _followers: IndirectBox<[ProfileViewBasic]>
             public var followers: [ProfileViewBasic] {
-                
+
                 _followers.value
             }
 
@@ -1756,7 +1756,7 @@ public struct KnownFollowers: ATProtocolCodable, ATProtocolValue {
             count: Int, followers: [ProfileViewBasic]
         ) {
             self.count = count
-            
+
             self._followers = IndirectBox(followers)
         }
 
@@ -1820,7 +1820,7 @@ public struct KnownFollowers: ATProtocolCodable, ATProtocolValue {
             case followers
         }
     }
-        
+
 public struct VerificationState: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.actor.defs#verificationState"
             public let verifications: [VerificationView]
@@ -1908,7 +1908,7 @@ public struct VerificationState: ATProtocolCodable, ATProtocolValue {
             case trustedVerifierStatus
         }
     }
-        
+
 public struct VerificationView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.actor.defs#verificationView"
             public let issuer: DID
@@ -2012,7 +2012,7 @@ public struct VerificationView: ATProtocolCodable, ATProtocolValue {
             case createdAt
         }
     }
-        
+
 public struct AdultContentPref: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.actor.defs#adultContentPref"
             public let enabled: Bool
@@ -2068,7 +2068,7 @@ public struct AdultContentPref: ATProtocolCodable, ATProtocolValue {
             case enabled
         }
     }
-        
+
 public struct ContentLabelPref: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.actor.defs#contentLabelPref"
             public let labelerDid: DID?
@@ -2162,7 +2162,7 @@ public struct ContentLabelPref: ATProtocolCodable, ATProtocolValue {
             case visibility
         }
     }
-        
+
 public struct SavedFeed: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.actor.defs#savedFeed"
             public let id: String
@@ -2266,7 +2266,7 @@ public struct SavedFeed: ATProtocolCodable, ATProtocolValue {
             case pinned
         }
     }
-        
+
 public struct SavedFeedsPrefV2: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.actor.defs#savedFeedsPrefV2"
             public let items: [AppBskyActorDefs.SavedFeed]
@@ -2322,7 +2322,7 @@ public struct SavedFeedsPrefV2: ATProtocolCodable, ATProtocolValue {
             case items
         }
     }
-        
+
 public struct SavedFeedsPref: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.actor.defs#savedFeedsPref"
             public let pinned: [ATProtocolURI]
@@ -2416,7 +2416,7 @@ public struct SavedFeedsPref: ATProtocolCodable, ATProtocolValue {
             case timelineIndex
         }
     }
-        
+
 public struct PersonalDetailsPref: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.actor.defs#personalDetailsPref"
             public let birthDate: ATProtocolDate?
@@ -2478,7 +2478,7 @@ public struct PersonalDetailsPref: ATProtocolCodable, ATProtocolValue {
             case birthDate
         }
     }
-        
+
 public struct DeclaredAgePref: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.actor.defs#declaredAgePref"
             public let isOverAge13: Bool?
@@ -2584,7 +2584,7 @@ public struct DeclaredAgePref: ATProtocolCodable, ATProtocolValue {
             case isOverAge18
         }
     }
-        
+
 public struct FeedViewPref: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.actor.defs#feedViewPref"
             public let feed: String
@@ -2750,7 +2750,7 @@ public struct FeedViewPref: ATProtocolCodable, ATProtocolValue {
             case hideQuotePosts
         }
     }
-        
+
 public struct ThreadViewPref: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.actor.defs#threadViewPref"
             public let sort: String?
@@ -2812,7 +2812,7 @@ public struct ThreadViewPref: ATProtocolCodable, ATProtocolValue {
             case sort
         }
     }
-        
+
 public struct InterestsPref: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.actor.defs#interestsPref"
             public let tags: [String]
@@ -2868,7 +2868,7 @@ public struct InterestsPref: ATProtocolCodable, ATProtocolValue {
             case tags
         }
     }
-        
+
 public struct MutedWord: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.actor.defs#mutedWord"
             public let id: String?
@@ -3006,7 +3006,7 @@ public struct MutedWord: ATProtocolCodable, ATProtocolValue {
             case expiresAt
         }
     }
-        
+
 public struct MutedWordsPref: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.actor.defs#mutedWordsPref"
             public let items: [AppBskyActorDefs.MutedWord]
@@ -3062,7 +3062,7 @@ public struct MutedWordsPref: ATProtocolCodable, ATProtocolValue {
             case items
         }
     }
-        
+
 public struct HiddenPostsPref: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.actor.defs#hiddenPostsPref"
             public let items: [ATProtocolURI]
@@ -3118,7 +3118,7 @@ public struct HiddenPostsPref: ATProtocolCodable, ATProtocolValue {
             case items
         }
     }
-        
+
 public struct LabelersPref: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.actor.defs#labelersPref"
             public let labelers: [LabelerPrefItem]
@@ -3174,7 +3174,7 @@ public struct LabelersPref: ATProtocolCodable, ATProtocolValue {
             case labelers
         }
     }
-        
+
 public struct LabelerPrefItem: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.actor.defs#labelerPrefItem"
             public let did: DID
@@ -3230,7 +3230,7 @@ public struct LabelerPrefItem: ATProtocolCodable, ATProtocolValue {
             case did
         }
     }
-        
+
 public struct BskyAppStatePref: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.actor.defs#bskyAppStatePref"
             public let activeProgressGuide: BskyAppProgressGuide?
@@ -3336,7 +3336,7 @@ public struct BskyAppStatePref: ATProtocolCodable, ATProtocolValue {
             case nuxs
         }
     }
-        
+
 public struct BskyAppProgressGuide: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.actor.defs#bskyAppProgressGuide"
             public let guide: String
@@ -3392,7 +3392,7 @@ public struct BskyAppProgressGuide: ATProtocolCodable, ATProtocolValue {
             case guide
         }
     }
-        
+
 public struct Nux: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.actor.defs#nux"
             public let id: String
@@ -3508,7 +3508,7 @@ public struct Nux: ATProtocolCodable, ATProtocolValue {
             case expiresAt
         }
     }
-        
+
 public struct VerificationPrefs: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.actor.defs#verificationPrefs"
             public let hideBadges: Bool?
@@ -3570,7 +3570,7 @@ public struct VerificationPrefs: ATProtocolCodable, ATProtocolValue {
             case hideBadges
         }
     }
-        
+
 public struct LiveEventPreferences: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.actor.defs#liveEventPreferences"
             public let hiddenFeedIds: [String]?
@@ -3654,7 +3654,7 @@ public struct LiveEventPreferences: ATProtocolCodable, ATProtocolValue {
             case hideAllFeeds
         }
     }
-        
+
 public struct PostInteractionSettingsPref: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.actor.defs#postInteractionSettingsPref"
             public let threadgateAllowRules: [PostInteractionSettingsPrefThreadgateAllowRulesUnion]?
@@ -3738,7 +3738,7 @@ public struct PostInteractionSettingsPref: ATProtocolCodable, ATProtocolValue {
             case postgateEmbeddingRules
         }
     }
-        
+
 public struct StatusView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.actor.defs#statusView"
             public let uri: ATProtocolURI?
@@ -3949,7 +3949,7 @@ public struct StatusView: ATProtocolCodable, ATProtocolValue {
 
 public struct Preferences: Codable, ATProtocolCodable, ATProtocolValue {
     public let items: [PreferencesForUnionArray]
-    
+
     public init(items: [PreferencesForUnionArray]) {
         self.items = items
     }
@@ -3974,24 +3974,24 @@ public struct Preferences: Codable, ATProtocolCodable, ATProtocolValue {
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? Preferences else { return false }
-        
+
         if self.items != other.items {
             return false
         }
 
         return true
     }
-    
+
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // For union arrays, we need to encode each item while preserving its order
         var itemsArray = [Any]()
-        
+
         for item in items {
             let itemValue = try item.toCBORValue()
             itemsArray.append(itemValue)
         }
-        
+
         return itemsArray
     }
 
@@ -4241,52 +4241,52 @@ public enum PreferencesForUnionArray: Codable, ATProtocolCodable, ATProtocolValu
         guard let otherValue = other as? PreferencesForUnionArray else { return false }
 
         switch (self, otherValue) {
-        case (.adultContentPref(let selfValue), 
+        case (.adultContentPref(let selfValue),
               .adultContentPref(let otherValue)):
             return selfValue == otherValue
-        case (.contentLabelPref(let selfValue), 
+        case (.contentLabelPref(let selfValue),
               .contentLabelPref(let otherValue)):
             return selfValue == otherValue
-        case (.savedFeedsPref(let selfValue), 
+        case (.savedFeedsPref(let selfValue),
               .savedFeedsPref(let otherValue)):
             return selfValue == otherValue
-        case (.savedFeedsPrefV2(let selfValue), 
+        case (.savedFeedsPrefV2(let selfValue),
               .savedFeedsPrefV2(let otherValue)):
             return selfValue == otherValue
-        case (.personalDetailsPref(let selfValue), 
+        case (.personalDetailsPref(let selfValue),
               .personalDetailsPref(let otherValue)):
             return selfValue == otherValue
-        case (.declaredAgePref(let selfValue), 
+        case (.declaredAgePref(let selfValue),
               .declaredAgePref(let otherValue)):
             return selfValue == otherValue
-        case (.feedViewPref(let selfValue), 
+        case (.feedViewPref(let selfValue),
               .feedViewPref(let otherValue)):
             return selfValue == otherValue
-        case (.threadViewPref(let selfValue), 
+        case (.threadViewPref(let selfValue),
               .threadViewPref(let otherValue)):
             return selfValue == otherValue
-        case (.interestsPref(let selfValue), 
+        case (.interestsPref(let selfValue),
               .interestsPref(let otherValue)):
             return selfValue == otherValue
-        case (.mutedWordsPref(let selfValue), 
+        case (.mutedWordsPref(let selfValue),
               .mutedWordsPref(let otherValue)):
             return selfValue == otherValue
-        case (.hiddenPostsPref(let selfValue), 
+        case (.hiddenPostsPref(let selfValue),
               .hiddenPostsPref(let otherValue)):
             return selfValue == otherValue
-        case (.bskyAppStatePref(let selfValue), 
+        case (.bskyAppStatePref(let selfValue),
               .bskyAppStatePref(let otherValue)):
             return selfValue == otherValue
-        case (.labelersPref(let selfValue), 
+        case (.labelersPref(let selfValue),
               .labelersPref(let otherValue)):
             return selfValue == otherValue
-        case (.postInteractionSettingsPref(let selfValue), 
+        case (.postInteractionSettingsPref(let selfValue),
               .postInteractionSettingsPref(let otherValue)):
             return selfValue == otherValue
-        case (.verificationPrefs(let selfValue), 
+        case (.verificationPrefs(let selfValue),
               .verificationPrefs(let otherValue)):
             return selfValue == otherValue
-        case (.liveEventPreferences(let selfValue), 
+        case (.liveEventPreferences(let selfValue),
               .liveEventPreferences(let otherValue)):
             return selfValue == otherValue
         case (.unexpected(let selfValue), .unexpected(let otherValue)):
@@ -4299,15 +4299,15 @@ public enum PreferencesForUnionArray: Codable, ATProtocolCodable, ATProtocolValu
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-    
+
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         var map = OrderedCBORMap()
-        
+
         switch self {
         case .adultContentPref(let value):
             map = map.adding(key: "$type", value: "app.bsky.actor.defs#adultContentPref")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -4324,7 +4324,7 @@ public enum PreferencesForUnionArray: Codable, ATProtocolCodable, ATProtocolValu
             return map
         case .contentLabelPref(let value):
             map = map.adding(key: "$type", value: "app.bsky.actor.defs#contentLabelPref")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -4341,7 +4341,7 @@ public enum PreferencesForUnionArray: Codable, ATProtocolCodable, ATProtocolValu
             return map
         case .savedFeedsPref(let value):
             map = map.adding(key: "$type", value: "app.bsky.actor.defs#savedFeedsPref")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -4358,7 +4358,7 @@ public enum PreferencesForUnionArray: Codable, ATProtocolCodable, ATProtocolValu
             return map
         case .savedFeedsPrefV2(let value):
             map = map.adding(key: "$type", value: "app.bsky.actor.defs#savedFeedsPrefV2")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -4375,7 +4375,7 @@ public enum PreferencesForUnionArray: Codable, ATProtocolCodable, ATProtocolValu
             return map
         case .personalDetailsPref(let value):
             map = map.adding(key: "$type", value: "app.bsky.actor.defs#personalDetailsPref")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -4392,7 +4392,7 @@ public enum PreferencesForUnionArray: Codable, ATProtocolCodable, ATProtocolValu
             return map
         case .declaredAgePref(let value):
             map = map.adding(key: "$type", value: "app.bsky.actor.defs#declaredAgePref")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -4409,7 +4409,7 @@ public enum PreferencesForUnionArray: Codable, ATProtocolCodable, ATProtocolValu
             return map
         case .feedViewPref(let value):
             map = map.adding(key: "$type", value: "app.bsky.actor.defs#feedViewPref")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -4426,7 +4426,7 @@ public enum PreferencesForUnionArray: Codable, ATProtocolCodable, ATProtocolValu
             return map
         case .threadViewPref(let value):
             map = map.adding(key: "$type", value: "app.bsky.actor.defs#threadViewPref")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -4443,7 +4443,7 @@ public enum PreferencesForUnionArray: Codable, ATProtocolCodable, ATProtocolValu
             return map
         case .interestsPref(let value):
             map = map.adding(key: "$type", value: "app.bsky.actor.defs#interestsPref")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -4460,7 +4460,7 @@ public enum PreferencesForUnionArray: Codable, ATProtocolCodable, ATProtocolValu
             return map
         case .mutedWordsPref(let value):
             map = map.adding(key: "$type", value: "app.bsky.actor.defs#mutedWordsPref")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -4477,7 +4477,7 @@ public enum PreferencesForUnionArray: Codable, ATProtocolCodable, ATProtocolValu
             return map
         case .hiddenPostsPref(let value):
             map = map.adding(key: "$type", value: "app.bsky.actor.defs#hiddenPostsPref")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -4494,7 +4494,7 @@ public enum PreferencesForUnionArray: Codable, ATProtocolCodable, ATProtocolValu
             return map
         case .bskyAppStatePref(let value):
             map = map.adding(key: "$type", value: "app.bsky.actor.defs#bskyAppStatePref")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -4511,7 +4511,7 @@ public enum PreferencesForUnionArray: Codable, ATProtocolCodable, ATProtocolValu
             return map
         case .labelersPref(let value):
             map = map.adding(key: "$type", value: "app.bsky.actor.defs#labelersPref")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -4528,7 +4528,7 @@ public enum PreferencesForUnionArray: Codable, ATProtocolCodable, ATProtocolValu
             return map
         case .postInteractionSettingsPref(let value):
             map = map.adding(key: "$type", value: "app.bsky.actor.defs#postInteractionSettingsPref")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -4545,7 +4545,7 @@ public enum PreferencesForUnionArray: Codable, ATProtocolCodable, ATProtocolValu
             return map
         case .verificationPrefs(let value):
             map = map.adding(key: "$type", value: "app.bsky.actor.defs#verificationPrefs")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -4562,7 +4562,7 @@ public enum PreferencesForUnionArray: Codable, ATProtocolCodable, ATProtocolValu
             return map
         case .liveEventPreferences(let value):
             map = map.adding(key: "$type", value: "app.bsky.actor.defs#liveEventPreferences")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -4586,38 +4586,38 @@ public enum PreferencesForUnionArray: Codable, ATProtocolCodable, ATProtocolValu
 
 public struct MutedWordTarget: Codable, ATProtocolCodable, ATProtocolValue {
             public let rawValue: String
-            
+
             // Predefined constants
-            // 
+            //
             public static let content = MutedWordTarget(rawValue: "content")
-            // 
+            //
             public static let tag = MutedWordTarget(rawValue: "tag")
-            
+
             public init(rawValue: String) {
                 self.rawValue = rawValue
             }
-            
+
             public init(from decoder: Decoder) throws {
                 let container = try decoder.singleValueContainer()
                 rawValue = try container.decode(String.self)
             }
-            
+
             public func encode(to encoder: Encoder) throws {
                 var container = encoder.singleValueContainer()
                 try container.encode(rawValue)
             }
-            
+
             public func isEqual(to other: any ATProtocolValue) -> Bool {
                 guard let otherValue = other as? MutedWordTarget else { return false }
                 return self.rawValue == otherValue.rawValue
             }
-            
+
             // DAGCBOR encoding with field ordering
             public func toCBORValue() throws -> Any {
                 // For string-based enum types, we return the raw string value directly
                 return rawValue
             }
-            
+
             // Provide allCases-like functionality
             public static var predefinedValues: [MutedWordTarget] {
                 return [
@@ -4716,7 +4716,7 @@ public enum PostInteractionSettingsPrefThreadgateAllowRulesUnion: Codable, ATPro
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-    
+
     public static func == (lhs: PostInteractionSettingsPrefThreadgateAllowRulesUnion, rhs: PostInteractionSettingsPrefThreadgateAllowRulesUnion) -> Bool {
         switch (lhs, rhs) {
         case (.appBskyFeedThreadgateMentionRule(let lhsValue),
@@ -4737,21 +4737,21 @@ public enum PostInteractionSettingsPrefThreadgateAllowRulesUnion: Codable, ATPro
             return false
         }
     }
-    
+
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? PostInteractionSettingsPrefThreadgateAllowRulesUnion else { return false }
         return self == other
     }
-    
+
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-        
+
         switch self {
         case .appBskyFeedThreadgateMentionRule(let value):
             map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#mentionRule")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -4768,7 +4768,7 @@ public enum PostInteractionSettingsPrefThreadgateAllowRulesUnion: Codable, ATPro
             return map
         case .appBskyFeedThreadgateFollowerRule(let value):
             map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#followerRule")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -4785,7 +4785,7 @@ public enum PostInteractionSettingsPrefThreadgateAllowRulesUnion: Codable, ATPro
             return map
         case .appBskyFeedThreadgateFollowingRule(let value):
             map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#followingRule")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -4802,7 +4802,7 @@ public enum PostInteractionSettingsPrefThreadgateAllowRulesUnion: Codable, ATPro
             return map
         case .appBskyFeedThreadgateListRule(let value):
             map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#listRule")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -4873,7 +4873,7 @@ public enum PostInteractionSettingsPrefPostgateEmbeddingRulesUnion: Codable, ATP
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-    
+
     public static func == (lhs: PostInteractionSettingsPrefPostgateEmbeddingRulesUnion, rhs: PostInteractionSettingsPrefPostgateEmbeddingRulesUnion) -> Bool {
         switch (lhs, rhs) {
         case (.appBskyFeedPostgateDisableRule(let lhsValue),
@@ -4885,21 +4885,21 @@ public enum PostInteractionSettingsPrefPostgateEmbeddingRulesUnion: Codable, ATP
             return false
         }
     }
-    
+
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? PostInteractionSettingsPrefPostgateEmbeddingRulesUnion else { return false }
         return self == other
     }
-    
+
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-        
+
         switch self {
         case .appBskyFeedPostgateDisableRule(let value):
             map = map.adding(key: "$type", value: "app.bsky.feed.postgate#disableRule")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -4970,7 +4970,7 @@ public enum StatusViewEmbedUnion: Codable, ATProtocolCodable, ATProtocolValue, S
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-    
+
     public static func == (lhs: StatusViewEmbedUnion, rhs: StatusViewEmbedUnion) -> Bool {
         switch (lhs, rhs) {
         case (.appBskyEmbedExternalView(let lhsValue),
@@ -4982,21 +4982,21 @@ public enum StatusViewEmbedUnion: Codable, ATProtocolCodable, ATProtocolValue, S
             return false
         }
     }
-    
+
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? StatusViewEmbedUnion else { return false }
         return self == other
     }
-    
+
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-        
+
         switch self {
         case .appBskyEmbedExternalView(let value):
             map = map.adding(key: "$type", value: "app.bsky.embed.external#view")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -5021,5 +5021,5 @@ public enum StatusViewEmbedUnion: Codable, ATProtocolCodable, ATProtocolValue, S
 }
 
 
-                           
+
 

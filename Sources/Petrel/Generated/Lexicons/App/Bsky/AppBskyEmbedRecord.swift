@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: app.bsky.embed.record
 
 
-public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue { 
+public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
 
     public static let typeIdentifier = "app.bsky.embed.record"
         public let record: ComAtprotoRepoStrongRef
@@ -50,7 +50,7 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
         private enum CodingKeys: String, CodingKey {
             case record
         }
-        
+
 public struct View: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.embed.record#view"
             public let record: ViewRecordUnion
@@ -106,7 +106,7 @@ public struct View: ATProtocolCodable, ATProtocolValue {
             case record
         }
     }
-        
+
 public struct ViewRecord: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.embed.record#viewRecord"
             public let uri: ATProtocolURI
@@ -358,7 +358,7 @@ public struct ViewRecord: ATProtocolCodable, ATProtocolValue {
             case indexedAt
         }
     }
-        
+
 public struct ViewNotFound: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.embed.record#viewNotFound"
             public let uri: ATProtocolURI
@@ -430,7 +430,7 @@ public struct ViewNotFound: ATProtocolCodable, ATProtocolValue {
             case notFound
         }
     }
-        
+
 public struct ViewBlocked: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.embed.record#viewBlocked"
             public let uri: ATProtocolURI
@@ -518,7 +518,7 @@ public struct ViewBlocked: ATProtocolCodable, ATProtocolValue {
             case author
         }
     }
-        
+
 public struct ViewDetached: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.embed.record#viewDetached"
             public let uri: ATProtocolURI
@@ -732,7 +732,7 @@ public indirect enum ViewRecordUnion: Codable, ATProtocolCodable, ATProtocolValu
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-    
+
     public static func == (lhs: ViewRecordUnion, rhs: ViewRecordUnion) -> Bool {
         switch (lhs, rhs) {
         case (.appBskyEmbedRecordViewRecord(let lhsValue),
@@ -765,21 +765,21 @@ public indirect enum ViewRecordUnion: Codable, ATProtocolCodable, ATProtocolValu
             return false
         }
     }
-    
+
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? ViewRecordUnion else { return false }
         return self == other
     }
-    
+
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-        
+
         switch self {
         case .appBskyEmbedRecordViewRecord(let value):
             map = map.adding(key: "$type", value: "app.bsky.embed.record#viewRecord")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -796,7 +796,7 @@ public indirect enum ViewRecordUnion: Codable, ATProtocolCodable, ATProtocolValu
             return map
         case .appBskyEmbedRecordViewNotFound(let value):
             map = map.adding(key: "$type", value: "app.bsky.embed.record#viewNotFound")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -813,7 +813,7 @@ public indirect enum ViewRecordUnion: Codable, ATProtocolCodable, ATProtocolValu
             return map
         case .appBskyEmbedRecordViewBlocked(let value):
             map = map.adding(key: "$type", value: "app.bsky.embed.record#viewBlocked")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -830,7 +830,7 @@ public indirect enum ViewRecordUnion: Codable, ATProtocolCodable, ATProtocolValu
             return map
         case .appBskyEmbedRecordViewDetached(let value):
             map = map.adding(key: "$type", value: "app.bsky.embed.record#viewDetached")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -847,7 +847,7 @@ public indirect enum ViewRecordUnion: Codable, ATProtocolCodable, ATProtocolValu
             return map
         case .appBskyFeedDefsGeneratorView(let value):
             map = map.adding(key: "$type", value: "app.bsky.feed.defs#generatorView")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -864,7 +864,7 @@ public indirect enum ViewRecordUnion: Codable, ATProtocolCodable, ATProtocolValu
             return map
         case .appBskyGraphDefsListView(let value):
             map = map.adding(key: "$type", value: "app.bsky.graph.defs#listView")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -881,7 +881,7 @@ public indirect enum ViewRecordUnion: Codable, ATProtocolCodable, ATProtocolValu
             return map
         case .appBskyLabelerDefsLabelerView(let value):
             map = map.adding(key: "$type", value: "app.bsky.labeler.defs#labelerView")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -898,7 +898,7 @@ public indirect enum ViewRecordUnion: Codable, ATProtocolCodable, ATProtocolValu
             return map
         case .appBskyGraphDefsStarterPackViewBasic(let value):
             map = map.adding(key: "$type", value: "app.bsky.graph.defs#starterPackViewBasic")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -1020,7 +1020,7 @@ public indirect enum ViewRecordEmbedsUnion: Codable, ATProtocolCodable, ATProtoc
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-    
+
     public static func == (lhs: ViewRecordEmbedsUnion, rhs: ViewRecordEmbedsUnion) -> Bool {
         switch (lhs, rhs) {
         case (.appBskyEmbedImagesView(let lhsValue),
@@ -1044,21 +1044,21 @@ public indirect enum ViewRecordEmbedsUnion: Codable, ATProtocolCodable, ATProtoc
             return false
         }
     }
-    
+
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? ViewRecordEmbedsUnion else { return false }
         return self == other
     }
-    
+
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-        
+
         switch self {
         case .appBskyEmbedImagesView(let value):
             map = map.adding(key: "$type", value: "app.bsky.embed.images#view")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -1075,7 +1075,7 @@ public indirect enum ViewRecordEmbedsUnion: Codable, ATProtocolCodable, ATProtoc
             return map
         case .appBskyEmbedVideoView(let value):
             map = map.adding(key: "$type", value: "app.bsky.embed.video#view")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -1092,7 +1092,7 @@ public indirect enum ViewRecordEmbedsUnion: Codable, ATProtocolCodable, ATProtoc
             return map
         case .appBskyEmbedExternalView(let value):
             map = map.adding(key: "$type", value: "app.bsky.embed.external#view")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -1109,7 +1109,7 @@ public indirect enum ViewRecordEmbedsUnion: Codable, ATProtocolCodable, ATProtoc
             return map
         case .appBskyEmbedRecordView(let value):
             map = map.adding(key: "$type", value: "app.bsky.embed.record#view")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -1126,7 +1126,7 @@ public indirect enum ViewRecordEmbedsUnion: Codable, ATProtocolCodable, ATProtoc
             return map
         case .appBskyEmbedRecordWithMediaView(let value):
             map = map.adding(key: "$type", value: "app.bsky.embed.recordWithMedia#view")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -1151,5 +1151,5 @@ public indirect enum ViewRecordEmbedsUnion: Codable, ATProtocolCodable, ATProtoc
 }
 
 
-                           
+
 

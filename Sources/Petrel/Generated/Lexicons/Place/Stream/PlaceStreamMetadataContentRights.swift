@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: place.stream.metadata.contentRights
 
 
-public struct PlaceStreamMetadataContentRights: ATProtocolCodable, ATProtocolValue { 
+public struct PlaceStreamMetadataContentRights: ATProtocolCodable, ATProtocolValue {
 
     public static let typeIdentifier = "place.stream.metadata.contentRights"
         public let creator: String?
@@ -130,5 +130,5 @@ public struct PlaceStreamMetadataContentRights: ATProtocolCodable, ATProtocolVal
 }
 
 
-                           
+
 

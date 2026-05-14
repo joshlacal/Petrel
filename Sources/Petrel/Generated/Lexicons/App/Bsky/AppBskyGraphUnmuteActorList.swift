@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: app.bsky.graph.unmuteActorList
 
 
-public struct AppBskyGraphUnmuteActorList { 
+public struct AppBskyGraphUnmuteActorList {
 
     public static let typeIdentifier = "app.bsky.graph.unmuteActorList"
 public struct Input: ATProtocolCodable {
@@ -15,7 +15,7 @@ public struct Input: ATProtocolCodable {
         public init(list: ATProtocolURI) {
             self.list = list
         }
-        
+
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -47,32 +47,32 @@ extension ATProtoClient.App.Bsky.Graph {
     // MARK: - unmuteActorList
 
     /// Unmutes the specified list of accounts. Requires auth.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    
-    /// 
+
+    ///
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func unmuteActorList(
-        
+
         input: AppBskyGraphUnmuteActorList.Input
-        
+
     ) async throws -> Int {
         let endpoint = "app.bsky.graph.unmuteActorList"
-        
-        var headers: [String: String] = [:]
-        
-        headers["Content-Type"] = "application/json"
-        
-        
-        
 
-        
+        var headers: [String: String] = [:]
+
+        headers["Content-Type"] = "application/json"
+
+
+
+
+
         let requestData: Data? = try JSONEncoder().encode(input)
-        
-        
+
+
         let queryItems: [URLQueryItem]? = nil
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
@@ -87,11 +87,11 @@ extension ATProtoClient.App.Bsky.Graph {
         let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        
+
         return responseCode
-        
+
     }
-    
+
 }
-                           
+
 

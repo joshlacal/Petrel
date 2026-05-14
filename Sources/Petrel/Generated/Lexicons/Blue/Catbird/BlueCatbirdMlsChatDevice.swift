@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: blue.catbird.mlsChat.device
 
 
-public struct BlueCatbirdMlsChatDevice: ATProtocolCodable, ATProtocolValue { 
+public struct BlueCatbirdMlsChatDevice: ATProtocolCodable, ATProtocolValue {
 
     public static let typeIdentifier = "blue.catbird.mlsChat.device"
         public let mlsSignaturePublicKey: Bytes
@@ -81,5 +81,5 @@ public struct BlueCatbirdMlsChatDevice: ATProtocolCodable, ATProtocolValue {
 }
 
 
-                           
+
 

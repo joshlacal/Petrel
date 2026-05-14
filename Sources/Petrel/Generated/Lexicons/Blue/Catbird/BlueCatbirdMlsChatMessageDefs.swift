@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: blue.catbird.mlsChat.message.defs
 
 
-public struct BlueCatbirdMlsChatMessageDefs { 
+public struct BlueCatbirdMlsChatMessageDefs {
 
     public static let typeIdentifier = "blue.catbird.mlsChat.message.defs"
-        
+
 public struct PayloadView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.message.defs#payloadView"
             public let version: Int
@@ -234,7 +234,7 @@ public struct PayloadView: ATProtocolCodable, ATProtocolValue {
             case typing
         }
     }
-        
+
 public struct RecordEmbed: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.message.defs#recordEmbed"
             public let uri: ATProtocolURI
@@ -372,7 +372,7 @@ public struct RecordEmbed: ATProtocolCodable, ATProtocolValue {
             case createdAt
         }
     }
-        
+
 public struct LinkEmbed: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.message.defs#linkEmbed"
             public let url: URI
@@ -516,7 +516,7 @@ public struct LinkEmbed: ATProtocolCodable, ATProtocolValue {
             case domain
         }
     }
-        
+
 public struct GifEmbed: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.message.defs#gifEmbed"
             public let tenorURL: URI
@@ -676,7 +676,7 @@ public struct GifEmbed: ATProtocolCodable, ATProtocolValue {
             case height
         }
     }
-        
+
 public struct AdminRoster: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.message.defs#adminRoster"
             public let version: Int
@@ -770,7 +770,7 @@ public struct AdminRoster: ATProtocolCodable, ATProtocolValue {
             case hash
         }
     }
-        
+
 public struct AdminAction: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.message.defs#adminAction"
             public let action: String
@@ -880,7 +880,7 @@ public struct AdminAction: ATProtocolCodable, ATProtocolValue {
             case reason
         }
     }
-        
+
 public struct ReactionPayload: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.message.defs#reactionPayload"
             public let messageId: String
@@ -968,7 +968,7 @@ public struct ReactionPayload: ATProtocolCodable, ATProtocolValue {
             case action
         }
     }
-        
+
 public struct ReadReceiptPayload: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.message.defs#readReceiptPayload"
             public let messageId: String
@@ -1024,7 +1024,7 @@ public struct ReadReceiptPayload: ATProtocolCodable, ATProtocolValue {
             case messageId
         }
     }
-        
+
 public struct TypingPayload: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.message.defs#typingPayload"
             public let isTyping: Bool
@@ -1180,7 +1180,7 @@ public enum PayloadViewEmbedUnion: Codable, ATProtocolCodable, ATProtocolValue, 
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-    
+
     public static func == (lhs: PayloadViewEmbedUnion, rhs: PayloadViewEmbedUnion) -> Bool {
         switch (lhs, rhs) {
         case (.blueCatbirdMlsChatMessageDefsRecordEmbed(let lhsValue),
@@ -1198,21 +1198,21 @@ public enum PayloadViewEmbedUnion: Codable, ATProtocolCodable, ATProtocolValue, 
             return false
         }
     }
-    
+
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? PayloadViewEmbedUnion else { return false }
         return self == other
     }
-    
+
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-        
+
         switch self {
         case .blueCatbirdMlsChatMessageDefsRecordEmbed(let value):
             map = map.adding(key: "$type", value: "blue.catbird.mlsChat.message.defs#recordEmbed")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -1229,7 +1229,7 @@ public enum PayloadViewEmbedUnion: Codable, ATProtocolCodable, ATProtocolValue, 
             return map
         case .blueCatbirdMlsChatMessageDefsLinkEmbed(let value):
             map = map.adding(key: "$type", value: "blue.catbird.mlsChat.message.defs#linkEmbed")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -1246,7 +1246,7 @@ public enum PayloadViewEmbedUnion: Codable, ATProtocolCodable, ATProtocolValue, 
             return map
         case .blueCatbirdMlsChatMessageDefsGifEmbed(let value):
             map = map.adding(key: "$type", value: "blue.catbird.mlsChat.message.defs#gifEmbed")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -1271,5 +1271,5 @@ public enum PayloadViewEmbedUnion: Codable, ATProtocolCodable, ATProtocolValue, 
 }
 
 
-                           
+
 

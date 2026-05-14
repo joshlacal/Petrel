@@ -5,107 +5,107 @@ import Foundation
 // lexicon: 1, id: app.bsky.graph.getRelationships
 
 
-public struct AppBskyGraphGetRelationships { 
+public struct AppBskyGraphGetRelationships {
 
-    public static let typeIdentifier = "app.bsky.graph.getRelationships"    
+    public static let typeIdentifier = "app.bsky.graph.getRelationships"
 public struct Parameters: Parametrizable {
         public let actor: ATIdentifier
         public let others: [ATIdentifier]?
-        
+
         public init(
-            actor: ATIdentifier, 
+            actor: ATIdentifier,
             others: [ATIdentifier]? = nil
             ) {
             self.actor = actor
             self.others = others
-            
+
         }
     }
-    
+
 public struct Output: ATProtocolCodable {
-        
-        
+
+
         public let actor: DID?
-        
+
         public let relationships: [OutputRelationshipsUnion]
-        
-        
-        
+
+
+
         // Standard public initializer
         public init(
-            
-            
+
+
             actor: DID? = nil,
-            
+
             relationships: [OutputRelationshipsUnion]
-            
-            
+
+
         ) {
-            
-            
+
+
             self.actor = actor
-            
+
             self.relationships = relationships
-            
-            
+
+
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
+
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
+
             self.actor = try container.decodeIfPresent(DID.self, forKey: .actor)
-            
-            
+
+
             self.relationships = try container.decode([OutputRelationshipsUnion].self, forKey: .relationships)
-            
-            
+
+
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
+
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(actor, forKey: .actor)
-            
-            
+
+
             try container.encode(relationships, forKey: .relationships)
-            
-            
+
+
         }
 
         public func toCBORValue() throws -> Any {
-            
+
             var map = OrderedCBORMap()
 
-            
-            
+
+
             if let value = actor {
                 // Encode optional property even if it's an empty array for CBOR
                 let actorValue = try value.toCBORValue()
                 map = map.adding(key: "actor", value: actorValue)
             }
-            
-            
-            
+
+
+
             let relationshipsValue = try relationships.toCBORValue()
             map = map.adding(key: "relationships", value: relationshipsValue)
-            
-            
+
+
 
             return map
-            
+
         }
-        
-        
+
+
         private enum CodingKeys: String, CodingKey {
             case actor
             case relationships
         }
-        
+
     }
-        
+
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case actorNotFound = "ActorNotFound.the primary actor at-identifier could not be resolved"
             public var description: String {
@@ -183,7 +183,7 @@ public enum OutputRelationshipsUnion: Codable, ATProtocolCodable, ATProtocolValu
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-    
+
     public static func == (lhs: OutputRelationshipsUnion, rhs: OutputRelationshipsUnion) -> Bool {
         switch (lhs, rhs) {
         case (.appBskyGraphDefsRelationship(let lhsValue),
@@ -198,21 +198,21 @@ public enum OutputRelationshipsUnion: Codable, ATProtocolCodable, ATProtocolValu
             return false
         }
     }
-    
+
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? OutputRelationshipsUnion else { return false }
         return self == other
     }
-    
+
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-        
+
         switch self {
         case .appBskyGraphDefsRelationship(let value):
             map = map.adding(key: "$type", value: "app.bsky.graph.defs#relationship")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -229,7 +229,7 @@ public enum OutputRelationshipsUnion: Codable, ATProtocolCodable, ATProtocolValu
             return map
         case .appBskyGraphDefsNotFoundActor(let value):
             map = map.adding(key: "$type", value: "app.bsky.graph.defs#notFoundActor")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -259,17 +259,17 @@ extension ATProtoClient.App.Bsky.Graph {
     // MARK: - getRelationships
 
     /// Enumerates public relationships between one account, and a list of other accounts. Does not require auth.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func getRelationships(input: AppBskyGraphGetRelationships.Parameters) async throws -> (responseCode: Int, data: AppBskyGraphGetRelationships.Output?) {
         let endpoint = "app.bsky.graph.getRelationships"
 
-        
+
         let queryItems = input.asQueryItems()
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -288,7 +288,7 @@ extension ATProtoClient.App.Bsky.Graph {
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
         if (200...299).contains(responseCode) {
-            
+
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -296,13 +296,13 @@ extension ATProtoClient.App.Bsky.Graph {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-            
+
 
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(AppBskyGraphGetRelationships.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -310,12 +310,12 @@ extension ATProtoClient.App.Bsky.Graph {
                 return (responseCode, nil)
             }
         } else {
-            
+
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-                           
+
 

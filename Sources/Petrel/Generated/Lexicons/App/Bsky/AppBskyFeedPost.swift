@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: app.bsky.feed.post
 
 
-public struct AppBskyFeedPost: ATProtocolCodable, ATProtocolValue { 
+public struct AppBskyFeedPost: ATProtocolCodable, ATProtocolValue {
 
     public static let typeIdentifier = "app.bsky.feed.post"
         public let text: String
@@ -183,7 +183,7 @@ public struct AppBskyFeedPost: ATProtocolCodable, ATProtocolValue {
             case tags
             case createdAt
         }
-        
+
 public struct ReplyRef: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.feed.post#replyRef"
             public let root: ComAtprotoRepoStrongRef
@@ -255,7 +255,7 @@ public struct ReplyRef: ATProtocolCodable, ATProtocolValue {
             case parent
         }
     }
-        
+
 public struct Entity: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.feed.post#entity"
             public let index: TextSlice
@@ -343,7 +343,7 @@ public struct Entity: ATProtocolCodable, ATProtocolValue {
             case value
         }
     }
-        
+
 public struct TextSlice: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.feed.post#textSlice"
             public let start: Int
@@ -519,7 +519,7 @@ public enum AppBskyFeedPostEmbedUnion: Codable, ATProtocolCodable, ATProtocolVal
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-    
+
     public static func == (lhs: AppBskyFeedPostEmbedUnion, rhs: AppBskyFeedPostEmbedUnion) -> Bool {
         switch (lhs, rhs) {
         case (.appBskyEmbedImages(let lhsValue),
@@ -543,21 +543,21 @@ public enum AppBskyFeedPostEmbedUnion: Codable, ATProtocolCodable, ATProtocolVal
             return false
         }
     }
-    
+
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? AppBskyFeedPostEmbedUnion else { return false }
         return self == other
     }
-    
+
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-        
+
         switch self {
         case .appBskyEmbedImages(let value):
             map = map.adding(key: "$type", value: "app.bsky.embed.images")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -574,7 +574,7 @@ public enum AppBskyFeedPostEmbedUnion: Codable, ATProtocolCodable, ATProtocolVal
             return map
         case .appBskyEmbedVideo(let value):
             map = map.adding(key: "$type", value: "app.bsky.embed.video")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -591,7 +591,7 @@ public enum AppBskyFeedPostEmbedUnion: Codable, ATProtocolCodable, ATProtocolVal
             return map
         case .appBskyEmbedExternal(let value):
             map = map.adding(key: "$type", value: "app.bsky.embed.external")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -608,7 +608,7 @@ public enum AppBskyFeedPostEmbedUnion: Codable, ATProtocolCodable, ATProtocolVal
             return map
         case .appBskyEmbedRecord(let value):
             map = map.adding(key: "$type", value: "app.bsky.embed.record")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -625,7 +625,7 @@ public enum AppBskyFeedPostEmbedUnion: Codable, ATProtocolCodable, ATProtocolVal
             return map
         case .appBskyEmbedRecordWithMedia(let value):
             map = map.adding(key: "$type", value: "app.bsky.embed.recordWithMedia")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -696,7 +696,7 @@ public enum AppBskyFeedPostLabelsUnion: Codable, ATProtocolCodable, ATProtocolVa
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-    
+
     public static func == (lhs: AppBskyFeedPostLabelsUnion, rhs: AppBskyFeedPostLabelsUnion) -> Bool {
         switch (lhs, rhs) {
         case (.comAtprotoLabelDefsSelfLabels(let lhsValue),
@@ -708,21 +708,21 @@ public enum AppBskyFeedPostLabelsUnion: Codable, ATProtocolCodable, ATProtocolVa
             return false
         }
     }
-    
+
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? AppBskyFeedPostLabelsUnion else { return false }
         return self == other
     }
-    
+
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-        
+
         switch self {
         case .comAtprotoLabelDefsSelfLabels(let value):
             map = map.adding(key: "$type", value: "com.atproto.label.defs#selfLabels")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -747,5 +747,5 @@ public enum AppBskyFeedPostLabelsUnion: Codable, ATProtocolCodable, ATProtocolVa
 }
 
 
-                           
+
 

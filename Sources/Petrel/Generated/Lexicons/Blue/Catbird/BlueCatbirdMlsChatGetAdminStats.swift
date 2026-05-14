@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: blue.catbird.mlsChat.getAdminStats
 
 
-public struct BlueCatbirdMlsChatGetAdminStats { 
+public struct BlueCatbirdMlsChatGetAdminStats {
 
     public static let typeIdentifier = "blue.catbird.mlsChat.getAdminStats"
-        
+
 public struct ModerationStats: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.getAdminStats#moderationStats"
             public let totalReports: Int
@@ -172,7 +172,7 @@ public struct ModerationStats: ATProtocolCodable, ATProtocolValue {
             case averageResolutionTimeHours
         }
     }
-        
+
 public struct ReportCategoryCounts: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.getAdminStats#reportCategoryCounts"
             public let harassment: Int?
@@ -387,123 +387,123 @@ public struct ReportCategoryCounts: ATProtocolCodable, ATProtocolValue {
             case privacyViolation
             case otherCategory
         }
-    }    
+    }
 public struct Parameters: Parametrizable {
         public let convoId: String?
         public let since: ATProtocolDate?
-        
+
         public init(
-            convoId: String? = nil, 
+            convoId: String? = nil,
             since: ATProtocolDate? = nil
             ) {
             self.convoId = convoId
             self.since = since
-            
+
         }
     }
-    
+
 public struct Output: ATProtocolCodable {
-        
-        
+
+
         public let stats: ModerationStats
-        
+
         public let generatedAt: ATProtocolDate
-        
+
         public let convoId: String?
-        
-        
-        
+
+
+
         // Standard public initializer
         public init(
-            
-            
+
+
             stats: ModerationStats,
-            
+
             generatedAt: ATProtocolDate,
-            
+
             convoId: String? = nil
-            
-            
+
+
         ) {
-            
-            
+
+
             self.stats = stats
-            
+
             self.generatedAt = generatedAt
-            
+
             self.convoId = convoId
-            
-            
+
+
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
+
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
+
             self.stats = try container.decode(ModerationStats.self, forKey: .stats)
-            
-            
+
+
             self.generatedAt = try container.decode(ATProtocolDate.self, forKey: .generatedAt)
-            
-            
+
+
             self.convoId = try container.decodeIfPresent(String.self, forKey: .convoId)
-            
-            
+
+
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
+
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(stats, forKey: .stats)
-            
-            
+
+
             try container.encode(generatedAt, forKey: .generatedAt)
-            
-            
+
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(convoId, forKey: .convoId)
-            
-            
+
+
         }
 
         public func toCBORValue() throws -> Any {
-            
+
             var map = OrderedCBORMap()
 
-            
-            
+
+
             let statsValue = try stats.toCBORValue()
             map = map.adding(key: "stats", value: statsValue)
-            
-            
-            
+
+
+
             let generatedAtValue = try generatedAt.toCBORValue()
             map = map.adding(key: "generatedAt", value: generatedAtValue)
-            
-            
-            
+
+
+
             if let value = convoId {
                 // Encode optional property even if it's an empty array for CBOR
                 let convoIdValue = try value.toCBORValue()
                 map = map.adding(key: "convoId", value: convoIdValue)
             }
-            
-            
+
+
 
             return map
-            
+
         }
-        
-        
+
+
         private enum CodingKeys: String, CodingKey {
             case stats
             case generatedAt
             case convoId
         }
-        
+
     }
-        
+
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case notAuthorized = "NotAuthorized.User is not authorized to view moderation statistics"
                 case convoNotFound = "ConvoNotFound.Conversation not found (when convoId is specified)"
@@ -528,17 +528,17 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - getAdminStats
 
     /// Get moderation statistics for App Store compliance demonstration Query moderation and admin action statistics. Returns aggregate counts of reports, removals, and block conflicts resolved. Used for App Store review to demonstrate active moderation capabilities. Only accessible to conversation admins.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func getAdminStats(input: BlueCatbirdMlsChatGetAdminStats.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatGetAdminStats.Output?) {
         let endpoint = "blue.catbird.mlsChat.getAdminStats"
 
-        
+
         let queryItems = input.asQueryItems()
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -564,10 +564,10 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         // Only decode response data if request was successful
         if (200...299).contains(responseCode) {
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatGetAdminStats.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -575,12 +575,12 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
                 return (responseCode, nil)
             }
         } else {
-            
+
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-                           
+
 

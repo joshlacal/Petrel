@@ -5,21 +5,21 @@ import Foundation
 // lexicon: 1, id: com.atproto.identity.resolveIdentity
 
 
-public struct ComAtprotoIdentityResolveIdentity { 
+public struct ComAtprotoIdentityResolveIdentity {
 
-    public static let typeIdentifier = "com.atproto.identity.resolveIdentity"    
+    public static let typeIdentifier = "com.atproto.identity.resolveIdentity"
 public struct Parameters: Parametrizable {
         public let identifier: ATIdentifier
-        
+
         public init(
             identifier: ATIdentifier
             ) {
             self.identifier = identifier
-            
+
         }
     }
     public typealias Output = ComAtprotoIdentityDefs.IdentityInfo
-            
+
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case handleNotFound = "HandleNotFound.The resolution process confirmed that the handle does not resolve to any DID."
                 case didNotFound = "DidNotFound.The DID resolution process confirmed that there is no current DID."
@@ -45,17 +45,17 @@ extension ATProtoClient.Com.Atproto.Identity {
     // MARK: - resolveIdentity
 
     /// Resolves an identity (DID or Handle) to a full identity (DID document and verified handle).
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func resolveIdentity(input: ComAtprotoIdentityResolveIdentity.Parameters) async throws -> (responseCode: Int, data: ComAtprotoIdentityResolveIdentity.Output?) {
         let endpoint = "com.atproto.identity.resolveIdentity"
 
-        
+
         let queryItems = input.asQueryItems()
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -74,7 +74,7 @@ extension ATProtoClient.Com.Atproto.Identity {
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
         if (200...299).contains(responseCode) {
-            
+
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -82,13 +82,13 @@ extension ATProtoClient.Com.Atproto.Identity {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-            
+
 
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(ComAtprotoIdentityResolveIdentity.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -96,12 +96,12 @@ extension ATProtoClient.Com.Atproto.Identity {
                 return (responseCode, nil)
             }
         } else {
-            
+
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-                           
+
 

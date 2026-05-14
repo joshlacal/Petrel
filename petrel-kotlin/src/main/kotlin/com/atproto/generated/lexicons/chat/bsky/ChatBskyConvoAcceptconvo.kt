@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: chat.bsky.convo.acceptConvo
-
+// Marks a conversation as accepted, so it is shown in the list of accepted convos instead on the request convos.
 package com.atproto.generated
 
 import kotlinx.serialization.*
@@ -25,8 +25,12 @@ object ChatBskyConvoAcceptConvoDefs {
 // Rev when the convo was accepted. If not present, the convo was already accepted.        @SerialName("rev")
         val rev: String? = null    )
 
+sealed class ChatBskyConvoAcceptConvoError(val name: String, val description: String?) {
+        object InvalidConvo: ChatBskyConvoAcceptConvoError("InvalidConvo", "")
+    }
+
 /**
- * 
+ * Marks a conversation as accepted, so it is shown in the list of accepted convos instead on the request convos.
  *
  * Endpoint: chat.bsky.convo.acceptConvo
  */

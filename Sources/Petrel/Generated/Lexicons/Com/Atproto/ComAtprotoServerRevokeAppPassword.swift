@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: com.atproto.server.revokeAppPassword
 
 
-public struct ComAtprotoServerRevokeAppPassword { 
+public struct ComAtprotoServerRevokeAppPassword {
 
     public static let typeIdentifier = "com.atproto.server.revokeAppPassword"
 public struct Input: ATProtocolCodable {
@@ -15,7 +15,7 @@ public struct Input: ATProtocolCodable {
         public init(name: String) {
             self.name = name
         }
-        
+
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -47,32 +47,32 @@ extension ATProtoClient.Com.Atproto.Server {
     // MARK: - revokeAppPassword
 
     /// Revoke an App Password by name.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    
-    /// 
+
+    ///
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func revokeAppPassword(
-        
+
         input: ComAtprotoServerRevokeAppPassword.Input
-        
+
     ) async throws -> Int {
         let endpoint = "com.atproto.server.revokeAppPassword"
-        
-        var headers: [String: String] = [:]
-        
-        headers["Content-Type"] = "application/json"
-        
-        
-        
 
-        
+        var headers: [String: String] = [:]
+
+        headers["Content-Type"] = "application/json"
+
+
+
+
+
         let requestData: Data? = try JSONEncoder().encode(input)
-        
-        
+
+
         let queryItems: [URLQueryItem]? = nil
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
@@ -87,11 +87,11 @@ extension ATProtoClient.Com.Atproto.Server {
         let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        
+
         return responseCode
-        
+
     }
-    
+
 }
-                           
+
 

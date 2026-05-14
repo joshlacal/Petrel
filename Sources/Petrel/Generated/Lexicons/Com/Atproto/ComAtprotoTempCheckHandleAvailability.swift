@@ -5,20 +5,20 @@ import Foundation
 // lexicon: 1, id: com.atproto.temp.checkHandleAvailability
 
 
-public struct ComAtprotoTempCheckHandleAvailability { 
+public struct ComAtprotoTempCheckHandleAvailability {
 
     public static let typeIdentifier = "com.atproto.temp.checkHandleAvailability"
-        
+
 public struct ResultAvailable: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "com.atproto.temp.checkHandleAvailability#resultAvailable"
 
         public init(
-            
+
         ) {
         }
 
         public init(from decoder: Decoder) throws {
-            
+
             let _ = decoder
         }
 
@@ -31,7 +31,7 @@ public struct ResultAvailable: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            
+
             return other is Self
         }
 
@@ -49,7 +49,7 @@ public struct ResultAvailable: ATProtocolCodable, ATProtocolValue {
             case typeIdentifier = "$type"
         }
     }
-        
+
 public struct ResultUnavailable: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "com.atproto.temp.checkHandleAvailability#resultUnavailable"
             public let suggestions: [Suggestion]
@@ -105,7 +105,7 @@ public struct ResultUnavailable: ATProtocolCodable, ATProtocolValue {
             case suggestions
         }
     }
-        
+
 public struct Suggestion: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "com.atproto.temp.checkHandleAvailability#suggestion"
             public let handle: Handle
@@ -176,104 +176,104 @@ public struct Suggestion: ATProtocolCodable, ATProtocolValue {
             case handle
             case method
         }
-    }    
+    }
 public struct Parameters: Parametrizable {
         public let handle: Handle
         public let email: String?
         public let birthDate: ATProtocolDate?
-        
+
         public init(
-            handle: Handle, 
-            email: String? = nil, 
+            handle: Handle,
+            email: String? = nil,
             birthDate: ATProtocolDate? = nil
             ) {
             self.handle = handle
             self.email = email
             self.birthDate = birthDate
-            
+
         }
     }
-    
+
 public struct Output: ATProtocolCodable {
-        
-        
+
+
         public let handle: Handle
-        
+
         public let result: OutputResultUnion
-        
-        
-        
+
+
+
         // Standard public initializer
         public init(
-            
-            
+
+
             handle: Handle,
-            
+
             result: OutputResultUnion
-            
-            
+
+
         ) {
-            
-            
+
+
             self.handle = handle
-            
+
             self.result = result
-            
-            
+
+
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
+
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
+
             self.handle = try container.decode(Handle.self, forKey: .handle)
-            
-            
+
+
             self.result = try container.decode(OutputResultUnion.self, forKey: .result)
-            
-            
+
+
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
+
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(handle, forKey: .handle)
-            
-            
+
+
             try container.encode(result, forKey: .result)
-            
-            
+
+
         }
 
         public func toCBORValue() throws -> Any {
-            
+
             var map = OrderedCBORMap()
 
-            
-            
+
+
             let handleValue = try handle.toCBORValue()
             map = map.adding(key: "handle", value: handleValue)
-            
-            
-            
+
+
+
             let resultValue = try result.toCBORValue()
             map = map.adding(key: "result", value: resultValue)
-            
-            
+
+
 
             return map
-            
+
         }
-        
-        
+
+
         private enum CodingKeys: String, CodingKey {
             case handle
             case result
         }
-        
+
     }
-        
+
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case invalidEmail = "InvalidEmail.An invalid email was provided."
             public var description: String {
@@ -351,7 +351,7 @@ public enum OutputResultUnion: Codable, ATProtocolCodable, ATProtocolValue, Send
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-    
+
     public static func == (lhs: OutputResultUnion, rhs: OutputResultUnion) -> Bool {
         switch (lhs, rhs) {
         case (.comAtprotoTempCheckHandleAvailabilityResultAvailable(let lhsValue),
@@ -366,21 +366,21 @@ public enum OutputResultUnion: Codable, ATProtocolCodable, ATProtocolValue, Send
             return false
         }
     }
-    
+
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? OutputResultUnion else { return false }
         return self == other
     }
-    
+
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-        
+
         switch self {
         case .comAtprotoTempCheckHandleAvailabilityResultAvailable(let value):
             map = map.adding(key: "$type", value: "com.atproto.temp.checkHandleAvailability#resultAvailable")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -397,7 +397,7 @@ public enum OutputResultUnion: Codable, ATProtocolCodable, ATProtocolValue, Send
             return map
         case .comAtprotoTempCheckHandleAvailabilityResultUnavailable(let value):
             map = map.adding(key: "$type", value: "com.atproto.temp.checkHandleAvailability#resultUnavailable")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -427,17 +427,17 @@ extension ATProtoClient.Com.Atproto.Temp {
     // MARK: - checkHandleAvailability
 
     /// Checks whether the provided handle is available. If the handle is not available, available suggestions will be returned. Optional inputs will be used to generate suggestions.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func checkHandleAvailability(input: ComAtprotoTempCheckHandleAvailability.Parameters) async throws -> (responseCode: Int, data: ComAtprotoTempCheckHandleAvailability.Output?) {
         let endpoint = "com.atproto.temp.checkHandleAvailability"
 
-        
+
         let queryItems = input.asQueryItems()
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -456,7 +456,7 @@ extension ATProtoClient.Com.Atproto.Temp {
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
         if (200...299).contains(responseCode) {
-            
+
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -464,13 +464,13 @@ extension ATProtoClient.Com.Atproto.Temp {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-            
+
 
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(ComAtprotoTempCheckHandleAvailability.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -478,12 +478,12 @@ extension ATProtoClient.Com.Atproto.Temp {
                 return (responseCode, nil)
             }
         } else {
-            
+
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-                           
+
 

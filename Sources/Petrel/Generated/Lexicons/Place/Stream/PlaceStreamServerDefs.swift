@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: place.stream.server.defs
 
 
-public struct PlaceStreamServerDefs { 
+public struct PlaceStreamServerDefs {
 
     public static let typeIdentifier = "place.stream.server.defs"
-        
+
 public struct Webhook: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "place.stream.server.defs#webhook"
             public let id: String
@@ -326,7 +326,7 @@ public struct Webhook: ATProtocolCodable, ATProtocolValue {
             case muteWords
         }
     }
-        
+
 public struct RewriteRule: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "place.stream.server.defs#rewriteRule"
             public let from: String
@@ -404,5 +404,5 @@ public struct RewriteRule: ATProtocolCodable, ATProtocolValue {
 }
 
 
-                           
+
 

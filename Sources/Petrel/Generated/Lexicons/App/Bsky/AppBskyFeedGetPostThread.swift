@@ -5,110 +5,110 @@ import Foundation
 // lexicon: 1, id: app.bsky.feed.getPostThread
 
 
-public struct AppBskyFeedGetPostThread { 
+public struct AppBskyFeedGetPostThread {
 
-    public static let typeIdentifier = "app.bsky.feed.getPostThread"    
+    public static let typeIdentifier = "app.bsky.feed.getPostThread"
 public struct Parameters: Parametrizable {
         public let uri: ATProtocolURI
         public let depth: Int?
         public let parentHeight: Int?
-        
+
         public init(
-            uri: ATProtocolURI, 
-            depth: Int? = nil, 
+            uri: ATProtocolURI,
+            depth: Int? = nil,
             parentHeight: Int? = nil
             ) {
             self.uri = uri
             self.depth = depth
             self.parentHeight = parentHeight
-            
+
         }
     }
-    
+
 public struct Output: ATProtocolCodable {
-        
-        
+
+
         public let thread: OutputThreadUnion
-        
+
         public let threadgate: AppBskyFeedDefs.ThreadgateView?
-        
-        
-        
+
+
+
         // Standard public initializer
         public init(
-            
-            
+
+
             thread: OutputThreadUnion,
-            
+
             threadgate: AppBskyFeedDefs.ThreadgateView? = nil
-            
-            
+
+
         ) {
-            
-            
+
+
             self.thread = thread
-            
+
             self.threadgate = threadgate
-            
-            
+
+
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
+
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
+
             self.thread = try container.decode(OutputThreadUnion.self, forKey: .thread)
-            
-            
+
+
             self.threadgate = try container.decodeIfPresent(AppBskyFeedDefs.ThreadgateView.self, forKey: .threadgate)
-            
-            
+
+
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
+
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(thread, forKey: .thread)
-            
-            
+
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(threadgate, forKey: .threadgate)
-            
-            
+
+
         }
 
         public func toCBORValue() throws -> Any {
-            
+
             var map = OrderedCBORMap()
 
-            
-            
+
+
             let threadValue = try thread.toCBORValue()
             map = map.adding(key: "thread", value: threadValue)
-            
-            
-            
+
+
+
             if let value = threadgate {
                 // Encode optional property even if it's an empty array for CBOR
                 let threadgateValue = try value.toCBORValue()
                 map = map.adding(key: "threadgate", value: threadgateValue)
             }
-            
-            
+
+
 
             return map
-            
+
         }
-        
-        
+
+
         private enum CodingKeys: String, CodingKey {
             case thread
             case threadgate
         }
-        
+
     }
-        
+
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case notFound = "NotFound."
             public var description: String {
@@ -198,7 +198,7 @@ public indirect enum OutputThreadUnion: Codable, ATProtocolCodable, ATProtocolVa
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-    
+
     public static func == (lhs: OutputThreadUnion, rhs: OutputThreadUnion) -> Bool {
         switch (lhs, rhs) {
         case (.appBskyFeedDefsThreadViewPost(let lhsValue),
@@ -216,21 +216,21 @@ public indirect enum OutputThreadUnion: Codable, ATProtocolCodable, ATProtocolVa
             return false
         }
     }
-    
+
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? OutputThreadUnion else { return false }
         return self == other
     }
-    
+
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-        
+
         switch self {
         case .appBskyFeedDefsThreadViewPost(let value):
             map = map.adding(key: "$type", value: "app.bsky.feed.defs#threadViewPost")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -247,7 +247,7 @@ public indirect enum OutputThreadUnion: Codable, ATProtocolCodable, ATProtocolVa
             return map
         case .appBskyFeedDefsNotFoundPost(let value):
             map = map.adding(key: "$type", value: "app.bsky.feed.defs#notFoundPost")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -264,7 +264,7 @@ public indirect enum OutputThreadUnion: Codable, ATProtocolCodable, ATProtocolVa
             return map
         case .appBskyFeedDefsBlockedPost(let value):
             map = map.adding(key: "$type", value: "app.bsky.feed.defs#blockedPost")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -294,17 +294,17 @@ extension ATProtoClient.App.Bsky.Feed {
     // MARK: - getPostThread
 
     /// Get posts in a thread. Does not require auth, but additional metadata and filtering will be applied for authed requests.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func getPostThread(input: AppBskyFeedGetPostThread.Parameters) async throws -> (responseCode: Int, data: AppBskyFeedGetPostThread.Output?) {
         let endpoint = "app.bsky.feed.getPostThread"
 
-        
+
         let queryItems = input.asQueryItems()
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -323,7 +323,7 @@ extension ATProtoClient.App.Bsky.Feed {
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
         if (200...299).contains(responseCode) {
-            
+
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -331,13 +331,13 @@ extension ATProtoClient.App.Bsky.Feed {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-            
+
 
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(AppBskyFeedGetPostThread.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -345,12 +345,12 @@ extension ATProtoClient.App.Bsky.Feed {
                 return (responseCode, nil)
             }
         } else {
-            
+
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-                           
+
 
