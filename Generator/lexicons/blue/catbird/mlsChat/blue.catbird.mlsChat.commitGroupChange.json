@@ -30,7 +30,9 @@
                 "invalidateWelcome",
                 "getPendingDeviceAdditions",
                 "claimPendingDeviceAddition",
-                "completePendingDeviceAddition"
+                "completePendingDeviceAddition",
+                "refreshGroupInfo",
+                "reissueAddMember"
               ]
             },
             "memberDids": {
@@ -82,6 +84,22 @@
             "epochAuthenticator": {
               "type": "string",
               "description": "Hex-encoded epoch_authenticator (RFC 9420 \u00a78.7) for the post-commit epoch. Optional. When present on an epoch-advancing action (addMembers, processExternalCommit, rejoin, commit, updateMetadata), the server records it in the epoch_authenticators table and uses it to validate future reportRecoveryFailure votes for quorum auto-reset (see ADR-002)."
+            },
+            "replacedKeyPackageHash": {
+              "type": "string",
+              "description": "Hex-encoded SHA-256 of the dead KP being replaced (action=reissueAddMember)."
+            },
+            "replacementWelcome": {
+              "type": "bytes",
+              "description": "Replacement MLS Welcome message for the recipient (action=reissueAddMember)."
+            },
+            "replacementCommit": {
+              "type": "bytes",
+              "description": "Replacement MLS Commit broadcast to all other members (action=reissueAddMember). MUST be at the same epoch as the original commit being replaced."
+            },
+            "replacementKeyPackageHash": {
+              "type": "string",
+              "description": "Hex-encoded SHA-256 of the fresh KP used in the replacement (action=reissueAddMember)."
             }
           }
         }
