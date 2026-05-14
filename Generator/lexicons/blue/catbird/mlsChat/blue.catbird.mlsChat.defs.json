@@ -133,6 +133,18 @@
           ]
         }
       }
+    },
+
+    "welcomeReissueRequest": {
+      "type": "object",
+      "description": "Event emitted when a recipient device calls reissueWelcome. Server pushes this to the inviter via subscribeEvents.",
+      "required": ["convoId", "recipientDeviceDid", "requestedAt", "requestId"],
+      "properties": {
+        "convoId": { "type": "string", "description": "Conversation needing a reissued Welcome." },
+        "recipientDeviceDid": { "type": "string", "format": "did", "description": "Recipient device that cannot decrypt the original Welcome." },
+        "requestedAt": { "type": "string", "format": "datetime" },
+        "requestId": { "type": "string", "description": "Server-generated request identifier. Inviter echoes this in the replacement commit's idempotencyKey." }
+      }
     }
   }
 }

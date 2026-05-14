@@ -34,7 +34,8 @@
             "#groupInfoRefreshRequestedEvent",
             "#readditionRequestedEvent",
             "#circuitBreakerTrippedEvent",
-            "#resetRequestedEvent"
+            "#resetRequestedEvent",
+            "#welcomeReissueRequestedEvent"
           ]
         }
       }
@@ -208,6 +209,18 @@
         "expectedNewMlsGroupId": { "type": "string", "description": "If non-null, only this mls_group_id may activate. Phase 2.5 indirect triggers always emit null here; admin/bootstrap direct flows always provide a value." },
         "reason": { "type": "string", "description": "Human-readable reason for the reset" },
         "requestedAt": { "type": "string", "format": "datetime", "description": "When the reset was requested (RFC3339)" }
+      }
+    },
+    "welcomeReissueRequestedEvent": {
+      "type": "object",
+      "description": "A recipient device called reissueWelcome because it cannot decrypt the original Welcome. Server pushes this event to the inviter, who is expected to re-stage a new commit with a fresh KP. Body fields mirror blue.catbird.mlsChat.defs#welcomeReissueRequest.",
+      "required": ["cursor", "convoId", "recipientDeviceDid", "requestedAt", "requestId"],
+      "properties": {
+        "cursor": { "type": "string", "description": "Resume cursor for this event position" },
+        "convoId": { "type": "string", "description": "Conversation needing a reissued Welcome." },
+        "recipientDeviceDid": { "type": "string", "format": "did", "description": "Recipient device that cannot decrypt the original Welcome." },
+        "requestedAt": { "type": "string", "format": "datetime", "description": "When the reissue was requested (RFC3339)." },
+        "requestId": { "type": "string", "description": "Server-generated request identifier. Inviter echoes this in the replacement commit's idempotencyKey." }
       }
     }
   }
