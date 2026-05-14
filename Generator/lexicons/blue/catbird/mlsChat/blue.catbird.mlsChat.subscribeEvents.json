@@ -49,6 +49,11 @@
         "ephemeral": {
           "type": "boolean",
           "description": "When true, this is an ephemeral signal (typing, read receipt, presence) that should NOT be shown in chat history. Omitted (defaults to false) for regular persistent messages."
+        },
+        "epoch": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "MLS epoch this message was encrypted at. Recipient SHOULD reject events where epoch < localJoinEpoch BEFORE feeding to unprotect_message."
         }
       }
     },
