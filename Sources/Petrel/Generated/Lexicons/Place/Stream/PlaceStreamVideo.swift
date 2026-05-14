@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: place.stream.video
 
 
-public struct PlaceStreamVideo: ATProtocolCodable, ATProtocolValue {
+public struct PlaceStreamVideo: ATProtocolCodable, ATProtocolValue { 
 
     public static let typeIdentifier = "place.stream.video"
         public let title: String
@@ -121,5 +121,5 @@ public struct PlaceStreamVideo: ATProtocolCodable, ATProtocolValue {
 }
 
 
-
+                           
 

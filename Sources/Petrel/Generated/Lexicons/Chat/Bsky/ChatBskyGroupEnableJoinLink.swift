@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: chat.bsky.group.enableJoinLink
 
 
-public struct ChatBskyGroupEnableJoinLink {
+public struct ChatBskyGroupEnableJoinLink { 
 
     public static let typeIdentifier = "chat.bsky.group.enableJoinLink"
 public struct Input: ATProtocolCodable {
@@ -15,7 +15,7 @@ public struct Input: ATProtocolCodable {
         public init(convoId: String) {
             self.convoId = convoId
         }
-
+        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -38,69 +38,69 @@ public struct Input: ATProtocolCodable {
             case convoId
         }
     }
-
+    
 public struct Output: ATProtocolCodable {
-
-
+        
+        
         public let joinLink: ChatBskyGroupDefs.JoinLinkView
-
-
-
+        
+        
+        
         // Standard public initializer
         public init(
-
-
+            
+            
             joinLink: ChatBskyGroupDefs.JoinLinkView
-
-
+            
+            
         ) {
-
-
+            
+            
             self.joinLink = joinLink
-
-
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
-
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            
             self.joinLink = try container.decode(ChatBskyGroupDefs.JoinLinkView.self, forKey: .joinLink)
-
-
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
-
+            
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
             try container.encode(joinLink, forKey: .joinLink)
-
-
+            
+            
         }
 
         public func toCBORValue() throws -> Any {
-
+            
             var map = OrderedCBORMap()
 
-
-
+            
+            
             let joinLinkValue = try joinLink.toCBORValue()
             map = map.adding(key: "joinLink", value: joinLinkValue)
-
-
+            
+            
 
             return map
-
+            
         }
-
-
+        
+        
         private enum CodingKeys: String, CodingKey {
             case joinLink
         }
-
+        
     }
-
+        
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case invalidConvo = "InvalidConvo."
                 case insufficientRole = "InsufficientRole."
@@ -125,34 +125,34 @@ extension ATProtoClient.Chat.Bsky.Group {
     // MARK: - enableJoinLink
 
     /// [NOTE: This is under active development and should be considered unstable while this note is here]. Re-enables a previously disabled join link for the group convo.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-
-    ///
+    
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func enableJoinLink(
-
+        
         input: ChatBskyGroupEnableJoinLink.Input
-
+        
     ) async throws -> (responseCode: Int, data: ChatBskyGroupEnableJoinLink.Output?) {
         let endpoint = "chat.bsky.group.enableJoinLink"
-
+        
         var headers: [String: String] = [:]
-
+        
         headers["Content-Type"] = "application/json"
-
-
-
+        
+        
+        
         headers["Accept"] = "application/json"
+        
 
-
-
+        
         let requestData: Data? = try JSONEncoder().encode(input)
-
-
+        
+        
         let queryItems: [URLQueryItem]? = nil
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
@@ -167,12 +167,12 @@ extension ATProtoClient.Chat.Bsky.Group {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
+        
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
         if (200...299).contains(responseCode) {
-
+            
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -180,13 +180,13 @@ extension ATProtoClient.Chat.Bsky.Group {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-
+            
 
             do {
-
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(ChatBskyGroupEnableJoinLink.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -197,9 +197,9 @@ extension ATProtoClient.Chat.Bsky.Group {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-
+        
     }
-
+    
 }
-
+                           
 

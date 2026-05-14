@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: com.atproto.label.subscribeLabels
 
 
-public struct ComAtprotoLabelSubscribeLabels {
+public struct ComAtprotoLabelSubscribeLabels { 
 
     public static let typeIdentifier = "com.atproto.label.subscribeLabels"
-
+        
 public struct Labels: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "com.atproto.label.subscribeLabels#labels"
             public let seq: Int
@@ -80,7 +80,7 @@ public struct Labels: ATProtocolCodable, ATProtocolValue {
             case labels
         }
     }
-
+        
 public struct Info: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "com.atproto.label.subscribeLabels#info"
             public let name: String
@@ -157,15 +157,15 @@ public struct Info: ATProtocolCodable, ATProtocolValue {
             case name
             case message
         }
-    }
+    }    
 public struct Parameters: Parametrizable {
         public let cursor: Int?
-
+        
         public init(
             cursor: Int? = nil
             ) {
             self.cursor = cursor
-
+            
         }
     }
 public enum Message: Codable, Sendable {
@@ -182,7 +182,7 @@ public enum Message: Codable, Sendable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let type = try container.decode(String.self, forKey: .type)
-
+        
         switch type {
 
         case "com.atproto.label.subscribeLabels#labels":
@@ -213,7 +213,7 @@ public enum Message: Codable, Sendable {
 
         }
     }
-}
+}        
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case futureCursor = "FutureCursor."
             public var description: String {
@@ -232,12 +232,12 @@ public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertibl
 }
 
 
-
+                           
 
 /// Subscribe to stream of labels (and negations). Public endpoint implemented by mod services. Uses same sequencing scheme as repo event stream.
 
 extension ATProtoClient.Com.Atproto.Label {
-
+    
     public func subscribeLabels(
         cursor: Int? = nil
     ) async throws -> AsyncThrowingStream<ComAtprotoLabelSubscribeLabels.Message, Error> {
@@ -255,5 +255,5 @@ extension ATProtoClient.Com.Atproto.Label {
             parameters: input
         )
     }
-
+    
 }

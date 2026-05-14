@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: chat.bsky.group.rejectJoinRequest
 
 
-public struct ChatBskyGroupRejectJoinRequest {
+public struct ChatBskyGroupRejectJoinRequest { 
 
     public static let typeIdentifier = "chat.bsky.group.rejectJoinRequest"
 public struct Input: ATProtocolCodable {
@@ -17,7 +17,7 @@ public struct Input: ATProtocolCodable {
             self.convoId = convoId
             self.member = member
         }
-
+        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -45,43 +45,43 @@ public struct Input: ATProtocolCodable {
             case member
         }
     }
-
+    
 public struct Output: ATProtocolCodable {
-
+        
         // Empty output - no properties (response is {})
-
-
+        
+        
         // Standard public initializer
         public init(
-
+            
         ) {
-
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
-
+            
             // Empty output - just validate it's an object by trying to get any container
             _ = try decoder.singleValueContainer()
-
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
-
+            
             // Empty output - encode empty object
             _ = encoder.singleValueContainer()
-
+            
         }
 
         public func toCBORValue() throws -> Any {
-
+            
             // Empty output - return empty CBOR map
             return OrderedCBORMap()
-
+            
         }
-
-
+        
+        
     }
-
+        
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case invalidConvo = "InvalidConvo."
                 case insufficientRole = "InsufficientRole."
@@ -104,34 +104,34 @@ extension ATProtoClient.Chat.Bsky.Group {
     // MARK: - rejectJoinRequest
 
     /// [NOTE: This is under active development and should be considered unstable while this note is here]. Rejects a request to join a group (via join link) the user owns. Action taken by the group owner.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-
-    ///
+    
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func rejectJoinRequest(
-
+        
         input: ChatBskyGroupRejectJoinRequest.Input
-
+        
     ) async throws -> (responseCode: Int, data: ChatBskyGroupRejectJoinRequest.Output?) {
         let endpoint = "chat.bsky.group.rejectJoinRequest"
-
+        
         var headers: [String: String] = [:]
-
+        
         headers["Content-Type"] = "application/json"
-
-
-
+        
+        
+        
         headers["Accept"] = "application/json"
+        
 
-
-
+        
         let requestData: Data? = try JSONEncoder().encode(input)
-
-
+        
+        
         let queryItems: [URLQueryItem]? = nil
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
@@ -146,12 +146,12 @@ extension ATProtoClient.Chat.Bsky.Group {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
+        
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
         if (200...299).contains(responseCode) {
-
+            
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -159,13 +159,13 @@ extension ATProtoClient.Chat.Bsky.Group {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-
+            
 
             do {
-
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(ChatBskyGroupRejectJoinRequest.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -176,9 +176,9 @@ extension ATProtoClient.Chat.Bsky.Group {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-
+        
     }
-
+    
 }
-
+                           
 

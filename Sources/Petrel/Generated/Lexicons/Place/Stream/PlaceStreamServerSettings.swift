@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: place.stream.server.settings
 
 
-public struct PlaceStreamServerSettings: ATProtocolCodable, ATProtocolValue {
+public struct PlaceStreamServerSettings: ATProtocolCodable, ATProtocolValue { 
 
     public static let typeIdentifier = "place.stream.server.settings"
         public let debugRecording: Bool?
@@ -65,5 +65,5 @@ public struct PlaceStreamServerSettings: ATProtocolCodable, ATProtocolValue {
 }
 
 
-
+                           
 

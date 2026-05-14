@@ -5,85 +5,85 @@ import Foundation
 // lexicon: 1, id: place.stream.branding.getBlob
 
 
-public struct PlaceStreamBrandingGetBlob {
+public struct PlaceStreamBrandingGetBlob { 
 
-    public static let typeIdentifier = "place.stream.branding.getBlob"
+    public static let typeIdentifier = "place.stream.branding.getBlob"    
 public struct Parameters: Parametrizable {
         public let key: String
         public let broadcaster: DID?
-
+        
         public init(
-            key: String,
+            key: String, 
             broadcaster: DID? = nil
             ) {
             self.key = key
             self.broadcaster = broadcaster
-
+            
         }
     }
-
+    
 public struct Output: ATProtocolCodable {
-
-
+        
+        
         public let data: Data
-
-
-
+        
+        
+        
         // Standard public initializer
         public init(
-
-
+            
+            
             data: Data
-
-
+            
+            
         ) {
-
-
+            
+            
             self.data = data
-
-
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
-
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            
             self.data = try container.decode(Data.self, forKey: .data)
-
-
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
-
+            
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
             try container.encode(data, forKey: .data)
-
-
+            
+            
         }
 
         public func toCBORValue() throws -> Any {
-
+            
             var map = OrderedCBORMap()
 
-
-
+            
+            
             let dataValue = try data.toCBORValue()
             map = map.adding(key: "data", value: dataValue)
-
-
+            
+            
 
             return map
-
+            
         }
-
-
+        
+        
         private enum CodingKeys: String, CodingKey {
             case data
         }
-
+        
     }
-
+        
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case brandingNotFound = "BrandingNotFound.The requested branding asset does not exist"
             public var description: String {
@@ -107,17 +107,17 @@ extension ATProtoClient.Place.Stream.Branding {
     // MARK: - getBlob
 
     /// Get a specific branding asset blob by key.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-    ///
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func getBlob(input: PlaceStreamBrandingGetBlob.Parameters) async throws -> (responseCode: Int, data: PlaceStreamBrandingGetBlob.Output?) {
         let endpoint = "place.stream.branding.getBlob"
 
-
+        
         let queryItems = input.asQueryItems()
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -136,14 +136,14 @@ extension ATProtoClient.Place.Stream.Branding {
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
         if (200...299).contains(responseCode) {
-
+            
             // Wildcard encoding ("*/*") — accept any Content-Type, including a missing one.
-
+            
 
             do {
-
+                
                 let decodedData = PlaceStreamBrandingGetBlob.Output(data: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -151,12 +151,12 @@ extension ATProtoClient.Place.Stream.Branding {
                 return (responseCode, nil)
             }
         } else {
-
+            
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
+                           
 

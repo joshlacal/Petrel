@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: place.stream.chat.pinnedRecord
 
 
-public struct PlaceStreamChatPinnedRecord: ATProtocolCodable, ATProtocolValue {
+public struct PlaceStreamChatPinnedRecord: ATProtocolCodable, ATProtocolValue { 
 
     public static let typeIdentifier = "place.stream.chat.pinnedRecord"
         public let pinnedMessage: ATProtocolURI
@@ -104,5 +104,5 @@ public struct PlaceStreamChatPinnedRecord: ATProtocolCodable, ATProtocolValue {
 }
 
 
-
+                           
 

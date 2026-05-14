@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: blue.catbird.mlsChat.createConvo
 
 
-public struct BlueCatbirdMlsChatCreateConvo {
+public struct BlueCatbirdMlsChatCreateConvo { 
 
     public static let typeIdentifier = "blue.catbird.mlsChat.createConvo"
-
+        
 public struct KeyPackageHashEntry: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.createConvo#keyPackageHashEntry"
             public let did: DID
@@ -80,7 +80,7 @@ public struct KeyPackageHashEntry: ATProtocolCodable, ATProtocolValue {
             case hash
         }
     }
-
+        
 public struct InviteAction: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.createConvo#inviteAction"
             public let action: String
@@ -177,7 +177,7 @@ public struct Input: ATProtocolCodable {
             self.invite = invite
             self.currentEpoch = currentEpoch
         }
-
+        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -240,113 +240,113 @@ public struct Input: ATProtocolCodable {
             case currentEpoch
         }
     }
-
+    
 public struct Output: ATProtocolCodable {
-
-
+        
+        
         public let convo: BlueCatbirdMlsChatDefs.ConvoView
-
+        
         public let inviteCode: String?
-
+        
         public let sequencerDs: DID?
-
-
-
+        
+        
+        
         // Standard public initializer
         public init(
-
-
+            
+            
             convo: BlueCatbirdMlsChatDefs.ConvoView,
-
+            
             inviteCode: String? = nil,
-
+            
             sequencerDs: DID? = nil
-
-
+            
+            
         ) {
-
-
+            
+            
             self.convo = convo
-
+            
             self.inviteCode = inviteCode
-
+            
             self.sequencerDs = sequencerDs
-
-
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
-
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            
             self.convo = try container.decode(BlueCatbirdMlsChatDefs.ConvoView.self, forKey: .convo)
-
-
+            
+            
             self.inviteCode = try container.decodeIfPresent(String.self, forKey: .inviteCode)
-
-
+            
+            
             self.sequencerDs = try container.decodeIfPresent(DID.self, forKey: .sequencerDs)
-
-
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
-
+            
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
             try container.encode(convo, forKey: .convo)
-
-
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(inviteCode, forKey: .inviteCode)
-
-
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(sequencerDs, forKey: .sequencerDs)
-
-
+            
+            
         }
 
         public func toCBORValue() throws -> Any {
-
+            
             var map = OrderedCBORMap()
 
-
-
+            
+            
             let convoValue = try convo.toCBORValue()
             map = map.adding(key: "convo", value: convoValue)
-
-
-
+            
+            
+            
             if let value = inviteCode {
                 // Encode optional property even if it's an empty array for CBOR
                 let inviteCodeValue = try value.toCBORValue()
                 map = map.adding(key: "inviteCode", value: inviteCodeValue)
             }
-
-
-
+            
+            
+            
             if let value = sequencerDs {
                 // Encode optional property even if it's an empty array for CBOR
                 let sequencerDsValue = try value.toCBORValue()
                 map = map.adding(key: "sequencerDs", value: sequencerDsValue)
             }
-
-
+            
+            
 
             return map
-
+            
         }
-
-
+        
+        
         private enum CodingKeys: String, CodingKey {
             case convo
             case inviteCode
             case sequencerDs
         }
-
+        
     }
-
+        
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case invalidCipherSuite = "InvalidCipherSuite.The specified cipher suite is not supported"
                 case keyPackageNotFound = "KeyPackageNotFound.Key package not found for one or more initial members"
@@ -372,34 +372,34 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - createConvo
 
     /// Create a new MLS conversation with optional initial members, metadata, and invite link (consolidates createConvo + createInvite + revokeInvite) Create a new MLS conversation. Optionally adds initial members with a Welcome message and creates an invite link in one atomic operation.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-
-    ///
+    
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func createConvo(
-
+        
         input: BlueCatbirdMlsChatCreateConvo.Input
-
+        
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatCreateConvo.Output?) {
         let endpoint = "blue.catbird.mlsChat.createConvo"
-
+        
         var headers: [String: String] = [:]
-
+        
         headers["Content-Type"] = "application/json"
-
-
-
+        
+        
+        
         headers["Accept"] = "application/json"
+        
 
-
-
+        
         let requestData: Data? = try JSONEncoder().encode(input)
-
-
+        
+        
         let queryItems: [URLQueryItem]? = nil
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
@@ -414,12 +414,12 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
+        
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
         if (200...299).contains(responseCode) {
-
+            
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -427,13 +427,13 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-
+            
 
             do {
-
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatCreateConvo.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -444,9 +444,9 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-
+        
     }
-
+    
 }
-
+                           
 

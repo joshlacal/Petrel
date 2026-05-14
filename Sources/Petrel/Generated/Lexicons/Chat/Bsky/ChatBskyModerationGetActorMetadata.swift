@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: chat.bsky.moderation.getActorMetadata
 
 
-public struct ChatBskyModerationGetActorMetadata {
+public struct ChatBskyModerationGetActorMetadata { 
 
     public static let typeIdentifier = "chat.bsky.moderation.getActorMetadata"
-
+        
 public struct Metadata: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.moderation.getActorMetadata#metadata"
             public let messagesSent: Int
@@ -111,114 +111,114 @@ public struct Metadata: ATProtocolCodable, ATProtocolValue {
             case convos
             case convosStarted
         }
-    }
+    }    
 public struct Parameters: Parametrizable {
         public let actor: DID
-
+        
         public init(
             actor: DID
             ) {
             self.actor = actor
-
+            
         }
     }
-
+    
 public struct Output: ATProtocolCodable {
-
-
+        
+        
         public let day: Metadata
-
+        
         public let month: Metadata
-
+        
         public let all: Metadata
-
-
-
+        
+        
+        
         // Standard public initializer
         public init(
-
-
+            
+            
             day: Metadata,
-
+            
             month: Metadata,
-
+            
             all: Metadata
-
-
+            
+            
         ) {
-
-
+            
+            
             self.day = day
-
+            
             self.month = month
-
+            
             self.all = all
-
-
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
-
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            
             self.day = try container.decode(Metadata.self, forKey: .day)
-
-
+            
+            
             self.month = try container.decode(Metadata.self, forKey: .month)
-
-
+            
+            
             self.all = try container.decode(Metadata.self, forKey: .all)
-
-
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
-
+            
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
             try container.encode(day, forKey: .day)
-
-
+            
+            
             try container.encode(month, forKey: .month)
-
-
+            
+            
             try container.encode(all, forKey: .all)
-
-
+            
+            
         }
 
         public func toCBORValue() throws -> Any {
-
+            
             var map = OrderedCBORMap()
 
-
-
+            
+            
             let dayValue = try day.toCBORValue()
             map = map.adding(key: "day", value: dayValue)
-
-
-
+            
+            
+            
             let monthValue = try month.toCBORValue()
             map = map.adding(key: "month", value: monthValue)
-
-
-
+            
+            
+            
             let allValue = try all.toCBORValue()
             map = map.adding(key: "all", value: allValue)
-
-
+            
+            
 
             return map
-
+            
         }
-
-
+        
+        
         private enum CodingKeys: String, CodingKey {
             case day
             case month
             case all
         }
-
+        
     }
 
 
@@ -231,18 +231,18 @@ public struct Output: ATProtocolCodable {
 extension ATProtoClient.Chat.Bsky.Moderation {
     // MARK: - getActorMetadata
 
-    ///
-    ///
+    /// 
+    /// 
     /// - Parameter input: The input parameters for the request
-    ///
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func getActorMetadata(input: ChatBskyModerationGetActorMetadata.Parameters) async throws -> (responseCode: Int, data: ChatBskyModerationGetActorMetadata.Output?) {
         let endpoint = "chat.bsky.moderation.getActorMetadata"
 
-
+        
         let queryItems = input.asQueryItems()
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -261,7 +261,7 @@ extension ATProtoClient.Chat.Bsky.Moderation {
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
         if (200...299).contains(responseCode) {
-
+            
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -269,13 +269,13 @@ extension ATProtoClient.Chat.Bsky.Moderation {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-
+            
 
             do {
-
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(ChatBskyModerationGetActorMetadata.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -283,12 +283,12 @@ extension ATProtoClient.Chat.Bsky.Moderation {
                 return (responseCode, nil)
             }
         } else {
-
+            
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
+                           
 

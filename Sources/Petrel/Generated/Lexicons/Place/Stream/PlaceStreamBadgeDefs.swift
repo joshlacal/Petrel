@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: place.stream.badge.defs
 
 
-public struct PlaceStreamBadgeDefs {
+public struct PlaceStreamBadgeDefs { 
 
     public static let typeIdentifier = "place.stream.badge.defs"
-
+        
 public struct BadgeView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "place.stream.badge.defs#badgeView"
             public let badgeType: String
@@ -124,5 +124,5 @@ public struct BadgeView: ATProtocolCodable, ATProtocolValue {
 }
 
 
-
+                           
 

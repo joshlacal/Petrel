@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: app.bsky.graph.list
 
 
-public struct AppBskyGraphList: ATProtocolCodable, ATProtocolValue {
+public struct AppBskyGraphList: ATProtocolCodable, ATProtocolValue { 
 
     public static let typeIdentifier = "app.bsky.graph.list"
         public let purpose: AppBskyGraphDefs.ListPurpose
@@ -195,7 +195,7 @@ public enum AppBskyGraphListLabelsUnion: Codable, ATProtocolCodable, ATProtocolV
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-
+    
     public static func == (lhs: AppBskyGraphListLabelsUnion, rhs: AppBskyGraphListLabelsUnion) -> Bool {
         switch (lhs, rhs) {
         case (.comAtprotoLabelDefsSelfLabels(let lhsValue),
@@ -207,21 +207,21 @@ public enum AppBskyGraphListLabelsUnion: Codable, ATProtocolCodable, ATProtocolV
             return false
         }
     }
-
+    
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? AppBskyGraphListLabelsUnion else { return false }
         return self == other
     }
-
+    
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-
+        
         switch self {
         case .comAtprotoLabelDefsSelfLabels(let value):
             map = map.adding(key: "$type", value: "com.atproto.label.defs#selfLabels")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -246,5 +246,5 @@ public enum AppBskyGraphListLabelsUnion: Codable, ATProtocolCodable, ATProtocolV
 }
 
 
-
+                           
 

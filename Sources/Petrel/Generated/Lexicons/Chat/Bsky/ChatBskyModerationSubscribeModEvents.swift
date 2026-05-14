@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: chat.bsky.moderation.subscribeModEvents
 
 
-public struct ChatBskyModerationSubscribeModEvents {
+public struct ChatBskyModerationSubscribeModEvents { 
 
     public static let typeIdentifier = "chat.bsky.moderation.subscribeModEvents"
-
+        
 public struct EventConvoFirstMessage: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.moderation.subscribeModEvents#eventConvoFirstMessage"
             public let convoId: String
@@ -149,15 +149,15 @@ public struct EventConvoFirstMessage: ATProtocolCodable, ATProtocolValue {
             case rev
             case user
         }
-    }
+    }    
 public struct Parameters: Parametrizable {
         public let cursor: String?
-
+        
         public init(
             cursor: String? = nil
             ) {
             self.cursor = cursor
-
+            
         }
     }
 public enum Message: Codable, Sendable {
@@ -172,7 +172,7 @@ public enum Message: Codable, Sendable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let type = try container.decode(String.self, forKey: .type)
-
+        
         switch type {
 
         case "chat.bsky.moderation.subscribeModEvents#eventConvoFirstMessage":
@@ -196,7 +196,7 @@ public enum Message: Codable, Sendable {
 
         }
     }
-}
+}        
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case futureCursor = "FutureCursor."
                 case consumerTooSlow = "ConsumerTooSlow.If the consumer of the stream can not keep up with events, and a backlog gets too large, the server will drop the connection."
@@ -216,12 +216,12 @@ public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertibl
 }
 
 
-
+                           
 
 /// Subscribe to stream of chat events targeted to moderation. Private endpoint.
 
 extension ATProtoClient.Chat.Bsky.Moderation {
-
+    
     public func subscribeModEvents(
         cursor: String? = nil
     ) async throws -> AsyncThrowingStream<ChatBskyModerationSubscribeModEvents.Message, Error> {
@@ -239,5 +239,5 @@ extension ATProtoClient.Chat.Bsky.Moderation {
             parameters: input
         )
     }
-
+    
 }

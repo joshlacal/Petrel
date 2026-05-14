@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: app.bsky.draft.deleteDraft
 
 
-public struct AppBskyDraftDeleteDraft {
+public struct AppBskyDraftDeleteDraft { 
 
     public static let typeIdentifier = "app.bsky.draft.deleteDraft"
 public struct Input: ATProtocolCodable {
@@ -15,7 +15,7 @@ public struct Input: ATProtocolCodable {
         public init(id: TID) {
             self.id = id
         }
-
+        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -47,32 +47,32 @@ extension ATProtoClient.App.Bsky.Draft {
     // MARK: - deleteDraft
 
     /// Deletes a draft by ID. Requires authentication.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-
-    ///
+    
+    /// 
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func deleteDraft(
-
+        
         input: AppBskyDraftDeleteDraft.Input
-
+        
     ) async throws -> Int {
         let endpoint = "app.bsky.draft.deleteDraft"
-
+        
         var headers: [String: String] = [:]
-
+        
         headers["Content-Type"] = "application/json"
+        
+        
+        
 
-
-
-
-
+        
         let requestData: Data? = try JSONEncoder().encode(input)
-
-
+        
+        
         let queryItems: [URLQueryItem]? = nil
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
@@ -87,11 +87,11 @@ extension ATProtoClient.App.Bsky.Draft {
         let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
+        
         return responseCode
-
+        
     }
-
+    
 }
-
+                           
 

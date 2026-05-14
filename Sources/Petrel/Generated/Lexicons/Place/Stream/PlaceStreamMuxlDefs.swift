@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: place.stream.muxl.defs
 
 
-public struct PlaceStreamMuxlDefs {
+public struct PlaceStreamMuxlDefs { 
 
     public static let typeIdentifier = "place.stream.muxl.defs"
-
+        
 public struct Track: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "place.stream.muxl.defs#track"
             public let id: Int
@@ -174,5 +174,5 @@ public struct Track: ATProtocolCodable, ATProtocolValue {
 }
 
 
-
+                           
 

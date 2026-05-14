@@ -12,20 +12,20 @@ import AppKit
 // lexicon: 1, id: place.stream.playback.whep
 
 
-public struct PlaceStreamPlaybackWhep {
+public struct PlaceStreamPlaybackWhep { 
 
-    public static let typeIdentifier = "place.stream.playback.whep"
+    public static let typeIdentifier = "place.stream.playback.whep"    
 public struct Parameters: Parametrizable {
         public let streamer: String
         public let rendition: String
-
+        
         public init(
-            streamer: String,
+            streamer: String, 
             rendition: String
             ) {
             self.streamer = streamer
             self.rendition = rendition
-
+            
         }
     }
 public struct Input: ATProtocolCodable {
@@ -35,7 +35,7 @@ public struct Input: ATProtocolCodable {
         public init(data: Data) {
             self.data = data
         }
-
+        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -58,69 +58,69 @@ public struct Input: ATProtocolCodable {
             case data
         }
     }
-
+    
 public struct Output: ATProtocolCodable {
-
-
+        
+        
         public let data: Data
-
-
-
+        
+        
+        
         // Standard public initializer
         public init(
-
-
+            
+            
             data: Data
-
-
+            
+            
         ) {
-
-
+            
+            
             self.data = data
-
-
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
-
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            
             self.data = try container.decode(Data.self, forKey: .data)
-
-
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
-
+            
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
             try container.encode(data, forKey: .data)
-
-
+            
+            
         }
 
         public func toCBORValue() throws -> Any {
-
+            
             var map = OrderedCBORMap()
 
-
-
+            
+            
             let dataValue = try data.toCBORValue()
             map = map.adding(key: "data", value: dataValue)
-
-
+            
+            
 
             return map
-
+            
         }
-
-
+        
+        
         private enum CodingKeys: String, CodingKey {
             case data
         }
-
+        
     }
-
+        
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case unauthorized = "Unauthorized.This user may not play this stream."
             public var description: String {
@@ -142,25 +142,25 @@ extension ATProtoClient.Place.Stream.Playback {
     // MARK: - whep
 
     /// Play a stream over WebRTC using WHEP.
-    ///
+    /// 
     /// - Parameters:
     ///   - data: The binary data to upload
     ///   - mimeType: The MIME type of the data being uploaded
     ///   - stripMetadata: Whether to strip metadata from images (default: true)
     ///   - params: The query parameters for the request
-    ///
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func whep(
-
+        
         data: Data,
         mimeType: String,
         stripMetadata: Bool = true,
         params: PlaceStreamPlaybackWhep.Parameters
-
+        
     ) async throws -> (responseCode: Int, data: PlaceStreamPlaybackWhep.Output?) {
         let endpoint = "place.stream.playback.whep"
-
+        
         var dataToUpload = data
         if stripMetadata, let strippedData = ImageMetadataStripper.stripMetadata(from: dataToUpload) {
             dataToUpload = strippedData
@@ -172,15 +172,15 @@ extension ATProtoClient.Place.Stream.Playback {
             "Content-Type": mimeType,
             "Content-Length": "\(dataToUpload.count)"
         ]
-
-
+        
+        
         headers["Accept"] = "*/*"
+        
 
-
-
-
+        
+        
         let queryItems = params.asQueryItems()
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
@@ -195,19 +195,19 @@ extension ATProtoClient.Place.Stream.Playback {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
+        
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
         if (200...299).contains(responseCode) {
-
+            
             // Wildcard encoding ("*/*") — accept any Content-Type, including a missing one.
-
+            
 
             do {
-
+                
                 let decodedData = PlaceStreamPlaybackWhep.Output(data: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -218,9 +218,9 @@ extension ATProtoClient.Place.Stream.Playback {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-
+        
     }
-
+    
     /// Compresses an image while maintaining reasonable quality
     /// - Parameters:
     ///   - imageData: The original image data
@@ -253,7 +253,7 @@ extension ATProtoClient.Place.Stream.Playback {
         return nil
         #endif
     }
-
+    
 }
-
+                           
 

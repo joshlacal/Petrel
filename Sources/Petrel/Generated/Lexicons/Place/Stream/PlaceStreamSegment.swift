@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: place.stream.segment
 
 
-public struct PlaceStreamSegment: ATProtocolCodable, ATProtocolValue {
+public struct PlaceStreamSegment: ATProtocolCodable, ATProtocolValue { 
 
     public static let typeIdentifier = "place.stream.segment"
         public let id: String
@@ -205,7 +205,7 @@ public struct PlaceStreamSegment: ATProtocolCodable, ATProtocolValue {
             case contentRights
             case distributionPolicy
         }
-
+        
 public struct Audio: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "place.stream.segment#audio"
             public let codec: String
@@ -293,7 +293,7 @@ public struct Audio: ATProtocolCodable, ATProtocolValue {
             case channels
         }
     }
-
+        
 public struct Video: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "place.stream.segment#video"
             public let codec: String
@@ -425,7 +425,7 @@ public struct Video: ATProtocolCodable, ATProtocolValue {
             case bframes
         }
     }
-
+        
 public struct Framerate: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "place.stream.segment#framerate"
             public let num: Int
@@ -497,7 +497,7 @@ public struct Framerate: ATProtocolCodable, ATProtocolValue {
             case den
         }
     }
-
+        
 public struct SegmentView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "place.stream.segment#segmentView"
             public let cid: CID
@@ -575,5 +575,5 @@ public struct SegmentView: ATProtocolCodable, ATProtocolValue {
 }
 
 
-
+                           
 

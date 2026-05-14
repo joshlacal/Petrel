@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: blue.catbird.mlsChat.commitGroupChange
 
 
-public struct BlueCatbirdMlsChatCommitGroupChange {
+public struct BlueCatbirdMlsChatCommitGroupChange { 
 
     public static let typeIdentifier = "blue.catbird.mlsChat.commitGroupChange"
-
+        
 public struct RateLimitedBody: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.commitGroupChange#rateLimitedBody"
             public let error: String
@@ -112,7 +112,7 @@ public struct RateLimitedBody: ATProtocolCodable, ATProtocolValue {
             case scope
         }
     }
-
+        
 public struct KeyPackageHashEntry: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.commitGroupChange#keyPackageHashEntry"
             public let did: DID
@@ -184,7 +184,7 @@ public struct KeyPackageHashEntry: ATProtocolCodable, ATProtocolValue {
             case hash
         }
     }
-
+        
 public struct PendingDeviceAddition: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.commitGroupChange#pendingDeviceAddition"
             public let id: String
@@ -393,9 +393,13 @@ public struct Input: ATProtocolCodable {
         public let idempotencyKey: String?
         public let confirmationTag: Bytes?
         public let epochAuthenticator: String?
+        public let replacedKeyPackageHash: String?
+        public let replacementWelcome: Bytes?
+        public let replacementCommit: Bytes?
+        public let replacementKeyPackageHash: String?
 
         /// Standard public initializer
-        public init(convoId: String, action: String, memberDids: [DID]? = nil, commit: Bytes? = nil, welcome: Bytes? = nil, groupInfo: Bytes? = nil, keyPackageHashes: [KeyPackageHashEntry]? = nil, deviceId: String? = nil, pendingAdditionId: String? = nil, idempotencyKey: String? = nil, confirmationTag: Bytes? = nil, epochAuthenticator: String? = nil) {
+        public init(convoId: String, action: String, memberDids: [DID]? = nil, commit: Bytes? = nil, welcome: Bytes? = nil, groupInfo: Bytes? = nil, keyPackageHashes: [KeyPackageHashEntry]? = nil, deviceId: String? = nil, pendingAdditionId: String? = nil, idempotencyKey: String? = nil, confirmationTag: Bytes? = nil, epochAuthenticator: String? = nil, replacedKeyPackageHash: String? = nil, replacementWelcome: Bytes? = nil, replacementCommit: Bytes? = nil, replacementKeyPackageHash: String? = nil) {
             self.convoId = convoId
             self.action = action
             self.memberDids = memberDids
@@ -408,8 +412,12 @@ public struct Input: ATProtocolCodable {
             self.idempotencyKey = idempotencyKey
             self.confirmationTag = confirmationTag
             self.epochAuthenticator = epochAuthenticator
+            self.replacedKeyPackageHash = replacedKeyPackageHash
+            self.replacementWelcome = replacementWelcome
+            self.replacementCommit = replacementCommit
+            self.replacementKeyPackageHash = replacementKeyPackageHash
         }
-
+        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -425,6 +433,10 @@ public struct Input: ATProtocolCodable {
             self.idempotencyKey = try container.decodeIfPresent(String.self, forKey: .idempotencyKey)
             self.confirmationTag = try container.decodeIfPresent(Bytes.self, forKey: .confirmationTag)
             self.epochAuthenticator = try container.decodeIfPresent(String.self, forKey: .epochAuthenticator)
+            self.replacedKeyPackageHash = try container.decodeIfPresent(String.self, forKey: .replacedKeyPackageHash)
+            self.replacementWelcome = try container.decodeIfPresent(Bytes.self, forKey: .replacementWelcome)
+            self.replacementCommit = try container.decodeIfPresent(Bytes.self, forKey: .replacementCommit)
+            self.replacementKeyPackageHash = try container.decodeIfPresent(String.self, forKey: .replacementKeyPackageHash)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -441,6 +453,10 @@ public struct Input: ATProtocolCodable {
             try container.encodeIfPresent(idempotencyKey, forKey: .idempotencyKey)
             try container.encodeIfPresent(confirmationTag, forKey: .confirmationTag)
             try container.encodeIfPresent(epochAuthenticator, forKey: .epochAuthenticator)
+            try container.encodeIfPresent(replacedKeyPackageHash, forKey: .replacedKeyPackageHash)
+            try container.encodeIfPresent(replacementWelcome, forKey: .replacementWelcome)
+            try container.encodeIfPresent(replacementCommit, forKey: .replacementCommit)
+            try container.encodeIfPresent(replacementKeyPackageHash, forKey: .replacementKeyPackageHash)
         }
 
         public func toCBORValue() throws -> Any {
@@ -489,6 +505,22 @@ public struct Input: ATProtocolCodable {
                 let epochAuthenticatorValue = try value.toCBORValue()
                 map = map.adding(key: "epochAuthenticator", value: epochAuthenticatorValue)
             }
+            if let value = replacedKeyPackageHash {
+                let replacedKeyPackageHashValue = try value.toCBORValue()
+                map = map.adding(key: "replacedKeyPackageHash", value: replacedKeyPackageHashValue)
+            }
+            if let value = replacementWelcome {
+                let replacementWelcomeValue = try value.toCBORValue()
+                map = map.adding(key: "replacementWelcome", value: replacementWelcomeValue)
+            }
+            if let value = replacementCommit {
+                let replacementCommitValue = try value.toCBORValue()
+                map = map.adding(key: "replacementCommit", value: replacementCommitValue)
+            }
+            if let value = replacementKeyPackageHash {
+                let replacementKeyPackageHashValue = try value.toCBORValue()
+                map = map.adding(key: "replacementKeyPackageHash", value: replacementKeyPackageHashValue)
+            }
             return map
         }
 
@@ -505,170 +537,174 @@ public struct Input: ATProtocolCodable {
             case idempotencyKey
             case confirmationTag
             case epochAuthenticator
+            case replacedKeyPackageHash
+            case replacementWelcome
+            case replacementCommit
+            case replacementKeyPackageHash
         }
     }
-
+    
 public struct Output: ATProtocolCodable {
-
-
+        
+        
         public let success: Bool
-
+        
         public let newEpoch: Int?
-
+        
         public let rejoinedAt: ATProtocolDate?
-
+        
         public let pendingAdditions: [PendingDeviceAddition]?
-
+        
         public let claimedAddition: PendingDeviceAddition?
-
+        
         public let confirmationTag: Bytes?
-
-
-
+        
+        
+        
         // Standard public initializer
         public init(
-
-
+            
+            
             success: Bool,
-
+            
             newEpoch: Int? = nil,
-
+            
             rejoinedAt: ATProtocolDate? = nil,
-
+            
             pendingAdditions: [PendingDeviceAddition]? = nil,
-
+            
             claimedAddition: PendingDeviceAddition? = nil,
-
+            
             confirmationTag: Bytes? = nil
-
-
+            
+            
         ) {
-
-
+            
+            
             self.success = success
-
+            
             self.newEpoch = newEpoch
-
+            
             self.rejoinedAt = rejoinedAt
-
+            
             self.pendingAdditions = pendingAdditions
-
+            
             self.claimedAddition = claimedAddition
-
+            
             self.confirmationTag = confirmationTag
-
-
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
-
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            
             self.success = try container.decode(Bool.self, forKey: .success)
-
-
+            
+            
             self.newEpoch = try container.decodeIfPresent(Int.self, forKey: .newEpoch)
-
-
+            
+            
             self.rejoinedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .rejoinedAt)
-
-
+            
+            
             self.pendingAdditions = try container.decodeIfPresent([PendingDeviceAddition].self, forKey: .pendingAdditions)
-
-
+            
+            
             self.claimedAddition = try container.decodeIfPresent(PendingDeviceAddition.self, forKey: .claimedAddition)
-
-
+            
+            
             self.confirmationTag = try container.decodeIfPresent(Bytes.self, forKey: .confirmationTag)
-
-
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
-
+            
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
             try container.encode(success, forKey: .success)
-
-
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(newEpoch, forKey: .newEpoch)
-
-
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(rejoinedAt, forKey: .rejoinedAt)
-
-
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(pendingAdditions, forKey: .pendingAdditions)
-
-
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(claimedAddition, forKey: .claimedAddition)
-
-
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(confirmationTag, forKey: .confirmationTag)
-
-
+            
+            
         }
 
         public func toCBORValue() throws -> Any {
-
+            
             var map = OrderedCBORMap()
 
-
-
+            
+            
             let successValue = try success.toCBORValue()
             map = map.adding(key: "success", value: successValue)
-
-
-
+            
+            
+            
             if let value = newEpoch {
                 // Encode optional property even if it's an empty array for CBOR
                 let newEpochValue = try value.toCBORValue()
                 map = map.adding(key: "newEpoch", value: newEpochValue)
             }
-
-
-
+            
+            
+            
             if let value = rejoinedAt {
                 // Encode optional property even if it's an empty array for CBOR
                 let rejoinedAtValue = try value.toCBORValue()
                 map = map.adding(key: "rejoinedAt", value: rejoinedAtValue)
             }
-
-
-
+            
+            
+            
             if let value = pendingAdditions {
                 // Encode optional property even if it's an empty array for CBOR
                 let pendingAdditionsValue = try value.toCBORValue()
                 map = map.adding(key: "pendingAdditions", value: pendingAdditionsValue)
             }
-
-
-
+            
+            
+            
             if let value = claimedAddition {
                 // Encode optional property even if it's an empty array for CBOR
                 let claimedAdditionValue = try value.toCBORValue()
                 map = map.adding(key: "claimedAddition", value: claimedAdditionValue)
             }
-
-
-
+            
+            
+            
             if let value = confirmationTag {
                 // Encode optional property even if it's an empty array for CBOR
                 let confirmationTagValue = try value.toCBORValue()
                 map = map.adding(key: "confirmationTag", value: confirmationTagValue)
             }
-
-
+            
+            
 
             return map
-
+            
         }
-
-
+        
+        
         private enum CodingKeys: String, CodingKey {
             case success
             case newEpoch
@@ -677,9 +713,9 @@ public struct Output: ATProtocolCodable {
             case claimedAddition
             case confirmationTag
         }
-
+        
     }
-
+        
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case convoNotFound = "ConvoNotFound.Conversation not found"
                 case notMember = "NotMember.Caller is not a member of the conversation"
@@ -715,34 +751,34 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - commitGroupChange
 
     /// Commit MLS group membership changes (consolidates addMembers + processExternalCommit + rejoin + readdition + getPendingDeviceAdditions + claimPendingDeviceAddition + completePendingDeviceAddition) Perform MLS group membership operations. The 'action' field determines the operation type. This consolidates all membership-changing operations into a single endpoint.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-
-    ///
+    
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func commitGroupChange(
-
+        
         input: BlueCatbirdMlsChatCommitGroupChange.Input
-
+        
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatCommitGroupChange.Output?) {
         let endpoint = "blue.catbird.mlsChat.commitGroupChange"
-
+        
         var headers: [String: String] = [:]
-
+        
         headers["Content-Type"] = "application/json"
-
-
-
+        
+        
+        
         headers["Accept"] = "application/json"
+        
 
-
-
+        
         let requestData: Data? = try JSONEncoder().encode(input)
-
-
+        
+        
         let queryItems: [URLQueryItem]? = nil
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
@@ -757,12 +793,12 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
+        
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
         if (200...299).contains(responseCode) {
-
+            
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -770,13 +806,13 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-
+            
 
             do {
-
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatCommitGroupChange.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -787,9 +823,9 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-
+        
     }
-
+    
 }
-
+                           
 

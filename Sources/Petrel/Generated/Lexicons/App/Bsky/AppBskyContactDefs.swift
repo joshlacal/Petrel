@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: app.bsky.contact.defs
 
 
-public struct AppBskyContactDefs {
+public struct AppBskyContactDefs { 
 
     public static let typeIdentifier = "app.bsky.contact.defs"
-
+        
 public struct MatchAndContactIndex: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.contact.defs#matchAndContactIndex"
             public let match: AppBskyActorDefs.ProfileView
@@ -80,7 +80,7 @@ public struct MatchAndContactIndex: ATProtocolCodable, ATProtocolValue {
             case contactIndex
         }
     }
-
+        
 public struct SyncStatus: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.contact.defs#syncStatus"
             public let syncedAt: ATProtocolDate
@@ -152,7 +152,7 @@ public struct SyncStatus: ATProtocolCodable, ATProtocolValue {
             case matchesCount
         }
     }
-
+        
 public struct Notification: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.contact.defs#notification"
             public let from: DID
@@ -230,5 +230,5 @@ public struct Notification: ATProtocolCodable, ATProtocolValue {
 }
 
 
-
+                           
 

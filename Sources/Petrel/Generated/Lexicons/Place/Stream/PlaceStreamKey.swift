@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: place.stream.key
 
 
-public struct PlaceStreamKey: ATProtocolCodable, ATProtocolValue {
+public struct PlaceStreamKey: ATProtocolCodable, ATProtocolValue { 
 
     public static let typeIdentifier = "place.stream.key"
         public let signingKey: String
@@ -87,5 +87,5 @@ public struct PlaceStreamKey: ATProtocolCodable, ATProtocolValue {
 }
 
 
-
+                           
 

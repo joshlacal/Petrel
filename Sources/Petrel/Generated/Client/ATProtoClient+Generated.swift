@@ -278,7 +278,7 @@ public actor ATProtoClient {
         LogManager.logInfo("ATProtoClient - initializeFromStoredAccount called, isGatewayMode: \(isGatewayMode)")
         if let account = await accountManager.getCurrentAccount() {
             LogManager.logInfo("ATProtoClient - Found current account: \(account.did), pdsURL: \(account.pdsURL)")
-
+            
             // In gateway mode, DON'T update the base URL - keep using the gateway URL
             // The gateway handles all routing to the actual PDS
             if !isGatewayMode {
@@ -286,7 +286,7 @@ public actor ATProtoClient {
             } else {
                 LogManager.logInfo("ATProtoClient - Gateway mode: keeping gateway URL as base URL")
             }
-
+            
             // Load and apply service DIDs from stored account
             LogManager.logInfo("ATProtoClient - Loading service DIDs from stored account: bskyAppViewDID=\(account.bskyAppViewDID), bskyChatDID=\(account.bskyChatDID)")
             await networkService.setServiceDID(account.bskyAppViewDID, for: "app.bsky")
@@ -630,7 +630,7 @@ public actor ATProtoClient {
             } else {
                 LogManager.logInfo("ATProtoClient - Gateway mode: keeping gateway URL as base URL during account switch")
             }
-
+            
             // Load and apply service DIDs from account
             LogManager.logInfo("ATProtoClient - Loading service DIDs from account: bskyAppViewDID=\(account.bskyAppViewDID), bskyChatDID=\(account.bskyChatDID)")
             await networkService.setServiceDID(account.bskyAppViewDID, for: "app.bsky")
@@ -646,7 +646,7 @@ public actor ATProtoClient {
         }
         try await accountManager.removeAccount(did: did)
     }
-
+    
     /// Updates the service DID mappings for app.bsky and chat.bsky namespaces.
     /// Use this to change the AppView or Chat service after client initialization.
     /// - Parameters:
@@ -657,7 +657,7 @@ public actor ATProtoClient {
         await networkService.setServiceDID(bskyAppViewDID, for: "app.bsky")
         await networkService.setServiceDID(bskyChatDID, for: "chat.bsky")
     }
-
+    
     /// Updates the service DIDs for the current account and persists them.
     /// This is the primary method for changing service DIDs after login.
     /// - Parameters:
@@ -672,10 +672,10 @@ public actor ATProtoClient {
 
         // Persist to account storage
         try await accountManager.updateServiceDIDs(bskyAppViewDID: bskyAppViewDID, bskyChatDID: bskyChatDID)
-
+        
         LogManager.logInfo("ATProtoClient - Service DIDs updated and persisted for current account")
     }
-
+    
     /// Gets the current account information including service DIDs.
     /// - Returns: The current account if available, or nil if not authenticated.
     public func getCurrentAccount() async -> Account? {
@@ -713,7 +713,7 @@ public actor ATProtoClient {
     public func setHeader(name: String, value: String) async {
         await networkService.setHeader(name: name, value: value)
     }
-
+    
     /// Removes a custom header.
     /// - Parameter name: The header name to remove.
     public func removeHeader(name: String) async {
@@ -734,7 +734,7 @@ public actor ATProtoClient {
 
     // MARK: - Generated API Namespaced Classes
 
-
+  
     public lazy var app: App = {
     return App(networkService: self.networkService)
 }()

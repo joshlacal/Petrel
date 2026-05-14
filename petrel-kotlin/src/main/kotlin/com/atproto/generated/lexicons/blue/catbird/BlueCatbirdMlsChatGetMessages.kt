@@ -34,14 +34,16 @@ object BlueCatbirdMlsChatGetMessagesDefs {
         val sinceSeq: Int? = null,// Filter by message type: 'app' for user content only, 'commit' for MLS protocol control messages only, 'all' for both        @SerialName("type")
         val type: String? = null,// Lower bound (inclusive) on MLS epoch. Only honored for type='commit' or type='all' — narrows the commit-catchup range so LIMIT reaches the commits a lagging client actually needs. Defaults to 0 (start of history) when omitted.        @SerialName("fromEpoch")
         val fromEpoch: Int? = null,// Upper bound (inclusive) on MLS epoch. Only honored for type='commit' or type='all'. Defaults to the conversation's current_epoch when omitted.        @SerialName("toEpoch")
-        val toEpoch: Int? = null    )
+        val toEpoch: Int? = null,// Recipient's join epoch for this convo. Server MUST suppress application messages with epoch < joinEpoch in the response. Commits are NOT suppressed (recipients need them for tree state). Optional; when omitted, server falls back to per-recipient join-epoch lookup.        @SerialName("joinEpoch")
+        val joinEpoch: Int? = null    )
 
     @Serializable
     data class BlueCatbirdMlsChatGetMessagesOutput(
 // Messages in stable conversation timeline order (seq ASC)        @SerialName("messages")
         val messages: List<BlueCatbirdMlsChatDefsMessageView>,// Sequence number of the last message in this response. Use as sinceSeq for next page.        @SerialName("lastSeq")
         val lastSeq: Int? = null,// Gap detection metadata for missing messages        @SerialName("gapInfo")
-        val gapInfo: BlueCatbirdMlsChatGetMessagesGapInfo? = null    )
+        val gapInfo: BlueCatbirdMlsChatGetMessagesGapInfo? = null,// Count of pre-join messages suppressed from this response.        @SerialName("suppressedBeforeJoin")
+        val suppressedBeforeJoin: Int? = null    )
 
 sealed class BlueCatbirdMlsChatGetMessagesError(val name: String, val description: String?) {
         object ConvoNotFound: BlueCatbirdMlsChatGetMessagesError("ConvoNotFound", "Conversation not found")

@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: blue.catbird.mlsChat.bootstrapResetGroup
 
 
-public struct BlueCatbirdMlsChatBootstrapResetGroup {
+public struct BlueCatbirdMlsChatBootstrapResetGroup { 
 
     public static let typeIdentifier = "blue.catbird.mlsChat.bootstrapResetGroup"
-
+        
 public struct KeyPackageHashEntry: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.bootstrapResetGroup#keyPackageHashEntry"
             public let did: DID
@@ -105,7 +105,7 @@ public struct Input: ATProtocolCodable {
             self.metadataBlobLocator = metadataBlobLocator
             self.metadataVersion = metadataVersion
         }
-
+        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -183,91 +183,91 @@ public struct Input: ATProtocolCodable {
             case metadataVersion
         }
     }
-
+    
 public struct Output: ATProtocolCodable {
-
-
+        
+        
         public let convo: BlueCatbirdMlsChatDefs.ConvoView
-
+        
         public let generation: Int?
-
-
-
+        
+        
+        
         // Standard public initializer
         public init(
-
-
+            
+            
             convo: BlueCatbirdMlsChatDefs.ConvoView,
-
+            
             generation: Int? = nil
-
-
+            
+            
         ) {
-
-
+            
+            
             self.convo = convo
-
+            
             self.generation = generation
-
-
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
-
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            
             self.convo = try container.decode(BlueCatbirdMlsChatDefs.ConvoView.self, forKey: .convo)
-
-
+            
+            
             self.generation = try container.decodeIfPresent(Int.self, forKey: .generation)
-
-
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
-
+            
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
             try container.encode(convo, forKey: .convo)
-
-
+            
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(generation, forKey: .generation)
-
-
+            
+            
         }
 
         public func toCBORValue() throws -> Any {
-
+            
             var map = OrderedCBORMap()
 
-
-
+            
+            
             let convoValue = try convo.toCBORValue()
             map = map.adding(key: "convo", value: convoValue)
-
-
-
+            
+            
+            
             if let value = generation {
                 // Encode optional property even if it's an empty array for CBOR
                 let generationValue = try value.toCBORValue()
                 map = map.adding(key: "generation", value: generationValue)
             }
-
-
+            
+            
 
             return map
-
+            
         }
-
-
+        
+        
         private enum CodingKeys: String, CodingKey {
             case convo
             case generation
         }
-
+        
     }
-
+        
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case bootstrapTargetNotFound = "BootstrapTargetNotFound.No conversation row matches (originalConvoId, newGroupId). Either the convo doesn't exist, or the post-reset group_id has already been overwritten by a subsequent reset."
                 case alreadyBootstrapped = "AlreadyBootstrapped.The post-reset row has already been bootstrapped by another caller (group_info IS NOT NULL). Caller lost the first-responder race; fall back to receiving the Welcome from the winner."
@@ -292,34 +292,34 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - bootstrapResetGroup
 
     /// Complete a post-auto-reset conversation by populating its emptied MLS state (group_info, welcome messages). The post-reset row exists with id=originalConvoId, group_id=newGroupId, and group_info=NULL — this endpoint UPDATEs that row in place rather than INSERTing a new conversation. First caller (in the existing member roster) for a given (originalConvoId, newGroupId) wins; later callers receive AlreadyBootstrapped 409 and fall back to receiving the Welcome from the winner. Bootstrap a post-auto-reset conversation in place. Member roster is preserved across reset, so this endpoint does not re-insert members.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-
-    ///
+    
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func bootstrapResetGroup(
-
+        
         input: BlueCatbirdMlsChatBootstrapResetGroup.Input
-
+        
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatBootstrapResetGroup.Output?) {
         let endpoint = "blue.catbird.mlsChat.bootstrapResetGroup"
-
+        
         var headers: [String: String] = [:]
-
+        
         headers["Content-Type"] = "application/json"
-
-
-
+        
+        
+        
         headers["Accept"] = "application/json"
+        
 
-
-
+        
         let requestData: Data? = try JSONEncoder().encode(input)
-
-
+        
+        
         let queryItems: [URLQueryItem]? = nil
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
@@ -334,12 +334,12 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
+        
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
         if (200...299).contains(responseCode) {
-
+            
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -347,13 +347,13 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-
+            
 
             do {
-
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatBootstrapResetGroup.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -364,9 +364,9 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-
+        
     }
-
+    
 }
-
+                           
 

@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: app.bsky.contact.verifyPhone
 
 
-public struct AppBskyContactVerifyPhone {
+public struct AppBskyContactVerifyPhone { 
 
     public static let typeIdentifier = "app.bsky.contact.verifyPhone"
 public struct Input: ATProtocolCodable {
@@ -17,7 +17,7 @@ public struct Input: ATProtocolCodable {
             self.phone = phone
             self.code = code
         }
-
+        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -45,69 +45,69 @@ public struct Input: ATProtocolCodable {
             case code
         }
     }
-
+    
 public struct Output: ATProtocolCodable {
-
-
+        
+        
         public let token: String
-
-
-
+        
+        
+        
         // Standard public initializer
         public init(
-
-
+            
+            
             token: String
-
-
+            
+            
         ) {
-
-
+            
+            
             self.token = token
-
-
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
-
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            
             self.token = try container.decode(String.self, forKey: .token)
-
-
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
-
+            
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
             try container.encode(token, forKey: .token)
-
-
+            
+            
         }
 
         public func toCBORValue() throws -> Any {
-
+            
             var map = OrderedCBORMap()
 
-
-
+            
+            
             let tokenValue = try token.toCBORValue()
             map = map.adding(key: "token", value: tokenValue)
-
-
+            
+            
 
             return map
-
+            
         }
-
-
+        
+        
         private enum CodingKeys: String, CodingKey {
             case token
         }
-
+        
     }
-
+        
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case rateLimitExceeded = "RateLimitExceeded."
                 case invalidDid = "InvalidDid."
@@ -133,34 +133,34 @@ extension ATProtoClient.App.Bsky.Contact {
     // MARK: - verifyPhone
 
     /// Verifies control over a phone number with a code received via SMS and starts a contact import session. Requires authentication.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-
-    ///
+    
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func verifyPhone(
-
+        
         input: AppBskyContactVerifyPhone.Input
-
+        
     ) async throws -> (responseCode: Int, data: AppBskyContactVerifyPhone.Output?) {
         let endpoint = "app.bsky.contact.verifyPhone"
-
+        
         var headers: [String: String] = [:]
-
+        
         headers["Content-Type"] = "application/json"
-
-
-
+        
+        
+        
         headers["Accept"] = "application/json"
+        
 
-
-
+        
         let requestData: Data? = try JSONEncoder().encode(input)
-
-
+        
+        
         let queryItems: [URLQueryItem]? = nil
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
@@ -175,12 +175,12 @@ extension ATProtoClient.App.Bsky.Contact {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
+        
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
         if (200...299).contains(responseCode) {
-
+            
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -188,13 +188,13 @@ extension ATProtoClient.App.Bsky.Contact {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-
+            
 
             do {
-
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(AppBskyContactVerifyPhone.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -205,9 +205,9 @@ extension ATProtoClient.App.Bsky.Contact {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-
+        
     }
-
+    
 }
-
+                           
 

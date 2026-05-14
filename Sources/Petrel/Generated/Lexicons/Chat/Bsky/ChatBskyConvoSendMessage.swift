@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: chat.bsky.convo.sendMessage
 
 
-public struct ChatBskyConvoSendMessage {
+public struct ChatBskyConvoSendMessage { 
 
     public static let typeIdentifier = "chat.bsky.convo.sendMessage"
 public struct Input: ATProtocolCodable {
@@ -17,7 +17,7 @@ public struct Input: ATProtocolCodable {
             self.convoId = convoId
             self.message = message
         }
-
+        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -46,7 +46,7 @@ public struct Input: ATProtocolCodable {
         }
     }
     public typealias Output = ChatBskyConvoDefs.MessageView
-
+            
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case convoLocked = "ConvoLocked."
                 case invalidConvo = "InvalidConvo."
@@ -69,34 +69,34 @@ extension ATProtoClient.Chat.Bsky.Convo {
     // MARK: - sendMessage
 
     /// Sends a message to a conversation.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-
-    ///
+    
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func sendMessage(
-
+        
         input: ChatBskyConvoSendMessage.Input
-
+        
     ) async throws -> (responseCode: Int, data: ChatBskyConvoSendMessage.Output?) {
         let endpoint = "chat.bsky.convo.sendMessage"
-
+        
         var headers: [String: String] = [:]
-
+        
         headers["Content-Type"] = "application/json"
-
-
-
+        
+        
+        
         headers["Accept"] = "application/json"
+        
 
-
-
+        
         let requestData: Data? = try JSONEncoder().encode(input)
-
-
+        
+        
         let queryItems: [URLQueryItem]? = nil
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
@@ -111,12 +111,12 @@ extension ATProtoClient.Chat.Bsky.Convo {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
+        
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
         if (200...299).contains(responseCode) {
-
+            
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -124,13 +124,13 @@ extension ATProtoClient.Chat.Bsky.Convo {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-
+            
 
             do {
-
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(ChatBskyConvoSendMessage.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -141,9 +141,9 @@ extension ATProtoClient.Chat.Bsky.Convo {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-
+        
     }
-
+    
 }
-
+                           
 

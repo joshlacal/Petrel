@@ -5,102 +5,102 @@ import Foundation
 // lexicon: 1, id: chat.bsky.convo.getLog
 
 
-public struct ChatBskyConvoGetLog {
+public struct ChatBskyConvoGetLog { 
 
-    public static let typeIdentifier = "chat.bsky.convo.getLog"
+    public static let typeIdentifier = "chat.bsky.convo.getLog"    
 public struct Parameters: Parametrizable {
         public let cursor: String?
-
+        
         public init(
             cursor: String? = nil
             ) {
             self.cursor = cursor
-
+            
         }
     }
-
+    
 public struct Output: ATProtocolCodable {
-
-
+        
+        
         public let cursor: String?
-
+        
         public let logs: [OutputLogsUnion]
-
-
-
+        
+        
+        
         // Standard public initializer
         public init(
-
-
+            
+            
             cursor: String? = nil,
-
+            
             logs: [OutputLogsUnion]
-
-
+            
+            
         ) {
-
-
+            
+            
             self.cursor = cursor
-
+            
             self.logs = logs
-
-
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
-
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            
             self.cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
-
-
+            
+            
             self.logs = try container.decode([OutputLogsUnion].self, forKey: .logs)
-
-
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
-
+            
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(cursor, forKey: .cursor)
-
-
+            
+            
             try container.encode(logs, forKey: .logs)
-
-
+            
+            
         }
 
         public func toCBORValue() throws -> Any {
-
+            
             var map = OrderedCBORMap()
 
-
-
+            
+            
             if let value = cursor {
                 // Encode optional property even if it's an empty array for CBOR
                 let cursorValue = try value.toCBORValue()
                 map = map.adding(key: "cursor", value: cursorValue)
             }
-
-
-
+            
+            
+            
             let logsValue = try logs.toCBORValue()
             map = map.adding(key: "logs", value: logsValue)
-
-
+            
+            
 
             return map
-
+            
         }
-
-
+        
+        
         private enum CodingKeys: String, CodingKey {
             case cursor
             case logs
         }
-
+        
     }
 
 
@@ -493,7 +493,7 @@ public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendab
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-
+    
     public static func == (lhs: OutputLogsUnion, rhs: OutputLogsUnion) -> Bool {
         switch (lhs, rhs) {
         case (.chatBskyConvoDefsLogBeginConvo(let lhsValue),
@@ -583,21 +583,21 @@ public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendab
             return false
         }
     }
-
+    
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? OutputLogsUnion else { return false }
         return self == other
     }
-
+    
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-
+        
         switch self {
         case .chatBskyConvoDefsLogBeginConvo(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logBeginConvo")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -614,7 +614,7 @@ public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendab
             return map
         case .chatBskyConvoDefsLogAcceptConvo(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logAcceptConvo")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -631,7 +631,7 @@ public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendab
             return map
         case .chatBskyConvoDefsLogLeaveConvo(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logLeaveConvo")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -648,7 +648,7 @@ public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendab
             return map
         case .chatBskyConvoDefsLogMuteConvo(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logMuteConvo")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -665,7 +665,7 @@ public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendab
             return map
         case .chatBskyConvoDefsLogUnmuteConvo(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logUnmuteConvo")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -682,7 +682,7 @@ public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendab
             return map
         case .chatBskyConvoDefsLogCreateMessage(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logCreateMessage")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -699,7 +699,7 @@ public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendab
             return map
         case .chatBskyConvoDefsLogDeleteMessage(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logDeleteMessage")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -716,7 +716,7 @@ public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendab
             return map
         case .chatBskyConvoDefsLogReadMessage(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logReadMessage")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -733,7 +733,7 @@ public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendab
             return map
         case .chatBskyConvoDefsLogAddReaction(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logAddReaction")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -750,7 +750,7 @@ public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendab
             return map
         case .chatBskyConvoDefsLogRemoveReaction(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logRemoveReaction")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -767,7 +767,7 @@ public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendab
             return map
         case .chatBskyConvoDefsLogReadConvo(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logReadConvo")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -784,7 +784,7 @@ public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendab
             return map
         case .chatBskyConvoDefsLogAddMember(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logAddMember")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -801,7 +801,7 @@ public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendab
             return map
         case .chatBskyConvoDefsLogRemoveMember(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logRemoveMember")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -818,7 +818,7 @@ public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendab
             return map
         case .chatBskyConvoDefsLogMemberJoin(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logMemberJoin")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -835,7 +835,7 @@ public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendab
             return map
         case .chatBskyConvoDefsLogMemberLeave(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logMemberLeave")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -852,7 +852,7 @@ public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendab
             return map
         case .chatBskyConvoDefsLogLockConvo(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logLockConvo")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -869,7 +869,7 @@ public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendab
             return map
         case .chatBskyConvoDefsLogUnlockConvo(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logUnlockConvo")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -886,7 +886,7 @@ public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendab
             return map
         case .chatBskyConvoDefsLogLockConvoPermanently(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logLockConvoPermanently")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -903,7 +903,7 @@ public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendab
             return map
         case .chatBskyConvoDefsLogEditGroup(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logEditGroup")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -920,7 +920,7 @@ public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendab
             return map
         case .chatBskyConvoDefsLogCreateJoinLink(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logCreateJoinLink")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -937,7 +937,7 @@ public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendab
             return map
         case .chatBskyConvoDefsLogEditJoinLink(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logEditJoinLink")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -954,7 +954,7 @@ public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendab
             return map
         case .chatBskyConvoDefsLogEnableJoinLink(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logEnableJoinLink")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -971,7 +971,7 @@ public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendab
             return map
         case .chatBskyConvoDefsLogDisableJoinLink(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logDisableJoinLink")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -988,7 +988,7 @@ public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendab
             return map
         case .chatBskyConvoDefsLogIncomingJoinRequest(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logIncomingJoinRequest")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -1005,7 +1005,7 @@ public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendab
             return map
         case .chatBskyConvoDefsLogApproveJoinRequest(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logApproveJoinRequest")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -1022,7 +1022,7 @@ public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendab
             return map
         case .chatBskyConvoDefsLogRejectJoinRequest(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logRejectJoinRequest")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -1039,7 +1039,7 @@ public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendab
             return map
         case .chatBskyConvoDefsLogOutgoingJoinRequest(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logOutgoingJoinRequest")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -1068,18 +1068,18 @@ public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendab
 extension ATProtoClient.Chat.Bsky.Convo {
     // MARK: - getLog
 
-    ///
-    ///
+    /// 
+    /// 
     /// - Parameter input: The input parameters for the request
-    ///
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func getLog(input: ChatBskyConvoGetLog.Parameters) async throws -> (responseCode: Int, data: ChatBskyConvoGetLog.Output?) {
         let endpoint = "chat.bsky.convo.getLog"
 
-
+        
         let queryItems = input.asQueryItems()
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -1098,7 +1098,7 @@ extension ATProtoClient.Chat.Bsky.Convo {
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
         if (200...299).contains(responseCode) {
-
+            
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -1106,13 +1106,13 @@ extension ATProtoClient.Chat.Bsky.Convo {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-
+            
 
             do {
-
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(ChatBskyConvoGetLog.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -1120,12 +1120,12 @@ extension ATProtoClient.Chat.Bsky.Convo {
                 return (responseCode, nil)
             }
         } else {
-
+            
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
+                           
 

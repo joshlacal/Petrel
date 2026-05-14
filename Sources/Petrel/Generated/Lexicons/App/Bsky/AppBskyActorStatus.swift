@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: app.bsky.actor.status
 
 
-public struct AppBskyActorStatus: ATProtocolCodable, ATProtocolValue {
+public struct AppBskyActorStatus: ATProtocolCodable, ATProtocolValue { 
 
     public static let typeIdentifier = "app.bsky.actor.status"
         public let status: String
@@ -150,7 +150,7 @@ public enum AppBskyActorStatusEmbedUnion: Codable, ATProtocolCodable, ATProtocol
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-
+    
     public static func == (lhs: AppBskyActorStatusEmbedUnion, rhs: AppBskyActorStatusEmbedUnion) -> Bool {
         switch (lhs, rhs) {
         case (.appBskyEmbedExternal(let lhsValue),
@@ -162,21 +162,21 @@ public enum AppBskyActorStatusEmbedUnion: Codable, ATProtocolCodable, ATProtocol
             return false
         }
     }
-
+    
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? AppBskyActorStatusEmbedUnion else { return false }
         return self == other
     }
-
+    
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-
+        
         switch self {
         case .appBskyEmbedExternal(let value):
             map = map.adding(key: "$type", value: "app.bsky.embed.external")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -201,5 +201,5 @@ public enum AppBskyActorStatusEmbedUnion: Codable, ATProtocolCodable, ATProtocol
 }
 
 
-
+                           
 

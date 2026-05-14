@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: com.atproto.server.defs
 
 
-public struct ComAtprotoServerDefs {
+public struct ComAtprotoServerDefs { 
 
     public static let typeIdentifier = "com.atproto.server.defs"
-
+        
 public struct InviteCode: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "com.atproto.server.defs#inviteCode"
             public let code: String
@@ -160,7 +160,7 @@ public struct InviteCode: ATProtocolCodable, ATProtocolValue {
             case uses
         }
     }
-
+        
 public struct InviteCodeUse: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "com.atproto.server.defs#inviteCodeUse"
             public let usedBy: DID
@@ -238,5 +238,5 @@ public struct InviteCodeUse: ATProtocolCodable, ATProtocolValue {
 }
 
 
-
+                           
 

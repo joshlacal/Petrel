@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: app.bsky.graph.follow
 
 
-public struct AppBskyGraphFollow: ATProtocolCodable, ATProtocolValue {
+public struct AppBskyGraphFollow: ATProtocolCodable, ATProtocolValue { 
 
     public static let typeIdentifier = "app.bsky.graph.follow"
         public let subject: DID
@@ -87,5 +87,5 @@ public struct AppBskyGraphFollow: ATProtocolCodable, ATProtocolValue {
 }
 
 
-
+                           
 

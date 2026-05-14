@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: place.stream.chat.defs
 
 
-public struct PlaceStreamChatDefs {
+public struct PlaceStreamChatDefs { 
 
     public static let typeIdentifier = "place.stream.chat.defs"
-
+        
 public struct MessageView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "place.stream.chat.defs#messageView"
             public let uri: ATProtocolURI
@@ -216,7 +216,7 @@ public struct MessageView: ATProtocolCodable, ATProtocolValue {
             case badges
         }
     }
-
+        
 public struct PinnedRecordView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "place.stream.chat.defs#pinnedRecordView"
             public let uri: ATProtocolURI
@@ -415,7 +415,7 @@ public indirect enum MessageViewReplyToUnion: Codable, ATProtocolCodable, ATProt
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-
+    
     public static func == (lhs: MessageViewReplyToUnion, rhs: MessageViewReplyToUnion) -> Bool {
         switch (lhs, rhs) {
         case (.placeStreamChatDefsMessageView(let lhsValue),
@@ -427,21 +427,21 @@ public indirect enum MessageViewReplyToUnion: Codable, ATProtocolCodable, ATProt
             return false
         }
     }
-
+    
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? MessageViewReplyToUnion else { return false }
         return self == other
     }
-
+    
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-
+        
         switch self {
         case .placeStreamChatDefsMessageView(let value):
             map = map.adding(key: "$type", value: "place.stream.chat.defs#messageView")
-
+            
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -466,5 +466,5 @@ public indirect enum MessageViewReplyToUnion: Codable, ATProtocolCodable, ATProt
 }
 
 
-
+                           
 

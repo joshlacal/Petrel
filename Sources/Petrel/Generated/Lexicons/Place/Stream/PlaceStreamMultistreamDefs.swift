@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: place.stream.multistream.defs
 
 
-public struct PlaceStreamMultistreamDefs {
+public struct PlaceStreamMultistreamDefs { 
 
     public static let typeIdentifier = "place.stream.multistream.defs"
-
+        
 public struct TargetView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "place.stream.multistream.defs#targetView"
             public let uri: ATProtocolURI
@@ -118,7 +118,7 @@ public struct TargetView: ATProtocolCodable, ATProtocolValue {
             case latestEvent
         }
     }
-
+        
 public struct Event: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "place.stream.multistream.defs#event"
             public let message: String
@@ -212,5 +212,5 @@ public struct Event: ATProtocolCodable, ATProtocolValue {
 }
 
 
-
+                           
 

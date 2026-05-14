@@ -5,20 +5,20 @@ import Foundation
 // lexicon: 1, id: app.bsky.notification.defs
 
 
-public struct AppBskyNotificationDefs {
+public struct AppBskyNotificationDefs { 
 
     public static let typeIdentifier = "app.bsky.notification.defs"
-
+        
 public struct RecordDeleted: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.notification.defs#recordDeleted"
 
         public init(
-
+            
         ) {
         }
 
         public init(from decoder: Decoder) throws {
-
+            
             let _ = decoder
         }
 
@@ -31,7 +31,7 @@ public struct RecordDeleted: ATProtocolCodable, ATProtocolValue {
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-
+            
             return other is Self
         }
 
@@ -49,7 +49,7 @@ public struct RecordDeleted: ATProtocolCodable, ATProtocolValue {
             case typeIdentifier = "$type"
         }
     }
-
+        
 public struct ChatPreference: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.notification.defs#chatPreference"
             public let include: String
@@ -121,7 +121,7 @@ public struct ChatPreference: ATProtocolCodable, ATProtocolValue {
             case push
         }
     }
-
+        
 public struct FilterablePreference: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.notification.defs#filterablePreference"
             public let include: String
@@ -209,7 +209,7 @@ public struct FilterablePreference: ATProtocolCodable, ATProtocolValue {
             case push
         }
     }
-
+        
 public struct Preference: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.notification.defs#preference"
             public let list: Bool
@@ -281,7 +281,7 @@ public struct Preference: ATProtocolCodable, ATProtocolValue {
             case push
         }
     }
-
+        
 public struct Preferences: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.notification.defs#preferences"
             public let chat: ChatPreference
@@ -529,7 +529,7 @@ public struct Preferences: ATProtocolCodable, ATProtocolValue {
             case verified
         }
     }
-
+        
 public struct ActivitySubscription: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.notification.defs#activitySubscription"
             public let post: Bool
@@ -601,7 +601,7 @@ public struct ActivitySubscription: ATProtocolCodable, ATProtocolValue {
             case reply
         }
     }
-
+        
 public struct SubjectActivitySubscription: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.notification.defs#subjectActivitySubscription"
             public let subject: DID
@@ -679,5 +679,5 @@ public struct SubjectActivitySubscription: ATProtocolCodable, ATProtocolValue {
 }
 
 
-
+                           
 

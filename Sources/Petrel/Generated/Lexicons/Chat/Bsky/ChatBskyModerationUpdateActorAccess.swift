@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: chat.bsky.moderation.updateActorAccess
 
 
-public struct ChatBskyModerationUpdateActorAccess {
+public struct ChatBskyModerationUpdateActorAccess { 
 
     public static let typeIdentifier = "chat.bsky.moderation.updateActorAccess"
 public struct Input: ATProtocolCodable {
@@ -19,7 +19,7 @@ public struct Input: ATProtocolCodable {
             self.allowAccess = allowAccess
             self.ref = ref
         }
-
+        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -62,33 +62,33 @@ public struct Input: ATProtocolCodable {
 extension ATProtoClient.Chat.Bsky.Moderation {
     // MARK: - updateActorAccess
 
-    ///
-    ///
+    /// 
+    /// 
     /// - Parameter input: The input parameters for the request
-
-    ///
+    
+    /// 
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func updateActorAccess(
-
+        
         input: ChatBskyModerationUpdateActorAccess.Input
-
+        
     ) async throws -> Int {
         let endpoint = "chat.bsky.moderation.updateActorAccess"
-
+        
         var headers: [String: String] = [:]
-
+        
         headers["Content-Type"] = "application/json"
+        
+        
+        
 
-
-
-
-
+        
         let requestData: Data? = try JSONEncoder().encode(input)
-
-
+        
+        
         let queryItems: [URLQueryItem]? = nil
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
@@ -103,11 +103,11 @@ extension ATProtoClient.Chat.Bsky.Moderation {
         let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
+        
         return responseCode
-
+        
     }
-
+    
 }
-
+                           
 

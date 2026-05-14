@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: place.stream.live.recommendations
 
 
-public struct PlaceStreamLiveRecommendations: ATProtocolCodable, ATProtocolValue {
+public struct PlaceStreamLiveRecommendations: ATProtocolCodable, ATProtocolValue { 
 
     public static let typeIdentifier = "place.stream.live.recommendations"
         public let streamers: [DID]
@@ -70,5 +70,5 @@ public struct PlaceStreamLiveRecommendations: ATProtocolCodable, ATProtocolValue
 }
 
 
-
+                           
 

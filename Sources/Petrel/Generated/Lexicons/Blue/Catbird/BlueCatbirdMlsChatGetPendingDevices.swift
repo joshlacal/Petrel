@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: blue.catbird.mlsChat.getPendingDevices
 
 
-public struct BlueCatbirdMlsChatGetPendingDevices {
+public struct BlueCatbirdMlsChatGetPendingDevices { 
 
     public static let typeIdentifier = "blue.catbird.mlsChat.getPendingDevices"
-
+        
 public struct PendingDeviceAddition: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.getPendingDevices#pendingDeviceAddition"
             public let convoId: String
@@ -117,81 +117,81 @@ public struct PendingDeviceAddition: ATProtocolCodable, ATProtocolValue {
             case createdAt
             case welcome
         }
-    }
+    }    
 public struct Parameters: Parametrizable {
         public let convoIds: [String]?
         public let limit: Int?
-
+        
         public init(
-            convoIds: [String]? = nil,
+            convoIds: [String]? = nil, 
             limit: Int? = nil
             ) {
             self.convoIds = convoIds
             self.limit = limit
-
+            
         }
     }
-
+    
 public struct Output: ATProtocolCodable {
-
-
+        
+        
         public let pendingAdditions: [PendingDeviceAddition]
-
-
-
+        
+        
+        
         // Standard public initializer
         public init(
-
-
+            
+            
             pendingAdditions: [PendingDeviceAddition]
-
-
+            
+            
         ) {
-
-
+            
+            
             self.pendingAdditions = pendingAdditions
-
-
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
-
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            
             self.pendingAdditions = try container.decode([PendingDeviceAddition].self, forKey: .pendingAdditions)
-
-
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
-
+            
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
             try container.encode(pendingAdditions, forKey: .pendingAdditions)
-
-
+            
+            
         }
 
         public func toCBORValue() throws -> Any {
-
+            
             var map = OrderedCBORMap()
 
-
-
+            
+            
             let pendingAdditionsValue = try pendingAdditions.toCBORValue()
             map = map.adding(key: "pendingAdditions", value: pendingAdditionsValue)
-
-
+            
+            
 
             return map
-
+            
         }
-
-
+        
+        
         private enum CodingKeys: String, CodingKey {
             case pendingAdditions
         }
-
+        
     }
 
 
@@ -205,17 +205,17 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - getPendingDevices
 
     /// Get pending device additions for the authenticated user List pending device additions — conversations that a newly registered device should join via Welcome messages.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-    ///
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func getPendingDevices(input: BlueCatbirdMlsChatGetPendingDevices.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatGetPendingDevices.Output?) {
         let endpoint = "blue.catbird.mlsChat.getPendingDevices"
 
-
+        
         let queryItems = input.asQueryItems()
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -234,7 +234,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
         if (200...299).contains(responseCode) {
-
+            
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -242,13 +242,13 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-
+            
 
             do {
-
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatGetPendingDevices.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -256,12 +256,12 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
                 return (responseCode, nil)
             }
         } else {
-
+            
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
+                           
 

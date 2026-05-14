@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: app.bsky.embed.defs
 
 
-public struct AppBskyEmbedDefs {
+public struct AppBskyEmbedDefs { 
 
     public static let typeIdentifier = "app.bsky.embed.defs"
-
+        
 public struct AspectRatio: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.embed.defs#aspectRatio"
             public let width: Int
@@ -86,5 +86,5 @@ public struct AspectRatio: ATProtocolCodable, ATProtocolValue {
 }
 
 
-
+                           
 

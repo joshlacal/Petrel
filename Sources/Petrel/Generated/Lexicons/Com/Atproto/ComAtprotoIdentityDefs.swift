@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: com.atproto.identity.defs
 
 
-public struct ComAtprotoIdentityDefs {
+public struct ComAtprotoIdentityDefs { 
 
     public static let typeIdentifier = "com.atproto.identity.defs"
-
+        
 public struct IdentityInfo: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "com.atproto.identity.defs#identityInfo"
             public let did: DID
@@ -102,5 +102,5 @@ public struct IdentityInfo: ATProtocolCodable, ATProtocolValue {
 }
 
 
-
+                           
 

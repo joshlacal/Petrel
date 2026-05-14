@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: place.stream.chat.gate
 
 
-public struct PlaceStreamChatGate: ATProtocolCodable, ATProtocolValue {
+public struct PlaceStreamChatGate: ATProtocolCodable, ATProtocolValue { 
 
     public static let typeIdentifier = "place.stream.chat.gate"
         public let hiddenMessage: ATProtocolURI
@@ -59,5 +59,5 @@ public struct PlaceStreamChatGate: ATProtocolCodable, ATProtocolValue {
 }
 
 
-
+                           
 

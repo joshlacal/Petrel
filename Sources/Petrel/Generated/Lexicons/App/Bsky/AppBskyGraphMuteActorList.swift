@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: app.bsky.graph.muteActorList
 
 
-public struct AppBskyGraphMuteActorList {
+public struct AppBskyGraphMuteActorList { 
 
     public static let typeIdentifier = "app.bsky.graph.muteActorList"
 public struct Input: ATProtocolCodable {
@@ -15,7 +15,7 @@ public struct Input: ATProtocolCodable {
         public init(list: ATProtocolURI) {
             self.list = list
         }
-
+        
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -47,32 +47,32 @@ extension ATProtoClient.App.Bsky.Graph {
     // MARK: - muteActorList
 
     /// Creates a mute relationship for the specified list of accounts. Mutes are private in Bluesky. Requires auth.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-
-    ///
+    
+    /// 
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func muteActorList(
-
+        
         input: AppBskyGraphMuteActorList.Input
-
+        
     ) async throws -> Int {
         let endpoint = "app.bsky.graph.muteActorList"
-
+        
         var headers: [String: String] = [:]
-
+        
         headers["Content-Type"] = "application/json"
+        
+        
+        
 
-
-
-
-
+        
         let requestData: Data? = try JSONEncoder().encode(input)
-
-
+        
+        
         let queryItems: [URLQueryItem]? = nil
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "POST",
@@ -87,11 +87,11 @@ extension ATProtoClient.App.Bsky.Graph {
         let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
+        
         return responseCode
-
+        
     }
-
+    
 }
-
+                           
 

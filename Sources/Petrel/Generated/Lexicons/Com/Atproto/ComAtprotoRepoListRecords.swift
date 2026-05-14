@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: com.atproto.repo.listRecords
 
 
-public struct ComAtprotoRepoListRecords {
+public struct ComAtprotoRepoListRecords { 
 
     public static let typeIdentifier = "com.atproto.repo.listRecords"
-
+        
 public struct Record: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "com.atproto.repo.listRecords#record"
             public let uri: ATProtocolURI
@@ -95,19 +95,19 @@ public struct Record: ATProtocolCodable, ATProtocolValue {
             case cid
             case value
         }
-    }
+    }    
 public struct Parameters: Parametrizable {
         public let repo: ATIdentifier
         public let collection: NSID
         public let limit: Int?
         public let cursor: String?
         public let reverse: Bool?
-
+        
         public init(
-            repo: ATIdentifier,
-            collection: NSID,
-            limit: Int? = nil,
-            cursor: String? = nil,
+            repo: ATIdentifier, 
+            collection: NSID, 
+            limit: Int? = nil, 
+            cursor: String? = nil, 
             reverse: Bool? = nil
             ) {
             self.repo = repo
@@ -115,92 +115,92 @@ public struct Parameters: Parametrizable {
             self.limit = limit
             self.cursor = cursor
             self.reverse = reverse
-
+            
         }
     }
-
+    
 public struct Output: ATProtocolCodable {
-
-
+        
+        
         public let cursor: String?
-
+        
         public let records: [Record]
-
-
-
+        
+        
+        
         // Standard public initializer
         public init(
-
-
+            
+            
             cursor: String? = nil,
-
+            
             records: [Record]
-
-
+            
+            
         ) {
-
-
+            
+            
             self.cursor = cursor
-
+            
             self.records = records
-
-
+            
+            
         }
-
+        
         public init(from decoder: Decoder) throws {
-
+            
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            
             self.cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
-
-
+            
+            
             self.records = try container.decode([Record].self, forKey: .records)
-
-
+            
+            
         }
-
+        
         public func encode(to encoder: Encoder) throws {
-
+            
             var container = encoder.container(keyedBy: CodingKeys.self)
-
+            
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(cursor, forKey: .cursor)
-
-
+            
+            
             try container.encode(records, forKey: .records)
-
-
+            
+            
         }
 
         public func toCBORValue() throws -> Any {
-
+            
             var map = OrderedCBORMap()
 
-
-
+            
+            
             if let value = cursor {
                 // Encode optional property even if it's an empty array for CBOR
                 let cursorValue = try value.toCBORValue()
                 map = map.adding(key: "cursor", value: cursorValue)
             }
-
-
-
+            
+            
+            
             let recordsValue = try records.toCBORValue()
             map = map.adding(key: "records", value: recordsValue)
-
-
+            
+            
 
             return map
-
+            
         }
-
-
+        
+        
         private enum CodingKeys: String, CodingKey {
             case cursor
             case records
         }
-
+        
     }
 
 
@@ -214,17 +214,17 @@ extension ATProtoClient.Com.Atproto.Repo {
     // MARK: - listRecords
 
     /// List a range of records in a repository, matching a specific collection. Does not require auth.
-    ///
+    /// 
     /// - Parameter input: The input parameters for the request
-    ///
+    /// 
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func listRecords(input: ComAtprotoRepoListRecords.Parameters) async throws -> (responseCode: Int, data: ComAtprotoRepoListRecords.Output?) {
         let endpoint = "com.atproto.repo.listRecords"
 
-
+        
         let queryItems = input.asQueryItems()
-
+        
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -243,7 +243,7 @@ extension ATProtoClient.Com.Atproto.Repo {
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
         if (200...299).contains(responseCode) {
-
+            
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -251,13 +251,13 @@ extension ATProtoClient.Com.Atproto.Repo {
             if !contentType.lowercased().contains("application/json") {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
-
+            
 
             do {
-
+                
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(ComAtprotoRepoListRecords.Output.self, from: responseData)
-
+                
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -265,12 +265,12 @@ extension ATProtoClient.Com.Atproto.Repo {
                 return (responseCode, nil)
             }
         } else {
-
+            
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
+                           
 

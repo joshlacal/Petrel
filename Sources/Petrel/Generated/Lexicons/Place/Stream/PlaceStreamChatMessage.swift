@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: place.stream.chat.message
 
 
-public struct PlaceStreamChatMessage: ATProtocolCodable, ATProtocolValue {
+public struct PlaceStreamChatMessage: ATProtocolCodable, ATProtocolValue { 
 
     public static let typeIdentifier = "place.stream.chat.message"
         public let text: String
@@ -109,7 +109,7 @@ public struct PlaceStreamChatMessage: ATProtocolCodable, ATProtocolValue {
             case streamer
             case reply
         }
-
+        
 public struct ReplyRef: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "place.stream.chat.message#replyRef"
             public let root: ComAtprotoRepoStrongRef
@@ -187,5 +187,5 @@ public struct ReplyRef: ATProtocolCodable, ATProtocolValue {
 }
 
 
-
+                           
 

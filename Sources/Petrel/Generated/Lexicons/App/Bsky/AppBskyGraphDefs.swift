@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: app.bsky.graph.defs
 
 
-public struct AppBskyGraphDefs {
+public struct AppBskyGraphDefs { 
 
     public static let typeIdentifier = "app.bsky.graph.defs"
-
+        
 public struct ListViewBasic: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.graph.defs#listViewBasic"
             public let uri: ATProtocolURI
@@ -222,7 +222,7 @@ public struct ListViewBasic: ATProtocolCodable, ATProtocolValue {
             case indexedAt
         }
     }
-
+        
 public struct ListView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.graph.defs#listView"
             public let uri: ATProtocolURI
@@ -490,7 +490,7 @@ public struct ListView: ATProtocolCodable, ATProtocolValue {
             case indexedAt
         }
     }
-
+        
 public struct ListItemView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.graph.defs#listItemView"
             public let uri: ATProtocolURI
@@ -562,7 +562,7 @@ public struct ListItemView: ATProtocolCodable, ATProtocolValue {
             case subject
         }
     }
-
+        
 public struct StarterPackView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.graph.defs#starterPackView"
             public let uri: ATProtocolURI
@@ -814,7 +814,7 @@ public struct StarterPackView: ATProtocolCodable, ATProtocolValue {
             case indexedAt
         }
     }
-
+        
 public struct StarterPackViewBasic: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.graph.defs#starterPackViewBasic"
             public let uri: ATProtocolURI
@@ -1022,7 +1022,7 @@ public struct StarterPackViewBasic: ATProtocolCodable, ATProtocolValue {
             case indexedAt
         }
     }
-
+        
 public struct ListViewerState: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.graph.defs#listViewerState"
             public let muted: Bool?
@@ -1106,7 +1106,7 @@ public struct ListViewerState: ATProtocolCodable, ATProtocolValue {
             case blocked
         }
     }
-
+        
 public struct NotFoundActor: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.graph.defs#notFoundActor"
             public let actor: ATIdentifier
@@ -1178,7 +1178,7 @@ public struct NotFoundActor: ATProtocolCodable, ATProtocolValue {
             case notFound
         }
     }
-
+        
 public struct Relationship: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "app.bsky.graph.defs#relationship"
             public let did: DID
@@ -1371,40 +1371,40 @@ public struct Relationship: ATProtocolCodable, ATProtocolValue {
 
 public struct ListPurpose: Codable, ATProtocolCodable, ATProtocolValue {
             public let rawValue: String
-
+            
             // Predefined constants
-            //
+            // 
             public static let appbskygraphdefsmodlist = ListPurpose(rawValue: "app.bsky.graph.defs#modlist")
-            //
+            // 
             public static let appbskygraphdefscuratelist = ListPurpose(rawValue: "app.bsky.graph.defs#curatelist")
-            //
+            // 
             public static let appbskygraphdefsreferencelist = ListPurpose(rawValue: "app.bsky.graph.defs#referencelist")
-
+            
             public init(rawValue: String) {
                 self.rawValue = rawValue
             }
-
+            
             public init(from decoder: Decoder) throws {
                 let container = try decoder.singleValueContainer()
                 rawValue = try container.decode(String.self)
             }
-
+            
             public func encode(to encoder: Encoder) throws {
                 var container = encoder.singleValueContainer()
                 try container.encode(rawValue)
             }
-
+            
             public func isEqual(to other: any ATProtocolValue) -> Bool {
                 guard let otherValue = other as? ListPurpose else { return false }
                 return self.rawValue == otherValue.rawValue
             }
-
+            
             // DAGCBOR encoding with field ordering
             public func toCBORValue() throws -> Any {
                 // For string-based enum types, we return the raw string value directly
                 return rawValue
             }
-
+            
             // Provide allCases-like functionality
             public static var predefinedValues: [ListPurpose] {
                 return [
@@ -1419,5 +1419,5 @@ public struct ListPurpose: Codable, ATProtocolCodable, ATProtocolValue {
 }
 
 
-
+                           
 

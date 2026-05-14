@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: chat.bsky.actor.declaration
 
 
-public struct ChatBskyActorDeclaration: ATProtocolCodable, ATProtocolValue {
+public struct ChatBskyActorDeclaration: ATProtocolCodable, ATProtocolValue { 
 
     public static let typeIdentifier = "chat.bsky.actor.declaration"
         public let allowIncoming: String
@@ -76,5 +76,5 @@ public struct ChatBskyActorDeclaration: ATProtocolCodable, ATProtocolValue {
 }
 
 
-
+                           
 

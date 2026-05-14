@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: chat.bsky.group.defs
 
 
-public struct ChatBskyGroupDefs {
+public struct ChatBskyGroupDefs { 
 
     public static let typeIdentifier = "chat.bsky.group.defs"
-
+        
 public struct JoinLinkView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.group.defs#joinLinkView"
             public let code: String
@@ -128,7 +128,7 @@ public struct JoinLinkView: ATProtocolCodable, ATProtocolValue {
             case createdAt
         }
     }
-
+        
 public struct GroupPublicView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.group.defs#groupPublicView"
             public let name: String
@@ -232,7 +232,7 @@ public struct GroupPublicView: ATProtocolCodable, ATProtocolValue {
             case requireApproval
         }
     }
-
+        
 public struct JoinRequestView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.group.defs#joinRequestView"
             public let convoId: String
@@ -325,38 +325,38 @@ public struct JoinRequestView: ATProtocolCodable, ATProtocolValue {
 
 public struct LinkEnabledStatus: Codable, ATProtocolCodable, ATProtocolValue {
             public let rawValue: String
-
+            
             // Predefined constants
-            //
+            // 
             public static let enabled = LinkEnabledStatus(rawValue: "enabled")
-            //
+            // 
             public static let disabled = LinkEnabledStatus(rawValue: "disabled")
-
+            
             public init(rawValue: String) {
                 self.rawValue = rawValue
             }
-
+            
             public init(from decoder: Decoder) throws {
                 let container = try decoder.singleValueContainer()
                 rawValue = try container.decode(String.self)
             }
-
+            
             public func encode(to encoder: Encoder) throws {
                 var container = encoder.singleValueContainer()
                 try container.encode(rawValue)
             }
-
+            
             public func isEqual(to other: any ATProtocolValue) -> Bool {
                 guard let otherValue = other as? LinkEnabledStatus else { return false }
                 return self.rawValue == otherValue.rawValue
             }
-
+            
             // DAGCBOR encoding with field ordering
             public func toCBORValue() throws -> Any {
                 // For string-based enum types, we return the raw string value directly
                 return rawValue
             }
-
+            
             // Provide allCases-like functionality
             public static var predefinedValues: [LinkEnabledStatus] {
                 return [
@@ -369,38 +369,38 @@ public struct LinkEnabledStatus: Codable, ATProtocolCodable, ATProtocolValue {
 
 public struct JoinRule: Codable, ATProtocolCodable, ATProtocolValue {
             public let rawValue: String
-
+            
             // Predefined constants
-            //
+            // 
             public static let anyone = JoinRule(rawValue: "anyone")
-            //
+            // 
             public static let followedbyowner = JoinRule(rawValue: "followedByOwner")
-
+            
             public init(rawValue: String) {
                 self.rawValue = rawValue
             }
-
+            
             public init(from decoder: Decoder) throws {
                 let container = try decoder.singleValueContainer()
                 rawValue = try container.decode(String.self)
             }
-
+            
             public func encode(to encoder: Encoder) throws {
                 var container = encoder.singleValueContainer()
                 try container.encode(rawValue)
             }
-
+            
             public func isEqual(to other: any ATProtocolValue) -> Bool {
                 guard let otherValue = other as? JoinRule else { return false }
                 return self.rawValue == otherValue.rawValue
             }
-
+            
             // DAGCBOR encoding with field ordering
             public func toCBORValue() throws -> Any {
                 // For string-based enum types, we return the raw string value directly
                 return rawValue
             }
-
+            
             // Provide allCases-like functionality
             public static var predefinedValues: [JoinRule] {
                 return [
@@ -414,5 +414,5 @@ public struct JoinRule: Codable, ATProtocolCodable, ATProtocolValue {
 }
 
 
-
+                           
 

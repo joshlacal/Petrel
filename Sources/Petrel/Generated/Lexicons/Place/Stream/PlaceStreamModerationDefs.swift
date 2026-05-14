@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: place.stream.moderation.defs
 
 
-public struct PlaceStreamModerationDefs {
+public struct PlaceStreamModerationDefs { 
 
     public static let typeIdentifier = "place.stream.moderation.defs"
-
+        
 public struct PermissionView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "place.stream.moderation.defs#permissionView"
             public let uri: ATProtocolURI
@@ -118,5 +118,5 @@ public struct PermissionView: ATProtocolCodable, ATProtocolValue {
 }
 
 
-
+                           
 

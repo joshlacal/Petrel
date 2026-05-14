@@ -71,7 +71,11 @@ object BlueCatbirdMlsChatCommitGroupChangeDefs {
         val pendingAdditionId: String? = null,// Client-generated UUID for idempotent retries        @SerialName("idempotencyKey")
         val idempotencyKey: String? = null,// MLS confirmation tag from the client's post-commit group state.        @SerialName("confirmationTag")
         val confirmationTag: Bytes? = null,// Hex-encoded epoch_authenticator (RFC 9420 §8.7) for the post-commit epoch. Optional. When present on an epoch-advancing action (addMembers, processExternalCommit, rejoin, commit, updateMetadata), the server records it in the epoch_authenticators table and uses it to validate future reportRecoveryFailure votes for quorum auto-reset (see ADR-002).        @SerialName("epochAuthenticator")
-        val epochAuthenticator: String? = null    )
+        val epochAuthenticator: String? = null,// Hex-encoded SHA-256 of the dead KP being replaced (action=reissueAddMember).        @SerialName("replacedKeyPackageHash")
+        val replacedKeyPackageHash: String? = null,// Replacement MLS Welcome message for the recipient (action=reissueAddMember).        @SerialName("replacementWelcome")
+        val replacementWelcome: Bytes? = null,// Replacement MLS Commit broadcast to all other members (action=reissueAddMember). MUST be at the same epoch as the original commit being replaced.        @SerialName("replacementCommit")
+        val replacementCommit: Bytes? = null,// Hex-encoded SHA-256 of the fresh KP used in the replacement (action=reissueAddMember).        @SerialName("replacementKeyPackageHash")
+        val replacementKeyPackageHash: String? = null    )
 
     @Serializable
     data class BlueCatbirdMlsChatCommitGroupChangeOutput(
