@@ -13,13 +13,13 @@ public struct EventConvoFirstMessage: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "chat.bsky.moderation.subscribeModEvents#eventConvoFirstMessage"
             public let convoId: String
             public let createdAt: ATProtocolDate
-            public let messageId: String?
+            public let messageId: String
             public let recipients: [DID]
             public let rev: String
             public let user: DID
 
         public init(
-            convoId: String, createdAt: ATProtocolDate, messageId: String?, recipients: [DID], rev: String, user: DID
+            convoId: String, createdAt: ATProtocolDate, messageId: String, recipients: [DID], rev: String, user: DID
         ) {
             self.convoId = convoId
             self.createdAt = createdAt
@@ -44,9 +44,9 @@ public struct EventConvoFirstMessage: ATProtocolCodable, ATProtocolValue {
                 throw error
             }
             do {
-                self.messageId = try container.decodeIfPresent(String.self, forKey: .messageId)
+                self.messageId = try container.decode(String.self, forKey: .messageId)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'messageId': \(error)")
+                LogManager.logError("Decoding error for required property 'messageId': \(error)")
                 throw error
             }
             do {
@@ -74,7 +74,7 @@ public struct EventConvoFirstMessage: ATProtocolCodable, ATProtocolValue {
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(convoId, forKey: .convoId)
             try container.encode(createdAt, forKey: .createdAt)
-            try container.encodeIfPresent(messageId, forKey: .messageId)
+            try container.encode(messageId, forKey: .messageId)
             try container.encode(recipients, forKey: .recipients)
             try container.encode(rev, forKey: .rev)
             try container.encode(user, forKey: .user)
@@ -83,11 +83,7 @@ public struct EventConvoFirstMessage: ATProtocolCodable, ATProtocolValue {
         public func hash(into hasher: inout Hasher) {
             hasher.combine(convoId)
             hasher.combine(createdAt)
-            if let value = messageId {
-                hasher.combine(value)
-            } else {
-                hasher.combine(nil as Int?)
-            }
+            hasher.combine(messageId)
             hasher.combine(recipients)
             hasher.combine(rev)
             hasher.combine(user)
@@ -127,10 +123,8 @@ public struct EventConvoFirstMessage: ATProtocolCodable, ATProtocolValue {
             map = map.adding(key: "convoId", value: convoIdValue)
             let createdAtValue = try createdAt.toCBORValue()
             map = map.adding(key: "createdAt", value: createdAtValue)
-            if let value = messageId {
-                let messageIdValue = try value.toCBORValue()
-                map = map.adding(key: "messageId", value: messageIdValue)
-            }
+            let messageIdValue = try messageId.toCBORValue()
+            map = map.adding(key: "messageId", value: messageIdValue)
             let recipientsValue = try recipients.toCBORValue()
             map = map.adding(key: "recipients", value: recipientsValue)
             let revValue = try rev.toCBORValue()

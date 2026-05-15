@@ -2471,6 +2471,16 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
 
+            decoders["blue.catbird.mlsChat.defs#welcomeReissueRequest"] = { decoder in
+                do {
+                    let decodedObject = try BlueCatbirdMlsChatDefs.WelcomeReissueRequest(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding BlueCatbirdMlsChatDefs.WelcomeReissueRequest: \(error)")
+                    return .decodeError("Error decoding BlueCatbirdMlsChatDefs.WelcomeReissueRequest: \(error)")
+                }
+            }
+
             decoders["blue.catbird.mlsChat.updateConvo#policyInput"] = { decoder in
                 do {
                     let decodedObject = try BlueCatbirdMlsChatUpdateConvo.PolicyInput(from: decoder)
@@ -2818,6 +2828,16 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 } catch {
                     LogManager.logDebug("Error decoding BlueCatbirdMlsChatSubscribeEvents.ResetRequestedEvent: \(error)")
                     return .decodeError("Error decoding BlueCatbirdMlsChatSubscribeEvents.ResetRequestedEvent: \(error)")
+                }
+            }
+
+            decoders["blue.catbird.mlsChat.subscribeEvents#welcomeReissueRequestedEvent"] = { decoder in
+                do {
+                    let decodedObject = try BlueCatbirdMlsChatSubscribeEvents.WelcomeReissueRequestedEvent(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding BlueCatbirdMlsChatSubscribeEvents.WelcomeReissueRequestedEvent: \(error)")
+                    return .decodeError("Error decoding BlueCatbirdMlsChatSubscribeEvents.WelcomeReissueRequestedEvent: \(error)")
                 }
             }
 

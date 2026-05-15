@@ -30,7 +30,8 @@
                 "invalidateWelcome",
                 "getPendingDeviceAdditions",
                 "claimPendingDeviceAddition",
-                "completePendingDeviceAddition"
+                "completePendingDeviceAddition",
+                "refreshGroupInfo"
               ]
             },
             "memberDids": {
