@@ -98,12 +98,16 @@ public struct Output: ATProtocolCodable {
 public enum OutputMessagesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
     case chatBskyConvoDefsMessageView(ChatBskyConvoDefs.MessageView)
     case chatBskyConvoDefsDeletedMessageView(ChatBskyConvoDefs.DeletedMessageView)
+    case chatBskyConvoDefsSystemMessageView(ChatBskyConvoDefs.SystemMessageView)
     case unexpected(ATProtocolValueContainer)
     public init(_ value: ChatBskyConvoDefs.MessageView) {
         self = .chatBskyConvoDefsMessageView(value)
     }
     public init(_ value: ChatBskyConvoDefs.DeletedMessageView) {
         self = .chatBskyConvoDefsDeletedMessageView(value)
+    }
+    public init(_ value: ChatBskyConvoDefs.SystemMessageView) {
+        self = .chatBskyConvoDefsSystemMessageView(value)
     }
 
     public init(from decoder: Decoder) throws {
@@ -117,6 +121,9 @@ public enum OutputMessagesUnion: Codable, ATProtocolCodable, ATProtocolValue, Se
         case "chat.bsky.convo.defs#deletedMessageView":
             let value = try ChatBskyConvoDefs.DeletedMessageView(from: decoder)
             self = .chatBskyConvoDefsDeletedMessageView(value)
+        case "chat.bsky.convo.defs#systemMessageView":
+            let value = try ChatBskyConvoDefs.SystemMessageView(from: decoder)
+            self = .chatBskyConvoDefsSystemMessageView(value)
         default:
             let unknownValue = try ATProtocolValueContainer(from: decoder)
             self = .unexpected(unknownValue)
@@ -133,6 +140,9 @@ public enum OutputMessagesUnion: Codable, ATProtocolCodable, ATProtocolValue, Se
         case .chatBskyConvoDefsDeletedMessageView(let value):
             try container.encode("chat.bsky.convo.defs#deletedMessageView", forKey: .type)
             try value.encode(to: encoder)
+        case .chatBskyConvoDefsSystemMessageView(let value):
+            try container.encode("chat.bsky.convo.defs#systemMessageView", forKey: .type)
+            try value.encode(to: encoder)
         case .unexpected(let container):
             try container.encode(to: encoder)
         }
@@ -145,6 +155,9 @@ public enum OutputMessagesUnion: Codable, ATProtocolCodable, ATProtocolValue, Se
             hasher.combine(value)
         case .chatBskyConvoDefsDeletedMessageView(let value):
             hasher.combine("chat.bsky.convo.defs#deletedMessageView")
+            hasher.combine(value)
+        case .chatBskyConvoDefsSystemMessageView(let value):
+            hasher.combine("chat.bsky.convo.defs#systemMessageView")
             hasher.combine(value)
         case .unexpected(let container):
             hasher.combine("unexpected")
@@ -163,6 +176,9 @@ public enum OutputMessagesUnion: Codable, ATProtocolCodable, ATProtocolValue, Se
             return lhsValue == rhsValue
         case (.chatBskyConvoDefsDeletedMessageView(let lhsValue),
               .chatBskyConvoDefsDeletedMessageView(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.chatBskyConvoDefsSystemMessageView(let lhsValue),
+              .chatBskyConvoDefsSystemMessageView(let rhsValue)):
             return lhsValue == rhsValue
         case (.unexpected(let lhsValue), .unexpected(let rhsValue)):
             return lhsValue.isEqual(to: rhsValue)
@@ -201,6 +217,23 @@ public enum OutputMessagesUnion: Codable, ATProtocolCodable, ATProtocolValue, Se
             return map
         case .chatBskyConvoDefsDeletedMessageView(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#deletedMessageView")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .chatBskyConvoDefsSystemMessageView(let value):
+            map = map.adding(key: "$type", value: "chat.bsky.convo.defs#systemMessageView")
             
             let valueDict = try value.toCBORValue()
 

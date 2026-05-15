@@ -1067,6 +1067,18 @@ public final class Chat: @unchecked Sendable {
 
         }
 
+        public lazy var group: Group = {
+            return Group(networkService: self.networkService)
+        }()
+
+        public final class Group: @unchecked Sendable {
+            internal let networkService: NetworkService
+            internal init(networkService: NetworkService) {
+                self.networkService = networkService
+            }
+
+        }
+
         public lazy var actor: Actor = {
             return Actor(networkService: self.networkService)
         }()

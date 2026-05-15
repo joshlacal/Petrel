@@ -118,7 +118,20 @@ public struct Output: ATProtocolCodable {
         }
         
     }
+        
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                case invalidConvo = "InvalidConvo."
+                case ownerCannotLeave = "OwnerCannotLeave.The owner of a group conversation cannot leave before locking the group."
+            public var description: String {
+                return self.rawValue
+            }
 
+            public var errorName: String {
+                // Extract just the error name from the raw value
+                let parts = self.rawValue.split(separator: ".")
+                return String(parts.first ?? "")
+            }
+        }
 
 
 
@@ -127,7 +140,7 @@ public struct Output: ATProtocolCodable {
 extension ATProtoClient.Chat.Bsky.Convo {
     // MARK: - leaveConvo
 
-    /// 
+    /// Leaves a conversation (direct or group). For group, this effectively removes membership. For direct, membership is never removed, only changed to remove from enumerations by the user who left.
     /// 
     /// - Parameter input: The input parameters for the request
     

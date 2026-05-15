@@ -48,6 +48,57 @@ sealed interface ChatBskyConvoGetLogOutputLogsUnion {
     data class LogRemoveReaction(val value: com.atproto.generated.ChatBskyConvoDefsLogRemoveReaction) : ChatBskyConvoGetLogOutputLogsUnion
 
     @Serializable
+    data class LogReadConvo(val value: com.atproto.generated.ChatBskyConvoDefsLogReadConvo) : ChatBskyConvoGetLogOutputLogsUnion
+
+    @Serializable
+    data class LogAddMember(val value: com.atproto.generated.ChatBskyConvoDefsLogAddMember) : ChatBskyConvoGetLogOutputLogsUnion
+
+    @Serializable
+    data class LogRemoveMember(val value: com.atproto.generated.ChatBskyConvoDefsLogRemoveMember) : ChatBskyConvoGetLogOutputLogsUnion
+
+    @Serializable
+    data class LogMemberJoin(val value: com.atproto.generated.ChatBskyConvoDefsLogMemberJoin) : ChatBskyConvoGetLogOutputLogsUnion
+
+    @Serializable
+    data class LogMemberLeave(val value: com.atproto.generated.ChatBskyConvoDefsLogMemberLeave) : ChatBskyConvoGetLogOutputLogsUnion
+
+    @Serializable
+    data class LogLockConvo(val value: com.atproto.generated.ChatBskyConvoDefsLogLockConvo) : ChatBskyConvoGetLogOutputLogsUnion
+
+    @Serializable
+    data class LogUnlockConvo(val value: com.atproto.generated.ChatBskyConvoDefsLogUnlockConvo) : ChatBskyConvoGetLogOutputLogsUnion
+
+    @Serializable
+    data class LogLockConvoPermanently(val value: com.atproto.generated.ChatBskyConvoDefsLogLockConvoPermanently) : ChatBskyConvoGetLogOutputLogsUnion
+
+    @Serializable
+    data class LogEditGroup(val value: com.atproto.generated.ChatBskyConvoDefsLogEditGroup) : ChatBskyConvoGetLogOutputLogsUnion
+
+    @Serializable
+    data class LogCreateJoinLink(val value: com.atproto.generated.ChatBskyConvoDefsLogCreateJoinLink) : ChatBskyConvoGetLogOutputLogsUnion
+
+    @Serializable
+    data class LogEditJoinLink(val value: com.atproto.generated.ChatBskyConvoDefsLogEditJoinLink) : ChatBskyConvoGetLogOutputLogsUnion
+
+    @Serializable
+    data class LogEnableJoinLink(val value: com.atproto.generated.ChatBskyConvoDefsLogEnableJoinLink) : ChatBskyConvoGetLogOutputLogsUnion
+
+    @Serializable
+    data class LogDisableJoinLink(val value: com.atproto.generated.ChatBskyConvoDefsLogDisableJoinLink) : ChatBskyConvoGetLogOutputLogsUnion
+
+    @Serializable
+    data class LogIncomingJoinRequest(val value: com.atproto.generated.ChatBskyConvoDefsLogIncomingJoinRequest) : ChatBskyConvoGetLogOutputLogsUnion
+
+    @Serializable
+    data class LogApproveJoinRequest(val value: com.atproto.generated.ChatBskyConvoDefsLogApproveJoinRequest) : ChatBskyConvoGetLogOutputLogsUnion
+
+    @Serializable
+    data class LogRejectJoinRequest(val value: com.atproto.generated.ChatBskyConvoDefsLogRejectJoinRequest) : ChatBskyConvoGetLogOutputLogsUnion
+
+    @Serializable
+    data class LogOutgoingJoinRequest(val value: com.atproto.generated.ChatBskyConvoDefsLogOutgoingJoinRequest) : ChatBskyConvoGetLogOutputLogsUnion
+
+    @Serializable
     data class Unexpected(val value: JsonElement) : ChatBskyConvoGetLogOutputLogsUnion
 }
 
@@ -118,6 +169,108 @@ object ChatBskyConvoGetLogOutputLogsUnionSerializer : kotlinx.serialization.KSer
                     it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logRemoveReaction")
                 })
             }
+            is ChatBskyConvoGetLogOutputLogsUnion.LogReadConvo -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsLogReadConvo.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logReadConvo")
+                })
+            }
+            is ChatBskyConvoGetLogOutputLogsUnion.LogAddMember -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsLogAddMember.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logAddMember")
+                })
+            }
+            is ChatBskyConvoGetLogOutputLogsUnion.LogRemoveMember -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsLogRemoveMember.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logRemoveMember")
+                })
+            }
+            is ChatBskyConvoGetLogOutputLogsUnion.LogMemberJoin -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsLogMemberJoin.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logMemberJoin")
+                })
+            }
+            is ChatBskyConvoGetLogOutputLogsUnion.LogMemberLeave -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsLogMemberLeave.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logMemberLeave")
+                })
+            }
+            is ChatBskyConvoGetLogOutputLogsUnion.LogLockConvo -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsLogLockConvo.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logLockConvo")
+                })
+            }
+            is ChatBskyConvoGetLogOutputLogsUnion.LogUnlockConvo -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsLogUnlockConvo.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logUnlockConvo")
+                })
+            }
+            is ChatBskyConvoGetLogOutputLogsUnion.LogLockConvoPermanently -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsLogLockConvoPermanently.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logLockConvoPermanently")
+                })
+            }
+            is ChatBskyConvoGetLogOutputLogsUnion.LogEditGroup -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsLogEditGroup.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logEditGroup")
+                })
+            }
+            is ChatBskyConvoGetLogOutputLogsUnion.LogCreateJoinLink -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsLogCreateJoinLink.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logCreateJoinLink")
+                })
+            }
+            is ChatBskyConvoGetLogOutputLogsUnion.LogEditJoinLink -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsLogEditJoinLink.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logEditJoinLink")
+                })
+            }
+            is ChatBskyConvoGetLogOutputLogsUnion.LogEnableJoinLink -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsLogEnableJoinLink.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logEnableJoinLink")
+                })
+            }
+            is ChatBskyConvoGetLogOutputLogsUnion.LogDisableJoinLink -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsLogDisableJoinLink.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logDisableJoinLink")
+                })
+            }
+            is ChatBskyConvoGetLogOutputLogsUnion.LogIncomingJoinRequest -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsLogIncomingJoinRequest.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logIncomingJoinRequest")
+                })
+            }
+            is ChatBskyConvoGetLogOutputLogsUnion.LogApproveJoinRequest -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsLogApproveJoinRequest.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logApproveJoinRequest")
+                })
+            }
+            is ChatBskyConvoGetLogOutputLogsUnion.LogRejectJoinRequest -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsLogRejectJoinRequest.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logRejectJoinRequest")
+                })
+            }
+            is ChatBskyConvoGetLogOutputLogsUnion.LogOutgoingJoinRequest -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsLogOutgoingJoinRequest.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logOutgoingJoinRequest")
+                })
+            }
             is ChatBskyConvoGetLogOutputLogsUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
             // subscription codegen) are runtime-only sentinels; JSON round-trip
@@ -166,6 +319,57 @@ object ChatBskyConvoGetLogOutputLogsUnionSerializer : kotlinx.serialization.KSer
             )
             "chat.bsky.convo.defs#logRemoveReaction" -> ChatBskyConvoGetLogOutputLogsUnion.LogRemoveReaction(
                 jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsLogRemoveReaction.serializer(), element)
+            )
+            "chat.bsky.convo.defs#logReadConvo" -> ChatBskyConvoGetLogOutputLogsUnion.LogReadConvo(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsLogReadConvo.serializer(), element)
+            )
+            "chat.bsky.convo.defs#logAddMember" -> ChatBskyConvoGetLogOutputLogsUnion.LogAddMember(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsLogAddMember.serializer(), element)
+            )
+            "chat.bsky.convo.defs#logRemoveMember" -> ChatBskyConvoGetLogOutputLogsUnion.LogRemoveMember(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsLogRemoveMember.serializer(), element)
+            )
+            "chat.bsky.convo.defs#logMemberJoin" -> ChatBskyConvoGetLogOutputLogsUnion.LogMemberJoin(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsLogMemberJoin.serializer(), element)
+            )
+            "chat.bsky.convo.defs#logMemberLeave" -> ChatBskyConvoGetLogOutputLogsUnion.LogMemberLeave(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsLogMemberLeave.serializer(), element)
+            )
+            "chat.bsky.convo.defs#logLockConvo" -> ChatBskyConvoGetLogOutputLogsUnion.LogLockConvo(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsLogLockConvo.serializer(), element)
+            )
+            "chat.bsky.convo.defs#logUnlockConvo" -> ChatBskyConvoGetLogOutputLogsUnion.LogUnlockConvo(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsLogUnlockConvo.serializer(), element)
+            )
+            "chat.bsky.convo.defs#logLockConvoPermanently" -> ChatBskyConvoGetLogOutputLogsUnion.LogLockConvoPermanently(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsLogLockConvoPermanently.serializer(), element)
+            )
+            "chat.bsky.convo.defs#logEditGroup" -> ChatBskyConvoGetLogOutputLogsUnion.LogEditGroup(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsLogEditGroup.serializer(), element)
+            )
+            "chat.bsky.convo.defs#logCreateJoinLink" -> ChatBskyConvoGetLogOutputLogsUnion.LogCreateJoinLink(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsLogCreateJoinLink.serializer(), element)
+            )
+            "chat.bsky.convo.defs#logEditJoinLink" -> ChatBskyConvoGetLogOutputLogsUnion.LogEditJoinLink(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsLogEditJoinLink.serializer(), element)
+            )
+            "chat.bsky.convo.defs#logEnableJoinLink" -> ChatBskyConvoGetLogOutputLogsUnion.LogEnableJoinLink(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsLogEnableJoinLink.serializer(), element)
+            )
+            "chat.bsky.convo.defs#logDisableJoinLink" -> ChatBskyConvoGetLogOutputLogsUnion.LogDisableJoinLink(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsLogDisableJoinLink.serializer(), element)
+            )
+            "chat.bsky.convo.defs#logIncomingJoinRequest" -> ChatBskyConvoGetLogOutputLogsUnion.LogIncomingJoinRequest(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsLogIncomingJoinRequest.serializer(), element)
+            )
+            "chat.bsky.convo.defs#logApproveJoinRequest" -> ChatBskyConvoGetLogOutputLogsUnion.LogApproveJoinRequest(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsLogApproveJoinRequest.serializer(), element)
+            )
+            "chat.bsky.convo.defs#logRejectJoinRequest" -> ChatBskyConvoGetLogOutputLogsUnion.LogRejectJoinRequest(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsLogRejectJoinRequest.serializer(), element)
+            )
+            "chat.bsky.convo.defs#logOutgoingJoinRequest" -> ChatBskyConvoGetLogOutputLogsUnion.LogOutgoingJoinRequest(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsLogOutgoingJoinRequest.serializer(), element)
             )
             else -> ChatBskyConvoGetLogOutputLogsUnion.Unexpected(element)
         }

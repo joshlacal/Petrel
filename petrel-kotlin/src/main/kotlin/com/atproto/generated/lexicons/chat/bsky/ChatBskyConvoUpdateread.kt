@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: chat.bsky.convo.updateRead
-
+// Updates the read state of a conversation from, optionally specifying the last read message.
 package com.atproto.generated
 
 import kotlinx.serialization.*
@@ -26,8 +26,12 @@ object ChatBskyConvoUpdateReadDefs {
         @SerialName("convo")
         val convo: ChatBskyConvoDefsConvoView    )
 
+sealed class ChatBskyConvoUpdateReadError(val name: String, val description: String?) {
+        object InvalidConvo: ChatBskyConvoUpdateReadError("InvalidConvo", "")
+    }
+
 /**
- * 
+ * Updates the read state of a conversation from, optionally specifying the last read message.
  *
  * Endpoint: chat.bsky.convo.updateRead
  */

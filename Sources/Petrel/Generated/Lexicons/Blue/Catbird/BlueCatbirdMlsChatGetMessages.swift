@@ -103,6 +103,7 @@ public struct Parameters: Parametrizable {
         public let type: String?
         public let fromEpoch: Int?
         public let toEpoch: Int?
+        public let joinEpoch: Int?
         
         public init(
             convoId: String, 
@@ -110,7 +111,8 @@ public struct Parameters: Parametrizable {
             sinceSeq: Int? = nil, 
             type: String? = nil, 
             fromEpoch: Int? = nil, 
-            toEpoch: Int? = nil
+            toEpoch: Int? = nil, 
+            joinEpoch: Int? = nil
             ) {
             self.convoId = convoId
             self.limit = limit
@@ -118,6 +120,7 @@ public struct Parameters: Parametrizable {
             self.type = type
             self.fromEpoch = fromEpoch
             self.toEpoch = toEpoch
+            self.joinEpoch = joinEpoch
             
         }
     }
@@ -131,6 +134,8 @@ public struct Output: ATProtocolCodable {
         
         public let gapInfo: GapInfo?
         
+        public let suppressedBeforeJoin: Int?
+        
         
         
         // Standard public initializer
@@ -141,7 +146,9 @@ public struct Output: ATProtocolCodable {
             
             lastSeq: Int? = nil,
             
-            gapInfo: GapInfo? = nil
+            gapInfo: GapInfo? = nil,
+            
+            suppressedBeforeJoin: Int? = nil
             
             
         ) {
@@ -152,6 +159,8 @@ public struct Output: ATProtocolCodable {
             self.lastSeq = lastSeq
             
             self.gapInfo = gapInfo
+            
+            self.suppressedBeforeJoin = suppressedBeforeJoin
             
             
         }
@@ -169,6 +178,9 @@ public struct Output: ATProtocolCodable {
             self.gapInfo = try container.decodeIfPresent(GapInfo.self, forKey: .gapInfo)
             
             
+            self.suppressedBeforeJoin = try container.decodeIfPresent(Int.self, forKey: .suppressedBeforeJoin)
+            
+            
         }
         
         public func encode(to encoder: Encoder) throws {
@@ -184,6 +196,10 @@ public struct Output: ATProtocolCodable {
             
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(gapInfo, forKey: .gapInfo)
+            
+            
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(suppressedBeforeJoin, forKey: .suppressedBeforeJoin)
             
             
         }
@@ -214,6 +230,14 @@ public struct Output: ATProtocolCodable {
             }
             
             
+            
+            if let value = suppressedBeforeJoin {
+                // Encode optional property even if it's an empty array for CBOR
+                let suppressedBeforeJoinValue = try value.toCBORValue()
+                map = map.adding(key: "suppressedBeforeJoin", value: suppressedBeforeJoinValue)
+            }
+            
+            
 
             return map
             
@@ -224,6 +248,7 @@ public struct Output: ATProtocolCodable {
             case messages
             case lastSeq
             case gapInfo
+            case suppressedBeforeJoin
         }
         
     }

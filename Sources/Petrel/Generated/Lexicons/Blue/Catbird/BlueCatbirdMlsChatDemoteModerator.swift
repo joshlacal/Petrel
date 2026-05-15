@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: blue.catbird.mlsChat.demoteModerator
 
 
-public struct BlueCatbirdMlsChatDemoteModerator { 
+public struct BlueCatbirdMlsChatDemoteModerator {
 
     public static let typeIdentifier = "blue.catbird.mlsChat.demoteModerator"
 public struct Input: ATProtocolCodable {
@@ -17,7 +17,7 @@ public struct Input: ATProtocolCodable {
             self.convoId = convoId
             self.targetDid = targetDid
         }
-        
+
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -45,69 +45,69 @@ public struct Input: ATProtocolCodable {
             case targetDid
         }
     }
-    
+
 public struct Output: ATProtocolCodable {
-        
-        
+
+
         public let ok: Bool
-        
-        
-        
+
+
+
         // Standard public initializer
         public init(
-            
-            
+
+
             ok: Bool
-            
-            
+
+
         ) {
-            
-            
+
+
             self.ok = ok
-            
-            
+
+
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
+
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
+
             self.ok = try container.decode(Bool.self, forKey: .ok)
-            
-            
+
+
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
+
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(ok, forKey: .ok)
-            
-            
+
+
         }
 
         public func toCBORValue() throws -> Any {
-            
+
             var map = OrderedCBORMap()
 
-            
-            
+
+
             let okValue = try ok.toCBORValue()
             map = map.adding(key: "ok", value: okValue)
-            
-            
+
+
 
             return map
-            
+
         }
-        
-        
+
+
         private enum CodingKeys: String, CodingKey {
             case ok
         }
-        
+
     }
-        
+
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case notAdmin = "NotAdmin.Caller is not an admin (unless self-demotion)"
                 case notMember = "NotMember.Target is not a member"
@@ -132,26 +132,26 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - demoteModerator
 
     /// Demote a moderator to regular member (admin-only, or self-demotion) Demote a moderator to regular member. Caller must be an admin (unless demoting self). Server enforces authorization, updates DB, and logs action.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func demoteModerator(
-        
+
         input: BlueCatbirdMlsChatDemoteModerator.Input
-        
+
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatDemoteModerator.Output?) {
         let endpoint = "blue.catbird.mlsChat.demoteModerator"
-        
+
         var headers: [String: String] = [:]
-        
+
         headers["Content-Type"] = "application/json"
-        
-        
-        
+
+
+
         headers["Accept"] = "application/json"
-        
+
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -168,7 +168,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        
+
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
@@ -180,10 +180,10 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         // Only decode response data if request was successful
         if (200...299).contains(responseCode) {
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatDemoteModerator.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -194,9 +194,9 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-        
+
     }
-    
+
 }
-                           
+
 

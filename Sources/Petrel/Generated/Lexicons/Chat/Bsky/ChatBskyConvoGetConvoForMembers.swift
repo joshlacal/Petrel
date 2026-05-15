@@ -80,7 +80,23 @@ public struct Output: ATProtocolCodable {
         }
         
     }
+        
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                case accountSuspended = "AccountSuspended."
+                case blockedActor = "BlockedActor."
+                case messagesDisabled = "MessagesDisabled."
+                case notFollowedBySender = "NotFollowedBySender."
+                case recipientNotFound = "RecipientNotFound."
+            public var description: String {
+                return self.rawValue
+            }
 
+            public var errorName: String {
+                // Extract just the error name from the raw value
+                let parts = self.rawValue.split(separator: ".")
+                return String(parts.first ?? "")
+            }
+        }
 
 
 
@@ -91,7 +107,7 @@ public struct Output: ATProtocolCodable {
 extension ATProtoClient.Chat.Bsky.Convo {
     // MARK: - getConvoForMembers
 
-    /// 
+    /// Get or create a 1-1 conversation for the given members. Always returns the same direct (non-group) conversation. To create a group conversation, use createGroup.
     /// 
     /// - Parameter input: The input parameters for the request
     /// 

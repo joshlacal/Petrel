@@ -46,7 +46,20 @@ public struct Input: ATProtocolCodable {
         }
     }
     public typealias Output = ChatBskyConvoDefs.DeletedMessageView
-    
+            
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                case invalidConvo = "InvalidConvo."
+                case messageDeleteNotAllowed = "MessageDeleteNotAllowed.Indicates that this message cannot be deleted, e.g. because it is a system message."
+            public var description: String {
+                return self.rawValue
+            }
+
+            public var errorName: String {
+                // Extract just the error name from the raw value
+                let parts = self.rawValue.split(separator: ".")
+                return String(parts.first ?? "")
+            }
+        }
 
 
 
@@ -55,7 +68,7 @@ public struct Input: ATProtocolCodable {
 extension ATProtoClient.Chat.Bsky.Convo {
     // MARK: - deleteMessageForSelf
 
-    /// 
+    /// Marks a message as deleted for the viewer, so they won't see that message in future enumerations.
     /// 
     /// - Parameter input: The input parameters for the request
     

@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: blue.catbird.mlsChat.getKeyPackageStats
 
 
-public struct BlueCatbirdMlsChatGetKeyPackageStats { 
+public struct BlueCatbirdMlsChatGetKeyPackageStats {
 
     public static let typeIdentifier = "blue.catbird.mlsChat.getKeyPackageStats"
-        
+
 public struct CipherSuiteStats: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.getKeyPackageStats#cipherSuiteStats"
             public let cipherSuite: String
@@ -101,259 +101,259 @@ public struct CipherSuiteStats: ATProtocolCodable, ATProtocolValue {
             case available
             case consumed
         }
-    }    
+    }
 public struct Parameters: Parametrizable {
         public let did: DID?
         public let cipherSuite: String?
-        
+
         public init(
-            did: DID? = nil, 
+            did: DID? = nil,
             cipherSuite: String? = nil
             ) {
             self.did = did
             self.cipherSuite = cipherSuite
-            
+
         }
     }
-    
+
 public struct Output: ATProtocolCodable {
-        
-        
+
+
         public let available: Int
-        
+
         public let threshold: Int
-        
+
         public let needsReplenish: Bool
-        
+
         public let total: Int
-        
+
         public let consumed: Int
-        
+
         public let consumedLast24h: Int
-        
+
         public let consumedLast7d: Int
-        
+
         public let averageDailyConsumption: Int
-        
+
         public let predictedDepletionDays: Int?
-        
+
         public let oldestExpiresIn: String?
-        
+
         public let byCipherSuite: [CipherSuiteStats]?
-        
-        
-        
+
+
+
         // Standard public initializer
         public init(
-            
-            
+
+
             available: Int,
-            
+
             threshold: Int,
-            
+
             needsReplenish: Bool,
-            
+
             total: Int,
-            
+
             consumed: Int,
-            
+
             consumedLast24h: Int,
-            
+
             consumedLast7d: Int,
-            
+
             averageDailyConsumption: Int,
-            
+
             predictedDepletionDays: Int? = nil,
-            
+
             oldestExpiresIn: String? = nil,
-            
+
             byCipherSuite: [CipherSuiteStats]? = nil
-            
-            
+
+
         ) {
-            
-            
+
+
             self.available = available
-            
+
             self.threshold = threshold
-            
+
             self.needsReplenish = needsReplenish
-            
+
             self.total = total
-            
+
             self.consumed = consumed
-            
+
             self.consumedLast24h = consumedLast24h
-            
+
             self.consumedLast7d = consumedLast7d
-            
+
             self.averageDailyConsumption = averageDailyConsumption
-            
+
             self.predictedDepletionDays = predictedDepletionDays
-            
+
             self.oldestExpiresIn = oldestExpiresIn
-            
+
             self.byCipherSuite = byCipherSuite
-            
-            
+
+
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
+
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
+
             self.available = try container.decode(Int.self, forKey: .available)
-            
-            
+
+
             self.threshold = try container.decode(Int.self, forKey: .threshold)
-            
-            
+
+
             self.needsReplenish = try container.decode(Bool.self, forKey: .needsReplenish)
-            
-            
+
+
             self.total = try container.decode(Int.self, forKey: .total)
-            
-            
+
+
             self.consumed = try container.decode(Int.self, forKey: .consumed)
-            
-            
+
+
             self.consumedLast24h = try container.decode(Int.self, forKey: .consumedLast24h)
-            
-            
+
+
             self.consumedLast7d = try container.decode(Int.self, forKey: .consumedLast7d)
-            
-            
+
+
             self.averageDailyConsumption = try container.decode(Int.self, forKey: .averageDailyConsumption)
-            
-            
+
+
             self.predictedDepletionDays = try container.decodeIfPresent(Int.self, forKey: .predictedDepletionDays)
-            
-            
+
+
             self.oldestExpiresIn = try container.decodeIfPresent(String.self, forKey: .oldestExpiresIn)
-            
-            
+
+
             self.byCipherSuite = try container.decodeIfPresent([CipherSuiteStats].self, forKey: .byCipherSuite)
-            
-            
+
+
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
+
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(available, forKey: .available)
-            
-            
+
+
             try container.encode(threshold, forKey: .threshold)
-            
-            
+
+
             try container.encode(needsReplenish, forKey: .needsReplenish)
-            
-            
+
+
             try container.encode(total, forKey: .total)
-            
-            
+
+
             try container.encode(consumed, forKey: .consumed)
-            
-            
+
+
             try container.encode(consumedLast24h, forKey: .consumedLast24h)
-            
-            
+
+
             try container.encode(consumedLast7d, forKey: .consumedLast7d)
-            
-            
+
+
             try container.encode(averageDailyConsumption, forKey: .averageDailyConsumption)
-            
-            
+
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(predictedDepletionDays, forKey: .predictedDepletionDays)
-            
-            
+
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(oldestExpiresIn, forKey: .oldestExpiresIn)
-            
-            
+
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(byCipherSuite, forKey: .byCipherSuite)
-            
-            
+
+
         }
 
         public func toCBORValue() throws -> Any {
-            
+
             var map = OrderedCBORMap()
 
-            
-            
+
+
             let availableValue = try available.toCBORValue()
             map = map.adding(key: "available", value: availableValue)
-            
-            
-            
+
+
+
             let thresholdValue = try threshold.toCBORValue()
             map = map.adding(key: "threshold", value: thresholdValue)
-            
-            
-            
+
+
+
             let needsReplenishValue = try needsReplenish.toCBORValue()
             map = map.adding(key: "needsReplenish", value: needsReplenishValue)
-            
-            
-            
+
+
+
             let totalValue = try total.toCBORValue()
             map = map.adding(key: "total", value: totalValue)
-            
-            
-            
+
+
+
             let consumedValue = try consumed.toCBORValue()
             map = map.adding(key: "consumed", value: consumedValue)
-            
-            
-            
+
+
+
             let consumedLast24hValue = try consumedLast24h.toCBORValue()
             map = map.adding(key: "consumedLast24h", value: consumedLast24hValue)
-            
-            
-            
+
+
+
             let consumedLast7dValue = try consumedLast7d.toCBORValue()
             map = map.adding(key: "consumedLast7d", value: consumedLast7dValue)
-            
-            
-            
+
+
+
             let averageDailyConsumptionValue = try averageDailyConsumption.toCBORValue()
             map = map.adding(key: "averageDailyConsumption", value: averageDailyConsumptionValue)
-            
-            
-            
+
+
+
             if let value = predictedDepletionDays {
                 // Encode optional property even if it's an empty array for CBOR
                 let predictedDepletionDaysValue = try value.toCBORValue()
                 map = map.adding(key: "predictedDepletionDays", value: predictedDepletionDaysValue)
             }
-            
-            
-            
+
+
+
             if let value = oldestExpiresIn {
                 // Encode optional property even if it's an empty array for CBOR
                 let oldestExpiresInValue = try value.toCBORValue()
                 map = map.adding(key: "oldestExpiresIn", value: oldestExpiresInValue)
             }
-            
-            
-            
+
+
+
             if let value = byCipherSuite {
                 // Encode optional property even if it's an empty array for CBOR
                 let byCipherSuiteValue = try value.toCBORValue()
                 map = map.adding(key: "byCipherSuite", value: byCipherSuiteValue)
             }
-            
-            
+
+
 
             return map
-            
+
         }
-        
-        
+
+
         private enum CodingKeys: String, CodingKey {
             case available
             case threshold
@@ -367,9 +367,9 @@ public struct Output: ATProtocolCodable {
             case oldestExpiresIn
             case byCipherSuite
         }
-        
+
     }
-        
+
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case invalidDid = "InvalidDid.The provided DID is invalid"
             public var description: String {
@@ -393,17 +393,17 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - getKeyPackageStats
 
     /// Get key package inventory statistics for the authenticated user to determine when replenishment is needed
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func getKeyPackageStats(input: BlueCatbirdMlsChatGetKeyPackageStats.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatGetKeyPackageStats.Output?) {
         let endpoint = "blue.catbird.mlsChat.getKeyPackageStats"
 
-        
+
         let queryItems = input.asQueryItems()
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -429,10 +429,10 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         // Only decode response data if request was successful
         if (200...299).contains(responseCode) {
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatGetKeyPackageStats.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -440,12 +440,12 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
                 return (responseCode, nil)
             }
         } else {
-            
+
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-                           
+
 

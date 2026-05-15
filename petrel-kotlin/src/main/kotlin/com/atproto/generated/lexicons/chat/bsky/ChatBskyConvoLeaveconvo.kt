@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: chat.bsky.convo.leaveConvo
-
+// Leaves a conversation (direct or group). For group, this effectively removes membership. For direct, membership is never removed, only changed to remove from enumerations by the user who left.
 package com.atproto.generated
 
 import kotlinx.serialization.*
@@ -26,8 +26,13 @@ object ChatBskyConvoLeaveConvoDefs {
         val convoId: String,        @SerialName("rev")
         val rev: String    )
 
+sealed class ChatBskyConvoLeaveConvoError(val name: String, val description: String?) {
+        object InvalidConvo: ChatBskyConvoLeaveConvoError("InvalidConvo", "")
+        object OwnerCannotLeave: ChatBskyConvoLeaveConvoError("OwnerCannotLeave", "The owner of a group conversation cannot leave before locking the group.")
+    }
+
 /**
- * 
+ * Leaves a conversation (direct or group). For group, this effectively removes membership. For direct, membership is never removed, only changed to remove from enumerations by the user who left.
  *
  * Endpoint: chat.bsky.convo.leaveConvo
  */

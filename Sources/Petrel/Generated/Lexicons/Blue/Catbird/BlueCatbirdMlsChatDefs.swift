@@ -752,6 +752,110 @@ public struct KeyPackageRef: ATProtocolCodable, ATProtocolValue {
             case cipherSuite
         }
     }
+        
+public struct WelcomeReissueRequest: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "blue.catbird.mlsChat.defs#welcomeReissueRequest"
+            public let convoId: String
+            public let recipientDeviceDid: DID
+            public let requestedAt: ATProtocolDate
+            public let requestId: String
+
+        public init(
+            convoId: String, recipientDeviceDid: DID, requestedAt: ATProtocolDate, requestId: String
+        ) {
+            self.convoId = convoId
+            self.recipientDeviceDid = recipientDeviceDid
+            self.requestedAt = requestedAt
+            self.requestId = requestId
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                self.convoId = try container.decode(String.self, forKey: .convoId)
+            } catch {
+                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                throw error
+            }
+            do {
+                self.recipientDeviceDid = try container.decode(DID.self, forKey: .recipientDeviceDid)
+            } catch {
+                LogManager.logError("Decoding error for required property 'recipientDeviceDid': \(error)")
+                throw error
+            }
+            do {
+                self.requestedAt = try container.decode(ATProtocolDate.self, forKey: .requestedAt)
+            } catch {
+                LogManager.logError("Decoding error for required property 'requestedAt': \(error)")
+                throw error
+            }
+            do {
+                self.requestId = try container.decode(String.self, forKey: .requestId)
+            } catch {
+                LogManager.logError("Decoding error for required property 'requestId': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            try container.encode(convoId, forKey: .convoId)
+            try container.encode(recipientDeviceDid, forKey: .recipientDeviceDid)
+            try container.encode(requestedAt, forKey: .requestedAt)
+            try container.encode(requestId, forKey: .requestId)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(convoId)
+            hasher.combine(recipientDeviceDid)
+            hasher.combine(requestedAt)
+            hasher.combine(requestId)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+            if convoId != other.convoId {
+                return false
+            }
+            if recipientDeviceDid != other.recipientDeviceDid {
+                return false
+            }
+            if requestedAt != other.requestedAt {
+                return false
+            }
+            if requestId != other.requestId {
+                return false
+            }
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            let convoIdValue = try convoId.toCBORValue()
+            map = map.adding(key: "convoId", value: convoIdValue)
+            let recipientDeviceDidValue = try recipientDeviceDid.toCBORValue()
+            map = map.adding(key: "recipientDeviceDid", value: recipientDeviceDidValue)
+            let requestedAtValue = try requestedAt.toCBORValue()
+            map = map.adding(key: "requestedAt", value: requestedAtValue)
+            let requestIdValue = try requestId.toCBORValue()
+            map = map.adding(key: "requestId", value: requestIdValue)
+            return map
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case convoId
+            case recipientDeviceDid
+            case requestedAt
+            case requestId
+        }
+    }
 
 
 

@@ -32,6 +32,8 @@ public struct Output: ATProtocolCodable {
         
         public let messages: [OutputMessagesUnion]
         
+        public let relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic]?
+        
         
         
         // Standard public initializer
@@ -40,7 +42,9 @@ public struct Output: ATProtocolCodable {
             
             cursor: String? = nil,
             
-            messages: [OutputMessagesUnion]
+            messages: [OutputMessagesUnion],
+            
+            relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic]? = nil
             
             
         ) {
@@ -49,6 +53,8 @@ public struct Output: ATProtocolCodable {
             self.cursor = cursor
             
             self.messages = messages
+            
+            self.relatedProfiles = relatedProfiles
             
             
         }
@@ -63,6 +69,9 @@ public struct Output: ATProtocolCodable {
             self.messages = try container.decode([OutputMessagesUnion].self, forKey: .messages)
             
             
+            self.relatedProfiles = try container.decodeIfPresent([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .relatedProfiles)
+            
+            
         }
         
         public func encode(to encoder: Encoder) throws {
@@ -74,6 +83,10 @@ public struct Output: ATProtocolCodable {
             
             
             try container.encode(messages, forKey: .messages)
+            
+            
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(relatedProfiles, forKey: .relatedProfiles)
             
             
         }
@@ -96,6 +109,14 @@ public struct Output: ATProtocolCodable {
             map = map.adding(key: "messages", value: messagesValue)
             
             
+            
+            if let value = relatedProfiles {
+                // Encode optional property even if it's an empty array for CBOR
+                let relatedProfilesValue = try value.toCBORValue()
+                map = map.adding(key: "relatedProfiles", value: relatedProfilesValue)
+            }
+            
+            
 
             return map
             
@@ -105,10 +126,23 @@ public struct Output: ATProtocolCodable {
         private enum CodingKeys: String, CodingKey {
             case cursor
             case messages
+            case relatedProfiles
         }
         
     }
+        
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                case invalidConvo = "InvalidConvo."
+            public var description: String {
+                return self.rawValue
+            }
 
+            public var errorName: String {
+                // Extract just the error name from the raw value
+                let parts = self.rawValue.split(separator: ".")
+                return String(parts.first ?? "")
+            }
+        }
 
 
 
@@ -117,12 +151,16 @@ public struct Output: ATProtocolCodable {
 public enum OutputMessagesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
     case chatBskyConvoDefsMessageView(ChatBskyConvoDefs.MessageView)
     case chatBskyConvoDefsDeletedMessageView(ChatBskyConvoDefs.DeletedMessageView)
+    case chatBskyConvoDefsSystemMessageView(ChatBskyConvoDefs.SystemMessageView)
     case unexpected(ATProtocolValueContainer)
     public init(_ value: ChatBskyConvoDefs.MessageView) {
         self = .chatBskyConvoDefsMessageView(value)
     }
     public init(_ value: ChatBskyConvoDefs.DeletedMessageView) {
         self = .chatBskyConvoDefsDeletedMessageView(value)
+    }
+    public init(_ value: ChatBskyConvoDefs.SystemMessageView) {
+        self = .chatBskyConvoDefsSystemMessageView(value)
     }
 
     public init(from decoder: Decoder) throws {
@@ -136,6 +174,9 @@ public enum OutputMessagesUnion: Codable, ATProtocolCodable, ATProtocolValue, Se
         case "chat.bsky.convo.defs#deletedMessageView":
             let value = try ChatBskyConvoDefs.DeletedMessageView(from: decoder)
             self = .chatBskyConvoDefsDeletedMessageView(value)
+        case "chat.bsky.convo.defs#systemMessageView":
+            let value = try ChatBskyConvoDefs.SystemMessageView(from: decoder)
+            self = .chatBskyConvoDefsSystemMessageView(value)
         default:
             let unknownValue = try ATProtocolValueContainer(from: decoder)
             self = .unexpected(unknownValue)
@@ -152,6 +193,9 @@ public enum OutputMessagesUnion: Codable, ATProtocolCodable, ATProtocolValue, Se
         case .chatBskyConvoDefsDeletedMessageView(let value):
             try container.encode("chat.bsky.convo.defs#deletedMessageView", forKey: .type)
             try value.encode(to: encoder)
+        case .chatBskyConvoDefsSystemMessageView(let value):
+            try container.encode("chat.bsky.convo.defs#systemMessageView", forKey: .type)
+            try value.encode(to: encoder)
         case .unexpected(let container):
             try container.encode(to: encoder)
         }
@@ -164,6 +208,9 @@ public enum OutputMessagesUnion: Codable, ATProtocolCodable, ATProtocolValue, Se
             hasher.combine(value)
         case .chatBskyConvoDefsDeletedMessageView(let value):
             hasher.combine("chat.bsky.convo.defs#deletedMessageView")
+            hasher.combine(value)
+        case .chatBskyConvoDefsSystemMessageView(let value):
+            hasher.combine("chat.bsky.convo.defs#systemMessageView")
             hasher.combine(value)
         case .unexpected(let container):
             hasher.combine("unexpected")
@@ -182,6 +229,9 @@ public enum OutputMessagesUnion: Codable, ATProtocolCodable, ATProtocolValue, Se
             return lhsValue == rhsValue
         case (.chatBskyConvoDefsDeletedMessageView(let lhsValue),
               .chatBskyConvoDefsDeletedMessageView(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.chatBskyConvoDefsSystemMessageView(let lhsValue),
+              .chatBskyConvoDefsSystemMessageView(let rhsValue)):
             return lhsValue == rhsValue
         case (.unexpected(let lhsValue), .unexpected(let rhsValue)):
             return lhsValue.isEqual(to: rhsValue)
@@ -235,6 +285,23 @@ public enum OutputMessagesUnion: Codable, ATProtocolCodable, ATProtocolValue, Se
                 }
             }
             return map
+        case .chatBskyConvoDefsSystemMessageView(let value):
+            map = map.adding(key: "$type", value: "chat.bsky.convo.defs#systemMessageView")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
         case .unexpected(let container):
             return try container.toCBORValue()
         }
@@ -249,7 +316,7 @@ public enum OutputMessagesUnion: Codable, ATProtocolCodable, ATProtocolValue, Se
 extension ATProtoClient.Chat.Bsky.Convo {
     // MARK: - getMessages
 
-    /// 
+    /// Returns a page of messages from a conversation.
     /// 
     /// - Parameter input: The input parameters for the request
     /// 

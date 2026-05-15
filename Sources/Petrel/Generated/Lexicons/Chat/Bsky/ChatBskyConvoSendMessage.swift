@@ -46,7 +46,20 @@ public struct Input: ATProtocolCodable {
         }
     }
     public typealias Output = ChatBskyConvoDefs.MessageView
-    
+            
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                case convoLocked = "ConvoLocked."
+                case invalidConvo = "InvalidConvo."
+            public var description: String {
+                return self.rawValue
+            }
+
+            public var errorName: String {
+                // Extract just the error name from the raw value
+                let parts = self.rawValue.split(separator: ".")
+                return String(parts.first ?? "")
+            }
+        }
 
 
 
@@ -55,7 +68,7 @@ public struct Input: ATProtocolCodable {
 extension ATProtoClient.Chat.Bsky.Convo {
     // MARK: - sendMessage
 
-    /// 
+    /// Sends a message to a conversation.
     /// 
     /// - Parameter input: The input parameters for the request
     

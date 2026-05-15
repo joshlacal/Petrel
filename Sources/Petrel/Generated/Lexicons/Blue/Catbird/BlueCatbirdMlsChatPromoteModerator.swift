@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: blue.catbird.mlsChat.promoteModerator
 
 
-public struct BlueCatbirdMlsChatPromoteModerator { 
+public struct BlueCatbirdMlsChatPromoteModerator {
 
     public static let typeIdentifier = "blue.catbird.mlsChat.promoteModerator"
 public struct Input: ATProtocolCodable {
@@ -17,7 +17,7 @@ public struct Input: ATProtocolCodable {
             self.convoId = convoId
             self.targetDid = targetDid
         }
-        
+
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -45,87 +45,87 @@ public struct Input: ATProtocolCodable {
             case targetDid
         }
     }
-    
+
 public struct Output: ATProtocolCodable {
-        
-        
+
+
         public let ok: Bool
-        
+
         public let promotedAt: ATProtocolDate
-        
-        
-        
+
+
+
         // Standard public initializer
         public init(
-            
-            
+
+
             ok: Bool,
-            
+
             promotedAt: ATProtocolDate
-            
-            
+
+
         ) {
-            
-            
+
+
             self.ok = ok
-            
+
             self.promotedAt = promotedAt
-            
-            
+
+
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
+
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
+
             self.ok = try container.decode(Bool.self, forKey: .ok)
-            
-            
+
+
             self.promotedAt = try container.decode(ATProtocolDate.self, forKey: .promotedAt)
-            
-            
+
+
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
+
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(ok, forKey: .ok)
-            
-            
+
+
             try container.encode(promotedAt, forKey: .promotedAt)
-            
-            
+
+
         }
 
         public func toCBORValue() throws -> Any {
-            
+
             var map = OrderedCBORMap()
 
-            
-            
+
+
             let okValue = try ok.toCBORValue()
             map = map.adding(key: "ok", value: okValue)
-            
-            
-            
+
+
+
             let promotedAtValue = try promotedAt.toCBORValue()
             map = map.adding(key: "promotedAt", value: promotedAtValue)
-            
-            
+
+
 
             return map
-            
+
         }
-        
-        
+
+
         private enum CodingKeys: String, CodingKey {
             case ok
             case promotedAt
         }
-        
+
     }
-        
+
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case notAdmin = "NotAdmin.Caller is not an admin of this conversation"
                 case notMember = "NotMember.Target is not a member of this conversation"
@@ -151,26 +151,26 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - promoteModerator
 
     /// Promote a member to moderator status (admin-only operation) Promote a conversation member to moderator. Caller must be an existing admin. Moderators can warn members and view reports but cannot promote/demote others.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func promoteModerator(
-        
+
         input: BlueCatbirdMlsChatPromoteModerator.Input
-        
+
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatPromoteModerator.Output?) {
         let endpoint = "blue.catbird.mlsChat.promoteModerator"
-        
+
         var headers: [String: String] = [:]
-        
+
         headers["Content-Type"] = "application/json"
-        
-        
-        
+
+
+
         headers["Accept"] = "application/json"
-        
+
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -187,7 +187,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        
+
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
@@ -199,10 +199,10 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         // Only decode response data if request was successful
         if (200...299).contains(responseCode) {
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatPromoteModerator.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -213,9 +213,9 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-        
+
     }
-    
+
 }
-                           
+
 

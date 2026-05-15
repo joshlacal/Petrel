@@ -90,3 +90,18 @@ object BlueCatbirdMlsChatDefsDefs {
             const val TYPE_IDENTIFIER = "#blueCatbirdMlsChatDefsKeyPackageRef"
         }
     }
+
+    /**
+     * Event emitted when a recipient device calls reissueWelcome. Server pushes this to the inviter via subscribeEvents.
+     */
+    @Serializable
+    data class BlueCatbirdMlsChatDefsWelcomeReissueRequest(
+/** Conversation needing a reissued Welcome. */        @SerialName("convoId")
+        val convoId: String,/** Recipient device that cannot decrypt the original Welcome. */        @SerialName("recipientDeviceDid")
+        val recipientDeviceDid: DID,        @SerialName("requestedAt")
+        val requestedAt: ATProtocolDate,/** Server-generated request identifier. Inviter echoes this in the replacement commit's idempotencyKey. */        @SerialName("requestId")
+        val requestId: String    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#blueCatbirdMlsChatDefsWelcomeReissueRequest"
+        }
+    }

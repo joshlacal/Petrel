@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: blue.catbird.mlsChat.getReports
 
 
-public struct BlueCatbirdMlsChatGetReports { 
+public struct BlueCatbirdMlsChatGetReports {
 
     public static let typeIdentifier = "blue.catbird.mlsChat.getReports"
-        
+
 public struct ReportView: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.getReports#reportView"
             public let id: String
@@ -187,86 +187,86 @@ public struct ReportView: ATProtocolCodable, ATProtocolValue {
             case resolvedBy
             case resolvedAt
         }
-    }    
+    }
 public struct Parameters: Parametrizable {
         public let convoId: String
         public let status: String?
         public let limit: Int?
-        
+
         public init(
-            convoId: String, 
-            status: String? = nil, 
+            convoId: String,
+            status: String? = nil,
             limit: Int? = nil
             ) {
             self.convoId = convoId
             self.status = status
             self.limit = limit
-            
+
         }
     }
-    
+
 public struct Output: ATProtocolCodable {
-        
-        
+
+
         public let reports: [ReportView]
-        
-        
-        
+
+
+
         // Standard public initializer
         public init(
-            
-            
+
+
             reports: [ReportView]
-            
-            
+
+
         ) {
-            
-            
+
+
             self.reports = reports
-            
-            
+
+
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
+
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
+
             self.reports = try container.decode([ReportView].self, forKey: .reports)
-            
-            
+
+
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
+
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(reports, forKey: .reports)
-            
-            
+
+
         }
 
         public func toCBORValue() throws -> Any {
-            
+
             var map = OrderedCBORMap()
 
-            
-            
+
+
             let reportsValue = try reports.toCBORValue()
             map = map.adding(key: "reports", value: reportsValue)
-            
-            
+
+
 
             return map
-            
+
         }
-        
-        
+
+
         private enum CodingKeys: String, CodingKey {
             case reports
         }
-        
+
     }
-        
+
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case notAdmin = "NotAdmin.Caller is not an admin"
                 case convoNotFound = "ConvoNotFound.Conversation not found"
@@ -291,17 +291,17 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - getReports
 
     /// Get reports for a conversation (admin-only) Retrieve reports for a conversation. Admin-only endpoint. Returns encrypted report blobs that admins must decrypt locally using MLS group key.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func getReports(input: BlueCatbirdMlsChatGetReports.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatGetReports.Output?) {
         let endpoint = "blue.catbird.mlsChat.getReports"
 
-        
+
         let queryItems = input.asQueryItems()
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -327,10 +327,10 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         // Only decode response data if request was successful
         if (200...299).contains(responseCode) {
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatGetReports.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -338,12 +338,12 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
                 return (responseCode, nil)
             }
         } else {
-            
+
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-                           
+
 

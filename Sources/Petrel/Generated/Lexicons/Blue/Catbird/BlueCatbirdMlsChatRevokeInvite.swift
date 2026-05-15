@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: blue.catbird.mlsChat.revokeInvite
 
 
-public struct BlueCatbirdMlsChatRevokeInvite { 
+public struct BlueCatbirdMlsChatRevokeInvite {
 
     public static let typeIdentifier = "blue.catbird.mlsChat.revokeInvite"
 public struct Input: ATProtocolCodable {
@@ -15,7 +15,7 @@ public struct Input: ATProtocolCodable {
         public init(inviteId: String) {
             self.inviteId = inviteId
         }
-        
+
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -38,69 +38,69 @@ public struct Input: ATProtocolCodable {
             case inviteId
         }
     }
-    
+
 public struct Output: ATProtocolCodable {
-        
-        
+
+
         public let success: Bool
-        
-        
-        
+
+
+
         // Standard public initializer
         public init(
-            
-            
+
+
             success: Bool
-            
-            
+
+
         ) {
-            
-            
+
+
             self.success = success
-            
-            
+
+
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
+
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
+
             self.success = try container.decode(Bool.self, forKey: .success)
-            
-            
+
+
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
+
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(success, forKey: .success)
-            
-            
+
+
         }
 
         public func toCBORValue() throws -> Any {
-            
+
             var map = OrderedCBORMap()
 
-            
-            
+
+
             let successValue = try success.toCBORValue()
             map = map.adding(key: "success", value: successValue)
-            
-            
+
+
 
             return map
-            
+
         }
-        
-        
+
+
         private enum CodingKeys: String, CodingKey {
             case success
         }
-        
+
     }
-        
+
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case unauthorized = "Unauthorized.Caller is not an admin of this conversation"
                 case inviteNotFound = "InviteNotFound.Invite not found"
@@ -124,26 +124,26 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - revokeInvite
 
     /// Revoke an existing invite link Revoke an invite link to prevent further use. Only admins can revoke invites.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func revokeInvite(
-        
+
         input: BlueCatbirdMlsChatRevokeInvite.Input
-        
+
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatRevokeInvite.Output?) {
         let endpoint = "blue.catbird.mlsChat.revokeInvite"
-        
+
         var headers: [String: String] = [:]
-        
+
         headers["Content-Type"] = "application/json"
-        
-        
-        
+
+
+
         headers["Accept"] = "application/json"
-        
+
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -160,7 +160,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        
+
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
@@ -172,10 +172,10 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         // Only decode response data if request was successful
         if (200...299).contains(responseCode) {
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatRevokeInvite.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -186,9 +186,9 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-        
+
     }
-    
+
 }
-                           
+
 
