@@ -69,7 +69,7 @@ object ChatBskyModerationSubscribeModEventsMessageUnionSerializer : kotlinx.seri
         @SerialName("convoId")
         val convoId: String,        @SerialName("createdAt")
         val createdAt: ATProtocolDate,        @SerialName("messageId")
-        val messageId: String? = null,/** The list of DIDs message recipients. Does not include the sender, which is in the `user` field */        @SerialName("recipients")
+        val messageId: String,/** The list of DIDs message recipients. Does not include the sender, which is in the `user` field */        @SerialName("recipients")
         val recipients: List<DID>,        @SerialName("rev")
         val rev: String,/** The DID of the message author. */        @SerialName("user")
         val user: DID    ) {

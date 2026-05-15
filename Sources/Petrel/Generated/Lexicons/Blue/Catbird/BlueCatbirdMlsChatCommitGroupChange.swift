@@ -393,13 +393,9 @@ public struct Input: ATProtocolCodable {
         public let idempotencyKey: String?
         public let confirmationTag: Bytes?
         public let epochAuthenticator: String?
-        public let replacedKeyPackageHash: String?
-        public let replacementWelcome: Bytes?
-        public let replacementCommit: Bytes?
-        public let replacementKeyPackageHash: String?
 
         /// Standard public initializer
-        public init(convoId: String, action: String, memberDids: [DID]? = nil, commit: Bytes? = nil, welcome: Bytes? = nil, groupInfo: Bytes? = nil, keyPackageHashes: [KeyPackageHashEntry]? = nil, deviceId: String? = nil, pendingAdditionId: String? = nil, idempotencyKey: String? = nil, confirmationTag: Bytes? = nil, epochAuthenticator: String? = nil, replacedKeyPackageHash: String? = nil, replacementWelcome: Bytes? = nil, replacementCommit: Bytes? = nil, replacementKeyPackageHash: String? = nil) {
+        public init(convoId: String, action: String, memberDids: [DID]? = nil, commit: Bytes? = nil, welcome: Bytes? = nil, groupInfo: Bytes? = nil, keyPackageHashes: [KeyPackageHashEntry]? = nil, deviceId: String? = nil, pendingAdditionId: String? = nil, idempotencyKey: String? = nil, confirmationTag: Bytes? = nil, epochAuthenticator: String? = nil) {
             self.convoId = convoId
             self.action = action
             self.memberDids = memberDids
@@ -412,10 +408,6 @@ public struct Input: ATProtocolCodable {
             self.idempotencyKey = idempotencyKey
             self.confirmationTag = confirmationTag
             self.epochAuthenticator = epochAuthenticator
-            self.replacedKeyPackageHash = replacedKeyPackageHash
-            self.replacementWelcome = replacementWelcome
-            self.replacementCommit = replacementCommit
-            self.replacementKeyPackageHash = replacementKeyPackageHash
         }
         
 
@@ -433,10 +425,6 @@ public struct Input: ATProtocolCodable {
             self.idempotencyKey = try container.decodeIfPresent(String.self, forKey: .idempotencyKey)
             self.confirmationTag = try container.decodeIfPresent(Bytes.self, forKey: .confirmationTag)
             self.epochAuthenticator = try container.decodeIfPresent(String.self, forKey: .epochAuthenticator)
-            self.replacedKeyPackageHash = try container.decodeIfPresent(String.self, forKey: .replacedKeyPackageHash)
-            self.replacementWelcome = try container.decodeIfPresent(Bytes.self, forKey: .replacementWelcome)
-            self.replacementCommit = try container.decodeIfPresent(Bytes.self, forKey: .replacementCommit)
-            self.replacementKeyPackageHash = try container.decodeIfPresent(String.self, forKey: .replacementKeyPackageHash)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -453,10 +441,6 @@ public struct Input: ATProtocolCodable {
             try container.encodeIfPresent(idempotencyKey, forKey: .idempotencyKey)
             try container.encodeIfPresent(confirmationTag, forKey: .confirmationTag)
             try container.encodeIfPresent(epochAuthenticator, forKey: .epochAuthenticator)
-            try container.encodeIfPresent(replacedKeyPackageHash, forKey: .replacedKeyPackageHash)
-            try container.encodeIfPresent(replacementWelcome, forKey: .replacementWelcome)
-            try container.encodeIfPresent(replacementCommit, forKey: .replacementCommit)
-            try container.encodeIfPresent(replacementKeyPackageHash, forKey: .replacementKeyPackageHash)
         }
 
         public func toCBORValue() throws -> Any {
@@ -505,22 +489,6 @@ public struct Input: ATProtocolCodable {
                 let epochAuthenticatorValue = try value.toCBORValue()
                 map = map.adding(key: "epochAuthenticator", value: epochAuthenticatorValue)
             }
-            if let value = replacedKeyPackageHash {
-                let replacedKeyPackageHashValue = try value.toCBORValue()
-                map = map.adding(key: "replacedKeyPackageHash", value: replacedKeyPackageHashValue)
-            }
-            if let value = replacementWelcome {
-                let replacementWelcomeValue = try value.toCBORValue()
-                map = map.adding(key: "replacementWelcome", value: replacementWelcomeValue)
-            }
-            if let value = replacementCommit {
-                let replacementCommitValue = try value.toCBORValue()
-                map = map.adding(key: "replacementCommit", value: replacementCommitValue)
-            }
-            if let value = replacementKeyPackageHash {
-                let replacementKeyPackageHashValue = try value.toCBORValue()
-                map = map.adding(key: "replacementKeyPackageHash", value: replacementKeyPackageHashValue)
-            }
             return map
         }
 
@@ -537,10 +505,6 @@ public struct Input: ATProtocolCodable {
             case idempotencyKey
             case confirmationTag
             case epochAuthenticator
-            case replacedKeyPackageHash
-            case replacementWelcome
-            case replacementCommit
-            case replacementKeyPackageHash
         }
     }
     

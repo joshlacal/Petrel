@@ -1,0 +1,71 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.mlsChat.reissueWelcomeRespond",
+  "description": "Inviter/admin response to a pending reissueWelcome request. Stores a fresh MLS Welcome for the recipient device and marks the reissue request as answered.",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["requestId", "welcomeBlob"],
+          "properties": {
+            "requestId": {
+              "type": "string",
+              "description": "Identifier returned by the server-side reissue request record."
+            },
+            "welcomeBlob": {
+              "type": "bytes",
+              "description": "TLS-serialized MLS Welcome generated for the recipient device."
+            },
+            "keyPackageHash": {
+              "type": "string",
+              "description": "Optional hex-encoded SHA-256 hash of the recipient key package used to generate this Welcome."
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["stored", "requestId", "welcomeBlobId", "respondedAt"],
+          "properties": {
+            "stored": {
+              "type": "boolean",
+              "description": "True when the Welcome was stored and the request was marked answered."
+            },
+            "requestId": {
+              "type": "string",
+              "description": "Echo of the answered reissue request identifier."
+            },
+            "welcomeBlobId": {
+              "type": "string",
+              "description": "Server identifier for the stored Welcome blob."
+            },
+            "respondedAt": {
+              "type": "string",
+              "format": "datetime",
+              "description": "Server timestamp when the Welcome was stored."
+            }
+          }
+        }
+      },
+      "errors": [
+        {
+          "name": "RequestNotFound",
+          "description": "No pending unanswered reissue request exists for requestId."
+        },
+        {
+          "name": "Unauthorized",
+          "description": "Caller is not an active admin/inviter for the request conversation."
+        },
+        {
+          "name": "InvalidWelcome",
+          "description": "Welcome bytes are missing or invalid."
+        }
+      ]
+    }
+  }
+}
