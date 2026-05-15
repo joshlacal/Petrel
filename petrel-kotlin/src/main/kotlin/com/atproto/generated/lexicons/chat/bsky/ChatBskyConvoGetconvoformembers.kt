@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: chat.bsky.convo.getConvoForMembers
-
+// Get or create a 1-1 conversation for the given members. Always returns the same direct (non-group) conversation. To create a group conversation, use createGroup.
 package com.atproto.generated
 
 import kotlinx.serialization.*
@@ -25,8 +25,16 @@ object ChatBskyConvoGetConvoForMembersDefs {
         @SerialName("convo")
         val convo: ChatBskyConvoDefsConvoView    )
 
+sealed class ChatBskyConvoGetConvoForMembersError(val name: String, val description: String?) {
+        object AccountSuspended: ChatBskyConvoGetConvoForMembersError("AccountSuspended", "")
+        object BlockedActor: ChatBskyConvoGetConvoForMembersError("BlockedActor", "")
+        object MessagesDisabled: ChatBskyConvoGetConvoForMembersError("MessagesDisabled", "")
+        object NotFollowedBySender: ChatBskyConvoGetConvoForMembersError("NotFollowedBySender", "")
+        object RecipientNotFound: ChatBskyConvoGetConvoForMembersError("RecipientNotFound", "")
+    }
+
 /**
- * 
+ * Get or create a 1-1 conversation for the given members. Always returns the same direct (non-group) conversation. To create a group conversation, use createGroup.
  *
  * Endpoint: chat.bsky.convo.getConvoForMembers
  */

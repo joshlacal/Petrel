@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: blue.catbird.mlsChat.invalidateWelcome
 
 
-public struct BlueCatbirdMlsChatInvalidateWelcome { 
+public struct BlueCatbirdMlsChatInvalidateWelcome {
 
     public static let typeIdentifier = "blue.catbird.mlsChat.invalidateWelcome"
 public struct Input: ATProtocolCodable {
@@ -17,7 +17,7 @@ public struct Input: ATProtocolCodable {
             self.convoId = convoId
             self.reason = reason
         }
-        
+
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -45,91 +45,91 @@ public struct Input: ATProtocolCodable {
             case reason
         }
     }
-    
+
 public struct Output: ATProtocolCodable {
-        
-        
+
+
         public let invalidated: Bool
-        
+
         public let welcomeId: String?
-        
-        
-        
+
+
+
         // Standard public initializer
         public init(
-            
-            
+
+
             invalidated: Bool,
-            
+
             welcomeId: String? = nil
-            
-            
+
+
         ) {
-            
-            
+
+
             self.invalidated = invalidated
-            
+
             self.welcomeId = welcomeId
-            
-            
+
+
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
+
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
+
             self.invalidated = try container.decode(Bool.self, forKey: .invalidated)
-            
-            
+
+
             self.welcomeId = try container.decodeIfPresent(String.self, forKey: .welcomeId)
-            
-            
+
+
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
+
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(invalidated, forKey: .invalidated)
-            
-            
+
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(welcomeId, forKey: .welcomeId)
-            
-            
+
+
         }
 
         public func toCBORValue() throws -> Any {
-            
+
             var map = OrderedCBORMap()
 
-            
-            
+
+
             let invalidatedValue = try invalidated.toCBORValue()
             map = map.adding(key: "invalidated", value: invalidatedValue)
-            
-            
-            
+
+
+
             if let value = welcomeId {
                 // Encode optional property even if it's an empty array for CBOR
                 let welcomeIdValue = try value.toCBORValue()
                 map = map.adding(key: "welcomeId", value: welcomeIdValue)
             }
-            
-            
+
+
 
             return map
-            
+
         }
-        
-        
+
+
         private enum CodingKeys: String, CodingKey {
             case invalidated
             case welcomeId
         }
-        
+
     }
-        
+
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case notFound = "NotFound.No unconsumed Welcome found for this conversation and user"
                 case unauthorized = "Unauthorized.Not the recipient of this Welcome"
@@ -152,26 +152,26 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - invalidateWelcome
 
     /// Invalidate a Welcome message that cannot be processed (e.g., NoMatchingKeyPackage). This allows the client to fall back to External Commit or request re-addition.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func invalidateWelcome(
-        
+
         input: BlueCatbirdMlsChatInvalidateWelcome.Input
-        
+
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatInvalidateWelcome.Output?) {
         let endpoint = "blue.catbird.mlsChat.invalidateWelcome"
-        
+
         var headers: [String: String] = [:]
-        
+
         headers["Content-Type"] = "application/json"
-        
-        
-        
+
+
+
         headers["Accept"] = "application/json"
-        
+
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -188,7 +188,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        
+
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
@@ -200,10 +200,10 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         // Only decode response data if request was successful
         if (200...299).contains(responseCode) {
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatInvalidateWelcome.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -214,9 +214,9 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-        
+
     }
-    
+
 }
-                           
+
 

@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: blue.catbird.mlsChat.subscribeConvoEvents
 
 
-public struct BlueCatbirdMlsChatSubscribeConvoEvents { 
+public struct BlueCatbirdMlsChatSubscribeConvoEvents {
 
     public static let typeIdentifier = "blue.catbird.mlsChat.subscribeConvoEvents"
-        
+
 public struct EventWrapper: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.subscribeConvoEvents#eventWrapper"
             public let event: EventWrapperEventUnion
@@ -64,7 +64,7 @@ public struct EventWrapper: ATProtocolCodable, ATProtocolValue {
             case event
         }
     }
-        
+
 public struct MessageEvent: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.subscribeConvoEvents#messageEvent"
             public let cursor: String
@@ -136,7 +136,7 @@ public struct MessageEvent: ATProtocolCodable, ATProtocolValue {
             case message
         }
     }
-        
+
 public struct ReactionEvent: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.subscribeConvoEvents#reactionEvent"
             public let cursor: String
@@ -272,7 +272,7 @@ public struct ReactionEvent: ATProtocolCodable, ATProtocolValue {
             case action
         }
     }
-        
+
 public struct TypingEvent: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.subscribeConvoEvents#typingEvent"
             public let cursor: String
@@ -376,7 +376,7 @@ public struct TypingEvent: ATProtocolCodable, ATProtocolValue {
             case isTyping
         }
     }
-        
+
 public struct InfoEvent: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.subscribeConvoEvents#infoEvent"
             public let cursor: String
@@ -448,7 +448,7 @@ public struct InfoEvent: ATProtocolCodable, ATProtocolValue {
             case info
         }
     }
-        
+
 public struct NewDeviceEvent: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.subscribeConvoEvents#newDeviceEvent"
             public let cursor: String
@@ -606,7 +606,7 @@ public struct NewDeviceEvent: ATProtocolCodable, ATProtocolValue {
             case pendingAdditionId
         }
     }
-        
+
 public struct GroupInfoRefreshRequestedEvent: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.subscribeConvoEvents#groupInfoRefreshRequestedEvent"
             public let cursor: String
@@ -710,7 +710,7 @@ public struct GroupInfoRefreshRequestedEvent: ATProtocolCodable, ATProtocolValue
             case requestedAt
         }
     }
-        
+
 public struct ReadditionRequestedEvent: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.subscribeConvoEvents#readditionRequestedEvent"
             public let cursor: String
@@ -814,7 +814,7 @@ public struct ReadditionRequestedEvent: ATProtocolCodable, ATProtocolValue {
             case requestedAt
         }
     }
-        
+
 public struct MembershipChangeEvent: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.subscribeConvoEvents#membershipChangeEvent"
             public let cursor: String
@@ -978,7 +978,7 @@ public struct MembershipChangeEvent: ATProtocolCodable, ATProtocolValue {
             case epoch
         }
     }
-        
+
 public struct ReadEvent: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.subscribeConvoEvents#readEvent"
             public let cursor: String
@@ -1103,21 +1103,21 @@ public struct ReadEvent: ATProtocolCodable, ATProtocolValue {
             case messageId
             case readAt
         }
-    }    
+    }
 public struct Parameters: Parametrizable {
         public let cursor: String?
         public let convoId: String?
         public let ticket: String?
-        
+
         public init(
-            cursor: String? = nil, 
-            convoId: String? = nil, 
+            cursor: String? = nil,
+            convoId: String? = nil,
             ticket: String? = nil
             ) {
             self.cursor = cursor
             self.convoId = convoId
             self.ticket = ticket
-            
+
         }
     }
 public enum Message: Codable, Sendable {
@@ -1148,7 +1148,7 @@ public enum Message: Codable, Sendable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let type = try container.decode(String.self, forKey: .type)
-        
+
         switch type {
 
         case "blue.catbird.mlsChat.subscribeConvoEvents#messageEvent":
@@ -1385,7 +1385,7 @@ public enum EventWrapperEventUnion: Codable, ATProtocolCodable, ATProtocolValue,
     private enum CodingKeys: String, CodingKey {
         case type = "$type"
     }
-    
+
     public static func == (lhs: EventWrapperEventUnion, rhs: EventWrapperEventUnion) -> Bool {
         switch (lhs, rhs) {
         case (.blueCatbirdMlsChatSubscribeConvoEventsMessageEvent(let lhsValue),
@@ -1421,21 +1421,21 @@ public enum EventWrapperEventUnion: Codable, ATProtocolCodable, ATProtocolValue,
             return false
         }
     }
-    
+
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? EventWrapperEventUnion else { return false }
         return self == other
     }
-    
+
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
-        
+
         switch self {
         case .blueCatbirdMlsChatSubscribeConvoEventsMessageEvent(let value):
             map = map.adding(key: "$type", value: "blue.catbird.mlsChat.subscribeConvoEvents#messageEvent")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -1452,7 +1452,7 @@ public enum EventWrapperEventUnion: Codable, ATProtocolCodable, ATProtocolValue,
             return map
         case .blueCatbirdMlsChatSubscribeConvoEventsReactionEvent(let value):
             map = map.adding(key: "$type", value: "blue.catbird.mlsChat.subscribeConvoEvents#reactionEvent")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -1469,7 +1469,7 @@ public enum EventWrapperEventUnion: Codable, ATProtocolCodable, ATProtocolValue,
             return map
         case .blueCatbirdMlsChatSubscribeConvoEventsTypingEvent(let value):
             map = map.adding(key: "$type", value: "blue.catbird.mlsChat.subscribeConvoEvents#typingEvent")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -1486,7 +1486,7 @@ public enum EventWrapperEventUnion: Codable, ATProtocolCodable, ATProtocolValue,
             return map
         case .blueCatbirdMlsChatSubscribeConvoEventsInfoEvent(let value):
             map = map.adding(key: "$type", value: "blue.catbird.mlsChat.subscribeConvoEvents#infoEvent")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -1503,7 +1503,7 @@ public enum EventWrapperEventUnion: Codable, ATProtocolCodable, ATProtocolValue,
             return map
         case .blueCatbirdMlsChatSubscribeConvoEventsNewDeviceEvent(let value):
             map = map.adding(key: "$type", value: "blue.catbird.mlsChat.subscribeConvoEvents#newDeviceEvent")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -1520,7 +1520,7 @@ public enum EventWrapperEventUnion: Codable, ATProtocolCodable, ATProtocolValue,
             return map
         case .blueCatbirdMlsChatSubscribeConvoEventsGroupInfoRefreshRequestedEvent(let value):
             map = map.adding(key: "$type", value: "blue.catbird.mlsChat.subscribeConvoEvents#groupInfoRefreshRequestedEvent")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -1537,7 +1537,7 @@ public enum EventWrapperEventUnion: Codable, ATProtocolCodable, ATProtocolValue,
             return map
         case .blueCatbirdMlsChatSubscribeConvoEventsReadditionRequestedEvent(let value):
             map = map.adding(key: "$type", value: "blue.catbird.mlsChat.subscribeConvoEvents#readditionRequestedEvent")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -1554,7 +1554,7 @@ public enum EventWrapperEventUnion: Codable, ATProtocolCodable, ATProtocolValue,
             return map
         case .blueCatbirdMlsChatSubscribeConvoEventsMembershipChangeEvent(let value):
             map = map.adding(key: "$type", value: "blue.catbird.mlsChat.subscribeConvoEvents#membershipChangeEvent")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -1571,7 +1571,7 @@ public enum EventWrapperEventUnion: Codable, ATProtocolCodable, ATProtocolValue,
             return map
         case .blueCatbirdMlsChatSubscribeConvoEventsReadEvent(let value):
             map = map.adding(key: "$type", value: "blue.catbird.mlsChat.subscribeConvoEvents#readEvent")
-            
+
             let valueDict = try value.toCBORValue()
 
             // If the value is already an OrderedCBORMap, merge its entries
@@ -1596,12 +1596,12 @@ public enum EventWrapperEventUnion: Codable, ATProtocolCodable, ATProtocolValue,
 }
 
 
-                           
+
 
 /// Firehose-style subscription for conversation updates (messages, reactions, typing indicators) Subscribe to live events (new messages, reactions, etc.) via firehose-style DAG-CBOR framing in conversations involving the authenticated user
 
 extension ATProtoClient.Blue.Catbird.MlsChat {
-    
+
     public func subscribeConvoEvents(
         cursor: String? = nil, convoId: String? = nil, ticket: String? = nil
     ) async throws -> AsyncThrowingStream<BlueCatbirdMlsChatSubscribeConvoEvents.Message, Error> {
@@ -1619,5 +1619,5 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             parameters: input
         )
     }
-    
+
 }

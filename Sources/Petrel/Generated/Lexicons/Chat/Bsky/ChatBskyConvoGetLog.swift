@@ -119,6 +119,23 @@ public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendab
     case chatBskyConvoDefsLogReadMessage(ChatBskyConvoDefs.LogReadMessage)
     case chatBskyConvoDefsLogAddReaction(ChatBskyConvoDefs.LogAddReaction)
     case chatBskyConvoDefsLogRemoveReaction(ChatBskyConvoDefs.LogRemoveReaction)
+    case chatBskyConvoDefsLogReadConvo(ChatBskyConvoDefs.LogReadConvo)
+    case chatBskyConvoDefsLogAddMember(ChatBskyConvoDefs.LogAddMember)
+    case chatBskyConvoDefsLogRemoveMember(ChatBskyConvoDefs.LogRemoveMember)
+    case chatBskyConvoDefsLogMemberJoin(ChatBskyConvoDefs.LogMemberJoin)
+    case chatBskyConvoDefsLogMemberLeave(ChatBskyConvoDefs.LogMemberLeave)
+    case chatBskyConvoDefsLogLockConvo(ChatBskyConvoDefs.LogLockConvo)
+    case chatBskyConvoDefsLogUnlockConvo(ChatBskyConvoDefs.LogUnlockConvo)
+    case chatBskyConvoDefsLogLockConvoPermanently(ChatBskyConvoDefs.LogLockConvoPermanently)
+    case chatBskyConvoDefsLogEditGroup(ChatBskyConvoDefs.LogEditGroup)
+    case chatBskyConvoDefsLogCreateJoinLink(ChatBskyConvoDefs.LogCreateJoinLink)
+    case chatBskyConvoDefsLogEditJoinLink(ChatBskyConvoDefs.LogEditJoinLink)
+    case chatBskyConvoDefsLogEnableJoinLink(ChatBskyConvoDefs.LogEnableJoinLink)
+    case chatBskyConvoDefsLogDisableJoinLink(ChatBskyConvoDefs.LogDisableJoinLink)
+    case chatBskyConvoDefsLogIncomingJoinRequest(ChatBskyConvoDefs.LogIncomingJoinRequest)
+    case chatBskyConvoDefsLogApproveJoinRequest(ChatBskyConvoDefs.LogApproveJoinRequest)
+    case chatBskyConvoDefsLogRejectJoinRequest(ChatBskyConvoDefs.LogRejectJoinRequest)
+    case chatBskyConvoDefsLogOutgoingJoinRequest(ChatBskyConvoDefs.LogOutgoingJoinRequest)
     case unexpected(ATProtocolValueContainer)
     public init(_ value: ChatBskyConvoDefs.LogBeginConvo) {
         self = .chatBskyConvoDefsLogBeginConvo(value)
@@ -149,6 +166,57 @@ public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendab
     }
     public init(_ value: ChatBskyConvoDefs.LogRemoveReaction) {
         self = .chatBskyConvoDefsLogRemoveReaction(value)
+    }
+    public init(_ value: ChatBskyConvoDefs.LogReadConvo) {
+        self = .chatBskyConvoDefsLogReadConvo(value)
+    }
+    public init(_ value: ChatBskyConvoDefs.LogAddMember) {
+        self = .chatBskyConvoDefsLogAddMember(value)
+    }
+    public init(_ value: ChatBskyConvoDefs.LogRemoveMember) {
+        self = .chatBskyConvoDefsLogRemoveMember(value)
+    }
+    public init(_ value: ChatBskyConvoDefs.LogMemberJoin) {
+        self = .chatBskyConvoDefsLogMemberJoin(value)
+    }
+    public init(_ value: ChatBskyConvoDefs.LogMemberLeave) {
+        self = .chatBskyConvoDefsLogMemberLeave(value)
+    }
+    public init(_ value: ChatBskyConvoDefs.LogLockConvo) {
+        self = .chatBskyConvoDefsLogLockConvo(value)
+    }
+    public init(_ value: ChatBskyConvoDefs.LogUnlockConvo) {
+        self = .chatBskyConvoDefsLogUnlockConvo(value)
+    }
+    public init(_ value: ChatBskyConvoDefs.LogLockConvoPermanently) {
+        self = .chatBskyConvoDefsLogLockConvoPermanently(value)
+    }
+    public init(_ value: ChatBskyConvoDefs.LogEditGroup) {
+        self = .chatBskyConvoDefsLogEditGroup(value)
+    }
+    public init(_ value: ChatBskyConvoDefs.LogCreateJoinLink) {
+        self = .chatBskyConvoDefsLogCreateJoinLink(value)
+    }
+    public init(_ value: ChatBskyConvoDefs.LogEditJoinLink) {
+        self = .chatBskyConvoDefsLogEditJoinLink(value)
+    }
+    public init(_ value: ChatBskyConvoDefs.LogEnableJoinLink) {
+        self = .chatBskyConvoDefsLogEnableJoinLink(value)
+    }
+    public init(_ value: ChatBskyConvoDefs.LogDisableJoinLink) {
+        self = .chatBskyConvoDefsLogDisableJoinLink(value)
+    }
+    public init(_ value: ChatBskyConvoDefs.LogIncomingJoinRequest) {
+        self = .chatBskyConvoDefsLogIncomingJoinRequest(value)
+    }
+    public init(_ value: ChatBskyConvoDefs.LogApproveJoinRequest) {
+        self = .chatBskyConvoDefsLogApproveJoinRequest(value)
+    }
+    public init(_ value: ChatBskyConvoDefs.LogRejectJoinRequest) {
+        self = .chatBskyConvoDefsLogRejectJoinRequest(value)
+    }
+    public init(_ value: ChatBskyConvoDefs.LogOutgoingJoinRequest) {
+        self = .chatBskyConvoDefsLogOutgoingJoinRequest(value)
     }
 
     public init(from decoder: Decoder) throws {
@@ -186,6 +254,57 @@ public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendab
         case "chat.bsky.convo.defs#logRemoveReaction":
             let value = try ChatBskyConvoDefs.LogRemoveReaction(from: decoder)
             self = .chatBskyConvoDefsLogRemoveReaction(value)
+        case "chat.bsky.convo.defs#logReadConvo":
+            let value = try ChatBskyConvoDefs.LogReadConvo(from: decoder)
+            self = .chatBskyConvoDefsLogReadConvo(value)
+        case "chat.bsky.convo.defs#logAddMember":
+            let value = try ChatBskyConvoDefs.LogAddMember(from: decoder)
+            self = .chatBskyConvoDefsLogAddMember(value)
+        case "chat.bsky.convo.defs#logRemoveMember":
+            let value = try ChatBskyConvoDefs.LogRemoveMember(from: decoder)
+            self = .chatBskyConvoDefsLogRemoveMember(value)
+        case "chat.bsky.convo.defs#logMemberJoin":
+            let value = try ChatBskyConvoDefs.LogMemberJoin(from: decoder)
+            self = .chatBskyConvoDefsLogMemberJoin(value)
+        case "chat.bsky.convo.defs#logMemberLeave":
+            let value = try ChatBskyConvoDefs.LogMemberLeave(from: decoder)
+            self = .chatBskyConvoDefsLogMemberLeave(value)
+        case "chat.bsky.convo.defs#logLockConvo":
+            let value = try ChatBskyConvoDefs.LogLockConvo(from: decoder)
+            self = .chatBskyConvoDefsLogLockConvo(value)
+        case "chat.bsky.convo.defs#logUnlockConvo":
+            let value = try ChatBskyConvoDefs.LogUnlockConvo(from: decoder)
+            self = .chatBskyConvoDefsLogUnlockConvo(value)
+        case "chat.bsky.convo.defs#logLockConvoPermanently":
+            let value = try ChatBskyConvoDefs.LogLockConvoPermanently(from: decoder)
+            self = .chatBskyConvoDefsLogLockConvoPermanently(value)
+        case "chat.bsky.convo.defs#logEditGroup":
+            let value = try ChatBskyConvoDefs.LogEditGroup(from: decoder)
+            self = .chatBskyConvoDefsLogEditGroup(value)
+        case "chat.bsky.convo.defs#logCreateJoinLink":
+            let value = try ChatBskyConvoDefs.LogCreateJoinLink(from: decoder)
+            self = .chatBskyConvoDefsLogCreateJoinLink(value)
+        case "chat.bsky.convo.defs#logEditJoinLink":
+            let value = try ChatBskyConvoDefs.LogEditJoinLink(from: decoder)
+            self = .chatBskyConvoDefsLogEditJoinLink(value)
+        case "chat.bsky.convo.defs#logEnableJoinLink":
+            let value = try ChatBskyConvoDefs.LogEnableJoinLink(from: decoder)
+            self = .chatBskyConvoDefsLogEnableJoinLink(value)
+        case "chat.bsky.convo.defs#logDisableJoinLink":
+            let value = try ChatBskyConvoDefs.LogDisableJoinLink(from: decoder)
+            self = .chatBskyConvoDefsLogDisableJoinLink(value)
+        case "chat.bsky.convo.defs#logIncomingJoinRequest":
+            let value = try ChatBskyConvoDefs.LogIncomingJoinRequest(from: decoder)
+            self = .chatBskyConvoDefsLogIncomingJoinRequest(value)
+        case "chat.bsky.convo.defs#logApproveJoinRequest":
+            let value = try ChatBskyConvoDefs.LogApproveJoinRequest(from: decoder)
+            self = .chatBskyConvoDefsLogApproveJoinRequest(value)
+        case "chat.bsky.convo.defs#logRejectJoinRequest":
+            let value = try ChatBskyConvoDefs.LogRejectJoinRequest(from: decoder)
+            self = .chatBskyConvoDefsLogRejectJoinRequest(value)
+        case "chat.bsky.convo.defs#logOutgoingJoinRequest":
+            let value = try ChatBskyConvoDefs.LogOutgoingJoinRequest(from: decoder)
+            self = .chatBskyConvoDefsLogOutgoingJoinRequest(value)
         default:
             let unknownValue = try ATProtocolValueContainer(from: decoder)
             self = .unexpected(unknownValue)
@@ -226,6 +345,57 @@ public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendab
         case .chatBskyConvoDefsLogRemoveReaction(let value):
             try container.encode("chat.bsky.convo.defs#logRemoveReaction", forKey: .type)
             try value.encode(to: encoder)
+        case .chatBskyConvoDefsLogReadConvo(let value):
+            try container.encode("chat.bsky.convo.defs#logReadConvo", forKey: .type)
+            try value.encode(to: encoder)
+        case .chatBskyConvoDefsLogAddMember(let value):
+            try container.encode("chat.bsky.convo.defs#logAddMember", forKey: .type)
+            try value.encode(to: encoder)
+        case .chatBskyConvoDefsLogRemoveMember(let value):
+            try container.encode("chat.bsky.convo.defs#logRemoveMember", forKey: .type)
+            try value.encode(to: encoder)
+        case .chatBskyConvoDefsLogMemberJoin(let value):
+            try container.encode("chat.bsky.convo.defs#logMemberJoin", forKey: .type)
+            try value.encode(to: encoder)
+        case .chatBskyConvoDefsLogMemberLeave(let value):
+            try container.encode("chat.bsky.convo.defs#logMemberLeave", forKey: .type)
+            try value.encode(to: encoder)
+        case .chatBskyConvoDefsLogLockConvo(let value):
+            try container.encode("chat.bsky.convo.defs#logLockConvo", forKey: .type)
+            try value.encode(to: encoder)
+        case .chatBskyConvoDefsLogUnlockConvo(let value):
+            try container.encode("chat.bsky.convo.defs#logUnlockConvo", forKey: .type)
+            try value.encode(to: encoder)
+        case .chatBskyConvoDefsLogLockConvoPermanently(let value):
+            try container.encode("chat.bsky.convo.defs#logLockConvoPermanently", forKey: .type)
+            try value.encode(to: encoder)
+        case .chatBskyConvoDefsLogEditGroup(let value):
+            try container.encode("chat.bsky.convo.defs#logEditGroup", forKey: .type)
+            try value.encode(to: encoder)
+        case .chatBskyConvoDefsLogCreateJoinLink(let value):
+            try container.encode("chat.bsky.convo.defs#logCreateJoinLink", forKey: .type)
+            try value.encode(to: encoder)
+        case .chatBskyConvoDefsLogEditJoinLink(let value):
+            try container.encode("chat.bsky.convo.defs#logEditJoinLink", forKey: .type)
+            try value.encode(to: encoder)
+        case .chatBskyConvoDefsLogEnableJoinLink(let value):
+            try container.encode("chat.bsky.convo.defs#logEnableJoinLink", forKey: .type)
+            try value.encode(to: encoder)
+        case .chatBskyConvoDefsLogDisableJoinLink(let value):
+            try container.encode("chat.bsky.convo.defs#logDisableJoinLink", forKey: .type)
+            try value.encode(to: encoder)
+        case .chatBskyConvoDefsLogIncomingJoinRequest(let value):
+            try container.encode("chat.bsky.convo.defs#logIncomingJoinRequest", forKey: .type)
+            try value.encode(to: encoder)
+        case .chatBskyConvoDefsLogApproveJoinRequest(let value):
+            try container.encode("chat.bsky.convo.defs#logApproveJoinRequest", forKey: .type)
+            try value.encode(to: encoder)
+        case .chatBskyConvoDefsLogRejectJoinRequest(let value):
+            try container.encode("chat.bsky.convo.defs#logRejectJoinRequest", forKey: .type)
+            try value.encode(to: encoder)
+        case .chatBskyConvoDefsLogOutgoingJoinRequest(let value):
+            try container.encode("chat.bsky.convo.defs#logOutgoingJoinRequest", forKey: .type)
+            try value.encode(to: encoder)
         case .unexpected(let container):
             try container.encode(to: encoder)
         }
@@ -262,6 +432,57 @@ public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendab
             hasher.combine(value)
         case .chatBskyConvoDefsLogRemoveReaction(let value):
             hasher.combine("chat.bsky.convo.defs#logRemoveReaction")
+            hasher.combine(value)
+        case .chatBskyConvoDefsLogReadConvo(let value):
+            hasher.combine("chat.bsky.convo.defs#logReadConvo")
+            hasher.combine(value)
+        case .chatBskyConvoDefsLogAddMember(let value):
+            hasher.combine("chat.bsky.convo.defs#logAddMember")
+            hasher.combine(value)
+        case .chatBskyConvoDefsLogRemoveMember(let value):
+            hasher.combine("chat.bsky.convo.defs#logRemoveMember")
+            hasher.combine(value)
+        case .chatBskyConvoDefsLogMemberJoin(let value):
+            hasher.combine("chat.bsky.convo.defs#logMemberJoin")
+            hasher.combine(value)
+        case .chatBskyConvoDefsLogMemberLeave(let value):
+            hasher.combine("chat.bsky.convo.defs#logMemberLeave")
+            hasher.combine(value)
+        case .chatBskyConvoDefsLogLockConvo(let value):
+            hasher.combine("chat.bsky.convo.defs#logLockConvo")
+            hasher.combine(value)
+        case .chatBskyConvoDefsLogUnlockConvo(let value):
+            hasher.combine("chat.bsky.convo.defs#logUnlockConvo")
+            hasher.combine(value)
+        case .chatBskyConvoDefsLogLockConvoPermanently(let value):
+            hasher.combine("chat.bsky.convo.defs#logLockConvoPermanently")
+            hasher.combine(value)
+        case .chatBskyConvoDefsLogEditGroup(let value):
+            hasher.combine("chat.bsky.convo.defs#logEditGroup")
+            hasher.combine(value)
+        case .chatBskyConvoDefsLogCreateJoinLink(let value):
+            hasher.combine("chat.bsky.convo.defs#logCreateJoinLink")
+            hasher.combine(value)
+        case .chatBskyConvoDefsLogEditJoinLink(let value):
+            hasher.combine("chat.bsky.convo.defs#logEditJoinLink")
+            hasher.combine(value)
+        case .chatBskyConvoDefsLogEnableJoinLink(let value):
+            hasher.combine("chat.bsky.convo.defs#logEnableJoinLink")
+            hasher.combine(value)
+        case .chatBskyConvoDefsLogDisableJoinLink(let value):
+            hasher.combine("chat.bsky.convo.defs#logDisableJoinLink")
+            hasher.combine(value)
+        case .chatBskyConvoDefsLogIncomingJoinRequest(let value):
+            hasher.combine("chat.bsky.convo.defs#logIncomingJoinRequest")
+            hasher.combine(value)
+        case .chatBskyConvoDefsLogApproveJoinRequest(let value):
+            hasher.combine("chat.bsky.convo.defs#logApproveJoinRequest")
+            hasher.combine(value)
+        case .chatBskyConvoDefsLogRejectJoinRequest(let value):
+            hasher.combine("chat.bsky.convo.defs#logRejectJoinRequest")
+            hasher.combine(value)
+        case .chatBskyConvoDefsLogOutgoingJoinRequest(let value):
+            hasher.combine("chat.bsky.convo.defs#logOutgoingJoinRequest")
             hasher.combine(value)
         case .unexpected(let container):
             hasher.combine("unexpected")
@@ -304,6 +525,57 @@ public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendab
             return lhsValue == rhsValue
         case (.chatBskyConvoDefsLogRemoveReaction(let lhsValue),
               .chatBskyConvoDefsLogRemoveReaction(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.chatBskyConvoDefsLogReadConvo(let lhsValue),
+              .chatBskyConvoDefsLogReadConvo(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.chatBskyConvoDefsLogAddMember(let lhsValue),
+              .chatBskyConvoDefsLogAddMember(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.chatBskyConvoDefsLogRemoveMember(let lhsValue),
+              .chatBskyConvoDefsLogRemoveMember(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.chatBskyConvoDefsLogMemberJoin(let lhsValue),
+              .chatBskyConvoDefsLogMemberJoin(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.chatBskyConvoDefsLogMemberLeave(let lhsValue),
+              .chatBskyConvoDefsLogMemberLeave(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.chatBskyConvoDefsLogLockConvo(let lhsValue),
+              .chatBskyConvoDefsLogLockConvo(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.chatBskyConvoDefsLogUnlockConvo(let lhsValue),
+              .chatBskyConvoDefsLogUnlockConvo(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.chatBskyConvoDefsLogLockConvoPermanently(let lhsValue),
+              .chatBskyConvoDefsLogLockConvoPermanently(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.chatBskyConvoDefsLogEditGroup(let lhsValue),
+              .chatBskyConvoDefsLogEditGroup(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.chatBskyConvoDefsLogCreateJoinLink(let lhsValue),
+              .chatBskyConvoDefsLogCreateJoinLink(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.chatBskyConvoDefsLogEditJoinLink(let lhsValue),
+              .chatBskyConvoDefsLogEditJoinLink(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.chatBskyConvoDefsLogEnableJoinLink(let lhsValue),
+              .chatBskyConvoDefsLogEnableJoinLink(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.chatBskyConvoDefsLogDisableJoinLink(let lhsValue),
+              .chatBskyConvoDefsLogDisableJoinLink(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.chatBskyConvoDefsLogIncomingJoinRequest(let lhsValue),
+              .chatBskyConvoDefsLogIncomingJoinRequest(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.chatBskyConvoDefsLogApproveJoinRequest(let lhsValue),
+              .chatBskyConvoDefsLogApproveJoinRequest(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.chatBskyConvoDefsLogRejectJoinRequest(let lhsValue),
+              .chatBskyConvoDefsLogRejectJoinRequest(let rhsValue)):
+            return lhsValue == rhsValue
+        case (.chatBskyConvoDefsLogOutgoingJoinRequest(let lhsValue),
+              .chatBskyConvoDefsLogOutgoingJoinRequest(let rhsValue)):
             return lhsValue == rhsValue
         case (.unexpected(let lhsValue), .unexpected(let rhsValue)):
             return lhsValue.isEqual(to: rhsValue)
@@ -478,6 +750,295 @@ public enum OutputLogsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendab
             return map
         case .chatBskyConvoDefsLogRemoveReaction(let value):
             map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logRemoveReaction")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .chatBskyConvoDefsLogReadConvo(let value):
+            map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logReadConvo")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .chatBskyConvoDefsLogAddMember(let value):
+            map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logAddMember")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .chatBskyConvoDefsLogRemoveMember(let value):
+            map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logRemoveMember")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .chatBskyConvoDefsLogMemberJoin(let value):
+            map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logMemberJoin")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .chatBskyConvoDefsLogMemberLeave(let value):
+            map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logMemberLeave")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .chatBskyConvoDefsLogLockConvo(let value):
+            map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logLockConvo")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .chatBskyConvoDefsLogUnlockConvo(let value):
+            map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logUnlockConvo")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .chatBskyConvoDefsLogLockConvoPermanently(let value):
+            map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logLockConvoPermanently")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .chatBskyConvoDefsLogEditGroup(let value):
+            map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logEditGroup")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .chatBskyConvoDefsLogCreateJoinLink(let value):
+            map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logCreateJoinLink")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .chatBskyConvoDefsLogEditJoinLink(let value):
+            map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logEditJoinLink")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .chatBskyConvoDefsLogEnableJoinLink(let value):
+            map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logEnableJoinLink")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .chatBskyConvoDefsLogDisableJoinLink(let value):
+            map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logDisableJoinLink")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .chatBskyConvoDefsLogIncomingJoinRequest(let value):
+            map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logIncomingJoinRequest")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .chatBskyConvoDefsLogApproveJoinRequest(let value):
+            map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logApproveJoinRequest")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .chatBskyConvoDefsLogRejectJoinRequest(let value):
+            map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logRejectJoinRequest")
+            
+            let valueDict = try value.toCBORValue()
+
+            // If the value is already an OrderedCBORMap, merge its entries
+            if let orderedMap = valueDict as? OrderedCBORMap {
+                for (key, value) in orderedMap.entries where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            } else if let dict = valueDict as? [String: Any] {
+                // Otherwise add each key-value pair from the dictionary
+                for (key, value) in dict where key != "$type" {
+                    map = map.adding(key: key, value: value)
+                }
+            }
+            return map
+        case .chatBskyConvoDefsLogOutgoingJoinRequest(let value):
+            map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logOutgoingJoinRequest")
             
             let valueDict = try value.toCBORValue()
 

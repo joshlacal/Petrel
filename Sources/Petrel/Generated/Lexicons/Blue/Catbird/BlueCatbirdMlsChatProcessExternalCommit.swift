@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: blue.catbird.mlsChat.processExternalCommit
 
 
-public struct BlueCatbirdMlsChatProcessExternalCommit { 
+public struct BlueCatbirdMlsChatProcessExternalCommit {
 
     public static let typeIdentifier = "blue.catbird.mlsChat.processExternalCommit"
 public struct Input: ATProtocolCodable {
@@ -21,7 +21,7 @@ public struct Input: ATProtocolCodable {
             self.idempotencyKey = idempotencyKey
             self.groupInfo = groupInfo
         }
-        
+
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -63,95 +63,95 @@ public struct Input: ATProtocolCodable {
             case groupInfo
         }
     }
-    
+
 public struct Output: ATProtocolCodable {
-        
-        
+
+
         public let epoch: Int?
-        
+
         public let rejoinedAt: ATProtocolDate?
-        
-        
-        
+
+
+
         // Standard public initializer
         public init(
-            
-            
+
+
             epoch: Int? = nil,
-            
+
             rejoinedAt: ATProtocolDate? = nil
-            
-            
+
+
         ) {
-            
-            
+
+
             self.epoch = epoch
-            
+
             self.rejoinedAt = rejoinedAt
-            
-            
+
+
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
+
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
+
             self.epoch = try container.decodeIfPresent(Int.self, forKey: .epoch)
-            
-            
+
+
             self.rejoinedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .rejoinedAt)
-            
-            
+
+
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
+
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(epoch, forKey: .epoch)
-            
-            
+
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(rejoinedAt, forKey: .rejoinedAt)
-            
-            
+
+
         }
 
         public func toCBORValue() throws -> Any {
-            
+
             var map = OrderedCBORMap()
 
-            
-            
+
+
             if let value = epoch {
                 // Encode optional property even if it's an empty array for CBOR
                 let epochValue = try value.toCBORValue()
                 map = map.adding(key: "epoch", value: epochValue)
             }
-            
-            
-            
+
+
+
             if let value = rejoinedAt {
                 // Encode optional property even if it's an empty array for CBOR
                 let rejoinedAtValue = try value.toCBORValue()
                 map = map.adding(key: "rejoinedAt", value: rejoinedAtValue)
             }
-            
-            
+
+
 
             return map
-            
+
         }
-        
-        
+
+
         private enum CodingKeys: String, CodingKey {
             case epoch
             case rejoinedAt
         }
-        
+
     }
-        
+
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case unauthorized = "Unauthorized."
                 case invalidCommit = "InvalidCommit."
@@ -175,26 +175,26 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - processExternalCommit
 
     /// Process an external commit for a conversation. This allows a client to add itself to a group using a cached GroupInfo.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func processExternalCommit(
-        
+
         input: BlueCatbirdMlsChatProcessExternalCommit.Input
-        
+
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatProcessExternalCommit.Output?) {
         let endpoint = "blue.catbird.mlsChat.processExternalCommit"
-        
+
         var headers: [String: String] = [:]
-        
+
         headers["Content-Type"] = "application/json"
-        
-        
-        
+
+
+
         headers["Accept"] = "application/json"
-        
+
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -211,7 +211,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        
+
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
@@ -223,10 +223,10 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         // Only decode response data if request was successful
         if (200...299).contains(responseCode) {
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatProcessExternalCommit.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -237,9 +237,9 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-        
+
     }
-    
+
 }
-                           
+
 

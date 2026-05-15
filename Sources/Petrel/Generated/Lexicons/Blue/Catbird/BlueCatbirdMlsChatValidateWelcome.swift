@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: blue.catbird.mlsChat.validateWelcome
 
 
-public struct BlueCatbirdMlsChatValidateWelcome { 
+public struct BlueCatbirdMlsChatValidateWelcome {
 
     public static let typeIdentifier = "blue.catbird.mlsChat.validateWelcome"
 public struct Input: ATProtocolCodable {
@@ -15,7 +15,7 @@ public struct Input: ATProtocolCodable {
         public init(welcomeMessage: Bytes) {
             self.welcomeMessage = welcomeMessage
         }
-        
+
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -38,164 +38,164 @@ public struct Input: ATProtocolCodable {
             case welcomeMessage
         }
     }
-    
+
 public struct Output: ATProtocolCodable {
-        
-        
+
+
         public let valid: Bool
-        
+
         public let keyPackageHash: String
-        
+
         public let recipientDid: DID?
-        
+
         public let groupId: String?
-        
+
         public let reserved: Bool?
-        
+
         public let reservedUntil: ATProtocolDate?
-        
-        
-        
+
+
+
         // Standard public initializer
         public init(
-            
-            
+
+
             valid: Bool,
-            
+
             keyPackageHash: String,
-            
+
             recipientDid: DID? = nil,
-            
+
             groupId: String? = nil,
-            
+
             reserved: Bool? = nil,
-            
+
             reservedUntil: ATProtocolDate? = nil
-            
-            
+
+
         ) {
-            
-            
+
+
             self.valid = valid
-            
+
             self.keyPackageHash = keyPackageHash
-            
+
             self.recipientDid = recipientDid
-            
+
             self.groupId = groupId
-            
+
             self.reserved = reserved
-            
+
             self.reservedUntil = reservedUntil
-            
-            
+
+
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
+
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
+
             self.valid = try container.decode(Bool.self, forKey: .valid)
-            
-            
+
+
             self.keyPackageHash = try container.decode(String.self, forKey: .keyPackageHash)
-            
-            
+
+
             self.recipientDid = try container.decodeIfPresent(DID.self, forKey: .recipientDid)
-            
-            
+
+
             self.groupId = try container.decodeIfPresent(String.self, forKey: .groupId)
-            
-            
+
+
             self.reserved = try container.decodeIfPresent(Bool.self, forKey: .reserved)
-            
-            
+
+
             self.reservedUntil = try container.decodeIfPresent(ATProtocolDate.self, forKey: .reservedUntil)
-            
-            
+
+
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
+
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(valid, forKey: .valid)
-            
-            
+
+
             try container.encode(keyPackageHash, forKey: .keyPackageHash)
-            
-            
+
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(recipientDid, forKey: .recipientDid)
-            
-            
+
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(groupId, forKey: .groupId)
-            
-            
+
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(reserved, forKey: .reserved)
-            
-            
+
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(reservedUntil, forKey: .reservedUntil)
-            
-            
+
+
         }
 
         public func toCBORValue() throws -> Any {
-            
+
             var map = OrderedCBORMap()
 
-            
-            
+
+
             let validValue = try valid.toCBORValue()
             map = map.adding(key: "valid", value: validValue)
-            
-            
-            
+
+
+
             let keyPackageHashValue = try keyPackageHash.toCBORValue()
             map = map.adding(key: "keyPackageHash", value: keyPackageHashValue)
-            
-            
-            
+
+
+
             if let value = recipientDid {
                 // Encode optional property even if it's an empty array for CBOR
                 let recipientDidValue = try value.toCBORValue()
                 map = map.adding(key: "recipientDid", value: recipientDidValue)
             }
-            
-            
-            
+
+
+
             if let value = groupId {
                 // Encode optional property even if it's an empty array for CBOR
                 let groupIdValue = try value.toCBORValue()
                 map = map.adding(key: "groupId", value: groupIdValue)
             }
-            
-            
-            
+
+
+
             if let value = reserved {
                 // Encode optional property even if it's an empty array for CBOR
                 let reservedValue = try value.toCBORValue()
                 map = map.adding(key: "reserved", value: reservedValue)
             }
-            
-            
-            
+
+
+
             if let value = reservedUntil {
                 // Encode optional property even if it's an empty array for CBOR
                 let reservedUntilValue = try value.toCBORValue()
                 map = map.adding(key: "reservedUntil", value: reservedUntilValue)
             }
-            
-            
+
+
 
             return map
-            
+
         }
-        
-        
+
+
         private enum CodingKeys: String, CodingKey {
             case valid
             case keyPackageHash
@@ -204,9 +204,9 @@ public struct Output: ATProtocolCodable {
             case reserved
             case reservedUntil
         }
-        
+
     }
-        
+
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case invalidWelcome = "InvalidWelcome.Welcome message is malformed or cannot be parsed"
                 case keyPackageNotFound = "KeyPackageNotFound.Referenced key package was never uploaded by this user"
@@ -232,26 +232,26 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - validateWelcome
 
     /// Validate a Welcome message before processing and reserve the referenced key package. Prevents race conditions and helps clients detect missing bundles early.
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func validateWelcome(
-        
+
         input: BlueCatbirdMlsChatValidateWelcome.Input
-        
+
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatValidateWelcome.Output?) {
         let endpoint = "blue.catbird.mlsChat.validateWelcome"
-        
+
         var headers: [String: String] = [:]
-        
+
         headers["Content-Type"] = "application/json"
-        
-        
-        
+
+
+
         headers["Accept"] = "application/json"
-        
+
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -268,7 +268,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        
+
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
@@ -280,10 +280,10 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         // Only decode response data if request was successful
         if (200...299).contains(responseCode) {
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatValidateWelcome.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -294,9 +294,9 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-        
+
     }
-    
+
 }
-                           
+
 

@@ -14,13 +14,15 @@ public struct MessageEvent: ATProtocolCodable, ATProtocolValue {
             public let cursor: String
             public let message: BlueCatbirdMlsChatDefs.MessageView
             public let ephemeral: Bool?
+            public let epoch: Int?
 
         public init(
-            cursor: String, message: BlueCatbirdMlsChatDefs.MessageView, ephemeral: Bool?
+            cursor: String, message: BlueCatbirdMlsChatDefs.MessageView, ephemeral: Bool?, epoch: Int?
         ) {
             self.cursor = cursor
             self.message = message
             self.ephemeral = ephemeral
+            self.epoch = epoch
         }
 
         public init(from decoder: Decoder) throws {
@@ -43,6 +45,12 @@ public struct MessageEvent: ATProtocolCodable, ATProtocolValue {
                 LogManager.logDebug("Decoding error for optional property 'ephemeral': \(error)")
                 throw error
             }
+            do {
+                self.epoch = try container.decodeIfPresent(Int.self, forKey: .epoch)
+            } catch {
+                LogManager.logDebug("Decoding error for optional property 'epoch': \(error)")
+                throw error
+            }
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -51,12 +59,18 @@ public struct MessageEvent: ATProtocolCodable, ATProtocolValue {
             try container.encode(cursor, forKey: .cursor)
             try container.encode(message, forKey: .message)
             try container.encodeIfPresent(ephemeral, forKey: .ephemeral)
+            try container.encodeIfPresent(epoch, forKey: .epoch)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(cursor)
             hasher.combine(message)
             if let value = ephemeral {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = epoch {
                 hasher.combine(value)
             } else {
                 hasher.combine(nil as Int?)
@@ -72,6 +86,9 @@ public struct MessageEvent: ATProtocolCodable, ATProtocolValue {
                 return false
             }
             if ephemeral != other.ephemeral {
+                return false
+            }
+            if epoch != other.epoch {
                 return false
             }
             return true
@@ -92,6 +109,10 @@ public struct MessageEvent: ATProtocolCodable, ATProtocolValue {
                 let ephemeralValue = try value.toCBORValue()
                 map = map.adding(key: "ephemeral", value: ephemeralValue)
             }
+            if let value = epoch {
+                let epochValue = try value.toCBORValue()
+                map = map.adding(key: "epoch", value: epochValue)
+            }
             return map
         }
 
@@ -100,6 +121,7 @@ public struct MessageEvent: ATProtocolCodable, ATProtocolValue {
             case cursor
             case message
             case ephemeral
+            case epoch
         }
     }
         
@@ -1553,6 +1575,126 @@ public struct ResetRequestedEvent: ATProtocolCodable, ATProtocolValue {
             case reason
             case requestedAt
         }
+    }
+        
+public struct WelcomeReissueRequestedEvent: ATProtocolCodable, ATProtocolValue {
+            public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#welcomeReissueRequestedEvent"
+            public let cursor: String
+            public let convoId: String
+            public let recipientDeviceDid: DID
+            public let requestedAt: ATProtocolDate
+            public let requestId: String
+
+        public init(
+            cursor: String, convoId: String, recipientDeviceDid: DID, requestedAt: ATProtocolDate, requestId: String
+        ) {
+            self.cursor = cursor
+            self.convoId = convoId
+            self.recipientDeviceDid = recipientDeviceDid
+            self.requestedAt = requestedAt
+            self.requestId = requestId
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                self.cursor = try container.decode(String.self, forKey: .cursor)
+            } catch {
+                LogManager.logError("Decoding error for required property 'cursor': \(error)")
+                throw error
+            }
+            do {
+                self.convoId = try container.decode(String.self, forKey: .convoId)
+            } catch {
+                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                throw error
+            }
+            do {
+                self.recipientDeviceDid = try container.decode(DID.self, forKey: .recipientDeviceDid)
+            } catch {
+                LogManager.logError("Decoding error for required property 'recipientDeviceDid': \(error)")
+                throw error
+            }
+            do {
+                self.requestedAt = try container.decode(ATProtocolDate.self, forKey: .requestedAt)
+            } catch {
+                LogManager.logError("Decoding error for required property 'requestedAt': \(error)")
+                throw error
+            }
+            do {
+                self.requestId = try container.decode(String.self, forKey: .requestId)
+            } catch {
+                LogManager.logError("Decoding error for required property 'requestId': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            try container.encode(cursor, forKey: .cursor)
+            try container.encode(convoId, forKey: .convoId)
+            try container.encode(recipientDeviceDid, forKey: .recipientDeviceDid)
+            try container.encode(requestedAt, forKey: .requestedAt)
+            try container.encode(requestId, forKey: .requestId)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(cursor)
+            hasher.combine(convoId)
+            hasher.combine(recipientDeviceDid)
+            hasher.combine(requestedAt)
+            hasher.combine(requestId)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+            if cursor != other.cursor {
+                return false
+            }
+            if convoId != other.convoId {
+                return false
+            }
+            if recipientDeviceDid != other.recipientDeviceDid {
+                return false
+            }
+            if requestedAt != other.requestedAt {
+                return false
+            }
+            if requestId != other.requestId {
+                return false
+            }
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            let cursorValue = try cursor.toCBORValue()
+            map = map.adding(key: "cursor", value: cursorValue)
+            let convoIdValue = try convoId.toCBORValue()
+            map = map.adding(key: "convoId", value: convoIdValue)
+            let recipientDeviceDidValue = try recipientDeviceDid.toCBORValue()
+            map = map.adding(key: "recipientDeviceDid", value: recipientDeviceDidValue)
+            let requestedAtValue = try requestedAt.toCBORValue()
+            map = map.adding(key: "requestedAt", value: requestedAtValue)
+            let requestIdValue = try requestId.toCBORValue()
+            map = map.adding(key: "requestId", value: requestIdValue)
+            return map
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case cursor
+            case convoId
+            case recipientDeviceDid
+            case requestedAt
+            case requestId
+        }
     }    
 public struct Parameters: Parametrizable {
         public let ticket: String?
@@ -1592,6 +1734,8 @@ public enum Message: Codable, Sendable {
     case circuitBreakerTrippedEvent(CircuitBreakerTrippedEvent)
 
     case resetRequestedEvent(ResetRequestedEvent)
+
+    case welcomeReissueRequestedEvent(WelcomeReissueRequestedEvent)
 
 
     enum CodingKeys: String, CodingKey {
@@ -1652,6 +1796,10 @@ public enum Message: Codable, Sendable {
             let value = try ResetRequestedEvent(from: decoder)
             self = .resetRequestedEvent(value)
 
+        case "blue.catbird.mlsChat.subscribeEvents#welcomeReissueRequestedEvent":
+            let value = try WelcomeReissueRequestedEvent(from: decoder)
+            self = .welcomeReissueRequestedEvent(value)
+
         default:
             throw DecodingError.dataCorruptedError(
                 forKey: .type,
@@ -1698,6 +1846,9 @@ public enum Message: Codable, Sendable {
             try value.encode(to: encoder)
 
         case .resetRequestedEvent(let value):
+            try value.encode(to: encoder)
+
+        case .welcomeReissueRequestedEvent(let value):
             try value.encode(to: encoder)
 
         }

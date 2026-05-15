@@ -13,17 +13,20 @@ public struct Parameters: Parametrizable {
         public let cursor: String?
         public let readState: String?
         public let status: String?
+        public let kind: String?
         
         public init(
             limit: Int? = nil, 
             cursor: String? = nil, 
             readState: String? = nil, 
-            status: String? = nil
+            status: String? = nil, 
+            kind: String? = nil
             ) {
             self.limit = limit
             self.cursor = cursor
             self.readState = readState
             self.status = status
+            self.kind = kind
             
         }
     }
@@ -122,7 +125,7 @@ public struct Output: ATProtocolCodable {
 extension ATProtoClient.Chat.Bsky.Convo {
     // MARK: - listConvos
 
-    /// 
+    /// Returns a page of conversations (direct or group) for the user.
     /// 
     /// - Parameter input: The input parameters for the request
     /// 

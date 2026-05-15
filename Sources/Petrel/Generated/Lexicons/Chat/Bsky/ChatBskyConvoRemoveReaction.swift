@@ -116,6 +116,8 @@ public struct Output: ATProtocolCodable {
     }
         
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                case invalidConvo = "InvalidConvo."
+                case reactionNotAllowed = "ReactionNotAllowed.Indicates that reactions are not allowed on this message, e.g. because it is a system message."
                 case reactionMessageDeleted = "ReactionMessageDeleted.Indicates that the message has been deleted and reactions can no longer be added/removed."
                 case reactionInvalidValue = "ReactionInvalidValue.Indicates the value for the reaction is not acceptable. In general, this means it is not an emoji."
             public var description: String {

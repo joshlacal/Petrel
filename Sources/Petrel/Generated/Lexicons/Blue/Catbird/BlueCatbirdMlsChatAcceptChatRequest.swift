@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: blue.catbird.mlsChat.acceptChatRequest
 
 
-public struct BlueCatbirdMlsChatAcceptChatRequest { 
+public struct BlueCatbirdMlsChatAcceptChatRequest {
 
     public static let typeIdentifier = "blue.catbird.mlsChat.acceptChatRequest"
-        
+
 public struct DeliveredMessage: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.acceptChatRequest#deliveredMessage"
             public let id: String
@@ -143,7 +143,7 @@ public struct Input: ATProtocolCodable {
             self.requestId = requestId
             self.welcomeData = welcomeData
         }
-        
+
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -173,105 +173,105 @@ public struct Input: ATProtocolCodable {
             case welcomeData
         }
     }
-    
+
 public struct Output: ATProtocolCodable {
-        
-        
+
+
         public let convoId: String
-        
+
         public let heldMessages: [DeliveredMessage]
-        
+
         public let acceptedAt: ATProtocolDate
-        
-        
-        
+
+
+
         // Standard public initializer
         public init(
-            
-            
+
+
             convoId: String,
-            
+
             heldMessages: [DeliveredMessage],
-            
+
             acceptedAt: ATProtocolDate
-            
-            
+
+
         ) {
-            
-            
+
+
             self.convoId = convoId
-            
+
             self.heldMessages = heldMessages
-            
+
             self.acceptedAt = acceptedAt
-            
-            
+
+
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
+
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
+
             self.convoId = try container.decode(String.self, forKey: .convoId)
-            
-            
+
+
             self.heldMessages = try container.decode([DeliveredMessage].self, forKey: .heldMessages)
-            
-            
+
+
             self.acceptedAt = try container.decode(ATProtocolDate.self, forKey: .acceptedAt)
-            
-            
+
+
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
+
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(convoId, forKey: .convoId)
-            
-            
+
+
             try container.encode(heldMessages, forKey: .heldMessages)
-            
-            
+
+
             try container.encode(acceptedAt, forKey: .acceptedAt)
-            
-            
+
+
         }
 
         public func toCBORValue() throws -> Any {
-            
+
             var map = OrderedCBORMap()
 
-            
-            
+
+
             let convoIdValue = try convoId.toCBORValue()
             map = map.adding(key: "convoId", value: convoIdValue)
-            
-            
-            
+
+
+
             let heldMessagesValue = try heldMessages.toCBORValue()
             map = map.adding(key: "heldMessages", value: heldMessagesValue)
-            
-            
-            
+
+
+
             let acceptedAtValue = try acceptedAt.toCBORValue()
             map = map.adding(key: "acceptedAt", value: acceptedAtValue)
-            
-            
+
+
 
             return map
-            
+
         }
-        
-        
+
+
         private enum CodingKeys: String, CodingKey {
             case convoId
             case heldMessages
             case acceptedAt
         }
-        
+
     }
-        
+
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case requestNotFound = "RequestNotFound."
                 case requestExpired = "RequestExpired."
@@ -295,26 +295,26 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - acceptChatRequest
 
     /// Accept a chat request, create MLS group, and deliver held messages
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func acceptChatRequest(
-        
+
         input: BlueCatbirdMlsChatAcceptChatRequest.Input
-        
+
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatAcceptChatRequest.Output?) {
         let endpoint = "blue.catbird.mlsChat.acceptChatRequest"
-        
+
         var headers: [String: String] = [:]
-        
+
         headers["Content-Type"] = "application/json"
-        
-        
-        
+
+
+
         headers["Accept"] = "application/json"
-        
+
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -331,7 +331,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        
+
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
@@ -343,10 +343,10 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         // Only decode response data if request was successful
         if (200...299).contains(responseCode) {
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatAcceptChatRequest.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -357,9 +357,9 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-        
+
     }
-    
+
 }
-                           
+
 

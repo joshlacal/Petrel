@@ -28,6 +28,8 @@ object ChatBskyConvoAddReactionDefs {
         val message: ChatBskyConvoDefsMessageView    )
 
 sealed class ChatBskyConvoAddReactionError(val name: String, val description: String?) {
+        object InvalidConvo: ChatBskyConvoAddReactionError("InvalidConvo", "")
+        object ReactionNotAllowed: ChatBskyConvoAddReactionError("ReactionNotAllowed", "Indicates that reactions are not allowed on this message, e.g. because it is a system message.")
         object ReactionMessageDeleted: ChatBskyConvoAddReactionError("ReactionMessageDeleted", "Indicates that the message has been deleted and reactions can no longer be added/removed.")
         object ReactionLimitReached: ChatBskyConvoAddReactionError("ReactionLimitReached", "Indicates that the message has the maximum number of reactions allowed for a single user, and the requested reaction wasn't yet present. If it was already present, the request will not fail since it is idempotent.")
         object ReactionInvalidValue: ChatBskyConvoAddReactionError("ReactionInvalidValue", "Indicates the value for the reaction is not acceptable. In general, this means it is not an emoji.")

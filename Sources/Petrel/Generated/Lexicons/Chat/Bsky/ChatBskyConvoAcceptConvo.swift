@@ -104,7 +104,19 @@ public struct Output: ATProtocolCodable {
         }
         
     }
+        
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                case invalidConvo = "InvalidConvo."
+            public var description: String {
+                return self.rawValue
+            }
 
+            public var errorName: String {
+                // Extract just the error name from the raw value
+                let parts = self.rawValue.split(separator: ".")
+                return String(parts.first ?? "")
+            }
+        }
 
 
 
@@ -113,7 +125,7 @@ public struct Output: ATProtocolCodable {
 extension ATProtoClient.Chat.Bsky.Convo {
     // MARK: - acceptConvo
 
-    /// 
+    /// Marks a conversation as accepted, so it is shown in the list of accepted convos instead on the request convos.
     /// 
     /// - Parameter input: The input parameters for the request
     

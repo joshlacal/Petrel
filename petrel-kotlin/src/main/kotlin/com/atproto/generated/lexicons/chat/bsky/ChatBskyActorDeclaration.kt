@@ -21,7 +21,8 @@ object ChatBskyActorDeclarationDefs {
     @Serializable
     data class ChatBskyActorDeclaration(
         @SerialName("allowIncoming")
-        val allowIncoming: String    ) {
+        val allowIncoming: String,/** [NOTE: This is under active development and should be considered unstable while this note is here]. Declaration about group chat invitation preferences for the record owner. */        @SerialName("allowGroupInvites")
+        val allowGroupInvites: String? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = ""
         }

@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: blue.catbird.mlsChat.publishKeyPackage
 
 
-public struct BlueCatbirdMlsChatPublishKeyPackage { 
+public struct BlueCatbirdMlsChatPublishKeyPackage {
 
     public static let typeIdentifier = "blue.catbird.mlsChat.publishKeyPackage"
 public struct Input: ATProtocolCodable {
@@ -21,7 +21,7 @@ public struct Input: ATProtocolCodable {
             self.cipherSuite = cipherSuite
             self.expires = expires
         }
-        
+
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -63,43 +63,43 @@ public struct Input: ATProtocolCodable {
             case expires
         }
     }
-    
+
 public struct Output: ATProtocolCodable {
-        
+
         // Empty output - no properties (response is {})
-        
-        
+
+
         // Standard public initializer
         public init(
-            
+
         ) {
-            
+
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
+
             // Empty output - just validate it's an object by trying to get any container
             _ = try decoder.singleValueContainer()
-            
+
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
+
             // Empty output - encode empty object
             _ = encoder.singleValueContainer()
-            
+
         }
 
         public func toCBORValue() throws -> Any {
-            
+
             // Empty output - return empty CBOR map
             return OrderedCBORMap()
-            
+
         }
-        
-        
+
+
     }
-        
+
 public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
                 case invalidKeyPackage = "InvalidKeyPackage.Key package is malformed or invalid"
                 case invalidCipherSuite = "InvalidCipherSuite.Cipher suite is not supported"
@@ -124,26 +124,26 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - publishKeyPackage
 
     /// Publish an MLS key package to enable others to add you to conversations
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func publishKeyPackage(
-        
+
         input: BlueCatbirdMlsChatPublishKeyPackage.Input
-        
+
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatPublishKeyPackage.Output?) {
         let endpoint = "blue.catbird.mlsChat.publishKeyPackage"
-        
+
         var headers: [String: String] = [:]
-        
+
         headers["Content-Type"] = "application/json"
-        
-        
-        
+
+
+
         headers["Accept"] = "application/json"
-        
+
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -160,7 +160,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        
+
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
@@ -172,10 +172,10 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         // Only decode response data if request was successful
         if (200...299).contains(responseCode) {
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatPublishKeyPackage.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -186,9 +186,9 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-        
+
     }
-    
+
 }
-                           
+
 

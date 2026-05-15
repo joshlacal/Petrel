@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: chat.bsky.convo.listConvos
-
+// Returns a page of conversations (direct or group) for the user.
 package com.atproto.generated
 
 import kotlinx.serialization.*
@@ -20,8 +20,9 @@ object ChatBskyConvoListConvosDefs {
         @SerialName("limit")
         val limit: Int? = null,        @SerialName("cursor")
         val cursor: String? = null,        @SerialName("readState")
-        val readState: String? = null,        @SerialName("status")
-        val status: String? = null    )
+        val readState: String? = null,// Filter convos by their status. It is discouraged to call with "request" and preferred to call chat.bsky.convo.listConvoRequests, which also includes group join requests made by the user.        @SerialName("status")
+        val status: String? = null,// Filter by conversation kind.        @SerialName("kind")
+        val kind: String? = null    )
 
     @Serializable
     data class ChatBskyConvoListConvosOutput(
@@ -30,7 +31,7 @@ object ChatBskyConvoListConvosDefs {
         val convos: List<ChatBskyConvoDefsConvoView>    )
 
 /**
- * 
+ * Returns a page of conversations (direct or group) for the user.
  *
  * Endpoint: chat.bsky.convo.listConvos
  */

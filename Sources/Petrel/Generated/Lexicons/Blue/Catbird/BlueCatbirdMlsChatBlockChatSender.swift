@@ -5,7 +5,7 @@ import Foundation
 // lexicon: 1, id: blue.catbird.mlsChat.blockChatSender
 
 
-public struct BlueCatbirdMlsChatBlockChatSender { 
+public struct BlueCatbirdMlsChatBlockChatSender {
 
     public static let typeIdentifier = "blue.catbird.mlsChat.blockChatSender"
 public struct Input: ATProtocolCodable {
@@ -19,7 +19,7 @@ public struct Input: ATProtocolCodable {
             self.requestId = requestId
             self.reason = reason
         }
-        
+
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -56,85 +56,85 @@ public struct Input: ATProtocolCodable {
             case reason
         }
     }
-    
+
 public struct Output: ATProtocolCodable {
-        
-        
+
+
         public let success: Bool
-        
+
         public let blockedCount: Int
-        
-        
-        
+
+
+
         // Standard public initializer
         public init(
-            
-            
+
+
             success: Bool,
-            
+
             blockedCount: Int
-            
-            
+
+
         ) {
-            
-            
+
+
             self.success = success
-            
+
             self.blockedCount = blockedCount
-            
-            
+
+
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
+
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
+
             self.success = try container.decode(Bool.self, forKey: .success)
-            
-            
+
+
             self.blockedCount = try container.decode(Int.self, forKey: .blockedCount)
-            
-            
+
+
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
+
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(success, forKey: .success)
-            
-            
+
+
             try container.encode(blockedCount, forKey: .blockedCount)
-            
-            
+
+
         }
 
         public func toCBORValue() throws -> Any {
-            
+
             var map = OrderedCBORMap()
 
-            
-            
+
+
             let successValue = try success.toCBORValue()
             map = map.adding(key: "success", value: successValue)
-            
-            
-            
+
+
+
             let blockedCountValue = try blockedCount.toCBORValue()
             map = map.adding(key: "blockedCount", value: blockedCountValue)
-            
-            
+
+
 
             return map
-            
+
         }
-        
-        
+
+
         private enum CodingKeys: String, CodingKey {
             case success
             case blockedCount
         }
-        
+
     }
 
 
@@ -146,26 +146,26 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - blockChatSender
 
     /// Block a sender and decline all their pending requests
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func blockChatSender(
-        
+
         input: BlueCatbirdMlsChatBlockChatSender.Input
-        
+
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatBlockChatSender.Output?) {
         let endpoint = "blue.catbird.mlsChat.blockChatSender"
-        
+
         var headers: [String: String] = [:]
-        
+
         headers["Content-Type"] = "application/json"
-        
-        
-        
+
+
+
         headers["Accept"] = "application/json"
-        
+
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -182,7 +182,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        
+
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
@@ -194,10 +194,10 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         // Only decode response data if request was successful
         if (200...299).contains(responseCode) {
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatBlockChatSender.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -208,9 +208,9 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-        
+
     }
-    
+
 }
-                           
+
 

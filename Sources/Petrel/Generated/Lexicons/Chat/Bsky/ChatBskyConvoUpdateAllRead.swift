@@ -111,7 +111,7 @@ public struct Output: ATProtocolCodable {
 extension ATProtoClient.Chat.Bsky.Convo {
     // MARK: - updateAllRead
 
-    /// 
+    /// Sets conversations from a user as read to the latest message, with filters.
     /// 
     /// - Parameter input: The input parameters for the request
     

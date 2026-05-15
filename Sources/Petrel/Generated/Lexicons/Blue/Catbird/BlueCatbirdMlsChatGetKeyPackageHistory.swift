@@ -5,10 +5,10 @@ import Foundation
 // lexicon: 1, id: blue.catbird.mlsChat.getKeyPackageHistory
 
 
-public struct BlueCatbirdMlsChatGetKeyPackageHistory { 
+public struct BlueCatbirdMlsChatGetKeyPackageHistory {
 
     public static let typeIdentifier = "blue.catbird.mlsChat.getKeyPackageHistory"
-        
+
 public struct KeyPackageHistoryEntry: ATProtocolCodable, ATProtocolValue {
             public static let typeIdentifier = "blue.catbird.mlsChat.getKeyPackageHistory#keyPackageHistoryEntry"
             public let packageId: String
@@ -205,103 +205,103 @@ public struct KeyPackageHistoryEntry: ATProtocolCodable, ATProtocolValue {
             case deviceId
             case cipherSuite
         }
-    }    
+    }
 public struct Parameters: Parametrizable {
         public let limit: Int?
         public let cursor: String?
-        
+
         public init(
-            limit: Int? = nil, 
+            limit: Int? = nil,
             cursor: String? = nil
             ) {
             self.limit = limit
             self.cursor = cursor
-            
+
         }
     }
-    
+
 public struct Output: ATProtocolCodable {
-        
-        
+
+
         public let history: [KeyPackageHistoryEntry]
-        
+
         public let cursor: String?
-        
-        
-        
+
+
+
         // Standard public initializer
         public init(
-            
-            
+
+
             history: [KeyPackageHistoryEntry],
-            
+
             cursor: String? = nil
-            
-            
+
+
         ) {
-            
-            
+
+
             self.history = history
-            
+
             self.cursor = cursor
-            
-            
+
+
         }
-        
+
         public init(from decoder: Decoder) throws {
-            
+
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            
+
             self.history = try container.decode([KeyPackageHistoryEntry].self, forKey: .history)
-            
-            
+
+
             self.cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
-            
-            
+
+
         }
-        
+
         public func encode(to encoder: Encoder) throws {
-            
+
             var container = encoder.container(keyedBy: CodingKeys.self)
-            
+
             try container.encode(history, forKey: .history)
-            
-            
+
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(cursor, forKey: .cursor)
-            
-            
+
+
         }
 
         public func toCBORValue() throws -> Any {
-            
+
             var map = OrderedCBORMap()
 
-            
-            
+
+
             let historyValue = try history.toCBORValue()
             map = map.adding(key: "history", value: historyValue)
-            
-            
-            
+
+
+
             if let value = cursor {
                 // Encode optional property even if it's an empty array for CBOR
                 let cursorValue = try value.toCBORValue()
                 map = map.adding(key: "cursor", value: cursorValue)
             }
-            
-            
+
+
 
             return map
-            
+
         }
-        
-        
+
+
         private enum CodingKeys: String, CodingKey {
             case history
             case cursor
         }
-        
+
     }
 
 
@@ -315,17 +315,17 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - getKeyPackageHistory
 
     /// Get key package consumption history for the authenticated user
-    /// 
+    ///
     /// - Parameter input: The input parameters for the request
-    /// 
+    ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func getKeyPackageHistory(input: BlueCatbirdMlsChatGetKeyPackageHistory.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatGetKeyPackageHistory.Output?) {
         let endpoint = "blue.catbird.mlsChat.getKeyPackageHistory"
 
-        
+
         let queryItems = input.asQueryItems()
-        
+
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -351,10 +351,10 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         // Only decode response data if request was successful
         if (200...299).contains(responseCode) {
             do {
-                
+
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatGetKeyPackageHistory.Output.self, from: responseData)
-                
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
@@ -362,12 +362,12 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
                 return (responseCode, nil)
             }
         } else {
-            
+
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-                           
+
 

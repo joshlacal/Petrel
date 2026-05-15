@@ -80,7 +80,19 @@ public struct Output: ATProtocolCodable {
         }
         
     }
+        
+public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+                case invalidConvo = "InvalidConvo."
+            public var description: String {
+                return self.rawValue
+            }
 
+            public var errorName: String {
+                // Extract just the error name from the raw value
+                let parts = self.rawValue.split(separator: ".")
+                return String(parts.first ?? "")
+            }
+        }
 
 
 
@@ -91,7 +103,7 @@ public struct Output: ATProtocolCodable {
 extension ATProtoClient.Chat.Bsky.Convo {
     // MARK: - getConvo
 
-    /// 
+    /// Gets an existing conversation by its ID.
     /// 
     /// - Parameter input: The input parameters for the request
     /// 
