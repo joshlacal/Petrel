@@ -1,14 +1,10 @@
 import Foundation
 
-
-
 // lexicon: 1, id: chat.bsky.convo.updateAllRead
 
-
-public struct ChatBskyConvoUpdateAllRead {
-
+public enum ChatBskyConvoUpdateAllRead {
     public static let typeIdentifier = "chat.bsky.convo.updateAllRead"
-public struct Input: ATProtocolCodable {
+    public struct Input: ATProtocolCodable {
         public let status: String?
 
         /// Standard public initializer
@@ -16,10 +12,9 @@ public struct Input: ATProtocolCodable {
             self.status = status
         }
 
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.status = try container.decodeIfPresent(String.self, forKey: .status)
+            status = try container.decodeIfPresent(String.self, forKey: .status)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -41,85 +36,55 @@ public struct Input: ATProtocolCodable {
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let updatedCount: Int
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             updatedCount: Int
 
-
         ) {
-
-
             self.updatedCount = updatedCount
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.updatedCount = try container.decode(Int.self, forKey: .updatedCount)
-
-
+            updatedCount = try container.decode(Int.self, forKey: .updatedCount)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(updatedCount, forKey: .updatedCount)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let updatedCountValue = try updatedCount.toCBORValue()
             map = map.adding(key: "updatedCount", value: updatedCountValue)
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case updatedCount
         }
-
     }
-
-
-
-
 }
 
-extension ATProtoClient.Chat.Bsky.Convo {
+public extension ATProtoClient.Chat.Bsky.Convo {
     // MARK: - updateAllRead
 
-    /// Sets conversations from a user as read to the latest message, with filters.
-    ///
-    /// - Parameter input: The input parameters for the request
+    // Sets conversations from a user as read to the latest message, with filters.
+    //
+    // - Parameter input: The input parameters for the request
 
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func updateAllRead(
-
+    func updateAllRead(
         input: ChatBskyConvoUpdateAllRead.Input
 
     ) async throws -> (responseCode: Int, data: ChatBskyConvoUpdateAllRead.Output?) {
@@ -129,14 +94,9 @@ extension ATProtoClient.Chat.Bsky.Convo {
 
         headers["Content-Type"] = "application/json"
 
-
-
         headers["Accept"] = "application/json"
 
-
-
         let requestData: Data? = try JSONEncoder().encode(input)
-
 
         let queryItems: [URLQueryItem]? = nil
 
@@ -154,12 +114,10 @@ extension ATProtoClient.Chat.Bsky.Convo {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -168,9 +126,7 @@ extension ATProtoClient.Chat.Bsky.Convo {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(ChatBskyConvoUpdateAllRead.Output.self, from: responseData)
 
@@ -184,9 +140,5 @@ extension ATProtoClient.Chat.Bsky.Convo {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-
     }
-
 }
-
-

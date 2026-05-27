@@ -1,25 +1,21 @@
 import Foundation
 
-
-
 // lexicon: 1, id: chat.bsky.moderation.subscribeModEvents
 
-
-public struct ChatBskyModerationSubscribeModEvents {
-
+public enum ChatBskyModerationSubscribeModEvents {
     public static let typeIdentifier = "chat.bsky.moderation.subscribeModEvents"
 
-public struct EventConvoFirstMessage: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "chat.bsky.moderation.subscribeModEvents#eventConvoFirstMessage"
-            public let convoId: String
-            public let createdAt: ATProtocolDate
-            public let messageId: String
-            public let recipients: [DID]
-            public let rev: String
-            public let user: DID
+    public struct EventConvoFirstMessage: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "chat.bsky.moderation.subscribeModEvents#eventConvoFirstMessage"
+        public let convoId: String
+        public let createdAt: ATProtocolDate
+        public let messageId: String?
+        public let recipients: [DID]
+        public let rev: String
+        public let user: DID
 
         public init(
-            convoId: String, createdAt: ATProtocolDate, messageId: String, recipients: [DID], rev: String, user: DID
+            convoId: String, createdAt: ATProtocolDate, messageId: String?, recipients: [DID], rev: String, user: DID
         ) {
             self.convoId = convoId
             self.createdAt = createdAt
@@ -32,37 +28,37 @@ public struct EventConvoFirstMessage: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: .convoId)
             } catch {
                 LogManager.logError("Decoding error for required property 'convoId': \(error)")
                 throw error
             }
             do {
-                self.createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
             } catch {
                 LogManager.logError("Decoding error for required property 'createdAt': \(error)")
                 throw error
             }
             do {
-                self.messageId = try container.decode(String.self, forKey: .messageId)
+                messageId = try container.decodeIfPresent(String.self, forKey: .messageId)
             } catch {
-                LogManager.logError("Decoding error for required property 'messageId': \(error)")
+                LogManager.logDebug("Decoding error for optional property 'messageId': \(error)")
                 throw error
             }
             do {
-                self.recipients = try container.decode([DID].self, forKey: .recipients)
+                recipients = try container.decode([DID].self, forKey: .recipients)
             } catch {
                 LogManager.logError("Decoding error for required property 'recipients': \(error)")
                 throw error
             }
             do {
-                self.rev = try container.decode(String.self, forKey: .rev)
+                rev = try container.decode(String.self, forKey: .rev)
             } catch {
                 LogManager.logError("Decoding error for required property 'rev': \(error)")
                 throw error
             }
             do {
-                self.user = try container.decode(DID.self, forKey: .user)
+                user = try container.decode(DID.self, forKey: .user)
             } catch {
                 LogManager.logError("Decoding error for required property 'user': \(error)")
                 throw error
@@ -74,7 +70,7 @@ public struct EventConvoFirstMessage: ATProtocolCodable, ATProtocolValue {
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(convoId, forKey: .convoId)
             try container.encode(createdAt, forKey: .createdAt)
-            try container.encode(messageId, forKey: .messageId)
+            try container.encodeIfPresent(messageId, forKey: .messageId)
             try container.encode(recipients, forKey: .recipients)
             try container.encode(rev, forKey: .rev)
             try container.encode(user, forKey: .user)
@@ -83,7 +79,11 @@ public struct EventConvoFirstMessage: ATProtocolCodable, ATProtocolValue {
         public func hash(into hasher: inout Hasher) {
             hasher.combine(convoId)
             hasher.combine(createdAt)
-            hasher.combine(messageId)
+            if let value = messageId {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
             hasher.combine(recipients)
             hasher.combine(rev)
             hasher.combine(user)
@@ -123,8 +123,10 @@ public struct EventConvoFirstMessage: ATProtocolCodable, ATProtocolValue {
             map = map.adding(key: "convoId", value: convoIdValue)
             let createdAtValue = try createdAt.toCBORValue()
             map = map.adding(key: "createdAt", value: createdAtValue)
-            let messageIdValue = try messageId.toCBORValue()
-            map = map.adding(key: "messageId", value: messageIdValue)
+            if let value = messageId {
+                let messageIdValue = try value.toCBORValue()
+                map = map.adding(key: "messageId", value: messageIdValue)
+            }
             let recipientsValue = try recipients.toCBORValue()
             map = map.adding(key: "recipients", value: recipientsValue)
             let revValue = try rev.toCBORValue()
@@ -144,94 +146,83 @@ public struct EventConvoFirstMessage: ATProtocolCodable, ATProtocolValue {
             case user
         }
     }
-public struct Parameters: Parametrizable {
+
+    public struct Parameters: Parametrizable {
         public let cursor: String?
 
         public init(
             cursor: String? = nil
-            ) {
+        ) {
             self.cursor = cursor
-
-        }
-    }
-public enum Message: Codable, Sendable {
-
-    case eventConvoFirstMessage(EventConvoFirstMessage)
-
-
-    enum CodingKeys: String, CodingKey {
-        case type = "$type"
-    }
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        let type = try container.decode(String.self, forKey: .type)
-
-        switch type {
-
-        case "chat.bsky.moderation.subscribeModEvents#eventConvoFirstMessage":
-            let value = try EventConvoFirstMessage(from: decoder)
-            self = .eventConvoFirstMessage(value)
-
-        default:
-            throw DecodingError.dataCorruptedError(
-                forKey: .type,
-                in: container,
-                debugDescription: "Unknown message type: \(type)"
-            )
         }
     }
 
-    public func encode(to encoder: Encoder) throws {
-        switch self {
+    public enum Message: Codable, Sendable {
+        case eventConvoFirstMessage(EventConvoFirstMessage)
 
-        case .eventConvoFirstMessage(let value):
-            try value.encode(to: encoder)
-
+        enum CodingKeys: String, CodingKey {
+            case type = "$type"
         }
-    }
-}
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case futureCursor = "FutureCursor."
-                case consumerTooSlow = "ConsumerTooSlow.If the consumer of the stream can not keep up with events, and a backlog gets too large, the server will drop the connection."
-            public var description: String {
-                return self.rawValue
-            }
 
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let type = try container.decode(String.self, forKey: .type)
+
+            switch type {
+            case "chat.bsky.moderation.subscribeModEvents#eventConvoFirstMessage":
+                let value = try EventConvoFirstMessage(from: decoder)
+                self = .eventConvoFirstMessage(value)
+
+            default:
+                throw DecodingError.dataCorruptedError(
+                    forKey: .type,
+                    in: container,
+                    debugDescription: "Unknown message type: \(type)"
+                )
             }
         }
 
+        public func encode(to encoder: Encoder) throws {
+            switch self {
+            case let .eventConvoFirstMessage(value):
+                try value.encode(to: encoder)
+            }
+        }
+    }
 
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case futureCursor = "FutureCursor."
+        case consumerTooSlow = "ConsumerTooSlow.If the consumer of the stream can not keep up with events, and a backlog gets too large, the server will drop the connection."
+        public var description: String {
+            return rawValue
+        }
 
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
+// Subscribe to stream of chat events targeted to moderation. Private endpoint.
 
-
-
-/// Subscribe to stream of chat events targeted to moderation. Private endpoint.
-
-extension ATProtoClient.Chat.Bsky.Moderation {
-
-    public func subscribeModEvents(
+public extension ATProtoClient.Chat.Bsky.Moderation {
+    func subscribeModEvents(
         cursor: String? = nil
     ) async throws -> AsyncThrowingStream<ChatBskyModerationSubscribeModEvents.Message, Error> {
         let params = ChatBskyModerationSubscribeModEvents.Parameters(cursor: cursor)
-        return try await self.networkService.subscribe(
+        return try await networkService.subscribe(
             endpoint: "chat.bsky.moderation.subscribeModEvents",
             parameters: params
         )
     }
 
     /// Alternative signature accepting input struct
-    public func subscribeModEvents(input: ChatBskyModerationSubscribeModEvents.Parameters) async throws -> AsyncThrowingStream<ChatBskyModerationSubscribeModEvents.Message, Error> {
-        return try await self.networkService.subscribe(
+    func subscribeModEvents(input: ChatBskyModerationSubscribeModEvents.Parameters) async throws -> AsyncThrowingStream<ChatBskyModerationSubscribeModEvents.Message, Error> {
+        return try await networkService.subscribe(
             endpoint: "chat.bsky.moderation.subscribeModEvents",
             parameters: input
         )
     }
-
 }

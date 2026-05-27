@@ -12,7 +12,7 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
     case unknownType(String, ATProtocolValueContainer)
     case decodeError(String)
 
-    // A factory for resolving decoders based on type string
+    /// A factory for resolving decoders based on type string
     struct TypeDecoderFactory {
         typealias DecoderFunction = @Sendable (Decoder) throws -> ATProtocolValueContainer
 
@@ -1741,6 +1741,16 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
 
+            decoders["chat.bsky.convo.defs#convoRef"] = { decoder in
+                do {
+                    let decodedObject = try ChatBskyConvoDefs.ConvoRef(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding ChatBskyConvoDefs.ConvoRef: \(error)")
+                    return .decodeError("Error decoding ChatBskyConvoDefs.ConvoRef: \(error)")
+                }
+            }
+
             decoders["chat.bsky.convo.defs#messageRef"] = { decoder in
                 do {
                     let decodedObject = try ChatBskyConvoDefs.MessageRef(from: decoder)
@@ -2281,13 +2291,13 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
 
-            decoders["chat.bsky.group.defs#groupPublicView"] = { decoder in
+            decoders["chat.bsky.group.defs#joinLinkPreviewView"] = { decoder in
                 do {
-                    let decodedObject = try ChatBskyGroupDefs.GroupPublicView(from: decoder)
+                    let decodedObject = try ChatBskyGroupDefs.JoinLinkPreviewView(from: decoder)
                     return .knownType(decodedObject)
                 } catch {
-                    LogManager.logDebug("Error decoding ChatBskyGroupDefs.GroupPublicView: \(error)")
-                    return .decodeError("Error decoding ChatBskyGroupDefs.GroupPublicView: \(error)")
+                    LogManager.logDebug("Error decoding ChatBskyGroupDefs.JoinLinkPreviewView: \(error)")
+                    return .decodeError("Error decoding ChatBskyGroupDefs.JoinLinkPreviewView: \(error)")
                 }
             }
 
@@ -3854,9 +3864,8 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: DynamicCodingKeys.self)
         if let typeName = container.allKeys.first(where: { $0.stringValue == "$type" }),
-           let typeValue = try? container.decode(String.self, forKey: typeName) {
-
-
+           let typeValue = try? container.decode(String.self, forKey: typeName)
+        {
             if let decoderFunction = ATProtocolValueContainer.decoderFactory.decoder(for: typeValue) {
                 self = try decoderFunction(decoder)
             } else {
@@ -3892,9 +3901,8 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
             return .null
         }
 
-
         if var arrayContainer = try? decoder.unkeyedContainer() {
-            return .array(try decodeAny(from: &arrayContainer))
+            return try .array(decodeAny(from: &arrayContainer))
         }
 
         if let nestedContainer = try? decoder.container(keyedBy: DynamicCodingKeys.self) {
@@ -3909,52 +3917,52 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
         var container = encoder.singleValueContainer()
 
         switch self {
-        case .string(let stringValue):
+        case let .string(stringValue):
             try container.encode(stringValue)
-        case .number(let intValue):
+        case let .number(intValue):
             try container.encode(intValue)
-        case .bigNumber(let bigNumberString):
+        case let .bigNumber(bigNumberString):
             try container.encode(bigNumberString)
-        case .bool(let boolValue):
+        case let .bool(boolValue):
             try container.encode(boolValue)
         case .null:
             try container.encodeNil()
-        case .link(let linkValue):
+        case let .link(linkValue):
             try container.encode(linkValue)
-        case .bytes(let bytesValue):
+        case let .bytes(bytesValue):
             try container.encode(bytesValue)
-        case .array(let arrayValue):
+        case let .array(arrayValue):
             var arrayContainer = encoder.unkeyedContainer()
             for value in arrayValue {
                 try arrayContainer.encode(value)
             }
-        case .object(let objectValue):
+        case let .object(objectValue):
             var objectContainer = encoder.container(keyedBy: DynamicCodingKeys.self)
             for (key, value) in objectValue {
                 let key = DynamicCodingKeys(stringValue: key)!
                 try objectContainer.encode(value, forKey: key)
             }
-        case .knownType(let customValue):
+        case let .knownType(customValue):
             try customValue.encode(to: encoder)
-        case .unknownType(_, let unknownValue):
+        case let .unknownType(_, unknownValue):
             try unknownValue.encode(to: encoder)
-        case .decodeError(let errorMessage):
+        case let .decodeError(errorMessage):
             throw EncodingError.invalidValue(errorMessage, EncodingError.Context(codingPath: encoder.codingPath, debugDescription: "Cannot encode a decoding error."))
         }
     }
 
-    // DAG-CBOR encoding with field ordering
+    /// DAG-CBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
         switch self {
-        case .knownType(let value):
+        case let .knownType(value):
             return try value.toCBORValue()
-        case .string(let string):
+        case let .string(string):
             return string
-        case .number(let number):
+        case let .number(number):
             return number
-        case .bigNumber(let string):
+        case let .bigNumber(string):
             return string
-        case .object(let dict):
+        case let .object(dict):
             var map = OrderedCBORMap()
             // Sort keys to maintain consistent ordering
             let sortedKeys = dict.keys.sorted { a, b in
@@ -3971,19 +3979,19 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
             return map
-        case .array(let array):
+        case let .array(array):
             return try array.map { try $0.toCBORValue() }
-        case .bool(let bool):
+        case let .bool(bool):
             return bool
         case .null:
             return nil as Any?
-        case .link(let link):
+        case let .link(link):
             return link
-        case .bytes(let bytes):
+        case let .bytes(bytes):
             return bytes
-        case .unknownType(_, let container):
+        case let .unknownType(_, container):
             return try container.toCBORValue()
-        case .decodeError(let error):
+        case let .decodeError(error):
             throw DAGCBORError.encodingFailed("Cannot encode error: \(error)")
         }
     }
@@ -3998,7 +4006,7 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
 
         init?(intValue: Int) {
             self.intValue = intValue
-            self.stringValue = String(intValue)
+            stringValue = String(intValue)
         }
     }
 
@@ -4042,9 +4050,9 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
             } else if let value = try? unkeyedContainer.decode(String.self) {
                 array.append(.string(value))
             } else if var nestedArrayContainer = try? unkeyedContainer.nestedUnkeyedContainer() {
-                array.append(.array(try decodeAny(from: &nestedArrayContainer)))
+                try array.append(.array(decodeAny(from: &nestedArrayContainer)))
             } else if let nestedContainer = try? unkeyedContainer.nestedContainer(keyedBy: DynamicCodingKeys.self) {
-                array.append(try decodeAny(from: nestedContainer))
+                try array.append(decodeAny(from: nestedContainer))
             } else {
                 LogManager.logDebug("Cannot decode array element at index \(unkeyedContainer.currentIndex)")
                 array.append(.decodeError("Cannot decode array element at index \(unkeyedContainer.currentIndex)"))

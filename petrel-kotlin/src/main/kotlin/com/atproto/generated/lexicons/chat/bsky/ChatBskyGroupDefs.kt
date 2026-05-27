@@ -43,14 +43,15 @@ enum class ChatBskyGroupDefsJoinRule {
     }
 
     @Serializable
-    data class ChatBskyGroupDefsGroupPublicView(
+    data class ChatBskyGroupDefsJoinLinkPreviewView(
         @SerialName("name")
         val name: String,        @SerialName("owner")
         val owner: ChatBskyActorDefsProfileViewBasic,        @SerialName("memberCount")
         val memberCount: Int,        @SerialName("requireApproval")
-        val requireApproval: Boolean    ) {
+        val requireApproval: Boolean,/** Present only if the request is authenticated and the user is a member of the group. */        @SerialName("convo")
+        val convo: ChatBskyConvoDefsConvoView? = null    ) {
         companion object {
-            const val TYPE_IDENTIFIER = "#chatBskyGroupDefsGroupPublicView"
+            const val TYPE_IDENTIFIER = "#chatBskyGroupDefsJoinLinkPreviewView"
         }
     }
 

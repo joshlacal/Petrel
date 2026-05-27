@@ -891,6 +891,16 @@ enum class ChatBskyConvoDefsConvoStatus {
     ACCEPTED}
 
     @Serializable
+    data class ChatBskyConvoDefsConvoRef(
+        @SerialName("did")
+        val did: DID,        @SerialName("convoId")
+        val convoId: String    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#chatBskyConvoDefsConvoRef"
+        }
+    }
+
+    @Serializable
     data class ChatBskyConvoDefsMessageRef(
         @SerialName("did")
         val did: DID,        @SerialName("convoId")

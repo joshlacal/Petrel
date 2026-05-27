@@ -30,7 +30,7 @@
     },
     "eventConvoFirstMessage": {
       "type": "object",
-      "required": ["createdAt", "rev", "convoId", "messageId", "user", "recipients"],
+      "required": ["createdAt", "rev", "convoId", "user", "recipients"],
       "properties": {
         "convoId": { "type": "string" },
         "createdAt": { "type": "string", "format": "datetime" },

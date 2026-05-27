@@ -1,21 +1,17 @@
 import Foundation
 
-
-
 // lexicon: 1, id: chat.bsky.group.defs
 
-
-public struct ChatBskyGroupDefs {
-
+public enum ChatBskyGroupDefs {
     public static let typeIdentifier = "chat.bsky.group.defs"
 
-public struct JoinLinkView: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "chat.bsky.group.defs#joinLinkView"
-            public let code: String
-            public let enabledStatus: LinkEnabledStatus
-            public let requireApproval: Bool
-            public let joinRule: JoinRule
-            public let createdAt: ATProtocolDate
+    public struct JoinLinkView: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "chat.bsky.group.defs#joinLinkView"
+        public let code: String
+        public let enabledStatus: LinkEnabledStatus
+        public let requireApproval: Bool
+        public let joinRule: JoinRule
+        public let createdAt: ATProtocolDate
 
         public init(
             code: String, enabledStatus: LinkEnabledStatus, requireApproval: Bool, joinRule: JoinRule, createdAt: ATProtocolDate
@@ -30,31 +26,31 @@ public struct JoinLinkView: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.code = try container.decode(String.self, forKey: .code)
+                code = try container.decode(String.self, forKey: .code)
             } catch {
                 LogManager.logError("Decoding error for required property 'code': \(error)")
                 throw error
             }
             do {
-                self.enabledStatus = try container.decode(LinkEnabledStatus.self, forKey: .enabledStatus)
+                enabledStatus = try container.decode(LinkEnabledStatus.self, forKey: .enabledStatus)
             } catch {
                 LogManager.logError("Decoding error for required property 'enabledStatus': \(error)")
                 throw error
             }
             do {
-                self.requireApproval = try container.decode(Bool.self, forKey: .requireApproval)
+                requireApproval = try container.decode(Bool.self, forKey: .requireApproval)
             } catch {
                 LogManager.logError("Decoding error for required property 'requireApproval': \(error)")
                 throw error
             }
             do {
-                self.joinRule = try container.decode(JoinRule.self, forKey: .joinRule)
+                joinRule = try container.decode(JoinRule.self, forKey: .joinRule)
             } catch {
                 LogManager.logError("Decoding error for required property 'joinRule': \(error)")
                 throw error
             }
             do {
-                self.createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
             } catch {
                 LogManager.logError("Decoding error for required property 'createdAt': \(error)")
                 throw error
@@ -129,46 +125,54 @@ public struct JoinLinkView: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-public struct GroupPublicView: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "chat.bsky.group.defs#groupPublicView"
-            public let name: String
-            public let owner: ChatBskyActorDefs.ProfileViewBasic
-            public let memberCount: Int
-            public let requireApproval: Bool
+    public struct JoinLinkPreviewView: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "chat.bsky.group.defs#joinLinkPreviewView"
+        public let name: String
+        public let owner: ChatBskyActorDefs.ProfileViewBasic
+        public let memberCount: Int
+        public let requireApproval: Bool
+        public let convo: ChatBskyConvoDefs.ConvoView?
 
         public init(
-            name: String, owner: ChatBskyActorDefs.ProfileViewBasic, memberCount: Int, requireApproval: Bool
+            name: String, owner: ChatBskyActorDefs.ProfileViewBasic, memberCount: Int, requireApproval: Bool, convo: ChatBskyConvoDefs.ConvoView?
         ) {
             self.name = name
             self.owner = owner
             self.memberCount = memberCount
             self.requireApproval = requireApproval
+            self.convo = convo
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.name = try container.decode(String.self, forKey: .name)
+                name = try container.decode(String.self, forKey: .name)
             } catch {
                 LogManager.logError("Decoding error for required property 'name': \(error)")
                 throw error
             }
             do {
-                self.owner = try container.decode(ChatBskyActorDefs.ProfileViewBasic.self, forKey: .owner)
+                owner = try container.decode(ChatBskyActorDefs.ProfileViewBasic.self, forKey: .owner)
             } catch {
                 LogManager.logError("Decoding error for required property 'owner': \(error)")
                 throw error
             }
             do {
-                self.memberCount = try container.decode(Int.self, forKey: .memberCount)
+                memberCount = try container.decode(Int.self, forKey: .memberCount)
             } catch {
                 LogManager.logError("Decoding error for required property 'memberCount': \(error)")
                 throw error
             }
             do {
-                self.requireApproval = try container.decode(Bool.self, forKey: .requireApproval)
+                requireApproval = try container.decode(Bool.self, forKey: .requireApproval)
             } catch {
                 LogManager.logError("Decoding error for required property 'requireApproval': \(error)")
+                throw error
+            }
+            do {
+                convo = try container.decodeIfPresent(ChatBskyConvoDefs.ConvoView.self, forKey: .convo)
+            } catch {
+                LogManager.logDebug("Decoding error for optional property 'convo': \(error)")
                 throw error
             }
         }
@@ -180,6 +184,7 @@ public struct GroupPublicView: ATProtocolCodable, ATProtocolValue {
             try container.encode(owner, forKey: .owner)
             try container.encode(memberCount, forKey: .memberCount)
             try container.encode(requireApproval, forKey: .requireApproval)
+            try container.encodeIfPresent(convo, forKey: .convo)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -187,6 +192,11 @@ public struct GroupPublicView: ATProtocolCodable, ATProtocolValue {
             hasher.combine(owner)
             hasher.combine(memberCount)
             hasher.combine(requireApproval)
+            if let value = convo {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -201,6 +211,9 @@ public struct GroupPublicView: ATProtocolCodable, ATProtocolValue {
                 return false
             }
             if requireApproval != other.requireApproval {
+                return false
+            }
+            if convo != other.convo {
                 return false
             }
             return true
@@ -221,6 +234,10 @@ public struct GroupPublicView: ATProtocolCodable, ATProtocolValue {
             map = map.adding(key: "memberCount", value: memberCountValue)
             let requireApprovalValue = try requireApproval.toCBORValue()
             map = map.adding(key: "requireApproval", value: requireApprovalValue)
+            if let value = convo {
+                let convoValue = try value.toCBORValue()
+                map = map.adding(key: "convo", value: convoValue)
+            }
             return map
         }
 
@@ -230,14 +247,15 @@ public struct GroupPublicView: ATProtocolCodable, ATProtocolValue {
             case owner
             case memberCount
             case requireApproval
+            case convo
         }
     }
 
-public struct JoinRequestView: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "chat.bsky.group.defs#joinRequestView"
-            public let convoId: String
-            public let requestedBy: ChatBskyActorDefs.ProfileViewBasic
-            public let requestedAt: ATProtocolDate
+    public struct JoinRequestView: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "chat.bsky.group.defs#joinRequestView"
+        public let convoId: String
+        public let requestedBy: ChatBskyActorDefs.ProfileViewBasic
+        public let requestedAt: ATProtocolDate
 
         public init(
             convoId: String, requestedBy: ChatBskyActorDefs.ProfileViewBasic, requestedAt: ATProtocolDate
@@ -250,19 +268,19 @@ public struct JoinRequestView: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: .convoId)
             } catch {
                 LogManager.logError("Decoding error for required property 'convoId': \(error)")
                 throw error
             }
             do {
-                self.requestedBy = try container.decode(ChatBskyActorDefs.ProfileViewBasic.self, forKey: .requestedBy)
+                requestedBy = try container.decode(ChatBskyActorDefs.ProfileViewBasic.self, forKey: .requestedBy)
             } catch {
                 LogManager.logError("Decoding error for required property 'requestedBy': \(error)")
                 throw error
             }
             do {
-                self.requestedAt = try container.decode(ATProtocolDate.self, forKey: .requestedAt)
+                requestedAt = try container.decode(ATProtocolDate.self, forKey: .requestedAt)
             } catch {
                 LogManager.logError("Decoding error for required property 'requestedAt': \(error)")
                 throw error
@@ -321,98 +339,89 @@ public struct JoinRequestView: ATProtocolCodable, ATProtocolValue {
         }
     }
 
+    public struct LinkEnabledStatus: Codable, ATProtocolCodable, ATProtocolValue {
+        public let rawValue: String
 
+        /// Predefined constants
+        ///
+        public static let enabled = LinkEnabledStatus(rawValue: "enabled")
+        ///
+        public static let disabled = LinkEnabledStatus(rawValue: "disabled")
 
-public struct LinkEnabledStatus: Codable, ATProtocolCodable, ATProtocolValue {
-            public let rawValue: String
-
-            // Predefined constants
-            //
-            public static let enabled = LinkEnabledStatus(rawValue: "enabled")
-            //
-            public static let disabled = LinkEnabledStatus(rawValue: "disabled")
-
-            public init(rawValue: String) {
-                self.rawValue = rawValue
-            }
-
-            public init(from decoder: Decoder) throws {
-                let container = try decoder.singleValueContainer()
-                rawValue = try container.decode(String.self)
-            }
-
-            public func encode(to encoder: Encoder) throws {
-                var container = encoder.singleValueContainer()
-                try container.encode(rawValue)
-            }
-
-            public func isEqual(to other: any ATProtocolValue) -> Bool {
-                guard let otherValue = other as? LinkEnabledStatus else { return false }
-                return self.rawValue == otherValue.rawValue
-            }
-
-            // DAGCBOR encoding with field ordering
-            public func toCBORValue() throws -> Any {
-                // For string-based enum types, we return the raw string value directly
-                return rawValue
-            }
-
-            // Provide allCases-like functionality
-            public static var predefinedValues: [LinkEnabledStatus] {
-                return [
-                    .enabled,
-                    .disabled,
-                ]
-            }
+        public init(rawValue: String) {
+            self.rawValue = rawValue
         }
 
-
-public struct JoinRule: Codable, ATProtocolCodable, ATProtocolValue {
-            public let rawValue: String
-
-            // Predefined constants
-            //
-            public static let anyone = JoinRule(rawValue: "anyone")
-            //
-            public static let followedbyowner = JoinRule(rawValue: "followedByOwner")
-
-            public init(rawValue: String) {
-                self.rawValue = rawValue
-            }
-
-            public init(from decoder: Decoder) throws {
-                let container = try decoder.singleValueContainer()
-                rawValue = try container.decode(String.self)
-            }
-
-            public func encode(to encoder: Encoder) throws {
-                var container = encoder.singleValueContainer()
-                try container.encode(rawValue)
-            }
-
-            public func isEqual(to other: any ATProtocolValue) -> Bool {
-                guard let otherValue = other as? JoinRule else { return false }
-                return self.rawValue == otherValue.rawValue
-            }
-
-            // DAGCBOR encoding with field ordering
-            public func toCBORValue() throws -> Any {
-                // For string-based enum types, we return the raw string value directly
-                return rawValue
-            }
-
-            // Provide allCases-like functionality
-            public static var predefinedValues: [JoinRule] {
-                return [
-                    .anyone,
-                    .followedbyowner,
-                ]
-            }
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            rawValue = try container.decode(String.self)
         }
 
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.singleValueContainer()
+            try container.encode(rawValue)
+        }
 
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? LinkEnabledStatus else { return false }
+            return rawValue == otherValue.rawValue
+        }
+
+        /// DAGCBOR encoding with field ordering
+        public func toCBORValue() throws -> Any {
+            // For string-based enum types, we return the raw string value directly
+            return rawValue
+        }
+
+        /// Provide allCases-like functionality
+        public static var predefinedValues: [LinkEnabledStatus] {
+            return [
+                .enabled,
+                .disabled,
+            ]
+        }
+    }
+
+    public struct JoinRule: Codable, ATProtocolCodable, ATProtocolValue {
+        public let rawValue: String
+
+        /// Predefined constants
+        ///
+        public static let anyone = JoinRule(rawValue: "anyone")
+        ///
+        public static let followedbyowner = JoinRule(rawValue: "followedByOwner")
+
+        public init(rawValue: String) {
+            self.rawValue = rawValue
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            rawValue = try container.decode(String.self)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.singleValueContainer()
+            try container.encode(rawValue)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? JoinRule else { return false }
+            return rawValue == otherValue.rawValue
+        }
+
+        /// DAGCBOR encoding with field ordering
+        public func toCBORValue() throws -> Any {
+            // For string-based enum types, we return the raw string value directly
+            return rawValue
+        }
+
+        /// Provide allCases-like functionality
+        public static var predefinedValues: [JoinRule] {
+            return [
+                .anyone,
+                .followedbyowner,
+            ]
+        }
+    }
 }
-
-
-
-

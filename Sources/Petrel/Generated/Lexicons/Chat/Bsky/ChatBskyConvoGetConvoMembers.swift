@@ -1,14 +1,10 @@
 import Foundation
 
-
-
 // lexicon: 1, id: chat.bsky.convo.getConvoMembers
 
-
-public struct ChatBskyConvoGetConvoMembers {
-
+public enum ChatBskyConvoGetConvoMembers {
     public static let typeIdentifier = "chat.bsky.convo.getConvoMembers"
-public struct Parameters: Parametrizable {
+    public struct Parameters: Parametrizable {
         public let convoId: String
         public let limit: Int?
         public let cursor: String?
@@ -17,72 +13,49 @@ public struct Parameters: Parametrizable {
             convoId: String,
             limit: Int? = nil,
             cursor: String? = nil
-            ) {
+        ) {
             self.convoId = convoId
             self.limit = limit
             self.cursor = cursor
-
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let cursor: String?
 
         public let members: [ChatBskyActorDefs.ProfileViewBasic]
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             cursor: String? = nil,
 
             members: [ChatBskyActorDefs.ProfileViewBasic]
 
-
         ) {
-
-
             self.cursor = cursor
 
             self.members = members
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
 
-
-            self.members = try container.decode([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .members)
-
-
+            members = try container.decode([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .members)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(cursor, forKey: .cursor)
 
-
             try container.encode(members, forKey: .members)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             if let value = cursor {
                 // Encode optional property even if it's an empty array for CBOR
@@ -90,45 +63,33 @@ public struct Output: ATProtocolCodable {
                 map = map.adding(key: "cursor", value: cursorValue)
             }
 
-
-
             let membersValue = try members.toCBORValue()
             map = map.adding(key: "members", value: membersValue)
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case cursor
             case members
         }
-
     }
 
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case invalidConvo = "InvalidConvo."
-            public var description: String {
-                return self.rawValue
-            }
-
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case invalidConvo = "InvalidConvo."
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-
-
-extension ATProtoClient.Chat.Bsky.Convo {
+public extension ATProtoClient.Chat.Bsky.Convo {
     // MARK: - getConvoMembers
 
     /// Returns a paginated list of members from a conversation.
@@ -137,9 +98,8 @@ extension ATProtoClient.Chat.Bsky.Convo {
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func getConvoMembers(input: ChatBskyConvoGetConvoMembers.Parameters) async throws -> (responseCode: Int, data: ChatBskyConvoGetConvoMembers.Output?) {
+    func getConvoMembers(input: ChatBskyConvoGetConvoMembers.Parameters) async throws -> (responseCode: Int, data: ChatBskyConvoGetConvoMembers.Output?) {
         let endpoint = "chat.bsky.convo.getConvoMembers"
-
 
         let queryItems = input.asQueryItems()
 
@@ -160,8 +120,7 @@ extension ATProtoClient.Chat.Bsky.Convo {
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -170,9 +129,7 @@ extension ATProtoClient.Chat.Bsky.Convo {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(ChatBskyConvoGetConvoMembers.Output.self, from: responseData)
 
@@ -183,12 +140,9 @@ extension ATProtoClient.Chat.Bsky.Convo {
                 return (responseCode, nil)
             }
         } else {
-
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
-

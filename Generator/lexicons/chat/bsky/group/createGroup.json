@@ -20,7 +20,6 @@
           "properties": {
             "members": {
               "type": "array",
-              "minLength": 1,
               "maxLength": 49,
               "items": {
                 "type": "string",
