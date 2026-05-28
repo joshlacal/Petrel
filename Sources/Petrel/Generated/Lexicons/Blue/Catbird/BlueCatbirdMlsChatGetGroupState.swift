@@ -11,13 +11,19 @@ public struct BlueCatbirdMlsChatGetGroupState {
 public struct Parameters: Parametrizable {
         public let convoId: String
         public let include: String?
+        public let keyPackageHashes: [String]?
+        public let deviceId: String?
 
         public init(
             convoId: String,
-            include: String? = nil
+            include: String? = nil,
+            keyPackageHashes: [String]? = nil,
+            deviceId: String? = nil
             ) {
             self.convoId = convoId
             self.include = include
+            self.keyPackageHashes = keyPackageHashes
+            self.deviceId = deviceId
 
         }
     }
@@ -237,5 +243,4 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         }
     }
 }
-
 

@@ -19,7 +19,9 @@ object BlueCatbirdMlsChatGetGroupStateDefs {
     data class BlueCatbirdMlsChatGetGroupStateParameters(
 // Conversation identifier        @SerialName("convoId")
         val convoId: String,// Comma-separated list of state components to include: 'groupInfo' (TLS-serialized GroupInfo for external commit), 'welcome' (pending Welcome message), 'epoch' (current epoch number). Defaults to 'groupInfo,epoch'.        @SerialName("include")
-        val include: String? = null    )
+        val include: String? = null,// Hex-encoded local key package hash references held by the caller. When fetching a Welcome, the server only returns a per-device Welcome whose keyPackageHash is in this list.        @SerialName("keyPackageHashes")
+        val keyPackageHashes: List<String>? = null,// Caller device identifier. Used as a fallback routing hint for Welcome selection and key-package diagnostics.        @SerialName("deviceId")
+        val deviceId: String? = null    )
 
     @Serializable
     data class BlueCatbirdMlsChatGetGroupStateOutput(

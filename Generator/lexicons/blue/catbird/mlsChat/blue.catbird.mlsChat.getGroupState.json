@@ -18,6 +18,18 @@
             "type": "string",
             "description": "Comma-separated list of state components to include: 'groupInfo' (TLS-serialized GroupInfo for external commit), 'welcome' (pending Welcome message), 'epoch' (current epoch number). Defaults to 'groupInfo,epoch'.",
             "default": "groupInfo,epoch"
+          },
+          "keyPackageHashes": {
+            "type": "array",
+            "description": "Hex-encoded local key package hash references held by the caller. When fetching a Welcome, the server only returns a per-device Welcome whose keyPackageHash is in this list.",
+            "maxLength": 200,
+            "items": {
+              "type": "string"
+            }
+          },
+          "deviceId": {
+            "type": "string",
+            "description": "Caller device identifier. Used as a fallback routing hint for Welcome selection and key-package diagnostics."
           }
         }
       },
