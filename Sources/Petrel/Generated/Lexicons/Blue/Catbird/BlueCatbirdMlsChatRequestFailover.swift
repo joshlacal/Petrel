@@ -1,14 +1,10 @@
 import Foundation
 
-
-
 // lexicon: 1, id: blue.catbird.mlsChat.requestFailover
 
-
-public struct BlueCatbirdMlsChatRequestFailover {
-
+public enum BlueCatbirdMlsChatRequestFailover {
     public static let typeIdentifier = "blue.catbird.mlsChat.requestFailover"
-public struct Input: ATProtocolCodable {
+    public struct Input: ATProtocolCodable {
         public let convoId: String
 
         /// Standard public initializer
@@ -16,10 +12,9 @@ public struct Input: ATProtocolCodable {
             self.convoId = convoId
         }
 
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.convoId = try container.decode(String.self, forKey: .convoId)
+            convoId = try container.decode(String.self, forKey: .convoId)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -39,9 +34,7 @@ public struct Input: ATProtocolCodable {
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let newSequencerDid: DID
 
         public let convoId: String
@@ -50,12 +43,8 @@ public struct Output: ATProtocolCodable {
 
         public let sequencerTerm: Int
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             newSequencerDid: DID,
 
             convoId: String,
@@ -64,10 +53,7 @@ public struct Output: ATProtocolCodable {
 
             sequencerTerm: Int
 
-
         ) {
-
-
             self.newSequencerDid = newSequencerDid
 
             self.convoId = convoId
@@ -75,76 +61,49 @@ public struct Output: ATProtocolCodable {
             self.epoch = epoch
 
             self.sequencerTerm = sequencerTerm
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.newSequencerDid = try container.decode(DID.self, forKey: .newSequencerDid)
+            newSequencerDid = try container.decode(DID.self, forKey: .newSequencerDid)
 
+            convoId = try container.decode(String.self, forKey: .convoId)
 
-            self.convoId = try container.decode(String.self, forKey: .convoId)
+            epoch = try container.decode(Int.self, forKey: .epoch)
 
-
-            self.epoch = try container.decode(Int.self, forKey: .epoch)
-
-
-            self.sequencerTerm = try container.decode(Int.self, forKey: .sequencerTerm)
-
-
+            sequencerTerm = try container.decode(Int.self, forKey: .sequencerTerm)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(newSequencerDid, forKey: .newSequencerDid)
 
-
             try container.encode(convoId, forKey: .convoId)
-
 
             try container.encode(epoch, forKey: .epoch)
 
-
             try container.encode(sequencerTerm, forKey: .sequencerTerm)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let newSequencerDidValue = try newSequencerDid.toCBORValue()
             map = map.adding(key: "newSequencerDid", value: newSequencerDidValue)
 
-
-
             let convoIdValue = try convoId.toCBORValue()
             map = map.adding(key: "convoId", value: convoIdValue)
-
-
 
             let epochValue = try epoch.toCBORValue()
             map = map.adding(key: "epoch", value: epochValue)
 
-
-
             let sequencerTermValue = try sequencerTerm.toCBORValue()
             map = map.adding(key: "sequencerTerm", value: sequencerTermValue)
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case newSequencerDid
@@ -152,40 +111,35 @@ public struct Output: ATProtocolCodable {
             case epoch
             case sequencerTerm
         }
-
     }
 
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case convoNotFound = "ConvoNotFound.Conversation not found"
-                case notMember = "NotMember.Caller is not a member of the conversation"
-                case sequencerHealthy = "SequencerHealthy.Current sequencer is still healthy, failover denied"
-            public var description: String {
-                return self.rawValue
-            }
-
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case convoNotFound = "ConvoNotFound.Conversation not found"
+        case notMember = "NotMember.Caller is not a member of the conversation"
+        case sequencerHealthy = "SequencerHealthy.Current sequencer is still healthy, failover denied"
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-extension ATProtoClient.Blue.Catbird.MlsChat {
+public extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - requestFailover
 
-    /// Request sequencer failover when the current sequencer is unreachable Request sequencer failover for a conversation. Only members may call this. The handler health-checks the current sequencer before allowing the takeover. Returns CONFLICT if the current sequencer is still healthy.
-    ///
-    /// - Parameter input: The input parameters for the request
+    // Request sequencer failover when the current sequencer is unreachable Request sequencer failover for a conversation. Only members may call this. The handler health-checks the current sequencer before allowing the takeover. Returns CONFLICT if the current sequencer is still healthy.
+    //
+    // - Parameter input: The input parameters for the request
 
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func requestFailover(
-
+    func requestFailover(
         input: BlueCatbirdMlsChatRequestFailover.Input
 
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatRequestFailover.Output?) {
@@ -195,14 +149,9 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
 
         headers["Content-Type"] = "application/json"
 
-
-
         headers["Accept"] = "application/json"
 
-
-
         let requestData: Data? = try JSONEncoder().encode(input)
-
 
         let queryItems: [URLQueryItem]? = nil
 
@@ -220,12 +169,10 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -234,9 +181,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatRequestFailover.Output.self, from: responseData)
 
@@ -250,9 +195,5 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-
     }
-
 }
-
-

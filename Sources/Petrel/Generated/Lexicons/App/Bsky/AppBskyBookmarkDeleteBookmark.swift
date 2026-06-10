@@ -1,14 +1,10 @@
 import Foundation
 
-
-
 // lexicon: 1, id: app.bsky.bookmark.deleteBookmark
 
-
-public struct AppBskyBookmarkDeleteBookmark {
-
+public enum AppBskyBookmarkDeleteBookmark {
     public static let typeIdentifier = "app.bsky.bookmark.deleteBookmark"
-public struct Input: ATProtocolCodable {
+    public struct Input: ATProtocolCodable {
         public let uri: ATProtocolURI
 
         /// Standard public initializer
@@ -16,10 +12,9 @@ public struct Input: ATProtocolCodable {
             self.uri = uri
         }
 
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+            uri = try container.decode(ATProtocolURI.self, forKey: .uri)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -38,35 +33,32 @@ public struct Input: ATProtocolCodable {
             case uri
         }
     }
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case unsupportedCollection = "UnsupportedCollection.The URI to be bookmarked is for an unsupported collection."
-            public var description: String {
-                return self.rawValue
-            }
 
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case unsupportedCollection = "UnsupportedCollection.The URI to be bookmarked is for an unsupported collection."
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-extension ATProtoClient.App.Bsky.Bookmark {
+public extension ATProtoClient.App.Bsky.Bookmark {
     // MARK: - deleteBookmark
 
-    /// Deletes a private bookmark for the specified record. Currently, only `app.bsky.feed.post` records are supported. Requires authentication.
-    ///
-    /// - Parameter input: The input parameters for the request
+    // Deletes a private bookmark for the specified record. Currently, only `app.bsky.feed.post` records are supported. Requires authentication.
+    //
+    // - Parameter input: The input parameters for the request
 
     ///
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func deleteBookmark(
-
+    func deleteBookmark(
         input: AppBskyBookmarkDeleteBookmark.Input
 
     ) async throws -> Int {
@@ -76,12 +68,7 @@ extension ATProtoClient.App.Bsky.Bookmark {
 
         headers["Content-Type"] = "application/json"
 
-
-
-
-
         let requestData: Data? = try JSONEncoder().encode(input)
-
 
         let queryItems: [URLQueryItem]? = nil
 
@@ -97,13 +84,6 @@ extension ATProtoClient.App.Bsky.Bookmark {
         let serviceDID = await networkService.getServiceDID(for: "app.bsky.bookmark.deleteBookmark")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
         let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        let responseCode = response.statusCode
-
-
-        return responseCode
-
+        return response.statusCode
     }
-
 }
-
-

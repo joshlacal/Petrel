@@ -1,22 +1,18 @@
 import Foundation
 
-
-
 // lexicon: 1, id: blue.catbird.mlsChat.updateConvo
 
-
-public struct BlueCatbirdMlsChatUpdateConvo {
-
+public enum BlueCatbirdMlsChatUpdateConvo {
     public static let typeIdentifier = "blue.catbird.mlsChat.updateConvo"
 
-public struct PolicyInput: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "blue.catbird.mlsChat.updateConvo#policyInput"
-            public let allowInvites: Bool?
-            public let adminOnlyInvites: Bool?
-            public let allowMemberAdd: Bool?
-            public let allowMemberRemove: Bool?
-            public let requireAdminApproval: Bool?
-            public let maxMembers: Int?
+    public struct PolicyInput: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "blue.catbird.mlsChat.updateConvo#policyInput"
+        public let allowInvites: Bool?
+        public let adminOnlyInvites: Bool?
+        public let allowMemberAdd: Bool?
+        public let allowMemberRemove: Bool?
+        public let requireAdminApproval: Bool?
+        public let maxMembers: Int?
 
         public init(
             allowInvites: Bool?, adminOnlyInvites: Bool?, allowMemberAdd: Bool?, allowMemberRemove: Bool?, requireAdminApproval: Bool?, maxMembers: Int?
@@ -32,37 +28,37 @@ public struct PolicyInput: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.allowInvites = try container.decodeIfPresent(Bool.self, forKey: .allowInvites)
+                allowInvites = try container.decodeIfPresent(Bool.self, forKey: .allowInvites)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'allowInvites': \(error)")
                 throw error
             }
             do {
-                self.adminOnlyInvites = try container.decodeIfPresent(Bool.self, forKey: .adminOnlyInvites)
+                adminOnlyInvites = try container.decodeIfPresent(Bool.self, forKey: .adminOnlyInvites)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'adminOnlyInvites': \(error)")
                 throw error
             }
             do {
-                self.allowMemberAdd = try container.decodeIfPresent(Bool.self, forKey: .allowMemberAdd)
+                allowMemberAdd = try container.decodeIfPresent(Bool.self, forKey: .allowMemberAdd)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'allowMemberAdd': \(error)")
                 throw error
             }
             do {
-                self.allowMemberRemove = try container.decodeIfPresent(Bool.self, forKey: .allowMemberRemove)
+                allowMemberRemove = try container.decodeIfPresent(Bool.self, forKey: .allowMemberRemove)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'allowMemberRemove': \(error)")
                 throw error
             }
             do {
-                self.requireAdminApproval = try container.decodeIfPresent(Bool.self, forKey: .requireAdminApproval)
+                requireAdminApproval = try container.decodeIfPresent(Bool.self, forKey: .requireAdminApproval)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'requireAdminApproval': \(error)")
                 throw error
             }
             do {
-                self.maxMembers = try container.decodeIfPresent(Int.self, forKey: .maxMembers)
+                maxMembers = try container.decodeIfPresent(Int.self, forKey: .maxMembers)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'maxMembers': \(error)")
                 throw error
@@ -181,17 +177,17 @@ public struct PolicyInput: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-public struct PolicyView: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "blue.catbird.mlsChat.updateConvo#policyView"
-            public let convoId: String
-            public let allowInvites: Bool
-            public let adminOnlyInvites: Bool
-            public let allowMemberAdd: Bool
-            public let allowMemberRemove: Bool
-            public let requireAdminApproval: Bool
-            public let maxMembers: Int
-            public let updatedAt: ATProtocolDate
-            public let updatedBy: DID?
+    public struct PolicyView: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "blue.catbird.mlsChat.updateConvo#policyView"
+        public let convoId: String
+        public let allowInvites: Bool
+        public let adminOnlyInvites: Bool
+        public let allowMemberAdd: Bool
+        public let allowMemberRemove: Bool
+        public let requireAdminApproval: Bool
+        public let maxMembers: Int
+        public let updatedAt: ATProtocolDate
+        public let updatedBy: DID?
 
         public init(
             convoId: String, allowInvites: Bool, adminOnlyInvites: Bool, allowMemberAdd: Bool, allowMemberRemove: Bool, requireAdminApproval: Bool, maxMembers: Int, updatedAt: ATProtocolDate, updatedBy: DID?
@@ -210,55 +206,55 @@ public struct PolicyView: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: .convoId)
             } catch {
                 LogManager.logError("Decoding error for required property 'convoId': \(error)")
                 throw error
             }
             do {
-                self.allowInvites = try container.decode(Bool.self, forKey: .allowInvites)
+                allowInvites = try container.decode(Bool.self, forKey: .allowInvites)
             } catch {
                 LogManager.logError("Decoding error for required property 'allowInvites': \(error)")
                 throw error
             }
             do {
-                self.adminOnlyInvites = try container.decode(Bool.self, forKey: .adminOnlyInvites)
+                adminOnlyInvites = try container.decode(Bool.self, forKey: .adminOnlyInvites)
             } catch {
                 LogManager.logError("Decoding error for required property 'adminOnlyInvites': \(error)")
                 throw error
             }
             do {
-                self.allowMemberAdd = try container.decode(Bool.self, forKey: .allowMemberAdd)
+                allowMemberAdd = try container.decode(Bool.self, forKey: .allowMemberAdd)
             } catch {
                 LogManager.logError("Decoding error for required property 'allowMemberAdd': \(error)")
                 throw error
             }
             do {
-                self.allowMemberRemove = try container.decode(Bool.self, forKey: .allowMemberRemove)
+                allowMemberRemove = try container.decode(Bool.self, forKey: .allowMemberRemove)
             } catch {
                 LogManager.logError("Decoding error for required property 'allowMemberRemove': \(error)")
                 throw error
             }
             do {
-                self.requireAdminApproval = try container.decode(Bool.self, forKey: .requireAdminApproval)
+                requireAdminApproval = try container.decode(Bool.self, forKey: .requireAdminApproval)
             } catch {
                 LogManager.logError("Decoding error for required property 'requireAdminApproval': \(error)")
                 throw error
             }
             do {
-                self.maxMembers = try container.decode(Int.self, forKey: .maxMembers)
+                maxMembers = try container.decode(Int.self, forKey: .maxMembers)
             } catch {
                 LogManager.logError("Decoding error for required property 'maxMembers': \(error)")
                 throw error
             }
             do {
-                self.updatedAt = try container.decode(ATProtocolDate.self, forKey: .updatedAt)
+                updatedAt = try container.decode(ATProtocolDate.self, forKey: .updatedAt)
             } catch {
                 LogManager.logError("Decoding error for required property 'updatedAt': \(error)")
                 throw error
             }
             do {
-                self.updatedBy = try container.decodeIfPresent(DID.self, forKey: .updatedBy)
+                updatedBy = try container.decodeIfPresent(DID.self, forKey: .updatedBy)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'updatedBy': \(error)")
                 throw error
@@ -370,7 +366,8 @@ public struct PolicyView: ATProtocolCodable, ATProtocolValue {
             case updatedBy
         }
     }
-public struct Input: ATProtocolCodable {
+
+    public struct Input: ATProtocolCodable {
         public let convoId: String
         public let action: String
         public let targetDid: DID?
@@ -388,15 +385,14 @@ public struct Input: ATProtocolCodable {
             self.epoch = epoch
         }
 
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.convoId = try container.decode(String.self, forKey: .convoId)
-            self.action = try container.decode(String.self, forKey: .action)
-            self.targetDid = try container.decodeIfPresent(DID.self, forKey: .targetDid)
-            self.policy = try container.decodeIfPresent(PolicyInput.self, forKey: .policy)
-            self.groupInfo = try container.decodeIfPresent(Bytes.self, forKey: .groupInfo)
-            self.epoch = try container.decodeIfPresent(Int.self, forKey: .epoch)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            action = try container.decode(String.self, forKey: .action)
+            targetDid = try container.decodeIfPresent(DID.self, forKey: .targetDid)
+            policy = try container.decodeIfPresent(PolicyInput.self, forKey: .policy)
+            groupInfo = try container.decodeIfPresent(Bytes.self, forKey: .groupInfo)
+            epoch = try container.decodeIfPresent(Int.self, forKey: .epoch)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -444,82 +440,56 @@ public struct Input: ATProtocolCodable {
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let success: Bool
 
         public let newEpoch: Int?
 
         public let policy: PolicyView?
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             success: Bool,
 
             newEpoch: Int? = nil,
 
             policy: PolicyView? = nil
 
-
         ) {
-
-
             self.success = success
 
             self.newEpoch = newEpoch
 
             self.policy = policy
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.success = try container.decode(Bool.self, forKey: .success)
+            success = try container.decode(Bool.self, forKey: .success)
 
+            newEpoch = try container.decodeIfPresent(Int.self, forKey: .newEpoch)
 
-            self.newEpoch = try container.decodeIfPresent(Int.self, forKey: .newEpoch)
-
-
-            self.policy = try container.decodeIfPresent(PolicyView.self, forKey: .policy)
-
-
+            policy = try container.decodeIfPresent(PolicyView.self, forKey: .policy)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(success, forKey: .success)
 
-
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(newEpoch, forKey: .newEpoch)
 
-
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(policy, forKey: .policy)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let successValue = try success.toCBORValue()
             map = map.adding(key: "success", value: successValue)
-
-
 
             if let value = newEpoch {
                 // Encode optional property even if it's an empty array for CBOR
@@ -527,66 +497,55 @@ public struct Output: ATProtocolCodable {
                 map = map.adding(key: "newEpoch", value: newEpochValue)
             }
 
-
-
             if let value = policy {
                 // Encode optional property even if it's an empty array for CBOR
                 let policyValue = try value.toCBORValue()
                 map = map.adding(key: "policy", value: policyValue)
             }
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case success
             case newEpoch
             case policy
         }
-
     }
 
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case convoNotFound = "ConvoNotFound.Conversation not found"
-                case notMember = "NotMember.Caller is not a member of this conversation"
-                case unauthorized = "Unauthorized.Caller does not have required admin/moderator privileges"
-                case invalidAction = "InvalidAction.Unknown action value"
-                case missingTargetDid = "MissingTargetDid.targetDid is required for promote/demote actions"
-                case targetNotMember = "TargetNotMember.Target DID is not a member of the conversation"
-                case noFieldsProvided = "NoFieldsProvided.At least one policy field must be provided for updatePolicy"
-                case invalidGroupInfo = "InvalidGroupInfo.Provided GroupInfo is invalid or malformed"
-                case invalidMaxMembers = "InvalidMaxMembers.maxMembers is less than current member count"
-            public var description: String {
-                return self.rawValue
-            }
-
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case convoNotFound = "ConvoNotFound.Conversation not found"
+        case notMember = "NotMember.Caller is not a member of this conversation"
+        case unauthorized = "Unauthorized.Caller does not have required admin/moderator privileges"
+        case invalidAction = "InvalidAction.Unknown action value"
+        case missingTargetDid = "MissingTargetDid.targetDid is required for promote/demote actions"
+        case targetNotMember = "TargetNotMember.Target DID is not a member of the conversation"
+        case noFieldsProvided = "NoFieldsProvided.At least one policy field must be provided for updatePolicy"
+        case invalidGroupInfo = "InvalidGroupInfo.Provided GroupInfo is invalid or malformed"
+        case invalidMaxMembers = "InvalidMaxMembers.maxMembers is less than current member count"
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-extension ATProtoClient.Blue.Catbird.MlsChat {
+public extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - updateConvo
 
-    /// Update conversation settings (consolidates updatePolicy + promoteAdmin + demoteAdmin + promoteModerator + demoteModerator + updateGroupInfo + groupInfoRefresh) Perform administrative actions on a conversation. The 'action' field determines the operation. Most actions require admin privileges.
-    ///
-    /// - Parameter input: The input parameters for the request
+    // Update conversation settings (consolidates updatePolicy + promoteAdmin + demoteAdmin + promoteModerator + demoteModerator + updateGroupInfo + groupInfoRefresh) Perform administrative actions on a conversation. The 'action' field determines the operation. Most actions require admin privileges.
+    //
+    // - Parameter input: The input parameters for the request
 
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func updateConvo(
-
+    func updateConvo(
         input: BlueCatbirdMlsChatUpdateConvo.Input
 
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatUpdateConvo.Output?) {
@@ -596,14 +555,9 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
 
         headers["Content-Type"] = "application/json"
 
-
-
         headers["Accept"] = "application/json"
 
-
-
         let requestData: Data? = try JSONEncoder().encode(input)
-
 
         let queryItems: [URLQueryItem]? = nil
 
@@ -621,12 +575,10 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -635,9 +587,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatUpdateConvo.Output.self, from: responseData)
 
@@ -651,9 +601,5 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-
     }
-
 }
-
-

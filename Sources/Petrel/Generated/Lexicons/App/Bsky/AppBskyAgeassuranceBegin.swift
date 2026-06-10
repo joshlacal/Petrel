@@ -1,14 +1,10 @@
 import Foundation
 
-
-
 // lexicon: 1, id: app.bsky.ageassurance.begin
 
-
-public struct AppBskyAgeassuranceBegin {
-
+public enum AppBskyAgeassuranceBegin {
     public static let typeIdentifier = "app.bsky.ageassurance.begin"
-public struct Input: ATProtocolCodable {
+    public struct Input: ATProtocolCodable {
         public let email: String
         public let language: String
         public let countryCode: String
@@ -22,13 +18,12 @@ public struct Input: ATProtocolCodable {
             self.regionCode = regionCode
         }
 
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.email = try container.decode(String.self, forKey: .email)
-            self.language = try container.decode(String.self, forKey: .language)
-            self.countryCode = try container.decode(String.self, forKey: .countryCode)
-            self.regionCode = try container.decodeIfPresent(String.self, forKey: .regionCode)
+            email = try container.decode(String.self, forKey: .email)
+            language = try container.decode(String.self, forKey: .language)
+            countryCode = try container.decode(String.self, forKey: .countryCode)
+            regionCode = try container.decodeIfPresent(String.self, forKey: .regionCode)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -61,40 +56,37 @@ public struct Input: ATProtocolCodable {
             case regionCode
         }
     }
+
     public typealias Output = AppBskyAgeassuranceDefs.State
 
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case invalidEmail = "InvalidEmail."
-                case didTooLong = "DidTooLong."
-                case invalidInitiation = "InvalidInitiation."
-                case regionNotSupported = "RegionNotSupported."
-            public var description: String {
-                return self.rawValue
-            }
-
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case invalidEmail = "InvalidEmail."
+        case didTooLong = "DidTooLong."
+        case invalidInitiation = "InvalidInitiation."
+        case regionNotSupported = "RegionNotSupported."
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-extension ATProtoClient.App.Bsky.Ageassurance {
+public extension ATProtoClient.App.Bsky.Ageassurance {
     // MARK: - begin
 
-    /// Initiate Age Assurance for an account.
-    ///
-    /// - Parameter input: The input parameters for the request
+    // Initiate Age Assurance for an account.
+    //
+    // - Parameter input: The input parameters for the request
 
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func begin(
-
+    func begin(
         input: AppBskyAgeassuranceBegin.Input
 
     ) async throws -> (responseCode: Int, data: AppBskyAgeassuranceBegin.Output?) {
@@ -104,14 +96,9 @@ extension ATProtoClient.App.Bsky.Ageassurance {
 
         headers["Content-Type"] = "application/json"
 
-
-
         headers["Accept"] = "application/json"
 
-
-
         let requestData: Data? = try JSONEncoder().encode(input)
-
 
         let queryItems: [URLQueryItem]? = nil
 
@@ -129,12 +116,10 @@ extension ATProtoClient.App.Bsky.Ageassurance {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -143,9 +128,7 @@ extension ATProtoClient.App.Bsky.Ageassurance {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(AppBskyAgeassuranceBegin.Output.self, from: responseData)
 
@@ -159,9 +142,5 @@ extension ATProtoClient.App.Bsky.Ageassurance {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-
     }
-
 }
-
-

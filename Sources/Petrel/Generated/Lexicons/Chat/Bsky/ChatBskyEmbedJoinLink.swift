@@ -1,0 +1,273 @@
+import Foundation
+
+// lexicon: 1, id: chat.bsky.embed.joinLink
+
+public struct ChatBskyEmbedJoinLink: ATProtocolCodable, ATProtocolValue {
+    public static let typeIdentifier = "chat.bsky.embed.joinLink"
+    public let code: String
+
+    public init(code: String) {
+        self.code = code
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        code = try container.decode(String.self, forKey: .code)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(code, forKey: .code)
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(code)
+    }
+
+    public func isEqual(to other: any ATProtocolValue) -> Bool {
+        guard let other = other as? Self else { return false }
+        if code != other.code {
+            return false
+        }
+        return true
+    }
+
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        return lhs.isEqual(to: rhs)
+    }
+
+    public func toCBORValue() throws -> Any {
+        var map = OrderedCBORMap()
+        let codeValue = try code.toCBORValue()
+        map = map.adding(key: "code", value: codeValue)
+        return map
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case code
+    }
+
+    public struct View: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "chat.bsky.embed.joinLink#view"
+        public let joinLinkPreview: ViewJoinLinkPreviewUnion
+
+        public init(
+            joinLinkPreview: ViewJoinLinkPreviewUnion
+        ) {
+            self.joinLinkPreview = joinLinkPreview
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                joinLinkPreview = try container.decode(ViewJoinLinkPreviewUnion.self, forKey: .joinLinkPreview)
+            } catch {
+                LogManager.logError("Decoding error for required property 'joinLinkPreview': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            try container.encode(joinLinkPreview, forKey: .joinLinkPreview)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(joinLinkPreview)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+            if joinLinkPreview != other.joinLinkPreview {
+                return false
+            }
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            let joinLinkPreviewValue = try joinLinkPreview.toCBORValue()
+            map = map.adding(key: "joinLinkPreview", value: joinLinkPreviewValue)
+            return map
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case joinLinkPreview
+        }
+    }
+
+    public indirect enum ViewJoinLinkPreviewUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
+        case chatBskyGroupDefsJoinLinkPreviewView(ChatBskyGroupDefs.JoinLinkPreviewView)
+        case chatBskyGroupDefsDisabledJoinLinkPreviewView(ChatBskyGroupDefs.DisabledJoinLinkPreviewView)
+        case chatBskyGroupDefsInvalidJoinLinkPreviewView(ChatBskyGroupDefs.InvalidJoinLinkPreviewView)
+        case unexpected(ATProtocolValueContainer)
+        public init(_ value: ChatBskyGroupDefs.JoinLinkPreviewView) {
+            self = .chatBskyGroupDefsJoinLinkPreviewView(value)
+        }
+
+        public init(_ value: ChatBskyGroupDefs.DisabledJoinLinkPreviewView) {
+            self = .chatBskyGroupDefsDisabledJoinLinkPreviewView(value)
+        }
+
+        public init(_ value: ChatBskyGroupDefs.InvalidJoinLinkPreviewView) {
+            self = .chatBskyGroupDefsInvalidJoinLinkPreviewView(value)
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let typeValue = try container.decode(String.self, forKey: .type)
+
+            switch typeValue {
+            case "chat.bsky.group.defs#joinLinkPreviewView":
+                let value = try ChatBskyGroupDefs.JoinLinkPreviewView(from: decoder)
+                self = .chatBskyGroupDefsJoinLinkPreviewView(value)
+            case "chat.bsky.group.defs#disabledJoinLinkPreviewView":
+                let value = try ChatBskyGroupDefs.DisabledJoinLinkPreviewView(from: decoder)
+                self = .chatBskyGroupDefsDisabledJoinLinkPreviewView(value)
+            case "chat.bsky.group.defs#invalidJoinLinkPreviewView":
+                let value = try ChatBskyGroupDefs.InvalidJoinLinkPreviewView(from: decoder)
+                self = .chatBskyGroupDefsInvalidJoinLinkPreviewView(value)
+            default:
+                let unknownValue = try ATProtocolValueContainer(from: decoder)
+                self = .unexpected(unknownValue)
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            switch self {
+            case let .chatBskyGroupDefsJoinLinkPreviewView(value):
+                try container.encode("chat.bsky.group.defs#joinLinkPreviewView", forKey: .type)
+                try value.encode(to: encoder)
+            case let .chatBskyGroupDefsDisabledJoinLinkPreviewView(value):
+                try container.encode("chat.bsky.group.defs#disabledJoinLinkPreviewView", forKey: .type)
+                try value.encode(to: encoder)
+            case let .chatBskyGroupDefsInvalidJoinLinkPreviewView(value):
+                try container.encode("chat.bsky.group.defs#invalidJoinLinkPreviewView", forKey: .type)
+                try value.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
+            }
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            switch self {
+            case let .chatBskyGroupDefsJoinLinkPreviewView(value):
+                hasher.combine("chat.bsky.group.defs#joinLinkPreviewView")
+                hasher.combine(value)
+            case let .chatBskyGroupDefsDisabledJoinLinkPreviewView(value):
+                hasher.combine("chat.bsky.group.defs#disabledJoinLinkPreviewView")
+                hasher.combine(value)
+            case let .chatBskyGroupDefsInvalidJoinLinkPreviewView(value):
+                hasher.combine("chat.bsky.group.defs#invalidJoinLinkPreviewView")
+                hasher.combine(value)
+            case let .unexpected(container):
+                hasher.combine("unexpected")
+                hasher.combine(container)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case type = "$type"
+        }
+
+        public static func == (lhs: ViewJoinLinkPreviewUnion, rhs: ViewJoinLinkPreviewUnion) -> Bool {
+            switch (lhs, rhs) {
+            case let (
+                .chatBskyGroupDefsJoinLinkPreviewView(lhsValue),
+                .chatBskyGroupDefsJoinLinkPreviewView(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .chatBskyGroupDefsDisabledJoinLinkPreviewView(lhsValue),
+                .chatBskyGroupDefsDisabledJoinLinkPreviewView(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .chatBskyGroupDefsInvalidJoinLinkPreviewView(lhsValue),
+                .chatBskyGroupDefsInvalidJoinLinkPreviewView(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
+            default:
+                return false
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? ViewJoinLinkPreviewUnion else { return false }
+            return self == other
+        }
+
+        /// DAGCBOR encoding with field ordering
+        public func toCBORValue() throws -> Any {
+            // Create an ordered map to maintain field order
+            var map = OrderedCBORMap()
+
+            switch self {
+            case let .chatBskyGroupDefsJoinLinkPreviewView(value):
+                map = map.adding(key: "$type", value: "chat.bsky.group.defs#joinLinkPreviewView")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .chatBskyGroupDefsDisabledJoinLinkPreviewView(value):
+                map = map.adding(key: "$type", value: "chat.bsky.group.defs#disabledJoinLinkPreviewView")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .chatBskyGroupDefsInvalidJoinLinkPreviewView(value):
+                map = map.adding(key: "$type", value: "chat.bsky.group.defs#invalidJoinLinkPreviewView")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .unexpected(container):
+                return try container.toCBORValue()
+            }
+        }
+    }
+}

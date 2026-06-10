@@ -22,7 +22,8 @@ object ChatBskyConvoListConvosDefs {
         val cursor: String? = null,        @SerialName("readState")
         val readState: String? = null,// Filter convos by their status. It is discouraged to call with "request" and preferred to call chat.bsky.convo.listConvoRequests, which also includes group join requests made by the user.        @SerialName("status")
         val status: String? = null,// Filter by conversation kind.        @SerialName("kind")
-        val kind: String? = null    )
+        val kind: String? = null,// Filter by conversation lock status. Values follow chat.bsky.convo.defs#convoLockStatus.        @SerialName("lockStatus")
+        val lockStatus: String? = null    )
 
     @Serializable
     data class ChatBskyConvoListConvosOutput(

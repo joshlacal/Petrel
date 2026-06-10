@@ -1,109 +1,74 @@
 import Foundation
 
-
-
 // lexicon: 1, id: com.atproto.server.getAccountInviteCodes
 
-
-public struct ComAtprotoServerGetAccountInviteCodes {
-
+public enum ComAtprotoServerGetAccountInviteCodes {
     public static let typeIdentifier = "com.atproto.server.getAccountInviteCodes"
-public struct Parameters: Parametrizable {
+    public struct Parameters: Parametrizable {
         public let includeUsed: Bool?
         public let createAvailable: Bool?
 
         public init(
             includeUsed: Bool? = nil,
             createAvailable: Bool? = nil
-            ) {
+        ) {
             self.includeUsed = includeUsed
             self.createAvailable = createAvailable
-
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let codes: [ComAtprotoServerDefs.InviteCode]
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             codes: [ComAtprotoServerDefs.InviteCode]
 
-
         ) {
-
-
             self.codes = codes
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.codes = try container.decode([ComAtprotoServerDefs.InviteCode].self, forKey: .codes)
-
-
+            codes = try container.decode([ComAtprotoServerDefs.InviteCode].self, forKey: .codes)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(codes, forKey: .codes)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let codesValue = try codes.toCBORValue()
             map = map.adding(key: "codes", value: codesValue)
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case codes
         }
-
     }
 
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case duplicateCreate = "DuplicateCreate."
-            public var description: String {
-                return self.rawValue
-            }
-
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case duplicateCreate = "DuplicateCreate."
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-
-
-extension ATProtoClient.Com.Atproto.Server {
+public extension ATProtoClient.Com.Atproto.Server {
     // MARK: - getAccountInviteCodes
 
     /// Get all invite codes for the current account. Requires auth.
@@ -112,9 +77,8 @@ extension ATProtoClient.Com.Atproto.Server {
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func getAccountInviteCodes(input: ComAtprotoServerGetAccountInviteCodes.Parameters) async throws -> (responseCode: Int, data: ComAtprotoServerGetAccountInviteCodes.Output?) {
+    func getAccountInviteCodes(input: ComAtprotoServerGetAccountInviteCodes.Parameters) async throws -> (responseCode: Int, data: ComAtprotoServerGetAccountInviteCodes.Output?) {
         let endpoint = "com.atproto.server.getAccountInviteCodes"
-
 
         let queryItems = input.asQueryItems()
 
@@ -135,8 +99,7 @@ extension ATProtoClient.Com.Atproto.Server {
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -145,9 +108,7 @@ extension ATProtoClient.Com.Atproto.Server {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(ComAtprotoServerGetAccountInviteCodes.Output.self, from: responseData)
 
@@ -158,12 +119,9 @@ extension ATProtoClient.Com.Atproto.Server {
                 return (responseCode, nil)
             }
         } else {
-
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
-

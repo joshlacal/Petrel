@@ -21,6 +21,9 @@ sealed interface ChatBskyConvoDefsMessageInputEmbedUnion {
     data class Record(val value: com.atproto.generated.AppBskyEmbedRecord) : ChatBskyConvoDefsMessageInputEmbedUnion
 
     @Serializable
+    data class JoinLink(val value: com.atproto.generated.ChatBskyEmbedJoinLink) : ChatBskyConvoDefsMessageInputEmbedUnion
+
+    @Serializable
     data class Unexpected(val value: JsonElement) : ChatBskyConvoDefsMessageInputEmbedUnion
 }
 
@@ -35,6 +38,12 @@ object ChatBskyConvoDefsMessageInputEmbedUnionSerializer : kotlinx.serialization
                 val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyEmbedRecord.serializer(), value.value)
                 kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
                     it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.record")
+                })
+            }
+            is ChatBskyConvoDefsMessageInputEmbedUnion.JoinLink -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyEmbedJoinLink.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.embed.joinLink")
                 })
             }
             is ChatBskyConvoDefsMessageInputEmbedUnion.Unexpected -> value.value
@@ -59,6 +68,9 @@ object ChatBskyConvoDefsMessageInputEmbedUnionSerializer : kotlinx.serialization
             "app.bsky.embed.record" -> ChatBskyConvoDefsMessageInputEmbedUnion.Record(
                 jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyEmbedRecord.serializer(), element)
             )
+            "chat.bsky.embed.joinLink" -> ChatBskyConvoDefsMessageInputEmbedUnion.JoinLink(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyEmbedJoinLink.serializer(), element)
+            )
             else -> ChatBskyConvoDefsMessageInputEmbedUnion.Unexpected(element)
         }
     }
@@ -68,6 +80,9 @@ object ChatBskyConvoDefsMessageInputEmbedUnionSerializer : kotlinx.serialization
 sealed interface ChatBskyConvoDefsMessageViewEmbedUnion {
     @Serializable
     data class View(val value: com.atproto.generated.AppBskyEmbedRecordView) : ChatBskyConvoDefsMessageViewEmbedUnion
+
+    @Serializable
+    data class ChatBskyEmbedJoinLinkView(val value: com.atproto.generated.ChatBskyEmbedJoinLinkView) : ChatBskyConvoDefsMessageViewEmbedUnion
 
     @Serializable
     data class Unexpected(val value: JsonElement) : ChatBskyConvoDefsMessageViewEmbedUnion
@@ -84,6 +99,12 @@ object ChatBskyConvoDefsMessageViewEmbedUnionSerializer : kotlinx.serialization.
                 val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyEmbedRecordView.serializer(), value.value)
                 kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
                     it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.record#view")
+                })
+            }
+            is ChatBskyConvoDefsMessageViewEmbedUnion.ChatBskyEmbedJoinLinkView -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyEmbedJoinLinkView.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.embed.joinLink#view")
                 })
             }
             is ChatBskyConvoDefsMessageViewEmbedUnion.Unexpected -> value.value
@@ -107,6 +128,9 @@ object ChatBskyConvoDefsMessageViewEmbedUnionSerializer : kotlinx.serialization.
         return when (type) {
             "app.bsky.embed.record#view" -> ChatBskyConvoDefsMessageViewEmbedUnion.View(
                 jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyEmbedRecordView.serializer(), element)
+            )
+            "chat.bsky.embed.joinLink#view" -> ChatBskyConvoDefsMessageViewEmbedUnion.ChatBskyEmbedJoinLinkView(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyEmbedJoinLinkView.serializer(), element)
             )
             else -> ChatBskyConvoDefsMessageViewEmbedUnion.Unexpected(element)
         }
@@ -891,6 +915,16 @@ enum class ChatBskyConvoDefsConvoStatus {
     ACCEPTED}
 
     @Serializable
+    data class ChatBskyConvoDefsConvoRef(
+        @SerialName("did")
+        val did: DID,        @SerialName("convoId")
+        val convoId: String    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#chatBskyConvoDefsConvoRef"
+        }
+    }
+
+    @Serializable
     data class ChatBskyConvoDefsMessageRef(
         @SerialName("did")
         val did: DID,        @SerialName("convoId")
@@ -1149,7 +1183,7 @@ enum class ChatBskyConvoDefsConvoStatus {
     data class ChatBskyConvoDefsConvoView(
         @SerialName("id")
         val id: String,        @SerialName("rev")
-        val rev: String,/** Members of this conversation. For direct convos, it will be an immutable list of the 2 members. For group convos, it will a list of important members (the first few members, the viewer, the member who invited the viewer, the member who sent the last message, the member who sent the last reaction), but will not contain the full list of members. Use chat.bsky.convo.getConvoMembers to list all members. */        @SerialName("members")
+        val rev: String,/** Members of this conversation. For direct convos, it will be an immutable list of the 2 members. For group convos, it will a list of important members (the first few members, the viewer, the member who added the viewer, the member who sent the last message, the member who sent the last reaction), but will not contain the full list of members. Use chat.bsky.convo.getConvoMembers to list all members. */        @SerialName("members")
         val members: List<ChatBskyActorDefsProfileViewBasic>,        @SerialName("lastMessage")
         val lastMessage: ChatBskyConvoDefsConvoViewLastMessageUnion? = null,        @SerialName("lastReaction")
         val lastReaction: ChatBskyConvoDefsConvoViewLastReactionUnion? = null,        @SerialName("muted")
@@ -1177,12 +1211,16 @@ enum class ChatBskyConvoDefsConvoStatus {
      */
     @Serializable
     data class ChatBskyConvoDefsGroupConvo(
-/** The display name of the group conversation. */        @SerialName("name")
-        val name: String,/** The total number of members in the group conversation. */        @SerialName("memberCount")
-        val memberCount: Int,        @SerialName("createdAt")
+        @SerialName("createdAt")
         val createdAt: ATProtocolDate,        @SerialName("joinLink")
-        val joinLink: ChatBskyGroupDefsJoinLinkView? = null,/** The lock status of the conversation. */        @SerialName("lockStatus")
-        val lockStatus: ChatBskyConvoDefsConvoLockStatus    ) {
+        val joinLink: ChatBskyGroupDefsJoinLinkView? = null,/** The total number of pending join requests for the group conversation. Only present for the owner. Capped at 21. */        @SerialName("joinRequestCount")
+        val joinRequestCount: Int? = null,/** The lock status of the conversation. */        @SerialName("lockStatus")
+        val lockStatus: ChatBskyConvoDefsConvoLockStatus,/** Whether the lock status is being forced by a moderation override (account inactivation or convo takedown) rather than the owner's own setting. */        @SerialName("lockStatusModerationOverride")
+        val lockStatusModerationOverride: Boolean,/** The total number of members in the group conversation. */        @SerialName("memberCount")
+        val memberCount: Int,/** The maximum number of members allowed in the group conversation. */        @SerialName("memberLimit")
+        val memberLimit: Int,/** The display name of the group conversation. */        @SerialName("name")
+        val name: String,/** The number of unread join requests for the group conversation. Only present for the owner. */        @SerialName("unreadJoinRequestCount")
+        val unreadJoinRequestCount: Int? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#chatBskyConvoDefsGroupConvo"
         }
@@ -1560,7 +1598,7 @@ enum class ChatBskyConvoDefsConvoStatus {
     }
 
     /**
-     * [NOTE: This is under active development and should be considered unstable while this note is here]. Event indicating a join request was made by the viewer.
+     * [NOTE: This is under active development and should be considered unstable while this note is here]. Event indicating a join request was made by the requester. Only requester actor gets this.
      */
     @Serializable
     data class ChatBskyConvoDefsLogOutgoingJoinRequest(
@@ -1569,5 +1607,45 @@ enum class ChatBskyConvoDefsConvoStatus {
         val convoId: String    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#chatBskyConvoDefsLogOutgoingJoinRequest"
+        }
+    }
+
+    /**
+     * [NOTE: This is under active development and should be considered unstable while this note is here]. Event indicating a prospective member withdrew their join request. Only the owner gets this.
+     */
+    @Serializable
+    data class ChatBskyConvoDefsLogWithdrawIncomingJoinRequest(
+        @SerialName("rev")
+        val rev: String,        @SerialName("convoId")
+        val convoId: String,/** Prospective member who withdrew their join request. */        @SerialName("member")
+        val member: ChatBskyActorDefsProfileViewBasic    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#chatBskyConvoDefsLogWithdrawIncomingJoinRequest"
+        }
+    }
+
+    /**
+     * [NOTE: This is under active development and should be considered unstable while this note is here]. Event indicating the viewer withdrew their own join request. Only requester actor gets this.
+     */
+    @Serializable
+    data class ChatBskyConvoDefsLogWithdrawOutgoingJoinRequest(
+        @SerialName("rev")
+        val rev: String,        @SerialName("convoId")
+        val convoId: String    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#chatBskyConvoDefsLogWithdrawOutgoingJoinRequest"
+        }
+    }
+
+    /**
+     * [NOTE: This is under active development and should be considered unstable while this note is here]. Event indicating the group owner marked join requests as read. Only the owner gets this.
+     */
+    @Serializable
+    data class ChatBskyConvoDefsLogReadJoinRequests(
+        @SerialName("rev")
+        val rev: String,        @SerialName("convoId")
+        val convoId: String    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#chatBskyConvoDefsLogReadJoinRequests"
         }
     }

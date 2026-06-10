@@ -1,19 +1,15 @@
 import Foundation
 
-
-
 // lexicon: 1, id: blue.catbird.mlsChat.getMessages
 
-
-public struct BlueCatbirdMlsChatGetMessages {
-
+public enum BlueCatbirdMlsChatGetMessages {
     public static let typeIdentifier = "blue.catbird.mlsChat.getMessages"
 
-public struct GapInfo: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "blue.catbird.mlsChat.getMessages#gapInfo"
-            public let hasGaps: Bool
-            public let missingSeqs: [Int]
-            public let totalMessages: Int
+    public struct GapInfo: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "blue.catbird.mlsChat.getMessages#gapInfo"
+        public let hasGaps: Bool
+        public let missingSeqs: [Int]
+        public let totalMessages: Int
 
         public init(
             hasGaps: Bool, missingSeqs: [Int], totalMessages: Int
@@ -26,19 +22,19 @@ public struct GapInfo: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.hasGaps = try container.decode(Bool.self, forKey: .hasGaps)
+                hasGaps = try container.decode(Bool.self, forKey: .hasGaps)
             } catch {
                 LogManager.logError("Decoding error for required property 'hasGaps': \(error)")
                 throw error
             }
             do {
-                self.missingSeqs = try container.decode([Int].self, forKey: .missingSeqs)
+                missingSeqs = try container.decode([Int].self, forKey: .missingSeqs)
             } catch {
                 LogManager.logError("Decoding error for required property 'missingSeqs': \(error)")
                 throw error
             }
             do {
-                self.totalMessages = try container.decode(Int.self, forKey: .totalMessages)
+                totalMessages = try container.decode(Int.self, forKey: .totalMessages)
             } catch {
                 LogManager.logError("Decoding error for required property 'totalMessages': \(error)")
                 throw error
@@ -96,7 +92,8 @@ public struct GapInfo: ATProtocolCodable, ATProtocolValue {
             case totalMessages
         }
     }
-public struct Parameters: Parametrizable {
+
+    public struct Parameters: Parametrizable {
         public let convoId: String
         public let limit: Int?
         public let sinceSeq: Int?
@@ -113,7 +110,7 @@ public struct Parameters: Parametrizable {
             fromEpoch: Int? = nil,
             toEpoch: Int? = nil,
             joinEpoch: Int? = nil
-            ) {
+        ) {
             self.convoId = convoId
             self.limit = limit
             self.sinceSeq = sinceSeq
@@ -121,13 +118,10 @@ public struct Parameters: Parametrizable {
             self.fromEpoch = fromEpoch
             self.toEpoch = toEpoch
             self.joinEpoch = joinEpoch
-
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let messages: [BlueCatbirdMlsChatDefs.MessageView]
 
         public let lastSeq: Int?
@@ -136,12 +130,8 @@ public struct Output: ATProtocolCodable {
 
         public let suppressedBeforeJoin: Int?
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             messages: [BlueCatbirdMlsChatDefs.MessageView],
 
             lastSeq: Int? = nil,
@@ -150,10 +140,7 @@ public struct Output: ATProtocolCodable {
 
             suppressedBeforeJoin: Int? = nil
 
-
         ) {
-
-
             self.messages = messages
 
             self.lastSeq = lastSeq
@@ -161,59 +148,40 @@ public struct Output: ATProtocolCodable {
             self.gapInfo = gapInfo
 
             self.suppressedBeforeJoin = suppressedBeforeJoin
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.messages = try container.decode([BlueCatbirdMlsChatDefs.MessageView].self, forKey: .messages)
+            messages = try container.decode([BlueCatbirdMlsChatDefs.MessageView].self, forKey: .messages)
 
+            lastSeq = try container.decodeIfPresent(Int.self, forKey: .lastSeq)
 
-            self.lastSeq = try container.decodeIfPresent(Int.self, forKey: .lastSeq)
+            gapInfo = try container.decodeIfPresent(GapInfo.self, forKey: .gapInfo)
 
-
-            self.gapInfo = try container.decodeIfPresent(GapInfo.self, forKey: .gapInfo)
-
-
-            self.suppressedBeforeJoin = try container.decodeIfPresent(Int.self, forKey: .suppressedBeforeJoin)
-
-
+            suppressedBeforeJoin = try container.decodeIfPresent(Int.self, forKey: .suppressedBeforeJoin)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(messages, forKey: .messages)
 
-
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(lastSeq, forKey: .lastSeq)
-
 
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(gapInfo, forKey: .gapInfo)
 
-
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(suppressedBeforeJoin, forKey: .suppressedBeforeJoin)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let messagesValue = try messages.toCBORValue()
             map = map.adding(key: "messages", value: messagesValue)
-
-
 
             if let value = lastSeq {
                 // Encode optional property even if it's an empty array for CBOR
@@ -221,15 +189,11 @@ public struct Output: ATProtocolCodable {
                 map = map.adding(key: "lastSeq", value: lastSeqValue)
             }
 
-
-
             if let value = gapInfo {
                 // Encode optional property even if it's an empty array for CBOR
                 let gapInfoValue = try value.toCBORValue()
                 map = map.adding(key: "gapInfo", value: gapInfoValue)
             }
-
-
 
             if let value = suppressedBeforeJoin {
                 // Encode optional property even if it's an empty array for CBOR
@@ -237,12 +201,8 @@ public struct Output: ATProtocolCodable {
                 map = map.adding(key: "suppressedBeforeJoin", value: suppressedBeforeJoinValue)
             }
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case messages
@@ -250,31 +210,25 @@ public struct Output: ATProtocolCodable {
             case gapInfo
             case suppressedBeforeJoin
         }
-
     }
 
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case convoNotFound = "ConvoNotFound.Conversation not found"
-                case notMember = "NotMember.Caller is not a member of the conversation"
-                case invalidCursor = "InvalidCursor.sinceSeq parameter is invalid or exceeds available messages"
-            public var description: String {
-                return self.rawValue
-            }
-
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case convoNotFound = "ConvoNotFound.Conversation not found"
+        case notMember = "NotMember.Caller is not a member of the conversation"
+        case invalidCursor = "InvalidCursor.sinceSeq parameter is invalid or exceeds available messages"
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-
-
-extension ATProtoClient.Blue.Catbird.MlsChat {
+public extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - getMessages
 
     /// Retrieve messages from a conversation with type filtering (consolidates getMessages + getCommits) Retrieve messages from an MLS conversation. Messages are GUARANTEED to be returned in conversation timeline order (seq ASC). Clients MUST use seq for display/pagination/read cursors and use epoch only as the MLS decryptability gate. The 'type' filter replaces the separate getCommits endpoint.
@@ -283,9 +237,8 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func getMessages(input: BlueCatbirdMlsChatGetMessages.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatGetMessages.Output?) {
+    func getMessages(input: BlueCatbirdMlsChatGetMessages.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatGetMessages.Output?) {
         let endpoint = "blue.catbird.mlsChat.getMessages"
-
 
         let queryItems = input.asQueryItems()
 
@@ -306,8 +259,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -316,9 +268,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatGetMessages.Output.self, from: responseData)
 
@@ -329,7 +279,6 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
                 return (responseCode, nil)
             }
         } else {
-
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)

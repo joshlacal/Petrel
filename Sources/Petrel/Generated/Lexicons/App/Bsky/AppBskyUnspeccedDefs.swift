@@ -1,17 +1,13 @@
 import Foundation
 
-
-
 // lexicon: 1, id: app.bsky.unspecced.defs
 
-
-public struct AppBskyUnspeccedDefs {
-
+public enum AppBskyUnspeccedDefs {
     public static let typeIdentifier = "app.bsky.unspecced.defs"
 
-public struct SkeletonSearchPost: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.unspecced.defs#skeletonSearchPost"
-            public let uri: ATProtocolURI
+    public struct SkeletonSearchPost: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.unspecced.defs#skeletonSearchPost"
+        public let uri: ATProtocolURI
 
         public init(
             uri: ATProtocolURI
@@ -22,7 +18,7 @@ public struct SkeletonSearchPost: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
             } catch {
                 LogManager.logError("Decoding error for required property 'uri': \(error)")
                 throw error
@@ -65,9 +61,9 @@ public struct SkeletonSearchPost: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-public struct SkeletonSearchActor: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.unspecced.defs#skeletonSearchActor"
-            public let did: DID
+    public struct SkeletonSearchActor: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.unspecced.defs#skeletonSearchActor"
+        public let did: DID
 
         public init(
             did: DID
@@ -78,7 +74,7 @@ public struct SkeletonSearchActor: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.did = try container.decode(DID.self, forKey: .did)
+                did = try container.decode(DID.self, forKey: .did)
             } catch {
                 LogManager.logError("Decoding error for required property 'did': \(error)")
                 throw error
@@ -121,9 +117,9 @@ public struct SkeletonSearchActor: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-public struct SkeletonSearchStarterPack: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.unspecced.defs#skeletonSearchStarterPack"
-            public let uri: ATProtocolURI
+    public struct SkeletonSearchStarterPack: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.unspecced.defs#skeletonSearchStarterPack"
+        public let uri: ATProtocolURI
 
         public init(
             uri: ATProtocolURI
@@ -134,7 +130,7 @@ public struct SkeletonSearchStarterPack: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
             } catch {
                 LogManager.logError("Decoding error for required property 'uri': \(error)")
                 throw error
@@ -177,12 +173,12 @@ public struct SkeletonSearchStarterPack: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-public struct TrendingTopic: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.unspecced.defs#trendingTopic"
-            public let topic: String
-            public let displayName: String?
-            public let description: String?
-            public let link: String
+    public struct TrendingTopic: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.unspecced.defs#trendingTopic"
+        public let topic: String
+        public let displayName: String?
+        public let description: String?
+        public let link: String
 
         public init(
             topic: String, displayName: String?, description: String?, link: String
@@ -196,25 +192,25 @@ public struct TrendingTopic: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.topic = try container.decode(String.self, forKey: .topic)
+                topic = try container.decode(String.self, forKey: .topic)
             } catch {
                 LogManager.logError("Decoding error for required property 'topic': \(error)")
                 throw error
             }
             do {
-                self.displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
+                displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'displayName': \(error)")
                 throw error
             }
             do {
-                self.description = try container.decodeIfPresent(String.self, forKey: .description)
+                description = try container.decodeIfPresent(String.self, forKey: .description)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'description': \(error)")
                 throw error
             }
             do {
-                self.link = try container.decode(String.self, forKey: .link)
+                link = try container.decode(String.self, forKey: .link)
             } catch {
                 LogManager.logError("Decoding error for required property 'link': \(error)")
                 throw error
@@ -293,16 +289,16 @@ public struct TrendingTopic: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-public struct SkeletonTrend: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.unspecced.defs#skeletonTrend"
-            public let topic: String
-            public let displayName: String
-            public let link: String
-            public let startedAt: ATProtocolDate
-            public let postCount: Int
-            public let status: String?
-            public let category: String?
-            public let dids: [DID]
+    public struct SkeletonTrend: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.unspecced.defs#skeletonTrend"
+        public let topic: String
+        public let displayName: String
+        public let link: String
+        public let startedAt: ATProtocolDate
+        public let postCount: Int
+        public let status: String?
+        public let category: String?
+        public let dids: [DID]
 
         public init(
             topic: String, displayName: String, link: String, startedAt: ATProtocolDate, postCount: Int, status: String?, category: String?, dids: [DID]
@@ -320,49 +316,49 @@ public struct SkeletonTrend: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.topic = try container.decode(String.self, forKey: .topic)
+                topic = try container.decode(String.self, forKey: .topic)
             } catch {
                 LogManager.logError("Decoding error for required property 'topic': \(error)")
                 throw error
             }
             do {
-                self.displayName = try container.decode(String.self, forKey: .displayName)
+                displayName = try container.decode(String.self, forKey: .displayName)
             } catch {
                 LogManager.logError("Decoding error for required property 'displayName': \(error)")
                 throw error
             }
             do {
-                self.link = try container.decode(String.self, forKey: .link)
+                link = try container.decode(String.self, forKey: .link)
             } catch {
                 LogManager.logError("Decoding error for required property 'link': \(error)")
                 throw error
             }
             do {
-                self.startedAt = try container.decode(ATProtocolDate.self, forKey: .startedAt)
+                startedAt = try container.decode(ATProtocolDate.self, forKey: .startedAt)
             } catch {
                 LogManager.logError("Decoding error for required property 'startedAt': \(error)")
                 throw error
             }
             do {
-                self.postCount = try container.decode(Int.self, forKey: .postCount)
+                postCount = try container.decode(Int.self, forKey: .postCount)
             } catch {
                 LogManager.logError("Decoding error for required property 'postCount': \(error)")
                 throw error
             }
             do {
-                self.status = try container.decodeIfPresent(String.self, forKey: .status)
+                status = try container.decodeIfPresent(String.self, forKey: .status)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'status': \(error)")
                 throw error
             }
             do {
-                self.category = try container.decodeIfPresent(String.self, forKey: .category)
+                category = try container.decodeIfPresent(String.self, forKey: .category)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'category': \(error)")
                 throw error
             }
             do {
-                self.dids = try container.decode([DID].self, forKey: .dids)
+                dids = try container.decode([DID].self, forKey: .dids)
             } catch {
                 LogManager.logError("Decoding error for required property 'dids': \(error)")
                 throw error
@@ -473,16 +469,16 @@ public struct SkeletonTrend: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-public struct TrendView: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.unspecced.defs#trendView"
-            public let topic: String
-            public let displayName: String
-            public let link: String
-            public let startedAt: ATProtocolDate
-            public let postCount: Int
-            public let status: String?
-            public let category: String?
-            public let actors: [AppBskyActorDefs.ProfileViewBasic]
+    public struct TrendView: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.unspecced.defs#trendView"
+        public let topic: String
+        public let displayName: String
+        public let link: String
+        public let startedAt: ATProtocolDate
+        public let postCount: Int
+        public let status: String?
+        public let category: String?
+        public let actors: [AppBskyActorDefs.ProfileViewBasic]
 
         public init(
             topic: String, displayName: String, link: String, startedAt: ATProtocolDate, postCount: Int, status: String?, category: String?, actors: [AppBskyActorDefs.ProfileViewBasic]
@@ -500,49 +496,49 @@ public struct TrendView: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.topic = try container.decode(String.self, forKey: .topic)
+                topic = try container.decode(String.self, forKey: .topic)
             } catch {
                 LogManager.logError("Decoding error for required property 'topic': \(error)")
                 throw error
             }
             do {
-                self.displayName = try container.decode(String.self, forKey: .displayName)
+                displayName = try container.decode(String.self, forKey: .displayName)
             } catch {
                 LogManager.logError("Decoding error for required property 'displayName': \(error)")
                 throw error
             }
             do {
-                self.link = try container.decode(String.self, forKey: .link)
+                link = try container.decode(String.self, forKey: .link)
             } catch {
                 LogManager.logError("Decoding error for required property 'link': \(error)")
                 throw error
             }
             do {
-                self.startedAt = try container.decode(ATProtocolDate.self, forKey: .startedAt)
+                startedAt = try container.decode(ATProtocolDate.self, forKey: .startedAt)
             } catch {
                 LogManager.logError("Decoding error for required property 'startedAt': \(error)")
                 throw error
             }
             do {
-                self.postCount = try container.decode(Int.self, forKey: .postCount)
+                postCount = try container.decode(Int.self, forKey: .postCount)
             } catch {
                 LogManager.logError("Decoding error for required property 'postCount': \(error)")
                 throw error
             }
             do {
-                self.status = try container.decodeIfPresent(String.self, forKey: .status)
+                status = try container.decodeIfPresent(String.self, forKey: .status)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'status': \(error)")
                 throw error
             }
             do {
-                self.category = try container.decodeIfPresent(String.self, forKey: .category)
+                category = try container.decodeIfPresent(String.self, forKey: .category)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'category': \(error)")
                 throw error
             }
             do {
-                self.actors = try container.decode([AppBskyActorDefs.ProfileViewBasic].self, forKey: .actors)
+                actors = try container.decode([AppBskyActorDefs.ProfileViewBasic].self, forKey: .actors)
             } catch {
                 LogManager.logError("Decoding error for required property 'actors': \(error)")
                 throw error
@@ -653,14 +649,14 @@ public struct TrendView: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-public struct ThreadItemPost: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.unspecced.defs#threadItemPost"
-            public let post: AppBskyFeedDefs.PostView
-            public let moreParents: Bool
-            public let moreReplies: Int
-            public let opThread: Bool
-            public let hiddenByThreadgate: Bool
-            public let mutedByViewer: Bool
+    public struct ThreadItemPost: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.unspecced.defs#threadItemPost"
+        public let post: AppBskyFeedDefs.PostView
+        public let moreParents: Bool
+        public let moreReplies: Int
+        public let opThread: Bool
+        public let hiddenByThreadgate: Bool
+        public let mutedByViewer: Bool
 
         public init(
             post: AppBskyFeedDefs.PostView, moreParents: Bool, moreReplies: Int, opThread: Bool, hiddenByThreadgate: Bool, mutedByViewer: Bool
@@ -676,37 +672,37 @@ public struct ThreadItemPost: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.post = try container.decode(AppBskyFeedDefs.PostView.self, forKey: .post)
+                post = try container.decode(AppBskyFeedDefs.PostView.self, forKey: .post)
             } catch {
                 LogManager.logError("Decoding error for required property 'post': \(error)")
                 throw error
             }
             do {
-                self.moreParents = try container.decode(Bool.self, forKey: .moreParents)
+                moreParents = try container.decode(Bool.self, forKey: .moreParents)
             } catch {
                 LogManager.logError("Decoding error for required property 'moreParents': \(error)")
                 throw error
             }
             do {
-                self.moreReplies = try container.decode(Int.self, forKey: .moreReplies)
+                moreReplies = try container.decode(Int.self, forKey: .moreReplies)
             } catch {
                 LogManager.logError("Decoding error for required property 'moreReplies': \(error)")
                 throw error
             }
             do {
-                self.opThread = try container.decode(Bool.self, forKey: .opThread)
+                opThread = try container.decode(Bool.self, forKey: .opThread)
             } catch {
                 LogManager.logError("Decoding error for required property 'opThread': \(error)")
                 throw error
             }
             do {
-                self.hiddenByThreadgate = try container.decode(Bool.self, forKey: .hiddenByThreadgate)
+                hiddenByThreadgate = try container.decode(Bool.self, forKey: .hiddenByThreadgate)
             } catch {
                 LogManager.logError("Decoding error for required property 'hiddenByThreadgate': \(error)")
                 throw error
             }
             do {
-                self.mutedByViewer = try container.decode(Bool.self, forKey: .mutedByViewer)
+                mutedByViewer = try container.decode(Bool.self, forKey: .mutedByViewer)
             } catch {
                 LogManager.logError("Decoding error for required property 'mutedByViewer': \(error)")
                 throw error
@@ -789,17 +785,13 @@ public struct ThreadItemPost: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-public struct ThreadItemNoUnauthenticated: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.unspecced.defs#threadItemNoUnauthenticated"
+    public struct ThreadItemNoUnauthenticated: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.unspecced.defs#threadItemNoUnauthenticated"
 
-        public init(
-
-        ) {
-        }
+        public init() {}
 
         public init(from decoder: Decoder) throws {
-
-            let _ = decoder
+            _ = decoder
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -807,11 +799,9 @@ public struct ThreadItemNoUnauthenticated: ATProtocolCodable, ATProtocolValue {
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
         }
 
-        public func hash(into hasher: inout Hasher) {
-        }
+        public func hash(into hasher: inout Hasher) {}
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-
             return other is Self
         }
 
@@ -830,17 +820,13 @@ public struct ThreadItemNoUnauthenticated: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-public struct ThreadItemNotFound: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.unspecced.defs#threadItemNotFound"
+    public struct ThreadItemNotFound: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.unspecced.defs#threadItemNotFound"
 
-        public init(
-
-        ) {
-        }
+        public init() {}
 
         public init(from decoder: Decoder) throws {
-
-            let _ = decoder
+            _ = decoder
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -848,11 +834,9 @@ public struct ThreadItemNotFound: ATProtocolCodable, ATProtocolValue {
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
         }
 
-        public func hash(into hasher: inout Hasher) {
-        }
+        public func hash(into hasher: inout Hasher) {}
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-
             return other is Self
         }
 
@@ -871,9 +855,9 @@ public struct ThreadItemNotFound: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-public struct ThreadItemBlocked: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.unspecced.defs#threadItemBlocked"
-            public let author: AppBskyFeedDefs.BlockedAuthor
+    public struct ThreadItemBlocked: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.unspecced.defs#threadItemBlocked"
+        public let author: AppBskyFeedDefs.BlockedAuthor
 
         public init(
             author: AppBskyFeedDefs.BlockedAuthor
@@ -884,7 +868,7 @@ public struct ThreadItemBlocked: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.author = try container.decode(AppBskyFeedDefs.BlockedAuthor.self, forKey: .author)
+                author = try container.decode(AppBskyFeedDefs.BlockedAuthor.self, forKey: .author)
             } catch {
                 LogManager.logError("Decoding error for required property 'author': \(error)")
                 throw error
@@ -927,10 +911,10 @@ public struct ThreadItemBlocked: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-public struct AgeAssuranceState: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.unspecced.defs#ageAssuranceState"
-            public let lastInitiatedAt: ATProtocolDate?
-            public let status: String
+    public struct AgeAssuranceState: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.unspecced.defs#ageAssuranceState"
+        public let lastInitiatedAt: ATProtocolDate?
+        public let status: String
 
         public init(
             lastInitiatedAt: ATProtocolDate?, status: String
@@ -942,13 +926,13 @@ public struct AgeAssuranceState: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.lastInitiatedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .lastInitiatedAt)
+                lastInitiatedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .lastInitiatedAt)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'lastInitiatedAt': \(error)")
                 throw error
             }
             do {
-                self.status = try container.decode(String.self, forKey: .status)
+                status = try container.decode(String.self, forKey: .status)
             } catch {
                 LogManager.logError("Decoding error for required property 'status': \(error)")
                 throw error
@@ -1005,16 +989,16 @@ public struct AgeAssuranceState: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-public struct AgeAssuranceEvent: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.unspecced.defs#ageAssuranceEvent"
-            public let createdAt: ATProtocolDate
-            public let status: String
-            public let attemptId: String
-            public let email: String?
-            public let initIp: String?
-            public let initUa: String?
-            public let completeIp: String?
-            public let completeUa: String?
+    public struct AgeAssuranceEvent: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.unspecced.defs#ageAssuranceEvent"
+        public let createdAt: ATProtocolDate
+        public let status: String
+        public let attemptId: String
+        public let email: String?
+        public let initIp: String?
+        public let initUa: String?
+        public let completeIp: String?
+        public let completeUa: String?
 
         public init(
             createdAt: ATProtocolDate, status: String, attemptId: String, email: String?, initIp: String?, initUa: String?, completeIp: String?, completeUa: String?
@@ -1032,49 +1016,49 @@ public struct AgeAssuranceEvent: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
             } catch {
                 LogManager.logError("Decoding error for required property 'createdAt': \(error)")
                 throw error
             }
             do {
-                self.status = try container.decode(String.self, forKey: .status)
+                status = try container.decode(String.self, forKey: .status)
             } catch {
                 LogManager.logError("Decoding error for required property 'status': \(error)")
                 throw error
             }
             do {
-                self.attemptId = try container.decode(String.self, forKey: .attemptId)
+                attemptId = try container.decode(String.self, forKey: .attemptId)
             } catch {
                 LogManager.logError("Decoding error for required property 'attemptId': \(error)")
                 throw error
             }
             do {
-                self.email = try container.decodeIfPresent(String.self, forKey: .email)
+                email = try container.decodeIfPresent(String.self, forKey: .email)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'email': \(error)")
                 throw error
             }
             do {
-                self.initIp = try container.decodeIfPresent(String.self, forKey: .initIp)
+                initIp = try container.decodeIfPresent(String.self, forKey: .initIp)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'initIp': \(error)")
                 throw error
             }
             do {
-                self.initUa = try container.decodeIfPresent(String.self, forKey: .initUa)
+                initUa = try container.decodeIfPresent(String.self, forKey: .initUa)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'initUa': \(error)")
                 throw error
             }
             do {
-                self.completeIp = try container.decodeIfPresent(String.self, forKey: .completeIp)
+                completeIp = try container.decodeIfPresent(String.self, forKey: .completeIp)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'completeIp': \(error)")
                 throw error
             }
             do {
-                self.completeUa = try container.decodeIfPresent(String.self, forKey: .completeUa)
+                completeUa = try container.decodeIfPresent(String.self, forKey: .completeUa)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'completeUa': \(error)")
                 throw error
@@ -1202,11 +1186,4 @@ public struct AgeAssuranceEvent: ATProtocolCodable, ATProtocolValue {
             case completeUa
         }
     }
-
-
-
 }
-
-
-
-

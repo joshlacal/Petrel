@@ -1,27 +1,23 @@
 import Foundation
 
-
-
 // lexicon: 1, id: chat.bsky.actor.defs
 
-
-public struct ChatBskyActorDefs {
-
+public enum ChatBskyActorDefs {
     public static let typeIdentifier = "chat.bsky.actor.defs"
 
-public struct ProfileViewBasic: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "chat.bsky.actor.defs#profileViewBasic"
-            public let did: DID
-            public let handle: Handle
-            public let displayName: String?
-            public let avatar: URI?
-            public let associated: AppBskyActorDefs.ProfileAssociated?
-            public let viewer: AppBskyActorDefs.ViewerState?
-            public let labels: [ComAtprotoLabelDefs.Label]?
-            public let createdAt: ATProtocolDate?
-            public let chatDisabled: Bool?
-            public let verification: AppBskyActorDefs.VerificationState?
-            public let kind: ProfileViewBasicKindUnion?
+    public struct ProfileViewBasic: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "chat.bsky.actor.defs#profileViewBasic"
+        public let did: DID
+        public let handle: Handle
+        public let displayName: String?
+        public let avatar: URI?
+        public let associated: AppBskyActorDefs.ProfileAssociated?
+        public let viewer: AppBskyActorDefs.ViewerState?
+        public let labels: [ComAtprotoLabelDefs.Label]?
+        public let createdAt: ATProtocolDate?
+        public let chatDisabled: Bool?
+        public let verification: AppBskyActorDefs.VerificationState?
+        public let kind: ProfileViewBasicKindUnion?
 
         public init(
             did: DID, handle: Handle, displayName: String?, avatar: URI?, associated: AppBskyActorDefs.ProfileAssociated?, viewer: AppBskyActorDefs.ViewerState?, labels: [ComAtprotoLabelDefs.Label]?, createdAt: ATProtocolDate?, chatDisabled: Bool?, verification: AppBskyActorDefs.VerificationState?, kind: ProfileViewBasicKindUnion?
@@ -42,67 +38,67 @@ public struct ProfileViewBasic: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.did = try container.decode(DID.self, forKey: .did)
+                did = try container.decode(DID.self, forKey: .did)
             } catch {
                 LogManager.logError("Decoding error for required property 'did': \(error)")
                 throw error
             }
             do {
-                self.handle = try container.decode(Handle.self, forKey: .handle)
+                handle = try container.decode(Handle.self, forKey: .handle)
             } catch {
                 LogManager.logError("Decoding error for required property 'handle': \(error)")
                 throw error
             }
             do {
-                self.displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
+                displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'displayName': \(error)")
                 throw error
             }
             do {
-                self.avatar = try container.decodeIfPresent(URI.self, forKey: .avatar)
+                avatar = try container.decodeIfPresent(URI.self, forKey: .avatar)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'avatar': \(error)")
                 throw error
             }
             do {
-                self.associated = try container.decodeIfPresent(AppBskyActorDefs.ProfileAssociated.self, forKey: .associated)
+                associated = try container.decodeIfPresent(AppBskyActorDefs.ProfileAssociated.self, forKey: .associated)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'associated': \(error)")
                 throw error
             }
             do {
-                self.viewer = try container.decodeIfPresent(AppBskyActorDefs.ViewerState.self, forKey: .viewer)
+                viewer = try container.decodeIfPresent(AppBskyActorDefs.ViewerState.self, forKey: .viewer)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'viewer': \(error)")
                 throw error
             }
             do {
-                self.labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
+                labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'labels': \(error)")
                 throw error
             }
             do {
-                self.createdAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .createdAt)
+                createdAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .createdAt)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'createdAt': \(error)")
                 throw error
             }
             do {
-                self.chatDisabled = try container.decodeIfPresent(Bool.self, forKey: .chatDisabled)
+                chatDisabled = try container.decodeIfPresent(Bool.self, forKey: .chatDisabled)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'chatDisabled': \(error)")
                 throw error
             }
             do {
-                self.verification = try container.decodeIfPresent(AppBskyActorDefs.VerificationState.self, forKey: .verification)
+                verification = try container.decodeIfPresent(AppBskyActorDefs.VerificationState.self, forKey: .verification)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'verification': \(error)")
                 throw error
             }
             do {
-                self.kind = try container.decodeIfPresent(ProfileViewBasicKindUnion.self, forKey: .kind)
+                kind = try container.decodeIfPresent(ProfileViewBasicKindUnion.self, forKey: .kind)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'kind': \(error)")
                 throw error
@@ -279,17 +275,13 @@ public struct ProfileViewBasic: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-public struct DirectConvoMember: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "chat.bsky.actor.defs#directConvoMember"
+    public struct DirectConvoMember: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "chat.bsky.actor.defs#directConvoMember"
 
-        public init(
-
-        ) {
-        }
+        public init() {}
 
         public init(from decoder: Decoder) throws {
-
-            let _ = decoder
+            _ = decoder
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -297,11 +289,9 @@ public struct DirectConvoMember: ATProtocolCodable, ATProtocolValue {
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
         }
 
-        public func hash(into hasher: inout Hasher) {
-        }
+        public func hash(into hasher: inout Hasher) {}
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-
             return other is Self
         }
 
@@ -320,10 +310,10 @@ public struct DirectConvoMember: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-public struct GroupConvoMember: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "chat.bsky.actor.defs#groupConvoMember"
-            public let addedBy: ProfileViewBasic?
-            public let role: MemberRole
+    public struct GroupConvoMember: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "chat.bsky.actor.defs#groupConvoMember"
+        public let addedBy: ProfileViewBasic?
+        public let role: MemberRole
 
         public init(
             addedBy: ProfileViewBasic?, role: MemberRole
@@ -335,13 +325,13 @@ public struct GroupConvoMember: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.addedBy = try container.decodeIfPresent(ProfileViewBasic.self, forKey: .addedBy)
+                addedBy = try container.decodeIfPresent(ProfileViewBasic.self, forKey: .addedBy)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'addedBy': \(error)")
                 throw error
             }
             do {
-                self.role = try container.decode(MemberRole.self, forKey: .role)
+                role = try container.decode(MemberRole.self, forKey: .role)
             } catch {
                 LogManager.logError("Decoding error for required property 'role': \(error)")
                 throw error
@@ -398,17 +388,13 @@ public struct GroupConvoMember: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-public struct PastGroupConvoMember: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "chat.bsky.actor.defs#pastGroupConvoMember"
+    public struct PastGroupConvoMember: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "chat.bsky.actor.defs#pastGroupConvoMember"
 
-        public init(
-
-        ) {
-        }
+        public init() {}
 
         public init(from decoder: Decoder) throws {
-
-            let _ = decoder
+            _ = decoder
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -416,11 +402,9 @@ public struct PastGroupConvoMember: ATProtocolCodable, ATProtocolValue {
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
         }
 
-        public func hash(into hasher: inout Hasher) {
-        }
+        public func hash(into hasher: inout Hasher) {}
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-
             return other is Self
         }
 
@@ -439,216 +423,214 @@ public struct PastGroupConvoMember: ATProtocolCodable, ATProtocolValue {
         }
     }
 
+    public struct MemberRole: Codable, ATProtocolCodable, ATProtocolValue {
+        public let rawValue: String
 
+        /// Predefined constants
+        ///
+        public static let owner = MemberRole(rawValue: "owner")
+        ///
+        public static let standard = MemberRole(rawValue: "standard")
 
-public struct MemberRole: Codable, ATProtocolCodable, ATProtocolValue {
-            public let rawValue: String
-
-            // Predefined constants
-            //
-            public static let owner = MemberRole(rawValue: "owner")
-            //
-            public static let standard = MemberRole(rawValue: "standard")
-
-            public init(rawValue: String) {
-                self.rawValue = rawValue
-            }
-
-            public init(from decoder: Decoder) throws {
-                let container = try decoder.singleValueContainer()
-                rawValue = try container.decode(String.self)
-            }
-
-            public func encode(to encoder: Encoder) throws {
-                var container = encoder.singleValueContainer()
-                try container.encode(rawValue)
-            }
-
-            public func isEqual(to other: any ATProtocolValue) -> Bool {
-                guard let otherValue = other as? MemberRole else { return false }
-                return self.rawValue == otherValue.rawValue
-            }
-
-            // DAGCBOR encoding with field ordering
-            public func toCBORValue() throws -> Any {
-                // For string-based enum types, we return the raw string value directly
-                return rawValue
-            }
-
-            // Provide allCases-like functionality
-            public static var predefinedValues: [MemberRole] {
-                return [
-                    .owner,
-                    .standard,
-                ]
-            }
+        public init(rawValue: String) {
+            self.rawValue = rawValue
         }
 
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            rawValue = try container.decode(String.self)
+        }
 
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.singleValueContainer()
+            try container.encode(rawValue)
+        }
 
-public indirect enum ProfileViewBasicKindUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
-    case chatBskyActorDefsDirectConvoMember(ChatBskyActorDefs.DirectConvoMember)
-    case chatBskyActorDefsGroupConvoMember(ChatBskyActorDefs.GroupConvoMember)
-    case chatBskyActorDefsPastGroupConvoMember(ChatBskyActorDefs.PastGroupConvoMember)
-    case unexpected(ATProtocolValueContainer)
-    public init(_ value: ChatBskyActorDefs.DirectConvoMember) {
-        self = .chatBskyActorDefsDirectConvoMember(value)
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? MemberRole else { return false }
+            return rawValue == otherValue.rawValue
+        }
+
+        /// DAGCBOR encoding with field ordering
+        public func toCBORValue() throws -> Any {
+            // For string-based enum types, we return the raw string value directly
+            return rawValue
+        }
+
+        /// Provide allCases-like functionality
+        public static var predefinedValues: [MemberRole] {
+            return [
+                .owner,
+                .standard,
+            ]
+        }
     }
-    public init(_ value: ChatBskyActorDefs.GroupConvoMember) {
-        self = .chatBskyActorDefsGroupConvoMember(value)
-    }
-    public init(_ value: ChatBskyActorDefs.PastGroupConvoMember) {
-        self = .chatBskyActorDefsPastGroupConvoMember(value)
-    }
 
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        let typeValue = try container.decode(String.self, forKey: .type)
-
-        switch typeValue {
-        case "chat.bsky.actor.defs#directConvoMember":
-            let value = try ChatBskyActorDefs.DirectConvoMember(from: decoder)
+    public indirect enum ProfileViewBasicKindUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
+        case chatBskyActorDefsDirectConvoMember(ChatBskyActorDefs.DirectConvoMember)
+        case chatBskyActorDefsGroupConvoMember(ChatBskyActorDefs.GroupConvoMember)
+        case chatBskyActorDefsPastGroupConvoMember(ChatBskyActorDefs.PastGroupConvoMember)
+        case unexpected(ATProtocolValueContainer)
+        public init(_ value: ChatBskyActorDefs.DirectConvoMember) {
             self = .chatBskyActorDefsDirectConvoMember(value)
-        case "chat.bsky.actor.defs#groupConvoMember":
-            let value = try ChatBskyActorDefs.GroupConvoMember(from: decoder)
+        }
+
+        public init(_ value: ChatBskyActorDefs.GroupConvoMember) {
             self = .chatBskyActorDefsGroupConvoMember(value)
-        case "chat.bsky.actor.defs#pastGroupConvoMember":
-            let value = try ChatBskyActorDefs.PastGroupConvoMember(from: decoder)
+        }
+
+        public init(_ value: ChatBskyActorDefs.PastGroupConvoMember) {
             self = .chatBskyActorDefsPastGroupConvoMember(value)
-        default:
-            let unknownValue = try ATProtocolValueContainer(from: decoder)
-            self = .unexpected(unknownValue)
         }
-    }
 
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let typeValue = try container.decode(String.self, forKey: .type)
 
-        switch self {
-        case .chatBskyActorDefsDirectConvoMember(let value):
-            try container.encode("chat.bsky.actor.defs#directConvoMember", forKey: .type)
-            try value.encode(to: encoder)
-        case .chatBskyActorDefsGroupConvoMember(let value):
-            try container.encode("chat.bsky.actor.defs#groupConvoMember", forKey: .type)
-            try value.encode(to: encoder)
-        case .chatBskyActorDefsPastGroupConvoMember(let value):
-            try container.encode("chat.bsky.actor.defs#pastGroupConvoMember", forKey: .type)
-            try value.encode(to: encoder)
-        case .unexpected(let container):
-            try container.encode(to: encoder)
-        }
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        switch self {
-        case .chatBskyActorDefsDirectConvoMember(let value):
-            hasher.combine("chat.bsky.actor.defs#directConvoMember")
-            hasher.combine(value)
-        case .chatBskyActorDefsGroupConvoMember(let value):
-            hasher.combine("chat.bsky.actor.defs#groupConvoMember")
-            hasher.combine(value)
-        case .chatBskyActorDefsPastGroupConvoMember(let value):
-            hasher.combine("chat.bsky.actor.defs#pastGroupConvoMember")
-            hasher.combine(value)
-        case .unexpected(let container):
-            hasher.combine("unexpected")
-            hasher.combine(container)
-        }
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case type = "$type"
-    }
-
-    public static func == (lhs: ProfileViewBasicKindUnion, rhs: ProfileViewBasicKindUnion) -> Bool {
-        switch (lhs, rhs) {
-        case (.chatBskyActorDefsDirectConvoMember(let lhsValue),
-              .chatBskyActorDefsDirectConvoMember(let rhsValue)):
-            return lhsValue == rhsValue
-        case (.chatBskyActorDefsGroupConvoMember(let lhsValue),
-              .chatBskyActorDefsGroupConvoMember(let rhsValue)):
-            return lhsValue == rhsValue
-        case (.chatBskyActorDefsPastGroupConvoMember(let lhsValue),
-              .chatBskyActorDefsPastGroupConvoMember(let rhsValue)):
-            return lhsValue == rhsValue
-        case (.unexpected(let lhsValue), .unexpected(let rhsValue)):
-            return lhsValue.isEqual(to: rhsValue)
-        default:
-            return false
-        }
-    }
-
-    public func isEqual(to other: any ATProtocolValue) -> Bool {
-        guard let other = other as? ProfileViewBasicKindUnion else { return false }
-        return self == other
-    }
-
-    // DAGCBOR encoding with field ordering
-    public func toCBORValue() throws -> Any {
-        // Create an ordered map to maintain field order
-        var map = OrderedCBORMap()
-
-        switch self {
-        case .chatBskyActorDefsDirectConvoMember(let value):
-            map = map.adding(key: "$type", value: "chat.bsky.actor.defs#directConvoMember")
-
-            let valueDict = try value.toCBORValue()
-
-            // If the value is already an OrderedCBORMap, merge its entries
-            if let orderedMap = valueDict as? OrderedCBORMap {
-                for (key, value) in orderedMap.entries where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
-            } else if let dict = valueDict as? [String: Any] {
-                // Otherwise add each key-value pair from the dictionary
-                for (key, value) in dict where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
+            switch typeValue {
+            case "chat.bsky.actor.defs#directConvoMember":
+                let value = try ChatBskyActorDefs.DirectConvoMember(from: decoder)
+                self = .chatBskyActorDefsDirectConvoMember(value)
+            case "chat.bsky.actor.defs#groupConvoMember":
+                let value = try ChatBskyActorDefs.GroupConvoMember(from: decoder)
+                self = .chatBskyActorDefsGroupConvoMember(value)
+            case "chat.bsky.actor.defs#pastGroupConvoMember":
+                let value = try ChatBskyActorDefs.PastGroupConvoMember(from: decoder)
+                self = .chatBskyActorDefsPastGroupConvoMember(value)
+            default:
+                let unknownValue = try ATProtocolValueContainer(from: decoder)
+                self = .unexpected(unknownValue)
             }
-            return map
-        case .chatBskyActorDefsGroupConvoMember(let value):
-            map = map.adding(key: "$type", value: "chat.bsky.actor.defs#groupConvoMember")
+        }
 
-            let valueDict = try value.toCBORValue()
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
 
-            // If the value is already an OrderedCBORMap, merge its entries
-            if let orderedMap = valueDict as? OrderedCBORMap {
-                for (key, value) in orderedMap.entries where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
-            } else if let dict = valueDict as? [String: Any] {
-                // Otherwise add each key-value pair from the dictionary
-                for (key, value) in dict where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
+            switch self {
+            case let .chatBskyActorDefsDirectConvoMember(value):
+                try container.encode("chat.bsky.actor.defs#directConvoMember", forKey: .type)
+                try value.encode(to: encoder)
+            case let .chatBskyActorDefsGroupConvoMember(value):
+                try container.encode("chat.bsky.actor.defs#groupConvoMember", forKey: .type)
+                try value.encode(to: encoder)
+            case let .chatBskyActorDefsPastGroupConvoMember(value):
+                try container.encode("chat.bsky.actor.defs#pastGroupConvoMember", forKey: .type)
+                try value.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
             }
-            return map
-        case .chatBskyActorDefsPastGroupConvoMember(let value):
-            map = map.adding(key: "$type", value: "chat.bsky.actor.defs#pastGroupConvoMember")
+        }
 
-            let valueDict = try value.toCBORValue()
-
-            // If the value is already an OrderedCBORMap, merge its entries
-            if let orderedMap = valueDict as? OrderedCBORMap {
-                for (key, value) in orderedMap.entries where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
-            } else if let dict = valueDict as? [String: Any] {
-                // Otherwise add each key-value pair from the dictionary
-                for (key, value) in dict where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
+        public func hash(into hasher: inout Hasher) {
+            switch self {
+            case let .chatBskyActorDefsDirectConvoMember(value):
+                hasher.combine("chat.bsky.actor.defs#directConvoMember")
+                hasher.combine(value)
+            case let .chatBskyActorDefsGroupConvoMember(value):
+                hasher.combine("chat.bsky.actor.defs#groupConvoMember")
+                hasher.combine(value)
+            case let .chatBskyActorDefsPastGroupConvoMember(value):
+                hasher.combine("chat.bsky.actor.defs#pastGroupConvoMember")
+                hasher.combine(value)
+            case let .unexpected(container):
+                hasher.combine("unexpected")
+                hasher.combine(container)
             }
-            return map
-        case .unexpected(let container):
-            return try container.toCBORValue()
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case type = "$type"
+        }
+
+        public static func == (lhs: ProfileViewBasicKindUnion, rhs: ProfileViewBasicKindUnion) -> Bool {
+            switch (lhs, rhs) {
+            case let (
+                .chatBskyActorDefsDirectConvoMember(lhsValue),
+                .chatBskyActorDefsDirectConvoMember(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .chatBskyActorDefsGroupConvoMember(lhsValue),
+                .chatBskyActorDefsGroupConvoMember(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .chatBskyActorDefsPastGroupConvoMember(lhsValue),
+                .chatBskyActorDefsPastGroupConvoMember(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
+            default:
+                return false
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? ProfileViewBasicKindUnion else { return false }
+            return self == other
+        }
+
+        /// DAGCBOR encoding with field ordering
+        public func toCBORValue() throws -> Any {
+            // Create an ordered map to maintain field order
+            var map = OrderedCBORMap()
+
+            switch self {
+            case let .chatBskyActorDefsDirectConvoMember(value):
+                map = map.adding(key: "$type", value: "chat.bsky.actor.defs#directConvoMember")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .chatBskyActorDefsGroupConvoMember(value):
+                map = map.adding(key: "$type", value: "chat.bsky.actor.defs#groupConvoMember")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .chatBskyActorDefsPastGroupConvoMember(value):
+                map = map.adding(key: "$type", value: "chat.bsky.actor.defs#pastGroupConvoMember")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .unexpected(container):
+                return try container.toCBORValue()
+            }
         }
     }
 }
-
-
-}
-
-
-
-

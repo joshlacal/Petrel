@@ -1,119 +1,115 @@
 import Foundation
 
-
-
 // lexicon: 1, id: place.stream.chat.message
 
-
 public struct PlaceStreamChatMessage: ATProtocolCodable, ATProtocolValue {
-
     public static let typeIdentifier = "place.stream.chat.message"
-        public let text: String
-        public let createdAt: ATProtocolDate
-        public let facets: [PlaceStreamRichtextFacet]?
-        public let streamer: DID
-        public let reply: ReplyRef?
+    public let text: String
+    public let createdAt: ATProtocolDate
+    public let facets: [PlaceStreamRichtextFacet]?
+    public let streamer: DID
+    public let reply: ReplyRef?
 
-        public init(text: String, createdAt: ATProtocolDate, facets: [PlaceStreamRichtextFacet]?, streamer: DID, reply: ReplyRef?) {
-            self.text = text
-            self.createdAt = createdAt
-            self.facets = facets
-            self.streamer = streamer
-            self.reply = reply
+    public init(text: String, createdAt: ATProtocolDate, facets: [PlaceStreamRichtextFacet]?, streamer: DID, reply: ReplyRef?) {
+        self.text = text
+        self.createdAt = createdAt
+        self.facets = facets
+        self.streamer = streamer
+        self.reply = reply
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        text = try container.decode(String.self, forKey: .text)
+        createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+        facets = try container.decodeIfPresent([PlaceStreamRichtextFacet].self, forKey: .facets)
+        streamer = try container.decode(DID.self, forKey: .streamer)
+        reply = try container.decodeIfPresent(ReplyRef.self, forKey: .reply)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+        try container.encode(text, forKey: .text)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encodeIfPresent(facets, forKey: .facets)
+        try container.encode(streamer, forKey: .streamer)
+        try container.encodeIfPresent(reply, forKey: .reply)
+    }
+
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        return lhs.isEqual(to: rhs)
+    }
+
+    public func isEqual(to other: any ATProtocolValue) -> Bool {
+        guard let other = other as? Self else { return false }
+        if text != other.text {
+            return false
         }
-
-        public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.text = try container.decode(String.self, forKey: .text)
-            self.createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
-            self.facets = try container.decodeIfPresent([PlaceStreamRichtextFacet].self, forKey: .facets)
-            self.streamer = try container.decode(DID.self, forKey: .streamer)
-            self.reply = try container.decodeIfPresent(ReplyRef.self, forKey: .reply)
+        if createdAt != other.createdAt {
+            return false
         }
-
-        public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            try container.encode(text, forKey: .text)
-            try container.encode(createdAt, forKey: .createdAt)
-            try container.encodeIfPresent(facets, forKey: .facets)
-            try container.encode(streamer, forKey: .streamer)
-            try container.encodeIfPresent(reply, forKey: .reply)
+        if facets != other.facets {
+            return false
         }
-
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
+        if streamer != other.streamer {
+            return false
         }
-
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let other = other as? Self else { return false }
-            if text != other.text {
-                return false
-            }
-            if createdAt != other.createdAt {
-                return false
-            }
-            if facets != other.facets {
-                return false
-            }
-            if streamer != other.streamer {
-                return false
-            }
-            if reply != other.reply {
-                return false
-            }
-            return true
+        if reply != other.reply {
+            return false
         }
+        return true
+    }
 
-        public func hash(into hasher: inout Hasher) {
-            hasher.combine(text)
-            hasher.combine(createdAt)
-            if let value = facets {
-                hasher.combine(value)
-            } else {
-                hasher.combine(nil as Int?)
-            }
-            hasher.combine(streamer)
-            if let value = reply {
-                hasher.combine(value)
-            } else {
-                hasher.combine(nil as Int?)
-            }
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(text)
+        hasher.combine(createdAt)
+        if let value = facets {
+            hasher.combine(value)
+        } else {
+            hasher.combine(nil as Int?)
         }
-
-        public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
-            let textValue = try text.toCBORValue()
-            map = map.adding(key: "text", value: textValue)
-            let createdAtValue = try createdAt.toCBORValue()
-            map = map.adding(key: "createdAt", value: createdAtValue)
-            if let value = facets {
-                let facetsValue = try value.toCBORValue()
-                map = map.adding(key: "facets", value: facetsValue)
-            }
-            let streamerValue = try streamer.toCBORValue()
-            map = map.adding(key: "streamer", value: streamerValue)
-            if let value = reply {
-                let replyValue = try value.toCBORValue()
-                map = map.adding(key: "reply", value: replyValue)
-            }
-            return map
+        hasher.combine(streamer)
+        if let value = reply {
+            hasher.combine(value)
+        } else {
+            hasher.combine(nil as Int?)
         }
+    }
 
-        private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
-            case text
-            case createdAt
-            case facets
-            case streamer
-            case reply
+    public func toCBORValue() throws -> Any {
+        var map = OrderedCBORMap()
+        map = map.adding(key: "$type", value: Self.typeIdentifier)
+        let textValue = try text.toCBORValue()
+        map = map.adding(key: "text", value: textValue)
+        let createdAtValue = try createdAt.toCBORValue()
+        map = map.adding(key: "createdAt", value: createdAtValue)
+        if let value = facets {
+            let facetsValue = try value.toCBORValue()
+            map = map.adding(key: "facets", value: facetsValue)
         }
+        let streamerValue = try streamer.toCBORValue()
+        map = map.adding(key: "streamer", value: streamerValue)
+        if let value = reply {
+            let replyValue = try value.toCBORValue()
+            map = map.adding(key: "reply", value: replyValue)
+        }
+        return map
+    }
 
-public struct ReplyRef: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "place.stream.chat.message#replyRef"
-            public let root: ComAtprotoRepoStrongRef
-            public let parent: ComAtprotoRepoStrongRef
+    private enum CodingKeys: String, CodingKey {
+        case typeIdentifier = "$type"
+        case text
+        case createdAt
+        case facets
+        case streamer
+        case reply
+    }
+
+    public struct ReplyRef: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "place.stream.chat.message#replyRef"
+        public let root: ComAtprotoRepoStrongRef
+        public let parent: ComAtprotoRepoStrongRef
 
         public init(
             root: ComAtprotoRepoStrongRef, parent: ComAtprotoRepoStrongRef
@@ -125,13 +121,13 @@ public struct ReplyRef: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.root = try container.decode(ComAtprotoRepoStrongRef.self, forKey: .root)
+                root = try container.decode(ComAtprotoRepoStrongRef.self, forKey: .root)
             } catch {
                 LogManager.logError("Decoding error for required property 'root': \(error)")
                 throw error
             }
             do {
-                self.parent = try container.decode(ComAtprotoRepoStrongRef.self, forKey: .parent)
+                parent = try container.decode(ComAtprotoRepoStrongRef.self, forKey: .parent)
             } catch {
                 LogManager.logError("Decoding error for required property 'parent': \(error)")
                 throw error
@@ -181,11 +177,4 @@ public struct ReplyRef: ATProtocolCodable, ATProtocolValue {
             case parent
         }
     }
-
-
-
 }
-
-
-
-

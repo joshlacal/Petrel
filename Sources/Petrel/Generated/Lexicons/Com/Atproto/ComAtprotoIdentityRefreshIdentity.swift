@@ -1,14 +1,10 @@
 import Foundation
 
-
-
 // lexicon: 1, id: com.atproto.identity.refreshIdentity
 
-
-public struct ComAtprotoIdentityRefreshIdentity {
-
+public enum ComAtprotoIdentityRefreshIdentity {
     public static let typeIdentifier = "com.atproto.identity.refreshIdentity"
-public struct Input: ATProtocolCodable {
+    public struct Input: ATProtocolCodable {
         public let identifier: ATIdentifier
 
         /// Standard public initializer
@@ -16,10 +12,9 @@ public struct Input: ATProtocolCodable {
             self.identifier = identifier
         }
 
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.identifier = try container.decode(ATIdentifier.self, forKey: .identifier)
+            identifier = try container.decode(ATIdentifier.self, forKey: .identifier)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -38,39 +33,36 @@ public struct Input: ATProtocolCodable {
             case identifier
         }
     }
+
     public typealias Output = ComAtprotoIdentityDefs.IdentityInfo
 
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case handleNotFound = "HandleNotFound.The resolution process confirmed that the handle does not resolve to any DID."
-                case didNotFound = "DidNotFound.The DID resolution process confirmed that there is no current DID."
-                case didDeactivated = "DidDeactivated.The DID previously existed, but has been deactivated."
-            public var description: String {
-                return self.rawValue
-            }
-
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case handleNotFound = "HandleNotFound.The resolution process confirmed that the handle does not resolve to any DID."
+        case didNotFound = "DidNotFound.The DID resolution process confirmed that there is no current DID."
+        case didDeactivated = "DidDeactivated.The DID previously existed, but has been deactivated."
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-extension ATProtoClient.Com.Atproto.Identity {
+public extension ATProtoClient.Com.Atproto.Identity {
     // MARK: - refreshIdentity
 
-    /// Request that the server re-resolve an identity (DID and handle). The server may ignore this request, or require authentication, depending on the role, implementation, and policy of the server.
-    ///
-    /// - Parameter input: The input parameters for the request
+    // Request that the server re-resolve an identity (DID and handle). The server may ignore this request, or require authentication, depending on the role, implementation, and policy of the server.
+    //
+    // - Parameter input: The input parameters for the request
 
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func refreshIdentity(
-
+    func refreshIdentity(
         input: ComAtprotoIdentityRefreshIdentity.Input
 
     ) async throws -> (responseCode: Int, data: ComAtprotoIdentityRefreshIdentity.Output?) {
@@ -80,14 +72,9 @@ extension ATProtoClient.Com.Atproto.Identity {
 
         headers["Content-Type"] = "application/json"
 
-
-
         headers["Accept"] = "application/json"
 
-
-
         let requestData: Data? = try JSONEncoder().encode(input)
-
 
         let queryItems: [URLQueryItem]? = nil
 
@@ -105,12 +92,10 @@ extension ATProtoClient.Com.Atproto.Identity {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -119,9 +104,7 @@ extension ATProtoClient.Com.Atproto.Identity {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(ComAtprotoIdentityRefreshIdentity.Output.self, from: responseData)
 
@@ -135,9 +118,5 @@ extension ATProtoClient.Com.Atproto.Identity {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-
     }
-
 }
-
-

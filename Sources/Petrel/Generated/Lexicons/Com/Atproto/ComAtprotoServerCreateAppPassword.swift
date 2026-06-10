@@ -1,20 +1,16 @@
 import Foundation
 
-
-
 // lexicon: 1, id: com.atproto.server.createAppPassword
 
-
-public struct ComAtprotoServerCreateAppPassword {
-
+public enum ComAtprotoServerCreateAppPassword {
     public static let typeIdentifier = "com.atproto.server.createAppPassword"
 
-public struct AppPassword: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "com.atproto.server.createAppPassword#appPassword"
-            public let name: String
-            public let password: String
-            public let createdAt: ATProtocolDate
-            public let privileged: Bool?
+    public struct AppPassword: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "com.atproto.server.createAppPassword#appPassword"
+        public let name: String
+        public let password: String
+        public let createdAt: ATProtocolDate
+        public let privileged: Bool?
 
         public init(
             name: String, password: String, createdAt: ATProtocolDate, privileged: Bool?
@@ -28,25 +24,25 @@ public struct AppPassword: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.name = try container.decode(String.self, forKey: .name)
+                name = try container.decode(String.self, forKey: .name)
             } catch {
                 LogManager.logError("Decoding error for required property 'name': \(error)")
                 throw error
             }
             do {
-                self.password = try container.decode(String.self, forKey: .password)
+                password = try container.decode(String.self, forKey: .password)
             } catch {
                 LogManager.logError("Decoding error for required property 'password': \(error)")
                 throw error
             }
             do {
-                self.createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
             } catch {
                 LogManager.logError("Decoding error for required property 'createdAt': \(error)")
                 throw error
             }
             do {
-                self.privileged = try container.decodeIfPresent(Bool.self, forKey: .privileged)
+                privileged = try container.decodeIfPresent(Bool.self, forKey: .privileged)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'privileged': \(error)")
                 throw error
@@ -118,7 +114,8 @@ public struct AppPassword: ATProtocolCodable, ATProtocolValue {
             case privileged
         }
     }
-public struct Input: ATProtocolCodable {
+
+    public struct Input: ATProtocolCodable {
         public let name: String
         public let privileged: Bool?
 
@@ -128,11 +125,10 @@ public struct Input: ATProtocolCodable {
             self.privileged = privileged
         }
 
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.name = try container.decode(String.self, forKey: .name)
-            self.privileged = try container.decodeIfPresent(Bool.self, forKey: .privileged)
+            name = try container.decode(String.self, forKey: .name)
+            privileged = try container.decodeIfPresent(Bool.self, forKey: .privileged)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -157,37 +153,34 @@ public struct Input: ATProtocolCodable {
             case privileged
         }
     }
+
     public typealias Output = AppPassword
 
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case accountTakedown = "AccountTakedown."
-            public var description: String {
-                return self.rawValue
-            }
-
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case accountTakedown = "AccountTakedown."
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-extension ATProtoClient.Com.Atproto.Server {
+public extension ATProtoClient.Com.Atproto.Server {
     // MARK: - createAppPassword
 
-    /// Create an App Password.
-    ///
-    /// - Parameter input: The input parameters for the request
+    // Create an App Password.
+    //
+    // - Parameter input: The input parameters for the request
 
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func createAppPassword(
-
+    func createAppPassword(
         input: ComAtprotoServerCreateAppPassword.Input
 
     ) async throws -> (responseCode: Int, data: ComAtprotoServerCreateAppPassword.Output?) {
@@ -197,14 +190,9 @@ extension ATProtoClient.Com.Atproto.Server {
 
         headers["Content-Type"] = "application/json"
 
-
-
         headers["Accept"] = "application/json"
 
-
-
         let requestData: Data? = try JSONEncoder().encode(input)
-
 
         let queryItems: [URLQueryItem]? = nil
 
@@ -222,12 +210,10 @@ extension ATProtoClient.Com.Atproto.Server {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -236,9 +222,7 @@ extension ATProtoClient.Com.Atproto.Server {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(ComAtprotoServerCreateAppPassword.Output.self, from: responseData)
 
@@ -252,9 +236,5 @@ extension ATProtoClient.Com.Atproto.Server {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-
     }
-
 }
-
-

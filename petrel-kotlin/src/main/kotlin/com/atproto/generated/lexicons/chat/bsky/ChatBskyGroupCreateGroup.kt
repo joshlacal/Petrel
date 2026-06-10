@@ -29,9 +29,11 @@ object ChatBskyGroupCreateGroupDefs {
 sealed class ChatBskyGroupCreateGroupError(val name: String, val description: String?) {
         object AccountSuspended: ChatBskyGroupCreateGroupError("AccountSuspended", "")
         object BlockedActor: ChatBskyGroupCreateGroupError("BlockedActor", "")
-        object GroupInvitesDisabled: ChatBskyGroupCreateGroupError("GroupInvitesDisabled", "")
+        object BlockedSubject: ChatBskyGroupCreateGroupError("BlockedSubject", "")
+        object NewAccountCannotCreateGroup: ChatBskyGroupCreateGroupError("NewAccountCannotCreateGroup", "")
         object NotFollowedBySender: ChatBskyGroupCreateGroupError("NotFollowedBySender", "")
         object RecipientNotFound: ChatBskyGroupCreateGroupError("RecipientNotFound", "")
+        object UserForbidsGroups: ChatBskyGroupCreateGroupError("UserForbidsGroups", "")
     }
 
 /**

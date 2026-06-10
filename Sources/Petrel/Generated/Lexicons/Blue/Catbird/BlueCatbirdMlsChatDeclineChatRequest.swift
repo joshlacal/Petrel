@@ -1,14 +1,10 @@
 import Foundation
 
-
-
 // lexicon: 1, id: blue.catbird.mlsChat.declineChatRequest
 
-
-public struct BlueCatbirdMlsChatDeclineChatRequest {
-
+public enum BlueCatbirdMlsChatDeclineChatRequest {
     public static let typeIdentifier = "blue.catbird.mlsChat.declineChatRequest"
-public struct Input: ATProtocolCodable {
+    public struct Input: ATProtocolCodable {
         public let requestId: String
         public let reportReason: String?
         public let reportDetails: String?
@@ -20,12 +16,11 @@ public struct Input: ATProtocolCodable {
             self.reportDetails = reportDetails
         }
 
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.requestId = try container.decode(String.self, forKey: .requestId)
-            self.reportReason = try container.decodeIfPresent(String.self, forKey: .reportReason)
-            self.reportDetails = try container.decodeIfPresent(String.self, forKey: .reportDetails)
+            requestId = try container.decode(String.self, forKey: .requestId)
+            reportReason = try container.decodeIfPresent(String.self, forKey: .reportReason)
+            reportDetails = try container.decodeIfPresent(String.self, forKey: .reportDetails)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -57,86 +52,58 @@ public struct Input: ATProtocolCodable {
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let success: Bool
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             success: Bool
 
-
         ) {
-
-
             self.success = success
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.success = try container.decode(Bool.self, forKey: .success)
-
-
+            success = try container.decode(Bool.self, forKey: .success)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(success, forKey: .success)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let successValue = try success.toCBORValue()
             map = map.adding(key: "success", value: successValue)
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case success
         }
-
     }
 
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case requestNotFound = "RequestNotFound."
-            public var description: String {
-                return self.rawValue
-            }
-
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case requestNotFound = "RequestNotFound."
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-extension ATProtoClient.Blue.Catbird.MlsChat {
+public extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - declineChatRequest
 
     /// Decline a chat request
@@ -145,8 +112,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func declineChatRequest(
-
+    func declineChatRequest(
         input: BlueCatbirdMlsChatDeclineChatRequest.Input
 
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatDeclineChatRequest.Output?) {
@@ -156,10 +122,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
 
         headers["Content-Type"] = "application/json"
 
-
-
         headers["Accept"] = "application/json"
-
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -176,7 +139,6 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
@@ -186,9 +148,8 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         }
 
         // Only decode response data if request was successful
-        if (200...299).contains(responseCode) {
+        if (200 ... 299).contains(responseCode) {
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatDeclineChatRequest.Output.self, from: responseData)
 
@@ -202,9 +163,5 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-
     }
-
 }
-
-

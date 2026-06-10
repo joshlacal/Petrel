@@ -1,107 +1,72 @@
 import Foundation
 
-
-
 // lexicon: 1, id: blue.catbird.mlsChat.getBlob
 
-
-public struct BlueCatbirdMlsChatGetBlob {
-
+public enum BlueCatbirdMlsChatGetBlob {
     public static let typeIdentifier = "blue.catbird.mlsChat.getBlob"
-public struct Parameters: Parametrizable {
+    public struct Parameters: Parametrizable {
         public let blobId: String
 
         public init(
             blobId: String
-            ) {
+        ) {
             self.blobId = blobId
-
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let data: Data
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             data: Data
 
-
         ) {
-
-
             self.data = data
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.data = try container.decode(Data.self, forKey: .data)
-
-
+            data = try container.decode(Data.self, forKey: .data)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(data, forKey: .data)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let dataValue = try data.toCBORValue()
             map = map.adding(key: "data", value: dataValue)
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case data
         }
-
     }
 
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case blobNotFound = "BlobNotFound.Blob does not exist or has expired/been deleted"
-                case notAMember = "NotAMember.Requester is not an active member of the blob's conversation"
-            public var description: String {
-                return self.rawValue
-            }
-
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case blobNotFound = "BlobNotFound.Blob does not exist or has expired/been deleted"
+        case notAMember = "NotAMember.Requester is not an active member of the blob's conversation"
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-
-
-extension ATProtoClient.Blue.Catbird.MlsChat {
+public extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - getBlob
 
     /// Download an encrypted blob by ID Fetch an encrypted blob from the blob store. Returns raw encrypted bytes (application/octet-stream). Only active members of the blob's conversation can download it.
@@ -110,9 +75,8 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func getBlob(input: BlueCatbirdMlsChatGetBlob.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatGetBlob.Output?) {
+    func getBlob(input: BlueCatbirdMlsChatGetBlob.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatGetBlob.Output?) {
         let endpoint = "blue.catbird.mlsChat.getBlob"
-
 
         let queryItems = input.asQueryItems()
 
@@ -133,13 +97,10 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             // Wildcard encoding ("*/*") — accept any Content-Type, including a missing one.
 
-
             do {
-
                 let decodedData = BlueCatbirdMlsChatGetBlob.Output(data: responseData)
 
                 return (responseCode, decodedData)
@@ -149,12 +110,9 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
                 return (responseCode, nil)
             }
         } else {
-
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
-

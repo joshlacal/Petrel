@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: chat.bsky.convo.listConvoRequests
-// [NOTE: This is under active development and should be considered unstable while this note is here]. Returns a page of incoming conversation requests for the user. Direct convo requests are returned as convoView; group join requests are returned as joinRequestView.
+// [NOTE: This is under active development and should be considered unstable while this note is here]. Returns a page of incoming conversation requests for the user. Direct convo requests are returned as convoView; group join requests made by the user are returned as joinRequestConvoView.
 package com.atproto.generated
 
 import kotlinx.serialization.*
@@ -21,7 +21,7 @@ sealed interface ChatBskyConvoListConvoRequestsOutputRequestsUnion {
     data class ConvoView(val value: com.atproto.generated.ChatBskyConvoDefsConvoView) : ChatBskyConvoListConvoRequestsOutputRequestsUnion
 
     @Serializable
-    data class JoinRequestView(val value: com.atproto.generated.ChatBskyGroupDefsJoinRequestView) : ChatBskyConvoListConvoRequestsOutputRequestsUnion
+    data class JoinRequestConvoView(val value: com.atproto.generated.ChatBskyGroupDefsJoinRequestConvoView) : ChatBskyConvoListConvoRequestsOutputRequestsUnion
 
     @Serializable
     data class Unexpected(val value: JsonElement) : ChatBskyConvoListConvoRequestsOutputRequestsUnion
@@ -40,10 +40,10 @@ object ChatBskyConvoListConvoRequestsOutputRequestsUnionSerializer : kotlinx.ser
                     it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#convoView")
                 })
             }
-            is ChatBskyConvoListConvoRequestsOutputRequestsUnion.JoinRequestView -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyGroupDefsJoinRequestView.serializer(), value.value)
+            is ChatBskyConvoListConvoRequestsOutputRequestsUnion.JoinRequestConvoView -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyGroupDefsJoinRequestConvoView.serializer(), value.value)
                 kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.group.defs#joinRequestView")
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.group.defs#joinRequestConvoView")
                 })
             }
             is ChatBskyConvoListConvoRequestsOutputRequestsUnion.Unexpected -> value.value
@@ -68,8 +68,8 @@ object ChatBskyConvoListConvoRequestsOutputRequestsUnionSerializer : kotlinx.ser
             "chat.bsky.convo.defs#convoView" -> ChatBskyConvoListConvoRequestsOutputRequestsUnion.ConvoView(
                 jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsConvoView.serializer(), element)
             )
-            "chat.bsky.group.defs#joinRequestView" -> ChatBskyConvoListConvoRequestsOutputRequestsUnion.JoinRequestView(
-                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyGroupDefsJoinRequestView.serializer(), element)
+            "chat.bsky.group.defs#joinRequestConvoView" -> ChatBskyConvoListConvoRequestsOutputRequestsUnion.JoinRequestConvoView(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyGroupDefsJoinRequestConvoView.serializer(), element)
             )
             else -> ChatBskyConvoListConvoRequestsOutputRequestsUnion.Unexpected(element)
         }
@@ -89,7 +89,7 @@ object ChatBskyConvoListConvoRequestsOutputRequestsUnionSerializer : kotlinx.ser
         val requests: List<ChatBskyConvoListConvoRequestsOutputRequestsUnion>    )
 
 /**
- * [NOTE: This is under active development and should be considered unstable while this note is here]. Returns a page of incoming conversation requests for the user. Direct convo requests are returned as convoView; group join requests are returned as joinRequestView.
+ * [NOTE: This is under active development and should be considered unstable while this note is here]. Returns a page of incoming conversation requests for the user. Direct convo requests are returned as convoView; group join requests made by the user are returned as joinRequestConvoView.
  *
  * Endpoint: chat.bsky.convo.listConvoRequests
  */

@@ -21,9 +21,6 @@ sealed interface ChatBskyModerationGetMessageContextOutputMessagesUnion {
     data class MessageView(val value: com.atproto.generated.ChatBskyConvoDefsMessageView) : ChatBskyModerationGetMessageContextOutputMessagesUnion
 
     @Serializable
-    data class DeletedMessageView(val value: com.atproto.generated.ChatBskyConvoDefsDeletedMessageView) : ChatBskyModerationGetMessageContextOutputMessagesUnion
-
-    @Serializable
     data class SystemMessageView(val value: com.atproto.generated.ChatBskyConvoDefsSystemMessageView) : ChatBskyModerationGetMessageContextOutputMessagesUnion
 
     @Serializable
@@ -41,12 +38,6 @@ object ChatBskyModerationGetMessageContextOutputMessagesUnionSerializer : kotlin
                 val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsMessageView.serializer(), value.value)
                 kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
                     it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#messageView")
-                })
-            }
-            is ChatBskyModerationGetMessageContextOutputMessagesUnion.DeletedMessageView -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsDeletedMessageView.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#deletedMessageView")
                 })
             }
             is ChatBskyModerationGetMessageContextOutputMessagesUnion.SystemMessageView -> {
@@ -77,9 +68,6 @@ object ChatBskyModerationGetMessageContextOutputMessagesUnionSerializer : kotlin
             "chat.bsky.convo.defs#messageView" -> ChatBskyModerationGetMessageContextOutputMessagesUnion.MessageView(
                 jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsMessageView.serializer(), element)
             )
-            "chat.bsky.convo.defs#deletedMessageView" -> ChatBskyModerationGetMessageContextOutputMessagesUnion.DeletedMessageView(
-                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsDeletedMessageView.serializer(), element)
-            )
             "chat.bsky.convo.defs#systemMessageView" -> ChatBskyModerationGetMessageContextOutputMessagesUnion.SystemMessageView(
                 jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsSystemMessageView.serializer(), element)
             )
@@ -92,9 +80,10 @@ object ChatBskyModerationGetMessageContextOutputMessagesUnionSerializer : kotlin
     data class ChatBskyModerationGetMessageContextParameters(
 // Conversation that the message is from. NOTE: this field will eventually be required.        @SerialName("convoId")
         val convoId: String? = null,        @SerialName("messageId")
-        val messageId: String,        @SerialName("before")
-        val before: Int? = null,        @SerialName("after")
-        val after: Int? = null    )
+        val messageId: String,// Number of user messages before the target to include. System messages between the earliest returned user message and the target are also included, capped per gap by `maxInterleavedSystemMessages`. If there are no user messages before the target, up to `maxInterleavedSystemMessages` system messages immediately preceding the target are returned instead.        @SerialName("before")
+        val before: Int? = null,// Number of user messages after the target to include. System messages between the target and the latest returned user message are also included, capped per gap by `maxInterleavedSystemMessages`. If there are no user messages after the target, up to `maxInterleavedSystemMessages` system messages immediately following the target are returned instead.        @SerialName("after")
+        val after: Int? = null,// Maximum number of system messages to include per gap between consecutive returned messages (and per side when there are no user messages on that side). Within a gap, the system messages closest to the earlier message are kept.        @SerialName("maxInterleavedSystemMessages")
+        val maxInterleavedSystemMessages: Int? = null    )
 
     @Serializable
     data class ChatBskyModerationGetMessageContextOutput(

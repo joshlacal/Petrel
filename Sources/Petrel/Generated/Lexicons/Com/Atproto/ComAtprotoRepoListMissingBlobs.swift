@@ -1,18 +1,14 @@
 import Foundation
 
-
-
 // lexicon: 1, id: com.atproto.repo.listMissingBlobs
 
-
-public struct ComAtprotoRepoListMissingBlobs {
-
+public enum ComAtprotoRepoListMissingBlobs {
     public static let typeIdentifier = "com.atproto.repo.listMissingBlobs"
 
-public struct RecordBlob: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "com.atproto.repo.listMissingBlobs#recordBlob"
-            public let cid: CID
-            public let recordUri: ATProtocolURI
+    public struct RecordBlob: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "com.atproto.repo.listMissingBlobs#recordBlob"
+        public let cid: CID
+        public let recordUri: ATProtocolURI
 
         public init(
             cid: CID, recordUri: ATProtocolURI
@@ -24,13 +20,13 @@ public struct RecordBlob: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.cid = try container.decode(CID.self, forKey: .cid)
+                cid = try container.decode(CID.self, forKey: .cid)
             } catch {
                 LogManager.logError("Decoding error for required property 'cid': \(error)")
                 throw error
             }
             do {
-                self.recordUri = try container.decode(ATProtocolURI.self, forKey: .recordUri)
+                recordUri = try container.decode(ATProtocolURI.self, forKey: .recordUri)
             } catch {
                 LogManager.logError("Decoding error for required property 'recordUri': \(error)")
                 throw error
@@ -80,78 +76,56 @@ public struct RecordBlob: ATProtocolCodable, ATProtocolValue {
             case recordUri
         }
     }
-public struct Parameters: Parametrizable {
+
+    public struct Parameters: Parametrizable {
         public let limit: Int?
         public let cursor: String?
 
         public init(
             limit: Int? = nil,
             cursor: String? = nil
-            ) {
+        ) {
             self.limit = limit
             self.cursor = cursor
-
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let cursor: String?
 
         public let blobs: [RecordBlob]
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             cursor: String? = nil,
 
             blobs: [RecordBlob]
 
-
         ) {
-
-
             self.cursor = cursor
 
             self.blobs = blobs
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
 
-
-            self.blobs = try container.decode([RecordBlob].self, forKey: .blobs)
-
-
+            blobs = try container.decode([RecordBlob].self, forKey: .blobs)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(cursor, forKey: .cursor)
 
-
             try container.encode(blobs, forKey: .blobs)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             if let value = cursor {
                 // Encode optional property even if it's an empty array for CBOR
@@ -159,33 +133,20 @@ public struct Output: ATProtocolCodable {
                 map = map.adding(key: "cursor", value: cursorValue)
             }
 
-
-
             let blobsValue = try blobs.toCBORValue()
             map = map.adding(key: "blobs", value: blobsValue)
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case cursor
             case blobs
         }
-
     }
-
-
-
-
 }
 
-
-
-extension ATProtoClient.Com.Atproto.Repo {
+public extension ATProtoClient.Com.Atproto.Repo {
     // MARK: - listMissingBlobs
 
     /// Returns a list of missing blobs for the requesting account. Intended to be used in the account migration flow.
@@ -194,9 +155,8 @@ extension ATProtoClient.Com.Atproto.Repo {
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func listMissingBlobs(input: ComAtprotoRepoListMissingBlobs.Parameters) async throws -> (responseCode: Int, data: ComAtprotoRepoListMissingBlobs.Output?) {
+    func listMissingBlobs(input: ComAtprotoRepoListMissingBlobs.Parameters) async throws -> (responseCode: Int, data: ComAtprotoRepoListMissingBlobs.Output?) {
         let endpoint = "com.atproto.repo.listMissingBlobs"
-
 
         let queryItems = input.asQueryItems()
 
@@ -217,8 +177,7 @@ extension ATProtoClient.Com.Atproto.Repo {
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -227,9 +186,7 @@ extension ATProtoClient.Com.Atproto.Repo {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(ComAtprotoRepoListMissingBlobs.Output.self, from: responseData)
 
@@ -240,12 +197,9 @@ extension ATProtoClient.Com.Atproto.Repo {
                 return (responseCode, nil)
             }
         } else {
-
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
-

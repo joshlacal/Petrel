@@ -1,14 +1,10 @@
 import Foundation
 
-
-
 // lexicon: 1, id: blue.catbird.mlsChat.completePendingDeviceAddition
 
-
-public struct BlueCatbirdMlsChatCompletePendingDeviceAddition {
-
+public enum BlueCatbirdMlsChatCompletePendingDeviceAddition {
     public static let typeIdentifier = "blue.catbird.mlsChat.completePendingDeviceAddition"
-public struct Input: ATProtocolCodable {
+    public struct Input: ATProtocolCodable {
         public let pendingAdditionId: String
         public let newEpoch: Int
 
@@ -18,11 +14,10 @@ public struct Input: ATProtocolCodable {
             self.newEpoch = newEpoch
         }
 
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.pendingAdditionId = try container.decode(String.self, forKey: .pendingAdditionId)
-            self.newEpoch = try container.decode(Int.self, forKey: .newEpoch)
+            pendingAdditionId = try container.decode(String.self, forKey: .pendingAdditionId)
+            newEpoch = try container.decode(Int.self, forKey: .newEpoch)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -46,69 +41,45 @@ public struct Input: ATProtocolCodable {
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let success: Bool
 
         public let error: String?
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             success: Bool,
 
             error: String? = nil
 
-
         ) {
-
-
             self.success = success
 
             self.error = error
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.success = try container.decode(Bool.self, forKey: .success)
+            success = try container.decode(Bool.self, forKey: .success)
 
-
-            self.error = try container.decodeIfPresent(String.self, forKey: .error)
-
-
+            error = try container.decodeIfPresent(String.self, forKey: .error)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(success, forKey: .success)
 
-
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(error, forKey: .error)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let successValue = try success.toCBORValue()
             map = map.adding(key: "success", value: successValue)
-
-
 
             if let value = error {
                 // Encode optional property even if it's an empty array for CBOR
@@ -116,38 +87,30 @@ public struct Output: ATProtocolCodable {
                 map = map.adding(key: "error", value: errorValue)
             }
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case success
             case error
         }
-
     }
 
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case notClaimed = "NotClaimed.Pending addition was not claimed by caller"
-            public var description: String {
-                return self.rawValue
-            }
-
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case notClaimed = "NotClaimed.Pending addition was not claimed by caller"
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-extension ATProtoClient.Blue.Catbird.MlsChat {
+public extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - completePendingDeviceAddition
 
     /// Mark a pending device addition as complete after successful addMembers Marks a claimed pending device addition as completed. Call this after successfully adding the device via addMembers. Returns success=false with error field if pending addition not found or in wrong state.
@@ -156,8 +119,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func completePendingDeviceAddition(
-
+    func completePendingDeviceAddition(
         input: BlueCatbirdMlsChatCompletePendingDeviceAddition.Input
 
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatCompletePendingDeviceAddition.Output?) {
@@ -167,10 +129,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
 
         headers["Content-Type"] = "application/json"
 
-
-
         headers["Accept"] = "application/json"
-
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -187,7 +146,6 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
@@ -197,9 +155,8 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         }
 
         // Only decode response data if request was successful
-        if (200...299).contains(responseCode) {
+        if (200 ... 299).contains(responseCode) {
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatCompletePendingDeviceAddition.Output.self, from: responseData)
 
@@ -213,9 +170,5 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-
     }
-
 }
-
-

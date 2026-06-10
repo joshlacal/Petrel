@@ -1,14 +1,10 @@
 import Foundation
 
-
-
 // lexicon: 1, id: app.bsky.notification.putPreferences
 
-
-public struct AppBskyNotificationPutPreferences {
-
+public enum AppBskyNotificationPutPreferences {
     public static let typeIdentifier = "app.bsky.notification.putPreferences"
-public struct Input: ATProtocolCodable {
+    public struct Input: ATProtocolCodable {
         public let priority: Bool
 
         /// Standard public initializer
@@ -16,10 +12,9 @@ public struct Input: ATProtocolCodable {
             self.priority = priority
         }
 
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.priority = try container.decode(Bool.self, forKey: .priority)
+            priority = try container.decode(Bool.self, forKey: .priority)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -38,23 +33,19 @@ public struct Input: ATProtocolCodable {
             case priority
         }
     }
-
-
-
 }
 
-extension ATProtoClient.App.Bsky.Notification {
+public extension ATProtoClient.App.Bsky.Notification {
     // MARK: - putPreferences
 
-    /// Set notification-related preferences for an account. Requires auth.
-    ///
-    /// - Parameter input: The input parameters for the request
+    // Set notification-related preferences for an account. Requires auth.
+    //
+    // - Parameter input: The input parameters for the request
 
     ///
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func putPreferences(
-
+    func putPreferences(
         input: AppBskyNotificationPutPreferences.Input
 
     ) async throws -> Int {
@@ -64,12 +55,7 @@ extension ATProtoClient.App.Bsky.Notification {
 
         headers["Content-Type"] = "application/json"
 
-
-
-
-
         let requestData: Data? = try JSONEncoder().encode(input)
-
 
         let queryItems: [URLQueryItem]? = nil
 
@@ -85,13 +71,6 @@ extension ATProtoClient.App.Bsky.Notification {
         let serviceDID = await networkService.getServiceDID(for: "app.bsky.notification.putPreferences")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
         let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        let responseCode = response.statusCode
-
-
-        return responseCode
-
+        return response.statusCode
     }
-
 }
-
-

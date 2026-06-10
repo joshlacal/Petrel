@@ -1,33 +1,23 @@
 import Foundation
 
-
-
 // lexicon: 1, id: app.bsky.actor.getProfile
 
-
-public struct AppBskyActorGetProfile {
-
+public enum AppBskyActorGetProfile {
     public static let typeIdentifier = "app.bsky.actor.getProfile"
-public struct Parameters: Parametrizable {
+    public struct Parameters: Parametrizable {
         public let actor: ATIdentifier
 
         public init(
             actor: ATIdentifier
-            ) {
+        ) {
             self.actor = actor
-
         }
     }
+
     public typealias Output = AppBskyActorDefs.ProfileViewDetailed
-
-
-
-
 }
 
-
-
-extension ATProtoClient.App.Bsky.Actor {
+public extension ATProtoClient.App.Bsky.Actor {
     // MARK: - getProfile
 
     /// Get detailed profile view of an actor. Does not require auth, but contains relevant metadata with auth.
@@ -36,9 +26,8 @@ extension ATProtoClient.App.Bsky.Actor {
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func getProfile(input: AppBskyActorGetProfile.Parameters) async throws -> (responseCode: Int, data: AppBskyActorGetProfile.Output?) {
+    func getProfile(input: AppBskyActorGetProfile.Parameters) async throws -> (responseCode: Int, data: AppBskyActorGetProfile.Output?) {
         let endpoint = "app.bsky.actor.getProfile"
-
 
         let queryItems = input.asQueryItems()
 
@@ -59,8 +48,7 @@ extension ATProtoClient.App.Bsky.Actor {
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -69,9 +57,7 @@ extension ATProtoClient.App.Bsky.Actor {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(AppBskyActorGetProfile.Output.self, from: responseData)
 
@@ -82,12 +68,9 @@ extension ATProtoClient.App.Bsky.Actor {
                 return (responseCode, nil)
             }
         } else {
-
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
-

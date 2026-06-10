@@ -1,14 +1,10 @@
 import Foundation
 
-
-
 // lexicon: 1, id: com.atproto.admin.searchAccounts
 
-
-public struct ComAtprotoAdminSearchAccounts {
-
+public enum ComAtprotoAdminSearchAccounts {
     public static let typeIdentifier = "com.atproto.admin.searchAccounts"
-public struct Parameters: Parametrizable {
+    public struct Parameters: Parametrizable {
         public let email: String?
         public let cursor: String?
         public let limit: Int?
@@ -17,72 +13,49 @@ public struct Parameters: Parametrizable {
             email: String? = nil,
             cursor: String? = nil,
             limit: Int? = nil
-            ) {
+        ) {
             self.email = email
             self.cursor = cursor
             self.limit = limit
-
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let cursor: String?
 
         public let accounts: [ComAtprotoAdminDefs.AccountView]
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             cursor: String? = nil,
 
             accounts: [ComAtprotoAdminDefs.AccountView]
 
-
         ) {
-
-
             self.cursor = cursor
 
             self.accounts = accounts
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
 
-
-            self.accounts = try container.decode([ComAtprotoAdminDefs.AccountView].self, forKey: .accounts)
-
-
+            accounts = try container.decode([ComAtprotoAdminDefs.AccountView].self, forKey: .accounts)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(cursor, forKey: .cursor)
 
-
             try container.encode(accounts, forKey: .accounts)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             if let value = cursor {
                 // Encode optional property even if it's an empty array for CBOR
@@ -90,33 +63,20 @@ public struct Output: ATProtocolCodable {
                 map = map.adding(key: "cursor", value: cursorValue)
             }
 
-
-
             let accountsValue = try accounts.toCBORValue()
             map = map.adding(key: "accounts", value: accountsValue)
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case cursor
             case accounts
         }
-
     }
-
-
-
-
 }
 
-
-
-extension ATProtoClient.Com.Atproto.Admin {
+public extension ATProtoClient.Com.Atproto.Admin {
     // MARK: - searchAccounts
 
     /// Get list of accounts that matches your search query.
@@ -125,9 +85,8 @@ extension ATProtoClient.Com.Atproto.Admin {
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func searchAccounts(input: ComAtprotoAdminSearchAccounts.Parameters) async throws -> (responseCode: Int, data: ComAtprotoAdminSearchAccounts.Output?) {
+    func searchAccounts(input: ComAtprotoAdminSearchAccounts.Parameters) async throws -> (responseCode: Int, data: ComAtprotoAdminSearchAccounts.Output?) {
         let endpoint = "com.atproto.admin.searchAccounts"
-
 
         let queryItems = input.asQueryItems()
 
@@ -148,8 +107,7 @@ extension ATProtoClient.Com.Atproto.Admin {
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -158,9 +116,7 @@ extension ATProtoClient.Com.Atproto.Admin {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(ComAtprotoAdminSearchAccounts.Output.self, from: responseData)
 
@@ -171,12 +127,9 @@ extension ATProtoClient.Com.Atproto.Admin {
                 return (responseCode, nil)
             }
         } else {
-
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
-

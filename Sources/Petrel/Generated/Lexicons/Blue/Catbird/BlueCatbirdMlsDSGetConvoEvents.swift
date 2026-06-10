@@ -1,23 +1,19 @@
 import Foundation
 
-
-
 // lexicon: 1, id: blue.catbird.mlsDS.getConvoEvents
 
-
-public struct BlueCatbirdMlsDSGetConvoEvents {
-
+public enum BlueCatbirdMlsDSGetConvoEvents {
     public static let typeIdentifier = "blue.catbird.mlsDS.getConvoEvents"
 
-public struct ConvoEventEntry: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "blue.catbird.mlsDS.getConvoEvents#convoEventEntry"
-            public let seq: Int
-            public let epoch: Int
-            public let msgId: String
-            public let messageType: String
-            public let ciphertext: Bytes
-            public let paddedSize: Int
-            public let createdAt: ATProtocolDate
+    public struct ConvoEventEntry: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "blue.catbird.mlsDS.getConvoEvents#convoEventEntry"
+        public let seq: Int
+        public let epoch: Int
+        public let msgId: String
+        public let messageType: String
+        public let ciphertext: Bytes
+        public let paddedSize: Int
+        public let createdAt: ATProtocolDate
 
         public init(
             seq: Int, epoch: Int, msgId: String, messageType: String, ciphertext: Bytes, paddedSize: Int, createdAt: ATProtocolDate
@@ -34,43 +30,43 @@ public struct ConvoEventEntry: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.seq = try container.decode(Int.self, forKey: .seq)
+                seq = try container.decode(Int.self, forKey: .seq)
             } catch {
                 LogManager.logError("Decoding error for required property 'seq': \(error)")
                 throw error
             }
             do {
-                self.epoch = try container.decode(Int.self, forKey: .epoch)
+                epoch = try container.decode(Int.self, forKey: .epoch)
             } catch {
                 LogManager.logError("Decoding error for required property 'epoch': \(error)")
                 throw error
             }
             do {
-                self.msgId = try container.decode(String.self, forKey: .msgId)
+                msgId = try container.decode(String.self, forKey: .msgId)
             } catch {
                 LogManager.logError("Decoding error for required property 'msgId': \(error)")
                 throw error
             }
             do {
-                self.messageType = try container.decode(String.self, forKey: .messageType)
+                messageType = try container.decode(String.self, forKey: .messageType)
             } catch {
                 LogManager.logError("Decoding error for required property 'messageType': \(error)")
                 throw error
             }
             do {
-                self.ciphertext = try container.decode(Bytes.self, forKey: .ciphertext)
+                ciphertext = try container.decode(Bytes.self, forKey: .ciphertext)
             } catch {
                 LogManager.logError("Decoding error for required property 'ciphertext': \(error)")
                 throw error
             }
             do {
-                self.paddedSize = try container.decode(Int.self, forKey: .paddedSize)
+                paddedSize = try container.decode(Int.self, forKey: .paddedSize)
             } catch {
                 LogManager.logError("Decoding error for required property 'paddedSize': \(error)")
                 throw error
             }
             do {
-                self.createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
             } catch {
                 LogManager.logError("Decoding error for required property 'createdAt': \(error)")
                 throw error
@@ -160,7 +156,8 @@ public struct ConvoEventEntry: ATProtocolCodable, ATProtocolValue {
             case createdAt
         }
     }
-public struct Parameters: Parametrizable {
+
+    public struct Parameters: Parametrizable {
         public let convoId: String
         public let afterSeq: Int?
         public let limit: Int?
@@ -169,17 +166,14 @@ public struct Parameters: Parametrizable {
             convoId: String,
             afterSeq: Int? = nil,
             limit: Int? = nil
-            ) {
+        ) {
             self.convoId = convoId
             self.afterSeq = afterSeq
             self.limit = limit
-
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let convoId: String
 
         public let fromSeqExclusive: Int
@@ -188,12 +182,8 @@ public struct Output: ATProtocolCodable {
 
         public let events: [ConvoEventEntry]
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             convoId: String,
 
             fromSeqExclusive: Int,
@@ -202,10 +192,7 @@ public struct Output: ATProtocolCodable {
 
             events: [ConvoEventEntry]
 
-
         ) {
-
-
             self.convoId = convoId
 
             self.fromSeqExclusive = fromSeqExclusive
@@ -213,76 +200,49 @@ public struct Output: ATProtocolCodable {
             self.toSeqInclusive = toSeqInclusive
 
             self.events = events
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.convoId = try container.decode(String.self, forKey: .convoId)
+            convoId = try container.decode(String.self, forKey: .convoId)
 
+            fromSeqExclusive = try container.decode(Int.self, forKey: .fromSeqExclusive)
 
-            self.fromSeqExclusive = try container.decode(Int.self, forKey: .fromSeqExclusive)
+            toSeqInclusive = try container.decode(Int.self, forKey: .toSeqInclusive)
 
-
-            self.toSeqInclusive = try container.decode(Int.self, forKey: .toSeqInclusive)
-
-
-            self.events = try container.decode([ConvoEventEntry].self, forKey: .events)
-
-
+            events = try container.decode([ConvoEventEntry].self, forKey: .events)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(convoId, forKey: .convoId)
 
-
             try container.encode(fromSeqExclusive, forKey: .fromSeqExclusive)
-
 
             try container.encode(toSeqInclusive, forKey: .toSeqInclusive)
 
-
             try container.encode(events, forKey: .events)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let convoIdValue = try convoId.toCBORValue()
             map = map.adding(key: "convoId", value: convoIdValue)
 
-
-
             let fromSeqExclusiveValue = try fromSeqExclusive.toCBORValue()
             map = map.adding(key: "fromSeqExclusive", value: fromSeqExclusiveValue)
-
-
 
             let toSeqInclusiveValue = try toSeqInclusive.toCBORValue()
             map = map.adding(key: "toSeqInclusive", value: toSeqInclusiveValue)
 
-
-
             let eventsValue = try events.toCBORValue()
             map = map.adding(key: "events", value: eventsValue)
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case convoId
@@ -290,30 +250,24 @@ public struct Output: ATProtocolCodable {
             case toSeqInclusive
             case events
         }
-
     }
 
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case conversationNotFound = "ConversationNotFound."
-                case notAuthorized = "NotAuthorized."
-            public var description: String {
-                return self.rawValue
-            }
-
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case conversationNotFound = "ConversationNotFound."
+        case notAuthorized = "NotAuthorized."
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-
-
-extension ATProtoClient.Blue.Catbird.MlsDS {
+public extension ATProtoClient.Blue.Catbird.MlsDS {
     // MARK: - getConvoEvents
 
     /// Paginated retrieval of conversation events for federation reconciliation. Fetch a page of conversation events (messages) after a given sequence number.
@@ -322,9 +276,8 @@ extension ATProtoClient.Blue.Catbird.MlsDS {
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func getConvoEvents(input: BlueCatbirdMlsDSGetConvoEvents.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsDSGetConvoEvents.Output?) {
+    func getConvoEvents(input: BlueCatbirdMlsDSGetConvoEvents.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsDSGetConvoEvents.Output?) {
         let endpoint = "blue.catbird.mlsDS.getConvoEvents"
-
 
         let queryItems = input.asQueryItems()
 
@@ -345,8 +298,7 @@ extension ATProtoClient.Blue.Catbird.MlsDS {
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -355,9 +307,7 @@ extension ATProtoClient.Blue.Catbird.MlsDS {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsDSGetConvoEvents.Output.self, from: responseData)
 
@@ -368,12 +318,9 @@ extension ATProtoClient.Blue.Catbird.MlsDS {
                 return (responseCode, nil)
             }
         } else {
-
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
-

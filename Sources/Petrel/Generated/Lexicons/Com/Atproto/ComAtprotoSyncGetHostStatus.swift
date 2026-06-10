@@ -1,27 +1,20 @@
 import Foundation
 
-
-
 // lexicon: 1, id: com.atproto.sync.getHostStatus
 
-
-public struct ComAtprotoSyncGetHostStatus {
-
+public enum ComAtprotoSyncGetHostStatus {
     public static let typeIdentifier = "com.atproto.sync.getHostStatus"
-public struct Parameters: Parametrizable {
+    public struct Parameters: Parametrizable {
         public let hostname: String
 
         public init(
             hostname: String
-            ) {
+        ) {
             self.hostname = hostname
-
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let hostname: String
 
         public let seq: Int?
@@ -30,12 +23,8 @@ public struct Output: ATProtocolCodable {
 
         public let status: ComAtprotoSyncDefs.HostStatus?
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             hostname: String,
 
             seq: Int? = nil,
@@ -44,10 +33,7 @@ public struct Output: ATProtocolCodable {
 
             status: ComAtprotoSyncDefs.HostStatus? = nil
 
-
         ) {
-
-
             self.hostname = hostname
 
             self.seq = seq
@@ -55,59 +41,40 @@ public struct Output: ATProtocolCodable {
             self.accountCount = accountCount
 
             self.status = status
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.hostname = try container.decode(String.self, forKey: .hostname)
+            hostname = try container.decode(String.self, forKey: .hostname)
 
+            seq = try container.decodeIfPresent(Int.self, forKey: .seq)
 
-            self.seq = try container.decodeIfPresent(Int.self, forKey: .seq)
+            accountCount = try container.decodeIfPresent(Int.self, forKey: .accountCount)
 
-
-            self.accountCount = try container.decodeIfPresent(Int.self, forKey: .accountCount)
-
-
-            self.status = try container.decodeIfPresent(ComAtprotoSyncDefs.HostStatus.self, forKey: .status)
-
-
+            status = try container.decodeIfPresent(ComAtprotoSyncDefs.HostStatus.self, forKey: .status)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(hostname, forKey: .hostname)
 
-
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(seq, forKey: .seq)
-
 
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(accountCount, forKey: .accountCount)
 
-
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(status, forKey: .status)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let hostnameValue = try hostname.toCBORValue()
             map = map.adding(key: "hostname", value: hostnameValue)
-
-
 
             if let value = seq {
                 // Encode optional property even if it's an empty array for CBOR
@@ -115,15 +82,11 @@ public struct Output: ATProtocolCodable {
                 map = map.adding(key: "seq", value: seqValue)
             }
 
-
-
             if let value = accountCount {
                 // Encode optional property even if it's an empty array for CBOR
                 let accountCountValue = try value.toCBORValue()
                 map = map.adding(key: "accountCount", value: accountCountValue)
             }
-
-
 
             if let value = status {
                 // Encode optional property even if it's an empty array for CBOR
@@ -131,12 +94,8 @@ public struct Output: ATProtocolCodable {
                 map = map.adding(key: "status", value: statusValue)
             }
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case hostname
@@ -144,29 +103,23 @@ public struct Output: ATProtocolCodable {
             case accountCount
             case status
         }
-
     }
 
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case hostNotFound = "HostNotFound."
-            public var description: String {
-                return self.rawValue
-            }
-
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case hostNotFound = "HostNotFound."
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-
-
-extension ATProtoClient.Com.Atproto.Sync {
+public extension ATProtoClient.Com.Atproto.Sync {
     // MARK: - getHostStatus
 
     /// Returns information about a specified upstream host, as consumed by the server. Implemented by relays.
@@ -175,9 +128,8 @@ extension ATProtoClient.Com.Atproto.Sync {
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func getHostStatus(input: ComAtprotoSyncGetHostStatus.Parameters) async throws -> (responseCode: Int, data: ComAtprotoSyncGetHostStatus.Output?) {
+    func getHostStatus(input: ComAtprotoSyncGetHostStatus.Parameters) async throws -> (responseCode: Int, data: ComAtprotoSyncGetHostStatus.Output?) {
         let endpoint = "com.atproto.sync.getHostStatus"
-
 
         let queryItems = input.asQueryItems()
 
@@ -198,8 +150,7 @@ extension ATProtoClient.Com.Atproto.Sync {
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -208,9 +159,7 @@ extension ATProtoClient.Com.Atproto.Sync {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(ComAtprotoSyncGetHostStatus.Output.self, from: responseData)
 
@@ -221,12 +170,9 @@ extension ATProtoClient.Com.Atproto.Sync {
                 return (responseCode, nil)
             }
         } else {
-
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
-

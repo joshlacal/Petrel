@@ -1,20 +1,16 @@
 import Foundation
 
-
-
 // lexicon: 1, id: blue.catbird.mlsChat.commitGroupChange
 
-
-public struct BlueCatbirdMlsChatCommitGroupChange {
-
+public enum BlueCatbirdMlsChatCommitGroupChange {
     public static let typeIdentifier = "blue.catbird.mlsChat.commitGroupChange"
 
-public struct RateLimitedBody: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "blue.catbird.mlsChat.commitGroupChange#rateLimitedBody"
-            public let error: String
-            public let message: String
-            public let retryAfterSeconds: Int
-            public let scope: String
+    public struct RateLimitedBody: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "blue.catbird.mlsChat.commitGroupChange#rateLimitedBody"
+        public let error: String
+        public let message: String
+        public let retryAfterSeconds: Int
+        public let scope: String
 
         public init(
             error: String, message: String, retryAfterSeconds: Int, scope: String
@@ -28,25 +24,25 @@ public struct RateLimitedBody: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.error = try container.decode(String.self, forKey: .error)
+                error = try container.decode(String.self, forKey: .error)
             } catch {
                 LogManager.logError("Decoding error for required property 'error': \(error)")
                 throw error
             }
             do {
-                self.message = try container.decode(String.self, forKey: .message)
+                message = try container.decode(String.self, forKey: .message)
             } catch {
                 LogManager.logError("Decoding error for required property 'message': \(error)")
                 throw error
             }
             do {
-                self.retryAfterSeconds = try container.decode(Int.self, forKey: .retryAfterSeconds)
+                retryAfterSeconds = try container.decode(Int.self, forKey: .retryAfterSeconds)
             } catch {
                 LogManager.logError("Decoding error for required property 'retryAfterSeconds': \(error)")
                 throw error
             }
             do {
-                self.scope = try container.decode(String.self, forKey: .scope)
+                scope = try container.decode(String.self, forKey: .scope)
             } catch {
                 LogManager.logError("Decoding error for required property 'scope': \(error)")
                 throw error
@@ -113,10 +109,10 @@ public struct RateLimitedBody: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-public struct KeyPackageHashEntry: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "blue.catbird.mlsChat.commitGroupChange#keyPackageHashEntry"
-            public let did: DID
-            public let hash: String
+    public struct KeyPackageHashEntry: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "blue.catbird.mlsChat.commitGroupChange#keyPackageHashEntry"
+        public let did: DID
+        public let hash: String
 
         public init(
             did: DID, hash: String
@@ -128,13 +124,13 @@ public struct KeyPackageHashEntry: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.did = try container.decode(DID.self, forKey: .did)
+                did = try container.decode(DID.self, forKey: .did)
             } catch {
                 LogManager.logError("Decoding error for required property 'did': \(error)")
                 throw error
             }
             do {
-                self.hash = try container.decode(String.self, forKey: .hash)
+                hash = try container.decode(String.self, forKey: .hash)
             } catch {
                 LogManager.logError("Decoding error for required property 'hash': \(error)")
                 throw error
@@ -185,17 +181,17 @@ public struct KeyPackageHashEntry: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-public struct PendingDeviceAddition: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "blue.catbird.mlsChat.commitGroupChange#pendingDeviceAddition"
-            public let id: String
-            public let convoId: String
-            public let userDid: DID
-            public let deviceId: String
-            public let deviceName: String?
-            public let deviceCredentialDid: String
-            public let status: String
-            public let claimedBy: DID?
-            public let createdAt: ATProtocolDate
+    public struct PendingDeviceAddition: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "blue.catbird.mlsChat.commitGroupChange#pendingDeviceAddition"
+        public let id: String
+        public let convoId: String
+        public let userDid: DID
+        public let deviceId: String
+        public let deviceName: String?
+        public let deviceCredentialDid: String
+        public let status: String
+        public let claimedBy: DID?
+        public let createdAt: ATProtocolDate
 
         public init(
             id: String, convoId: String, userDid: DID, deviceId: String, deviceName: String?, deviceCredentialDid: String, status: String, claimedBy: DID?, createdAt: ATProtocolDate
@@ -214,55 +210,55 @@ public struct PendingDeviceAddition: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.id = try container.decode(String.self, forKey: .id)
+                id = try container.decode(String.self, forKey: .id)
             } catch {
                 LogManager.logError("Decoding error for required property 'id': \(error)")
                 throw error
             }
             do {
-                self.convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: .convoId)
             } catch {
                 LogManager.logError("Decoding error for required property 'convoId': \(error)")
                 throw error
             }
             do {
-                self.userDid = try container.decode(DID.self, forKey: .userDid)
+                userDid = try container.decode(DID.self, forKey: .userDid)
             } catch {
                 LogManager.logError("Decoding error for required property 'userDid': \(error)")
                 throw error
             }
             do {
-                self.deviceId = try container.decode(String.self, forKey: .deviceId)
+                deviceId = try container.decode(String.self, forKey: .deviceId)
             } catch {
                 LogManager.logError("Decoding error for required property 'deviceId': \(error)")
                 throw error
             }
             do {
-                self.deviceName = try container.decodeIfPresent(String.self, forKey: .deviceName)
+                deviceName = try container.decodeIfPresent(String.self, forKey: .deviceName)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'deviceName': \(error)")
                 throw error
             }
             do {
-                self.deviceCredentialDid = try container.decode(String.self, forKey: .deviceCredentialDid)
+                deviceCredentialDid = try container.decode(String.self, forKey: .deviceCredentialDid)
             } catch {
                 LogManager.logError("Decoding error for required property 'deviceCredentialDid': \(error)")
                 throw error
             }
             do {
-                self.status = try container.decode(String.self, forKey: .status)
+                status = try container.decode(String.self, forKey: .status)
             } catch {
                 LogManager.logError("Decoding error for required property 'status': \(error)")
                 throw error
             }
             do {
-                self.claimedBy = try container.decodeIfPresent(DID.self, forKey: .claimedBy)
+                claimedBy = try container.decodeIfPresent(DID.self, forKey: .claimedBy)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'claimedBy': \(error)")
                 throw error
             }
             do {
-                self.createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
             } catch {
                 LogManager.logError("Decoding error for required property 'createdAt': \(error)")
                 throw error
@@ -380,7 +376,8 @@ public struct PendingDeviceAddition: ATProtocolCodable, ATProtocolValue {
             case createdAt
         }
     }
-public struct Input: ATProtocolCodable {
+
+    public struct Input: ATProtocolCodable {
         public let convoId: String
         public let action: String
         public let memberDids: [DID]?
@@ -410,21 +407,20 @@ public struct Input: ATProtocolCodable {
             self.epochAuthenticator = epochAuthenticator
         }
 
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.convoId = try container.decode(String.self, forKey: .convoId)
-            self.action = try container.decode(String.self, forKey: .action)
-            self.memberDids = try container.decodeIfPresent([DID].self, forKey: .memberDids)
-            self.commit = try container.decodeIfPresent(Bytes.self, forKey: .commit)
-            self.welcome = try container.decodeIfPresent(Bytes.self, forKey: .welcome)
-            self.groupInfo = try container.decodeIfPresent(Bytes.self, forKey: .groupInfo)
-            self.keyPackageHashes = try container.decodeIfPresent([KeyPackageHashEntry].self, forKey: .keyPackageHashes)
-            self.deviceId = try container.decodeIfPresent(String.self, forKey: .deviceId)
-            self.pendingAdditionId = try container.decodeIfPresent(String.self, forKey: .pendingAdditionId)
-            self.idempotencyKey = try container.decodeIfPresent(String.self, forKey: .idempotencyKey)
-            self.confirmationTag = try container.decodeIfPresent(Bytes.self, forKey: .confirmationTag)
-            self.epochAuthenticator = try container.decodeIfPresent(String.self, forKey: .epochAuthenticator)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            action = try container.decode(String.self, forKey: .action)
+            memberDids = try container.decodeIfPresent([DID].self, forKey: .memberDids)
+            commit = try container.decodeIfPresent(Bytes.self, forKey: .commit)
+            welcome = try container.decodeIfPresent(Bytes.self, forKey: .welcome)
+            groupInfo = try container.decodeIfPresent(Bytes.self, forKey: .groupInfo)
+            keyPackageHashes = try container.decodeIfPresent([KeyPackageHashEntry].self, forKey: .keyPackageHashes)
+            deviceId = try container.decodeIfPresent(String.self, forKey: .deviceId)
+            pendingAdditionId = try container.decodeIfPresent(String.self, forKey: .pendingAdditionId)
+            idempotencyKey = try container.decodeIfPresent(String.self, forKey: .idempotencyKey)
+            confirmationTag = try container.decodeIfPresent(Bytes.self, forKey: .confirmationTag)
+            epochAuthenticator = try container.decodeIfPresent(String.self, forKey: .epochAuthenticator)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -508,9 +504,7 @@ public struct Input: ATProtocolCodable {
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let success: Bool
 
         public let newEpoch: Int?
@@ -523,12 +517,8 @@ public struct Output: ATProtocolCodable {
 
         public let confirmationTag: Bytes?
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             success: Bool,
 
             newEpoch: Int? = nil,
@@ -541,10 +531,7 @@ public struct Output: ATProtocolCodable {
 
             confirmationTag: Bytes? = nil
 
-
         ) {
-
-
             self.success = success
 
             self.newEpoch = newEpoch
@@ -556,73 +543,50 @@ public struct Output: ATProtocolCodable {
             self.claimedAddition = claimedAddition
 
             self.confirmationTag = confirmationTag
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.success = try container.decode(Bool.self, forKey: .success)
+            success = try container.decode(Bool.self, forKey: .success)
 
+            newEpoch = try container.decodeIfPresent(Int.self, forKey: .newEpoch)
 
-            self.newEpoch = try container.decodeIfPresent(Int.self, forKey: .newEpoch)
+            rejoinedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .rejoinedAt)
 
+            pendingAdditions = try container.decodeIfPresent([PendingDeviceAddition].self, forKey: .pendingAdditions)
 
-            self.rejoinedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .rejoinedAt)
+            claimedAddition = try container.decodeIfPresent(PendingDeviceAddition.self, forKey: .claimedAddition)
 
-
-            self.pendingAdditions = try container.decodeIfPresent([PendingDeviceAddition].self, forKey: .pendingAdditions)
-
-
-            self.claimedAddition = try container.decodeIfPresent(PendingDeviceAddition.self, forKey: .claimedAddition)
-
-
-            self.confirmationTag = try container.decodeIfPresent(Bytes.self, forKey: .confirmationTag)
-
-
+            confirmationTag = try container.decodeIfPresent(Bytes.self, forKey: .confirmationTag)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(success, forKey: .success)
 
-
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(newEpoch, forKey: .newEpoch)
-
 
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(rejoinedAt, forKey: .rejoinedAt)
 
-
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(pendingAdditions, forKey: .pendingAdditions)
-
 
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(claimedAddition, forKey: .claimedAddition)
 
-
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(confirmationTag, forKey: .confirmationTag)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let successValue = try success.toCBORValue()
             map = map.adding(key: "success", value: successValue)
-
-
 
             if let value = newEpoch {
                 // Encode optional property even if it's an empty array for CBOR
@@ -630,15 +594,11 @@ public struct Output: ATProtocolCodable {
                 map = map.adding(key: "newEpoch", value: newEpochValue)
             }
 
-
-
             if let value = rejoinedAt {
                 // Encode optional property even if it's an empty array for CBOR
                 let rejoinedAtValue = try value.toCBORValue()
                 map = map.adding(key: "rejoinedAt", value: rejoinedAtValue)
             }
-
-
 
             if let value = pendingAdditions {
                 // Encode optional property even if it's an empty array for CBOR
@@ -646,15 +606,11 @@ public struct Output: ATProtocolCodable {
                 map = map.adding(key: "pendingAdditions", value: pendingAdditionsValue)
             }
 
-
-
             if let value = claimedAddition {
                 // Encode optional property even if it's an empty array for CBOR
                 let claimedAdditionValue = try value.toCBORValue()
                 map = map.adding(key: "claimedAddition", value: claimedAdditionValue)
             }
-
-
 
             if let value = confirmationTag {
                 // Encode optional property even if it's an empty array for CBOR
@@ -662,12 +618,8 @@ public struct Output: ATProtocolCodable {
                 map = map.adding(key: "confirmationTag", value: confirmationTagValue)
             }
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case success
@@ -677,52 +629,47 @@ public struct Output: ATProtocolCodable {
             case claimedAddition
             case confirmationTag
         }
-
     }
 
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case convoNotFound = "ConvoNotFound.Conversation not found"
-                case notMember = "NotMember.Caller is not a member of the conversation"
-                case invalidAction = "InvalidAction.Unknown action value"
-                case keyPackageNotFound = "KeyPackageNotFound.Key package not found for one or more members"
-                case alreadyMember = "AlreadyMember.One or more DIDs are already members"
-                case tooManyMembers = "TooManyMembers.Would exceed maximum member count"
-                case blockedByMember = "BlockedByMember.Cannot add user who has blocked or been blocked by an existing member"
-                case invalidCommit = "InvalidCommit.The provided MLS Commit message is invalid"
-                case invalidGroupInfo = "InvalidGroupInfo.The provided GroupInfo is invalid"
-                case pendingAdditionNotFound = "PendingAdditionNotFound.The specified pending addition does not exist"
-                case pendingAdditionAlreadyClaimed = "PendingAdditionAlreadyClaimed.The pending addition was already claimed by another member"
-                case unauthorized = "Unauthorized.Insufficient privileges for this operation"
-                case noKeyPackagesPublished = "NoKeyPackagesPublished.Layer 1 robustness gate: the calling device has zero published key packages and is therefore not eligible to issue an External Commit. The device must call publishKeyPackages and successfully publish at least one available, non-expired key package before retrying. Returned as HTTP 412 Precondition Failed."
-                case groupFrozen = "GroupFrozen.Layer 1 robustness circuit breaker: the conversation has been temporarily frozen because the server detected an epoch-storm pattern (too many epoch advances within a short window). All epoch-advancing commits are rejected until the freeze auto-thaws. Returned as HTTP 423 Locked."
-                case rateLimited = "RateLimited.Rate limit exceeded. Two cases: (a) per-conversation 30s External-Commit limit (existing). (b) per-(device, group) 60s External-Commit cooldown (Layer 1 §1.2). Both return HTTP 429 with body shaped per #rateLimitedBody (retryAfterSeconds + scope discriminator)."
-            public var description: String {
-                return self.rawValue
-            }
-
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case convoNotFound = "ConvoNotFound.Conversation not found"
+        case notMember = "NotMember.Caller is not a member of the conversation"
+        case invalidAction = "InvalidAction.Unknown action value"
+        case keyPackageNotFound = "KeyPackageNotFound.Key package not found for one or more members"
+        case alreadyMember = "AlreadyMember.One or more DIDs are already members"
+        case tooManyMembers = "TooManyMembers.Would exceed maximum member count"
+        case blockedByMember = "BlockedByMember.Cannot add user who has blocked or been blocked by an existing member"
+        case invalidCommit = "InvalidCommit.The provided MLS Commit message is invalid"
+        case invalidGroupInfo = "InvalidGroupInfo.The provided GroupInfo is invalid"
+        case pendingAdditionNotFound = "PendingAdditionNotFound.The specified pending addition does not exist"
+        case pendingAdditionAlreadyClaimed = "PendingAdditionAlreadyClaimed.The pending addition was already claimed by another member"
+        case unauthorized = "Unauthorized.Insufficient privileges for this operation"
+        case noKeyPackagesPublished = "NoKeyPackagesPublished.Layer 1 robustness gate: the calling device has zero published key packages and is therefore not eligible to issue an External Commit. The device must call publishKeyPackages and successfully publish at least one available, non-expired key package before retrying. Returned as HTTP 412 Precondition Failed."
+        case groupFrozen = "GroupFrozen.Layer 1 robustness circuit breaker: the conversation has been temporarily frozen because the server detected an epoch-storm pattern (too many epoch advances within a short window). All epoch-advancing commits are rejected until the freeze auto-thaws. Returned as HTTP 423 Locked."
+        case rateLimited = "RateLimited.Rate limit exceeded. Two cases: (a) per-conversation 30s External-Commit limit (existing). (b) per-(device, group) 60s External-Commit cooldown (Layer 1 §1.2). Both return HTTP 429 with body shaped per #rateLimitedBody (retryAfterSeconds + scope discriminator)."
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-extension ATProtoClient.Blue.Catbird.MlsChat {
+public extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - commitGroupChange
 
-    /// Commit MLS group membership changes (consolidates addMembers + processExternalCommit + rejoin + readdition + getPendingDeviceAdditions + claimPendingDeviceAddition + completePendingDeviceAddition) Perform MLS group membership operations. The 'action' field determines the operation type. This consolidates all membership-changing operations into a single endpoint.
-    ///
-    /// - Parameter input: The input parameters for the request
+    // Commit MLS group membership changes (consolidates addMembers + processExternalCommit + rejoin + readdition + getPendingDeviceAdditions + claimPendingDeviceAddition + completePendingDeviceAddition) Perform MLS group membership operations. The 'action' field determines the operation type. This consolidates all membership-changing operations into a single endpoint.
+    //
+    // - Parameter input: The input parameters for the request
 
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func commitGroupChange(
-
+    func commitGroupChange(
         input: BlueCatbirdMlsChatCommitGroupChange.Input
 
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatCommitGroupChange.Output?) {
@@ -732,14 +679,9 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
 
         headers["Content-Type"] = "application/json"
 
-
-
         headers["Accept"] = "application/json"
 
-
-
         let requestData: Data? = try JSONEncoder().encode(input)
-
 
         let queryItems: [URLQueryItem]? = nil
 
@@ -757,12 +699,10 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -771,9 +711,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatCommitGroupChange.Output.self, from: responseData)
 
@@ -787,9 +725,5 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-
     }
-
 }
-
-

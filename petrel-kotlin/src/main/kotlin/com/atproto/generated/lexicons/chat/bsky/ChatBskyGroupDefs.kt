@@ -29,6 +29,9 @@ enum class ChatBskyGroupDefsJoinRule {
     @SerialName("followedByOwner")
     FOLLOWEDBYOWNER}
 
+    /**
+     * Join link view to be used within a group view, so the convo is surrounding, not specified inside this view.
+     */
     @Serializable
     data class ChatBskyGroupDefsJoinLinkView(
         @SerialName("code")
@@ -42,18 +45,63 @@ enum class ChatBskyGroupDefsJoinRule {
         }
     }
 
+    /**
+     * Preview that can be shown in feeds, including to unauthenticated viewers.
+     */
     @Serializable
-    data class ChatBskyGroupDefsGroupPublicView(
-        @SerialName("name")
+    data class ChatBskyGroupDefsJoinLinkPreviewView(
+        @SerialName("convoId")
+        val convoId: String,        @SerialName("code")
+        val code: String,        @SerialName("name")
         val name: String,        @SerialName("owner")
         val owner: ChatBskyActorDefsProfileViewBasic,        @SerialName("memberCount")
-        val memberCount: Int,        @SerialName("requireApproval")
-        val requireApproval: Boolean    ) {
+        val memberCount: Int,        @SerialName("memberLimit")
+        val memberLimit: Int,        @SerialName("requireApproval")
+        val requireApproval: Boolean,        @SerialName("joinRule")
+        val joinRule: ChatBskyGroupDefsJoinRule,/** Present only if the request is authenticated and the user is a member of the group. */        @SerialName("convo")
+        val convo: ChatBskyConvoDefsConvoView? = null,        @SerialName("viewer")
+        val viewer: ChatBskyGroupDefsJoinLinkViewerState? = null    ) {
         companion object {
-            const val TYPE_IDENTIFIER = "#chatBskyGroupDefsGroupPublicView"
+            const val TYPE_IDENTIFIER = "#chatBskyGroupDefsJoinLinkPreviewView"
         }
     }
 
+    /**
+     * Preview for a disabled join link. Carries only the code so clients can correlate with the input and render a disabled state.
+     */
+    @Serializable
+    data class ChatBskyGroupDefsDisabledJoinLinkPreviewView(
+        @SerialName("code")
+        val code: String    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#chatBskyGroupDefsDisabledJoinLinkPreviewView"
+        }
+    }
+
+    /**
+     * Preview for a join link code that does not map to an existing link. Carries only the code so clients can correlate with the input and render an invalid state.
+     */
+    @Serializable
+    data class ChatBskyGroupDefsInvalidJoinLinkPreviewView(
+        @SerialName("code")
+        val code: String    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#chatBskyGroupDefsInvalidJoinLinkPreviewView"
+        }
+    }
+
+    @Serializable
+    data class ChatBskyGroupDefsJoinLinkViewerState(
+        @SerialName("requestedAt")
+        val requestedAt: ATProtocolDate? = null    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#chatBskyGroupDefsJoinLinkViewerState"
+        }
+    }
+
+    /**
+     * A join request from the perspective of the group owner.
+     */
     @Serializable
     data class ChatBskyGroupDefsJoinRequestView(
         @SerialName("convoId")
@@ -62,5 +110,22 @@ enum class ChatBskyGroupDefsJoinRule {
         val requestedAt: ATProtocolDate    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#chatBskyGroupDefsJoinRequestView"
+        }
+    }
+
+    /**
+     * A join request from the perspective of the requester, including enough group context to render the request in a list (e.g. group name, owner, member count).
+     */
+    @Serializable
+    data class ChatBskyGroupDefsJoinRequestConvoView(
+        @SerialName("convoId")
+        val convoId: String,        @SerialName("name")
+        val name: String,        @SerialName("owner")
+        val owner: ChatBskyActorDefsProfileViewBasic,        @SerialName("memberCount")
+        val memberCount: Int,        @SerialName("memberLimit")
+        val memberLimit: Int,        @SerialName("viewer")
+        val viewer: ChatBskyGroupDefsJoinLinkViewerState    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#chatBskyGroupDefsJoinRequestConvoView"
         }
     }

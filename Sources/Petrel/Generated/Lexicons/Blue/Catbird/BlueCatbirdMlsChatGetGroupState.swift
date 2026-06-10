@@ -1,14 +1,10 @@
 import Foundation
 
-
-
 // lexicon: 1, id: blue.catbird.mlsChat.getGroupState
 
-
-public struct BlueCatbirdMlsChatGetGroupState {
-
+public enum BlueCatbirdMlsChatGetGroupState {
     public static let typeIdentifier = "blue.catbird.mlsChat.getGroupState"
-public struct Parameters: Parametrizable {
+    public struct Parameters: Parametrizable {
         public let convoId: String
         public let include: String?
         public let keyPackageHashes: [String]?
@@ -19,18 +15,15 @@ public struct Parameters: Parametrizable {
             include: String? = nil,
             keyPackageHashes: [String]? = nil,
             deviceId: String? = nil
-            ) {
+        ) {
             self.convoId = convoId
             self.include = include
             self.keyPackageHashes = keyPackageHashes
             self.deviceId = deviceId
-
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let groupInfo: Bytes?
 
         public let epoch: Int?
@@ -39,12 +32,8 @@ public struct Output: ATProtocolCodable {
 
         public let expiresAt: ATProtocolDate?
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             groupInfo: Bytes? = nil,
 
             epoch: Int? = nil,
@@ -53,10 +42,7 @@ public struct Output: ATProtocolCodable {
 
             expiresAt: ATProtocolDate? = nil
 
-
         ) {
-
-
             self.groupInfo = groupInfo
 
             self.epoch = epoch
@@ -64,55 +50,38 @@ public struct Output: ATProtocolCodable {
             self.welcome = welcome
 
             self.expiresAt = expiresAt
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.groupInfo = try container.decodeIfPresent(Bytes.self, forKey: .groupInfo)
+            groupInfo = try container.decodeIfPresent(Bytes.self, forKey: .groupInfo)
 
+            epoch = try container.decodeIfPresent(Int.self, forKey: .epoch)
 
-            self.epoch = try container.decodeIfPresent(Int.self, forKey: .epoch)
+            welcome = try container.decodeIfPresent(Bytes.self, forKey: .welcome)
 
-
-            self.welcome = try container.decodeIfPresent(Bytes.self, forKey: .welcome)
-
-
-            self.expiresAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .expiresAt)
-
-
+            expiresAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .expiresAt)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(groupInfo, forKey: .groupInfo)
 
-
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(epoch, forKey: .epoch)
-
 
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(welcome, forKey: .welcome)
 
-
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(expiresAt, forKey: .expiresAt)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             if let value = groupInfo {
                 // Encode optional property even if it's an empty array for CBOR
@@ -120,15 +89,11 @@ public struct Output: ATProtocolCodable {
                 map = map.adding(key: "groupInfo", value: groupInfoValue)
             }
 
-
-
             if let value = epoch {
                 // Encode optional property even if it's an empty array for CBOR
                 let epochValue = try value.toCBORValue()
                 map = map.adding(key: "epoch", value: epochValue)
             }
-
-
 
             if let value = welcome {
                 // Encode optional property even if it's an empty array for CBOR
@@ -136,20 +101,14 @@ public struct Output: ATProtocolCodable {
                 map = map.adding(key: "welcome", value: welcomeValue)
             }
 
-
-
             if let value = expiresAt {
                 // Encode optional property even if it's an empty array for CBOR
                 let expiresAtValue = try value.toCBORValue()
                 map = map.adding(key: "expiresAt", value: expiresAtValue)
             }
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case groupInfo
@@ -157,31 +116,25 @@ public struct Output: ATProtocolCodable {
             case welcome
             case expiresAt
         }
-
     }
 
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case notFound = "NotFound.Conversation not found"
-                case unauthorized = "Unauthorized.Not a current or past member"
-                case groupInfoUnavailable = "GroupInfoUnavailable.GroupInfo not yet generated for this conversation"
-            public var description: String {
-                return self.rawValue
-            }
-
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case notFound = "NotFound.Conversation not found"
+        case unauthorized = "Unauthorized.Not a current or past member"
+        case groupInfoUnavailable = "GroupInfoUnavailable.GroupInfo not yet generated for this conversation"
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-
-
-extension ATProtoClient.Blue.Catbird.MlsChat {
+public extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - getGroupState
 
     /// Retrieve group state including GroupInfo, epoch, and welcome data (consolidates getGroupInfo + getEpoch + validateWelcome) Fetch MLS group state for a conversation. The 'include' parameter selects which state components to return, reducing multiple round-trips to a single call.
@@ -190,9 +143,8 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func getGroupState(input: BlueCatbirdMlsChatGetGroupState.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatGetGroupState.Output?) {
+    func getGroupState(input: BlueCatbirdMlsChatGetGroupState.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatGetGroupState.Output?) {
         let endpoint = "blue.catbird.mlsChat.getGroupState"
-
 
         let queryItems = input.asQueryItems()
 
@@ -213,8 +165,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -223,9 +174,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatGetGroupState.Output.self, from: responseData)
 
@@ -236,11 +185,9 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
                 return (responseCode, nil)
             }
         } else {
-
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-

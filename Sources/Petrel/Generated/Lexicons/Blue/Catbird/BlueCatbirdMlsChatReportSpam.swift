@@ -1,14 +1,10 @@
 import Foundation
 
-
-
 // lexicon: 1, id: blue.catbird.mlsChat.reportSpam
 
-
-public struct BlueCatbirdMlsChatReportSpam {
-
+public enum BlueCatbirdMlsChatReportSpam {
     public static let typeIdentifier = "blue.catbird.mlsChat.reportSpam"
-public struct Input: ATProtocolCodable {
+    public struct Input: ATProtocolCodable {
         public let convoId: String
         public let reportedDid: DID
         public let reason: String?
@@ -20,12 +16,11 @@ public struct Input: ATProtocolCodable {
             self.reason = reason
         }
 
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.convoId = try container.decode(String.self, forKey: .convoId)
-            self.reportedDid = try container.decode(DID.self, forKey: .reportedDid)
-            self.reason = try container.decodeIfPresent(String.self, forKey: .reason)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            reportedDid = try container.decode(DID.self, forKey: .reportedDid)
+            reason = try container.decodeIfPresent(String.self, forKey: .reason)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -55,117 +50,84 @@ public struct Input: ATProtocolCodable {
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let id: String
 
         public let createdAt: ATProtocolDate
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             id: String,
 
             createdAt: ATProtocolDate
 
-
         ) {
-
-
             self.id = id
 
             self.createdAt = createdAt
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.id = try container.decode(String.self, forKey: .id)
+            id = try container.decode(String.self, forKey: .id)
 
-
-            self.createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
-
-
+            createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(id, forKey: .id)
 
-
             try container.encode(createdAt, forKey: .createdAt)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let idValue = try id.toCBORValue()
             map = map.adding(key: "id", value: idValue)
 
-
-
             let createdAtValue = try createdAt.toCBORValue()
             map = map.adding(key: "createdAt", value: createdAtValue)
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case id
             case createdAt
         }
-
     }
 
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case conversationNotFound = "ConversationNotFound."
-                case notAMember = "NotAMember."
-                case alreadyReported = "AlreadyReported."
-            public var description: String {
-                return self.rawValue
-            }
-
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case conversationNotFound = "ConversationNotFound."
+        case notAMember = "NotAMember."
+        case alreadyReported = "AlreadyReported."
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-extension ATProtoClient.Blue.Catbird.MlsChat {
+public extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - reportSpam
 
-    /// Report an account as spam in an MLS conversation.
-    ///
-    /// - Parameter input: The input parameters for the request
+    // Report an account as spam in an MLS conversation.
+    //
+    // - Parameter input: The input parameters for the request
 
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func reportSpam(
-
+    func reportSpam(
         input: BlueCatbirdMlsChatReportSpam.Input
 
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatReportSpam.Output?) {
@@ -175,14 +137,9 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
 
         headers["Content-Type"] = "application/json"
 
-
-
         headers["Accept"] = "application/json"
 
-
-
         let requestData: Data? = try JSONEncoder().encode(input)
-
 
         let queryItems: [URLQueryItem]? = nil
 
@@ -200,12 +157,10 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -214,9 +169,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatReportSpam.Output.self, from: responseData)
 
@@ -230,9 +183,5 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-
     }
-
 }
-
-

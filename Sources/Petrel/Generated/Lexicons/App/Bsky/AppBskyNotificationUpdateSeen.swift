@@ -1,14 +1,10 @@
 import Foundation
 
-
-
 // lexicon: 1, id: app.bsky.notification.updateSeen
 
-
-public struct AppBskyNotificationUpdateSeen {
-
+public enum AppBskyNotificationUpdateSeen {
     public static let typeIdentifier = "app.bsky.notification.updateSeen"
-public struct Input: ATProtocolCodable {
+    public struct Input: ATProtocolCodable {
         public let seenAt: ATProtocolDate
 
         /// Standard public initializer
@@ -16,10 +12,9 @@ public struct Input: ATProtocolCodable {
             self.seenAt = seenAt
         }
 
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.seenAt = try container.decode(ATProtocolDate.self, forKey: .seenAt)
+            seenAt = try container.decode(ATProtocolDate.self, forKey: .seenAt)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -38,23 +33,19 @@ public struct Input: ATProtocolCodable {
             case seenAt
         }
     }
-
-
-
 }
 
-extension ATProtoClient.App.Bsky.Notification {
+public extension ATProtoClient.App.Bsky.Notification {
     // MARK: - updateSeen
 
-    /// Notify server that the requesting account has seen notifications. Requires auth.
-    ///
-    /// - Parameter input: The input parameters for the request
+    // Notify server that the requesting account has seen notifications. Requires auth.
+    //
+    // - Parameter input: The input parameters for the request
 
     ///
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func updateSeen(
-
+    func updateSeen(
         input: AppBskyNotificationUpdateSeen.Input
 
     ) async throws -> Int {
@@ -64,12 +55,7 @@ extension ATProtoClient.App.Bsky.Notification {
 
         headers["Content-Type"] = "application/json"
 
-
-
-
-
         let requestData: Data? = try JSONEncoder().encode(input)
-
 
         let queryItems: [URLQueryItem]? = nil
 
@@ -85,13 +71,6 @@ extension ATProtoClient.App.Bsky.Notification {
         let serviceDID = await networkService.getServiceDID(for: "app.bsky.notification.updateSeen")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
         let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        let responseCode = response.statusCode
-
-
-        return responseCode
-
+        return response.statusCode
     }
-
 }
-
-

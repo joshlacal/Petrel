@@ -1,14 +1,10 @@
 import Foundation
 
-
-
 // lexicon: 1, id: app.bsky.actor.putPreferences
 
-
-public struct AppBskyActorPutPreferences {
-
+public enum AppBskyActorPutPreferences {
     public static let typeIdentifier = "app.bsky.actor.putPreferences"
-public struct Input: ATProtocolCodable {
+    public struct Input: ATProtocolCodable {
         public let preferences: AppBskyActorDefs.Preferences
 
         /// Standard public initializer
@@ -16,10 +12,9 @@ public struct Input: ATProtocolCodable {
             self.preferences = preferences
         }
 
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.preferences = try container.decode(AppBskyActorDefs.Preferences.self, forKey: .preferences)
+            preferences = try container.decode(AppBskyActorDefs.Preferences.self, forKey: .preferences)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -38,23 +33,19 @@ public struct Input: ATProtocolCodable {
             case preferences
         }
     }
-
-
-
 }
 
-extension ATProtoClient.App.Bsky.Actor {
+public extension ATProtoClient.App.Bsky.Actor {
     // MARK: - putPreferences
 
-    /// Set the private preferences attached to the account.
-    ///
-    /// - Parameter input: The input parameters for the request
+    // Set the private preferences attached to the account.
+    //
+    // - Parameter input: The input parameters for the request
 
     ///
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func putPreferences(
-
+    func putPreferences(
         input: AppBskyActorPutPreferences.Input
 
     ) async throws -> Int {
@@ -64,12 +55,7 @@ extension ATProtoClient.App.Bsky.Actor {
 
         headers["Content-Type"] = "application/json"
 
-
-
-
-
         let requestData: Data? = try JSONEncoder().encode(input)
-
 
         let queryItems: [URLQueryItem]? = nil
 
@@ -85,13 +71,6 @@ extension ATProtoClient.App.Bsky.Actor {
         let serviceDID = await networkService.getServiceDID(for: "app.bsky.actor.putPreferences")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
         let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        let responseCode = response.statusCode
-
-
-        return responseCode
-
+        return response.statusCode
     }
-
 }
-
-

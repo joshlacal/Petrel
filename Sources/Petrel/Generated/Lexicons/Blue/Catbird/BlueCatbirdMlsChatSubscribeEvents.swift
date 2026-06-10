@@ -1,20 +1,16 @@
 import Foundation
 
-
-
 // lexicon: 1, id: blue.catbird.mlsChat.subscribeEvents
 
-
-public struct BlueCatbirdMlsChatSubscribeEvents {
-
+public enum BlueCatbirdMlsChatSubscribeEvents {
     public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents"
 
-public struct MessageEvent: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#messageEvent"
-            public let cursor: String
-            public let message: BlueCatbirdMlsChatDefs.MessageView
-            public let ephemeral: Bool?
-            public let epoch: Int?
+    public struct MessageEvent: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#messageEvent"
+        public let cursor: String
+        public let message: BlueCatbirdMlsChatDefs.MessageView
+        public let ephemeral: Bool?
+        public let epoch: Int?
 
         public init(
             cursor: String, message: BlueCatbirdMlsChatDefs.MessageView, ephemeral: Bool?, epoch: Int?
@@ -28,25 +24,25 @@ public struct MessageEvent: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.cursor = try container.decode(String.self, forKey: .cursor)
+                cursor = try container.decode(String.self, forKey: .cursor)
             } catch {
                 LogManager.logError("Decoding error for required property 'cursor': \(error)")
                 throw error
             }
             do {
-                self.message = try container.decode(BlueCatbirdMlsChatDefs.MessageView.self, forKey: .message)
+                message = try container.decode(BlueCatbirdMlsChatDefs.MessageView.self, forKey: .message)
             } catch {
                 LogManager.logError("Decoding error for required property 'message': \(error)")
                 throw error
             }
             do {
-                self.ephemeral = try container.decodeIfPresent(Bool.self, forKey: .ephemeral)
+                ephemeral = try container.decodeIfPresent(Bool.self, forKey: .ephemeral)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'ephemeral': \(error)")
                 throw error
             }
             do {
-                self.epoch = try container.decodeIfPresent(Int.self, forKey: .epoch)
+                epoch = try container.decodeIfPresent(Int.self, forKey: .epoch)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'epoch': \(error)")
                 throw error
@@ -125,14 +121,14 @@ public struct MessageEvent: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-public struct ReactionEvent: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#reactionEvent"
-            public let cursor: String
-            public let convoId: String
-            public let messageId: String
-            public let did: DID
-            public let reaction: String
-            public let action: String
+    public struct ReactionEvent: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#reactionEvent"
+        public let cursor: String
+        public let convoId: String
+        public let messageId: String
+        public let did: DID
+        public let reaction: String
+        public let action: String
 
         public init(
             cursor: String, convoId: String, messageId: String, did: DID, reaction: String, action: String
@@ -148,37 +144,37 @@ public struct ReactionEvent: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.cursor = try container.decode(String.self, forKey: .cursor)
+                cursor = try container.decode(String.self, forKey: .cursor)
             } catch {
                 LogManager.logError("Decoding error for required property 'cursor': \(error)")
                 throw error
             }
             do {
-                self.convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: .convoId)
             } catch {
                 LogManager.logError("Decoding error for required property 'convoId': \(error)")
                 throw error
             }
             do {
-                self.messageId = try container.decode(String.self, forKey: .messageId)
+                messageId = try container.decode(String.self, forKey: .messageId)
             } catch {
                 LogManager.logError("Decoding error for required property 'messageId': \(error)")
                 throw error
             }
             do {
-                self.did = try container.decode(DID.self, forKey: .did)
+                did = try container.decode(DID.self, forKey: .did)
             } catch {
                 LogManager.logError("Decoding error for required property 'did': \(error)")
                 throw error
             }
             do {
-                self.reaction = try container.decode(String.self, forKey: .reaction)
+                reaction = try container.decode(String.self, forKey: .reaction)
             } catch {
                 LogManager.logError("Decoding error for required property 'reaction': \(error)")
                 throw error
             }
             do {
-                self.action = try container.decode(String.self, forKey: .action)
+                action = try container.decode(String.self, forKey: .action)
             } catch {
                 LogManager.logError("Decoding error for required property 'action': \(error)")
                 throw error
@@ -261,12 +257,12 @@ public struct ReactionEvent: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-public struct TypingEvent: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#typingEvent"
-            public let cursor: String
-            public let convoId: String
-            public let did: DID
-            public let isTyping: Bool
+    public struct TypingEvent: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#typingEvent"
+        public let cursor: String
+        public let convoId: String
+        public let did: DID
+        public let isTyping: Bool
 
         public init(
             cursor: String, convoId: String, did: DID, isTyping: Bool
@@ -280,25 +276,25 @@ public struct TypingEvent: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.cursor = try container.decode(String.self, forKey: .cursor)
+                cursor = try container.decode(String.self, forKey: .cursor)
             } catch {
                 LogManager.logError("Decoding error for required property 'cursor': \(error)")
                 throw error
             }
             do {
-                self.convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: .convoId)
             } catch {
                 LogManager.logError("Decoding error for required property 'convoId': \(error)")
                 throw error
             }
             do {
-                self.did = try container.decode(DID.self, forKey: .did)
+                did = try container.decode(DID.self, forKey: .did)
             } catch {
                 LogManager.logError("Decoding error for required property 'did': \(error)")
                 throw error
             }
             do {
-                self.isTyping = try container.decode(Bool.self, forKey: .isTyping)
+                isTyping = try container.decode(Bool.self, forKey: .isTyping)
             } catch {
                 LogManager.logError("Decoding error for required property 'isTyping': \(error)")
                 throw error
@@ -365,15 +361,15 @@ public struct TypingEvent: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-public struct NewDeviceEvent: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#newDeviceEvent"
-            public let cursor: String
-            public let convoId: String
-            public let userDid: DID
-            public let deviceId: String
-            public let deviceName: String?
-            public let deviceCredentialDid: String
-            public let pendingAdditionId: String
+    public struct NewDeviceEvent: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#newDeviceEvent"
+        public let cursor: String
+        public let convoId: String
+        public let userDid: DID
+        public let deviceId: String
+        public let deviceName: String?
+        public let deviceCredentialDid: String
+        public let pendingAdditionId: String
 
         public init(
             cursor: String, convoId: String, userDid: DID, deviceId: String, deviceName: String?, deviceCredentialDid: String, pendingAdditionId: String
@@ -390,43 +386,43 @@ public struct NewDeviceEvent: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.cursor = try container.decode(String.self, forKey: .cursor)
+                cursor = try container.decode(String.self, forKey: .cursor)
             } catch {
                 LogManager.logError("Decoding error for required property 'cursor': \(error)")
                 throw error
             }
             do {
-                self.convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: .convoId)
             } catch {
                 LogManager.logError("Decoding error for required property 'convoId': \(error)")
                 throw error
             }
             do {
-                self.userDid = try container.decode(DID.self, forKey: .userDid)
+                userDid = try container.decode(DID.self, forKey: .userDid)
             } catch {
                 LogManager.logError("Decoding error for required property 'userDid': \(error)")
                 throw error
             }
             do {
-                self.deviceId = try container.decode(String.self, forKey: .deviceId)
+                deviceId = try container.decode(String.self, forKey: .deviceId)
             } catch {
                 LogManager.logError("Decoding error for required property 'deviceId': \(error)")
                 throw error
             }
             do {
-                self.deviceName = try container.decodeIfPresent(String.self, forKey: .deviceName)
+                deviceName = try container.decodeIfPresent(String.self, forKey: .deviceName)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'deviceName': \(error)")
                 throw error
             }
             do {
-                self.deviceCredentialDid = try container.decode(String.self, forKey: .deviceCredentialDid)
+                deviceCredentialDid = try container.decode(String.self, forKey: .deviceCredentialDid)
             } catch {
                 LogManager.logError("Decoding error for required property 'deviceCredentialDid': \(error)")
                 throw error
             }
             do {
-                self.pendingAdditionId = try container.decode(String.self, forKey: .pendingAdditionId)
+                pendingAdditionId = try container.decode(String.self, forKey: .pendingAdditionId)
             } catch {
                 LogManager.logError("Decoding error for required property 'pendingAdditionId': \(error)")
                 throw error
@@ -523,12 +519,12 @@ public struct NewDeviceEvent: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-public struct TreeChanged: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#treeChanged"
-            public let cursor: String
-            public let convoId: String
-            public let confirmationTag: Bytes
-            public let epoch: Int
+    public struct TreeChanged: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#treeChanged"
+        public let cursor: String
+        public let convoId: String
+        public let confirmationTag: Bytes
+        public let epoch: Int
 
         public init(
             cursor: String, convoId: String, confirmationTag: Bytes, epoch: Int
@@ -542,25 +538,25 @@ public struct TreeChanged: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.cursor = try container.decode(String.self, forKey: .cursor)
+                cursor = try container.decode(String.self, forKey: .cursor)
             } catch {
                 LogManager.logError("Decoding error for required property 'cursor': \(error)")
                 throw error
             }
             do {
-                self.convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: .convoId)
             } catch {
                 LogManager.logError("Decoding error for required property 'convoId': \(error)")
                 throw error
             }
             do {
-                self.confirmationTag = try container.decode(Bytes.self, forKey: .confirmationTag)
+                confirmationTag = try container.decode(Bytes.self, forKey: .confirmationTag)
             } catch {
                 LogManager.logError("Decoding error for required property 'confirmationTag': \(error)")
                 throw error
             }
             do {
-                self.epoch = try container.decode(Int.self, forKey: .epoch)
+                epoch = try container.decode(Int.self, forKey: .epoch)
             } catch {
                 LogManager.logError("Decoding error for required property 'epoch': \(error)")
                 throw error
@@ -627,13 +623,13 @@ public struct TreeChanged: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-public struct InfoEvent: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#infoEvent"
-            public let cursor: String
-            public let info: String
-            public let infoType: String?
-            public let convoId: String?
-            public let requestedBy: DID?
+    public struct InfoEvent: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#infoEvent"
+        public let cursor: String
+        public let info: String
+        public let infoType: String?
+        public let convoId: String?
+        public let requestedBy: DID?
 
         public init(
             cursor: String, info: String, infoType: String?, convoId: String?, requestedBy: DID?
@@ -648,31 +644,31 @@ public struct InfoEvent: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.cursor = try container.decode(String.self, forKey: .cursor)
+                cursor = try container.decode(String.self, forKey: .cursor)
             } catch {
                 LogManager.logError("Decoding error for required property 'cursor': \(error)")
                 throw error
             }
             do {
-                self.info = try container.decode(String.self, forKey: .info)
+                info = try container.decode(String.self, forKey: .info)
             } catch {
                 LogManager.logError("Decoding error for required property 'info': \(error)")
                 throw error
             }
             do {
-                self.infoType = try container.decodeIfPresent(String.self, forKey: .infoType)
+                infoType = try container.decodeIfPresent(String.self, forKey: .infoType)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'infoType': \(error)")
                 throw error
             }
             do {
-                self.convoId = try container.decodeIfPresent(String.self, forKey: .convoId)
+                convoId = try container.decodeIfPresent(String.self, forKey: .convoId)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'convoId': \(error)")
                 throw error
             }
             do {
-                self.requestedBy = try container.decodeIfPresent(DID.self, forKey: .requestedBy)
+                requestedBy = try container.decodeIfPresent(DID.self, forKey: .requestedBy)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'requestedBy': \(error)")
                 throw error
@@ -765,15 +761,15 @@ public struct InfoEvent: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-public struct GroupResetEvent: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#groupResetEvent"
-            public let cursor: String
-            public let convoId: String
-            public let newGroupId: String
-            public let resetGeneration: Int
-            public let resetBy: DID?
-            public let cipherSuite: String?
-            public let reason: String?
+    public struct GroupResetEvent: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#groupResetEvent"
+        public let cursor: String
+        public let convoId: String
+        public let newGroupId: String
+        public let resetGeneration: Int
+        public let resetBy: DID?
+        public let cipherSuite: String?
+        public let reason: String?
 
         public init(
             cursor: String, convoId: String, newGroupId: String, resetGeneration: Int, resetBy: DID?, cipherSuite: String?, reason: String?
@@ -790,43 +786,43 @@ public struct GroupResetEvent: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.cursor = try container.decode(String.self, forKey: .cursor)
+                cursor = try container.decode(String.self, forKey: .cursor)
             } catch {
                 LogManager.logError("Decoding error for required property 'cursor': \(error)")
                 throw error
             }
             do {
-                self.convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: .convoId)
             } catch {
                 LogManager.logError("Decoding error for required property 'convoId': \(error)")
                 throw error
             }
             do {
-                self.newGroupId = try container.decode(String.self, forKey: .newGroupId)
+                newGroupId = try container.decode(String.self, forKey: .newGroupId)
             } catch {
                 LogManager.logError("Decoding error for required property 'newGroupId': \(error)")
                 throw error
             }
             do {
-                self.resetGeneration = try container.decode(Int.self, forKey: .resetGeneration)
+                resetGeneration = try container.decode(Int.self, forKey: .resetGeneration)
             } catch {
                 LogManager.logError("Decoding error for required property 'resetGeneration': \(error)")
                 throw error
             }
             do {
-                self.resetBy = try container.decodeIfPresent(DID.self, forKey: .resetBy)
+                resetBy = try container.decodeIfPresent(DID.self, forKey: .resetBy)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'resetBy': \(error)")
                 throw error
             }
             do {
-                self.cipherSuite = try container.decodeIfPresent(String.self, forKey: .cipherSuite)
+                cipherSuite = try container.decodeIfPresent(String.self, forKey: .cipherSuite)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'cipherSuite': \(error)")
                 throw error
             }
             do {
-                self.reason = try container.decodeIfPresent(String.self, forKey: .reason)
+                reason = try container.decodeIfPresent(String.self, forKey: .reason)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'reason': \(error)")
                 throw error
@@ -935,12 +931,12 @@ public struct GroupResetEvent: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-public struct MembershipChangeEvent: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#membershipChangeEvent"
-            public let cursor: String
-            public let convoId: String
-            public let did: DID
-            public let action: String
+    public struct MembershipChangeEvent: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#membershipChangeEvent"
+        public let cursor: String
+        public let convoId: String
+        public let did: DID
+        public let action: String
 
         public init(
             cursor: String, convoId: String, did: DID, action: String
@@ -954,25 +950,25 @@ public struct MembershipChangeEvent: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.cursor = try container.decode(String.self, forKey: .cursor)
+                cursor = try container.decode(String.self, forKey: .cursor)
             } catch {
                 LogManager.logError("Decoding error for required property 'cursor': \(error)")
                 throw error
             }
             do {
-                self.convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: .convoId)
             } catch {
                 LogManager.logError("Decoding error for required property 'convoId': \(error)")
                 throw error
             }
             do {
-                self.did = try container.decode(DID.self, forKey: .did)
+                did = try container.decode(DID.self, forKey: .did)
             } catch {
                 LogManager.logError("Decoding error for required property 'did': \(error)")
                 throw error
             }
             do {
-                self.action = try container.decode(String.self, forKey: .action)
+                action = try container.decode(String.self, forKey: .action)
             } catch {
                 LogManager.logError("Decoding error for required property 'action': \(error)")
                 throw error
@@ -1039,12 +1035,12 @@ public struct MembershipChangeEvent: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-public struct GroupInfoRefreshRequestedEvent: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#groupInfoRefreshRequestedEvent"
-            public let cursor: String
-            public let convoId: String
-            public let requestedBy: DID?
-            public let requestedAt: ATProtocolDate?
+    public struct GroupInfoRefreshRequestedEvent: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#groupInfoRefreshRequestedEvent"
+        public let cursor: String
+        public let convoId: String
+        public let requestedBy: DID?
+        public let requestedAt: ATProtocolDate?
 
         public init(
             cursor: String, convoId: String, requestedBy: DID?, requestedAt: ATProtocolDate?
@@ -1058,25 +1054,25 @@ public struct GroupInfoRefreshRequestedEvent: ATProtocolCodable, ATProtocolValue
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.cursor = try container.decode(String.self, forKey: .cursor)
+                cursor = try container.decode(String.self, forKey: .cursor)
             } catch {
                 LogManager.logError("Decoding error for required property 'cursor': \(error)")
                 throw error
             }
             do {
-                self.convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: .convoId)
             } catch {
                 LogManager.logError("Decoding error for required property 'convoId': \(error)")
                 throw error
             }
             do {
-                self.requestedBy = try container.decodeIfPresent(DID.self, forKey: .requestedBy)
+                requestedBy = try container.decodeIfPresent(DID.self, forKey: .requestedBy)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'requestedBy': \(error)")
                 throw error
             }
             do {
-                self.requestedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .requestedAt)
+                requestedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .requestedAt)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'requestedAt': \(error)")
                 throw error
@@ -1155,12 +1151,12 @@ public struct GroupInfoRefreshRequestedEvent: ATProtocolCodable, ATProtocolValue
         }
     }
 
-public struct ReadditionRequestedEvent: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#readditionRequestedEvent"
-            public let cursor: String
-            public let convoId: String
-            public let requestedBy: DID?
-            public let requestedAt: ATProtocolDate?
+    public struct ReadditionRequestedEvent: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#readditionRequestedEvent"
+        public let cursor: String
+        public let convoId: String
+        public let requestedBy: DID?
+        public let requestedAt: ATProtocolDate?
 
         public init(
             cursor: String, convoId: String, requestedBy: DID?, requestedAt: ATProtocolDate?
@@ -1174,25 +1170,25 @@ public struct ReadditionRequestedEvent: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.cursor = try container.decode(String.self, forKey: .cursor)
+                cursor = try container.decode(String.self, forKey: .cursor)
             } catch {
                 LogManager.logError("Decoding error for required property 'cursor': \(error)")
                 throw error
             }
             do {
-                self.convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: .convoId)
             } catch {
                 LogManager.logError("Decoding error for required property 'convoId': \(error)")
                 throw error
             }
             do {
-                self.requestedBy = try container.decodeIfPresent(DID.self, forKey: .requestedBy)
+                requestedBy = try container.decodeIfPresent(DID.self, forKey: .requestedBy)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'requestedBy': \(error)")
                 throw error
             }
             do {
-                self.requestedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .requestedAt)
+                requestedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .requestedAt)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'requestedAt': \(error)")
                 throw error
@@ -1271,12 +1267,12 @@ public struct ReadditionRequestedEvent: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-public struct CircuitBreakerTrippedEvent: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#circuitBreakerTrippedEvent"
-            public let cursor: String
-            public let convoId: String
-            public let resetCount: Int
-            public let trippedAt: ATProtocolDate
+    public struct CircuitBreakerTrippedEvent: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#circuitBreakerTrippedEvent"
+        public let cursor: String
+        public let convoId: String
+        public let resetCount: Int
+        public let trippedAt: ATProtocolDate
 
         public init(
             cursor: String, convoId: String, resetCount: Int, trippedAt: ATProtocolDate
@@ -1290,25 +1286,25 @@ public struct CircuitBreakerTrippedEvent: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.cursor = try container.decode(String.self, forKey: .cursor)
+                cursor = try container.decode(String.self, forKey: .cursor)
             } catch {
                 LogManager.logError("Decoding error for required property 'cursor': \(error)")
                 throw error
             }
             do {
-                self.convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: .convoId)
             } catch {
                 LogManager.logError("Decoding error for required property 'convoId': \(error)")
                 throw error
             }
             do {
-                self.resetCount = try container.decode(Int.self, forKey: .resetCount)
+                resetCount = try container.decode(Int.self, forKey: .resetCount)
             } catch {
                 LogManager.logError("Decoding error for required property 'resetCount': \(error)")
                 throw error
             }
             do {
-                self.trippedAt = try container.decode(ATProtocolDate.self, forKey: .trippedAt)
+                trippedAt = try container.decode(ATProtocolDate.self, forKey: .trippedAt)
             } catch {
                 LogManager.logError("Decoding error for required property 'trippedAt': \(error)")
                 throw error
@@ -1375,17 +1371,17 @@ public struct CircuitBreakerTrippedEvent: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-public struct ResetRequestedEvent: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#resetRequestedEvent"
-            public let cursor: String
-            public let convoId: String
-            public let cryptoSessionId: String
-            public let generation: Int
-            public let trigger: String
-            public let requestEventId: String
-            public let expectedNewMlsGroupId: String?
-            public let reason: String?
-            public let requestedAt: ATProtocolDate?
+    public struct ResetRequestedEvent: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#resetRequestedEvent"
+        public let cursor: String
+        public let convoId: String
+        public let cryptoSessionId: String
+        public let generation: Int
+        public let trigger: String
+        public let requestEventId: String
+        public let expectedNewMlsGroupId: String?
+        public let reason: String?
+        public let requestedAt: ATProtocolDate?
 
         public init(
             cursor: String, convoId: String, cryptoSessionId: String, generation: Int, trigger: String, requestEventId: String, expectedNewMlsGroupId: String?, reason: String?, requestedAt: ATProtocolDate?
@@ -1404,55 +1400,55 @@ public struct ResetRequestedEvent: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.cursor = try container.decode(String.self, forKey: .cursor)
+                cursor = try container.decode(String.self, forKey: .cursor)
             } catch {
                 LogManager.logError("Decoding error for required property 'cursor': \(error)")
                 throw error
             }
             do {
-                self.convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: .convoId)
             } catch {
                 LogManager.logError("Decoding error for required property 'convoId': \(error)")
                 throw error
             }
             do {
-                self.cryptoSessionId = try container.decode(String.self, forKey: .cryptoSessionId)
+                cryptoSessionId = try container.decode(String.self, forKey: .cryptoSessionId)
             } catch {
                 LogManager.logError("Decoding error for required property 'cryptoSessionId': \(error)")
                 throw error
             }
             do {
-                self.generation = try container.decode(Int.self, forKey: .generation)
+                generation = try container.decode(Int.self, forKey: .generation)
             } catch {
                 LogManager.logError("Decoding error for required property 'generation': \(error)")
                 throw error
             }
             do {
-                self.trigger = try container.decode(String.self, forKey: .trigger)
+                trigger = try container.decode(String.self, forKey: .trigger)
             } catch {
                 LogManager.logError("Decoding error for required property 'trigger': \(error)")
                 throw error
             }
             do {
-                self.requestEventId = try container.decode(String.self, forKey: .requestEventId)
+                requestEventId = try container.decode(String.self, forKey: .requestEventId)
             } catch {
                 LogManager.logError("Decoding error for required property 'requestEventId': \(error)")
                 throw error
             }
             do {
-                self.expectedNewMlsGroupId = try container.decodeIfPresent(String.self, forKey: .expectedNewMlsGroupId)
+                expectedNewMlsGroupId = try container.decodeIfPresent(String.self, forKey: .expectedNewMlsGroupId)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'expectedNewMlsGroupId': \(error)")
                 throw error
             }
             do {
-                self.reason = try container.decodeIfPresent(String.self, forKey: .reason)
+                reason = try container.decodeIfPresent(String.self, forKey: .reason)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'reason': \(error)")
                 throw error
             }
             do {
-                self.requestedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .requestedAt)
+                requestedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .requestedAt)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'requestedAt': \(error)")
                 throw error
@@ -1577,13 +1573,13 @@ public struct ResetRequestedEvent: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-public struct WelcomeReissueRequestedEvent: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#welcomeReissueRequestedEvent"
-            public let cursor: String
-            public let convoId: String
-            public let recipientDeviceDid: DID
-            public let requestedAt: ATProtocolDate
-            public let requestId: String
+    public struct WelcomeReissueRequestedEvent: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "blue.catbird.mlsChat.subscribeEvents#welcomeReissueRequestedEvent"
+        public let cursor: String
+        public let convoId: String
+        public let recipientDeviceDid: DID
+        public let requestedAt: ATProtocolDate
+        public let requestId: String
 
         public init(
             cursor: String, convoId: String, recipientDeviceDid: DID, requestedAt: ATProtocolDate, requestId: String
@@ -1598,31 +1594,31 @@ public struct WelcomeReissueRequestedEvent: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.cursor = try container.decode(String.self, forKey: .cursor)
+                cursor = try container.decode(String.self, forKey: .cursor)
             } catch {
                 LogManager.logError("Decoding error for required property 'cursor': \(error)")
                 throw error
             }
             do {
-                self.convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: .convoId)
             } catch {
                 LogManager.logError("Decoding error for required property 'convoId': \(error)")
                 throw error
             }
             do {
-                self.recipientDeviceDid = try container.decode(DID.self, forKey: .recipientDeviceDid)
+                recipientDeviceDid = try container.decode(DID.self, forKey: .recipientDeviceDid)
             } catch {
                 LogManager.logError("Decoding error for required property 'recipientDeviceDid': \(error)")
                 throw error
             }
             do {
-                self.requestedAt = try container.decode(ATProtocolDate.self, forKey: .requestedAt)
+                requestedAt = try container.decode(ATProtocolDate.self, forKey: .requestedAt)
             } catch {
                 LogManager.logError("Decoding error for required property 'requestedAt': \(error)")
                 throw error
             }
             do {
-                self.requestId = try container.decode(String.self, forKey: .requestId)
+                requestId = try container.decode(String.self, forKey: .requestId)
             } catch {
                 LogManager.logError("Decoding error for required property 'requestId': \(error)")
                 throw error
@@ -1696,192 +1692,180 @@ public struct WelcomeReissueRequestedEvent: ATProtocolCodable, ATProtocolValue {
             case requestId
         }
     }
-public struct Parameters: Parametrizable {
+
+    public struct Parameters: Parametrizable {
         public let ticket: String?
         public let cursor: String?
 
         public init(
             ticket: String? = nil,
             cursor: String? = nil
-            ) {
+        ) {
             self.ticket = ticket
             self.cursor = cursor
-
-        }
-    }
-public enum Message: Codable, Sendable {
-
-    case messageEvent(MessageEvent)
-
-    case reactionEvent(ReactionEvent)
-
-    case typingEvent(TypingEvent)
-
-    case newDeviceEvent(NewDeviceEvent)
-
-    case infoEvent(InfoEvent)
-
-    case treeChanged(TreeChanged)
-
-    case groupResetEvent(GroupResetEvent)
-
-    case membershipChangeEvent(MembershipChangeEvent)
-
-    case groupInfoRefreshRequestedEvent(GroupInfoRefreshRequestedEvent)
-
-    case readditionRequestedEvent(ReadditionRequestedEvent)
-
-    case circuitBreakerTrippedEvent(CircuitBreakerTrippedEvent)
-
-    case resetRequestedEvent(ResetRequestedEvent)
-
-    case welcomeReissueRequestedEvent(WelcomeReissueRequestedEvent)
-
-
-    enum CodingKeys: String, CodingKey {
-        case type = "$type"
-    }
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        let type = try container.decode(String.self, forKey: .type)
-
-        switch type {
-
-        case "blue.catbird.mlsChat.subscribeEvents#messageEvent":
-            let value = try MessageEvent(from: decoder)
-            self = .messageEvent(value)
-
-        case "blue.catbird.mlsChat.subscribeEvents#reactionEvent":
-            let value = try ReactionEvent(from: decoder)
-            self = .reactionEvent(value)
-
-        case "blue.catbird.mlsChat.subscribeEvents#typingEvent":
-            let value = try TypingEvent(from: decoder)
-            self = .typingEvent(value)
-
-        case "blue.catbird.mlsChat.subscribeEvents#newDeviceEvent":
-            let value = try NewDeviceEvent(from: decoder)
-            self = .newDeviceEvent(value)
-
-        case "blue.catbird.mlsChat.subscribeEvents#infoEvent":
-            let value = try InfoEvent(from: decoder)
-            self = .infoEvent(value)
-
-        case "blue.catbird.mlsChat.subscribeEvents#treeChanged":
-            let value = try TreeChanged(from: decoder)
-            self = .treeChanged(value)
-
-        case "blue.catbird.mlsChat.subscribeEvents#groupResetEvent":
-            let value = try GroupResetEvent(from: decoder)
-            self = .groupResetEvent(value)
-
-        case "blue.catbird.mlsChat.subscribeEvents#membershipChangeEvent":
-            let value = try MembershipChangeEvent(from: decoder)
-            self = .membershipChangeEvent(value)
-
-        case "blue.catbird.mlsChat.subscribeEvents#groupInfoRefreshRequestedEvent":
-            let value = try GroupInfoRefreshRequestedEvent(from: decoder)
-            self = .groupInfoRefreshRequestedEvent(value)
-
-        case "blue.catbird.mlsChat.subscribeEvents#readditionRequestedEvent":
-            let value = try ReadditionRequestedEvent(from: decoder)
-            self = .readditionRequestedEvent(value)
-
-        case "blue.catbird.mlsChat.subscribeEvents#circuitBreakerTrippedEvent":
-            let value = try CircuitBreakerTrippedEvent(from: decoder)
-            self = .circuitBreakerTrippedEvent(value)
-
-        case "blue.catbird.mlsChat.subscribeEvents#resetRequestedEvent":
-            let value = try ResetRequestedEvent(from: decoder)
-            self = .resetRequestedEvent(value)
-
-        case "blue.catbird.mlsChat.subscribeEvents#welcomeReissueRequestedEvent":
-            let value = try WelcomeReissueRequestedEvent(from: decoder)
-            self = .welcomeReissueRequestedEvent(value)
-
-        default:
-            throw DecodingError.dataCorruptedError(
-                forKey: .type,
-                in: container,
-                debugDescription: "Unknown message type: \(type)"
-            )
         }
     }
 
-    public func encode(to encoder: Encoder) throws {
-        switch self {
+    public enum Message: Codable, Sendable {
+        case messageEvent(MessageEvent)
 
-        case .messageEvent(let value):
-            try value.encode(to: encoder)
+        case reactionEvent(ReactionEvent)
 
-        case .reactionEvent(let value):
-            try value.encode(to: encoder)
+        case typingEvent(TypingEvent)
 
-        case .typingEvent(let value):
-            try value.encode(to: encoder)
+        case newDeviceEvent(NewDeviceEvent)
 
-        case .newDeviceEvent(let value):
-            try value.encode(to: encoder)
+        case infoEvent(InfoEvent)
 
-        case .infoEvent(let value):
-            try value.encode(to: encoder)
+        case treeChanged(TreeChanged)
 
-        case .treeChanged(let value):
-            try value.encode(to: encoder)
+        case groupResetEvent(GroupResetEvent)
 
-        case .groupResetEvent(let value):
-            try value.encode(to: encoder)
+        case membershipChangeEvent(MembershipChangeEvent)
 
-        case .membershipChangeEvent(let value):
-            try value.encode(to: encoder)
+        case groupInfoRefreshRequestedEvent(GroupInfoRefreshRequestedEvent)
 
-        case .groupInfoRefreshRequestedEvent(let value):
-            try value.encode(to: encoder)
+        case readditionRequestedEvent(ReadditionRequestedEvent)
 
-        case .readditionRequestedEvent(let value):
-            try value.encode(to: encoder)
+        case circuitBreakerTrippedEvent(CircuitBreakerTrippedEvent)
 
-        case .circuitBreakerTrippedEvent(let value):
-            try value.encode(to: encoder)
+        case resetRequestedEvent(ResetRequestedEvent)
 
-        case .resetRequestedEvent(let value):
-            try value.encode(to: encoder)
+        case welcomeReissueRequestedEvent(WelcomeReissueRequestedEvent)
 
-        case .welcomeReissueRequestedEvent(let value):
-            try value.encode(to: encoder)
+        enum CodingKeys: String, CodingKey {
+            case type = "$type"
+        }
 
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let type = try container.decode(String.self, forKey: .type)
+
+            switch type {
+            case "blue.catbird.mlsChat.subscribeEvents#messageEvent":
+                let value = try MessageEvent(from: decoder)
+                self = .messageEvent(value)
+
+            case "blue.catbird.mlsChat.subscribeEvents#reactionEvent":
+                let value = try ReactionEvent(from: decoder)
+                self = .reactionEvent(value)
+
+            case "blue.catbird.mlsChat.subscribeEvents#typingEvent":
+                let value = try TypingEvent(from: decoder)
+                self = .typingEvent(value)
+
+            case "blue.catbird.mlsChat.subscribeEvents#newDeviceEvent":
+                let value = try NewDeviceEvent(from: decoder)
+                self = .newDeviceEvent(value)
+
+            case "blue.catbird.mlsChat.subscribeEvents#infoEvent":
+                let value = try InfoEvent(from: decoder)
+                self = .infoEvent(value)
+
+            case "blue.catbird.mlsChat.subscribeEvents#treeChanged":
+                let value = try TreeChanged(from: decoder)
+                self = .treeChanged(value)
+
+            case "blue.catbird.mlsChat.subscribeEvents#groupResetEvent":
+                let value = try GroupResetEvent(from: decoder)
+                self = .groupResetEvent(value)
+
+            case "blue.catbird.mlsChat.subscribeEvents#membershipChangeEvent":
+                let value = try MembershipChangeEvent(from: decoder)
+                self = .membershipChangeEvent(value)
+
+            case "blue.catbird.mlsChat.subscribeEvents#groupInfoRefreshRequestedEvent":
+                let value = try GroupInfoRefreshRequestedEvent(from: decoder)
+                self = .groupInfoRefreshRequestedEvent(value)
+
+            case "blue.catbird.mlsChat.subscribeEvents#readditionRequestedEvent":
+                let value = try ReadditionRequestedEvent(from: decoder)
+                self = .readditionRequestedEvent(value)
+
+            case "blue.catbird.mlsChat.subscribeEvents#circuitBreakerTrippedEvent":
+                let value = try CircuitBreakerTrippedEvent(from: decoder)
+                self = .circuitBreakerTrippedEvent(value)
+
+            case "blue.catbird.mlsChat.subscribeEvents#resetRequestedEvent":
+                let value = try ResetRequestedEvent(from: decoder)
+                self = .resetRequestedEvent(value)
+
+            case "blue.catbird.mlsChat.subscribeEvents#welcomeReissueRequestedEvent":
+                let value = try WelcomeReissueRequestedEvent(from: decoder)
+                self = .welcomeReissueRequestedEvent(value)
+
+            default:
+                throw DecodingError.dataCorruptedError(
+                    forKey: .type,
+                    in: container,
+                    debugDescription: "Unknown message type: \(type)"
+                )
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            switch self {
+            case let .messageEvent(value):
+                try value.encode(to: encoder)
+
+            case let .reactionEvent(value):
+                try value.encode(to: encoder)
+
+            case let .typingEvent(value):
+                try value.encode(to: encoder)
+
+            case let .newDeviceEvent(value):
+                try value.encode(to: encoder)
+
+            case let .infoEvent(value):
+                try value.encode(to: encoder)
+
+            case let .treeChanged(value):
+                try value.encode(to: encoder)
+
+            case let .groupResetEvent(value):
+                try value.encode(to: encoder)
+
+            case let .membershipChangeEvent(value):
+                try value.encode(to: encoder)
+
+            case let .groupInfoRefreshRequestedEvent(value):
+                try value.encode(to: encoder)
+
+            case let .readditionRequestedEvent(value):
+                try value.encode(to: encoder)
+
+            case let .circuitBreakerTrippedEvent(value):
+                try value.encode(to: encoder)
+
+            case let .resetRequestedEvent(value):
+                try value.encode(to: encoder)
+
+            case let .welcomeReissueRequestedEvent(value):
+                try value.encode(to: encoder)
+            }
         }
     }
 }
 
+// Subscribe to live conversation events via WebSocket (consolidates subscribeConvoEvents with streamlined event types) Subscribe to live events (messages, membership changes, epoch advances, conversation updates) via firehose-style DAG-CBOR framing. Requires a valid ticket from getSubscriptionTicket.
 
-
-}
-
-
-
-
-/// Subscribe to live conversation events via WebSocket (consolidates subscribeConvoEvents with streamlined event types) Subscribe to live events (messages, membership changes, epoch advances, conversation updates) via firehose-style DAG-CBOR framing. Requires a valid ticket from getSubscriptionTicket.
-
-extension ATProtoClient.Blue.Catbird.MlsChat {
-
-    public func subscribeEvents(
+public extension ATProtoClient.Blue.Catbird.MlsChat {
+    func subscribeEvents(
         ticket: String? = nil, cursor: String? = nil
     ) async throws -> AsyncThrowingStream<BlueCatbirdMlsChatSubscribeEvents.Message, Error> {
         let params = BlueCatbirdMlsChatSubscribeEvents.Parameters(ticket: ticket, cursor: cursor)
-        return try await self.networkService.subscribe(
+        return try await networkService.subscribe(
             endpoint: "blue.catbird.mlsChat.subscribeEvents",
             parameters: params
         )
     }
 
     /// Alternative signature accepting input struct
-    public func subscribeEvents(input: BlueCatbirdMlsChatSubscribeEvents.Parameters) async throws -> AsyncThrowingStream<BlueCatbirdMlsChatSubscribeEvents.Message, Error> {
-        return try await self.networkService.subscribe(
+    func subscribeEvents(input: BlueCatbirdMlsChatSubscribeEvents.Parameters) async throws -> AsyncThrowingStream<BlueCatbirdMlsChatSubscribeEvents.Message, Error> {
+        return try await networkService.subscribe(
             endpoint: "blue.catbird.mlsChat.subscribeEvents",
             parameters: input
         )
     }
-
 }

@@ -28,6 +28,7 @@ object ChatBskyConvoGetConvoForMembersDefs {
 sealed class ChatBskyConvoGetConvoForMembersError(val name: String, val description: String?) {
         object AccountSuspended: ChatBskyConvoGetConvoForMembersError("AccountSuspended", "")
         object BlockedActor: ChatBskyConvoGetConvoForMembersError("BlockedActor", "")
+        object BlockedSubject: ChatBskyConvoGetConvoForMembersError("BlockedSubject", "")
         object MessagesDisabled: ChatBskyConvoGetConvoForMembersError("MessagesDisabled", "")
         object NotFollowedBySender: ChatBskyConvoGetConvoForMembersError("NotFollowedBySender", "")
         object RecipientNotFound: ChatBskyConvoGetConvoForMembersError("RecipientNotFound", "")

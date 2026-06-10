@@ -1,14 +1,10 @@
 import Foundation
 
-
-
 // lexicon: 1, id: app.bsky.contact.importContacts
 
-
-public struct AppBskyContactImportContacts {
-
+public enum AppBskyContactImportContacts {
     public static let typeIdentifier = "app.bsky.contact.importContacts"
-public struct Input: ATProtocolCodable {
+    public struct Input: ATProtocolCodable {
         public let token: String
         public let contacts: [String]
 
@@ -18,11 +14,10 @@ public struct Input: ATProtocolCodable {
             self.contacts = contacts
         }
 
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.token = try container.decode(String.self, forKey: .token)
-            self.contacts = try container.decode([String].self, forKey: .contacts)
+            token = try container.decode(String.self, forKey: .token)
+            contacts = try container.decode([String].self, forKey: .contacts)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -46,101 +41,72 @@ public struct Input: ATProtocolCodable {
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let matchesAndContactIndexes: [AppBskyContactDefs.MatchAndContactIndex]
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             matchesAndContactIndexes: [AppBskyContactDefs.MatchAndContactIndex]
 
-
         ) {
-
-
             self.matchesAndContactIndexes = matchesAndContactIndexes
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.matchesAndContactIndexes = try container.decode([AppBskyContactDefs.MatchAndContactIndex].self, forKey: .matchesAndContactIndexes)
-
-
+            matchesAndContactIndexes = try container.decode([AppBskyContactDefs.MatchAndContactIndex].self, forKey: .matchesAndContactIndexes)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(matchesAndContactIndexes, forKey: .matchesAndContactIndexes)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let matchesAndContactIndexesValue = try matchesAndContactIndexes.toCBORValue()
             map = map.adding(key: "matchesAndContactIndexes", value: matchesAndContactIndexesValue)
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case matchesAndContactIndexes
         }
-
     }
 
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case invalidDid = "InvalidDid."
-                case invalidContacts = "InvalidContacts."
-                case tooManyContacts = "TooManyContacts."
-                case invalidToken = "InvalidToken."
-                case internalError = "InternalError."
-            public var description: String {
-                return self.rawValue
-            }
-
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case invalidDid = "InvalidDid."
+        case invalidContacts = "InvalidContacts."
+        case tooManyContacts = "TooManyContacts."
+        case invalidToken = "InvalidToken."
+        case internalError = "InternalError."
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-extension ATProtoClient.App.Bsky.Contact {
+public extension ATProtoClient.App.Bsky.Contact {
     // MARK: - importContacts
 
-    /// Import contacts for securely matching with other users. This follows the protocol explained in https://docs.bsky.app/blog/contact-import-rfc. Requires authentication.
-    ///
-    /// - Parameter input: The input parameters for the request
+    // Import contacts for securely matching with other users. This follows the protocol explained in https://docs.bsky.app/blog/contact-import-rfc. Requires authentication.
+    //
+    // - Parameter input: The input parameters for the request
 
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func importContacts(
-
+    func importContacts(
         input: AppBskyContactImportContacts.Input
 
     ) async throws -> (responseCode: Int, data: AppBskyContactImportContacts.Output?) {
@@ -150,14 +116,9 @@ extension ATProtoClient.App.Bsky.Contact {
 
         headers["Content-Type"] = "application/json"
 
-
-
         headers["Accept"] = "application/json"
 
-
-
         let requestData: Data? = try JSONEncoder().encode(input)
-
 
         let queryItems: [URLQueryItem]? = nil
 
@@ -175,12 +136,10 @@ extension ATProtoClient.App.Bsky.Contact {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -189,9 +148,7 @@ extension ATProtoClient.App.Bsky.Contact {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(AppBskyContactImportContacts.Output.self, from: responseData)
 
@@ -205,9 +162,5 @@ extension ATProtoClient.App.Bsky.Contact {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-
     }
-
 }
-
-

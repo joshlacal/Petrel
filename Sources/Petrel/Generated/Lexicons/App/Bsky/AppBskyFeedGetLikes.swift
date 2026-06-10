@@ -1,19 +1,15 @@
 import Foundation
 
-
-
 // lexicon: 1, id: app.bsky.feed.getLikes
 
-
-public struct AppBskyFeedGetLikes {
-
+public enum AppBskyFeedGetLikes {
     public static let typeIdentifier = "app.bsky.feed.getLikes"
 
-public struct Like: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.feed.getLikes#like"
-            public let indexedAt: ATProtocolDate
-            public let createdAt: ATProtocolDate
-            public let actor: AppBskyActorDefs.ProfileView
+    public struct Like: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.feed.getLikes#like"
+        public let indexedAt: ATProtocolDate
+        public let createdAt: ATProtocolDate
+        public let actor: AppBskyActorDefs.ProfileView
 
         public init(
             indexedAt: ATProtocolDate, createdAt: ATProtocolDate, actor: AppBskyActorDefs.ProfileView
@@ -26,19 +22,19 @@ public struct Like: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
+                indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
             } catch {
                 LogManager.logError("Decoding error for required property 'indexedAt': \(error)")
                 throw error
             }
             do {
-                self.createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
             } catch {
                 LogManager.logError("Decoding error for required property 'createdAt': \(error)")
                 throw error
             }
             do {
-                self.actor = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: .actor)
+                actor = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: .actor)
             } catch {
                 LogManager.logError("Decoding error for required property 'actor': \(error)")
                 throw error
@@ -96,7 +92,8 @@ public struct Like: ATProtocolCodable, ATProtocolValue {
             case actor
         }
     }
-public struct Parameters: Parametrizable {
+
+    public struct Parameters: Parametrizable {
         public let uri: ATProtocolURI
         public let cid: CID?
         public let limit: Int?
@@ -107,18 +104,15 @@ public struct Parameters: Parametrizable {
             cid: CID? = nil,
             limit: Int? = nil,
             cursor: String? = nil
-            ) {
+        ) {
             self.uri = uri
             self.cid = cid
             self.limit = limit
             self.cursor = cursor
-
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let uri: ATProtocolURI
 
         public let cid: CID?
@@ -127,12 +121,8 @@ public struct Output: ATProtocolCodable {
 
         public let likes: [Like]
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             uri: ATProtocolURI,
 
             cid: CID? = nil,
@@ -141,10 +131,7 @@ public struct Output: ATProtocolCodable {
 
             likes: [Like]
 
-
         ) {
-
-
             self.uri = uri
 
             self.cid = cid
@@ -152,58 +139,39 @@ public struct Output: ATProtocolCodable {
             self.cursor = cursor
 
             self.likes = likes
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+            uri = try container.decode(ATProtocolURI.self, forKey: .uri)
 
+            cid = try container.decodeIfPresent(CID.self, forKey: .cid)
 
-            self.cid = try container.decodeIfPresent(CID.self, forKey: .cid)
+            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
 
-
-            self.cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
-
-
-            self.likes = try container.decode([Like].self, forKey: .likes)
-
-
+            likes = try container.decode([Like].self, forKey: .likes)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(uri, forKey: .uri)
 
-
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(cid, forKey: .cid)
-
 
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(cursor, forKey: .cursor)
 
-
             try container.encode(likes, forKey: .likes)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let uriValue = try uri.toCBORValue()
             map = map.adding(key: "uri", value: uriValue)
-
-
 
             if let value = cid {
                 // Encode optional property even if it's an empty array for CBOR
@@ -211,25 +179,17 @@ public struct Output: ATProtocolCodable {
                 map = map.adding(key: "cid", value: cidValue)
             }
 
-
-
             if let value = cursor {
                 // Encode optional property even if it's an empty array for CBOR
                 let cursorValue = try value.toCBORValue()
                 map = map.adding(key: "cursor", value: cursorValue)
             }
 
-
-
             let likesValue = try likes.toCBORValue()
             map = map.adding(key: "likes", value: likesValue)
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case uri
@@ -237,17 +197,10 @@ public struct Output: ATProtocolCodable {
             case cursor
             case likes
         }
-
     }
-
-
-
-
 }
 
-
-
-extension ATProtoClient.App.Bsky.Feed {
+public extension ATProtoClient.App.Bsky.Feed {
     // MARK: - getLikes
 
     /// Get like records which reference a subject (by AT-URI and CID).
@@ -256,9 +209,8 @@ extension ATProtoClient.App.Bsky.Feed {
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func getLikes(input: AppBskyFeedGetLikes.Parameters) async throws -> (responseCode: Int, data: AppBskyFeedGetLikes.Output?) {
+    func getLikes(input: AppBskyFeedGetLikes.Parameters) async throws -> (responseCode: Int, data: AppBskyFeedGetLikes.Output?) {
         let endpoint = "app.bsky.feed.getLikes"
-
 
         let queryItems = input.asQueryItems()
 
@@ -279,8 +231,7 @@ extension ATProtoClient.App.Bsky.Feed {
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -289,9 +240,7 @@ extension ATProtoClient.App.Bsky.Feed {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(AppBskyFeedGetLikes.Output.self, from: responseData)
 
@@ -302,12 +251,9 @@ extension ATProtoClient.App.Bsky.Feed {
                 return (responseCode, nil)
             }
         } else {
-
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
-

@@ -1,14 +1,10 @@
 import Foundation
 
-
-
 // lexicon: 1, id: com.atproto.temp.requestPhoneVerification
 
-
-public struct ComAtprotoTempRequestPhoneVerification {
-
+public enum ComAtprotoTempRequestPhoneVerification {
     public static let typeIdentifier = "com.atproto.temp.requestPhoneVerification"
-public struct Input: ATProtocolCodable {
+    public struct Input: ATProtocolCodable {
         public let phoneNumber: String
 
         /// Standard public initializer
@@ -16,10 +12,9 @@ public struct Input: ATProtocolCodable {
             self.phoneNumber = phoneNumber
         }
 
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.phoneNumber = try container.decode(String.self, forKey: .phoneNumber)
+            phoneNumber = try container.decode(String.self, forKey: .phoneNumber)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -38,23 +33,19 @@ public struct Input: ATProtocolCodable {
             case phoneNumber
         }
     }
-
-
-
 }
 
-extension ATProtoClient.Com.Atproto.Temp {
+public extension ATProtoClient.Com.Atproto.Temp {
     // MARK: - requestPhoneVerification
 
-    /// Request a verification code to be sent to the supplied phone number
-    ///
-    /// - Parameter input: The input parameters for the request
+    // Request a verification code to be sent to the supplied phone number
+    //
+    // - Parameter input: The input parameters for the request
 
     ///
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func requestPhoneVerification(
-
+    func requestPhoneVerification(
         input: ComAtprotoTempRequestPhoneVerification.Input
 
     ) async throws -> Int {
@@ -64,12 +55,7 @@ extension ATProtoClient.Com.Atproto.Temp {
 
         headers["Content-Type"] = "application/json"
 
-
-
-
-
         let requestData: Data? = try JSONEncoder().encode(input)
-
 
         let queryItems: [URLQueryItem]? = nil
 
@@ -85,13 +71,6 @@ extension ATProtoClient.Com.Atproto.Temp {
         let serviceDID = await networkService.getServiceDID(for: "com.atproto.temp.requestPhoneVerification")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
         let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        let responseCode = response.statusCode
-
-
-        return responseCode
-
+        return response.statusCode
     }
-
 }
-
-

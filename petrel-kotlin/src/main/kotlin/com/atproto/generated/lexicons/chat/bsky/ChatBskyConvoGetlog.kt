@@ -99,6 +99,15 @@ sealed interface ChatBskyConvoGetLogOutputLogsUnion {
     data class LogOutgoingJoinRequest(val value: com.atproto.generated.ChatBskyConvoDefsLogOutgoingJoinRequest) : ChatBskyConvoGetLogOutputLogsUnion
 
     @Serializable
+    data class LogWithdrawIncomingJoinRequest(val value: com.atproto.generated.ChatBskyConvoDefsLogWithdrawIncomingJoinRequest) : ChatBskyConvoGetLogOutputLogsUnion
+
+    @Serializable
+    data class LogWithdrawOutgoingJoinRequest(val value: com.atproto.generated.ChatBskyConvoDefsLogWithdrawOutgoingJoinRequest) : ChatBskyConvoGetLogOutputLogsUnion
+
+    @Serializable
+    data class LogReadJoinRequests(val value: com.atproto.generated.ChatBskyConvoDefsLogReadJoinRequests) : ChatBskyConvoGetLogOutputLogsUnion
+
+    @Serializable
     data class Unexpected(val value: JsonElement) : ChatBskyConvoGetLogOutputLogsUnion
 }
 
@@ -271,6 +280,24 @@ object ChatBskyConvoGetLogOutputLogsUnionSerializer : kotlinx.serialization.KSer
                     it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logOutgoingJoinRequest")
                 })
             }
+            is ChatBskyConvoGetLogOutputLogsUnion.LogWithdrawIncomingJoinRequest -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsLogWithdrawIncomingJoinRequest.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logWithdrawIncomingJoinRequest")
+                })
+            }
+            is ChatBskyConvoGetLogOutputLogsUnion.LogWithdrawOutgoingJoinRequest -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsLogWithdrawOutgoingJoinRequest.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logWithdrawOutgoingJoinRequest")
+                })
+            }
+            is ChatBskyConvoGetLogOutputLogsUnion.LogReadJoinRequests -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.ChatBskyConvoDefsLogReadJoinRequests.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logReadJoinRequests")
+                })
+            }
             is ChatBskyConvoGetLogOutputLogsUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
             // subscription codegen) are runtime-only sentinels; JSON round-trip
@@ -370,6 +397,15 @@ object ChatBskyConvoGetLogOutputLogsUnionSerializer : kotlinx.serialization.KSer
             )
             "chat.bsky.convo.defs#logOutgoingJoinRequest" -> ChatBskyConvoGetLogOutputLogsUnion.LogOutgoingJoinRequest(
                 jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsLogOutgoingJoinRequest.serializer(), element)
+            )
+            "chat.bsky.convo.defs#logWithdrawIncomingJoinRequest" -> ChatBskyConvoGetLogOutputLogsUnion.LogWithdrawIncomingJoinRequest(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsLogWithdrawIncomingJoinRequest.serializer(), element)
+            )
+            "chat.bsky.convo.defs#logWithdrawOutgoingJoinRequest" -> ChatBskyConvoGetLogOutputLogsUnion.LogWithdrawOutgoingJoinRequest(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsLogWithdrawOutgoingJoinRequest.serializer(), element)
+            )
+            "chat.bsky.convo.defs#logReadJoinRequests" -> ChatBskyConvoGetLogOutputLogsUnion.LogReadJoinRequests(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.ChatBskyConvoDefsLogReadJoinRequests.serializer(), element)
             )
             else -> ChatBskyConvoGetLogOutputLogsUnion.Unexpected(element)
         }

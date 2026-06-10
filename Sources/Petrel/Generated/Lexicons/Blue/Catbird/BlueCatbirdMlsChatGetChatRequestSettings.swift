@@ -1,129 +1,85 @@
 import Foundation
 
-
-
 // lexicon: 1, id: blue.catbird.mlsChat.getChatRequestSettings
 
-
-public struct BlueCatbirdMlsChatGetChatRequestSettings {
-
+public enum BlueCatbirdMlsChatGetChatRequestSettings {
     public static let typeIdentifier = "blue.catbird.mlsChat.getChatRequestSettings"
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let allowFollowersBypass: Bool
 
         public let allowFollowingBypass: Bool
 
         public let autoExpireDays: Int
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             allowFollowersBypass: Bool,
 
             allowFollowingBypass: Bool,
 
             autoExpireDays: Int
 
-
         ) {
-
-
             self.allowFollowersBypass = allowFollowersBypass
 
             self.allowFollowingBypass = allowFollowingBypass
 
             self.autoExpireDays = autoExpireDays
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.allowFollowersBypass = try container.decode(Bool.self, forKey: .allowFollowersBypass)
+            allowFollowersBypass = try container.decode(Bool.self, forKey: .allowFollowersBypass)
 
+            allowFollowingBypass = try container.decode(Bool.self, forKey: .allowFollowingBypass)
 
-            self.allowFollowingBypass = try container.decode(Bool.self, forKey: .allowFollowingBypass)
-
-
-            self.autoExpireDays = try container.decode(Int.self, forKey: .autoExpireDays)
-
-
+            autoExpireDays = try container.decode(Int.self, forKey: .autoExpireDays)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(allowFollowersBypass, forKey: .allowFollowersBypass)
 
-
             try container.encode(allowFollowingBypass, forKey: .allowFollowingBypass)
 
-
             try container.encode(autoExpireDays, forKey: .autoExpireDays)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let allowFollowersBypassValue = try allowFollowersBypass.toCBORValue()
             map = map.adding(key: "allowFollowersBypass", value: allowFollowersBypassValue)
 
-
-
             let allowFollowingBypassValue = try allowFollowingBypass.toCBORValue()
             map = map.adding(key: "allowFollowingBypass", value: allowFollowingBypassValue)
-
-
 
             let autoExpireDaysValue = try autoExpireDays.toCBORValue()
             map = map.adding(key: "autoExpireDays", value: autoExpireDaysValue)
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case allowFollowersBypass
             case allowFollowingBypass
             case autoExpireDays
         }
-
     }
-
-
-
-
 }
 
-
-
-extension ATProtoClient.Blue.Catbird.MlsChat {
+public extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - getChatRequestSettings
 
     /// Get user's chat request settings
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func getChatRequestSettings() async throws -> (responseCode: Int, data: BlueCatbirdMlsChatGetChatRequestSettings.Output?) {
+    func getChatRequestSettings() async throws -> (responseCode: Int, data: BlueCatbirdMlsChatGetChatRequestSettings.Output?) {
         let endpoint = "blue.catbird.mlsChat.getChatRequestSettings"
-
 
         let queryItems: [URLQueryItem]? = nil
 
@@ -150,9 +106,8 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         }
 
         // Only decode response data if request was successful
-        if (200...299).contains(responseCode) {
+        if (200 ... 299).contains(responseCode) {
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatGetChatRequestSettings.Output.self, from: responseData)
 
@@ -163,12 +118,9 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
                 return (responseCode, nil)
             }
         } else {
-
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
-

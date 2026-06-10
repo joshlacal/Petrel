@@ -1,115 +1,75 @@
 import Foundation
 
-
-
 // lexicon: 1, id: app.bsky.unspecced.getTrendingTopics
 
-
-public struct AppBskyUnspeccedGetTrendingTopics {
-
+public enum AppBskyUnspeccedGetTrendingTopics {
     public static let typeIdentifier = "app.bsky.unspecced.getTrendingTopics"
-public struct Parameters: Parametrizable {
+    public struct Parameters: Parametrizable {
         public let viewer: DID?
         public let limit: Int?
 
         public init(
             viewer: DID? = nil,
             limit: Int? = nil
-            ) {
+        ) {
             self.viewer = viewer
             self.limit = limit
-
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let topics: [AppBskyUnspeccedDefs.TrendingTopic]
 
         public let suggested: [AppBskyUnspeccedDefs.TrendingTopic]
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             topics: [AppBskyUnspeccedDefs.TrendingTopic],
 
             suggested: [AppBskyUnspeccedDefs.TrendingTopic]
 
-
         ) {
-
-
             self.topics = topics
 
             self.suggested = suggested
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.topics = try container.decode([AppBskyUnspeccedDefs.TrendingTopic].self, forKey: .topics)
+            topics = try container.decode([AppBskyUnspeccedDefs.TrendingTopic].self, forKey: .topics)
 
-
-            self.suggested = try container.decode([AppBskyUnspeccedDefs.TrendingTopic].self, forKey: .suggested)
-
-
+            suggested = try container.decode([AppBskyUnspeccedDefs.TrendingTopic].self, forKey: .suggested)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(topics, forKey: .topics)
 
-
             try container.encode(suggested, forKey: .suggested)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let topicsValue = try topics.toCBORValue()
             map = map.adding(key: "topics", value: topicsValue)
 
-
-
             let suggestedValue = try suggested.toCBORValue()
             map = map.adding(key: "suggested", value: suggestedValue)
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case topics
             case suggested
         }
-
     }
-
-
-
-
 }
 
-
-
-extension ATProtoClient.App.Bsky.Unspecced {
+public extension ATProtoClient.App.Bsky.Unspecced {
     // MARK: - getTrendingTopics
 
     /// Get a list of trending topics
@@ -118,9 +78,8 @@ extension ATProtoClient.App.Bsky.Unspecced {
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func getTrendingTopics(input: AppBskyUnspeccedGetTrendingTopics.Parameters) async throws -> (responseCode: Int, data: AppBskyUnspeccedGetTrendingTopics.Output?) {
+    func getTrendingTopics(input: AppBskyUnspeccedGetTrendingTopics.Parameters) async throws -> (responseCode: Int, data: AppBskyUnspeccedGetTrendingTopics.Output?) {
         let endpoint = "app.bsky.unspecced.getTrendingTopics"
-
 
         let queryItems = input.asQueryItems()
 
@@ -141,8 +100,7 @@ extension ATProtoClient.App.Bsky.Unspecced {
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -151,9 +109,7 @@ extension ATProtoClient.App.Bsky.Unspecced {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(AppBskyUnspeccedGetTrendingTopics.Output.self, from: responseData)
 
@@ -164,12 +120,9 @@ extension ATProtoClient.App.Bsky.Unspecced {
                 return (responseCode, nil)
             }
         } else {
-
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
-

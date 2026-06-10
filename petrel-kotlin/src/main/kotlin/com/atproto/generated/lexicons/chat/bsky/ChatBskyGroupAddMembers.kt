@@ -30,13 +30,14 @@ object ChatBskyGroupAddMembersDefs {
 sealed class ChatBskyGroupAddMembersError(val name: String, val description: String?) {
         object AccountSuspended: ChatBskyGroupAddMembersError("AccountSuspended", "")
         object BlockedActor: ChatBskyGroupAddMembersError("BlockedActor", "")
-        object GroupInvitesDisabled: ChatBskyGroupAddMembersError("GroupInvitesDisabled", "")
+        object BlockedSubject: ChatBskyGroupAddMembersError("BlockedSubject", "")
         object ConvoLocked: ChatBskyGroupAddMembersError("ConvoLocked", "")
         object InsufficientRole: ChatBskyGroupAddMembersError("InsufficientRole", "")
         object InvalidConvo: ChatBskyGroupAddMembersError("InvalidConvo", "")
         object MemberLimitReached: ChatBskyGroupAddMembersError("MemberLimitReached", "")
         object NotFollowedBySender: ChatBskyGroupAddMembersError("NotFollowedBySender", "")
         object RecipientNotFound: ChatBskyGroupAddMembersError("RecipientNotFound", "")
+        object UserForbidsGroups: ChatBskyGroupAddMembersError("UserForbidsGroups", "")
     }
 
 /**

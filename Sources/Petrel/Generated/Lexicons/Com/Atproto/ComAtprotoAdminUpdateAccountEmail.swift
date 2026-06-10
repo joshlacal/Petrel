@@ -1,14 +1,10 @@
 import Foundation
 
-
-
 // lexicon: 1, id: com.atproto.admin.updateAccountEmail
 
-
-public struct ComAtprotoAdminUpdateAccountEmail {
-
+public enum ComAtprotoAdminUpdateAccountEmail {
     public static let typeIdentifier = "com.atproto.admin.updateAccountEmail"
-public struct Input: ATProtocolCodable {
+    public struct Input: ATProtocolCodable {
         public let account: ATIdentifier
         public let email: String
 
@@ -18,11 +14,10 @@ public struct Input: ATProtocolCodable {
             self.email = email
         }
 
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.account = try container.decode(ATIdentifier.self, forKey: .account)
-            self.email = try container.decode(String.self, forKey: .email)
+            account = try container.decode(ATIdentifier.self, forKey: .account)
+            email = try container.decode(String.self, forKey: .email)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -45,23 +40,19 @@ public struct Input: ATProtocolCodable {
             case email
         }
     }
-
-
-
 }
 
-extension ATProtoClient.Com.Atproto.Admin {
+public extension ATProtoClient.Com.Atproto.Admin {
     // MARK: - updateAccountEmail
 
-    /// Administrative action to update an account's email.
-    ///
-    /// - Parameter input: The input parameters for the request
+    // Administrative action to update an account's email.
+    //
+    // - Parameter input: The input parameters for the request
 
     ///
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func updateAccountEmail(
-
+    func updateAccountEmail(
         input: ComAtprotoAdminUpdateAccountEmail.Input
 
     ) async throws -> Int {
@@ -71,12 +62,7 @@ extension ATProtoClient.Com.Atproto.Admin {
 
         headers["Content-Type"] = "application/json"
 
-
-
-
-
         let requestData: Data? = try JSONEncoder().encode(input)
-
 
         let queryItems: [URLQueryItem]? = nil
 
@@ -92,13 +78,6 @@ extension ATProtoClient.Com.Atproto.Admin {
         let serviceDID = await networkService.getServiceDID(for: "com.atproto.admin.updateAccountEmail")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
         let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        let responseCode = response.statusCode
-
-
-        return responseCode
-
+        return response.statusCode
     }
-
 }
-
-

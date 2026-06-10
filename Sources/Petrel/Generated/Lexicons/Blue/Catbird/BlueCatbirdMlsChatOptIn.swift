@@ -1,19 +1,15 @@
 import Foundation
 
-
-
 // lexicon: 1, id: blue.catbird.mlsChat.optIn
 
-
-public struct BlueCatbirdMlsChatOptIn {
-
+public enum BlueCatbirdMlsChatOptIn {
     public static let typeIdentifier = "blue.catbird.mlsChat.optIn"
 
-public struct OptInStatus: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "blue.catbird.mlsChat.optIn#optInStatus"
-            public let did: DID
-            public let optedIn: Bool
-            public let optedInAt: ATProtocolDate?
+    public struct OptInStatus: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "blue.catbird.mlsChat.optIn#optInStatus"
+        public let did: DID
+        public let optedIn: Bool
+        public let optedInAt: ATProtocolDate?
 
         public init(
             did: DID, optedIn: Bool, optedInAt: ATProtocolDate?
@@ -26,19 +22,19 @@ public struct OptInStatus: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.did = try container.decode(DID.self, forKey: .did)
+                did = try container.decode(DID.self, forKey: .did)
             } catch {
                 LogManager.logError("Decoding error for required property 'did': \(error)")
                 throw error
             }
             do {
-                self.optedIn = try container.decode(Bool.self, forKey: .optedIn)
+                optedIn = try container.decode(Bool.self, forKey: .optedIn)
             } catch {
                 LogManager.logError("Decoding error for required property 'optedIn': \(error)")
                 throw error
             }
             do {
-                self.optedInAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .optedInAt)
+                optedInAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .optedInAt)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'optedInAt': \(error)")
                 throw error
@@ -102,7 +98,8 @@ public struct OptInStatus: ATProtocolCodable, ATProtocolValue {
             case optedInAt
         }
     }
-public struct Input: ATProtocolCodable {
+
+    public struct Input: ATProtocolCodable {
         public let action: String
         public let dids: [DID]?
         public let deviceId: String?
@@ -120,15 +117,14 @@ public struct Input: ATProtocolCodable {
             self.autoExpireDays = autoExpireDays
         }
 
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.action = try container.decode(String.self, forKey: .action)
-            self.dids = try container.decodeIfPresent([DID].self, forKey: .dids)
-            self.deviceId = try container.decodeIfPresent(String.self, forKey: .deviceId)
-            self.allowFollowersBypass = try container.decodeIfPresent(Bool.self, forKey: .allowFollowersBypass)
-            self.allowFollowingBypass = try container.decodeIfPresent(Bool.self, forKey: .allowFollowingBypass)
-            self.autoExpireDays = try container.decodeIfPresent(Int.self, forKey: .autoExpireDays)
+            action = try container.decode(String.self, forKey: .action)
+            dids = try container.decodeIfPresent([DID].self, forKey: .dids)
+            deviceId = try container.decodeIfPresent(String.self, forKey: .deviceId)
+            allowFollowersBypass = try container.decodeIfPresent(Bool.self, forKey: .allowFollowersBypass)
+            allowFollowingBypass = try container.decodeIfPresent(Bool.self, forKey: .allowFollowingBypass)
+            autoExpireDays = try container.decodeIfPresent(Int.self, forKey: .autoExpireDays)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -178,9 +174,7 @@ public struct Input: ATProtocolCodable {
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let success: Bool?
 
         public let optedIn: Bool?
@@ -195,12 +189,8 @@ public struct Output: ATProtocolCodable {
 
         public let autoExpireDays: Int?
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             success: Bool? = nil,
 
             optedIn: Bool? = nil,
@@ -215,10 +205,7 @@ public struct Output: ATProtocolCodable {
 
             autoExpireDays: Int? = nil
 
-
         ) {
-
-
             self.success = success
 
             self.optedIn = optedIn
@@ -232,76 +219,53 @@ public struct Output: ATProtocolCodable {
             self.allowFollowingBypass = allowFollowingBypass
 
             self.autoExpireDays = autoExpireDays
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.success = try container.decodeIfPresent(Bool.self, forKey: .success)
+            success = try container.decodeIfPresent(Bool.self, forKey: .success)
 
+            optedIn = try container.decodeIfPresent(Bool.self, forKey: .optedIn)
 
-            self.optedIn = try container.decodeIfPresent(Bool.self, forKey: .optedIn)
+            optedInAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .optedInAt)
 
+            statuses = try container.decodeIfPresent([OptInStatus].self, forKey: .statuses)
 
-            self.optedInAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .optedInAt)
+            allowFollowersBypass = try container.decodeIfPresent(Bool.self, forKey: .allowFollowersBypass)
 
+            allowFollowingBypass = try container.decodeIfPresent(Bool.self, forKey: .allowFollowingBypass)
 
-            self.statuses = try container.decodeIfPresent([OptInStatus].self, forKey: .statuses)
-
-
-            self.allowFollowersBypass = try container.decodeIfPresent(Bool.self, forKey: .allowFollowersBypass)
-
-
-            self.allowFollowingBypass = try container.decodeIfPresent(Bool.self, forKey: .allowFollowingBypass)
-
-
-            self.autoExpireDays = try container.decodeIfPresent(Int.self, forKey: .autoExpireDays)
-
-
+            autoExpireDays = try container.decodeIfPresent(Int.self, forKey: .autoExpireDays)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(success, forKey: .success)
 
-
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(optedIn, forKey: .optedIn)
-
 
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(optedInAt, forKey: .optedInAt)
 
-
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(statuses, forKey: .statuses)
-
 
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(allowFollowersBypass, forKey: .allowFollowersBypass)
 
-
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(allowFollowingBypass, forKey: .allowFollowingBypass)
 
-
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(autoExpireDays, forKey: .autoExpireDays)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             if let value = success {
                 // Encode optional property even if it's an empty array for CBOR
@@ -309,15 +273,11 @@ public struct Output: ATProtocolCodable {
                 map = map.adding(key: "success", value: successValue)
             }
 
-
-
             if let value = optedIn {
                 // Encode optional property even if it's an empty array for CBOR
                 let optedInValue = try value.toCBORValue()
                 map = map.adding(key: "optedIn", value: optedInValue)
             }
-
-
 
             if let value = optedInAt {
                 // Encode optional property even if it's an empty array for CBOR
@@ -325,15 +285,11 @@ public struct Output: ATProtocolCodable {
                 map = map.adding(key: "optedInAt", value: optedInAtValue)
             }
 
-
-
             if let value = statuses {
                 // Encode optional property even if it's an empty array for CBOR
                 let statusesValue = try value.toCBORValue()
                 map = map.adding(key: "statuses", value: statusesValue)
             }
-
-
 
             if let value = allowFollowersBypass {
                 // Encode optional property even if it's an empty array for CBOR
@@ -341,15 +297,11 @@ public struct Output: ATProtocolCodable {
                 map = map.adding(key: "allowFollowersBypass", value: allowFollowersBypassValue)
             }
 
-
-
             if let value = allowFollowingBypass {
                 // Encode optional property even if it's an empty array for CBOR
                 let allowFollowingBypassValue = try value.toCBORValue()
                 map = map.adding(key: "allowFollowingBypass", value: allowFollowingBypassValue)
             }
-
-
 
             if let value = autoExpireDays {
                 // Encode optional property even if it's an empty array for CBOR
@@ -357,12 +309,8 @@ public struct Output: ATProtocolCodable {
                 map = map.adding(key: "autoExpireDays", value: autoExpireDaysValue)
             }
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case success
@@ -373,41 +321,36 @@ public struct Output: ATProtocolCodable {
             case allowFollowingBypass
             case autoExpireDays
         }
-
     }
 
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case invalidAction = "InvalidAction.Unknown action value"
-                case alreadyOptedIn = "AlreadyOptedIn.User is already opted in"
-                case alreadyOptedOut = "AlreadyOptedOut.User is already opted out"
-                case tooManyDids = "TooManyDids.Too many DIDs requested (max 100)"
-            public var description: String {
-                return self.rawValue
-            }
-
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case invalidAction = "InvalidAction.Unknown action value"
+        case alreadyOptedIn = "AlreadyOptedIn.User is already opted in"
+        case alreadyOptedOut = "AlreadyOptedOut.User is already opted out"
+        case tooManyDids = "TooManyDids.Too many DIDs requested (max 100)"
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-extension ATProtoClient.Blue.Catbird.MlsChat {
+public extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - optIn
 
-    /// Manage MLS chat opt-in status (consolidates optIn + optOut + getOptInStatus + getChatRequestSettings + updateChatRequestSettings + acceptChatRequest + declineChatRequest + sendChatRequest) Manage MLS chat participation. Supports opting in/out, checking status for multiple DIDs, and managing chat request settings.
-    ///
-    /// - Parameter input: The input parameters for the request
+    // Manage MLS chat opt-in status (consolidates optIn + optOut + getOptInStatus + getChatRequestSettings + updateChatRequestSettings + acceptChatRequest + declineChatRequest + sendChatRequest) Manage MLS chat participation. Supports opting in/out, checking status for multiple DIDs, and managing chat request settings.
+    //
+    // - Parameter input: The input parameters for the request
 
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func optIn(
-
+    func optIn(
         input: BlueCatbirdMlsChatOptIn.Input
 
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatOptIn.Output?) {
@@ -417,14 +360,9 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
 
         headers["Content-Type"] = "application/json"
 
-
-
         headers["Accept"] = "application/json"
 
-
-
         let requestData: Data? = try JSONEncoder().encode(input)
-
 
         let queryItems: [URLQueryItem]? = nil
 
@@ -442,12 +380,10 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -456,9 +392,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatOptIn.Output.self, from: responseData)
 
@@ -472,9 +406,5 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-
     }
-
 }
-
-

@@ -1,85 +1,58 @@
 import Foundation
 
-
-
 // lexicon: 1, id: app.bsky.graph.getBlocks
 
-
-public struct AppBskyGraphGetBlocks {
-
+public enum AppBskyGraphGetBlocks {
     public static let typeIdentifier = "app.bsky.graph.getBlocks"
-public struct Parameters: Parametrizable {
+    public struct Parameters: Parametrizable {
         public let limit: Int?
         public let cursor: String?
 
         public init(
             limit: Int? = nil,
             cursor: String? = nil
-            ) {
+        ) {
             self.limit = limit
             self.cursor = cursor
-
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let cursor: String?
 
         public let blocks: [AppBskyActorDefs.ProfileView]
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             cursor: String? = nil,
 
             blocks: [AppBskyActorDefs.ProfileView]
 
-
         ) {
-
-
             self.cursor = cursor
 
             self.blocks = blocks
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
 
-
-            self.blocks = try container.decode([AppBskyActorDefs.ProfileView].self, forKey: .blocks)
-
-
+            blocks = try container.decode([AppBskyActorDefs.ProfileView].self, forKey: .blocks)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(cursor, forKey: .cursor)
 
-
             try container.encode(blocks, forKey: .blocks)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             if let value = cursor {
                 // Encode optional property even if it's an empty array for CBOR
@@ -87,33 +60,20 @@ public struct Output: ATProtocolCodable {
                 map = map.adding(key: "cursor", value: cursorValue)
             }
 
-
-
             let blocksValue = try blocks.toCBORValue()
             map = map.adding(key: "blocks", value: blocksValue)
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case cursor
             case blocks
         }
-
     }
-
-
-
-
 }
 
-
-
-extension ATProtoClient.App.Bsky.Graph {
+public extension ATProtoClient.App.Bsky.Graph {
     // MARK: - getBlocks
 
     /// Enumerates which accounts the requesting account is currently blocking. Requires auth.
@@ -122,9 +82,8 @@ extension ATProtoClient.App.Bsky.Graph {
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func getBlocks(input: AppBskyGraphGetBlocks.Parameters) async throws -> (responseCode: Int, data: AppBskyGraphGetBlocks.Output?) {
+    func getBlocks(input: AppBskyGraphGetBlocks.Parameters) async throws -> (responseCode: Int, data: AppBskyGraphGetBlocks.Output?) {
         let endpoint = "app.bsky.graph.getBlocks"
-
 
         let queryItems = input.asQueryItems()
 
@@ -145,8 +104,7 @@ extension ATProtoClient.App.Bsky.Graph {
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -155,9 +113,7 @@ extension ATProtoClient.App.Bsky.Graph {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(AppBskyGraphGetBlocks.Output.self, from: responseData)
 
@@ -168,12 +124,9 @@ extension ATProtoClient.App.Bsky.Graph {
                 return (responseCode, nil)
             }
         } else {
-
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
-

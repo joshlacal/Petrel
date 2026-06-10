@@ -1,14 +1,10 @@
 import Foundation
 
-
-
 // lexicon: 1, id: app.bsky.notification.registerPush
 
-
-public struct AppBskyNotificationRegisterPush {
-
+public enum AppBskyNotificationRegisterPush {
     public static let typeIdentifier = "app.bsky.notification.registerPush"
-public struct Input: ATProtocolCodable {
+    public struct Input: ATProtocolCodable {
         public let serviceDid: DID
         public let token: String
         public let platform: String
@@ -24,14 +20,13 @@ public struct Input: ATProtocolCodable {
             self.ageRestricted = ageRestricted
         }
 
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.serviceDid = try container.decode(DID.self, forKey: .serviceDid)
-            self.token = try container.decode(String.self, forKey: .token)
-            self.platform = try container.decode(String.self, forKey: .platform)
-            self.appId = try container.decode(String.self, forKey: .appId)
-            self.ageRestricted = try container.decodeIfPresent(Bool.self, forKey: .ageRestricted)
+            serviceDid = try container.decode(DID.self, forKey: .serviceDid)
+            token = try container.decode(String.self, forKey: .token)
+            platform = try container.decode(String.self, forKey: .platform)
+            appId = try container.decode(String.self, forKey: .appId)
+            ageRestricted = try container.decodeIfPresent(Bool.self, forKey: .ageRestricted)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -68,23 +63,19 @@ public struct Input: ATProtocolCodable {
             case ageRestricted
         }
     }
-
-
-
 }
 
-extension ATProtoClient.App.Bsky.Notification {
+public extension ATProtoClient.App.Bsky.Notification {
     // MARK: - registerPush
 
-    /// Register to receive push notifications, via a specified service, for the requesting account. Requires auth.
-    ///
-    /// - Parameter input: The input parameters for the request
+    // Register to receive push notifications, via a specified service, for the requesting account. Requires auth.
+    //
+    // - Parameter input: The input parameters for the request
 
     ///
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func registerPush(
-
+    func registerPush(
         input: AppBskyNotificationRegisterPush.Input
 
     ) async throws -> Int {
@@ -94,12 +85,7 @@ extension ATProtoClient.App.Bsky.Notification {
 
         headers["Content-Type"] = "application/json"
 
-
-
-
-
         let requestData: Data? = try JSONEncoder().encode(input)
-
 
         let queryItems: [URLQueryItem]? = nil
 
@@ -115,13 +101,6 @@ extension ATProtoClient.App.Bsky.Notification {
         let serviceDID = await networkService.getServiceDID(for: "app.bsky.notification.registerPush")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
         let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        let responseCode = response.statusCode
-
-
-        return responseCode
-
+        return response.statusCode
     }
-
 }
-
-

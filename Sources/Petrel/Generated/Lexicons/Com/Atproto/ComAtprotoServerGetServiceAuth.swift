@@ -1,14 +1,10 @@
 import Foundation
 
-
-
 // lexicon: 1, id: com.atproto.server.getServiceAuth
 
-
-public struct ComAtprotoServerGetServiceAuth {
-
+public enum ComAtprotoServerGetServiceAuth {
     public static let typeIdentifier = "com.atproto.server.getServiceAuth"
-public struct Parameters: Parametrizable {
+    public struct Parameters: Parametrizable {
         public let aud: DID
         public let exp: Int?
         public let lxm: NSID?
@@ -17,96 +13,65 @@ public struct Parameters: Parametrizable {
             aud: DID,
             exp: Int? = nil,
             lxm: NSID? = nil
-            ) {
+        ) {
             self.aud = aud
             self.exp = exp
             self.lxm = lxm
-
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let token: String
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             token: String
 
-
         ) {
-
-
             self.token = token
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.token = try container.decode(String.self, forKey: .token)
-
-
+            token = try container.decode(String.self, forKey: .token)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(token, forKey: .token)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let tokenValue = try token.toCBORValue()
             map = map.adding(key: "token", value: tokenValue)
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case token
         }
-
     }
 
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case badExpiration = "BadExpiration.Indicates that the requested expiration date is not a valid. May be in the past or may be reliant on the requested scopes."
-            public var description: String {
-                return self.rawValue
-            }
-
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case badExpiration = "BadExpiration.Indicates that the requested expiration date is not a valid. May be in the past or may be reliant on the requested scopes."
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-
-
-extension ATProtoClient.Com.Atproto.Server {
+public extension ATProtoClient.Com.Atproto.Server {
     // MARK: - getServiceAuth
 
     /// Get a signed token on behalf of the requesting DID for the requested service.
@@ -115,9 +80,8 @@ extension ATProtoClient.Com.Atproto.Server {
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func getServiceAuth(input: ComAtprotoServerGetServiceAuth.Parameters) async throws -> (responseCode: Int, data: ComAtprotoServerGetServiceAuth.Output?) {
+    func getServiceAuth(input: ComAtprotoServerGetServiceAuth.Parameters) async throws -> (responseCode: Int, data: ComAtprotoServerGetServiceAuth.Output?) {
         let endpoint = "com.atproto.server.getServiceAuth"
-
 
         let queryItems = input.asQueryItems()
 
@@ -138,8 +102,7 @@ extension ATProtoClient.Com.Atproto.Server {
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -148,9 +111,7 @@ extension ATProtoClient.Com.Atproto.Server {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(ComAtprotoServerGetServiceAuth.Output.self, from: responseData)
 
@@ -161,12 +122,9 @@ extension ATProtoClient.Com.Atproto.Server {
                 return (responseCode, nil)
             }
         } else {
-
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
-

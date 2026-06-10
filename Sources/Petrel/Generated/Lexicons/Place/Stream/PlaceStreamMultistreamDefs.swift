@@ -1,20 +1,16 @@
 import Foundation
 
-
-
 // lexicon: 1, id: place.stream.multistream.defs
 
-
-public struct PlaceStreamMultistreamDefs {
-
+public enum PlaceStreamMultistreamDefs {
     public static let typeIdentifier = "place.stream.multistream.defs"
 
-public struct TargetView: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "place.stream.multistream.defs#targetView"
-            public let uri: ATProtocolURI
-            public let cid: CID
-            public let record: ATProtocolValueContainer
-            public let latestEvent: PlaceStreamMultistreamDefs.Event?
+    public struct TargetView: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "place.stream.multistream.defs#targetView"
+        public let uri: ATProtocolURI
+        public let cid: CID
+        public let record: ATProtocolValueContainer
+        public let latestEvent: PlaceStreamMultistreamDefs.Event?
 
         public init(
             uri: ATProtocolURI, cid: CID, record: ATProtocolValueContainer, latestEvent: PlaceStreamMultistreamDefs.Event?
@@ -28,25 +24,25 @@ public struct TargetView: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
             } catch {
                 LogManager.logError("Decoding error for required property 'uri': \(error)")
                 throw error
             }
             do {
-                self.cid = try container.decode(CID.self, forKey: .cid)
+                cid = try container.decode(CID.self, forKey: .cid)
             } catch {
                 LogManager.logError("Decoding error for required property 'cid': \(error)")
                 throw error
             }
             do {
-                self.record = try container.decode(ATProtocolValueContainer.self, forKey: .record)
+                record = try container.decode(ATProtocolValueContainer.self, forKey: .record)
             } catch {
                 LogManager.logError("Decoding error for required property 'record': \(error)")
                 throw error
             }
             do {
-                self.latestEvent = try container.decodeIfPresent(PlaceStreamMultistreamDefs.Event.self, forKey: .latestEvent)
+                latestEvent = try container.decodeIfPresent(PlaceStreamMultistreamDefs.Event.self, forKey: .latestEvent)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'latestEvent': \(error)")
                 throw error
@@ -119,11 +115,11 @@ public struct TargetView: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-public struct Event: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "place.stream.multistream.defs#event"
-            public let message: String
-            public let status: String
-            public let createdAt: ATProtocolDate
+    public struct Event: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "place.stream.multistream.defs#event"
+        public let message: String
+        public let status: String
+        public let createdAt: ATProtocolDate
 
         public init(
             message: String, status: String, createdAt: ATProtocolDate
@@ -136,19 +132,19 @@ public struct Event: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.message = try container.decode(String.self, forKey: .message)
+                message = try container.decode(String.self, forKey: .message)
             } catch {
                 LogManager.logError("Decoding error for required property 'message': \(error)")
                 throw error
             }
             do {
-                self.status = try container.decode(String.self, forKey: .status)
+                status = try container.decode(String.self, forKey: .status)
             } catch {
                 LogManager.logError("Decoding error for required property 'status': \(error)")
                 throw error
             }
             do {
-                self.createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
             } catch {
                 LogManager.logError("Decoding error for required property 'createdAt': \(error)")
                 throw error
@@ -206,11 +202,4 @@ public struct Event: ATProtocolCodable, ATProtocolValue {
             case createdAt
         }
     }
-
-
-
 }
-
-
-
-

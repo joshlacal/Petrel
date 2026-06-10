@@ -1,14 +1,10 @@
 import Foundation
 
-
-
 // lexicon: 1, id: blue.catbird.mlsChat.getGroupMetadataBlob
 
-
-public struct BlueCatbirdMlsChatGetGroupMetadataBlob {
-
+public enum BlueCatbirdMlsChatGetGroupMetadataBlob {
     public static let typeIdentifier = "blue.catbird.mlsChat.getGroupMetadataBlob"
-public struct Parameters: Parametrizable {
+    public struct Parameters: Parametrizable {
         public let blobLocator: String?
         public let convoId: String?
         public let groupId: String?
@@ -23,99 +19,68 @@ public struct Parameters: Parametrizable {
             resetGeneration: Int? = nil,
             metadataVersion: Int? = nil,
             kind: String? = nil
-            ) {
+        ) {
             self.blobLocator = blobLocator
             self.convoId = convoId
             self.groupId = groupId
             self.resetGeneration = resetGeneration
             self.metadataVersion = metadataVersion
             self.kind = kind
-
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let data: Data
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             data: Data
 
-
         ) {
-
-
             self.data = data
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.data = try container.decode(Data.self, forKey: .data)
-
-
+            data = try container.decode(Data.self, forKey: .data)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(data, forKey: .data)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let dataValue = try data.toCBORValue()
             map = map.adding(key: "data", value: dataValue)
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case data
         }
-
     }
 
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case blobNotFound = "BlobNotFound.Metadata blob does not exist or has been garbage collected"
-            public var description: String {
-                return self.rawValue
-            }
-
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case blobNotFound = "BlobNotFound.Metadata blob does not exist or has been garbage collected"
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-
-
-extension ATProtoClient.Blue.Catbird.MlsChat {
+public extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - getGroupMetadataBlob
 
     /// Fetch an encrypted group metadata blob by locator Download an encrypted metadata blob. Returns raw encrypted bytes. The blob is opaque — decryption requires the MLS epoch key derived by group members. Clients should pass both convoId (stable application conversation) and groupId (MLS crypto context) when available; older clients may pass groupId only.
@@ -124,9 +89,8 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func getGroupMetadataBlob(input: BlueCatbirdMlsChatGetGroupMetadataBlob.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatGetGroupMetadataBlob.Output?) {
+    func getGroupMetadataBlob(input: BlueCatbirdMlsChatGetGroupMetadataBlob.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatGetGroupMetadataBlob.Output?) {
         let endpoint = "blue.catbird.mlsChat.getGroupMetadataBlob"
-
 
         let queryItems = input.asQueryItems()
 
@@ -147,13 +111,10 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             // Wildcard encoding ("*/*") — accept any Content-Type, including a missing one.
 
-
             do {
-
                 let decodedData = BlueCatbirdMlsChatGetGroupMetadataBlob.Output(data: responseData)
 
                 return (responseCode, decodedData)
@@ -163,12 +124,9 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
                 return (responseCode, nil)
             }
         } else {
-
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
-

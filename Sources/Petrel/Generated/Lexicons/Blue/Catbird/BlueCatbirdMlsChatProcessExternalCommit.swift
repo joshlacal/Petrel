@@ -1,14 +1,10 @@
 import Foundation
 
-
-
 // lexicon: 1, id: blue.catbird.mlsChat.processExternalCommit
 
-
-public struct BlueCatbirdMlsChatProcessExternalCommit {
-
+public enum BlueCatbirdMlsChatProcessExternalCommit {
     public static let typeIdentifier = "blue.catbird.mlsChat.processExternalCommit"
-public struct Input: ATProtocolCodable {
+    public struct Input: ATProtocolCodable {
         public let convoId: String
         public let externalCommit: String
         public let idempotencyKey: String?
@@ -22,13 +18,12 @@ public struct Input: ATProtocolCodable {
             self.groupInfo = groupInfo
         }
 
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.convoId = try container.decode(String.self, forKey: .convoId)
-            self.externalCommit = try container.decode(String.self, forKey: .externalCommit)
-            self.idempotencyKey = try container.decodeIfPresent(String.self, forKey: .idempotencyKey)
-            self.groupInfo = try container.decodeIfPresent(String.self, forKey: .groupInfo)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            externalCommit = try container.decode(String.self, forKey: .externalCommit)
+            idempotencyKey = try container.decodeIfPresent(String.self, forKey: .idempotencyKey)
+            groupInfo = try container.decodeIfPresent(String.self, forKey: .groupInfo)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -64,65 +59,43 @@ public struct Input: ATProtocolCodable {
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let epoch: Int?
 
         public let rejoinedAt: ATProtocolDate?
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             epoch: Int? = nil,
 
             rejoinedAt: ATProtocolDate? = nil
 
-
         ) {
-
-
             self.epoch = epoch
 
             self.rejoinedAt = rejoinedAt
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.epoch = try container.decodeIfPresent(Int.self, forKey: .epoch)
+            epoch = try container.decodeIfPresent(Int.self, forKey: .epoch)
 
-
-            self.rejoinedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .rejoinedAt)
-
-
+            rejoinedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .rejoinedAt)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(epoch, forKey: .epoch)
 
-
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(rejoinedAt, forKey: .rejoinedAt)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             if let value = epoch {
                 // Encode optional property even if it's an empty array for CBOR
@@ -130,48 +103,38 @@ public struct Output: ATProtocolCodable {
                 map = map.adding(key: "epoch", value: epochValue)
             }
 
-
-
             if let value = rejoinedAt {
                 // Encode optional property even if it's an empty array for CBOR
                 let rejoinedAtValue = try value.toCBORValue()
                 map = map.adding(key: "rejoinedAt", value: rejoinedAtValue)
             }
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case epoch
             case rejoinedAt
         }
-
     }
 
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case unauthorized = "Unauthorized."
-                case invalidCommit = "InvalidCommit."
-                case invalidGroupInfo = "InvalidGroupInfo."
-            public var description: String {
-                return self.rawValue
-            }
-
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case unauthorized = "Unauthorized."
+        case invalidCommit = "InvalidCommit."
+        case invalidGroupInfo = "InvalidGroupInfo."
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-extension ATProtoClient.Blue.Catbird.MlsChat {
+public extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - processExternalCommit
 
     /// Process an external commit for a conversation. This allows a client to add itself to a group using a cached GroupInfo.
@@ -180,8 +143,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func processExternalCommit(
-
+    func processExternalCommit(
         input: BlueCatbirdMlsChatProcessExternalCommit.Input
 
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatProcessExternalCommit.Output?) {
@@ -191,10 +153,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
 
         headers["Content-Type"] = "application/json"
 
-
-
         headers["Accept"] = "application/json"
-
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -211,7 +170,6 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
@@ -221,9 +179,8 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         }
 
         // Only decode response data if request was successful
-        if (200...299).contains(responseCode) {
+        if (200 ... 299).contains(responseCode) {
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatProcessExternalCommit.Output.self, from: responseData)
 
@@ -237,9 +194,5 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-
     }
-
 }
-
-

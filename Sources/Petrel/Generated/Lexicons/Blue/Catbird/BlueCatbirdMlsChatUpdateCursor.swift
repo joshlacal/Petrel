@@ -1,14 +1,10 @@
 import Foundation
 
-
-
 // lexicon: 1, id: blue.catbird.mlsChat.updateCursor
 
-
-public struct BlueCatbirdMlsChatUpdateCursor {
-
+public enum BlueCatbirdMlsChatUpdateCursor {
     public static let typeIdentifier = "blue.catbird.mlsChat.updateCursor"
-public struct Input: ATProtocolCodable {
+    public struct Input: ATProtocolCodable {
         public let convoId: String
         public let cursor: String
 
@@ -18,11 +14,10 @@ public struct Input: ATProtocolCodable {
             self.cursor = cursor
         }
 
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.convoId = try container.decode(String.self, forKey: .convoId)
-            self.cursor = try container.decode(String.self, forKey: .cursor)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            cursor = try container.decode(String.self, forKey: .cursor)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -46,99 +41,70 @@ public struct Input: ATProtocolCodable {
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let updatedAt: ATProtocolDate
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             updatedAt: ATProtocolDate
 
-
         ) {
-
-
             self.updatedAt = updatedAt
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.updatedAt = try container.decode(ATProtocolDate.self, forKey: .updatedAt)
-
-
+            updatedAt = try container.decode(ATProtocolDate.self, forKey: .updatedAt)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(updatedAt, forKey: .updatedAt)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let updatedAtValue = try updatedAt.toCBORValue()
             map = map.adding(key: "updatedAt", value: updatedAtValue)
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case updatedAt
         }
-
     }
 
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case convoNotFound = "ConvoNotFound.Conversation not found"
-                case notMember = "NotMember.Caller is not a member of the conversation"
-                case invalidCursor = "InvalidCursor.The provided cursor value is invalid"
-            public var description: String {
-                return self.rawValue
-            }
-
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case convoNotFound = "ConvoNotFound.Conversation not found"
+        case notMember = "NotMember.Caller is not a member of the conversation"
+        case invalidCursor = "InvalidCursor.The provided cursor value is invalid"
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-extension ATProtoClient.Blue.Catbird.MlsChat {
+public extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - updateCursor
 
-    /// Update the read cursor position for a conversation Update the read cursor for a conversation to track the last-read position.
-    ///
-    /// - Parameter input: The input parameters for the request
+    // Update the read cursor position for a conversation Update the read cursor for a conversation to track the last-read position.
+    //
+    // - Parameter input: The input parameters for the request
 
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func updateCursor(
-
+    func updateCursor(
         input: BlueCatbirdMlsChatUpdateCursor.Input
 
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatUpdateCursor.Output?) {
@@ -148,14 +114,9 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
 
         headers["Content-Type"] = "application/json"
 
-
-
         headers["Accept"] = "application/json"
 
-
-
         let requestData: Data? = try JSONEncoder().encode(input)
-
 
         let queryItems: [URLQueryItem]? = nil
 
@@ -173,12 +134,10 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -187,9 +146,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatUpdateCursor.Output.self, from: responseData)
 
@@ -203,9 +160,5 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-
     }
-
 }
-
-

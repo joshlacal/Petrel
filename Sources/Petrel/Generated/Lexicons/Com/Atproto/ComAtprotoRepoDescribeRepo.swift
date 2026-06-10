@@ -1,27 +1,20 @@
 import Foundation
 
-
-
 // lexicon: 1, id: com.atproto.repo.describeRepo
 
-
-public struct ComAtprotoRepoDescribeRepo {
-
+public enum ComAtprotoRepoDescribeRepo {
     public static let typeIdentifier = "com.atproto.repo.describeRepo"
-public struct Parameters: Parametrizable {
+    public struct Parameters: Parametrizable {
         public let repo: ATIdentifier
 
         public init(
             repo: ATIdentifier
-            ) {
+        ) {
             self.repo = repo
-
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let handle: Handle
 
         public let did: DID
@@ -32,12 +25,8 @@ public struct Output: ATProtocolCodable {
 
         public let handleIsCorrect: Bool
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             handle: Handle,
 
             did: DID,
@@ -48,10 +37,7 @@ public struct Output: ATProtocolCodable {
 
             handleIsCorrect: Bool
 
-
         ) {
-
-
             self.handle = handle
 
             self.did = did
@@ -61,87 +47,56 @@ public struct Output: ATProtocolCodable {
             self.collections = collections
 
             self.handleIsCorrect = handleIsCorrect
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.handle = try container.decode(Handle.self, forKey: .handle)
+            handle = try container.decode(Handle.self, forKey: .handle)
 
+            did = try container.decode(DID.self, forKey: .did)
 
-            self.did = try container.decode(DID.self, forKey: .did)
+            didDoc = try container.decode(DIDDocument.self, forKey: .didDoc)
 
+            collections = try container.decode([NSID].self, forKey: .collections)
 
-            self.didDoc = try container.decode(DIDDocument.self, forKey: .didDoc)
-
-
-            self.collections = try container.decode([NSID].self, forKey: .collections)
-
-
-            self.handleIsCorrect = try container.decode(Bool.self, forKey: .handleIsCorrect)
-
-
+            handleIsCorrect = try container.decode(Bool.self, forKey: .handleIsCorrect)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(handle, forKey: .handle)
 
-
             try container.encode(did, forKey: .did)
-
 
             try container.encode(didDoc, forKey: .didDoc)
 
-
             try container.encode(collections, forKey: .collections)
 
-
             try container.encode(handleIsCorrect, forKey: .handleIsCorrect)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let handleValue = try handle.toCBORValue()
             map = map.adding(key: "handle", value: handleValue)
 
-
-
             let didValue = try did.toCBORValue()
             map = map.adding(key: "did", value: didValue)
-
-
 
             let didDocValue = try didDoc.toCBORValue()
             map = map.adding(key: "didDoc", value: didDocValue)
 
-
-
             let collectionsValue = try collections.toCBORValue()
             map = map.adding(key: "collections", value: collectionsValue)
-
-
 
             let handleIsCorrectValue = try handleIsCorrect.toCBORValue()
             map = map.adding(key: "handleIsCorrect", value: handleIsCorrectValue)
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case handle
@@ -150,17 +105,10 @@ public struct Output: ATProtocolCodable {
             case collections
             case handleIsCorrect
         }
-
     }
-
-
-
-
 }
 
-
-
-extension ATProtoClient.Com.Atproto.Repo {
+public extension ATProtoClient.Com.Atproto.Repo {
     // MARK: - describeRepo
 
     /// Get information about an account and repository, including the list of collections. Does not require auth.
@@ -169,9 +117,8 @@ extension ATProtoClient.Com.Atproto.Repo {
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func describeRepo(input: ComAtprotoRepoDescribeRepo.Parameters) async throws -> (responseCode: Int, data: ComAtprotoRepoDescribeRepo.Output?) {
+    func describeRepo(input: ComAtprotoRepoDescribeRepo.Parameters) async throws -> (responseCode: Int, data: ComAtprotoRepoDescribeRepo.Output?) {
         let endpoint = "com.atproto.repo.describeRepo"
-
 
         let queryItems = input.asQueryItems()
 
@@ -192,8 +139,7 @@ extension ATProtoClient.Com.Atproto.Repo {
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -202,9 +148,7 @@ extension ATProtoClient.Com.Atproto.Repo {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(ComAtprotoRepoDescribeRepo.Output.self, from: responseData)
 
@@ -215,12 +159,9 @@ extension ATProtoClient.Com.Atproto.Repo {
                 return (responseCode, nil)
             }
         } else {
-
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
-

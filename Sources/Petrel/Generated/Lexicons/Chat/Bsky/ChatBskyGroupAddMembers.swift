@@ -1,14 +1,10 @@
 import Foundation
 
-
-
 // lexicon: 1, id: chat.bsky.group.addMembers
 
-
-public struct ChatBskyGroupAddMembers {
-
+public enum ChatBskyGroupAddMembers {
     public static let typeIdentifier = "chat.bsky.group.addMembers"
-public struct Input: ATProtocolCodable {
+    public struct Input: ATProtocolCodable {
         public let convoId: String
         public let members: [DID]
 
@@ -18,11 +14,10 @@ public struct Input: ATProtocolCodable {
             self.members = members
         }
 
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.convoId = try container.decode(String.self, forKey: .convoId)
-            self.members = try container.decode([DID].self, forKey: .members)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            members = try container.decode([DID].self, forKey: .members)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -46,69 +41,45 @@ public struct Input: ATProtocolCodable {
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let convo: ChatBskyConvoDefs.ConvoView
 
         public let addedMembers: [ChatBskyActorDefs.ProfileViewBasic]?
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             convo: ChatBskyConvoDefs.ConvoView,
 
             addedMembers: [ChatBskyActorDefs.ProfileViewBasic]? = nil
 
-
         ) {
-
-
             self.convo = convo
 
             self.addedMembers = addedMembers
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.convo = try container.decode(ChatBskyConvoDefs.ConvoView.self, forKey: .convo)
+            convo = try container.decode(ChatBskyConvoDefs.ConvoView.self, forKey: .convo)
 
-
-            self.addedMembers = try container.decodeIfPresent([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .addedMembers)
-
-
+            addedMembers = try container.decodeIfPresent([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .addedMembers)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(convo, forKey: .convo)
 
-
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(addedMembers, forKey: .addedMembers)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let convoValue = try convo.toCBORValue()
             map = map.adding(key: "convo", value: convoValue)
-
-
 
             if let value = addedMembers {
                 // Encode optional property even if it's an empty array for CBOR
@@ -116,57 +87,49 @@ public struct Output: ATProtocolCodable {
                 map = map.adding(key: "addedMembers", value: addedMembersValue)
             }
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case convo
             case addedMembers
         }
-
     }
 
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case accountSuspended = "AccountSuspended."
-                case blockedActor = "BlockedActor."
-                case groupInvitesDisabled = "GroupInvitesDisabled."
-                case convoLocked = "ConvoLocked."
-                case insufficientRole = "InsufficientRole."
-                case invalidConvo = "InvalidConvo."
-                case memberLimitReached = "MemberLimitReached."
-                case notFollowedBySender = "NotFollowedBySender."
-                case recipientNotFound = "RecipientNotFound."
-            public var description: String {
-                return self.rawValue
-            }
-
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case accountSuspended = "AccountSuspended."
+        case blockedActor = "BlockedActor."
+        case blockedSubject = "BlockedSubject."
+        case convoLocked = "ConvoLocked."
+        case insufficientRole = "InsufficientRole."
+        case invalidConvo = "InvalidConvo."
+        case memberLimitReached = "MemberLimitReached."
+        case notFollowedBySender = "NotFollowedBySender."
+        case recipientNotFound = "RecipientNotFound."
+        case userForbidsGroups = "UserForbidsGroups."
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-extension ATProtoClient.Chat.Bsky.Group {
+public extension ATProtoClient.Chat.Bsky.Group {
     // MARK: - addMembers
 
-    /// [NOTE: This is under active development and should be considered unstable while this note is here]. Adds members to a group. The members are added in 'request' status, so they have to accept it. This creates convo memberships.
-    ///
-    /// - Parameter input: The input parameters for the request
+    // [NOTE: This is under active development and should be considered unstable while this note is here]. Adds members to a group. The members are added in 'request' status, so they have to accept it. This creates convo memberships.
+    //
+    // - Parameter input: The input parameters for the request
 
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func addMembers(
-
+    func addMembers(
         input: ChatBskyGroupAddMembers.Input
 
     ) async throws -> (responseCode: Int, data: ChatBskyGroupAddMembers.Output?) {
@@ -176,14 +139,9 @@ extension ATProtoClient.Chat.Bsky.Group {
 
         headers["Content-Type"] = "application/json"
 
-
-
         headers["Accept"] = "application/json"
 
-
-
         let requestData: Data? = try JSONEncoder().encode(input)
-
 
         let queryItems: [URLQueryItem]? = nil
 
@@ -201,12 +159,10 @@ extension ATProtoClient.Chat.Bsky.Group {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -215,9 +171,7 @@ extension ATProtoClient.Chat.Bsky.Group {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(ChatBskyGroupAddMembers.Output.self, from: responseData)
 
@@ -231,9 +185,5 @@ extension ATProtoClient.Chat.Bsky.Group {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-
     }
-
 }
-
-

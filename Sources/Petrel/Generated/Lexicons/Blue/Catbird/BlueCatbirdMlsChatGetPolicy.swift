@@ -1,107 +1,72 @@
 import Foundation
 
-
-
 // lexicon: 1, id: blue.catbird.mlsChat.getPolicy
 
-
-public struct BlueCatbirdMlsChatGetPolicy {
-
+public enum BlueCatbirdMlsChatGetPolicy {
     public static let typeIdentifier = "blue.catbird.mlsChat.getPolicy"
-public struct Parameters: Parametrizable {
+    public struct Parameters: Parametrizable {
         public let convoId: String
 
         public init(
             convoId: String
-            ) {
+        ) {
             self.convoId = convoId
-
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let policy: BlueCatbirdMlsChatUpdatePolicy.PolicyView
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             policy: BlueCatbirdMlsChatUpdatePolicy.PolicyView
 
-
         ) {
-
-
             self.policy = policy
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.policy = try container.decode(BlueCatbirdMlsChatUpdatePolicy.PolicyView.self, forKey: .policy)
-
-
+            policy = try container.decode(BlueCatbirdMlsChatUpdatePolicy.PolicyView.self, forKey: .policy)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(policy, forKey: .policy)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let policyValue = try policy.toCBORValue()
             map = map.adding(key: "policy", value: policyValue)
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case policy
         }
-
     }
 
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case convoNotFound = "ConvoNotFound.Conversation not found"
-                case notMember = "NotMember.Caller is not a member of this conversation"
-            public var description: String {
-                return self.rawValue
-            }
-
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case convoNotFound = "ConvoNotFound.Conversation not found"
+        case notMember = "NotMember.Caller is not a member of this conversation"
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-
-
-extension ATProtoClient.Blue.Catbird.MlsChat {
+public extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - getPolicy
 
     /// Retrieve conversation policy settings Query to fetch policy settings for a conversation. All members can view policy.
@@ -110,9 +75,8 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func getPolicy(input: BlueCatbirdMlsChatGetPolicy.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatGetPolicy.Output?) {
+    func getPolicy(input: BlueCatbirdMlsChatGetPolicy.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatGetPolicy.Output?) {
         let endpoint = "blue.catbird.mlsChat.getPolicy"
-
 
         let queryItems = input.asQueryItems()
 
@@ -139,9 +103,8 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         }
 
         // Only decode response data if request was successful
-        if (200...299).contains(responseCode) {
+        if (200 ... 299).contains(responseCode) {
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatGetPolicy.Output.self, from: responseData)
 
@@ -152,12 +115,9 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
                 return (responseCode, nil)
             }
         } else {
-
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
-

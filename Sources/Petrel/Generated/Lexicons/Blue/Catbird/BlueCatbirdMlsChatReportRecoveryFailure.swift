@@ -1,14 +1,10 @@
 import Foundation
 
-
-
 // lexicon: 1, id: blue.catbird.mlsChat.reportRecoveryFailure
 
-
-public struct BlueCatbirdMlsChatReportRecoveryFailure {
-
+public enum BlueCatbirdMlsChatReportRecoveryFailure {
     public static let typeIdentifier = "blue.catbird.mlsChat.reportRecoveryFailure"
-public struct Input: ATProtocolCodable {
+    public struct Input: ATProtocolCodable {
         public let convoId: String
         public let failureType: String?
         public let failureMode: String?
@@ -22,13 +18,12 @@ public struct Input: ATProtocolCodable {
             self.epochAuthenticator = epochAuthenticator
         }
 
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.convoId = try container.decode(String.self, forKey: .convoId)
-            self.failureType = try container.decodeIfPresent(String.self, forKey: .failureType)
-            self.failureMode = try container.decodeIfPresent(String.self, forKey: .failureMode)
-            self.epochAuthenticator = try container.decodeIfPresent(String.self, forKey: .epochAuthenticator)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            failureType = try container.decodeIfPresent(String.self, forKey: .failureType)
+            failureMode = try container.decodeIfPresent(String.self, forKey: .failureMode)
+            epochAuthenticator = try container.decodeIfPresent(String.self, forKey: .epochAuthenticator)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -66,9 +61,7 @@ public struct Input: ATProtocolCodable {
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let recorded: Bool
 
         public let autoResetTriggered: Bool
@@ -83,12 +76,8 @@ public struct Output: ATProtocolCodable {
 
         public let resetGeneration: Int?
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             recorded: Bool,
 
             autoResetTriggered: Bool,
@@ -103,10 +92,7 @@ public struct Output: ATProtocolCodable {
 
             resetGeneration: Int? = nil
 
-
         ) {
-
-
             self.recorded = recorded
 
             self.autoResetTriggered = autoResetTriggered
@@ -120,92 +106,61 @@ public struct Output: ATProtocolCodable {
             self.newGroupId = newGroupId
 
             self.resetGeneration = resetGeneration
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.recorded = try container.decode(Bool.self, forKey: .recorded)
+            recorded = try container.decode(Bool.self, forKey: .recorded)
 
+            autoResetTriggered = try container.decode(Bool.self, forKey: .autoResetTriggered)
 
-            self.autoResetTriggered = try container.decode(Bool.self, forKey: .autoResetTriggered)
+            failureCount = try container.decode(Int.self, forKey: .failureCount)
 
+            memberCount = try container.decode(Int.self, forKey: .memberCount)
 
-            self.failureCount = try container.decode(Int.self, forKey: .failureCount)
+            reason = try container.decodeIfPresent(String.self, forKey: .reason)
 
+            newGroupId = try container.decodeIfPresent(String.self, forKey: .newGroupId)
 
-            self.memberCount = try container.decode(Int.self, forKey: .memberCount)
-
-
-            self.reason = try container.decodeIfPresent(String.self, forKey: .reason)
-
-
-            self.newGroupId = try container.decodeIfPresent(String.self, forKey: .newGroupId)
-
-
-            self.resetGeneration = try container.decodeIfPresent(Int.self, forKey: .resetGeneration)
-
-
+            resetGeneration = try container.decodeIfPresent(Int.self, forKey: .resetGeneration)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(recorded, forKey: .recorded)
 
-
             try container.encode(autoResetTriggered, forKey: .autoResetTriggered)
-
 
             try container.encode(failureCount, forKey: .failureCount)
 
-
             try container.encode(memberCount, forKey: .memberCount)
-
 
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(reason, forKey: .reason)
 
-
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(newGroupId, forKey: .newGroupId)
 
-
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(resetGeneration, forKey: .resetGeneration)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let recordedValue = try recorded.toCBORValue()
             map = map.adding(key: "recorded", value: recordedValue)
 
-
-
             let autoResetTriggeredValue = try autoResetTriggered.toCBORValue()
             map = map.adding(key: "autoResetTriggered", value: autoResetTriggeredValue)
-
-
 
             let failureCountValue = try failureCount.toCBORValue()
             map = map.adding(key: "failureCount", value: failureCountValue)
 
-
-
             let memberCountValue = try memberCount.toCBORValue()
             map = map.adding(key: "memberCount", value: memberCountValue)
-
-
 
             if let value = reason {
                 // Encode optional property even if it's an empty array for CBOR
@@ -213,15 +168,11 @@ public struct Output: ATProtocolCodable {
                 map = map.adding(key: "reason", value: reasonValue)
             }
 
-
-
             if let value = newGroupId {
                 // Encode optional property even if it's an empty array for CBOR
                 let newGroupIdValue = try value.toCBORValue()
                 map = map.adding(key: "newGroupId", value: newGroupIdValue)
             }
-
-
 
             if let value = resetGeneration {
                 // Encode optional property even if it's an empty array for CBOR
@@ -229,12 +180,8 @@ public struct Output: ATProtocolCodable {
                 map = map.adding(key: "resetGeneration", value: resetGenerationValue)
             }
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case recorded
@@ -245,39 +192,34 @@ public struct Output: ATProtocolCodable {
             case newGroupId
             case resetGeneration
         }
-
     }
 
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case convoNotFound = "ConvoNotFound.Conversation not found"
-                case notMember = "NotMember.Caller is not a member of the conversation"
-            public var description: String {
-                return self.rawValue
-            }
-
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case convoNotFound = "ConvoNotFound.Conversation not found"
+        case notMember = "NotMember.Caller is not a member of the conversation"
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-extension ATProtoClient.Blue.Catbird.MlsChat {
+public extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - reportRecoveryFailure
 
-    /// Report that recovery has been exhausted for a conversation Report that a client has exhausted all recovery attempts for a conversation. Any member may report. When votes from at least ceil(2/3) of the active identity DIDs carry a valid epoch_authenticator within the 1-hour expiry window, the server auto-resets the group (see ADR-002).
-    ///
-    /// - Parameter input: The input parameters for the request
+    // Report that recovery has been exhausted for a conversation Report that a client has exhausted all recovery attempts for a conversation. Any member may report. When votes from at least ceil(2/3) of the active identity DIDs carry a valid epoch_authenticator within the 1-hour expiry window, the server auto-resets the group (see ADR-002).
+    //
+    // - Parameter input: The input parameters for the request
 
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func reportRecoveryFailure(
-
+    func reportRecoveryFailure(
         input: BlueCatbirdMlsChatReportRecoveryFailure.Input
 
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatReportRecoveryFailure.Output?) {
@@ -287,14 +229,9 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
 
         headers["Content-Type"] = "application/json"
 
-
-
         headers["Accept"] = "application/json"
 
-
-
         let requestData: Data? = try JSONEncoder().encode(input)
-
 
         let queryItems: [URLQueryItem]? = nil
 
@@ -312,12 +249,10 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -326,9 +261,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatReportRecoveryFailure.Output.self, from: responseData)
 
@@ -342,9 +275,5 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-
     }
-
 }
-
-

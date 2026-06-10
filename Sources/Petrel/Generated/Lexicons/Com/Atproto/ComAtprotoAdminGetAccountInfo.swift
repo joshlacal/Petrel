@@ -1,33 +1,23 @@
 import Foundation
 
-
-
 // lexicon: 1, id: com.atproto.admin.getAccountInfo
 
-
-public struct ComAtprotoAdminGetAccountInfo {
-
+public enum ComAtprotoAdminGetAccountInfo {
     public static let typeIdentifier = "com.atproto.admin.getAccountInfo"
-public struct Parameters: Parametrizable {
+    public struct Parameters: Parametrizable {
         public let did: DID
 
         public init(
             did: DID
-            ) {
+        ) {
             self.did = did
-
         }
     }
+
     public typealias Output = ComAtprotoAdminDefs.AccountView
-
-
-
-
 }
 
-
-
-extension ATProtoClient.Com.Atproto.Admin {
+public extension ATProtoClient.Com.Atproto.Admin {
     // MARK: - getAccountInfo
 
     /// Get details about an account.
@@ -36,9 +26,8 @@ extension ATProtoClient.Com.Atproto.Admin {
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func getAccountInfo(input: ComAtprotoAdminGetAccountInfo.Parameters) async throws -> (responseCode: Int, data: ComAtprotoAdminGetAccountInfo.Output?) {
+    func getAccountInfo(input: ComAtprotoAdminGetAccountInfo.Parameters) async throws -> (responseCode: Int, data: ComAtprotoAdminGetAccountInfo.Output?) {
         let endpoint = "com.atproto.admin.getAccountInfo"
-
 
         let queryItems = input.asQueryItems()
 
@@ -59,8 +48,7 @@ extension ATProtoClient.Com.Atproto.Admin {
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -69,9 +57,7 @@ extension ATProtoClient.Com.Atproto.Admin {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(ComAtprotoAdminGetAccountInfo.Output.self, from: responseData)
 
@@ -82,12 +68,9 @@ extension ATProtoClient.Com.Atproto.Admin {
                 return (responseCode, nil)
             }
         } else {
-
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
-

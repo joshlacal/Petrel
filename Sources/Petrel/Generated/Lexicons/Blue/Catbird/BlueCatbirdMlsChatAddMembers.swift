@@ -1,18 +1,14 @@
 import Foundation
 
-
-
 // lexicon: 1, id: blue.catbird.mlsChat.addMembers
 
-
-public struct BlueCatbirdMlsChatAddMembers {
-
+public enum BlueCatbirdMlsChatAddMembers {
     public static let typeIdentifier = "blue.catbird.mlsChat.addMembers"
 
-public struct KeyPackageHashEntry: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "blue.catbird.mlsChat.addMembers#keyPackageHashEntry"
-            public let did: DID
-            public let hash: String
+    public struct KeyPackageHashEntry: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "blue.catbird.mlsChat.addMembers#keyPackageHashEntry"
+        public let did: DID
+        public let hash: String
 
         public init(
             did: DID, hash: String
@@ -24,13 +20,13 @@ public struct KeyPackageHashEntry: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.did = try container.decode(DID.self, forKey: .did)
+                did = try container.decode(DID.self, forKey: .did)
             } catch {
                 LogManager.logError("Decoding error for required property 'did': \(error)")
                 throw error
             }
             do {
-                self.hash = try container.decode(String.self, forKey: .hash)
+                hash = try container.decode(String.self, forKey: .hash)
             } catch {
                 LogManager.logError("Decoding error for required property 'hash': \(error)")
                 throw error
@@ -80,7 +76,8 @@ public struct KeyPackageHashEntry: ATProtocolCodable, ATProtocolValue {
             case hash
         }
     }
-public struct Input: ATProtocolCodable {
+
+    public struct Input: ATProtocolCodable {
         public let convoId: String
         public let idempotencyKey: String?
         public let didList: [DID]
@@ -98,15 +95,14 @@ public struct Input: ATProtocolCodable {
             self.keyPackageHashes = keyPackageHashes
         }
 
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.convoId = try container.decode(String.self, forKey: .convoId)
-            self.idempotencyKey = try container.decodeIfPresent(String.self, forKey: .idempotencyKey)
-            self.didList = try container.decode([DID].self, forKey: .didList)
-            self.commit = try container.decodeIfPresent(String.self, forKey: .commit)
-            self.welcomeMessage = try container.decodeIfPresent(String.self, forKey: .welcomeMessage)
-            self.keyPackageHashes = try container.decodeIfPresent([KeyPackageHashEntry].self, forKey: .keyPackageHashes)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            idempotencyKey = try container.decodeIfPresent(String.self, forKey: .idempotencyKey)
+            didList = try container.decode([DID].self, forKey: .didList)
+            commit = try container.decodeIfPresent(String.self, forKey: .commit)
+            welcomeMessage = try container.decodeIfPresent(String.self, forKey: .welcomeMessage)
+            keyPackageHashes = try container.decodeIfPresent([KeyPackageHashEntry].self, forKey: .keyPackageHashes)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -154,109 +150,77 @@ public struct Input: ATProtocolCodable {
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let success: Bool
 
         public let newEpoch: Int
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             success: Bool,
 
             newEpoch: Int
 
-
         ) {
-
-
             self.success = success
 
             self.newEpoch = newEpoch
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.success = try container.decode(Bool.self, forKey: .success)
+            success = try container.decode(Bool.self, forKey: .success)
 
-
-            self.newEpoch = try container.decode(Int.self, forKey: .newEpoch)
-
-
+            newEpoch = try container.decode(Int.self, forKey: .newEpoch)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(success, forKey: .success)
 
-
             try container.encode(newEpoch, forKey: .newEpoch)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let successValue = try success.toCBORValue()
             map = map.adding(key: "success", value: successValue)
 
-
-
             let newEpochValue = try newEpoch.toCBORValue()
             map = map.adding(key: "newEpoch", value: newEpochValue)
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case success
             case newEpoch
         }
-
     }
 
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case convoNotFound = "ConvoNotFound.Conversation not found"
-                case notMember = "NotMember.Caller is not a member of the conversation"
-                case keyPackageNotFound = "KeyPackageNotFound.Key package not found for one or more members"
-                case alreadyMember = "AlreadyMember.One or more DIDs are already members"
-                case tooManyMembers = "TooManyMembers.Would exceed maximum member count"
-                case blockedByMember = "BlockedByMember.Cannot add user who has blocked or been blocked by an existing member (Bluesky social graph enforcement)"
-            public var description: String {
-                return self.rawValue
-            }
-
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case convoNotFound = "ConvoNotFound.Conversation not found"
+        case notMember = "NotMember.Caller is not a member of the conversation"
+        case keyPackageNotFound = "KeyPackageNotFound.Key package not found for one or more members"
+        case alreadyMember = "AlreadyMember.One or more DIDs are already members"
+        case tooManyMembers = "TooManyMembers.Would exceed maximum member count"
+        case blockedByMember = "BlockedByMember.Cannot add user who has blocked or been blocked by an existing member (Bluesky social graph enforcement)"
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-extension ATProtoClient.Blue.Catbird.MlsChat {
+public extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - addMembers
 
     /// Add new members to an existing MLS conversation Add members to an existing MLS conversation
@@ -265,8 +229,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func addMembers(
-
+    func addMembers(
         input: BlueCatbirdMlsChatAddMembers.Input
 
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatAddMembers.Output?) {
@@ -276,10 +239,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
 
         headers["Content-Type"] = "application/json"
 
-
-
         headers["Accept"] = "application/json"
-
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -296,7 +256,6 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
@@ -306,9 +265,8 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         }
 
         // Only decode response data if request was successful
-        if (200...299).contains(responseCode) {
+        if (200 ... 299).contains(responseCode) {
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatAddMembers.Output.self, from: responseData)
 
@@ -322,9 +280,5 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-
     }
-
 }
-
-

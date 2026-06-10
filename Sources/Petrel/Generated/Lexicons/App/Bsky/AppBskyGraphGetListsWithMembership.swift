@@ -1,18 +1,14 @@
 import Foundation
 
-
-
 // lexicon: 1, id: app.bsky.graph.getListsWithMembership
 
-
-public struct AppBskyGraphGetListsWithMembership {
-
+public enum AppBskyGraphGetListsWithMembership {
     public static let typeIdentifier = "app.bsky.graph.getListsWithMembership"
 
-public struct ListWithMembership: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "app.bsky.graph.getListsWithMembership#listWithMembership"
-            public let list: AppBskyGraphDefs.ListView
-            public let listItem: AppBskyGraphDefs.ListItemView?
+    public struct ListWithMembership: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.graph.getListsWithMembership#listWithMembership"
+        public let list: AppBskyGraphDefs.ListView
+        public let listItem: AppBskyGraphDefs.ListItemView?
 
         public init(
             list: AppBskyGraphDefs.ListView, listItem: AppBskyGraphDefs.ListItemView?
@@ -24,13 +20,13 @@ public struct ListWithMembership: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.list = try container.decode(AppBskyGraphDefs.ListView.self, forKey: .list)
+                list = try container.decode(AppBskyGraphDefs.ListView.self, forKey: .list)
             } catch {
                 LogManager.logError("Decoding error for required property 'list': \(error)")
                 throw error
             }
             do {
-                self.listItem = try container.decodeIfPresent(AppBskyGraphDefs.ListItemView.self, forKey: .listItem)
+                listItem = try container.decodeIfPresent(AppBskyGraphDefs.ListItemView.self, forKey: .listItem)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'listItem': \(error)")
                 throw error
@@ -86,7 +82,8 @@ public struct ListWithMembership: ATProtocolCodable, ATProtocolValue {
             case listItem
         }
     }
-public struct Parameters: Parametrizable {
+
+    public struct Parameters: Parametrizable {
         public let actor: ATIdentifier
         public let limit: Int?
         public let cursor: String?
@@ -97,73 +94,50 @@ public struct Parameters: Parametrizable {
             limit: Int? = nil,
             cursor: String? = nil,
             purposes: [String]? = nil
-            ) {
+        ) {
             self.actor = actor
             self.limit = limit
             self.cursor = cursor
             self.purposes = purposes
-
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let cursor: String?
 
         public let listsWithMembership: [ListWithMembership]
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             cursor: String? = nil,
 
             listsWithMembership: [ListWithMembership]
 
-
         ) {
-
-
             self.cursor = cursor
 
             self.listsWithMembership = listsWithMembership
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
 
-
-            self.listsWithMembership = try container.decode([ListWithMembership].self, forKey: .listsWithMembership)
-
-
+            listsWithMembership = try container.decode([ListWithMembership].self, forKey: .listsWithMembership)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(cursor, forKey: .cursor)
 
-
             try container.encode(listsWithMembership, forKey: .listsWithMembership)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             if let value = cursor {
                 // Encode optional property even if it's an empty array for CBOR
@@ -171,33 +145,20 @@ public struct Output: ATProtocolCodable {
                 map = map.adding(key: "cursor", value: cursorValue)
             }
 
-
-
             let listsWithMembershipValue = try listsWithMembership.toCBORValue()
             map = map.adding(key: "listsWithMembership", value: listsWithMembershipValue)
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case cursor
             case listsWithMembership
         }
-
     }
-
-
-
-
 }
 
-
-
-extension ATProtoClient.App.Bsky.Graph {
+public extension ATProtoClient.App.Bsky.Graph {
     // MARK: - getListsWithMembership
 
     /// Enumerates the lists created by the session user, and includes membership information about `actor` in those lists. Only supports curation and moderation lists (no reference lists, used in starter packs). Requires auth.
@@ -206,9 +167,8 @@ extension ATProtoClient.App.Bsky.Graph {
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func getListsWithMembership(input: AppBskyGraphGetListsWithMembership.Parameters) async throws -> (responseCode: Int, data: AppBskyGraphGetListsWithMembership.Output?) {
+    func getListsWithMembership(input: AppBskyGraphGetListsWithMembership.Parameters) async throws -> (responseCode: Int, data: AppBskyGraphGetListsWithMembership.Output?) {
         let endpoint = "app.bsky.graph.getListsWithMembership"
-
 
         let queryItems = input.asQueryItems()
 
@@ -229,8 +189,7 @@ extension ATProtoClient.App.Bsky.Graph {
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -239,9 +198,7 @@ extension ATProtoClient.App.Bsky.Graph {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(AppBskyGraphGetListsWithMembership.Output.self, from: responseData)
 
@@ -252,12 +209,9 @@ extension ATProtoClient.App.Bsky.Graph {
                 return (responseCode, nil)
             }
         } else {
-
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
-

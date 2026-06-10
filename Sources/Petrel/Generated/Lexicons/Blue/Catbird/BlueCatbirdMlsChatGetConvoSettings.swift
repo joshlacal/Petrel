@@ -1,125 +1,86 @@
 import Foundation
 
-
-
 // lexicon: 1, id: blue.catbird.mlsChat.getConvoSettings
 
-
-public struct BlueCatbirdMlsChatGetConvoSettings {
-
+public enum BlueCatbirdMlsChatGetConvoSettings {
     public static let typeIdentifier = "blue.catbird.mlsChat.getConvoSettings"
-public struct Parameters: Parametrizable {
+    public struct Parameters: Parametrizable {
         public let convoId: String
 
         public init(
             convoId: String
-            ) {
+        ) {
             self.convoId = convoId
-
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let convoId: String
 
         public let policy: ATProtocolValueContainer
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             convoId: String,
 
             policy: ATProtocolValueContainer
 
-
         ) {
-
-
             self.convoId = convoId
 
             self.policy = policy
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.convoId = try container.decode(String.self, forKey: .convoId)
+            convoId = try container.decode(String.self, forKey: .convoId)
 
-
-            self.policy = try container.decode(ATProtocolValueContainer.self, forKey: .policy)
-
-
+            policy = try container.decode(ATProtocolValueContainer.self, forKey: .policy)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(convoId, forKey: .convoId)
 
-
             try container.encode(policy, forKey: .policy)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let convoIdValue = try convoId.toCBORValue()
             map = map.adding(key: "convoId", value: convoIdValue)
 
-
-
             let policyValue = try policy.toCBORValue()
             map = map.adding(key: "policy", value: policyValue)
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case convoId
             case policy
         }
-
     }
 
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case convoNotFound = "ConvoNotFound.Conversation not found"
-                case notMember = "NotMember.Caller is not a member of this conversation"
-            public var description: String {
-                return self.rawValue
-            }
-
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case convoNotFound = "ConvoNotFound.Conversation not found"
+        case notMember = "NotMember.Caller is not a member of this conversation"
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-
-
-extension ATProtoClient.Blue.Catbird.MlsChat {
+public extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - getConvoSettings
 
     /// Get conversation settings and policy Retrieve current settings and policy for a conversation.
@@ -128,9 +89,8 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func getConvoSettings(input: BlueCatbirdMlsChatGetConvoSettings.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatGetConvoSettings.Output?) {
+    func getConvoSettings(input: BlueCatbirdMlsChatGetConvoSettings.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatGetConvoSettings.Output?) {
         let endpoint = "blue.catbird.mlsChat.getConvoSettings"
-
 
         let queryItems = input.asQueryItems()
 
@@ -151,8 +111,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -161,9 +120,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatGetConvoSettings.Output.self, from: responseData)
 
@@ -174,12 +131,9 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
                 return (responseCode, nil)
             }
         } else {
-
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
-

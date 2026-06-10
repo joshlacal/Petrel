@@ -1,94 +1,58 @@
 import Foundation
 
-
-
 // lexicon: 1, id: app.bsky.feed.getPosts
 
-
-public struct AppBskyFeedGetPosts {
-
+public enum AppBskyFeedGetPosts {
     public static let typeIdentifier = "app.bsky.feed.getPosts"
-public struct Parameters: Parametrizable {
+    public struct Parameters: Parametrizable {
         public let uris: [ATProtocolURI]
 
         public init(
             uris: [ATProtocolURI]
-            ) {
+        ) {
             self.uris = uris
-
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let posts: [AppBskyFeedDefs.PostView]
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             posts: [AppBskyFeedDefs.PostView]
 
-
         ) {
-
-
             self.posts = posts
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.posts = try container.decode([AppBskyFeedDefs.PostView].self, forKey: .posts)
-
-
+            posts = try container.decode([AppBskyFeedDefs.PostView].self, forKey: .posts)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(posts, forKey: .posts)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let postsValue = try posts.toCBORValue()
             map = map.adding(key: "posts", value: postsValue)
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case posts
         }
-
     }
-
-
-
-
 }
 
-
-
-extension ATProtoClient.App.Bsky.Feed {
+public extension ATProtoClient.App.Bsky.Feed {
     // MARK: - getPosts
 
     /// Gets post views for a specified list of posts (by AT-URI). This is sometimes referred to as 'hydrating' a 'feed skeleton'.
@@ -97,9 +61,8 @@ extension ATProtoClient.App.Bsky.Feed {
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func getPosts(input: AppBskyFeedGetPosts.Parameters) async throws -> (responseCode: Int, data: AppBskyFeedGetPosts.Output?) {
+    func getPosts(input: AppBskyFeedGetPosts.Parameters) async throws -> (responseCode: Int, data: AppBskyFeedGetPosts.Output?) {
         let endpoint = "app.bsky.feed.getPosts"
-
 
         let queryItems = input.asQueryItems()
 
@@ -120,8 +83,7 @@ extension ATProtoClient.App.Bsky.Feed {
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -130,9 +92,7 @@ extension ATProtoClient.App.Bsky.Feed {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(AppBskyFeedGetPosts.Output.self, from: responseData)
 
@@ -143,12 +103,9 @@ extension ATProtoClient.App.Bsky.Feed {
                 return (responseCode, nil)
             }
         } else {
-
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
-

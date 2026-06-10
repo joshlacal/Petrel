@@ -28,6 +28,7 @@ object ChatBskyConvoUnlockConvoDefs {
 sealed class ChatBskyConvoUnlockConvoError(val name: String, val description: String?) {
         object InvalidConvo: ChatBskyConvoUnlockConvoError("InvalidConvo", "")
         object InsufficientRole: ChatBskyConvoUnlockConvoError("InsufficientRole", "")
+        object ConvoLockedByModeration: ChatBskyConvoUnlockConvoError("ConvoLockedByModeration", "")
     }
 
 /**

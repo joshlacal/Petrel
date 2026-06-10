@@ -1,14 +1,10 @@
 import Foundation
 
-
-
 // lexicon: 1, id: blue.catbird.mlsChat.getSubscriptionTicket
 
-
-public struct BlueCatbirdMlsChatGetSubscriptionTicket {
-
+public enum BlueCatbirdMlsChatGetSubscriptionTicket {
     public static let typeIdentifier = "blue.catbird.mlsChat.getSubscriptionTicket"
-public struct Input: ATProtocolCodable {
+    public struct Input: ATProtocolCodable {
         public let convoIds: [String]?
 
         /// Standard public initializer
@@ -16,10 +12,9 @@ public struct Input: ATProtocolCodable {
             self.convoIds = convoIds
         }
 
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.convoIds = try container.decodeIfPresent([String].self, forKey: .convoIds)
+            convoIds = try container.decodeIfPresent([String].self, forKey: .convoIds)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -41,81 +36,55 @@ public struct Input: ATProtocolCodable {
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let ticket: String
 
         public let endpoint: URI?
 
         public let expiresAt: ATProtocolDate
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             ticket: String,
 
             endpoint: URI? = nil,
 
             expiresAt: ATProtocolDate
 
-
         ) {
-
-
             self.ticket = ticket
 
             self.endpoint = endpoint
 
             self.expiresAt = expiresAt
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.ticket = try container.decode(String.self, forKey: .ticket)
+            ticket = try container.decode(String.self, forKey: .ticket)
 
+            endpoint = try container.decodeIfPresent(URI.self, forKey: .endpoint)
 
-            self.endpoint = try container.decodeIfPresent(URI.self, forKey: .endpoint)
-
-
-            self.expiresAt = try container.decode(ATProtocolDate.self, forKey: .expiresAt)
-
-
+            expiresAt = try container.decode(ATProtocolDate.self, forKey: .expiresAt)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(ticket, forKey: .ticket)
 
-
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(endpoint, forKey: .endpoint)
 
-
             try container.encode(expiresAt, forKey: .expiresAt)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let ticketValue = try ticket.toCBORValue()
             map = map.adding(key: "ticket", value: ticketValue)
-
-
 
             if let value = endpoint {
                 // Encode optional property even if it's an empty array for CBOR
@@ -123,55 +92,44 @@ public struct Output: ATProtocolCodable {
                 map = map.adding(key: "endpoint", value: endpointValue)
             }
 
-
-
             let expiresAtValue = try expiresAt.toCBORValue()
             map = map.adding(key: "expiresAt", value: expiresAtValue)
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case ticket
             case endpoint
             case expiresAt
         }
-
     }
 
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case notMember = "NotMember.User is not a member of one or more specified conversations"
-            public var description: String {
-                return self.rawValue
-            }
-
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case notMember = "NotMember.User is not a member of one or more specified conversations"
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-extension ATProtoClient.Blue.Catbird.MlsChat {
+public extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - getSubscriptionTicket
 
-    /// Get a short-lived ticket for WebSocket subscription authentication (same as v1, in v2 namespace) Get a short-lived ticket for WebSocket subscription authentication. Call this via PDS proxy, then connect directly to the MLS DS WebSocket endpoint with the ticket.
-    ///
-    /// - Parameter input: The input parameters for the request
+    // Get a short-lived ticket for WebSocket subscription authentication (same as v1, in v2 namespace) Get a short-lived ticket for WebSocket subscription authentication. Call this via PDS proxy, then connect directly to the MLS DS WebSocket endpoint with the ticket.
+    //
+    // - Parameter input: The input parameters for the request
 
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func getSubscriptionTicket(
-
+    func getSubscriptionTicket(
         input: BlueCatbirdMlsChatGetSubscriptionTicket.Input
 
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatGetSubscriptionTicket.Output?) {
@@ -181,14 +139,9 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
 
         headers["Content-Type"] = "application/json"
 
-
-
         headers["Accept"] = "application/json"
 
-
-
         let requestData: Data? = try JSONEncoder().encode(input)
-
 
         let queryItems: [URLQueryItem]? = nil
 
@@ -206,12 +159,10 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -220,9 +171,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatGetSubscriptionTicket.Output.self, from: responseData)
 
@@ -236,9 +185,5 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-
     }
-
 }
-
-

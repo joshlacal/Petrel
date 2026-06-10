@@ -1,91 +1,52 @@
 import Foundation
 
-
-
 // lexicon: 1, id: place.stream.server.getServerTime
 
-
-public struct PlaceStreamServerGetServerTime {
-
+public enum PlaceStreamServerGetServerTime {
     public static let typeIdentifier = "place.stream.server.getServerTime"
-public struct Parameters: Parametrizable {
-
-        public init(
-            ) {
-
-        }
+    public struct Parameters: Parametrizable {
+        public init() {}
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let serverTime: ATProtocolDate
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             serverTime: ATProtocolDate
 
-
         ) {
-
-
             self.serverTime = serverTime
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.serverTime = try container.decode(ATProtocolDate.self, forKey: .serverTime)
-
-
+            serverTime = try container.decode(ATProtocolDate.self, forKey: .serverTime)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(serverTime, forKey: .serverTime)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let serverTimeValue = try serverTime.toCBORValue()
             map = map.adding(key: "serverTime", value: serverTimeValue)
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case serverTime
         }
-
     }
-
-
-
-
 }
 
-
-
-extension ATProtoClient.Place.Stream.Server {
+public extension ATProtoClient.Place.Stream.Server {
     // MARK: - getServerTime
 
     /// Get the current server time for client clock synchronization
@@ -94,9 +55,8 @@ extension ATProtoClient.Place.Stream.Server {
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func getServerTime(input: PlaceStreamServerGetServerTime.Parameters) async throws -> (responseCode: Int, data: PlaceStreamServerGetServerTime.Output?) {
+    func getServerTime(input: PlaceStreamServerGetServerTime.Parameters) async throws -> (responseCode: Int, data: PlaceStreamServerGetServerTime.Output?) {
         let endpoint = "place.stream.server.getServerTime"
-
 
         let queryItems = input.asQueryItems()
 
@@ -117,8 +77,7 @@ extension ATProtoClient.Place.Stream.Server {
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -127,9 +86,7 @@ extension ATProtoClient.Place.Stream.Server {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(PlaceStreamServerGetServerTime.Output.self, from: responseData)
 
@@ -140,12 +97,9 @@ extension ATProtoClient.Place.Stream.Server {
                 return (responseCode, nil)
             }
         } else {
-
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
-

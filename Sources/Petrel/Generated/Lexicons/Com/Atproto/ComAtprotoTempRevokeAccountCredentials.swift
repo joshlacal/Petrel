@@ -1,14 +1,10 @@
 import Foundation
 
-
-
 // lexicon: 1, id: com.atproto.temp.revokeAccountCredentials
 
-
-public struct ComAtprotoTempRevokeAccountCredentials {
-
+public enum ComAtprotoTempRevokeAccountCredentials {
     public static let typeIdentifier = "com.atproto.temp.revokeAccountCredentials"
-public struct Input: ATProtocolCodable {
+    public struct Input: ATProtocolCodable {
         public let account: ATIdentifier
 
         /// Standard public initializer
@@ -16,10 +12,9 @@ public struct Input: ATProtocolCodable {
             self.account = account
         }
 
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.account = try container.decode(ATIdentifier.self, forKey: .account)
+            account = try container.decode(ATIdentifier.self, forKey: .account)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -38,23 +33,19 @@ public struct Input: ATProtocolCodable {
             case account
         }
     }
-
-
-
 }
 
-extension ATProtoClient.Com.Atproto.Temp {
+public extension ATProtoClient.Com.Atproto.Temp {
     // MARK: - revokeAccountCredentials
 
-    /// Revoke sessions, password, and app passwords associated with account. May be resolved by a password reset.
-    ///
-    /// - Parameter input: The input parameters for the request
+    // Revoke sessions, password, and app passwords associated with account. May be resolved by a password reset.
+    //
+    // - Parameter input: The input parameters for the request
 
     ///
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func revokeAccountCredentials(
-
+    func revokeAccountCredentials(
         input: ComAtprotoTempRevokeAccountCredentials.Input
 
     ) async throws -> Int {
@@ -64,12 +55,7 @@ extension ATProtoClient.Com.Atproto.Temp {
 
         headers["Content-Type"] = "application/json"
 
-
-
-
-
         let requestData: Data? = try JSONEncoder().encode(input)
-
 
         let queryItems: [URLQueryItem]? = nil
 
@@ -85,13 +71,6 @@ extension ATProtoClient.Com.Atproto.Temp {
         let serviceDID = await networkService.getServiceDID(for: "com.atproto.temp.revokeAccountCredentials")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
         let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        let responseCode = response.statusCode
-
-
-        return responseCode
-
+        return response.statusCode
     }
-
 }
-
-

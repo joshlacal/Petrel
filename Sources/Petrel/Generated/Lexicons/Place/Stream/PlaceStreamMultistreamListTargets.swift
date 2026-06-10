@@ -1,19 +1,15 @@
 import Foundation
 
-
-
 // lexicon: 1, id: place.stream.multistream.listTargets
 
-
-public struct PlaceStreamMultistreamListTargets {
-
+public enum PlaceStreamMultistreamListTargets {
     public static let typeIdentifier = "place.stream.multistream.listTargets"
 
-public struct Record: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "place.stream.multistream.listTargets#record"
-            public let uri: ATProtocolURI
-            public let cid: CID
-            public let value: ATProtocolValueContainer
+    public struct Record: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "place.stream.multistream.listTargets#record"
+        public let uri: ATProtocolURI
+        public let cid: CID
+        public let value: ATProtocolValueContainer
 
         public init(
             uri: ATProtocolURI, cid: CID, value: ATProtocolValueContainer
@@ -26,19 +22,19 @@ public struct Record: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
             } catch {
                 LogManager.logError("Decoding error for required property 'uri': \(error)")
                 throw error
             }
             do {
-                self.cid = try container.decode(CID.self, forKey: .cid)
+                cid = try container.decode(CID.self, forKey: .cid)
             } catch {
                 LogManager.logError("Decoding error for required property 'cid': \(error)")
                 throw error
             }
             do {
-                self.value = try container.decode(ATProtocolValueContainer.self, forKey: .value)
+                value = try container.decode(ATProtocolValueContainer.self, forKey: .value)
             } catch {
                 LogManager.logError("Decoding error for required property 'value': \(error)")
                 throw error
@@ -96,83 +92,59 @@ public struct Record: ATProtocolCodable, ATProtocolValue {
             case value
         }
     }
-public struct Parameters: Parametrizable {
+
+    public struct Parameters: Parametrizable {
         public let limit: Int?
         public let cursor: String?
 
         public init(
             limit: Int? = nil,
             cursor: String? = nil
-            ) {
+        ) {
             self.limit = limit
             self.cursor = cursor
-
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let targets: [PlaceStreamMultistreamDefs.TargetView]
 
         public let cursor: String?
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             targets: [PlaceStreamMultistreamDefs.TargetView],
 
             cursor: String? = nil
 
-
         ) {
-
-
             self.targets = targets
 
             self.cursor = cursor
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.targets = try container.decode([PlaceStreamMultistreamDefs.TargetView].self, forKey: .targets)
+            targets = try container.decode([PlaceStreamMultistreamDefs.TargetView].self, forKey: .targets)
 
-
-            self.cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
-
-
+            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(targets, forKey: .targets)
 
-
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(cursor, forKey: .cursor)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let targetsValue = try targets.toCBORValue()
             map = map.adding(key: "targets", value: targetsValue)
-
-
 
             if let value = cursor {
                 // Encode optional property even if it's an empty array for CBOR
@@ -180,28 +152,17 @@ public struct Output: ATProtocolCodable {
                 map = map.adding(key: "cursor", value: cursorValue)
             }
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case targets
             case cursor
         }
-
     }
-
-
-
-
 }
 
-
-
-extension ATProtoClient.Place.Stream.Multistream {
+public extension ATProtoClient.Place.Stream.Multistream {
     // MARK: - listTargets
 
     /// List a range of targets for rebroadcasting a Streamplace stream.
@@ -210,9 +171,8 @@ extension ATProtoClient.Place.Stream.Multistream {
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func listTargets(input: PlaceStreamMultistreamListTargets.Parameters) async throws -> (responseCode: Int, data: PlaceStreamMultistreamListTargets.Output?) {
+    func listTargets(input: PlaceStreamMultistreamListTargets.Parameters) async throws -> (responseCode: Int, data: PlaceStreamMultistreamListTargets.Output?) {
         let endpoint = "place.stream.multistream.listTargets"
-
 
         let queryItems = input.asQueryItems()
 
@@ -233,8 +193,7 @@ extension ATProtoClient.Place.Stream.Multistream {
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -243,9 +202,7 @@ extension ATProtoClient.Place.Stream.Multistream {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(PlaceStreamMultistreamListTargets.Output.self, from: responseData)
 
@@ -256,12 +213,9 @@ extension ATProtoClient.Place.Stream.Multistream {
                 return (responseCode, nil)
             }
         } else {
-
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
-

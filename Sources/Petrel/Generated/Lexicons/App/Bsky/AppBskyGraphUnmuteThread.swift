@@ -1,14 +1,10 @@
 import Foundation
 
-
-
 // lexicon: 1, id: app.bsky.graph.unmuteThread
 
-
-public struct AppBskyGraphUnmuteThread {
-
+public enum AppBskyGraphUnmuteThread {
     public static let typeIdentifier = "app.bsky.graph.unmuteThread"
-public struct Input: ATProtocolCodable {
+    public struct Input: ATProtocolCodable {
         public let root: ATProtocolURI
 
         /// Standard public initializer
@@ -16,10 +12,9 @@ public struct Input: ATProtocolCodable {
             self.root = root
         }
 
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.root = try container.decode(ATProtocolURI.self, forKey: .root)
+            root = try container.decode(ATProtocolURI.self, forKey: .root)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -38,23 +33,19 @@ public struct Input: ATProtocolCodable {
             case root
         }
     }
-
-
-
 }
 
-extension ATProtoClient.App.Bsky.Graph {
+public extension ATProtoClient.App.Bsky.Graph {
     // MARK: - unmuteThread
 
-    /// Unmutes the specified thread. Requires auth.
-    ///
-    /// - Parameter input: The input parameters for the request
+    // Unmutes the specified thread. Requires auth.
+    //
+    // - Parameter input: The input parameters for the request
 
     ///
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func unmuteThread(
-
+    func unmuteThread(
         input: AppBskyGraphUnmuteThread.Input
 
     ) async throws -> Int {
@@ -64,12 +55,7 @@ extension ATProtoClient.App.Bsky.Graph {
 
         headers["Content-Type"] = "application/json"
 
-
-
-
-
         let requestData: Data? = try JSONEncoder().encode(input)
-
 
         let queryItems: [URLQueryItem]? = nil
 
@@ -85,13 +71,6 @@ extension ATProtoClient.App.Bsky.Graph {
         let serviceDID = await networkService.getServiceDID(for: "app.bsky.graph.unmuteThread")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
         let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        let responseCode = response.statusCode
-
-
-        return responseCode
-
+        return response.statusCode
     }
-
 }
-
-

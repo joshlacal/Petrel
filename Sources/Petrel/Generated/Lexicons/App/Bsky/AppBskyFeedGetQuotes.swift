@@ -1,14 +1,10 @@
 import Foundation
 
-
-
 // lexicon: 1, id: app.bsky.feed.getQuotes
 
-
-public struct AppBskyFeedGetQuotes {
-
+public enum AppBskyFeedGetQuotes {
     public static let typeIdentifier = "app.bsky.feed.getQuotes"
-public struct Parameters: Parametrizable {
+    public struct Parameters: Parametrizable {
         public let uri: ATProtocolURI
         public let cid: CID?
         public let limit: Int?
@@ -19,18 +15,15 @@ public struct Parameters: Parametrizable {
             cid: CID? = nil,
             limit: Int? = nil,
             cursor: String? = nil
-            ) {
+        ) {
             self.uri = uri
             self.cid = cid
             self.limit = limit
             self.cursor = cursor
-
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let uri: ATProtocolURI
 
         public let cid: CID?
@@ -39,12 +32,8 @@ public struct Output: ATProtocolCodable {
 
         public let posts: [AppBskyFeedDefs.PostView]
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             uri: ATProtocolURI,
 
             cid: CID? = nil,
@@ -53,10 +42,7 @@ public struct Output: ATProtocolCodable {
 
             posts: [AppBskyFeedDefs.PostView]
 
-
         ) {
-
-
             self.uri = uri
 
             self.cid = cid
@@ -64,58 +50,39 @@ public struct Output: ATProtocolCodable {
             self.cursor = cursor
 
             self.posts = posts
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+            uri = try container.decode(ATProtocolURI.self, forKey: .uri)
 
+            cid = try container.decodeIfPresent(CID.self, forKey: .cid)
 
-            self.cid = try container.decodeIfPresent(CID.self, forKey: .cid)
+            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
 
-
-            self.cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
-
-
-            self.posts = try container.decode([AppBskyFeedDefs.PostView].self, forKey: .posts)
-
-
+            posts = try container.decode([AppBskyFeedDefs.PostView].self, forKey: .posts)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(uri, forKey: .uri)
 
-
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(cid, forKey: .cid)
-
 
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(cursor, forKey: .cursor)
 
-
             try container.encode(posts, forKey: .posts)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let uriValue = try uri.toCBORValue()
             map = map.adding(key: "uri", value: uriValue)
-
-
 
             if let value = cid {
                 // Encode optional property even if it's an empty array for CBOR
@@ -123,25 +90,17 @@ public struct Output: ATProtocolCodable {
                 map = map.adding(key: "cid", value: cidValue)
             }
 
-
-
             if let value = cursor {
                 // Encode optional property even if it's an empty array for CBOR
                 let cursorValue = try value.toCBORValue()
                 map = map.adding(key: "cursor", value: cursorValue)
             }
 
-
-
             let postsValue = try posts.toCBORValue()
             map = map.adding(key: "posts", value: postsValue)
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case uri
@@ -149,17 +108,10 @@ public struct Output: ATProtocolCodable {
             case cursor
             case posts
         }
-
     }
-
-
-
-
 }
 
-
-
-extension ATProtoClient.App.Bsky.Feed {
+public extension ATProtoClient.App.Bsky.Feed {
     // MARK: - getQuotes
 
     /// Get a list of quotes for a given post.
@@ -168,9 +120,8 @@ extension ATProtoClient.App.Bsky.Feed {
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func getQuotes(input: AppBskyFeedGetQuotes.Parameters) async throws -> (responseCode: Int, data: AppBskyFeedGetQuotes.Output?) {
+    func getQuotes(input: AppBskyFeedGetQuotes.Parameters) async throws -> (responseCode: Int, data: AppBskyFeedGetQuotes.Output?) {
         let endpoint = "app.bsky.feed.getQuotes"
-
 
         let queryItems = input.asQueryItems()
 
@@ -191,8 +142,7 @@ extension ATProtoClient.App.Bsky.Feed {
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -201,9 +151,7 @@ extension ATProtoClient.App.Bsky.Feed {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(AppBskyFeedGetQuotes.Output.self, from: responseData)
 
@@ -214,12 +162,9 @@ extension ATProtoClient.App.Bsky.Feed {
                 return (responseCode, nil)
             }
         } else {
-
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
-

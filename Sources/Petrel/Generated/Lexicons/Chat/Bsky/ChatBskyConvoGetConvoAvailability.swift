@@ -1,87 +1,58 @@
 import Foundation
 
-
-
 // lexicon: 1, id: chat.bsky.convo.getConvoAvailability
 
-
-public struct ChatBskyConvoGetConvoAvailability {
-
+public enum ChatBskyConvoGetConvoAvailability {
     public static let typeIdentifier = "chat.bsky.convo.getConvoAvailability"
-public struct Parameters: Parametrizable {
+    public struct Parameters: Parametrizable {
         public let members: [DID]
 
         public init(
             members: [DID]
-            ) {
+        ) {
             self.members = members
-
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let canChat: Bool
 
         public let convo: ChatBskyConvoDefs.ConvoView?
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             canChat: Bool,
 
             convo: ChatBskyConvoDefs.ConvoView? = nil
 
-
         ) {
-
-
             self.canChat = canChat
 
             self.convo = convo
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.canChat = try container.decode(Bool.self, forKey: .canChat)
+            canChat = try container.decode(Bool.self, forKey: .canChat)
 
-
-            self.convo = try container.decodeIfPresent(ChatBskyConvoDefs.ConvoView.self, forKey: .convo)
-
-
+            convo = try container.decodeIfPresent(ChatBskyConvoDefs.ConvoView.self, forKey: .convo)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(canChat, forKey: .canChat)
 
-
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(convo, forKey: .convo)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let canChatValue = try canChat.toCBORValue()
             map = map.adding(key: "canChat", value: canChatValue)
-
-
 
             if let value = convo {
                 // Encode optional property even if it's an empty array for CBOR
@@ -89,28 +60,17 @@ public struct Output: ATProtocolCodable {
                 map = map.adding(key: "convo", value: convoValue)
             }
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case canChat
             case convo
         }
-
     }
-
-
-
-
 }
 
-
-
-extension ATProtoClient.Chat.Bsky.Convo {
+public extension ATProtoClient.Chat.Bsky.Convo {
     // MARK: - getConvoAvailability
 
     /// Check whether the requester and the other members can start a 1-1 chat. Only applicable to direct (non-group) conversations. If an existing convo is found for these members, it is returned. Does not create a new convo if it doesn't exist.
@@ -119,9 +79,8 @@ extension ATProtoClient.Chat.Bsky.Convo {
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func getConvoAvailability(input: ChatBskyConvoGetConvoAvailability.Parameters) async throws -> (responseCode: Int, data: ChatBskyConvoGetConvoAvailability.Output?) {
+    func getConvoAvailability(input: ChatBskyConvoGetConvoAvailability.Parameters) async throws -> (responseCode: Int, data: ChatBskyConvoGetConvoAvailability.Output?) {
         let endpoint = "chat.bsky.convo.getConvoAvailability"
-
 
         let queryItems = input.asQueryItems()
 
@@ -142,8 +101,7 @@ extension ATProtoClient.Chat.Bsky.Convo {
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -152,9 +110,7 @@ extension ATProtoClient.Chat.Bsky.Convo {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(ChatBskyConvoGetConvoAvailability.Output.self, from: responseData)
 
@@ -165,12 +121,9 @@ extension ATProtoClient.Chat.Bsky.Convo {
                 return (responseCode, nil)
             }
         } else {
-
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
-

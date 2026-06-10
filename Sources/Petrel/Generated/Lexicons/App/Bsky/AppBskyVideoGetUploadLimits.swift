@@ -1,17 +1,11 @@
 import Foundation
 
-
-
 // lexicon: 1, id: app.bsky.video.getUploadLimits
 
-
-public struct AppBskyVideoGetUploadLimits {
-
+public enum AppBskyVideoGetUploadLimits {
     public static let typeIdentifier = "app.bsky.video.getUploadLimits"
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let canUpload: Bool
 
         public let remainingDailyVideos: Int?
@@ -22,12 +16,8 @@ public struct Output: ATProtocolCodable {
 
         public let error: String?
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             canUpload: Bool,
 
             remainingDailyVideos: Int? = nil,
@@ -38,10 +28,7 @@ public struct Output: ATProtocolCodable {
 
             error: String? = nil
 
-
         ) {
-
-
             self.canUpload = canUpload
 
             self.remainingDailyVideos = remainingDailyVideos
@@ -51,66 +38,45 @@ public struct Output: ATProtocolCodable {
             self.message = message
 
             self.error = error
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.canUpload = try container.decode(Bool.self, forKey: .canUpload)
+            canUpload = try container.decode(Bool.self, forKey: .canUpload)
 
+            remainingDailyVideos = try container.decodeIfPresent(Int.self, forKey: .remainingDailyVideos)
 
-            self.remainingDailyVideos = try container.decodeIfPresent(Int.self, forKey: .remainingDailyVideos)
+            remainingDailyBytes = try container.decodeIfPresent(Int.self, forKey: .remainingDailyBytes)
 
+            message = try container.decodeIfPresent(String.self, forKey: .message)
 
-            self.remainingDailyBytes = try container.decodeIfPresent(Int.self, forKey: .remainingDailyBytes)
-
-
-            self.message = try container.decodeIfPresent(String.self, forKey: .message)
-
-
-            self.error = try container.decodeIfPresent(String.self, forKey: .error)
-
-
+            error = try container.decodeIfPresent(String.self, forKey: .error)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(canUpload, forKey: .canUpload)
 
-
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(remainingDailyVideos, forKey: .remainingDailyVideos)
-
 
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(remainingDailyBytes, forKey: .remainingDailyBytes)
 
-
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(message, forKey: .message)
 
-
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(error, forKey: .error)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let canUploadValue = try canUpload.toCBORValue()
             map = map.adding(key: "canUpload", value: canUploadValue)
-
-
 
             if let value = remainingDailyVideos {
                 // Encode optional property even if it's an empty array for CBOR
@@ -118,15 +84,11 @@ public struct Output: ATProtocolCodable {
                 map = map.adding(key: "remainingDailyVideos", value: remainingDailyVideosValue)
             }
 
-
-
             if let value = remainingDailyBytes {
                 // Encode optional property even if it's an empty array for CBOR
                 let remainingDailyBytesValue = try value.toCBORValue()
                 map = map.adding(key: "remainingDailyBytes", value: remainingDailyBytesValue)
             }
-
-
 
             if let value = message {
                 // Encode optional property even if it's an empty array for CBOR
@@ -134,20 +96,14 @@ public struct Output: ATProtocolCodable {
                 map = map.adding(key: "message", value: messageValue)
             }
 
-
-
             if let value = error {
                 // Encode optional property even if it's an empty array for CBOR
                 let errorValue = try value.toCBORValue()
                 map = map.adding(key: "error", value: errorValue)
             }
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case canUpload
@@ -156,26 +112,18 @@ public struct Output: ATProtocolCodable {
             case message
             case error
         }
-
     }
-
-
-
-
 }
 
-
-
-extension ATProtoClient.App.Bsky.Video {
+public extension ATProtoClient.App.Bsky.Video {
     // MARK: - getUploadLimits
 
     /// Get video upload limits for the authenticated user.
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func getUploadLimits() async throws -> (responseCode: Int, data: AppBskyVideoGetUploadLimits.Output?) {
+    func getUploadLimits() async throws -> (responseCode: Int, data: AppBskyVideoGetUploadLimits.Output?) {
         let endpoint = "app.bsky.video.getUploadLimits"
-
 
         let queryItems: [URLQueryItem]? = nil
 
@@ -196,8 +144,7 @@ extension ATProtoClient.App.Bsky.Video {
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -206,9 +153,7 @@ extension ATProtoClient.App.Bsky.Video {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(AppBskyVideoGetUploadLimits.Output.self, from: responseData)
 
@@ -219,12 +164,9 @@ extension ATProtoClient.App.Bsky.Video {
                 return (responseCode, nil)
             }
         } else {
-
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
-

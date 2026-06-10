@@ -1,14 +1,10 @@
 import Foundation
 
-
-
 // lexicon: 1, id: com.atproto.sync.notifyOfUpdate
 
-
-public struct ComAtprotoSyncNotifyOfUpdate {
-
+public enum ComAtprotoSyncNotifyOfUpdate {
     public static let typeIdentifier = "com.atproto.sync.notifyOfUpdate"
-public struct Input: ATProtocolCodable {
+    public struct Input: ATProtocolCodable {
         public let hostname: String
 
         /// Standard public initializer
@@ -16,10 +12,9 @@ public struct Input: ATProtocolCodable {
             self.hostname = hostname
         }
 
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.hostname = try container.decode(String.self, forKey: .hostname)
+            hostname = try container.decode(String.self, forKey: .hostname)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -38,23 +33,19 @@ public struct Input: ATProtocolCodable {
             case hostname
         }
     }
-
-
-
 }
 
-extension ATProtoClient.Com.Atproto.Sync {
+public extension ATProtoClient.Com.Atproto.Sync {
     // MARK: - notifyOfUpdate
 
-    /// Notify a crawling service of a recent update, and that crawling should resume. Intended use is after a gap between repo stream events caused the crawling service to disconnect. Does not require auth; implemented by Relay. DEPRECATED: just use com.atproto.sync.requestCrawl
-    ///
-    /// - Parameter input: The input parameters for the request
+    // Notify a crawling service of a recent update, and that crawling should resume. Intended use is after a gap between repo stream events caused the crawling service to disconnect. Does not require auth; implemented by Relay. DEPRECATED: just use com.atproto.sync.requestCrawl
+    //
+    // - Parameter input: The input parameters for the request
 
     ///
     /// - Returns: The HTTP response code
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func notifyOfUpdate(
-
+    func notifyOfUpdate(
         input: ComAtprotoSyncNotifyOfUpdate.Input
 
     ) async throws -> Int {
@@ -64,12 +55,7 @@ extension ATProtoClient.Com.Atproto.Sync {
 
         headers["Content-Type"] = "application/json"
 
-
-
-
-
         let requestData: Data? = try JSONEncoder().encode(input)
-
 
         let queryItems: [URLQueryItem]? = nil
 
@@ -85,13 +71,6 @@ extension ATProtoClient.Com.Atproto.Sync {
         let serviceDID = await networkService.getServiceDID(for: "com.atproto.sync.notifyOfUpdate")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
         let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        let responseCode = response.statusCode
-
-
-        return responseCode
-
+        return response.statusCode
     }
-
 }
-
-

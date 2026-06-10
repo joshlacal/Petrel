@@ -1,14 +1,10 @@
 import Foundation
 
-
-
 // lexicon: 1, id: blue.catbird.mlsChat.invalidateWelcome
 
-
-public struct BlueCatbirdMlsChatInvalidateWelcome {
-
+public enum BlueCatbirdMlsChatInvalidateWelcome {
     public static let typeIdentifier = "blue.catbird.mlsChat.invalidateWelcome"
-public struct Input: ATProtocolCodable {
+    public struct Input: ATProtocolCodable {
         public let convoId: String
         public let reason: String
 
@@ -18,11 +14,10 @@ public struct Input: ATProtocolCodable {
             self.reason = reason
         }
 
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.convoId = try container.decode(String.self, forKey: .convoId)
-            self.reason = try container.decode(String.self, forKey: .reason)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            reason = try container.decode(String.self, forKey: .reason)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -46,69 +41,45 @@ public struct Input: ATProtocolCodable {
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let invalidated: Bool
 
         public let welcomeId: String?
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             invalidated: Bool,
 
             welcomeId: String? = nil
 
-
         ) {
-
-
             self.invalidated = invalidated
 
             self.welcomeId = welcomeId
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.invalidated = try container.decode(Bool.self, forKey: .invalidated)
+            invalidated = try container.decode(Bool.self, forKey: .invalidated)
 
-
-            self.welcomeId = try container.decodeIfPresent(String.self, forKey: .welcomeId)
-
-
+            welcomeId = try container.decodeIfPresent(String.self, forKey: .welcomeId)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(invalidated, forKey: .invalidated)
 
-
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(welcomeId, forKey: .welcomeId)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let invalidatedValue = try invalidated.toCBORValue()
             map = map.adding(key: "invalidated", value: invalidatedValue)
-
-
 
             if let value = welcomeId {
                 // Encode optional property even if it's an empty array for CBOR
@@ -116,39 +87,31 @@ public struct Output: ATProtocolCodable {
                 map = map.adding(key: "welcomeId", value: welcomeIdValue)
             }
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case invalidated
             case welcomeId
         }
-
     }
 
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case notFound = "NotFound.No unconsumed Welcome found for this conversation and user"
-                case unauthorized = "Unauthorized.Not the recipient of this Welcome"
-            public var description: String {
-                return self.rawValue
-            }
-
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case notFound = "NotFound.No unconsumed Welcome found for this conversation and user"
+        case unauthorized = "Unauthorized.Not the recipient of this Welcome"
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-extension ATProtoClient.Blue.Catbird.MlsChat {
+public extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - invalidateWelcome
 
     /// Invalidate a Welcome message that cannot be processed (e.g., NoMatchingKeyPackage). This allows the client to fall back to External Commit or request re-addition.
@@ -157,8 +120,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func invalidateWelcome(
-
+    func invalidateWelcome(
         input: BlueCatbirdMlsChatInvalidateWelcome.Input
 
     ) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatInvalidateWelcome.Output?) {
@@ -168,10 +130,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
 
         headers["Content-Type"] = "application/json"
 
-
-
         headers["Accept"] = "application/json"
-
 
         let requestData: Data? = try JSONEncoder().encode(input)
         let urlRequest = try await networkService.createURLRequest(
@@ -188,7 +147,6 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
         guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
@@ -198,9 +156,8 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         }
 
         // Only decode response data if request was successful
-        if (200...299).contains(responseCode) {
+        if (200 ... 299).contains(responseCode) {
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatInvalidateWelcome.Output.self, from: responseData)
 
@@ -214,9 +171,5 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-
     }
-
 }
-
-

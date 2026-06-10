@@ -8,9 +8,11 @@
       "errors": [
         { "name": "AccountSuspended" },
         { "name": "BlockedActor" },
-        { "name": "GroupInvitesDisabled" },
+        { "name": "BlockedSubject" },
+        { "name": "NewAccountCannotCreateGroup" },
         { "name": "NotFollowedBySender" },
-        { "name": "RecipientNotFound" }
+        { "name": "RecipientNotFound" },
+        { "name": "UserForbidsGroups" }
       ],
       "input": {
         "encoding": "application/json",
@@ -20,7 +22,6 @@
           "properties": {
             "members": {
               "type": "array",
-              "minLength": 1,
               "maxLength": 49,
               "items": {
                 "type": "string",
@@ -30,8 +31,8 @@
             "name": {
               "type": "string",
               "minLength": 1,
-              "maxGraphemes": 128,
-              "maxLength": 1280
+              "maxGraphemes": 50,
+              "maxLength": 500
             }
           }
         }

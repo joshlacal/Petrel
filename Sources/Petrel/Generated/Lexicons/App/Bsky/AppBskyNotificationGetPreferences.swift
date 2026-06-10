@@ -1,91 +1,52 @@
 import Foundation
 
-
-
 // lexicon: 1, id: app.bsky.notification.getPreferences
 
-
-public struct AppBskyNotificationGetPreferences {
-
+public enum AppBskyNotificationGetPreferences {
     public static let typeIdentifier = "app.bsky.notification.getPreferences"
-public struct Parameters: Parametrizable {
-
-        public init(
-            ) {
-
-        }
+    public struct Parameters: Parametrizable {
+        public init() {}
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let preferences: AppBskyNotificationDefs.Preferences
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             preferences: AppBskyNotificationDefs.Preferences
 
-
         ) {
-
-
             self.preferences = preferences
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.preferences = try container.decode(AppBskyNotificationDefs.Preferences.self, forKey: .preferences)
-
-
+            preferences = try container.decode(AppBskyNotificationDefs.Preferences.self, forKey: .preferences)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(preferences, forKey: .preferences)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let preferencesValue = try preferences.toCBORValue()
             map = map.adding(key: "preferences", value: preferencesValue)
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case preferences
         }
-
     }
-
-
-
-
 }
 
-
-
-extension ATProtoClient.App.Bsky.Notification {
+public extension ATProtoClient.App.Bsky.Notification {
     // MARK: - getPreferences
 
     /// Get notification-related preferences for an account. Requires auth.
@@ -94,9 +55,8 @@ extension ATProtoClient.App.Bsky.Notification {
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func getPreferences(input: AppBskyNotificationGetPreferences.Parameters) async throws -> (responseCode: Int, data: AppBskyNotificationGetPreferences.Output?) {
+    func getPreferences(input: AppBskyNotificationGetPreferences.Parameters) async throws -> (responseCode: Int, data: AppBskyNotificationGetPreferences.Output?) {
         let endpoint = "app.bsky.notification.getPreferences"
-
 
         let queryItems = input.asQueryItems()
 
@@ -117,8 +77,7 @@ extension ATProtoClient.App.Bsky.Notification {
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -127,9 +86,7 @@ extension ATProtoClient.App.Bsky.Notification {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(AppBskyNotificationGetPreferences.Output.self, from: responseData)
 
@@ -140,12 +97,9 @@ extension ATProtoClient.App.Bsky.Notification {
                 return (responseCode, nil)
             }
         } else {
-
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
-

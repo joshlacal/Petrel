@@ -1,14 +1,10 @@
 import Foundation
 
-
-
 // lexicon: 1, id: app.bsky.unspecced.searchStarterPacksSkeleton
 
-
-public struct AppBskyUnspeccedSearchStarterPacksSkeleton {
-
+public enum AppBskyUnspeccedSearchStarterPacksSkeleton {
     public static let typeIdentifier = "app.bsky.unspecced.searchStarterPacksSkeleton"
-public struct Parameters: Parametrizable {
+    public struct Parameters: Parametrizable {
         public let q: String
         public let viewer: DID?
         public let limit: Int?
@@ -19,86 +15,61 @@ public struct Parameters: Parametrizable {
             viewer: DID? = nil,
             limit: Int? = nil,
             cursor: String? = nil
-            ) {
+        ) {
             self.q = q
             self.viewer = viewer
             self.limit = limit
             self.cursor = cursor
-
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let cursor: String?
 
         public let hitsTotal: Int?
 
         public let starterPacks: [AppBskyUnspeccedDefs.SkeletonSearchStarterPack]
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             cursor: String? = nil,
 
             hitsTotal: Int? = nil,
 
             starterPacks: [AppBskyUnspeccedDefs.SkeletonSearchStarterPack]
 
-
         ) {
-
-
             self.cursor = cursor
 
             self.hitsTotal = hitsTotal
 
             self.starterPacks = starterPacks
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
 
+            hitsTotal = try container.decodeIfPresent(Int.self, forKey: .hitsTotal)
 
-            self.hitsTotal = try container.decodeIfPresent(Int.self, forKey: .hitsTotal)
-
-
-            self.starterPacks = try container.decode([AppBskyUnspeccedDefs.SkeletonSearchStarterPack].self, forKey: .starterPacks)
-
-
+            starterPacks = try container.decode([AppBskyUnspeccedDefs.SkeletonSearchStarterPack].self, forKey: .starterPacks)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(cursor, forKey: .cursor)
 
-
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(hitsTotal, forKey: .hitsTotal)
 
-
             try container.encode(starterPacks, forKey: .starterPacks)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             if let value = cursor {
                 // Encode optional property even if it's an empty array for CBOR
@@ -106,54 +77,40 @@ public struct Output: ATProtocolCodable {
                 map = map.adding(key: "cursor", value: cursorValue)
             }
 
-
-
             if let value = hitsTotal {
                 // Encode optional property even if it's an empty array for CBOR
                 let hitsTotalValue = try value.toCBORValue()
                 map = map.adding(key: "hitsTotal", value: hitsTotalValue)
             }
 
-
-
             let starterPacksValue = try starterPacks.toCBORValue()
             map = map.adding(key: "starterPacks", value: starterPacksValue)
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case cursor
             case hitsTotal
             case starterPacks
         }
-
     }
 
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case badQueryString = "BadQueryString."
-            public var description: String {
-                return self.rawValue
-            }
-
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case badQueryString = "BadQueryString."
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-
-
-extension ATProtoClient.App.Bsky.Unspecced {
+public extension ATProtoClient.App.Bsky.Unspecced {
     // MARK: - searchStarterPacksSkeleton
 
     /// Backend Starter Pack search, returns only skeleton.
@@ -162,9 +119,8 @@ extension ATProtoClient.App.Bsky.Unspecced {
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func searchStarterPacksSkeleton(input: AppBskyUnspeccedSearchStarterPacksSkeleton.Parameters) async throws -> (responseCode: Int, data: AppBskyUnspeccedSearchStarterPacksSkeleton.Output?) {
+    func searchStarterPacksSkeleton(input: AppBskyUnspeccedSearchStarterPacksSkeleton.Parameters) async throws -> (responseCode: Int, data: AppBskyUnspeccedSearchStarterPacksSkeleton.Output?) {
         let endpoint = "app.bsky.unspecced.searchStarterPacksSkeleton"
-
 
         let queryItems = input.asQueryItems()
 
@@ -185,8 +141,7 @@ extension ATProtoClient.App.Bsky.Unspecced {
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -195,9 +150,7 @@ extension ATProtoClient.App.Bsky.Unspecced {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(AppBskyUnspeccedSearchStarterPacksSkeleton.Output.self, from: responseData)
 
@@ -208,12 +161,9 @@ extension ATProtoClient.App.Bsky.Unspecced {
                 return (responseCode, nil)
             }
         } else {
-
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
-

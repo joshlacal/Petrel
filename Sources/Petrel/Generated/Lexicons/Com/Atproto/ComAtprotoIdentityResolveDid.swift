@@ -1,107 +1,72 @@
 import Foundation
 
-
-
 // lexicon: 1, id: com.atproto.identity.resolveDid
 
-
-public struct ComAtprotoIdentityResolveDid {
-
+public enum ComAtprotoIdentityResolveDid {
     public static let typeIdentifier = "com.atproto.identity.resolveDid"
-public struct Parameters: Parametrizable {
+    public struct Parameters: Parametrizable {
         public let did: DID
 
         public init(
             did: DID
-            ) {
+        ) {
             self.did = did
-
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let didDoc: DIDDocument
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             didDoc: DIDDocument
 
-
         ) {
-
-
             self.didDoc = didDoc
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.didDoc = try container.decode(DIDDocument.self, forKey: .didDoc)
-
-
+            didDoc = try container.decode(DIDDocument.self, forKey: .didDoc)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(didDoc, forKey: .didDoc)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let didDocValue = try didDoc.toCBORValue()
             map = map.adding(key: "didDoc", value: didDocValue)
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case didDoc
         }
-
     }
 
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case didNotFound = "DidNotFound.The DID resolution process confirmed that there is no current DID."
-                case didDeactivated = "DidDeactivated.The DID previously existed, but has been deactivated."
-            public var description: String {
-                return self.rawValue
-            }
-
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case didNotFound = "DidNotFound.The DID resolution process confirmed that there is no current DID."
+        case didDeactivated = "DidDeactivated.The DID previously existed, but has been deactivated."
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
-
-
-extension ATProtoClient.Com.Atproto.Identity {
+public extension ATProtoClient.Com.Atproto.Identity {
     // MARK: - resolveDid
 
     /// Resolves DID to DID document. Does not bi-directionally verify handle.
@@ -110,9 +75,8 @@ extension ATProtoClient.Com.Atproto.Identity {
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func resolveDid(input: ComAtprotoIdentityResolveDid.Parameters) async throws -> (responseCode: Int, data: ComAtprotoIdentityResolveDid.Output?) {
+    func resolveDid(input: ComAtprotoIdentityResolveDid.Parameters) async throws -> (responseCode: Int, data: ComAtprotoIdentityResolveDid.Output?) {
         let endpoint = "com.atproto.identity.resolveDid"
-
 
         let queryItems = input.asQueryItems()
 
@@ -133,8 +97,7 @@ extension ATProtoClient.Com.Atproto.Identity {
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -143,9 +106,7 @@ extension ATProtoClient.Com.Atproto.Identity {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(ComAtprotoIdentityResolveDid.Output.self, from: responseData)
 
@@ -156,12 +117,9 @@ extension ATProtoClient.Com.Atproto.Identity {
                 return (responseCode, nil)
             }
         } else {
-
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
-

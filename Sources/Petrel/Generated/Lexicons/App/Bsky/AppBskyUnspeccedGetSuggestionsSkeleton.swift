@@ -1,14 +1,10 @@
 import Foundation
 
-
-
 // lexicon: 1, id: app.bsky.unspecced.getSuggestionsSkeleton
 
-
-public struct AppBskyUnspeccedGetSuggestionsSkeleton {
-
+public enum AppBskyUnspeccedGetSuggestionsSkeleton {
     public static let typeIdentifier = "app.bsky.unspecced.getSuggestionsSkeleton"
-public struct Parameters: Parametrizable {
+    public struct Parameters: Parametrizable {
         public let viewer: DID?
         public let limit: Int?
         public let cursor: String?
@@ -19,18 +15,15 @@ public struct Parameters: Parametrizable {
             limit: Int? = nil,
             cursor: String? = nil,
             relativeToDid: DID? = nil
-            ) {
+        ) {
             self.viewer = viewer
             self.limit = limit
             self.cursor = cursor
             self.relativeToDid = relativeToDid
-
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let cursor: String?
 
         public let actors: [AppBskyUnspeccedDefs.SkeletonSearchActor]
@@ -39,12 +32,8 @@ public struct Output: ATProtocolCodable {
 
         public let recId: Int?
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             cursor: String? = nil,
 
             actors: [AppBskyUnspeccedDefs.SkeletonSearchActor],
@@ -53,10 +42,7 @@ public struct Output: ATProtocolCodable {
 
             recId: Int? = nil
 
-
         ) {
-
-
             self.cursor = cursor
 
             self.actors = actors
@@ -64,54 +50,37 @@ public struct Output: ATProtocolCodable {
             self.relativeToDid = relativeToDid
 
             self.recId = recId
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
 
+            actors = try container.decode([AppBskyUnspeccedDefs.SkeletonSearchActor].self, forKey: .actors)
 
-            self.actors = try container.decode([AppBskyUnspeccedDefs.SkeletonSearchActor].self, forKey: .actors)
+            relativeToDid = try container.decodeIfPresent(DID.self, forKey: .relativeToDid)
 
-
-            self.relativeToDid = try container.decodeIfPresent(DID.self, forKey: .relativeToDid)
-
-
-            self.recId = try container.decodeIfPresent(Int.self, forKey: .recId)
-
-
+            recId = try container.decodeIfPresent(Int.self, forKey: .recId)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(cursor, forKey: .cursor)
 
-
             try container.encode(actors, forKey: .actors)
-
 
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(relativeToDid, forKey: .relativeToDid)
 
-
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(recId, forKey: .recId)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             if let value = cursor {
                 // Encode optional property even if it's an empty array for CBOR
@@ -119,12 +88,8 @@ public struct Output: ATProtocolCodable {
                 map = map.adding(key: "cursor", value: cursorValue)
             }
 
-
-
             let actorsValue = try actors.toCBORValue()
             map = map.adding(key: "actors", value: actorsValue)
-
-
 
             if let value = relativeToDid {
                 // Encode optional property even if it's an empty array for CBOR
@@ -132,20 +97,14 @@ public struct Output: ATProtocolCodable {
                 map = map.adding(key: "relativeToDid", value: relativeToDidValue)
             }
 
-
-
             if let value = recId {
                 // Encode optional property even if it's an empty array for CBOR
                 let recIdValue = try value.toCBORValue()
                 map = map.adding(key: "recId", value: recIdValue)
             }
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case cursor
@@ -153,17 +112,10 @@ public struct Output: ATProtocolCodable {
             case relativeToDid
             case recId
         }
-
     }
-
-
-
-
 }
 
-
-
-extension ATProtoClient.App.Bsky.Unspecced {
+public extension ATProtoClient.App.Bsky.Unspecced {
     // MARK: - getSuggestionsSkeleton
 
     /// Get a skeleton of suggested actors. Intended to be called and then hydrated through app.bsky.actor.getSuggestions
@@ -172,9 +124,8 @@ extension ATProtoClient.App.Bsky.Unspecced {
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func getSuggestionsSkeleton(input: AppBskyUnspeccedGetSuggestionsSkeleton.Parameters) async throws -> (responseCode: Int, data: AppBskyUnspeccedGetSuggestionsSkeleton.Output?) {
+    func getSuggestionsSkeleton(input: AppBskyUnspeccedGetSuggestionsSkeleton.Parameters) async throws -> (responseCode: Int, data: AppBskyUnspeccedGetSuggestionsSkeleton.Output?) {
         let endpoint = "app.bsky.unspecced.getSuggestionsSkeleton"
-
 
         let queryItems = input.asQueryItems()
 
@@ -195,8 +146,7 @@ extension ATProtoClient.App.Bsky.Unspecced {
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -205,9 +155,7 @@ extension ATProtoClient.App.Bsky.Unspecced {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(AppBskyUnspeccedGetSuggestionsSkeleton.Output.self, from: responseData)
 
@@ -218,12 +166,9 @@ extension ATProtoClient.App.Bsky.Unspecced {
                 return (responseCode, nil)
             }
         } else {
-
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
-

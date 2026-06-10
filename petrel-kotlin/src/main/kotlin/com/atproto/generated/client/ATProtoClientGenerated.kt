@@ -335,6 +335,12 @@ class ATProtoClient(val networkService: NetworkService) {
                 val client: ATProtoClient get() = this@ATProtoClient
             }
 
+            val embed: Embed = Embed()
+
+            inner class Embed {
+                val client: ATProtoClient get() = this@ATProtoClient
+            }
+
             val group: Group = Group()
 
             inner class Group {

@@ -1,21 +1,16 @@
 import Foundation
 
-
 #if canImport(UIKit)
-import UIKit
+    import UIKit
 #elseif canImport(AppKit)
-import AppKit
+    import AppKit
 #endif
-
-
 
 // lexicon: 1, id: com.atproto.repo.uploadBlob
 
-
-public struct ComAtprotoRepoUploadBlob {
-
+public enum ComAtprotoRepoUploadBlob {
     public static let typeIdentifier = "com.atproto.repo.uploadBlob"
-public struct Input: ATProtocolCodable {
+    public struct Input: ATProtocolCodable {
         public let data: Data
 
         /// Standard public initializer
@@ -23,10 +18,9 @@ public struct Input: ATProtocolCodable {
             self.data = data
         }
 
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.data = try container.decode(Data.self, forKey: .data)
+            data = try container.decode(Data.self, forKey: .data)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -46,88 +40,58 @@ public struct Input: ATProtocolCodable {
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let blob: Blob
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             blob: Blob
 
-
         ) {
-
-
             self.blob = blob
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.blob = try container.decode(Blob.self, forKey: .blob)
-
-
+            blob = try container.decode(Blob.self, forKey: .blob)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(blob, forKey: .blob)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let blobValue = try blob.toCBORValue()
             map = map.adding(key: "blob", value: blobValue)
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case blob
         }
-
     }
-
-
-
-
 }
 
 extension ATProtoClient.Com.Atproto.Repo {
     // MARK: - uploadBlob
 
-    /// Upload a new blob, to be referenced from a repository record. The blob will be deleted if it is not referenced within a time window (eg, minutes). Blob restrictions (mimetype, size, etc) are enforced when the reference is created. Requires auth, implemented by PDS.
-    ///
-    /// - Parameters:
-    ///   - data: The binary data to upload
-    ///   - mimeType: The MIME type of the data being uploaded
-    ///   - stripMetadata: Whether to strip metadata from images (default: true)
+    // Upload a new blob, to be referenced from a repository record. The blob will be deleted if it is not referenced within a time window (eg, minutes). Blob restrictions (mimetype, size, etc) are enforced when the reference is created. Requires auth, implemented by PDS.
+    //
+    // - Parameters:
+    //   - data: The binary data to upload
+    //   - mimeType: The MIME type of the data being uploaded
+    //   - stripMetadata: Whether to strip metadata from images (default: true)
 
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func uploadBlob(
-
         data: Data,
         mimeType: String,
         stripMetadata: Bool = true
@@ -144,14 +108,10 @@ extension ATProtoClient.Com.Atproto.Repo {
         }
         var headers: [String: String] = [
             "Content-Type": mimeType,
-            "Content-Length": "\(dataToUpload.count)"
+            "Content-Length": "\(dataToUpload.count)",
         ]
 
-
         headers["Accept"] = "application/json"
-
-
-
 
         let queryItems: [URLQueryItem]? = nil
 
@@ -169,12 +129,10 @@ extension ATProtoClient.Com.Atproto.Repo {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -183,9 +141,7 @@ extension ATProtoClient.Com.Atproto.Repo {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(ComAtprotoRepoUploadBlob.Output.self, from: responseData)
 
@@ -199,7 +155,6 @@ extension ATProtoClient.Com.Atproto.Repo {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-
     }
 
     /// Compresses an image while maintaining reasonable quality
@@ -207,34 +162,32 @@ extension ATProtoClient.Com.Atproto.Repo {
     ///   - imageData: The original image data
     ///   - maxSizeInBytes: The maximum target size in bytes (default: 1MB)
     /// - Returns: Compressed image data, or nil if compression failed
-    private func compressImage(_ imageData: Data, maxSizeInBytes: Int = 1000000) -> Data? {
+    private func compressImage(_ imageData: Data, maxSizeInBytes: Int = 1_000_000) -> Data? {
         #if canImport(UIKit)
-        guard let image = UIImage(data: imageData) else { return nil }
-        var compression: CGFloat = 1.0
-        var compressedData = image.jpegData(compressionQuality: compression)
-        while (compressedData?.count ?? 0) > maxSizeInBytes && compression > 0.1 {
-            compression -= 0.1
-            compressedData = image.jpegData(compressionQuality: compression)
-        }
-        return compressedData
-        #elseif canImport(AppKit)
-        guard let image = NSImage(data: imageData) else { return nil }
-        var compression: CGFloat = 1.0
-        var compressedData: Data?
-        repeat {
-            if let tiffRepresentation = image.tiffRepresentation,
-               let bitmapImage = NSBitmapImageRep(data: tiffRepresentation) {
-                compressedData = bitmapImage.representation(using: .jpeg, properties: [.compressionFactor: compression])
+            guard let image = UIImage(data: imageData) else { return nil }
+            var compression: CGFloat = 1.0
+            var compressedData = image.jpegData(compressionQuality: compression)
+            while (compressedData?.count ?? 0) > maxSizeInBytes, compression > 0.1 {
+                compression -= 0.1
+                compressedData = image.jpegData(compressionQuality: compression)
             }
-            compression -= 0.1
-        } while (compressedData?.count ?? 0) > maxSizeInBytes && compression > 0.1
-        return compressedData
+            return compressedData
+        #elseif canImport(AppKit)
+            guard let image = NSImage(data: imageData) else { return nil }
+            var compression: CGFloat = 1.0
+            var compressedData: Data?
+            repeat {
+                if let tiffRepresentation = image.tiffRepresentation,
+                   let bitmapImage = NSBitmapImageRep(data: tiffRepresentation)
+                {
+                    compressedData = bitmapImage.representation(using: .jpeg, properties: [.compressionFactor: compression])
+                }
+                compression -= 0.1
+            } while (compressedData?.count ?? 0) > maxSizeInBytes && compression > 0.1
+            return compressedData
         #else
-        LogManager.logError("Image compression not supported on this platform")
-        return nil
+            LogManager.logError("Image compression not supported on this platform")
+            return nil
         #endif
     }
-
 }
-
-

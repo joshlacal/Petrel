@@ -1,0 +1,426 @@
+import Foundation
+
+// lexicon: 1, id: chat.bsky.moderation.defs
+
+public enum ChatBskyModerationDefs {
+    public static let typeIdentifier = "chat.bsky.moderation.defs"
+
+    public struct ConvoView: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "chat.bsky.moderation.defs#convoView"
+        public let id: String
+        public let rev: String
+        public let kind: ConvoViewKindUnion?
+
+        public init(
+            id: String, rev: String, kind: ConvoViewKindUnion?
+        ) {
+            self.id = id
+            self.rev = rev
+            self.kind = kind
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                id = try container.decode(String.self, forKey: .id)
+            } catch {
+                LogManager.logError("Decoding error for required property 'id': \(error)")
+                throw error
+            }
+            do {
+                rev = try container.decode(String.self, forKey: .rev)
+            } catch {
+                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                throw error
+            }
+            do {
+                kind = try container.decodeIfPresent(ConvoViewKindUnion.self, forKey: .kind)
+            } catch {
+                LogManager.logDebug("Decoding error for optional property 'kind': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            try container.encode(id, forKey: .id)
+            try container.encode(rev, forKey: .rev)
+            try container.encodeIfPresent(kind, forKey: .kind)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(id)
+            hasher.combine(rev)
+            if let value = kind {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+            if id != other.id {
+                return false
+            }
+            if rev != other.rev {
+                return false
+            }
+            if kind != other.kind {
+                return false
+            }
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            let idValue = try id.toCBORValue()
+            map = map.adding(key: "id", value: idValue)
+            let revValue = try rev.toCBORValue()
+            map = map.adding(key: "rev", value: revValue)
+            if let value = kind {
+                let kindValue = try value.toCBORValue()
+                map = map.adding(key: "kind", value: kindValue)
+            }
+            return map
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case id
+            case rev
+            case kind
+        }
+    }
+
+    public struct DirectConvo: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "chat.bsky.moderation.defs#directConvo"
+
+        public init() {}
+
+        public init(from decoder: Decoder) throws {
+            _ = decoder
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+        }
+
+        public func hash(into hasher: inout Hasher) {}
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            return other is Self
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            return map
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+        }
+    }
+
+    public struct GroupConvo: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "chat.bsky.moderation.defs#groupConvo"
+        public let createdAt: ATProtocolDate
+        public let joinLink: ChatBskyGroupDefs.JoinLinkView?
+        public let joinRequestCount: Int
+        public let lockStatus: ChatBskyConvoDefs.ConvoLockStatus
+        public let memberCount: Int
+        public let memberLimit: Int
+        public let name: String
+
+        public init(
+            createdAt: ATProtocolDate, joinLink: ChatBskyGroupDefs.JoinLinkView?, joinRequestCount: Int, lockStatus: ChatBskyConvoDefs.ConvoLockStatus, memberCount: Int, memberLimit: Int, name: String
+        ) {
+            self.createdAt = createdAt
+            self.joinLink = joinLink
+            self.joinRequestCount = joinRequestCount
+            self.lockStatus = lockStatus
+            self.memberCount = memberCount
+            self.memberLimit = memberLimit
+            self.name = name
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+            } catch {
+                LogManager.logError("Decoding error for required property 'createdAt': \(error)")
+                throw error
+            }
+            do {
+                joinLink = try container.decodeIfPresent(ChatBskyGroupDefs.JoinLinkView.self, forKey: .joinLink)
+            } catch {
+                LogManager.logDebug("Decoding error for optional property 'joinLink': \(error)")
+                throw error
+            }
+            do {
+                joinRequestCount = try container.decode(Int.self, forKey: .joinRequestCount)
+            } catch {
+                LogManager.logError("Decoding error for required property 'joinRequestCount': \(error)")
+                throw error
+            }
+            do {
+                lockStatus = try container.decode(ChatBskyConvoDefs.ConvoLockStatus.self, forKey: .lockStatus)
+            } catch {
+                LogManager.logError("Decoding error for required property 'lockStatus': \(error)")
+                throw error
+            }
+            do {
+                memberCount = try container.decode(Int.self, forKey: .memberCount)
+            } catch {
+                LogManager.logError("Decoding error for required property 'memberCount': \(error)")
+                throw error
+            }
+            do {
+                memberLimit = try container.decode(Int.self, forKey: .memberLimit)
+            } catch {
+                LogManager.logError("Decoding error for required property 'memberLimit': \(error)")
+                throw error
+            }
+            do {
+                name = try container.decode(String.self, forKey: .name)
+            } catch {
+                LogManager.logError("Decoding error for required property 'name': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            try container.encode(createdAt, forKey: .createdAt)
+            try container.encodeIfPresent(joinLink, forKey: .joinLink)
+            try container.encode(joinRequestCount, forKey: .joinRequestCount)
+            try container.encode(lockStatus, forKey: .lockStatus)
+            try container.encode(memberCount, forKey: .memberCount)
+            try container.encode(memberLimit, forKey: .memberLimit)
+            try container.encode(name, forKey: .name)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(createdAt)
+            if let value = joinLink {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            hasher.combine(joinRequestCount)
+            hasher.combine(lockStatus)
+            hasher.combine(memberCount)
+            hasher.combine(memberLimit)
+            hasher.combine(name)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+            if createdAt != other.createdAt {
+                return false
+            }
+            if joinLink != other.joinLink {
+                return false
+            }
+            if joinRequestCount != other.joinRequestCount {
+                return false
+            }
+            if lockStatus != other.lockStatus {
+                return false
+            }
+            if memberCount != other.memberCount {
+                return false
+            }
+            if memberLimit != other.memberLimit {
+                return false
+            }
+            if name != other.name {
+                return false
+            }
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            let createdAtValue = try createdAt.toCBORValue()
+            map = map.adding(key: "createdAt", value: createdAtValue)
+            if let value = joinLink {
+                let joinLinkValue = try value.toCBORValue()
+                map = map.adding(key: "joinLink", value: joinLinkValue)
+            }
+            let joinRequestCountValue = try joinRequestCount.toCBORValue()
+            map = map.adding(key: "joinRequestCount", value: joinRequestCountValue)
+            let lockStatusValue = try lockStatus.toCBORValue()
+            map = map.adding(key: "lockStatus", value: lockStatusValue)
+            let memberCountValue = try memberCount.toCBORValue()
+            map = map.adding(key: "memberCount", value: memberCountValue)
+            let memberLimitValue = try memberLimit.toCBORValue()
+            map = map.adding(key: "memberLimit", value: memberLimitValue)
+            let nameValue = try name.toCBORValue()
+            map = map.adding(key: "name", value: nameValue)
+            return map
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case createdAt
+            case joinLink
+            case joinRequestCount
+            case lockStatus
+            case memberCount
+            case memberLimit
+            case name
+        }
+    }
+
+    public enum ConvoViewKindUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
+        case chatBskyModerationDefsDirectConvo(ChatBskyModerationDefs.DirectConvo)
+        case chatBskyModerationDefsGroupConvo(ChatBskyModerationDefs.GroupConvo)
+        case unexpected(ATProtocolValueContainer)
+        public init(_ value: ChatBskyModerationDefs.DirectConvo) {
+            self = .chatBskyModerationDefsDirectConvo(value)
+        }
+
+        public init(_ value: ChatBskyModerationDefs.GroupConvo) {
+            self = .chatBskyModerationDefsGroupConvo(value)
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let typeValue = try container.decode(String.self, forKey: .type)
+
+            switch typeValue {
+            case "chat.bsky.moderation.defs#directConvo":
+                let value = try ChatBskyModerationDefs.DirectConvo(from: decoder)
+                self = .chatBskyModerationDefsDirectConvo(value)
+            case "chat.bsky.moderation.defs#groupConvo":
+                let value = try ChatBskyModerationDefs.GroupConvo(from: decoder)
+                self = .chatBskyModerationDefsGroupConvo(value)
+            default:
+                let unknownValue = try ATProtocolValueContainer(from: decoder)
+                self = .unexpected(unknownValue)
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            switch self {
+            case let .chatBskyModerationDefsDirectConvo(value):
+                try container.encode("chat.bsky.moderation.defs#directConvo", forKey: .type)
+                try value.encode(to: encoder)
+            case let .chatBskyModerationDefsGroupConvo(value):
+                try container.encode("chat.bsky.moderation.defs#groupConvo", forKey: .type)
+                try value.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
+            }
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            switch self {
+            case let .chatBskyModerationDefsDirectConvo(value):
+                hasher.combine("chat.bsky.moderation.defs#directConvo")
+                hasher.combine(value)
+            case let .chatBskyModerationDefsGroupConvo(value):
+                hasher.combine("chat.bsky.moderation.defs#groupConvo")
+                hasher.combine(value)
+            case let .unexpected(container):
+                hasher.combine("unexpected")
+                hasher.combine(container)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case type = "$type"
+        }
+
+        public static func == (lhs: ConvoViewKindUnion, rhs: ConvoViewKindUnion) -> Bool {
+            switch (lhs, rhs) {
+            case let (
+                .chatBskyModerationDefsDirectConvo(lhsValue),
+                .chatBskyModerationDefsDirectConvo(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .chatBskyModerationDefsGroupConvo(lhsValue),
+                .chatBskyModerationDefsGroupConvo(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
+            default:
+                return false
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? ConvoViewKindUnion else { return false }
+            return self == other
+        }
+
+        /// DAGCBOR encoding with field ordering
+        public func toCBORValue() throws -> Any {
+            // Create an ordered map to maintain field order
+            var map = OrderedCBORMap()
+
+            switch self {
+            case let .chatBskyModerationDefsDirectConvo(value):
+                map = map.adding(key: "$type", value: "chat.bsky.moderation.defs#directConvo")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .chatBskyModerationDefsGroupConvo(value):
+                map = map.adding(key: "$type", value: "chat.bsky.moderation.defs#groupConvo")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .unexpected(container):
+                return try container.toCBORValue()
+            }
+        }
+    }
+}

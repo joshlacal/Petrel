@@ -1,19 +1,15 @@
 import Foundation
 
-
-
 // lexicon: 1, id: blue.catbird.mlsChat.getOptInStatus
 
-
-public struct BlueCatbirdMlsChatGetOptInStatus {
-
+public enum BlueCatbirdMlsChatGetOptInStatus {
     public static let typeIdentifier = "blue.catbird.mlsChat.getOptInStatus"
 
-public struct OptInStatus: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "blue.catbird.mlsChat.getOptInStatus#optInStatus"
-            public let did: DID
-            public let optedIn: Bool
-            public let optedInAt: ATProtocolDate?
+    public struct OptInStatus: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "blue.catbird.mlsChat.getOptInStatus#optInStatus"
+        public let did: DID
+        public let optedIn: Bool
+        public let optedInAt: ATProtocolDate?
 
         public init(
             did: DID, optedIn: Bool, optedInAt: ATProtocolDate?
@@ -26,19 +22,19 @@ public struct OptInStatus: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.did = try container.decode(DID.self, forKey: .did)
+                did = try container.decode(DID.self, forKey: .did)
             } catch {
                 LogManager.logError("Decoding error for required property 'did': \(error)")
                 throw error
             }
             do {
-                self.optedIn = try container.decode(Bool.self, forKey: .optedIn)
+                optedIn = try container.decode(Bool.self, forKey: .optedIn)
             } catch {
                 LogManager.logError("Decoding error for required property 'optedIn': \(error)")
                 throw error
             }
             do {
-                self.optedInAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .optedInAt)
+                optedInAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .optedInAt)
             } catch {
                 LogManager.logDebug("Decoding error for optional property 'optedInAt': \(error)")
                 throw error
@@ -102,87 +98,56 @@ public struct OptInStatus: ATProtocolCodable, ATProtocolValue {
             case optedInAt
         }
     }
-public struct Parameters: Parametrizable {
+
+    public struct Parameters: Parametrizable {
         public let dids: [DID]
 
         public init(
             dids: [DID]
-            ) {
+        ) {
             self.dids = dids
-
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let statuses: [OptInStatus]
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             statuses: [OptInStatus]
 
-
         ) {
-
-
             self.statuses = statuses
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.statuses = try container.decode([OptInStatus].self, forKey: .statuses)
-
-
+            statuses = try container.decode([OptInStatus].self, forKey: .statuses)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(statuses, forKey: .statuses)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let statusesValue = try statuses.toCBORValue()
             map = map.adding(key: "statuses", value: statusesValue)
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case statuses
         }
-
     }
-
-
-
-
 }
 
-
-
-extension ATProtoClient.Blue.Catbird.MlsChat {
+public extension ATProtoClient.Blue.Catbird.MlsChat {
     // MARK: - getOptInStatus
 
     /// Check if users have opted into MLS chat Query opt-in status for a list of users. Returns array of status objects with DID, opt-in boolean, and optional timestamp.
@@ -191,9 +156,8 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func getOptInStatus(input: BlueCatbirdMlsChatGetOptInStatus.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatGetOptInStatus.Output?) {
+    func getOptInStatus(input: BlueCatbirdMlsChatGetOptInStatus.Parameters) async throws -> (responseCode: Int, data: BlueCatbirdMlsChatGetOptInStatus.Output?) {
         let endpoint = "blue.catbird.mlsChat.getOptInStatus"
-
 
         let queryItems = input.asQueryItems()
 
@@ -220,9 +184,8 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         }
 
         // Only decode response data if request was successful
-        if (200...299).contains(responseCode) {
+        if (200 ... 299).contains(responseCode) {
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatGetOptInStatus.Output.self, from: responseData)
 
@@ -233,12 +196,9 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
                 return (responseCode, nil)
             }
         } else {
-
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
-

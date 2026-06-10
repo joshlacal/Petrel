@@ -1,31 +1,26 @@
 import Foundation
 
-
 #if canImport(UIKit)
-import UIKit
+    import UIKit
 #elseif canImport(AppKit)
-import AppKit
+    import AppKit
 #endif
-
-
 
 // lexicon: 1, id: blue.catbird.mlsChat.uploadBlob
 
-
-public struct BlueCatbirdMlsChatUploadBlob {
-
+public enum BlueCatbirdMlsChatUploadBlob {
     public static let typeIdentifier = "blue.catbird.mlsChat.uploadBlob"
-public struct Parameters: Parametrizable {
+    public struct Parameters: Parametrizable {
         public let convoId: String
 
         public init(
             convoId: String
-            ) {
+        ) {
             self.convoId = convoId
-
         }
     }
-public struct Input: ATProtocolCodable {
+
+    public struct Input: ATProtocolCodable {
         public let data: Data
 
         /// Standard public initializer
@@ -33,10 +28,9 @@ public struct Input: ATProtocolCodable {
             self.data = data
         }
 
-
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.data = try container.decode(Data.self, forKey: .data)
+            data = try container.decode(Data.self, forKey: .data)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -56,103 +50,71 @@ public struct Input: ATProtocolCodable {
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let blobId: String
 
         public let size: Int
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             blobId: String,
 
             size: Int
 
-
         ) {
-
-
             self.blobId = blobId
 
             self.size = size
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.blobId = try container.decode(String.self, forKey: .blobId)
+            blobId = try container.decode(String.self, forKey: .blobId)
 
-
-            self.size = try container.decode(Int.self, forKey: .size)
-
-
+            size = try container.decode(Int.self, forKey: .size)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(blobId, forKey: .blobId)
 
-
             try container.encode(size, forKey: .size)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let blobIdValue = try blobId.toCBORValue()
             map = map.adding(key: "blobId", value: blobIdValue)
 
-
-
             let sizeValue = try size.toCBORValue()
             map = map.adding(key: "size", value: sizeValue)
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case blobId
             case size
         }
-
     }
 
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case quotaExceeded = "QuotaExceeded.User's blob storage quota has been exceeded (500MB per user)"
-                case blobTooLarge = "BlobTooLarge.Blob exceeds maximum size (10MB)"
-                case notAMember = "NotAMember.Uploader is not an active member of the target conversation"
-            public var description: String {
-                return self.rawValue
-            }
-
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case quotaExceeded = "QuotaExceeded.User's blob storage quota has been exceeded (500MB per user)"
+        case blobTooLarge = "BlobTooLarge.Blob exceeds maximum size (10MB)"
+        case notAMember = "NotAMember.Uploader is not an active member of the target conversation"
+        public var description: String {
+            return rawValue
         }
 
-
-
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
 }
 
 extension ATProtoClient.Blue.Catbird.MlsChat {
@@ -169,7 +131,6 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func uploadBlob(
-
         data: Data,
         mimeType: String,
         stripMetadata: Bool = true,
@@ -187,14 +148,10 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         }
         var headers: [String: String] = [
             "Content-Type": mimeType,
-            "Content-Length": "\(dataToUpload.count)"
+            "Content-Length": "\(dataToUpload.count)",
         ]
 
-
         headers["Accept"] = "application/json"
-
-
-
 
         let queryItems = params.asQueryItems()
 
@@ -212,12 +169,10 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -226,9 +181,7 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(BlueCatbirdMlsChatUploadBlob.Output.self, from: responseData)
 
@@ -242,7 +195,6 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-
     }
 
     /// Compresses an image while maintaining reasonable quality
@@ -250,34 +202,32 @@ extension ATProtoClient.Blue.Catbird.MlsChat {
     ///   - imageData: The original image data
     ///   - maxSizeInBytes: The maximum target size in bytes (default: 1MB)
     /// - Returns: Compressed image data, or nil if compression failed
-    private func compressImage(_ imageData: Data, maxSizeInBytes: Int = 1000000) -> Data? {
+    private func compressImage(_ imageData: Data, maxSizeInBytes: Int = 1_000_000) -> Data? {
         #if canImport(UIKit)
-        guard let image = UIImage(data: imageData) else { return nil }
-        var compression: CGFloat = 1.0
-        var compressedData = image.jpegData(compressionQuality: compression)
-        while (compressedData?.count ?? 0) > maxSizeInBytes && compression > 0.1 {
-            compression -= 0.1
-            compressedData = image.jpegData(compressionQuality: compression)
-        }
-        return compressedData
-        #elseif canImport(AppKit)
-        guard let image = NSImage(data: imageData) else { return nil }
-        var compression: CGFloat = 1.0
-        var compressedData: Data?
-        repeat {
-            if let tiffRepresentation = image.tiffRepresentation,
-               let bitmapImage = NSBitmapImageRep(data: tiffRepresentation) {
-                compressedData = bitmapImage.representation(using: .jpeg, properties: [.compressionFactor: compression])
+            guard let image = UIImage(data: imageData) else { return nil }
+            var compression: CGFloat = 1.0
+            var compressedData = image.jpegData(compressionQuality: compression)
+            while (compressedData?.count ?? 0) > maxSizeInBytes, compression > 0.1 {
+                compression -= 0.1
+                compressedData = image.jpegData(compressionQuality: compression)
             }
-            compression -= 0.1
-        } while (compressedData?.count ?? 0) > maxSizeInBytes && compression > 0.1
-        return compressedData
+            return compressedData
+        #elseif canImport(AppKit)
+            guard let image = NSImage(data: imageData) else { return nil }
+            var compression: CGFloat = 1.0
+            var compressedData: Data?
+            repeat {
+                if let tiffRepresentation = image.tiffRepresentation,
+                   let bitmapImage = NSBitmapImageRep(data: tiffRepresentation)
+                {
+                    compressedData = bitmapImage.representation(using: .jpeg, properties: [.compressionFactor: compression])
+                }
+                compression -= 0.1
+            } while (compressedData?.count ?? 0) > maxSizeInBytes && compression > 0.1
+            return compressedData
         #else
-        LogManager.logError("Image compression not supported on this platform")
-        return nil
+            LogManager.logError("Image compression not supported on this platform")
+            return nil
         #endif
     }
-
 }
-
-

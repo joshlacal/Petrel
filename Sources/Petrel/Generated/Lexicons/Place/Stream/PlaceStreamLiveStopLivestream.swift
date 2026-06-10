@@ -1,122 +1,81 @@
 import Foundation
 
-
-
 // lexicon: 1, id: place.stream.live.stopLivestream
 
-
-public struct PlaceStreamLiveStopLivestream {
-
+public enum PlaceStreamLiveStopLivestream {
     public static let typeIdentifier = "place.stream.live.stopLivestream"
-public struct Input: ATProtocolCodable {
-
+    public struct Input: ATProtocolCodable {
         /// Standard public initializer
-        public init() {
-        }
-
+        public init() {}
 
         public func toCBORValue() throws -> Any {
             return OrderedCBORMap()
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let uri: URI
 
         public let cid: CID
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             uri: URI,
 
             cid: CID
 
-
         ) {
-
-
             self.uri = uri
 
             self.cid = cid
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.uri = try container.decode(URI.self, forKey: .uri)
+            uri = try container.decode(URI.self, forKey: .uri)
 
-
-            self.cid = try container.decode(CID.self, forKey: .cid)
-
-
+            cid = try container.decode(CID.self, forKey: .cid)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(uri, forKey: .uri)
 
-
             try container.encode(cid, forKey: .cid)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let uriValue = try uri.toCBORValue()
             map = map.adding(key: "uri", value: uriValue)
 
-
-
             let cidValue = try cid.toCBORValue()
             map = map.adding(key: "cid", value: cidValue)
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case uri
             case cid
         }
-
     }
-
-
-
-
 }
 
-extension ATProtoClient.Place.Stream.Live {
+public extension ATProtoClient.Place.Stream.Live {
     // MARK: - stopLivestream
 
-    /// Stop your current livestream, updating your current place.stream.livestream record and ceasing the flow of video.
-    ///
-    /// - Parameter input: The input parameters for the request
+    // Stop your current livestream, updating your current place.stream.livestream record and ceasing the flow of video.
+    //
+    // - Parameter input: The input parameters for the request
 
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func stopLivestream(
-
+    func stopLivestream(
         input: PlaceStreamLiveStopLivestream.Input
 
     ) async throws -> (responseCode: Int, data: PlaceStreamLiveStopLivestream.Output?) {
@@ -126,14 +85,9 @@ extension ATProtoClient.Place.Stream.Live {
 
         headers["Content-Type"] = "application/json"
 
-
-
         headers["Accept"] = "application/json"
 
-
-
         let requestData: Data? = try JSONEncoder().encode(input)
-
 
         let queryItems: [URLQueryItem]? = nil
 
@@ -151,12 +105,10 @@ extension ATProtoClient.Place.Stream.Live {
         let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled by the caller via the status code.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -165,9 +117,7 @@ extension ATProtoClient.Place.Stream.Live {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(PlaceStreamLiveStopLivestream.Output.self, from: responseData)
 
@@ -181,9 +131,5 @@ extension ATProtoClient.Place.Stream.Live {
             // Don't try to decode error responses as success types
             return (responseCode, nil)
         }
-
     }
-
 }
-
-

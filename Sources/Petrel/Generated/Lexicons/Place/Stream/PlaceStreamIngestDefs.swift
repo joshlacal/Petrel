@@ -1,18 +1,14 @@
 import Foundation
 
-
-
 // lexicon: 1, id: place.stream.ingest.defs
 
-
-public struct PlaceStreamIngestDefs {
-
+public enum PlaceStreamIngestDefs {
     public static let typeIdentifier = "place.stream.ingest.defs"
 
-public struct Ingest: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "place.stream.ingest.defs#ingest"
-            public let type: String
-            public let url: URI
+    public struct Ingest: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "place.stream.ingest.defs#ingest"
+        public let type: String
+        public let url: URI
 
         public init(
             type: String, url: URI
@@ -24,13 +20,13 @@ public struct Ingest: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.type = try container.decode(String.self, forKey: .type)
+                type = try container.decode(String.self, forKey: .type)
             } catch {
                 LogManager.logError("Decoding error for required property 'type': \(error)")
                 throw error
             }
             do {
-                self.url = try container.decode(URI.self, forKey: .url)
+                url = try container.decode(URI.self, forKey: .url)
             } catch {
                 LogManager.logError("Decoding error for required property 'url': \(error)")
                 throw error
@@ -80,11 +76,4 @@ public struct Ingest: ATProtocolCodable, ATProtocolValue {
             case url
         }
     }
-
-
-
 }
-
-
-
-

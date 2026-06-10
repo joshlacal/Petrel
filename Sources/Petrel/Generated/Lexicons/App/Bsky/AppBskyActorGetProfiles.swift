@@ -1,94 +1,58 @@
 import Foundation
 
-
-
 // lexicon: 1, id: app.bsky.actor.getProfiles
 
-
-public struct AppBskyActorGetProfiles {
-
+public enum AppBskyActorGetProfiles {
     public static let typeIdentifier = "app.bsky.actor.getProfiles"
-public struct Parameters: Parametrizable {
+    public struct Parameters: Parametrizable {
         public let actors: [ATIdentifier]
 
         public init(
             actors: [ATIdentifier]
-            ) {
+        ) {
             self.actors = actors
-
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let profiles: [AppBskyActorDefs.ProfileViewDetailed]
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             profiles: [AppBskyActorDefs.ProfileViewDetailed]
 
-
         ) {
-
-
             self.profiles = profiles
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.profiles = try container.decode([AppBskyActorDefs.ProfileViewDetailed].self, forKey: .profiles)
-
-
+            profiles = try container.decode([AppBskyActorDefs.ProfileViewDetailed].self, forKey: .profiles)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(profiles, forKey: .profiles)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let profilesValue = try profiles.toCBORValue()
             map = map.adding(key: "profiles", value: profilesValue)
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case profiles
         }
-
     }
-
-
-
-
 }
 
-
-
-extension ATProtoClient.App.Bsky.Actor {
+public extension ATProtoClient.App.Bsky.Actor {
     // MARK: - getProfiles
 
     /// Get detailed profile views of multiple actors.
@@ -97,9 +61,8 @@ extension ATProtoClient.App.Bsky.Actor {
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func getProfiles(input: AppBskyActorGetProfiles.Parameters) async throws -> (responseCode: Int, data: AppBskyActorGetProfiles.Output?) {
+    func getProfiles(input: AppBskyActorGetProfiles.Parameters) async throws -> (responseCode: Int, data: AppBskyActorGetProfiles.Output?) {
         let endpoint = "app.bsky.actor.getProfiles"
-
 
         let queryItems = input.asQueryItems()
 
@@ -120,8 +83,7 @@ extension ATProtoClient.App.Bsky.Actor {
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
             }
@@ -130,9 +92,7 @@ extension ATProtoClient.App.Bsky.Actor {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-
             do {
-
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode(AppBskyActorGetProfiles.Output.self, from: responseData)
 
@@ -143,12 +103,9 @@ extension ATProtoClient.App.Bsky.Actor {
                 return (responseCode, nil)
             }
         } else {
-
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
-

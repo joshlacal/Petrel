@@ -1,25 +1,21 @@
 import Foundation
 
-
-
 // lexicon: 1, id: chat.bsky.moderation.subscribeModEvents
 
-
-public struct ChatBskyModerationSubscribeModEvents {
-
+public enum ChatBskyModerationSubscribeModEvents {
     public static let typeIdentifier = "chat.bsky.moderation.subscribeModEvents"
 
-public struct EventConvoFirstMessage: ATProtocolCodable, ATProtocolValue {
-            public static let typeIdentifier = "chat.bsky.moderation.subscribeModEvents#eventConvoFirstMessage"
-            public let convoId: String
-            public let createdAt: ATProtocolDate
-            public let messageId: String
-            public let recipients: [DID]
-            public let rev: String
-            public let user: DID
+    public struct EventConvoFirstMessage: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "chat.bsky.moderation.subscribeModEvents#eventConvoFirstMessage"
+        public let convoId: String
+        public let createdAt: ATProtocolDate
+        public let messageId: String?
+        public let recipients: [DID]
+        public let rev: String
+        public let user: DID
 
         public init(
-            convoId: String, createdAt: ATProtocolDate, messageId: String, recipients: [DID], rev: String, user: DID
+            convoId: String, createdAt: ATProtocolDate, messageId: String?, recipients: [DID], rev: String, user: DID
         ) {
             self.convoId = convoId
             self.createdAt = createdAt
@@ -32,37 +28,37 @@ public struct EventConvoFirstMessage: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                self.convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: .convoId)
             } catch {
                 LogManager.logError("Decoding error for required property 'convoId': \(error)")
                 throw error
             }
             do {
-                self.createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
             } catch {
                 LogManager.logError("Decoding error for required property 'createdAt': \(error)")
                 throw error
             }
             do {
-                self.messageId = try container.decode(String.self, forKey: .messageId)
+                messageId = try container.decodeIfPresent(String.self, forKey: .messageId)
             } catch {
-                LogManager.logError("Decoding error for required property 'messageId': \(error)")
+                LogManager.logDebug("Decoding error for optional property 'messageId': \(error)")
                 throw error
             }
             do {
-                self.recipients = try container.decode([DID].self, forKey: .recipients)
+                recipients = try container.decode([DID].self, forKey: .recipients)
             } catch {
                 LogManager.logError("Decoding error for required property 'recipients': \(error)")
                 throw error
             }
             do {
-                self.rev = try container.decode(String.self, forKey: .rev)
+                rev = try container.decode(String.self, forKey: .rev)
             } catch {
                 LogManager.logError("Decoding error for required property 'rev': \(error)")
                 throw error
             }
             do {
-                self.user = try container.decode(DID.self, forKey: .user)
+                user = try container.decode(DID.self, forKey: .user)
             } catch {
                 LogManager.logError("Decoding error for required property 'user': \(error)")
                 throw error
@@ -74,7 +70,7 @@ public struct EventConvoFirstMessage: ATProtocolCodable, ATProtocolValue {
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(convoId, forKey: .convoId)
             try container.encode(createdAt, forKey: .createdAt)
-            try container.encode(messageId, forKey: .messageId)
+            try container.encodeIfPresent(messageId, forKey: .messageId)
             try container.encode(recipients, forKey: .recipients)
             try container.encode(rev, forKey: .rev)
             try container.encode(user, forKey: .user)
@@ -83,7 +79,11 @@ public struct EventConvoFirstMessage: ATProtocolCodable, ATProtocolValue {
         public func hash(into hasher: inout Hasher) {
             hasher.combine(convoId)
             hasher.combine(createdAt)
-            hasher.combine(messageId)
+            if let value = messageId {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
             hasher.combine(recipients)
             hasher.combine(rev)
             hasher.combine(user)
@@ -123,8 +123,10 @@ public struct EventConvoFirstMessage: ATProtocolCodable, ATProtocolValue {
             map = map.adding(key: "convoId", value: convoIdValue)
             let createdAtValue = try createdAt.toCBORValue()
             map = map.adding(key: "createdAt", value: createdAtValue)
-            let messageIdValue = try messageId.toCBORValue()
-            map = map.adding(key: "messageId", value: messageIdValue)
+            if let value = messageId {
+                let messageIdValue = try value.toCBORValue()
+                map = map.adding(key: "messageId", value: messageIdValue)
+            }
             let recipientsValue = try recipients.toCBORValue()
             map = map.adding(key: "recipients", value: recipientsValue)
             let revValue = try rev.toCBORValue()
@@ -144,94 +146,2163 @@ public struct EventConvoFirstMessage: ATProtocolCodable, ATProtocolValue {
             case user
         }
     }
-public struct Parameters: Parametrizable {
+
+    public struct EventGroupChatCreated: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "chat.bsky.moderation.subscribeModEvents#eventGroupChatCreated"
+        public let actorDid: DID
+        public let convoCreatedAt: ATProtocolDate
+        public let convoId: String
+        public let createdAt: ATProtocolDate
+        public let groupMemberCount: Int
+        public let groupName: String
+        public let initialMemberDids: [DID]
+        public let ownerDid: DID
+        public let rev: String
+
+        public init(
+            actorDid: DID, convoCreatedAt: ATProtocolDate, convoId: String, createdAt: ATProtocolDate, groupMemberCount: Int, groupName: String, initialMemberDids: [DID], ownerDid: DID, rev: String
+        ) {
+            self.actorDid = actorDid
+            self.convoCreatedAt = convoCreatedAt
+            self.convoId = convoId
+            self.createdAt = createdAt
+            self.groupMemberCount = groupMemberCount
+            self.groupName = groupName
+            self.initialMemberDids = initialMemberDids
+            self.ownerDid = ownerDid
+            self.rev = rev
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                actorDid = try container.decode(DID.self, forKey: .actorDid)
+            } catch {
+                LogManager.logError("Decoding error for required property 'actorDid': \(error)")
+                throw error
+            }
+            do {
+                convoCreatedAt = try container.decode(ATProtocolDate.self, forKey: .convoCreatedAt)
+            } catch {
+                LogManager.logError("Decoding error for required property 'convoCreatedAt': \(error)")
+                throw error
+            }
+            do {
+                convoId = try container.decode(String.self, forKey: .convoId)
+            } catch {
+                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                throw error
+            }
+            do {
+                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+            } catch {
+                LogManager.logError("Decoding error for required property 'createdAt': \(error)")
+                throw error
+            }
+            do {
+                groupMemberCount = try container.decode(Int.self, forKey: .groupMemberCount)
+            } catch {
+                LogManager.logError("Decoding error for required property 'groupMemberCount': \(error)")
+                throw error
+            }
+            do {
+                groupName = try container.decode(String.self, forKey: .groupName)
+            } catch {
+                LogManager.logError("Decoding error for required property 'groupName': \(error)")
+                throw error
+            }
+            do {
+                initialMemberDids = try container.decode([DID].self, forKey: .initialMemberDids)
+            } catch {
+                LogManager.logError("Decoding error for required property 'initialMemberDids': \(error)")
+                throw error
+            }
+            do {
+                ownerDid = try container.decode(DID.self, forKey: .ownerDid)
+            } catch {
+                LogManager.logError("Decoding error for required property 'ownerDid': \(error)")
+                throw error
+            }
+            do {
+                rev = try container.decode(String.self, forKey: .rev)
+            } catch {
+                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            try container.encode(actorDid, forKey: .actorDid)
+            try container.encode(convoCreatedAt, forKey: .convoCreatedAt)
+            try container.encode(convoId, forKey: .convoId)
+            try container.encode(createdAt, forKey: .createdAt)
+            try container.encode(groupMemberCount, forKey: .groupMemberCount)
+            try container.encode(groupName, forKey: .groupName)
+            try container.encode(initialMemberDids, forKey: .initialMemberDids)
+            try container.encode(ownerDid, forKey: .ownerDid)
+            try container.encode(rev, forKey: .rev)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(actorDid)
+            hasher.combine(convoCreatedAt)
+            hasher.combine(convoId)
+            hasher.combine(createdAt)
+            hasher.combine(groupMemberCount)
+            hasher.combine(groupName)
+            hasher.combine(initialMemberDids)
+            hasher.combine(ownerDid)
+            hasher.combine(rev)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+            if actorDid != other.actorDid {
+                return false
+            }
+            if convoCreatedAt != other.convoCreatedAt {
+                return false
+            }
+            if convoId != other.convoId {
+                return false
+            }
+            if createdAt != other.createdAt {
+                return false
+            }
+            if groupMemberCount != other.groupMemberCount {
+                return false
+            }
+            if groupName != other.groupName {
+                return false
+            }
+            if initialMemberDids != other.initialMemberDids {
+                return false
+            }
+            if ownerDid != other.ownerDid {
+                return false
+            }
+            if rev != other.rev {
+                return false
+            }
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            let actorDidValue = try actorDid.toCBORValue()
+            map = map.adding(key: "actorDid", value: actorDidValue)
+            let convoCreatedAtValue = try convoCreatedAt.toCBORValue()
+            map = map.adding(key: "convoCreatedAt", value: convoCreatedAtValue)
+            let convoIdValue = try convoId.toCBORValue()
+            map = map.adding(key: "convoId", value: convoIdValue)
+            let createdAtValue = try createdAt.toCBORValue()
+            map = map.adding(key: "createdAt", value: createdAtValue)
+            let groupMemberCountValue = try groupMemberCount.toCBORValue()
+            map = map.adding(key: "groupMemberCount", value: groupMemberCountValue)
+            let groupNameValue = try groupName.toCBORValue()
+            map = map.adding(key: "groupName", value: groupNameValue)
+            let initialMemberDidsValue = try initialMemberDids.toCBORValue()
+            map = map.adding(key: "initialMemberDids", value: initialMemberDidsValue)
+            let ownerDidValue = try ownerDid.toCBORValue()
+            map = map.adding(key: "ownerDid", value: ownerDidValue)
+            let revValue = try rev.toCBORValue()
+            map = map.adding(key: "rev", value: revValue)
+            return map
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case actorDid
+            case convoCreatedAt
+            case convoId
+            case createdAt
+            case groupMemberCount
+            case groupName
+            case initialMemberDids
+            case ownerDid
+            case rev
+        }
+    }
+
+    public struct EventGroupChatMemberAdded: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "chat.bsky.moderation.subscribeModEvents#eventGroupChatMemberAdded"
+        public let actorDid: DID
+        public let convoCreatedAt: ATProtocolDate
+        public let convoId: String
+        public let createdAt: ATProtocolDate
+        public let groupMemberCount: Int
+        public let groupName: String
+        public let ownerDid: DID
+        public let requestMembersCount: Int
+        public let rev: String
+        public let subjectDid: DID
+        public let subjectFollowsOwner: Bool
+
+        public init(
+            actorDid: DID, convoCreatedAt: ATProtocolDate, convoId: String, createdAt: ATProtocolDate, groupMemberCount: Int, groupName: String, ownerDid: DID, requestMembersCount: Int, rev: String, subjectDid: DID, subjectFollowsOwner: Bool
+        ) {
+            self.actorDid = actorDid
+            self.convoCreatedAt = convoCreatedAt
+            self.convoId = convoId
+            self.createdAt = createdAt
+            self.groupMemberCount = groupMemberCount
+            self.groupName = groupName
+            self.ownerDid = ownerDid
+            self.requestMembersCount = requestMembersCount
+            self.rev = rev
+            self.subjectDid = subjectDid
+            self.subjectFollowsOwner = subjectFollowsOwner
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                actorDid = try container.decode(DID.self, forKey: .actorDid)
+            } catch {
+                LogManager.logError("Decoding error for required property 'actorDid': \(error)")
+                throw error
+            }
+            do {
+                convoCreatedAt = try container.decode(ATProtocolDate.self, forKey: .convoCreatedAt)
+            } catch {
+                LogManager.logError("Decoding error for required property 'convoCreatedAt': \(error)")
+                throw error
+            }
+            do {
+                convoId = try container.decode(String.self, forKey: .convoId)
+            } catch {
+                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                throw error
+            }
+            do {
+                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+            } catch {
+                LogManager.logError("Decoding error for required property 'createdAt': \(error)")
+                throw error
+            }
+            do {
+                groupMemberCount = try container.decode(Int.self, forKey: .groupMemberCount)
+            } catch {
+                LogManager.logError("Decoding error for required property 'groupMemberCount': \(error)")
+                throw error
+            }
+            do {
+                groupName = try container.decode(String.self, forKey: .groupName)
+            } catch {
+                LogManager.logError("Decoding error for required property 'groupName': \(error)")
+                throw error
+            }
+            do {
+                ownerDid = try container.decode(DID.self, forKey: .ownerDid)
+            } catch {
+                LogManager.logError("Decoding error for required property 'ownerDid': \(error)")
+                throw error
+            }
+            do {
+                requestMembersCount = try container.decode(Int.self, forKey: .requestMembersCount)
+            } catch {
+                LogManager.logError("Decoding error for required property 'requestMembersCount': \(error)")
+                throw error
+            }
+            do {
+                rev = try container.decode(String.self, forKey: .rev)
+            } catch {
+                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                throw error
+            }
+            do {
+                subjectDid = try container.decode(DID.self, forKey: .subjectDid)
+            } catch {
+                LogManager.logError("Decoding error for required property 'subjectDid': \(error)")
+                throw error
+            }
+            do {
+                subjectFollowsOwner = try container.decode(Bool.self, forKey: .subjectFollowsOwner)
+            } catch {
+                LogManager.logError("Decoding error for required property 'subjectFollowsOwner': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            try container.encode(actorDid, forKey: .actorDid)
+            try container.encode(convoCreatedAt, forKey: .convoCreatedAt)
+            try container.encode(convoId, forKey: .convoId)
+            try container.encode(createdAt, forKey: .createdAt)
+            try container.encode(groupMemberCount, forKey: .groupMemberCount)
+            try container.encode(groupName, forKey: .groupName)
+            try container.encode(ownerDid, forKey: .ownerDid)
+            try container.encode(requestMembersCount, forKey: .requestMembersCount)
+            try container.encode(rev, forKey: .rev)
+            try container.encode(subjectDid, forKey: .subjectDid)
+            try container.encode(subjectFollowsOwner, forKey: .subjectFollowsOwner)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(actorDid)
+            hasher.combine(convoCreatedAt)
+            hasher.combine(convoId)
+            hasher.combine(createdAt)
+            hasher.combine(groupMemberCount)
+            hasher.combine(groupName)
+            hasher.combine(ownerDid)
+            hasher.combine(requestMembersCount)
+            hasher.combine(rev)
+            hasher.combine(subjectDid)
+            hasher.combine(subjectFollowsOwner)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+            if actorDid != other.actorDid {
+                return false
+            }
+            if convoCreatedAt != other.convoCreatedAt {
+                return false
+            }
+            if convoId != other.convoId {
+                return false
+            }
+            if createdAt != other.createdAt {
+                return false
+            }
+            if groupMemberCount != other.groupMemberCount {
+                return false
+            }
+            if groupName != other.groupName {
+                return false
+            }
+            if ownerDid != other.ownerDid {
+                return false
+            }
+            if requestMembersCount != other.requestMembersCount {
+                return false
+            }
+            if rev != other.rev {
+                return false
+            }
+            if subjectDid != other.subjectDid {
+                return false
+            }
+            if subjectFollowsOwner != other.subjectFollowsOwner {
+                return false
+            }
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            let actorDidValue = try actorDid.toCBORValue()
+            map = map.adding(key: "actorDid", value: actorDidValue)
+            let convoCreatedAtValue = try convoCreatedAt.toCBORValue()
+            map = map.adding(key: "convoCreatedAt", value: convoCreatedAtValue)
+            let convoIdValue = try convoId.toCBORValue()
+            map = map.adding(key: "convoId", value: convoIdValue)
+            let createdAtValue = try createdAt.toCBORValue()
+            map = map.adding(key: "createdAt", value: createdAtValue)
+            let groupMemberCountValue = try groupMemberCount.toCBORValue()
+            map = map.adding(key: "groupMemberCount", value: groupMemberCountValue)
+            let groupNameValue = try groupName.toCBORValue()
+            map = map.adding(key: "groupName", value: groupNameValue)
+            let ownerDidValue = try ownerDid.toCBORValue()
+            map = map.adding(key: "ownerDid", value: ownerDidValue)
+            let requestMembersCountValue = try requestMembersCount.toCBORValue()
+            map = map.adding(key: "requestMembersCount", value: requestMembersCountValue)
+            let revValue = try rev.toCBORValue()
+            map = map.adding(key: "rev", value: revValue)
+            let subjectDidValue = try subjectDid.toCBORValue()
+            map = map.adding(key: "subjectDid", value: subjectDidValue)
+            let subjectFollowsOwnerValue = try subjectFollowsOwner.toCBORValue()
+            map = map.adding(key: "subjectFollowsOwner", value: subjectFollowsOwnerValue)
+            return map
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case actorDid
+            case convoCreatedAt
+            case convoId
+            case createdAt
+            case groupMemberCount
+            case groupName
+            case ownerDid
+            case requestMembersCount
+            case rev
+            case subjectDid
+            case subjectFollowsOwner
+        }
+    }
+
+    public struct EventGroupChatMemberJoined: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "chat.bsky.moderation.subscribeModEvents#eventGroupChatMemberJoined"
+        public let actorDid: DID
+        public let convoCreatedAt: ATProtocolDate
+        public let convoId: String
+        public let createdAt: ATProtocolDate
+        public let groupMemberCount: Int
+        public let groupName: String
+        public let joinLinkCode: String
+        public let ownerDid: DID
+        public let rev: String
+        public let subjectFollowsOwner: Bool
+
+        public init(
+            actorDid: DID, convoCreatedAt: ATProtocolDate, convoId: String, createdAt: ATProtocolDate, groupMemberCount: Int, groupName: String, joinLinkCode: String, ownerDid: DID, rev: String, subjectFollowsOwner: Bool
+        ) {
+            self.actorDid = actorDid
+            self.convoCreatedAt = convoCreatedAt
+            self.convoId = convoId
+            self.createdAt = createdAt
+            self.groupMemberCount = groupMemberCount
+            self.groupName = groupName
+            self.joinLinkCode = joinLinkCode
+            self.ownerDid = ownerDid
+            self.rev = rev
+            self.subjectFollowsOwner = subjectFollowsOwner
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                actorDid = try container.decode(DID.self, forKey: .actorDid)
+            } catch {
+                LogManager.logError("Decoding error for required property 'actorDid': \(error)")
+                throw error
+            }
+            do {
+                convoCreatedAt = try container.decode(ATProtocolDate.self, forKey: .convoCreatedAt)
+            } catch {
+                LogManager.logError("Decoding error for required property 'convoCreatedAt': \(error)")
+                throw error
+            }
+            do {
+                convoId = try container.decode(String.self, forKey: .convoId)
+            } catch {
+                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                throw error
+            }
+            do {
+                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+            } catch {
+                LogManager.logError("Decoding error for required property 'createdAt': \(error)")
+                throw error
+            }
+            do {
+                groupMemberCount = try container.decode(Int.self, forKey: .groupMemberCount)
+            } catch {
+                LogManager.logError("Decoding error for required property 'groupMemberCount': \(error)")
+                throw error
+            }
+            do {
+                groupName = try container.decode(String.self, forKey: .groupName)
+            } catch {
+                LogManager.logError("Decoding error for required property 'groupName': \(error)")
+                throw error
+            }
+            do {
+                joinLinkCode = try container.decode(String.self, forKey: .joinLinkCode)
+            } catch {
+                LogManager.logError("Decoding error for required property 'joinLinkCode': \(error)")
+                throw error
+            }
+            do {
+                ownerDid = try container.decode(DID.self, forKey: .ownerDid)
+            } catch {
+                LogManager.logError("Decoding error for required property 'ownerDid': \(error)")
+                throw error
+            }
+            do {
+                rev = try container.decode(String.self, forKey: .rev)
+            } catch {
+                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                throw error
+            }
+            do {
+                subjectFollowsOwner = try container.decode(Bool.self, forKey: .subjectFollowsOwner)
+            } catch {
+                LogManager.logError("Decoding error for required property 'subjectFollowsOwner': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            try container.encode(actorDid, forKey: .actorDid)
+            try container.encode(convoCreatedAt, forKey: .convoCreatedAt)
+            try container.encode(convoId, forKey: .convoId)
+            try container.encode(createdAt, forKey: .createdAt)
+            try container.encode(groupMemberCount, forKey: .groupMemberCount)
+            try container.encode(groupName, forKey: .groupName)
+            try container.encode(joinLinkCode, forKey: .joinLinkCode)
+            try container.encode(ownerDid, forKey: .ownerDid)
+            try container.encode(rev, forKey: .rev)
+            try container.encode(subjectFollowsOwner, forKey: .subjectFollowsOwner)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(actorDid)
+            hasher.combine(convoCreatedAt)
+            hasher.combine(convoId)
+            hasher.combine(createdAt)
+            hasher.combine(groupMemberCount)
+            hasher.combine(groupName)
+            hasher.combine(joinLinkCode)
+            hasher.combine(ownerDid)
+            hasher.combine(rev)
+            hasher.combine(subjectFollowsOwner)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+            if actorDid != other.actorDid {
+                return false
+            }
+            if convoCreatedAt != other.convoCreatedAt {
+                return false
+            }
+            if convoId != other.convoId {
+                return false
+            }
+            if createdAt != other.createdAt {
+                return false
+            }
+            if groupMemberCount != other.groupMemberCount {
+                return false
+            }
+            if groupName != other.groupName {
+                return false
+            }
+            if joinLinkCode != other.joinLinkCode {
+                return false
+            }
+            if ownerDid != other.ownerDid {
+                return false
+            }
+            if rev != other.rev {
+                return false
+            }
+            if subjectFollowsOwner != other.subjectFollowsOwner {
+                return false
+            }
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            let actorDidValue = try actorDid.toCBORValue()
+            map = map.adding(key: "actorDid", value: actorDidValue)
+            let convoCreatedAtValue = try convoCreatedAt.toCBORValue()
+            map = map.adding(key: "convoCreatedAt", value: convoCreatedAtValue)
+            let convoIdValue = try convoId.toCBORValue()
+            map = map.adding(key: "convoId", value: convoIdValue)
+            let createdAtValue = try createdAt.toCBORValue()
+            map = map.adding(key: "createdAt", value: createdAtValue)
+            let groupMemberCountValue = try groupMemberCount.toCBORValue()
+            map = map.adding(key: "groupMemberCount", value: groupMemberCountValue)
+            let groupNameValue = try groupName.toCBORValue()
+            map = map.adding(key: "groupName", value: groupNameValue)
+            let joinLinkCodeValue = try joinLinkCode.toCBORValue()
+            map = map.adding(key: "joinLinkCode", value: joinLinkCodeValue)
+            let ownerDidValue = try ownerDid.toCBORValue()
+            map = map.adding(key: "ownerDid", value: ownerDidValue)
+            let revValue = try rev.toCBORValue()
+            map = map.adding(key: "rev", value: revValue)
+            let subjectFollowsOwnerValue = try subjectFollowsOwner.toCBORValue()
+            map = map.adding(key: "subjectFollowsOwner", value: subjectFollowsOwnerValue)
+            return map
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case actorDid
+            case convoCreatedAt
+            case convoId
+            case createdAt
+            case groupMemberCount
+            case groupName
+            case joinLinkCode
+            case ownerDid
+            case rev
+            case subjectFollowsOwner
+        }
+    }
+
+    public struct EventGroupChatJoinRequest: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "chat.bsky.moderation.subscribeModEvents#eventGroupChatJoinRequest"
+        public let actorDid: DID
+        public let convoCreatedAt: ATProtocolDate
+        public let convoId: String
+        public let createdAt: ATProtocolDate
+        public let groupMemberCount: Int
+        public let groupName: String
+        public let joinLinkCode: String
+        public let ownerDid: DID
+        public let rev: String
+        public let subjectFollowsOwner: Bool
+
+        public init(
+            actorDid: DID, convoCreatedAt: ATProtocolDate, convoId: String, createdAt: ATProtocolDate, groupMemberCount: Int, groupName: String, joinLinkCode: String, ownerDid: DID, rev: String, subjectFollowsOwner: Bool
+        ) {
+            self.actorDid = actorDid
+            self.convoCreatedAt = convoCreatedAt
+            self.convoId = convoId
+            self.createdAt = createdAt
+            self.groupMemberCount = groupMemberCount
+            self.groupName = groupName
+            self.joinLinkCode = joinLinkCode
+            self.ownerDid = ownerDid
+            self.rev = rev
+            self.subjectFollowsOwner = subjectFollowsOwner
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                actorDid = try container.decode(DID.self, forKey: .actorDid)
+            } catch {
+                LogManager.logError("Decoding error for required property 'actorDid': \(error)")
+                throw error
+            }
+            do {
+                convoCreatedAt = try container.decode(ATProtocolDate.self, forKey: .convoCreatedAt)
+            } catch {
+                LogManager.logError("Decoding error for required property 'convoCreatedAt': \(error)")
+                throw error
+            }
+            do {
+                convoId = try container.decode(String.self, forKey: .convoId)
+            } catch {
+                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                throw error
+            }
+            do {
+                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+            } catch {
+                LogManager.logError("Decoding error for required property 'createdAt': \(error)")
+                throw error
+            }
+            do {
+                groupMemberCount = try container.decode(Int.self, forKey: .groupMemberCount)
+            } catch {
+                LogManager.logError("Decoding error for required property 'groupMemberCount': \(error)")
+                throw error
+            }
+            do {
+                groupName = try container.decode(String.self, forKey: .groupName)
+            } catch {
+                LogManager.logError("Decoding error for required property 'groupName': \(error)")
+                throw error
+            }
+            do {
+                joinLinkCode = try container.decode(String.self, forKey: .joinLinkCode)
+            } catch {
+                LogManager.logError("Decoding error for required property 'joinLinkCode': \(error)")
+                throw error
+            }
+            do {
+                ownerDid = try container.decode(DID.self, forKey: .ownerDid)
+            } catch {
+                LogManager.logError("Decoding error for required property 'ownerDid': \(error)")
+                throw error
+            }
+            do {
+                rev = try container.decode(String.self, forKey: .rev)
+            } catch {
+                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                throw error
+            }
+            do {
+                subjectFollowsOwner = try container.decode(Bool.self, forKey: .subjectFollowsOwner)
+            } catch {
+                LogManager.logError("Decoding error for required property 'subjectFollowsOwner': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            try container.encode(actorDid, forKey: .actorDid)
+            try container.encode(convoCreatedAt, forKey: .convoCreatedAt)
+            try container.encode(convoId, forKey: .convoId)
+            try container.encode(createdAt, forKey: .createdAt)
+            try container.encode(groupMemberCount, forKey: .groupMemberCount)
+            try container.encode(groupName, forKey: .groupName)
+            try container.encode(joinLinkCode, forKey: .joinLinkCode)
+            try container.encode(ownerDid, forKey: .ownerDid)
+            try container.encode(rev, forKey: .rev)
+            try container.encode(subjectFollowsOwner, forKey: .subjectFollowsOwner)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(actorDid)
+            hasher.combine(convoCreatedAt)
+            hasher.combine(convoId)
+            hasher.combine(createdAt)
+            hasher.combine(groupMemberCount)
+            hasher.combine(groupName)
+            hasher.combine(joinLinkCode)
+            hasher.combine(ownerDid)
+            hasher.combine(rev)
+            hasher.combine(subjectFollowsOwner)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+            if actorDid != other.actorDid {
+                return false
+            }
+            if convoCreatedAt != other.convoCreatedAt {
+                return false
+            }
+            if convoId != other.convoId {
+                return false
+            }
+            if createdAt != other.createdAt {
+                return false
+            }
+            if groupMemberCount != other.groupMemberCount {
+                return false
+            }
+            if groupName != other.groupName {
+                return false
+            }
+            if joinLinkCode != other.joinLinkCode {
+                return false
+            }
+            if ownerDid != other.ownerDid {
+                return false
+            }
+            if rev != other.rev {
+                return false
+            }
+            if subjectFollowsOwner != other.subjectFollowsOwner {
+                return false
+            }
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            let actorDidValue = try actorDid.toCBORValue()
+            map = map.adding(key: "actorDid", value: actorDidValue)
+            let convoCreatedAtValue = try convoCreatedAt.toCBORValue()
+            map = map.adding(key: "convoCreatedAt", value: convoCreatedAtValue)
+            let convoIdValue = try convoId.toCBORValue()
+            map = map.adding(key: "convoId", value: convoIdValue)
+            let createdAtValue = try createdAt.toCBORValue()
+            map = map.adding(key: "createdAt", value: createdAtValue)
+            let groupMemberCountValue = try groupMemberCount.toCBORValue()
+            map = map.adding(key: "groupMemberCount", value: groupMemberCountValue)
+            let groupNameValue = try groupName.toCBORValue()
+            map = map.adding(key: "groupName", value: groupNameValue)
+            let joinLinkCodeValue = try joinLinkCode.toCBORValue()
+            map = map.adding(key: "joinLinkCode", value: joinLinkCodeValue)
+            let ownerDidValue = try ownerDid.toCBORValue()
+            map = map.adding(key: "ownerDid", value: ownerDidValue)
+            let revValue = try rev.toCBORValue()
+            map = map.adding(key: "rev", value: revValue)
+            let subjectFollowsOwnerValue = try subjectFollowsOwner.toCBORValue()
+            map = map.adding(key: "subjectFollowsOwner", value: subjectFollowsOwnerValue)
+            return map
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case actorDid
+            case convoCreatedAt
+            case convoId
+            case createdAt
+            case groupMemberCount
+            case groupName
+            case joinLinkCode
+            case ownerDid
+            case rev
+            case subjectFollowsOwner
+        }
+    }
+
+    public struct EventGroupChatJoinRequestApproved: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "chat.bsky.moderation.subscribeModEvents#eventGroupChatJoinRequestApproved"
+        public let actorDid: DID
+        public let convoCreatedAt: ATProtocolDate
+        public let convoId: String
+        public let createdAt: ATProtocolDate
+        public let groupMemberCount: Int
+        public let groupName: String
+        public let ownerDid: DID
+        public let rev: String
+        public let subjectDid: DID
+
+        public init(
+            actorDid: DID, convoCreatedAt: ATProtocolDate, convoId: String, createdAt: ATProtocolDate, groupMemberCount: Int, groupName: String, ownerDid: DID, rev: String, subjectDid: DID
+        ) {
+            self.actorDid = actorDid
+            self.convoCreatedAt = convoCreatedAt
+            self.convoId = convoId
+            self.createdAt = createdAt
+            self.groupMemberCount = groupMemberCount
+            self.groupName = groupName
+            self.ownerDid = ownerDid
+            self.rev = rev
+            self.subjectDid = subjectDid
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                actorDid = try container.decode(DID.self, forKey: .actorDid)
+            } catch {
+                LogManager.logError("Decoding error for required property 'actorDid': \(error)")
+                throw error
+            }
+            do {
+                convoCreatedAt = try container.decode(ATProtocolDate.self, forKey: .convoCreatedAt)
+            } catch {
+                LogManager.logError("Decoding error for required property 'convoCreatedAt': \(error)")
+                throw error
+            }
+            do {
+                convoId = try container.decode(String.self, forKey: .convoId)
+            } catch {
+                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                throw error
+            }
+            do {
+                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+            } catch {
+                LogManager.logError("Decoding error for required property 'createdAt': \(error)")
+                throw error
+            }
+            do {
+                groupMemberCount = try container.decode(Int.self, forKey: .groupMemberCount)
+            } catch {
+                LogManager.logError("Decoding error for required property 'groupMemberCount': \(error)")
+                throw error
+            }
+            do {
+                groupName = try container.decode(String.self, forKey: .groupName)
+            } catch {
+                LogManager.logError("Decoding error for required property 'groupName': \(error)")
+                throw error
+            }
+            do {
+                ownerDid = try container.decode(DID.self, forKey: .ownerDid)
+            } catch {
+                LogManager.logError("Decoding error for required property 'ownerDid': \(error)")
+                throw error
+            }
+            do {
+                rev = try container.decode(String.self, forKey: .rev)
+            } catch {
+                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                throw error
+            }
+            do {
+                subjectDid = try container.decode(DID.self, forKey: .subjectDid)
+            } catch {
+                LogManager.logError("Decoding error for required property 'subjectDid': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            try container.encode(actorDid, forKey: .actorDid)
+            try container.encode(convoCreatedAt, forKey: .convoCreatedAt)
+            try container.encode(convoId, forKey: .convoId)
+            try container.encode(createdAt, forKey: .createdAt)
+            try container.encode(groupMemberCount, forKey: .groupMemberCount)
+            try container.encode(groupName, forKey: .groupName)
+            try container.encode(ownerDid, forKey: .ownerDid)
+            try container.encode(rev, forKey: .rev)
+            try container.encode(subjectDid, forKey: .subjectDid)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(actorDid)
+            hasher.combine(convoCreatedAt)
+            hasher.combine(convoId)
+            hasher.combine(createdAt)
+            hasher.combine(groupMemberCount)
+            hasher.combine(groupName)
+            hasher.combine(ownerDid)
+            hasher.combine(rev)
+            hasher.combine(subjectDid)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+            if actorDid != other.actorDid {
+                return false
+            }
+            if convoCreatedAt != other.convoCreatedAt {
+                return false
+            }
+            if convoId != other.convoId {
+                return false
+            }
+            if createdAt != other.createdAt {
+                return false
+            }
+            if groupMemberCount != other.groupMemberCount {
+                return false
+            }
+            if groupName != other.groupName {
+                return false
+            }
+            if ownerDid != other.ownerDid {
+                return false
+            }
+            if rev != other.rev {
+                return false
+            }
+            if subjectDid != other.subjectDid {
+                return false
+            }
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            let actorDidValue = try actorDid.toCBORValue()
+            map = map.adding(key: "actorDid", value: actorDidValue)
+            let convoCreatedAtValue = try convoCreatedAt.toCBORValue()
+            map = map.adding(key: "convoCreatedAt", value: convoCreatedAtValue)
+            let convoIdValue = try convoId.toCBORValue()
+            map = map.adding(key: "convoId", value: convoIdValue)
+            let createdAtValue = try createdAt.toCBORValue()
+            map = map.adding(key: "createdAt", value: createdAtValue)
+            let groupMemberCountValue = try groupMemberCount.toCBORValue()
+            map = map.adding(key: "groupMemberCount", value: groupMemberCountValue)
+            let groupNameValue = try groupName.toCBORValue()
+            map = map.adding(key: "groupName", value: groupNameValue)
+            let ownerDidValue = try ownerDid.toCBORValue()
+            map = map.adding(key: "ownerDid", value: ownerDidValue)
+            let revValue = try rev.toCBORValue()
+            map = map.adding(key: "rev", value: revValue)
+            let subjectDidValue = try subjectDid.toCBORValue()
+            map = map.adding(key: "subjectDid", value: subjectDidValue)
+            return map
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case actorDid
+            case convoCreatedAt
+            case convoId
+            case createdAt
+            case groupMemberCount
+            case groupName
+            case ownerDid
+            case rev
+            case subjectDid
+        }
+    }
+
+    public struct EventGroupChatJoinRequestRejected: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "chat.bsky.moderation.subscribeModEvents#eventGroupChatJoinRequestRejected"
+        public let actorDid: DID
+        public let convoCreatedAt: ATProtocolDate
+        public let convoId: String
+        public let createdAt: ATProtocolDate
+        public let groupMemberCount: Int
+        public let groupName: String
+        public let ownerDid: DID
+        public let rev: String
+        public let subjectDid: DID
+
+        public init(
+            actorDid: DID, convoCreatedAt: ATProtocolDate, convoId: String, createdAt: ATProtocolDate, groupMemberCount: Int, groupName: String, ownerDid: DID, rev: String, subjectDid: DID
+        ) {
+            self.actorDid = actorDid
+            self.convoCreatedAt = convoCreatedAt
+            self.convoId = convoId
+            self.createdAt = createdAt
+            self.groupMemberCount = groupMemberCount
+            self.groupName = groupName
+            self.ownerDid = ownerDid
+            self.rev = rev
+            self.subjectDid = subjectDid
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                actorDid = try container.decode(DID.self, forKey: .actorDid)
+            } catch {
+                LogManager.logError("Decoding error for required property 'actorDid': \(error)")
+                throw error
+            }
+            do {
+                convoCreatedAt = try container.decode(ATProtocolDate.self, forKey: .convoCreatedAt)
+            } catch {
+                LogManager.logError("Decoding error for required property 'convoCreatedAt': \(error)")
+                throw error
+            }
+            do {
+                convoId = try container.decode(String.self, forKey: .convoId)
+            } catch {
+                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                throw error
+            }
+            do {
+                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+            } catch {
+                LogManager.logError("Decoding error for required property 'createdAt': \(error)")
+                throw error
+            }
+            do {
+                groupMemberCount = try container.decode(Int.self, forKey: .groupMemberCount)
+            } catch {
+                LogManager.logError("Decoding error for required property 'groupMemberCount': \(error)")
+                throw error
+            }
+            do {
+                groupName = try container.decode(String.self, forKey: .groupName)
+            } catch {
+                LogManager.logError("Decoding error for required property 'groupName': \(error)")
+                throw error
+            }
+            do {
+                ownerDid = try container.decode(DID.self, forKey: .ownerDid)
+            } catch {
+                LogManager.logError("Decoding error for required property 'ownerDid': \(error)")
+                throw error
+            }
+            do {
+                rev = try container.decode(String.self, forKey: .rev)
+            } catch {
+                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                throw error
+            }
+            do {
+                subjectDid = try container.decode(DID.self, forKey: .subjectDid)
+            } catch {
+                LogManager.logError("Decoding error for required property 'subjectDid': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            try container.encode(actorDid, forKey: .actorDid)
+            try container.encode(convoCreatedAt, forKey: .convoCreatedAt)
+            try container.encode(convoId, forKey: .convoId)
+            try container.encode(createdAt, forKey: .createdAt)
+            try container.encode(groupMemberCount, forKey: .groupMemberCount)
+            try container.encode(groupName, forKey: .groupName)
+            try container.encode(ownerDid, forKey: .ownerDid)
+            try container.encode(rev, forKey: .rev)
+            try container.encode(subjectDid, forKey: .subjectDid)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(actorDid)
+            hasher.combine(convoCreatedAt)
+            hasher.combine(convoId)
+            hasher.combine(createdAt)
+            hasher.combine(groupMemberCount)
+            hasher.combine(groupName)
+            hasher.combine(ownerDid)
+            hasher.combine(rev)
+            hasher.combine(subjectDid)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+            if actorDid != other.actorDid {
+                return false
+            }
+            if convoCreatedAt != other.convoCreatedAt {
+                return false
+            }
+            if convoId != other.convoId {
+                return false
+            }
+            if createdAt != other.createdAt {
+                return false
+            }
+            if groupMemberCount != other.groupMemberCount {
+                return false
+            }
+            if groupName != other.groupName {
+                return false
+            }
+            if ownerDid != other.ownerDid {
+                return false
+            }
+            if rev != other.rev {
+                return false
+            }
+            if subjectDid != other.subjectDid {
+                return false
+            }
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            let actorDidValue = try actorDid.toCBORValue()
+            map = map.adding(key: "actorDid", value: actorDidValue)
+            let convoCreatedAtValue = try convoCreatedAt.toCBORValue()
+            map = map.adding(key: "convoCreatedAt", value: convoCreatedAtValue)
+            let convoIdValue = try convoId.toCBORValue()
+            map = map.adding(key: "convoId", value: convoIdValue)
+            let createdAtValue = try createdAt.toCBORValue()
+            map = map.adding(key: "createdAt", value: createdAtValue)
+            let groupMemberCountValue = try groupMemberCount.toCBORValue()
+            map = map.adding(key: "groupMemberCount", value: groupMemberCountValue)
+            let groupNameValue = try groupName.toCBORValue()
+            map = map.adding(key: "groupName", value: groupNameValue)
+            let ownerDidValue = try ownerDid.toCBORValue()
+            map = map.adding(key: "ownerDid", value: ownerDidValue)
+            let revValue = try rev.toCBORValue()
+            map = map.adding(key: "rev", value: revValue)
+            let subjectDidValue = try subjectDid.toCBORValue()
+            map = map.adding(key: "subjectDid", value: subjectDidValue)
+            return map
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case actorDid
+            case convoCreatedAt
+            case convoId
+            case createdAt
+            case groupMemberCount
+            case groupName
+            case ownerDid
+            case rev
+            case subjectDid
+        }
+    }
+
+    public struct EventChatAccepted: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "chat.bsky.moderation.subscribeModEvents#eventChatAccepted"
+        public let actorDid: DID
+        public let convoCreatedAt: ATProtocolDate
+        public let convoId: String
+        public let createdAt: ATProtocolDate
+        public let groupMemberCount: Int?
+        public let groupName: String?
+        public let method: String
+        public let ownerDid: DID?
+        public let rev: String
+
+        public init(
+            actorDid: DID, convoCreatedAt: ATProtocolDate, convoId: String, createdAt: ATProtocolDate, groupMemberCount: Int?, groupName: String?, method: String, ownerDid: DID?, rev: String
+        ) {
+            self.actorDid = actorDid
+            self.convoCreatedAt = convoCreatedAt
+            self.convoId = convoId
+            self.createdAt = createdAt
+            self.groupMemberCount = groupMemberCount
+            self.groupName = groupName
+            self.method = method
+            self.ownerDid = ownerDid
+            self.rev = rev
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                actorDid = try container.decode(DID.self, forKey: .actorDid)
+            } catch {
+                LogManager.logError("Decoding error for required property 'actorDid': \(error)")
+                throw error
+            }
+            do {
+                convoCreatedAt = try container.decode(ATProtocolDate.self, forKey: .convoCreatedAt)
+            } catch {
+                LogManager.logError("Decoding error for required property 'convoCreatedAt': \(error)")
+                throw error
+            }
+            do {
+                convoId = try container.decode(String.self, forKey: .convoId)
+            } catch {
+                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                throw error
+            }
+            do {
+                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+            } catch {
+                LogManager.logError("Decoding error for required property 'createdAt': \(error)")
+                throw error
+            }
+            do {
+                groupMemberCount = try container.decodeIfPresent(Int.self, forKey: .groupMemberCount)
+            } catch {
+                LogManager.logDebug("Decoding error for optional property 'groupMemberCount': \(error)")
+                throw error
+            }
+            do {
+                groupName = try container.decodeIfPresent(String.self, forKey: .groupName)
+            } catch {
+                LogManager.logDebug("Decoding error for optional property 'groupName': \(error)")
+                throw error
+            }
+            do {
+                method = try container.decode(String.self, forKey: .method)
+            } catch {
+                LogManager.logError("Decoding error for required property 'method': \(error)")
+                throw error
+            }
+            do {
+                ownerDid = try container.decodeIfPresent(DID.self, forKey: .ownerDid)
+            } catch {
+                LogManager.logDebug("Decoding error for optional property 'ownerDid': \(error)")
+                throw error
+            }
+            do {
+                rev = try container.decode(String.self, forKey: .rev)
+            } catch {
+                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            try container.encode(actorDid, forKey: .actorDid)
+            try container.encode(convoCreatedAt, forKey: .convoCreatedAt)
+            try container.encode(convoId, forKey: .convoId)
+            try container.encode(createdAt, forKey: .createdAt)
+            try container.encodeIfPresent(groupMemberCount, forKey: .groupMemberCount)
+            try container.encodeIfPresent(groupName, forKey: .groupName)
+            try container.encode(method, forKey: .method)
+            try container.encodeIfPresent(ownerDid, forKey: .ownerDid)
+            try container.encode(rev, forKey: .rev)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(actorDid)
+            hasher.combine(convoCreatedAt)
+            hasher.combine(convoId)
+            hasher.combine(createdAt)
+            if let value = groupMemberCount {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = groupName {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            hasher.combine(method)
+            if let value = ownerDid {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            hasher.combine(rev)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+            if actorDid != other.actorDid {
+                return false
+            }
+            if convoCreatedAt != other.convoCreatedAt {
+                return false
+            }
+            if convoId != other.convoId {
+                return false
+            }
+            if createdAt != other.createdAt {
+                return false
+            }
+            if groupMemberCount != other.groupMemberCount {
+                return false
+            }
+            if groupName != other.groupName {
+                return false
+            }
+            if method != other.method {
+                return false
+            }
+            if ownerDid != other.ownerDid {
+                return false
+            }
+            if rev != other.rev {
+                return false
+            }
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            let actorDidValue = try actorDid.toCBORValue()
+            map = map.adding(key: "actorDid", value: actorDidValue)
+            let convoCreatedAtValue = try convoCreatedAt.toCBORValue()
+            map = map.adding(key: "convoCreatedAt", value: convoCreatedAtValue)
+            let convoIdValue = try convoId.toCBORValue()
+            map = map.adding(key: "convoId", value: convoIdValue)
+            let createdAtValue = try createdAt.toCBORValue()
+            map = map.adding(key: "createdAt", value: createdAtValue)
+            if let value = groupMemberCount {
+                let groupMemberCountValue = try value.toCBORValue()
+                map = map.adding(key: "groupMemberCount", value: groupMemberCountValue)
+            }
+            if let value = groupName {
+                let groupNameValue = try value.toCBORValue()
+                map = map.adding(key: "groupName", value: groupNameValue)
+            }
+            let methodValue = try method.toCBORValue()
+            map = map.adding(key: "method", value: methodValue)
+            if let value = ownerDid {
+                let ownerDidValue = try value.toCBORValue()
+                map = map.adding(key: "ownerDid", value: ownerDidValue)
+            }
+            let revValue = try rev.toCBORValue()
+            map = map.adding(key: "rev", value: revValue)
+            return map
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case actorDid
+            case convoCreatedAt
+            case convoId
+            case createdAt
+            case groupMemberCount
+            case groupName
+            case method
+            case ownerDid
+            case rev
+        }
+    }
+
+    public struct EventGroupChatMemberLeft: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "chat.bsky.moderation.subscribeModEvents#eventGroupChatMemberLeft"
+        public let actorDid: DID
+        public let convoCreatedAt: ATProtocolDate
+        public let convoId: String
+        public let createdAt: ATProtocolDate
+        public let groupMemberCount: Int
+        public let groupName: String
+        public let leaveMethod: String
+        public let ownerDid: DID
+        public let rev: String
+        public let subjectDid: DID
+
+        public init(
+            actorDid: DID, convoCreatedAt: ATProtocolDate, convoId: String, createdAt: ATProtocolDate, groupMemberCount: Int, groupName: String, leaveMethod: String, ownerDid: DID, rev: String, subjectDid: DID
+        ) {
+            self.actorDid = actorDid
+            self.convoCreatedAt = convoCreatedAt
+            self.convoId = convoId
+            self.createdAt = createdAt
+            self.groupMemberCount = groupMemberCount
+            self.groupName = groupName
+            self.leaveMethod = leaveMethod
+            self.ownerDid = ownerDid
+            self.rev = rev
+            self.subjectDid = subjectDid
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                actorDid = try container.decode(DID.self, forKey: .actorDid)
+            } catch {
+                LogManager.logError("Decoding error for required property 'actorDid': \(error)")
+                throw error
+            }
+            do {
+                convoCreatedAt = try container.decode(ATProtocolDate.self, forKey: .convoCreatedAt)
+            } catch {
+                LogManager.logError("Decoding error for required property 'convoCreatedAt': \(error)")
+                throw error
+            }
+            do {
+                convoId = try container.decode(String.self, forKey: .convoId)
+            } catch {
+                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                throw error
+            }
+            do {
+                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+            } catch {
+                LogManager.logError("Decoding error for required property 'createdAt': \(error)")
+                throw error
+            }
+            do {
+                groupMemberCount = try container.decode(Int.self, forKey: .groupMemberCount)
+            } catch {
+                LogManager.logError("Decoding error for required property 'groupMemberCount': \(error)")
+                throw error
+            }
+            do {
+                groupName = try container.decode(String.self, forKey: .groupName)
+            } catch {
+                LogManager.logError("Decoding error for required property 'groupName': \(error)")
+                throw error
+            }
+            do {
+                leaveMethod = try container.decode(String.self, forKey: .leaveMethod)
+            } catch {
+                LogManager.logError("Decoding error for required property 'leaveMethod': \(error)")
+                throw error
+            }
+            do {
+                ownerDid = try container.decode(DID.self, forKey: .ownerDid)
+            } catch {
+                LogManager.logError("Decoding error for required property 'ownerDid': \(error)")
+                throw error
+            }
+            do {
+                rev = try container.decode(String.self, forKey: .rev)
+            } catch {
+                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                throw error
+            }
+            do {
+                subjectDid = try container.decode(DID.self, forKey: .subjectDid)
+            } catch {
+                LogManager.logError("Decoding error for required property 'subjectDid': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            try container.encode(actorDid, forKey: .actorDid)
+            try container.encode(convoCreatedAt, forKey: .convoCreatedAt)
+            try container.encode(convoId, forKey: .convoId)
+            try container.encode(createdAt, forKey: .createdAt)
+            try container.encode(groupMemberCount, forKey: .groupMemberCount)
+            try container.encode(groupName, forKey: .groupName)
+            try container.encode(leaveMethod, forKey: .leaveMethod)
+            try container.encode(ownerDid, forKey: .ownerDid)
+            try container.encode(rev, forKey: .rev)
+            try container.encode(subjectDid, forKey: .subjectDid)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(actorDid)
+            hasher.combine(convoCreatedAt)
+            hasher.combine(convoId)
+            hasher.combine(createdAt)
+            hasher.combine(groupMemberCount)
+            hasher.combine(groupName)
+            hasher.combine(leaveMethod)
+            hasher.combine(ownerDid)
+            hasher.combine(rev)
+            hasher.combine(subjectDid)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+            if actorDid != other.actorDid {
+                return false
+            }
+            if convoCreatedAt != other.convoCreatedAt {
+                return false
+            }
+            if convoId != other.convoId {
+                return false
+            }
+            if createdAt != other.createdAt {
+                return false
+            }
+            if groupMemberCount != other.groupMemberCount {
+                return false
+            }
+            if groupName != other.groupName {
+                return false
+            }
+            if leaveMethod != other.leaveMethod {
+                return false
+            }
+            if ownerDid != other.ownerDid {
+                return false
+            }
+            if rev != other.rev {
+                return false
+            }
+            if subjectDid != other.subjectDid {
+                return false
+            }
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            let actorDidValue = try actorDid.toCBORValue()
+            map = map.adding(key: "actorDid", value: actorDidValue)
+            let convoCreatedAtValue = try convoCreatedAt.toCBORValue()
+            map = map.adding(key: "convoCreatedAt", value: convoCreatedAtValue)
+            let convoIdValue = try convoId.toCBORValue()
+            map = map.adding(key: "convoId", value: convoIdValue)
+            let createdAtValue = try createdAt.toCBORValue()
+            map = map.adding(key: "createdAt", value: createdAtValue)
+            let groupMemberCountValue = try groupMemberCount.toCBORValue()
+            map = map.adding(key: "groupMemberCount", value: groupMemberCountValue)
+            let groupNameValue = try groupName.toCBORValue()
+            map = map.adding(key: "groupName", value: groupNameValue)
+            let leaveMethodValue = try leaveMethod.toCBORValue()
+            map = map.adding(key: "leaveMethod", value: leaveMethodValue)
+            let ownerDidValue = try ownerDid.toCBORValue()
+            map = map.adding(key: "ownerDid", value: ownerDidValue)
+            let revValue = try rev.toCBORValue()
+            map = map.adding(key: "rev", value: revValue)
+            let subjectDidValue = try subjectDid.toCBORValue()
+            map = map.adding(key: "subjectDid", value: subjectDidValue)
+            return map
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case actorDid
+            case convoCreatedAt
+            case convoId
+            case createdAt
+            case groupMemberCount
+            case groupName
+            case leaveMethod
+            case ownerDid
+            case rev
+            case subjectDid
+        }
+    }
+
+    public struct EventGroupChatUpdated: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "chat.bsky.moderation.subscribeModEvents#eventGroupChatUpdated"
+        public let actorDid: DID
+        public let convoCreatedAt: ATProtocolDate
+        public let convoId: String
+        public let createdAt: ATProtocolDate
+        public let groupMemberCount: Int
+        public let groupName: String
+        public let joinLinkCode: String?
+        public let joinLinkFollowersOnly: Bool?
+        public let joinLinkRequiresApproval: Bool?
+        public let lockReason: String?
+        public let newName: String?
+        public let oldName: String?
+        public let ownerDid: DID
+        public let rev: String
+        public let updateType: String
+
+        public init(
+            actorDid: DID, convoCreatedAt: ATProtocolDate, convoId: String, createdAt: ATProtocolDate, groupMemberCount: Int, groupName: String, joinLinkCode: String?, joinLinkFollowersOnly: Bool?, joinLinkRequiresApproval: Bool?, lockReason: String?, newName: String?, oldName: String?, ownerDid: DID, rev: String, updateType: String
+        ) {
+            self.actorDid = actorDid
+            self.convoCreatedAt = convoCreatedAt
+            self.convoId = convoId
+            self.createdAt = createdAt
+            self.groupMemberCount = groupMemberCount
+            self.groupName = groupName
+            self.joinLinkCode = joinLinkCode
+            self.joinLinkFollowersOnly = joinLinkFollowersOnly
+            self.joinLinkRequiresApproval = joinLinkRequiresApproval
+            self.lockReason = lockReason
+            self.newName = newName
+            self.oldName = oldName
+            self.ownerDid = ownerDid
+            self.rev = rev
+            self.updateType = updateType
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                actorDid = try container.decode(DID.self, forKey: .actorDid)
+            } catch {
+                LogManager.logError("Decoding error for required property 'actorDid': \(error)")
+                throw error
+            }
+            do {
+                convoCreatedAt = try container.decode(ATProtocolDate.self, forKey: .convoCreatedAt)
+            } catch {
+                LogManager.logError("Decoding error for required property 'convoCreatedAt': \(error)")
+                throw error
+            }
+            do {
+                convoId = try container.decode(String.self, forKey: .convoId)
+            } catch {
+                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                throw error
+            }
+            do {
+                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+            } catch {
+                LogManager.logError("Decoding error for required property 'createdAt': \(error)")
+                throw error
+            }
+            do {
+                groupMemberCount = try container.decode(Int.self, forKey: .groupMemberCount)
+            } catch {
+                LogManager.logError("Decoding error for required property 'groupMemberCount': \(error)")
+                throw error
+            }
+            do {
+                groupName = try container.decode(String.self, forKey: .groupName)
+            } catch {
+                LogManager.logError("Decoding error for required property 'groupName': \(error)")
+                throw error
+            }
+            do {
+                joinLinkCode = try container.decodeIfPresent(String.self, forKey: .joinLinkCode)
+            } catch {
+                LogManager.logDebug("Decoding error for optional property 'joinLinkCode': \(error)")
+                throw error
+            }
+            do {
+                joinLinkFollowersOnly = try container.decodeIfPresent(Bool.self, forKey: .joinLinkFollowersOnly)
+            } catch {
+                LogManager.logDebug("Decoding error for optional property 'joinLinkFollowersOnly': \(error)")
+                throw error
+            }
+            do {
+                joinLinkRequiresApproval = try container.decodeIfPresent(Bool.self, forKey: .joinLinkRequiresApproval)
+            } catch {
+                LogManager.logDebug("Decoding error for optional property 'joinLinkRequiresApproval': \(error)")
+                throw error
+            }
+            do {
+                lockReason = try container.decodeIfPresent(String.self, forKey: .lockReason)
+            } catch {
+                LogManager.logDebug("Decoding error for optional property 'lockReason': \(error)")
+                throw error
+            }
+            do {
+                newName = try container.decodeIfPresent(String.self, forKey: .newName)
+            } catch {
+                LogManager.logDebug("Decoding error for optional property 'newName': \(error)")
+                throw error
+            }
+            do {
+                oldName = try container.decodeIfPresent(String.self, forKey: .oldName)
+            } catch {
+                LogManager.logDebug("Decoding error for optional property 'oldName': \(error)")
+                throw error
+            }
+            do {
+                ownerDid = try container.decode(DID.self, forKey: .ownerDid)
+            } catch {
+                LogManager.logError("Decoding error for required property 'ownerDid': \(error)")
+                throw error
+            }
+            do {
+                rev = try container.decode(String.self, forKey: .rev)
+            } catch {
+                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                throw error
+            }
+            do {
+                updateType = try container.decode(String.self, forKey: .updateType)
+            } catch {
+                LogManager.logError("Decoding error for required property 'updateType': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            try container.encode(actorDid, forKey: .actorDid)
+            try container.encode(convoCreatedAt, forKey: .convoCreatedAt)
+            try container.encode(convoId, forKey: .convoId)
+            try container.encode(createdAt, forKey: .createdAt)
+            try container.encode(groupMemberCount, forKey: .groupMemberCount)
+            try container.encode(groupName, forKey: .groupName)
+            try container.encodeIfPresent(joinLinkCode, forKey: .joinLinkCode)
+            try container.encodeIfPresent(joinLinkFollowersOnly, forKey: .joinLinkFollowersOnly)
+            try container.encodeIfPresent(joinLinkRequiresApproval, forKey: .joinLinkRequiresApproval)
+            try container.encodeIfPresent(lockReason, forKey: .lockReason)
+            try container.encodeIfPresent(newName, forKey: .newName)
+            try container.encodeIfPresent(oldName, forKey: .oldName)
+            try container.encode(ownerDid, forKey: .ownerDid)
+            try container.encode(rev, forKey: .rev)
+            try container.encode(updateType, forKey: .updateType)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(actorDid)
+            hasher.combine(convoCreatedAt)
+            hasher.combine(convoId)
+            hasher.combine(createdAt)
+            hasher.combine(groupMemberCount)
+            hasher.combine(groupName)
+            if let value = joinLinkCode {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = joinLinkFollowersOnly {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = joinLinkRequiresApproval {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = lockReason {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = newName {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = oldName {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            hasher.combine(ownerDid)
+            hasher.combine(rev)
+            hasher.combine(updateType)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+            if actorDid != other.actorDid {
+                return false
+            }
+            if convoCreatedAt != other.convoCreatedAt {
+                return false
+            }
+            if convoId != other.convoId {
+                return false
+            }
+            if createdAt != other.createdAt {
+                return false
+            }
+            if groupMemberCount != other.groupMemberCount {
+                return false
+            }
+            if groupName != other.groupName {
+                return false
+            }
+            if joinLinkCode != other.joinLinkCode {
+                return false
+            }
+            if joinLinkFollowersOnly != other.joinLinkFollowersOnly {
+                return false
+            }
+            if joinLinkRequiresApproval != other.joinLinkRequiresApproval {
+                return false
+            }
+            if lockReason != other.lockReason {
+                return false
+            }
+            if newName != other.newName {
+                return false
+            }
+            if oldName != other.oldName {
+                return false
+            }
+            if ownerDid != other.ownerDid {
+                return false
+            }
+            if rev != other.rev {
+                return false
+            }
+            if updateType != other.updateType {
+                return false
+            }
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            let actorDidValue = try actorDid.toCBORValue()
+            map = map.adding(key: "actorDid", value: actorDidValue)
+            let convoCreatedAtValue = try convoCreatedAt.toCBORValue()
+            map = map.adding(key: "convoCreatedAt", value: convoCreatedAtValue)
+            let convoIdValue = try convoId.toCBORValue()
+            map = map.adding(key: "convoId", value: convoIdValue)
+            let createdAtValue = try createdAt.toCBORValue()
+            map = map.adding(key: "createdAt", value: createdAtValue)
+            let groupMemberCountValue = try groupMemberCount.toCBORValue()
+            map = map.adding(key: "groupMemberCount", value: groupMemberCountValue)
+            let groupNameValue = try groupName.toCBORValue()
+            map = map.adding(key: "groupName", value: groupNameValue)
+            if let value = joinLinkCode {
+                let joinLinkCodeValue = try value.toCBORValue()
+                map = map.adding(key: "joinLinkCode", value: joinLinkCodeValue)
+            }
+            if let value = joinLinkFollowersOnly {
+                let joinLinkFollowersOnlyValue = try value.toCBORValue()
+                map = map.adding(key: "joinLinkFollowersOnly", value: joinLinkFollowersOnlyValue)
+            }
+            if let value = joinLinkRequiresApproval {
+                let joinLinkRequiresApprovalValue = try value.toCBORValue()
+                map = map.adding(key: "joinLinkRequiresApproval", value: joinLinkRequiresApprovalValue)
+            }
+            if let value = lockReason {
+                let lockReasonValue = try value.toCBORValue()
+                map = map.adding(key: "lockReason", value: lockReasonValue)
+            }
+            if let value = newName {
+                let newNameValue = try value.toCBORValue()
+                map = map.adding(key: "newName", value: newNameValue)
+            }
+            if let value = oldName {
+                let oldNameValue = try value.toCBORValue()
+                map = map.adding(key: "oldName", value: oldNameValue)
+            }
+            let ownerDidValue = try ownerDid.toCBORValue()
+            map = map.adding(key: "ownerDid", value: ownerDidValue)
+            let revValue = try rev.toCBORValue()
+            map = map.adding(key: "rev", value: revValue)
+            let updateTypeValue = try updateType.toCBORValue()
+            map = map.adding(key: "updateType", value: updateTypeValue)
+            return map
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case actorDid
+            case convoCreatedAt
+            case convoId
+            case createdAt
+            case groupMemberCount
+            case groupName
+            case joinLinkCode
+            case joinLinkFollowersOnly
+            case joinLinkRequiresApproval
+            case lockReason
+            case newName
+            case oldName
+            case ownerDid
+            case rev
+            case updateType
+        }
+    }
+
+    public struct EventRateLimitExceeded: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "chat.bsky.moderation.subscribeModEvents#eventRateLimitExceeded"
+        public let actorDid: DID
+        public let createdAt: ATProtocolDate
+        public let endpoint: String
+        public let rev: String
+
+        public init(
+            actorDid: DID, createdAt: ATProtocolDate, endpoint: String, rev: String
+        ) {
+            self.actorDid = actorDid
+            self.createdAt = createdAt
+            self.endpoint = endpoint
+            self.rev = rev
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                actorDid = try container.decode(DID.self, forKey: .actorDid)
+            } catch {
+                LogManager.logError("Decoding error for required property 'actorDid': \(error)")
+                throw error
+            }
+            do {
+                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+            } catch {
+                LogManager.logError("Decoding error for required property 'createdAt': \(error)")
+                throw error
+            }
+            do {
+                endpoint = try container.decode(String.self, forKey: .endpoint)
+            } catch {
+                LogManager.logError("Decoding error for required property 'endpoint': \(error)")
+                throw error
+            }
+            do {
+                rev = try container.decode(String.self, forKey: .rev)
+            } catch {
+                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            try container.encode(actorDid, forKey: .actorDid)
+            try container.encode(createdAt, forKey: .createdAt)
+            try container.encode(endpoint, forKey: .endpoint)
+            try container.encode(rev, forKey: .rev)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(actorDid)
+            hasher.combine(createdAt)
+            hasher.combine(endpoint)
+            hasher.combine(rev)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+            if actorDid != other.actorDid {
+                return false
+            }
+            if createdAt != other.createdAt {
+                return false
+            }
+            if endpoint != other.endpoint {
+                return false
+            }
+            if rev != other.rev {
+                return false
+            }
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            let actorDidValue = try actorDid.toCBORValue()
+            map = map.adding(key: "actorDid", value: actorDidValue)
+            let createdAtValue = try createdAt.toCBORValue()
+            map = map.adding(key: "createdAt", value: createdAtValue)
+            let endpointValue = try endpoint.toCBORValue()
+            map = map.adding(key: "endpoint", value: endpointValue)
+            let revValue = try rev.toCBORValue()
+            map = map.adding(key: "rev", value: revValue)
+            return map
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case actorDid
+            case createdAt
+            case endpoint
+            case rev
+        }
+    }
+
+    public struct Parameters: Parametrizable {
         public let cursor: String?
 
         public init(
             cursor: String? = nil
-            ) {
+        ) {
             self.cursor = cursor
-
-        }
-    }
-public enum Message: Codable, Sendable {
-
-    case eventConvoFirstMessage(EventConvoFirstMessage)
-
-
-    enum CodingKeys: String, CodingKey {
-        case type = "$type"
-    }
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        let type = try container.decode(String.self, forKey: .type)
-
-        switch type {
-
-        case "chat.bsky.moderation.subscribeModEvents#eventConvoFirstMessage":
-            let value = try EventConvoFirstMessage(from: decoder)
-            self = .eventConvoFirstMessage(value)
-
-        default:
-            throw DecodingError.dataCorruptedError(
-                forKey: .type,
-                in: container,
-                debugDescription: "Unknown message type: \(type)"
-            )
         }
     }
 
-    public func encode(to encoder: Encoder) throws {
-        switch self {
+    public enum Message: Codable, Sendable {
+        case eventConvoFirstMessage(EventConvoFirstMessage)
 
-        case .eventConvoFirstMessage(let value):
-            try value.encode(to: encoder)
+        case eventGroupChatCreated(EventGroupChatCreated)
 
+        case eventGroupChatMemberAdded(EventGroupChatMemberAdded)
+
+        case eventGroupChatMemberJoined(EventGroupChatMemberJoined)
+
+        case eventGroupChatJoinRequest(EventGroupChatJoinRequest)
+
+        case eventGroupChatJoinRequestApproved(EventGroupChatJoinRequestApproved)
+
+        case eventGroupChatJoinRequestRejected(EventGroupChatJoinRequestRejected)
+
+        case eventChatAccepted(EventChatAccepted)
+
+        case eventGroupChatMemberLeft(EventGroupChatMemberLeft)
+
+        case eventGroupChatUpdated(EventGroupChatUpdated)
+
+        case eventRateLimitExceeded(EventRateLimitExceeded)
+
+        enum CodingKeys: String, CodingKey {
+            case type = "$type"
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let type = try container.decode(String.self, forKey: .type)
+
+            switch type {
+            case "chat.bsky.moderation.subscribeModEvents#eventConvoFirstMessage":
+                let value = try EventConvoFirstMessage(from: decoder)
+                self = .eventConvoFirstMessage(value)
+
+            case "chat.bsky.moderation.subscribeModEvents#eventGroupChatCreated":
+                let value = try EventGroupChatCreated(from: decoder)
+                self = .eventGroupChatCreated(value)
+
+            case "chat.bsky.moderation.subscribeModEvents#eventGroupChatMemberAdded":
+                let value = try EventGroupChatMemberAdded(from: decoder)
+                self = .eventGroupChatMemberAdded(value)
+
+            case "chat.bsky.moderation.subscribeModEvents#eventGroupChatMemberJoined":
+                let value = try EventGroupChatMemberJoined(from: decoder)
+                self = .eventGroupChatMemberJoined(value)
+
+            case "chat.bsky.moderation.subscribeModEvents#eventGroupChatJoinRequest":
+                let value = try EventGroupChatJoinRequest(from: decoder)
+                self = .eventGroupChatJoinRequest(value)
+
+            case "chat.bsky.moderation.subscribeModEvents#eventGroupChatJoinRequestApproved":
+                let value = try EventGroupChatJoinRequestApproved(from: decoder)
+                self = .eventGroupChatJoinRequestApproved(value)
+
+            case "chat.bsky.moderation.subscribeModEvents#eventGroupChatJoinRequestRejected":
+                let value = try EventGroupChatJoinRequestRejected(from: decoder)
+                self = .eventGroupChatJoinRequestRejected(value)
+
+            case "chat.bsky.moderation.subscribeModEvents#eventChatAccepted":
+                let value = try EventChatAccepted(from: decoder)
+                self = .eventChatAccepted(value)
+
+            case "chat.bsky.moderation.subscribeModEvents#eventGroupChatMemberLeft":
+                let value = try EventGroupChatMemberLeft(from: decoder)
+                self = .eventGroupChatMemberLeft(value)
+
+            case "chat.bsky.moderation.subscribeModEvents#eventGroupChatUpdated":
+                let value = try EventGroupChatUpdated(from: decoder)
+                self = .eventGroupChatUpdated(value)
+
+            case "chat.bsky.moderation.subscribeModEvents#eventRateLimitExceeded":
+                let value = try EventRateLimitExceeded(from: decoder)
+                self = .eventRateLimitExceeded(value)
+
+            default:
+                throw DecodingError.dataCorruptedError(
+                    forKey: .type,
+                    in: container,
+                    debugDescription: "Unknown message type: \(type)"
+                )
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            switch self {
+            case let .eventConvoFirstMessage(value):
+                try value.encode(to: encoder)
+
+            case let .eventGroupChatCreated(value):
+                try value.encode(to: encoder)
+
+            case let .eventGroupChatMemberAdded(value):
+                try value.encode(to: encoder)
+
+            case let .eventGroupChatMemberJoined(value):
+                try value.encode(to: encoder)
+
+            case let .eventGroupChatJoinRequest(value):
+                try value.encode(to: encoder)
+
+            case let .eventGroupChatJoinRequestApproved(value):
+                try value.encode(to: encoder)
+
+            case let .eventGroupChatJoinRequestRejected(value):
+                try value.encode(to: encoder)
+
+            case let .eventChatAccepted(value):
+                try value.encode(to: encoder)
+
+            case let .eventGroupChatMemberLeft(value):
+                try value.encode(to: encoder)
+
+            case let .eventGroupChatUpdated(value):
+                try value.encode(to: encoder)
+
+            case let .eventRateLimitExceeded(value):
+                try value.encode(to: encoder)
+            }
+        }
+    }
+
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case futureCursor = "FutureCursor."
+        case consumerTooSlow = "ConsumerTooSlow.If the consumer of the stream can not keep up with events, and a backlog gets too large, the server will drop the connection."
+        public var description: String {
+            return rawValue
+        }
+
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
         }
     }
 }
-public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-                case futureCursor = "FutureCursor."
-                case consumerTooSlow = "ConsumerTooSlow.If the consumer of the stream can not keep up with events, and a backlog gets too large, the server will drop the connection."
-            public var description: String {
-                return self.rawValue
-            }
 
-            public var errorName: String {
-                // Extract just the error name from the raw value
-                let parts = self.rawValue.split(separator: ".")
-                return String(parts.first ?? "")
-            }
-        }
+// Subscribe to stream of chat events targeted to moderation. Private endpoint.
 
-
-
-}
-
-
-
-
-/// Subscribe to stream of chat events targeted to moderation. Private endpoint.
-
-extension ATProtoClient.Chat.Bsky.Moderation {
-
-    public func subscribeModEvents(
+public extension ATProtoClient.Chat.Bsky.Moderation {
+    func subscribeModEvents(
         cursor: String? = nil
     ) async throws -> AsyncThrowingStream<ChatBskyModerationSubscribeModEvents.Message, Error> {
         let params = ChatBskyModerationSubscribeModEvents.Parameters(cursor: cursor)
-        return try await self.networkService.subscribe(
+        return try await networkService.subscribe(
             endpoint: "chat.bsky.moderation.subscribeModEvents",
             parameters: params
         )
     }
 
     /// Alternative signature accepting input struct
-    public func subscribeModEvents(input: ChatBskyModerationSubscribeModEvents.Parameters) async throws -> AsyncThrowingStream<ChatBskyModerationSubscribeModEvents.Message, Error> {
-        return try await self.networkService.subscribe(
+    func subscribeModEvents(input: ChatBskyModerationSubscribeModEvents.Parameters) async throws -> AsyncThrowingStream<ChatBskyModerationSubscribeModEvents.Message, Error> {
+        return try await networkService.subscribe(
             endpoint: "chat.bsky.moderation.subscribeModEvents",
             parameters: input
         )
     }
-
 }

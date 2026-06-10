@@ -1,97 +1,61 @@
 import Foundation
 
-
-
 // lexicon: 1, id: place.stream.playback.getVideoPlaylist
 
-
-public struct PlaceStreamPlaybackGetVideoPlaylist {
-
+public enum PlaceStreamPlaybackGetVideoPlaylist {
     public static let typeIdentifier = "place.stream.playback.getVideoPlaylist"
-public struct Parameters: Parametrizable {
+    public struct Parameters: Parametrizable {
         public let uri: ATProtocolURI
         public let track: Int?
 
         public init(
             uri: ATProtocolURI,
             track: Int? = nil
-            ) {
+        ) {
             self.uri = uri
             self.track = track
-
         }
     }
 
-public struct Output: ATProtocolCodable {
-
-
+    public struct Output: ATProtocolCodable {
         public let data: Data
 
-
-
-        // Standard public initializer
+        /// Standard public initializer
         public init(
-
-
             data: Data
 
-
         ) {
-
-
             self.data = data
-
-
         }
 
         public init(from decoder: Decoder) throws {
-
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            self.data = try container.decode(Data.self, forKey: .data)
-
-
+            data = try container.decode(Data.self, forKey: .data)
         }
 
         public func encode(to encoder: Encoder) throws {
-
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(data, forKey: .data)
-
-
         }
 
         public func toCBORValue() throws -> Any {
-
             var map = OrderedCBORMap()
-
-
 
             let dataValue = try data.toCBORValue()
             map = map.adding(key: "data", value: dataValue)
 
-
-
             return map
-
         }
-
 
         private enum CodingKeys: String, CodingKey {
             case data
         }
-
     }
-
-
-
-
 }
 
-
-
-extension ATProtoClient.Place.Stream.Playback {
+public extension ATProtoClient.Place.Stream.Playback {
     // MARK: - getVideoPlaylist
 
     /// Get the HLS playlist for a video
@@ -100,9 +64,8 @@ extension ATProtoClient.Place.Stream.Playback {
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    public func getVideoPlaylist(input: PlaceStreamPlaybackGetVideoPlaylist.Parameters) async throws -> (responseCode: Int, data: PlaceStreamPlaybackGetVideoPlaylist.Output?) {
+    func getVideoPlaylist(input: PlaceStreamPlaybackGetVideoPlaylist.Parameters) async throws -> (responseCode: Int, data: PlaceStreamPlaybackGetVideoPlaylist.Output?) {
         let endpoint = "place.stream.playback.getVideoPlaylist"
-
 
         let queryItems = input.asQueryItems()
 
@@ -123,8 +86,7 @@ extension ATProtoClient.Place.Stream.Playback {
         // Only validate Content-Type and decode on success. Error responses
         // (4xx/5xx) may have missing or different Content-Type headers and
         // are handled via the status code / structured error parser below.
-        if (200...299).contains(responseCode) {
-
+        if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
                 throw NetworkError.invalidContentType(expected: "application/vnd.apple.mpegurl", actual: "nil")
             }
@@ -133,9 +95,7 @@ extension ATProtoClient.Place.Stream.Playback {
                 throw NetworkError.invalidContentType(expected: "application/vnd.apple.mpegurl", actual: contentType)
             }
 
-
             do {
-
                 let decodedData = PlaceStreamPlaybackGetVideoPlaylist.Output(data: responseData)
 
                 return (responseCode, decodedData)
@@ -145,12 +105,9 @@ extension ATProtoClient.Place.Stream.Playback {
                 return (responseCode, nil)
             }
         } else {
-
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
         }
     }
 }
-
-
