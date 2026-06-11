@@ -145,8 +145,7 @@ class LogManager {
     static func logSensitiveValue(_ value: String?, label: String, category: LogCategory = .authentication) {
         #if DEBUG
             if let value = value, !value.isEmpty {
-                // TEMPORARY: Truncation disabled for debugging
-                logDebug("\(label): \(value)", category: category)
+                logDebug("\(label): \(value.prefix(4))…(\(value.count) chars)", category: category)
             } else {
                 logDebug("\(label): nil", category: category)
             }
