@@ -1,0 +1,59 @@
+// Lexicon: 1, ID: com.atproto.sync.listBlobs
+// List blob CIDs for an account, since some repo revision. Does not require auth; implemented by PDS.
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object ComAtprotoSyncListBlobsDefs {
+    const val TYPE_IDENTIFIER = "com.atproto.sync.listBlobs"
+}
+
+@Serializable
+    data class ComAtprotoSyncListBlobsParameters(
+// The DID of the repo.        @SerialName("did")
+        val did: DID,// Optional revision of the repo to list blobs since.        @SerialName("since")
+        val since: String? = null,        @SerialName("limit")
+        val limit: Int? = null,        @SerialName("cursor")
+        val cursor: String? = null    )
+
+    @Serializable
+    data class ComAtprotoSyncListBlobsOutput(
+        @SerialName("cursor")
+        val cursor: String? = null,        @SerialName("cids")
+        val cids: List<CID>    )
+
+sealed class ComAtprotoSyncListBlobsError(val name: String, val description: String?) {
+        object RepoNotFound: ComAtprotoSyncListBlobsError("RepoNotFound", "")
+        object RepoTakendown: ComAtprotoSyncListBlobsError("RepoTakendown", "")
+        object RepoSuspended: ComAtprotoSyncListBlobsError("RepoSuspended", "")
+        object RepoDeactivated: ComAtprotoSyncListBlobsError("RepoDeactivated", "")
+    }
+
+/**
+ * List blob CIDs for an account, since some repo revision. Does not require auth; implemented by PDS.
+ *
+ * Endpoint: com.atproto.sync.listBlobs
+ */
+suspend fun ATProtoClient.Com.Atproto.Sync.listBlobs(
+parameters: ComAtprotoSyncListBlobsParameters): ATProtoResponse<ComAtprotoSyncListBlobsOutput> {
+    val endpoint = "com.atproto.sync.listBlobs"
+
+    // List<Pair<String, String>> preserves repeated keys, which ATProto
+    // array-valued query params rely on (e.g. `?actors=a&actors=b`).
+    val queryItems = parameters.toQueryItems()
+
+    return client.networkService.performRequest(
+        method = "GET",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf("Accept" to "application/json"),
+        body = null
+    )
+}

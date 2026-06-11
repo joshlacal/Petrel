@@ -1,0 +1,86 @@
+// Lexicon: 1, ID: app.bsky.actor.profile
+// A declaration of a Bluesky account profile.
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object AppBskyActorProfileDefs {
+    const val TYPE_IDENTIFIER = "app.bsky.actor.profile"
+}
+
+@Serializable(with = AppBskyActorProfileLabelsUnionSerializer::class)
+sealed interface AppBskyActorProfileLabelsUnion {
+    @Serializable
+    data class SelfLabels(val value: blue.catbird.petrel.generated.ComAtprotoLabelDefsSelfLabels) : AppBskyActorProfileLabelsUnion
+
+    @Serializable
+    data class Unexpected(val value: JsonElement) : AppBskyActorProfileLabelsUnion
+}
+
+object AppBskyActorProfileLabelsUnionSerializer : kotlinx.serialization.KSerializer<AppBskyActorProfileLabelsUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyActorProfileLabelsUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyActorProfileLabelsUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is AppBskyActorProfileLabelsUnion.SelfLabels -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoLabelDefsSelfLabels.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.label.defs#selfLabels")
+                })
+            }
+            is AppBskyActorProfileLabelsUnion.Unexpected -> value.value
+            // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
+            // subscription codegen) are runtime-only sentinels; JSON round-trip
+            // serialises them as an empty object tagged with the variant class
+            // name. Consumers should filter these before JSON serialisation.
+            else -> kotlinx.serialization.json.buildJsonObject {
+                put("\$type", kotlinx.serialization.json.JsonPrimitive(value::class.simpleName ?: "Unknown"))
+            }
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyActorProfileLabelsUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "com.atproto.label.defs#selfLabels" -> AppBskyActorProfileLabelsUnion.SelfLabels(
+                jsonDecoder.json.decodeFromJsonElement(blue.catbird.petrel.generated.ComAtprotoLabelDefsSelfLabels.serializer(), element)
+            )
+            else -> AppBskyActorProfileLabelsUnion.Unexpected(element)
+        }
+    }
+}
+
+    /**
+     * A declaration of a Bluesky account profile.
+     */
+    @Serializable
+    data class AppBskyActorProfile(
+        @SerialName("displayName")
+        val displayName: String? = null,/** Free-form profile description text. */        @SerialName("description")
+        val description: String? = null,/** Free-form pronouns text. */        @SerialName("pronouns")
+        val pronouns: String? = null,        @SerialName("website")
+        val website: URI? = null,/** Small image to be displayed next to posts from account. AKA, 'profile picture' */        @SerialName("avatar")
+        val avatar: Blob? = null,/** Larger horizontal image to display behind profile view. */        @SerialName("banner")
+        val banner: Blob? = null,/** Self-label values, specific to the Bluesky application, on the overall account. */        @SerialName("labels")
+        val labels: AppBskyActorProfileLabelsUnion? = null,        @SerialName("joinedViaStarterPack")
+        val joinedViaStarterPack: ComAtprotoRepoStrongRef? = null,        @SerialName("pinnedPost")
+        val pinnedPost: ComAtprotoRepoStrongRef? = null,        @SerialName("createdAt")
+        val createdAt: ATProtocolDate? = null    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = ""
+        }
+    }

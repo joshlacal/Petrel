@@ -1,0 +1,58 @@
+// Lexicon: 1, ID: app.bsky.unspecced.initAgeAssurance
+// Initiate age assurance for an account. This is a one-time action that will start the process of verifying the user's age.
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object AppBskyUnspeccedInitAgeAssuranceDefs {
+    const val TYPE_IDENTIFIER = "app.bsky.unspecced.initAgeAssurance"
+}
+
+@Serializable
+    data class AppBskyUnspeccedInitAgeAssuranceInput(
+// The user's email address to receive assurance instructions.        @SerialName("email")
+        val email: String,// The user's preferred language for communication during the assurance process.        @SerialName("language")
+        val language: String,// An ISO 3166-1 alpha-2 code of the user's location.        @SerialName("countryCode")
+        val countryCode: String    )
+
+    typealias AppBskyUnspeccedInitAgeAssuranceOutput = AppBskyUnspeccedDefsAgeAssuranceState
+
+sealed class AppBskyUnspeccedInitAgeAssuranceError(val name: String, val description: String?) {
+        object InvalidEmail: AppBskyUnspeccedInitAgeAssuranceError("InvalidEmail", "")
+        object DidTooLong: AppBskyUnspeccedInitAgeAssuranceError("DidTooLong", "")
+        object InvalidInitiation: AppBskyUnspeccedInitAgeAssuranceError("InvalidInitiation", "")
+    }
+
+/**
+ * Initiate age assurance for an account. This is a one-time action that will start the process of verifying the user's age.
+ *
+ * Endpoint: app.bsky.unspecced.initAgeAssurance
+ */
+suspend fun ATProtoClient.App.Bsky.Unspecced.initAgeAssurance(
+input: AppBskyUnspeccedInitAgeAssuranceInput): ATProtoResponse<AppBskyUnspeccedInitAgeAssuranceOutput> {
+    val endpoint = "app.bsky.unspecced.initAgeAssurance"
+
+    // JSON serialization
+    val body = Json.encodeToString(input)
+    val contentType = "application/json"
+
+    val queryItems: List<Pair<String, String>>? = null
+
+    return client.networkService.performRequest(
+        method = "POST",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf(
+            "Content-Type" to contentType,
+            "Accept" to "application/json"
+        ),
+        body = body
+    )
+}

@@ -1,0 +1,57 @@
+// Lexicon: 1, ID: app.bsky.unspecced.getTaggedSuggestions
+// Get a list of suggestions (feeds and users) tagged with categories
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object AppBskyUnspeccedGetTaggedSuggestionsDefs {
+    const val TYPE_IDENTIFIER = "app.bsky.unspecced.getTaggedSuggestions"
+}
+
+    @Serializable
+    data class AppBskyUnspeccedGetTaggedSuggestionsSuggestion(
+        @SerialName("tag")
+        val tag: String,        @SerialName("subjectType")
+        val subjectType: String,        @SerialName("subject")
+        val subject: URI    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#appBskyUnspeccedGetTaggedSuggestionsSuggestion"
+        }
+    }
+
+@Serializable
+    class AppBskyUnspeccedGetTaggedSuggestionsParameters
+
+    @Serializable
+    data class AppBskyUnspeccedGetTaggedSuggestionsOutput(
+        @SerialName("suggestions")
+        val suggestions: List<AppBskyUnspeccedGetTaggedSuggestionsSuggestion>    )
+
+/**
+ * Get a list of suggestions (feeds and users) tagged with categories
+ *
+ * Endpoint: app.bsky.unspecced.getTaggedSuggestions
+ */
+suspend fun ATProtoClient.App.Bsky.Unspecced.getTaggedSuggestions(
+parameters: AppBskyUnspeccedGetTaggedSuggestionsParameters): ATProtoResponse<AppBskyUnspeccedGetTaggedSuggestionsOutput> {
+    val endpoint = "app.bsky.unspecced.getTaggedSuggestions"
+
+    // List<Pair<String, String>> preserves repeated keys, which ATProto
+    // array-valued query params rely on (e.g. `?actors=a&actors=b`).
+    val queryItems = parameters.toQueryItems()
+
+    return client.networkService.performRequest(
+        method = "GET",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf("Accept" to "application/json"),
+        body = null
+    )
+}

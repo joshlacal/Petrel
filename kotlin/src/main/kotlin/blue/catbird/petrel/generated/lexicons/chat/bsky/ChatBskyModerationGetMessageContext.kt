@@ -1,0 +1,113 @@
+// Lexicon: 1, ID: chat.bsky.moderation.getMessageContext
+
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object ChatBskyModerationGetMessageContextDefs {
+    const val TYPE_IDENTIFIER = "chat.bsky.moderation.getMessageContext"
+}
+
+@Serializable(with = ChatBskyModerationGetMessageContextOutputMessagesUnionSerializer::class)
+sealed interface ChatBskyModerationGetMessageContextOutputMessagesUnion {
+    @Serializable
+    data class MessageView(val value: blue.catbird.petrel.generated.ChatBskyConvoDefsMessageView) : ChatBskyModerationGetMessageContextOutputMessagesUnion
+
+    @Serializable
+    data class SystemMessageView(val value: blue.catbird.petrel.generated.ChatBskyConvoDefsSystemMessageView) : ChatBskyModerationGetMessageContextOutputMessagesUnion
+
+    @Serializable
+    data class Unexpected(val value: JsonElement) : ChatBskyModerationGetMessageContextOutputMessagesUnion
+}
+
+object ChatBskyModerationGetMessageContextOutputMessagesUnionSerializer : kotlinx.serialization.KSerializer<ChatBskyModerationGetMessageContextOutputMessagesUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("ChatBskyModerationGetMessageContextOutputMessagesUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ChatBskyModerationGetMessageContextOutputMessagesUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is ChatBskyModerationGetMessageContextOutputMessagesUnion.MessageView -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsMessageView.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#messageView")
+                })
+            }
+            is ChatBskyModerationGetMessageContextOutputMessagesUnion.SystemMessageView -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsSystemMessageView.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#systemMessageView")
+                })
+            }
+            is ChatBskyModerationGetMessageContextOutputMessagesUnion.Unexpected -> value.value
+            // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
+            // subscription codegen) are runtime-only sentinels; JSON round-trip
+            // serialises them as an empty object tagged with the variant class
+            // name. Consumers should filter these before JSON serialisation.
+            else -> kotlinx.serialization.json.buildJsonObject {
+                put("\$type", kotlinx.serialization.json.JsonPrimitive(value::class.simpleName ?: "Unknown"))
+            }
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ChatBskyModerationGetMessageContextOutputMessagesUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "chat.bsky.convo.defs#messageView" -> ChatBskyModerationGetMessageContextOutputMessagesUnion.MessageView(
+                jsonDecoder.json.decodeFromJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsMessageView.serializer(), element)
+            )
+            "chat.bsky.convo.defs#systemMessageView" -> ChatBskyModerationGetMessageContextOutputMessagesUnion.SystemMessageView(
+                jsonDecoder.json.decodeFromJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsSystemMessageView.serializer(), element)
+            )
+            else -> ChatBskyModerationGetMessageContextOutputMessagesUnion.Unexpected(element)
+        }
+    }
+}
+
+@Serializable
+    data class ChatBskyModerationGetMessageContextParameters(
+// Conversation that the message is from. NOTE: this field will eventually be required.        @SerialName("convoId")
+        val convoId: String? = null,        @SerialName("messageId")
+        val messageId: String,// Number of user messages before the target to include. System messages between the earliest returned user message and the target are also included, capped per gap by `maxInterleavedSystemMessages`. If there are no user messages before the target, up to `maxInterleavedSystemMessages` system messages immediately preceding the target are returned instead.        @SerialName("before")
+        val before: Int? = null,// Number of user messages after the target to include. System messages between the target and the latest returned user message are also included, capped per gap by `maxInterleavedSystemMessages`. If there are no user messages after the target, up to `maxInterleavedSystemMessages` system messages immediately following the target are returned instead.        @SerialName("after")
+        val after: Int? = null,// Maximum number of system messages to include per gap between consecutive returned messages (and per side when there are no user messages on that side). Within a gap, the system messages closest to the earlier message are kept.        @SerialName("maxInterleavedSystemMessages")
+        val maxInterleavedSystemMessages: Int? = null    )
+
+    @Serializable
+    data class ChatBskyModerationGetMessageContextOutput(
+        @SerialName("messages")
+        val messages: List<ChatBskyModerationGetMessageContextOutputMessagesUnion>    )
+
+/**
+ * 
+ *
+ * Endpoint: chat.bsky.moderation.getMessageContext
+ */
+suspend fun ATProtoClient.Chat.Bsky.Moderation.getMessageContext(
+parameters: ChatBskyModerationGetMessageContextParameters): ATProtoResponse<ChatBskyModerationGetMessageContextOutput> {
+    val endpoint = "chat.bsky.moderation.getMessageContext"
+
+    // List<Pair<String, String>> preserves repeated keys, which ATProto
+    // array-valued query params rely on (e.g. `?actors=a&actors=b`).
+    val queryItems = parameters.toQueryItems()
+
+    return client.networkService.performRequest(
+        method = "GET",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf("Accept" to "application/json"),
+        body = null
+    )
+}

@@ -1,0 +1,53 @@
+// Lexicon: 1, ID: com.atproto.identity.resolveDid
+// Resolves DID to DID document. Does not bi-directionally verify handle.
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object ComAtprotoIdentityResolveDidDefs {
+    const val TYPE_IDENTIFIER = "com.atproto.identity.resolveDid"
+}
+
+@Serializable
+    data class ComAtprotoIdentityResolveDidParameters(
+// DID to resolve.        @SerialName("did")
+        val did: DID    )
+
+    @Serializable
+    data class ComAtprotoIdentityResolveDidOutput(
+// The complete DID document for the identity.        @SerialName("didDoc")
+        val didDoc: JsonElement    )
+
+sealed class ComAtprotoIdentityResolveDidError(val name: String, val description: String?) {
+        object DidNotFound: ComAtprotoIdentityResolveDidError("DidNotFound", "The DID resolution process confirmed that there is no current DID.")
+        object DidDeactivated: ComAtprotoIdentityResolveDidError("DidDeactivated", "The DID previously existed, but has been deactivated.")
+    }
+
+/**
+ * Resolves DID to DID document. Does not bi-directionally verify handle.
+ *
+ * Endpoint: com.atproto.identity.resolveDid
+ */
+suspend fun ATProtoClient.Com.Atproto.Identity.resolveDid(
+parameters: ComAtprotoIdentityResolveDidParameters): ATProtoResponse<ComAtprotoIdentityResolveDidOutput> {
+    val endpoint = "com.atproto.identity.resolveDid"
+
+    // List<Pair<String, String>> preserves repeated keys, which ATProto
+    // array-valued query params rely on (e.g. `?actors=a&actors=b`).
+    val queryItems = parameters.toQueryItems()
+
+    return client.networkService.performRequest(
+        method = "GET",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf("Accept" to "application/json"),
+        body = null
+    )
+}

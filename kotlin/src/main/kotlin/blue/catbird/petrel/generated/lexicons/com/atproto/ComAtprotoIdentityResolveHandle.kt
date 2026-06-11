@@ -1,0 +1,52 @@
+// Lexicon: 1, ID: com.atproto.identity.resolveHandle
+// Resolves an atproto handle (hostname) to a DID. Does not necessarily bi-directionally verify against the the DID document.
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object ComAtprotoIdentityResolveHandleDefs {
+    const val TYPE_IDENTIFIER = "com.atproto.identity.resolveHandle"
+}
+
+@Serializable
+    data class ComAtprotoIdentityResolveHandleParameters(
+// The handle to resolve.        @SerialName("handle")
+        val handle: Handle    )
+
+    @Serializable
+    data class ComAtprotoIdentityResolveHandleOutput(
+        @SerialName("did")
+        val did: DID    )
+
+sealed class ComAtprotoIdentityResolveHandleError(val name: String, val description: String?) {
+        object HandleNotFound: ComAtprotoIdentityResolveHandleError("HandleNotFound", "The resolution process confirmed that the handle does not resolve to any DID.")
+    }
+
+/**
+ * Resolves an atproto handle (hostname) to a DID. Does not necessarily bi-directionally verify against the the DID document.
+ *
+ * Endpoint: com.atproto.identity.resolveHandle
+ */
+suspend fun ATProtoClient.Com.Atproto.Identity.resolveHandle(
+parameters: ComAtprotoIdentityResolveHandleParameters): ATProtoResponse<ComAtprotoIdentityResolveHandleOutput> {
+    val endpoint = "com.atproto.identity.resolveHandle"
+
+    // List<Pair<String, String>> preserves repeated keys, which ATProto
+    // array-valued query params rely on (e.g. `?actors=a&actors=b`).
+    val queryItems = parameters.toQueryItems()
+
+    return client.networkService.performRequest(
+        method = "GET",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf("Accept" to "application/json"),
+        body = null
+    )
+}

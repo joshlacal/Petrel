@@ -1,0 +1,49 @@
+// Lexicon: 1, ID: app.bsky.unspecced.getTrendsSkeleton
+// Get the skeleton of trends on the network. Intended to be called and then hydrated through app.bsky.unspecced.getTrends
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object AppBskyUnspeccedGetTrendsSkeletonDefs {
+    const val TYPE_IDENTIFIER = "app.bsky.unspecced.getTrendsSkeleton"
+}
+
+@Serializable
+    data class AppBskyUnspeccedGetTrendsSkeletonParameters(
+// DID of the account making the request (not included for public/unauthenticated queries).        @SerialName("viewer")
+        val viewer: DID? = null,        @SerialName("limit")
+        val limit: Int? = null    )
+
+    @Serializable
+    data class AppBskyUnspeccedGetTrendsSkeletonOutput(
+        @SerialName("trends")
+        val trends: List<AppBskyUnspeccedDefsSkeletonTrend>    )
+
+/**
+ * Get the skeleton of trends on the network. Intended to be called and then hydrated through app.bsky.unspecced.getTrends
+ *
+ * Endpoint: app.bsky.unspecced.getTrendsSkeleton
+ */
+suspend fun ATProtoClient.App.Bsky.Unspecced.getTrendsSkeleton(
+parameters: AppBskyUnspeccedGetTrendsSkeletonParameters): ATProtoResponse<AppBskyUnspeccedGetTrendsSkeletonOutput> {
+    val endpoint = "app.bsky.unspecced.getTrendsSkeleton"
+
+    // List<Pair<String, String>> preserves repeated keys, which ATProto
+    // array-valued query params rely on (e.g. `?actors=a&actors=b`).
+    val queryItems = parameters.toQueryItems()
+
+    return client.networkService.performRequest(
+        method = "GET",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf("Accept" to "application/json"),
+        body = null
+    )
+}

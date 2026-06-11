@@ -1,9 +1,9 @@
-package com.atproto.client
+package blue.catbird.petrel.client
 
-import com.atproto.auth.OAuthConfig
-import com.atproto.auth.oauth.AuthenticationService
-import com.atproto.auth.token.TokenRefreshResult
-import com.atproto.network.NetworkService
+import blue.catbird.petrel.auth.OAuthConfig
+import blue.catbird.petrel.auth.oauth.AuthenticationService
+import blue.catbird.petrel.auth.token.TokenRefreshResult
+import blue.catbird.petrel.network.NetworkService
 
 class ATProtoClient(val networkService: NetworkService) {
     constructor(baseUrl: String = "https://bsky.social") : this(NetworkService(baseUrl))

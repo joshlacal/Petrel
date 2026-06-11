@@ -1,0 +1,55 @@
+// Lexicon: 1, ID: app.bsky.unspecced.getSuggestionsSkeleton
+// Get a skeleton of suggested actors. Intended to be called and then hydrated through app.bsky.actor.getSuggestions
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object AppBskyUnspeccedGetSuggestionsSkeletonDefs {
+    const val TYPE_IDENTIFIER = "app.bsky.unspecced.getSuggestionsSkeleton"
+}
+
+@Serializable
+    data class AppBskyUnspeccedGetSuggestionsSkeletonParameters(
+// DID of the account making the request (not included for public/unauthenticated queries). Used to boost followed accounts in ranking.        @SerialName("viewer")
+        val viewer: DID? = null,        @SerialName("limit")
+        val limit: Int? = null,        @SerialName("cursor")
+        val cursor: String? = null,// DID of the account to get suggestions relative to. If not provided, suggestions will be based on the viewer.        @SerialName("relativeToDid")
+        val relativeToDid: DID? = null    )
+
+    @Serializable
+    data class AppBskyUnspeccedGetSuggestionsSkeletonOutput(
+        @SerialName("cursor")
+        val cursor: String? = null,        @SerialName("actors")
+        val actors: List<AppBskyUnspeccedDefsSkeletonSearchActor>,// DID of the account these suggestions are relative to. If this is returned undefined, suggestions are based on the viewer.        @SerialName("relativeToDid")
+        val relativeToDid: DID? = null,// DEPRECATED: use recIdStr instead.        @SerialName("recId")
+        val recId: Int? = null,// Snowflake for this recommendation, use when submitting recommendation events.        @SerialName("recIdStr")
+        val recIdStr: String? = null    )
+
+/**
+ * Get a skeleton of suggested actors. Intended to be called and then hydrated through app.bsky.actor.getSuggestions
+ *
+ * Endpoint: app.bsky.unspecced.getSuggestionsSkeleton
+ */
+suspend fun ATProtoClient.App.Bsky.Unspecced.getSuggestionsSkeleton(
+parameters: AppBskyUnspeccedGetSuggestionsSkeletonParameters): ATProtoResponse<AppBskyUnspeccedGetSuggestionsSkeletonOutput> {
+    val endpoint = "app.bsky.unspecced.getSuggestionsSkeleton"
+
+    // List<Pair<String, String>> preserves repeated keys, which ATProto
+    // array-valued query params rely on (e.g. `?actors=a&actors=b`).
+    val queryItems = parameters.toQueryItems()
+
+    return client.networkService.performRequest(
+        method = "GET",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf("Accept" to "application/json"),
+        body = null
+    )
+}

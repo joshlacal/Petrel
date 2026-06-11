@@ -1,0 +1,45 @@
+// Lexicon: 1, ID: chat.bsky.actor.deleteAccount
+
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object ChatBskyActorDeleteAccountDefs {
+    const val TYPE_IDENTIFIER = "chat.bsky.actor.deleteAccount"
+}
+
+    @Serializable
+    class ChatBskyActorDeleteAccountOutput
+
+/**
+ * 
+ *
+ * Endpoint: chat.bsky.actor.deleteAccount
+ */
+suspend fun ATProtoClient.Chat.Bsky.Actor.deleteAccount(
+): ATProtoResponse<ChatBskyActorDeleteAccountOutput> {
+    val endpoint = "chat.bsky.actor.deleteAccount"
+
+    val body: String? = null
+    val contentType = "application/json"
+
+    val queryItems: List<Pair<String, String>>? = null
+
+    return client.networkService.performRequest(
+        method = "POST",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf(
+            "Content-Type" to contentType,
+            "Accept" to "application/json"
+        ),
+        body = body
+    )
+}

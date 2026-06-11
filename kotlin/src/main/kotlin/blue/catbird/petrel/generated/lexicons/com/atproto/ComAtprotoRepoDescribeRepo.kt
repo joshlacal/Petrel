@@ -1,0 +1,52 @@
+// Lexicon: 1, ID: com.atproto.repo.describeRepo
+// Get information about an account and repository, including the list of collections. Does not require auth.
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object ComAtprotoRepoDescribeRepoDefs {
+    const val TYPE_IDENTIFIER = "com.atproto.repo.describeRepo"
+}
+
+@Serializable
+    data class ComAtprotoRepoDescribeRepoParameters(
+// The handle or DID of the repo.        @SerialName("repo")
+        val repo: ATIdentifier    )
+
+    @Serializable
+    data class ComAtprotoRepoDescribeRepoOutput(
+        @SerialName("handle")
+        val handle: Handle,        @SerialName("did")
+        val did: DID,// The complete DID document for this account.        @SerialName("didDoc")
+        val didDoc: JsonElement,// List of all the collections (NSIDs) for which this repo contains at least one record.        @SerialName("collections")
+        val collections: List<NSID>,// Indicates if handle is currently valid (resolves bi-directionally)        @SerialName("handleIsCorrect")
+        val handleIsCorrect: Boolean    )
+
+/**
+ * Get information about an account and repository, including the list of collections. Does not require auth.
+ *
+ * Endpoint: com.atproto.repo.describeRepo
+ */
+suspend fun ATProtoClient.Com.Atproto.Repo.describeRepo(
+parameters: ComAtprotoRepoDescribeRepoParameters): ATProtoResponse<ComAtprotoRepoDescribeRepoOutput> {
+    val endpoint = "com.atproto.repo.describeRepo"
+
+    // List<Pair<String, String>> preserves repeated keys, which ATProto
+    // array-valued query params rely on (e.g. `?actors=a&actors=b`).
+    val queryItems = parameters.toQueryItems()
+
+    return client.networkService.performRequest(
+        method = "GET",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf("Accept" to "application/json"),
+        body = null
+    )
+}

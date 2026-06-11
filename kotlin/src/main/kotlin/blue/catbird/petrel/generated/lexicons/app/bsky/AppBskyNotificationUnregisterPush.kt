@@ -1,0 +1,51 @@
+// Lexicon: 1, ID: app.bsky.notification.unregisterPush
+// The inverse of registerPush - inform a specified service that push notifications should no longer be sent to the given token for the requesting account. Requires auth.
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object AppBskyNotificationUnregisterPushDefs {
+    const val TYPE_IDENTIFIER = "app.bsky.notification.unregisterPush"
+}
+
+@Serializable
+    data class AppBskyNotificationUnregisterPushInput(
+        @SerialName("serviceDid")
+        val serviceDid: DID,        @SerialName("token")
+        val token: String,        @SerialName("platform")
+        val platform: String,        @SerialName("appId")
+        val appId: String    )
+
+/**
+ * The inverse of registerPush - inform a specified service that push notifications should no longer be sent to the given token for the requesting account. Requires auth.
+ *
+ * Endpoint: app.bsky.notification.unregisterPush
+ */
+suspend fun ATProtoClient.App.Bsky.Notification.unregisterPush(
+input: AppBskyNotificationUnregisterPushInput): ATProtoResponse<Unit> {
+    val endpoint = "app.bsky.notification.unregisterPush"
+
+    // JSON serialization
+    val body = Json.encodeToString(input)
+    val contentType = "application/json"
+
+    val queryItems: List<Pair<String, String>>? = null
+
+    return client.networkService.performRequest(
+        method = "POST",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf(
+            "Content-Type" to contentType,
+            "Accept" to "None"
+        ),
+        body = body
+    )
+}

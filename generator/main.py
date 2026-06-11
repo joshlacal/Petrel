@@ -531,8 +531,8 @@ def generate_kotlin_overlay_namespaces(emit_hierarchy, reference_hierarchy):
 
     header = (
         "// Generated namespace extensions for an overlay package.\n\n"
-        "package com.atproto.generated\n\n"
-        "import com.atproto.client.*\n\n"
+        "package blue.catbird.petrel.generated\n\n"
+        "import blue.catbird.petrel.client.*\n\n"
     )
     return header + '\n'.join(extensions) + '\n\n' + '\n\n'.join(classes) + '\n'
 

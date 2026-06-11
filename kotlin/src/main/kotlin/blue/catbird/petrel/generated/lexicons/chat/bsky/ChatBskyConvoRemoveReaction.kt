@@ -1,0 +1,62 @@
+// Lexicon: 1, ID: chat.bsky.convo.removeReaction
+// Removes an emoji reaction from a message. Requires authentication. It is idempotent, so multiple calls from the same user with the same emoji result in that reaction not being present, even if it already wasn't.
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object ChatBskyConvoRemoveReactionDefs {
+    const val TYPE_IDENTIFIER = "chat.bsky.convo.removeReaction"
+}
+
+@Serializable
+    data class ChatBskyConvoRemoveReactionInput(
+        @SerialName("convoId")
+        val convoId: String,        @SerialName("messageId")
+        val messageId: String,        @SerialName("value")
+        val value: String    )
+
+    @Serializable
+    data class ChatBskyConvoRemoveReactionOutput(
+        @SerialName("message")
+        val message: ChatBskyConvoDefsMessageView    )
+
+sealed class ChatBskyConvoRemoveReactionError(val name: String, val description: String?) {
+        object InvalidConvo: ChatBskyConvoRemoveReactionError("InvalidConvo", "")
+        object ReactionNotAllowed: ChatBskyConvoRemoveReactionError("ReactionNotAllowed", "Indicates that reactions are not allowed on this message, e.g. because it is a system message.")
+        object ReactionMessageDeleted: ChatBskyConvoRemoveReactionError("ReactionMessageDeleted", "Indicates that the message has been deleted and reactions can no longer be added/removed.")
+        object ReactionInvalidValue: ChatBskyConvoRemoveReactionError("ReactionInvalidValue", "Indicates the value for the reaction is not acceptable. In general, this means it is not an emoji.")
+    }
+
+/**
+ * Removes an emoji reaction from a message. Requires authentication. It is idempotent, so multiple calls from the same user with the same emoji result in that reaction not being present, even if it already wasn't.
+ *
+ * Endpoint: chat.bsky.convo.removeReaction
+ */
+suspend fun ATProtoClient.Chat.Bsky.Convo.removeReaction(
+input: ChatBskyConvoRemoveReactionInput): ATProtoResponse<ChatBskyConvoRemoveReactionOutput> {
+    val endpoint = "chat.bsky.convo.removeReaction"
+
+    // JSON serialization
+    val body = Json.encodeToString(input)
+    val contentType = "application/json"
+
+    val queryItems: List<Pair<String, String>>? = null
+
+    return client.networkService.performRequest(
+        method = "POST",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf(
+            "Content-Type" to contentType,
+            "Accept" to "application/json"
+        ),
+        body = body
+    )
+}

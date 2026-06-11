@@ -1,0 +1,53 @@
+// Lexicon: 1, ID: com.atproto.server.getAccountInviteCodes
+// Get all invite codes for the current account. Requires auth.
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object ComAtprotoServerGetAccountInviteCodesDefs {
+    const val TYPE_IDENTIFIER = "com.atproto.server.getAccountInviteCodes"
+}
+
+@Serializable
+    data class ComAtprotoServerGetAccountInviteCodesParameters(
+        @SerialName("includeUsed")
+        val includeUsed: Boolean? = null,// Controls whether any new 'earned' but not 'created' invites should be created.        @SerialName("createAvailable")
+        val createAvailable: Boolean? = null    )
+
+    @Serializable
+    data class ComAtprotoServerGetAccountInviteCodesOutput(
+        @SerialName("codes")
+        val codes: List<ComAtprotoServerDefsInviteCode>    )
+
+sealed class ComAtprotoServerGetAccountInviteCodesError(val name: String, val description: String?) {
+        object DuplicateCreate: ComAtprotoServerGetAccountInviteCodesError("DuplicateCreate", "")
+    }
+
+/**
+ * Get all invite codes for the current account. Requires auth.
+ *
+ * Endpoint: com.atproto.server.getAccountInviteCodes
+ */
+suspend fun ATProtoClient.Com.Atproto.Server.getAccountInviteCodes(
+parameters: ComAtprotoServerGetAccountInviteCodesParameters): ATProtoResponse<ComAtprotoServerGetAccountInviteCodesOutput> {
+    val endpoint = "com.atproto.server.getAccountInviteCodes"
+
+    // List<Pair<String, String>> preserves repeated keys, which ATProto
+    // array-valued query params rely on (e.g. `?actors=a&actors=b`).
+    val queryItems = parameters.toQueryItems()
+
+    return client.networkService.performRequest(
+        method = "GET",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf("Accept" to "application/json"),
+        body = null
+    )
+}

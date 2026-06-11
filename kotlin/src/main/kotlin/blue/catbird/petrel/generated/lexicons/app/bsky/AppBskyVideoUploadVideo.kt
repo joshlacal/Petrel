@@ -1,0 +1,53 @@
+// Lexicon: 1, ID: app.bsky.video.uploadVideo
+// Upload a video to be processed then stored on the PDS.
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object AppBskyVideoUploadVideoDefs {
+    const val TYPE_IDENTIFIER = "app.bsky.video.uploadVideo"
+}
+
+@Serializable
+    data class AppBskyVideoUploadVideoInput(
+        @SerialName("data")
+        val `data`: ByteArray    )
+
+    @Serializable
+    data class AppBskyVideoUploadVideoOutput(
+        @SerialName("jobStatus")
+        val jobStatus: AppBskyVideoDefsJobStatus    )
+
+/**
+ * Upload a video to be processed then stored on the PDS.
+ *
+ * Endpoint: app.bsky.video.uploadVideo
+ */
+suspend fun ATProtoClient.App.Bsky.Video.uploadVideo(
+input: AppBskyVideoUploadVideoInput): ATProtoResponse<AppBskyVideoUploadVideoOutput> {
+    val endpoint = "app.bsky.video.uploadVideo"
+
+    // Binary data
+    val body = input.data
+    val contentType = "video/mp4"
+
+    val queryItems: List<Pair<String, String>>? = null
+
+    return client.networkService.performRequest(
+        method = "POST",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf(
+            "Content-Type" to contentType,
+            "Accept" to "application/json"
+        ),
+        body = body
+    )
+}

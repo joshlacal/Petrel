@@ -1,0 +1,48 @@
+// Lexicon: 1, ID: app.bsky.graph.getStarterPack
+// Gets a view of a starter pack.
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object AppBskyGraphGetStarterPackDefs {
+    const val TYPE_IDENTIFIER = "app.bsky.graph.getStarterPack"
+}
+
+@Serializable
+    data class AppBskyGraphGetStarterPackParameters(
+// Reference (AT-URI) of the starter pack record.        @SerialName("starterPack")
+        val starterPack: ATProtocolURI    )
+
+    @Serializable
+    data class AppBskyGraphGetStarterPackOutput(
+        @SerialName("starterPack")
+        val starterPack: AppBskyGraphDefsStarterPackView    )
+
+/**
+ * Gets a view of a starter pack.
+ *
+ * Endpoint: app.bsky.graph.getStarterPack
+ */
+suspend fun ATProtoClient.App.Bsky.Graph.getStarterPack(
+parameters: AppBskyGraphGetStarterPackParameters): ATProtoResponse<AppBskyGraphGetStarterPackOutput> {
+    val endpoint = "app.bsky.graph.getStarterPack"
+
+    // List<Pair<String, String>> preserves repeated keys, which ATProto
+    // array-valued query params rely on (e.g. `?actors=a&actors=b`).
+    val queryItems = parameters.toQueryItems()
+
+    return client.networkService.performRequest(
+        method = "GET",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf("Accept" to "application/json"),
+        body = null
+    )
+}

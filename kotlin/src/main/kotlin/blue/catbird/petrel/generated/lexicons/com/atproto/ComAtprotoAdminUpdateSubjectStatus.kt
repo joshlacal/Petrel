@@ -1,0 +1,202 @@
+// Lexicon: 1, ID: com.atproto.admin.updateSubjectStatus
+// Update the service-specific admin status of a subject (account, record, or blob).
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object ComAtprotoAdminUpdateSubjectStatusDefs {
+    const val TYPE_IDENTIFIER = "com.atproto.admin.updateSubjectStatus"
+}
+
+@Serializable(with = ComAtprotoAdminUpdateSubjectStatusInputSubjectUnionSerializer::class)
+sealed interface ComAtprotoAdminUpdateSubjectStatusInputSubjectUnion {
+    @Serializable
+    data class RepoRef(val value: blue.catbird.petrel.generated.ComAtprotoAdminDefsRepoRef) : ComAtprotoAdminUpdateSubjectStatusInputSubjectUnion
+
+    @Serializable
+    data class StrongRef(val value: blue.catbird.petrel.generated.ComAtprotoRepoStrongRef) : ComAtprotoAdminUpdateSubjectStatusInputSubjectUnion
+
+    @Serializable
+    data class RepoBlobRef(val value: blue.catbird.petrel.generated.ComAtprotoAdminDefsRepoBlobRef) : ComAtprotoAdminUpdateSubjectStatusInputSubjectUnion
+
+    @Serializable
+    data class Unexpected(val value: JsonElement) : ComAtprotoAdminUpdateSubjectStatusInputSubjectUnion
+}
+
+object ComAtprotoAdminUpdateSubjectStatusInputSubjectUnionSerializer : kotlinx.serialization.KSerializer<ComAtprotoAdminUpdateSubjectStatusInputSubjectUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("ComAtprotoAdminUpdateSubjectStatusInputSubjectUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ComAtprotoAdminUpdateSubjectStatusInputSubjectUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is ComAtprotoAdminUpdateSubjectStatusInputSubjectUnion.RepoRef -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoAdminDefsRepoRef.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.admin.defs#repoRef")
+                })
+            }
+            is ComAtprotoAdminUpdateSubjectStatusInputSubjectUnion.StrongRef -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoRepoStrongRef.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.repo.strongRef")
+                })
+            }
+            is ComAtprotoAdminUpdateSubjectStatusInputSubjectUnion.RepoBlobRef -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoAdminDefsRepoBlobRef.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.admin.defs#repoBlobRef")
+                })
+            }
+            is ComAtprotoAdminUpdateSubjectStatusInputSubjectUnion.Unexpected -> value.value
+            // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
+            // subscription codegen) are runtime-only sentinels; JSON round-trip
+            // serialises them as an empty object tagged with the variant class
+            // name. Consumers should filter these before JSON serialisation.
+            else -> kotlinx.serialization.json.buildJsonObject {
+                put("\$type", kotlinx.serialization.json.JsonPrimitive(value::class.simpleName ?: "Unknown"))
+            }
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ComAtprotoAdminUpdateSubjectStatusInputSubjectUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "com.atproto.admin.defs#repoRef" -> ComAtprotoAdminUpdateSubjectStatusInputSubjectUnion.RepoRef(
+                jsonDecoder.json.decodeFromJsonElement(blue.catbird.petrel.generated.ComAtprotoAdminDefsRepoRef.serializer(), element)
+            )
+            "com.atproto.repo.strongRef" -> ComAtprotoAdminUpdateSubjectStatusInputSubjectUnion.StrongRef(
+                jsonDecoder.json.decodeFromJsonElement(blue.catbird.petrel.generated.ComAtprotoRepoStrongRef.serializer(), element)
+            )
+            "com.atproto.admin.defs#repoBlobRef" -> ComAtprotoAdminUpdateSubjectStatusInputSubjectUnion.RepoBlobRef(
+                jsonDecoder.json.decodeFromJsonElement(blue.catbird.petrel.generated.ComAtprotoAdminDefsRepoBlobRef.serializer(), element)
+            )
+            else -> ComAtprotoAdminUpdateSubjectStatusInputSubjectUnion.Unexpected(element)
+        }
+    }
+}
+
+@Serializable(with = ComAtprotoAdminUpdateSubjectStatusOutputSubjectUnionSerializer::class)
+sealed interface ComAtprotoAdminUpdateSubjectStatusOutputSubjectUnion {
+    @Serializable
+    data class RepoRef(val value: blue.catbird.petrel.generated.ComAtprotoAdminDefsRepoRef) : ComAtprotoAdminUpdateSubjectStatusOutputSubjectUnion
+
+    @Serializable
+    data class StrongRef(val value: blue.catbird.petrel.generated.ComAtprotoRepoStrongRef) : ComAtprotoAdminUpdateSubjectStatusOutputSubjectUnion
+
+    @Serializable
+    data class RepoBlobRef(val value: blue.catbird.petrel.generated.ComAtprotoAdminDefsRepoBlobRef) : ComAtprotoAdminUpdateSubjectStatusOutputSubjectUnion
+
+    @Serializable
+    data class Unexpected(val value: JsonElement) : ComAtprotoAdminUpdateSubjectStatusOutputSubjectUnion
+}
+
+object ComAtprotoAdminUpdateSubjectStatusOutputSubjectUnionSerializer : kotlinx.serialization.KSerializer<ComAtprotoAdminUpdateSubjectStatusOutputSubjectUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("ComAtprotoAdminUpdateSubjectStatusOutputSubjectUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ComAtprotoAdminUpdateSubjectStatusOutputSubjectUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is ComAtprotoAdminUpdateSubjectStatusOutputSubjectUnion.RepoRef -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoAdminDefsRepoRef.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.admin.defs#repoRef")
+                })
+            }
+            is ComAtprotoAdminUpdateSubjectStatusOutputSubjectUnion.StrongRef -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoRepoStrongRef.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.repo.strongRef")
+                })
+            }
+            is ComAtprotoAdminUpdateSubjectStatusOutputSubjectUnion.RepoBlobRef -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoAdminDefsRepoBlobRef.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.admin.defs#repoBlobRef")
+                })
+            }
+            is ComAtprotoAdminUpdateSubjectStatusOutputSubjectUnion.Unexpected -> value.value
+            // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
+            // subscription codegen) are runtime-only sentinels; JSON round-trip
+            // serialises them as an empty object tagged with the variant class
+            // name. Consumers should filter these before JSON serialisation.
+            else -> kotlinx.serialization.json.buildJsonObject {
+                put("\$type", kotlinx.serialization.json.JsonPrimitive(value::class.simpleName ?: "Unknown"))
+            }
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ComAtprotoAdminUpdateSubjectStatusOutputSubjectUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "com.atproto.admin.defs#repoRef" -> ComAtprotoAdminUpdateSubjectStatusOutputSubjectUnion.RepoRef(
+                jsonDecoder.json.decodeFromJsonElement(blue.catbird.petrel.generated.ComAtprotoAdminDefsRepoRef.serializer(), element)
+            )
+            "com.atproto.repo.strongRef" -> ComAtprotoAdminUpdateSubjectStatusOutputSubjectUnion.StrongRef(
+                jsonDecoder.json.decodeFromJsonElement(blue.catbird.petrel.generated.ComAtprotoRepoStrongRef.serializer(), element)
+            )
+            "com.atproto.admin.defs#repoBlobRef" -> ComAtprotoAdminUpdateSubjectStatusOutputSubjectUnion.RepoBlobRef(
+                jsonDecoder.json.decodeFromJsonElement(blue.catbird.petrel.generated.ComAtprotoAdminDefsRepoBlobRef.serializer(), element)
+            )
+            else -> ComAtprotoAdminUpdateSubjectStatusOutputSubjectUnion.Unexpected(element)
+        }
+    }
+}
+
+@Serializable
+    data class ComAtprotoAdminUpdateSubjectStatusInput(
+        @SerialName("subject")
+        val subject: ComAtprotoAdminUpdateSubjectStatusInputSubjectUnion,        @SerialName("takedown")
+        val takedown: ComAtprotoAdminDefsStatusAttr? = null,        @SerialName("deactivated")
+        val deactivated: ComAtprotoAdminDefsStatusAttr? = null    )
+
+    @Serializable
+    data class ComAtprotoAdminUpdateSubjectStatusOutput(
+        @SerialName("subject")
+        val subject: ComAtprotoAdminUpdateSubjectStatusOutputSubjectUnion,        @SerialName("takedown")
+        val takedown: ComAtprotoAdminDefsStatusAttr? = null    )
+
+/**
+ * Update the service-specific admin status of a subject (account, record, or blob).
+ *
+ * Endpoint: com.atproto.admin.updateSubjectStatus
+ */
+suspend fun ATProtoClient.Com.Atproto.Admin.updateSubjectStatus(
+input: ComAtprotoAdminUpdateSubjectStatusInput): ATProtoResponse<ComAtprotoAdminUpdateSubjectStatusOutput> {
+    val endpoint = "com.atproto.admin.updateSubjectStatus"
+
+    // JSON serialization
+    val body = Json.encodeToString(input)
+    val contentType = "application/json"
+
+    val queryItems: List<Pair<String, String>>? = null
+
+    return client.networkService.performRequest(
+        method = "POST",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf(
+            "Content-Type" to contentType,
+            "Accept" to "application/json"
+        ),
+        body = body
+    )
+}

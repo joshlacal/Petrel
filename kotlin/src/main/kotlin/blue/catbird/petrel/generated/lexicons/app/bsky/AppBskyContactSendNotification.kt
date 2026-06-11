@@ -1,0 +1,52 @@
+// Lexicon: 1, ID: app.bsky.contact.sendNotification
+// System endpoint to send notifications related to contact imports. Requires role authentication.
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object AppBskyContactSendNotificationDefs {
+    const val TYPE_IDENTIFIER = "app.bsky.contact.sendNotification"
+}
+
+@Serializable
+    data class AppBskyContactSendNotificationInput(
+// The DID of who this notification comes from.        @SerialName("from")
+        val from: DID,// The DID of who this notification should go to.        @SerialName("to")
+        val to: DID    )
+
+    @Serializable
+    class AppBskyContactSendNotificationOutput
+
+/**
+ * System endpoint to send notifications related to contact imports. Requires role authentication.
+ *
+ * Endpoint: app.bsky.contact.sendNotification
+ */
+suspend fun ATProtoClient.App.Bsky.Contact.sendNotification(
+input: AppBskyContactSendNotificationInput): ATProtoResponse<AppBskyContactSendNotificationOutput> {
+    val endpoint = "app.bsky.contact.sendNotification"
+
+    // JSON serialization
+    val body = Json.encodeToString(input)
+    val contentType = "application/json"
+
+    val queryItems: List<Pair<String, String>>? = null
+
+    return client.networkService.performRequest(
+        method = "POST",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf(
+            "Content-Type" to contentType,
+            "Accept" to "application/json"
+        ),
+        body = body
+    )
+}

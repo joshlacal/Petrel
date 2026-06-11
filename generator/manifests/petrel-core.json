@@ -13,6 +13,6 @@
     "output": "Sources/Petrel/Generated"
   },
   "kotlin": {
-    "output": "kotlin/src/main/kotlin/com/atproto/generated"
+    "output": "kotlin/src/main/kotlin/blue/catbird/petrel/generated"
   }
 }

@@ -1,0 +1,56 @@
+// Lexicon: 1, ID: com.atproto.server.listAppPasswords
+// List all App Passwords.
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object ComAtprotoServerListAppPasswordsDefs {
+    const val TYPE_IDENTIFIER = "com.atproto.server.listAppPasswords"
+}
+
+    @Serializable
+    data class ComAtprotoServerListAppPasswordsAppPassword(
+        @SerialName("name")
+        val name: String,        @SerialName("createdAt")
+        val createdAt: ATProtocolDate,        @SerialName("privileged")
+        val privileged: Boolean? = null    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#comAtprotoServerListAppPasswordsAppPassword"
+        }
+    }
+
+    @Serializable
+    data class ComAtprotoServerListAppPasswordsOutput(
+        @SerialName("passwords")
+        val passwords: List<ComAtprotoServerListAppPasswordsAppPassword>    )
+
+sealed class ComAtprotoServerListAppPasswordsError(val name: String, val description: String?) {
+        object AccountTakedown: ComAtprotoServerListAppPasswordsError("AccountTakedown", "")
+    }
+
+/**
+ * List all App Passwords.
+ *
+ * Endpoint: com.atproto.server.listAppPasswords
+ */
+suspend fun ATProtoClient.Com.Atproto.Server.listAppPasswords(
+): ATProtoResponse<ComAtprotoServerListAppPasswordsOutput> {
+    val endpoint = "com.atproto.server.listAppPasswords"
+
+    val queryItems: List<Pair<String, String>>? = null
+
+    return client.networkService.performRequest(
+        method = "GET",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf("Accept" to "application/json"),
+        body = null
+    )
+}

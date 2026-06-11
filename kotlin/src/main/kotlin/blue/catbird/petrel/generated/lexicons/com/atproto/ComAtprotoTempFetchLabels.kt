@@ -1,0 +1,49 @@
+// Lexicon: 1, ID: com.atproto.temp.fetchLabels
+// DEPRECATED: use queryLabels or subscribeLabels instead -- Fetch all labels from a labeler created after a certain date.
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object ComAtprotoTempFetchLabelsDefs {
+    const val TYPE_IDENTIFIER = "com.atproto.temp.fetchLabels"
+}
+
+@Serializable
+    data class ComAtprotoTempFetchLabelsParameters(
+        @SerialName("since")
+        val since: Int? = null,        @SerialName("limit")
+        val limit: Int? = null    )
+
+    @Serializable
+    data class ComAtprotoTempFetchLabelsOutput(
+        @SerialName("labels")
+        val labels: List<ComAtprotoLabelDefsLabel>    )
+
+/**
+ * DEPRECATED: use queryLabels or subscribeLabels instead -- Fetch all labels from a labeler created after a certain date.
+ *
+ * Endpoint: com.atproto.temp.fetchLabels
+ */
+suspend fun ATProtoClient.Com.Atproto.Temp.fetchLabels(
+parameters: ComAtprotoTempFetchLabelsParameters): ATProtoResponse<ComAtprotoTempFetchLabelsOutput> {
+    val endpoint = "com.atproto.temp.fetchLabels"
+
+    // List<Pair<String, String>> preserves repeated keys, which ATProto
+    // array-valued query params rely on (e.g. `?actors=a&actors=b`).
+    val queryItems = parameters.toQueryItems()
+
+    return client.networkService.performRequest(
+        method = "GET",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf("Accept" to "application/json"),
+        body = null
+    )
+}

@@ -1,0 +1,64 @@
+// Lexicon: 1, ID: app.bsky.graph.getStarterPacksWithMembership
+// Enumerates the starter packs created by the session user, and includes membership information about `actor` in those starter packs. Requires auth.
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object AppBskyGraphGetStarterPacksWithMembershipDefs {
+    const val TYPE_IDENTIFIER = "app.bsky.graph.getStarterPacksWithMembership"
+}
+
+    /**
+     * A starter pack and an optional list item indicating membership of a target user to that starter pack.
+     */
+    @Serializable
+    data class AppBskyGraphGetStarterPacksWithMembershipStarterPackWithMembership(
+        @SerialName("starterPack")
+        val starterPack: AppBskyGraphDefsStarterPackView,        @SerialName("listItem")
+        val listItem: AppBskyGraphDefsListItemView? = null    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#appBskyGraphGetStarterPacksWithMembershipStarterPackWithMembership"
+        }
+    }
+
+@Serializable
+    data class AppBskyGraphGetStarterPacksWithMembershipParameters(
+// The account (actor) to check for membership.        @SerialName("actor")
+        val actor: ATIdentifier,        @SerialName("limit")
+        val limit: Int? = null,        @SerialName("cursor")
+        val cursor: String? = null    )
+
+    @Serializable
+    data class AppBskyGraphGetStarterPacksWithMembershipOutput(
+        @SerialName("cursor")
+        val cursor: String? = null,        @SerialName("starterPacksWithMembership")
+        val starterPacksWithMembership: List<AppBskyGraphGetStarterPacksWithMembershipStarterPackWithMembership>    )
+
+/**
+ * Enumerates the starter packs created by the session user, and includes membership information about `actor` in those starter packs. Requires auth.
+ *
+ * Endpoint: app.bsky.graph.getStarterPacksWithMembership
+ */
+suspend fun ATProtoClient.App.Bsky.Graph.getStarterPacksWithMembership(
+parameters: AppBskyGraphGetStarterPacksWithMembershipParameters): ATProtoResponse<AppBskyGraphGetStarterPacksWithMembershipOutput> {
+    val endpoint = "app.bsky.graph.getStarterPacksWithMembership"
+
+    // List<Pair<String, String>> preserves repeated keys, which ATProto
+    // array-valued query params rely on (e.g. `?actors=a&actors=b`).
+    val queryItems = parameters.toQueryItems()
+
+    return client.networkService.performRequest(
+        method = "GET",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf("Accept" to "application/json"),
+        body = null
+    )
+}

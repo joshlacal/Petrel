@@ -1,0 +1,45 @@
+// Lexicon: 1, ID: app.bsky.video.getUploadLimits
+// Get video upload limits for the authenticated user.
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object AppBskyVideoGetUploadLimitsDefs {
+    const val TYPE_IDENTIFIER = "app.bsky.video.getUploadLimits"
+}
+
+    @Serializable
+    data class AppBskyVideoGetUploadLimitsOutput(
+        @SerialName("canUpload")
+        val canUpload: Boolean,        @SerialName("remainingDailyVideos")
+        val remainingDailyVideos: Int? = null,        @SerialName("remainingDailyBytes")
+        val remainingDailyBytes: Int? = null,        @SerialName("message")
+        val message: String? = null,        @SerialName("error")
+        val error: String? = null    )
+
+/**
+ * Get video upload limits for the authenticated user.
+ *
+ * Endpoint: app.bsky.video.getUploadLimits
+ */
+suspend fun ATProtoClient.App.Bsky.Video.getUploadLimits(
+): ATProtoResponse<AppBskyVideoGetUploadLimitsOutput> {
+    val endpoint = "app.bsky.video.getUploadLimits"
+
+    val queryItems: List<Pair<String, String>>? = null
+
+    return client.networkService.performRequest(
+        method = "GET",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf("Accept" to "application/json"),
+        body = null
+    )
+}

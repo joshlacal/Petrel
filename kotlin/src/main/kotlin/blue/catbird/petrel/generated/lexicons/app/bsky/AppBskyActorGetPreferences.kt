@@ -1,0 +1,46 @@
+// Lexicon: 1, ID: app.bsky.actor.getPreferences
+// Get private preferences attached to the current account. Expected use is synchronization between multiple devices, and import/export during account migration. Requires auth.
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object AppBskyActorGetPreferencesDefs {
+    const val TYPE_IDENTIFIER = "app.bsky.actor.getPreferences"
+}
+
+@Serializable
+    class AppBskyActorGetPreferencesParameters
+
+    @Serializable
+    data class AppBskyActorGetPreferencesOutput(
+        @SerialName("preferences")
+        val preferences: AppBskyActorDefsPreferences    )
+
+/**
+ * Get private preferences attached to the current account. Expected use is synchronization between multiple devices, and import/export during account migration. Requires auth.
+ *
+ * Endpoint: app.bsky.actor.getPreferences
+ */
+suspend fun ATProtoClient.App.Bsky.Actor.getPreferences(
+parameters: AppBskyActorGetPreferencesParameters): ATProtoResponse<AppBskyActorGetPreferencesOutput> {
+    val endpoint = "app.bsky.actor.getPreferences"
+
+    // List<Pair<String, String>> preserves repeated keys, which ATProto
+    // array-valued query params rely on (e.g. `?actors=a&actors=b`).
+    val queryItems = parameters.toQueryItems()
+
+    return client.networkService.performRequest(
+        method = "GET",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf("Accept" to "application/json"),
+        body = null
+    )
+}

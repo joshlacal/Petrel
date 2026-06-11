@@ -1,0 +1,47 @@
+// Lexicon: 1, ID: com.atproto.server.requestEmailUpdate
+// Request a token in order to update email.
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object ComAtprotoServerRequestEmailUpdateDefs {
+    const val TYPE_IDENTIFIER = "com.atproto.server.requestEmailUpdate"
+}
+
+    @Serializable
+    data class ComAtprotoServerRequestEmailUpdateOutput(
+        @SerialName("tokenRequired")
+        val tokenRequired: Boolean    )
+
+/**
+ * Request a token in order to update email.
+ *
+ * Endpoint: com.atproto.server.requestEmailUpdate
+ */
+suspend fun ATProtoClient.Com.Atproto.Server.requestEmailUpdate(
+): ATProtoResponse<ComAtprotoServerRequestEmailUpdateOutput> {
+    val endpoint = "com.atproto.server.requestEmailUpdate"
+
+    val body: String? = null
+    val contentType = "application/json"
+
+    val queryItems: List<Pair<String, String>>? = null
+
+    return client.networkService.performRequest(
+        method = "POST",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf(
+            "Content-Type" to contentType,
+            "Accept" to "application/json"
+        ),
+        body = body
+    )
+}

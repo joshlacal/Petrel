@@ -1,0 +1,56 @@
+// Lexicon: 1, ID: app.bsky.contact.dismissMatch
+// Removes a match that was found via contact import. It shouldn't appear again if the same contact is re-imported. Requires authentication.
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object AppBskyContactDismissMatchDefs {
+    const val TYPE_IDENTIFIER = "app.bsky.contact.dismissMatch"
+}
+
+@Serializable
+    data class AppBskyContactDismissMatchInput(
+// The subject's DID to dismiss the match with.        @SerialName("subject")
+        val subject: DID    )
+
+    @Serializable
+    class AppBskyContactDismissMatchOutput
+
+sealed class AppBskyContactDismissMatchError(val name: String, val description: String?) {
+        object InvalidDid: AppBskyContactDismissMatchError("InvalidDid", "")
+        object InternalError: AppBskyContactDismissMatchError("InternalError", "")
+    }
+
+/**
+ * Removes a match that was found via contact import. It shouldn't appear again if the same contact is re-imported. Requires authentication.
+ *
+ * Endpoint: app.bsky.contact.dismissMatch
+ */
+suspend fun ATProtoClient.App.Bsky.Contact.dismissMatch(
+input: AppBskyContactDismissMatchInput): ATProtoResponse<AppBskyContactDismissMatchOutput> {
+    val endpoint = "app.bsky.contact.dismissMatch"
+
+    // JSON serialization
+    val body = Json.encodeToString(input)
+    val contentType = "application/json"
+
+    val queryItems: List<Pair<String, String>>? = null
+
+    return client.networkService.performRequest(
+        method = "POST",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf(
+            "Content-Type" to contentType,
+            "Accept" to "application/json"
+        ),
+        body = body
+    )
+}

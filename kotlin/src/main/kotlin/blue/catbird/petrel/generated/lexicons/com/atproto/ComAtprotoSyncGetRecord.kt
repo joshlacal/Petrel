@@ -1,0 +1,58 @@
+// Lexicon: 1, ID: com.atproto.sync.getRecord
+// Get data blocks needed to prove the existence or non-existence of record in the current version of repo. Does not require auth.
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object ComAtprotoSyncGetRecordDefs {
+    const val TYPE_IDENTIFIER = "com.atproto.sync.getRecord"
+}
+
+@Serializable
+    data class ComAtprotoSyncGetRecordParameters(
+// The DID of the repo.        @SerialName("did")
+        val did: DID,        @SerialName("collection")
+        val collection: NSID,// Record Key        @SerialName("rkey")
+        val rkey: String    )
+
+    @Serializable
+    data class ComAtprotoSyncGetRecordOutput(
+        @SerialName("data")
+        val `data`: ByteArray    )
+
+sealed class ComAtprotoSyncGetRecordError(val name: String, val description: String?) {
+        object RecordNotFound: ComAtprotoSyncGetRecordError("RecordNotFound", "")
+        object RepoNotFound: ComAtprotoSyncGetRecordError("RepoNotFound", "")
+        object RepoTakendown: ComAtprotoSyncGetRecordError("RepoTakendown", "")
+        object RepoSuspended: ComAtprotoSyncGetRecordError("RepoSuspended", "")
+        object RepoDeactivated: ComAtprotoSyncGetRecordError("RepoDeactivated", "")
+    }
+
+/**
+ * Get data blocks needed to prove the existence or non-existence of record in the current version of repo. Does not require auth.
+ *
+ * Endpoint: com.atproto.sync.getRecord
+ */
+suspend fun ATProtoClient.Com.Atproto.Sync.getRecord(
+parameters: ComAtprotoSyncGetRecordParameters): ATProtoResponse<ComAtprotoSyncGetRecordOutput> {
+    val endpoint = "com.atproto.sync.getRecord"
+
+    // List<Pair<String, String>> preserves repeated keys, which ATProto
+    // array-valued query params rely on (e.g. `?actors=a&actors=b`).
+    val queryItems = parameters.toQueryItems()
+
+    return client.networkService.performRequest(
+        method = "GET",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf("Accept" to "application/vnd.ipld.car"),
+        body = null
+    )
+}

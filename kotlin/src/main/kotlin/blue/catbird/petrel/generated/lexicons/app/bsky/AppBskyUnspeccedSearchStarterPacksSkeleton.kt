@@ -1,0 +1,57 @@
+// Lexicon: 1, ID: app.bsky.unspecced.searchStarterPacksSkeleton
+// Backend Starter Pack search, returns only skeleton.
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object AppBskyUnspeccedSearchStarterPacksSkeletonDefs {
+    const val TYPE_IDENTIFIER = "app.bsky.unspecced.searchStarterPacksSkeleton"
+}
+
+@Serializable
+    data class AppBskyUnspeccedSearchStarterPacksSkeletonParameters(
+// Search query string; syntax, phrase, boolean, and faceting is unspecified, but Lucene query syntax is recommended.        @SerialName("q")
+        val q: String,// DID of the account making the request (not included for public/unauthenticated queries).        @SerialName("viewer")
+        val viewer: DID? = null,        @SerialName("limit")
+        val limit: Int? = null,// Optional pagination mechanism; may not necessarily allow scrolling through entire result set.        @SerialName("cursor")
+        val cursor: String? = null    )
+
+    @Serializable
+    data class AppBskyUnspeccedSearchStarterPacksSkeletonOutput(
+        @SerialName("cursor")
+        val cursor: String? = null,// Count of search hits. Optional, may be rounded/truncated, and may not be possible to paginate through all hits.        @SerialName("hitsTotal")
+        val hitsTotal: Int? = null,        @SerialName("starterPacks")
+        val starterPacks: List<AppBskyUnspeccedDefsSkeletonSearchStarterPack>    )
+
+sealed class AppBskyUnspeccedSearchStarterPacksSkeletonError(val name: String, val description: String?) {
+        object BadQueryString: AppBskyUnspeccedSearchStarterPacksSkeletonError("BadQueryString", "")
+    }
+
+/**
+ * Backend Starter Pack search, returns only skeleton.
+ *
+ * Endpoint: app.bsky.unspecced.searchStarterPacksSkeleton
+ */
+suspend fun ATProtoClient.App.Bsky.Unspecced.searchStarterPacksSkeleton(
+parameters: AppBskyUnspeccedSearchStarterPacksSkeletonParameters): ATProtoResponse<AppBskyUnspeccedSearchStarterPacksSkeletonOutput> {
+    val endpoint = "app.bsky.unspecced.searchStarterPacksSkeleton"
+
+    // List<Pair<String, String>> preserves repeated keys, which ATProto
+    // array-valued query params rely on (e.g. `?actors=a&actors=b`).
+    val queryItems = parameters.toQueryItems()
+
+    return client.networkService.performRequest(
+        method = "GET",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf("Accept" to "application/json"),
+        body = null
+    )
+}

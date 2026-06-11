@@ -5,7 +5,7 @@ plugins {
     `maven-publish`
 }
 
-group = "com.atproto"
+group = "blue.catbird"
 version = providers.gradleProperty("version").orNull?.takeIf { it != "unspecified" } ?: "0.1.0"
 
 dependencies {

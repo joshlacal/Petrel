@@ -1,0 +1,49 @@
+// Lexicon: 1, ID: com.atproto.admin.enableAccountInvites
+// Re-enable an account's ability to receive invite codes.
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object ComAtprotoAdminEnableAccountInvitesDefs {
+    const val TYPE_IDENTIFIER = "com.atproto.admin.enableAccountInvites"
+}
+
+@Serializable
+    data class ComAtprotoAdminEnableAccountInvitesInput(
+        @SerialName("account")
+        val account: DID,// Optional reason for enabled invites.        @SerialName("note")
+        val note: String? = null    )
+
+/**
+ * Re-enable an account's ability to receive invite codes.
+ *
+ * Endpoint: com.atproto.admin.enableAccountInvites
+ */
+suspend fun ATProtoClient.Com.Atproto.Admin.enableAccountInvites(
+input: ComAtprotoAdminEnableAccountInvitesInput): ATProtoResponse<Unit> {
+    val endpoint = "com.atproto.admin.enableAccountInvites"
+
+    // JSON serialization
+    val body = Json.encodeToString(input)
+    val contentType = "application/json"
+
+    val queryItems: List<Pair<String, String>>? = null
+
+    return client.networkService.performRequest(
+        method = "POST",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf(
+            "Content-Type" to contentType,
+            "Accept" to "None"
+        ),
+        body = body
+    )
+}

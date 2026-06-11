@@ -1,0 +1,48 @@
+// Lexicon: 1, ID: com.atproto.sync.notifyOfUpdate
+// Notify a crawling service of a recent update, and that crawling should resume. Intended use is after a gap between repo stream events caused the crawling service to disconnect. Does not require auth; implemented by Relay. DEPRECATED: just use com.atproto.sync.requestCrawl
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object ComAtprotoSyncNotifyOfUpdateDefs {
+    const val TYPE_IDENTIFIER = "com.atproto.sync.notifyOfUpdate"
+}
+
+@Serializable
+    data class ComAtprotoSyncNotifyOfUpdateInput(
+// Hostname of the current service (usually a PDS) that is notifying of update.        @SerialName("hostname")
+        val hostname: String    )
+
+/**
+ * Notify a crawling service of a recent update, and that crawling should resume. Intended use is after a gap between repo stream events caused the crawling service to disconnect. Does not require auth; implemented by Relay. DEPRECATED: just use com.atproto.sync.requestCrawl
+ *
+ * Endpoint: com.atproto.sync.notifyOfUpdate
+ */
+suspend fun ATProtoClient.Com.Atproto.Sync.notifyOfUpdate(
+input: ComAtprotoSyncNotifyOfUpdateInput): ATProtoResponse<Unit> {
+    val endpoint = "com.atproto.sync.notifyOfUpdate"
+
+    // JSON serialization
+    val body = Json.encodeToString(input)
+    val contentType = "application/json"
+
+    val queryItems: List<Pair<String, String>>? = null
+
+    return client.networkService.performRequest(
+        method = "POST",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf(
+            "Content-Type" to contentType,
+            "Accept" to "None"
+        ),
+        body = body
+    )
+}

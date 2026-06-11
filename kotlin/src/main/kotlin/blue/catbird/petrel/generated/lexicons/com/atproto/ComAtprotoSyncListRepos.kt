@@ -1,0 +1,63 @@
+// Lexicon: 1, ID: com.atproto.sync.listRepos
+// Enumerates all the DID, rev, and commit CID for all repos hosted by this service. Does not require auth; implemented by PDS and Relay.
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object ComAtprotoSyncListReposDefs {
+    const val TYPE_IDENTIFIER = "com.atproto.sync.listRepos"
+}
+
+    @Serializable
+    data class ComAtprotoSyncListReposRepo(
+        @SerialName("did")
+        val did: DID,/** Current repo commit CID */        @SerialName("head")
+        val head: CID,        @SerialName("rev")
+        val rev: String,        @SerialName("active")
+        val active: Boolean? = null,/** If active=false, this optional field indicates a possible reason for why the account is not active. If active=false and no status is supplied, then the host makes no claim for why the repository is no longer being hosted. */        @SerialName("status")
+        val status: String? = null    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#comAtprotoSyncListReposRepo"
+        }
+    }
+
+@Serializable
+    data class ComAtprotoSyncListReposParameters(
+        @SerialName("limit")
+        val limit: Int? = null,        @SerialName("cursor")
+        val cursor: String? = null    )
+
+    @Serializable
+    data class ComAtprotoSyncListReposOutput(
+        @SerialName("cursor")
+        val cursor: String? = null,        @SerialName("repos")
+        val repos: List<ComAtprotoSyncListReposRepo>    )
+
+/**
+ * Enumerates all the DID, rev, and commit CID for all repos hosted by this service. Does not require auth; implemented by PDS and Relay.
+ *
+ * Endpoint: com.atproto.sync.listRepos
+ */
+suspend fun ATProtoClient.Com.Atproto.Sync.listRepos(
+parameters: ComAtprotoSyncListReposParameters): ATProtoResponse<ComAtprotoSyncListReposOutput> {
+    val endpoint = "com.atproto.sync.listRepos"
+
+    // List<Pair<String, String>> preserves repeated keys, which ATProto
+    // array-valued query params rely on (e.g. `?actors=a&actors=b`).
+    val queryItems = parameters.toQueryItems()
+
+    return client.networkService.performRequest(
+        method = "GET",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf("Accept" to "application/json"),
+        body = null
+    )
+}

@@ -1,0 +1,54 @@
+// Lexicon: 1, ID: com.atproto.lexicon.resolveLexicon
+// Resolves an atproto lexicon (NSID) to a schema.
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object ComAtprotoLexiconResolveLexiconDefs {
+    const val TYPE_IDENTIFIER = "com.atproto.lexicon.resolveLexicon"
+}
+
+@Serializable
+    data class ComAtprotoLexiconResolveLexiconParameters(
+// The lexicon NSID to resolve.        @SerialName("nsid")
+        val nsid: NSID    )
+
+    @Serializable
+    data class ComAtprotoLexiconResolveLexiconOutput(
+// The CID of the lexicon schema record.        @SerialName("cid")
+        val cid: CID,// The resolved lexicon schema record.        @SerialName("schema")
+        val schema: ComAtprotoLexiconSchema,// The AT-URI of the lexicon schema record.        @SerialName("uri")
+        val uri: ATProtocolURI    )
+
+sealed class ComAtprotoLexiconResolveLexiconError(val name: String, val description: String?) {
+        object LexiconNotFound: ComAtprotoLexiconResolveLexiconError("LexiconNotFound", "No lexicon was resolved for the NSID.")
+    }
+
+/**
+ * Resolves an atproto lexicon (NSID) to a schema.
+ *
+ * Endpoint: com.atproto.lexicon.resolveLexicon
+ */
+suspend fun ATProtoClient.Com.Atproto.Lexicon.resolveLexicon(
+parameters: ComAtprotoLexiconResolveLexiconParameters): ATProtoResponse<ComAtprotoLexiconResolveLexiconOutput> {
+    val endpoint = "com.atproto.lexicon.resolveLexicon"
+
+    // List<Pair<String, String>> preserves repeated keys, which ATProto
+    // array-valued query params rely on (e.g. `?actors=a&actors=b`).
+    val queryItems = parameters.toQueryItems()
+
+    return client.networkService.performRequest(
+        method = "GET",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf("Accept" to "application/json"),
+        body = null
+    )
+}

@@ -37,9 +37,9 @@ fun {{ receiver_type }}.{{ function_name }}(
     client.openSubscription(endpoint, queryItems, hostOverride, websocketClient) { frame ->
         {% if is_union %}
         val decoded: {{ message_type }} = when (frame) {
-            is com.atproto.runtime.subscription.CborFrame.Error ->
+            is blue.catbird.petrel.runtime.subscription.CborFrame.Error ->
                 {{ message_union }}Error(frame.name, frame.message)
-            is com.atproto.runtime.subscription.CborFrame.Message -> {
+            is blue.catbird.petrel.runtime.subscription.CborFrame.Message -> {
                 val json = kotlinx.serialization.json.Json {
                     ignoreUnknownKeys = true
                     isLenient = true
@@ -50,7 +50,7 @@ fun {{ receiver_type }}.{{ function_name }}(
                         {% if variant.decodable %}
                         "{{ variant.header_tag }}" -> {{ message_union }}.{{ variant.short_name }}(
                             json.decodeFromJsonElement(
-                                com.atproto.generated.{{ variant.payload_type }}.serializer(),
+                                blue.catbird.petrel.generated.{{ variant.payload_type }}.serializer(),
                                 frame.payload
                             )
                         )
@@ -74,12 +74,12 @@ fun {{ receiver_type }}.{{ function_name }}(
         // of every binary frame's payload. Subscriptions without union schemas
         // are rare in practice — see docs/plans/2026-04-19-kotlin-subscription-codegen.md.
         when (frame) {
-            is com.atproto.runtime.subscription.CborFrame.Message -> {
+            is blue.catbird.petrel.runtime.subscription.CborFrame.Message -> {
                 // Non-union subscription: surface the raw payload to consumers
                 // via kotlinx.serialization.json.JsonObject under a placeholder.
                 emit({{ message_type }}())
             }
-            is com.atproto.runtime.subscription.CborFrame.Error -> {
+            is blue.catbird.petrel.runtime.subscription.CborFrame.Error -> {
                 throw io.ktor.utils.io.errors.IOException(
                     "Subscription error frame: ${frame.name}: ${frame.message ?: "(no detail)"}"
                 )

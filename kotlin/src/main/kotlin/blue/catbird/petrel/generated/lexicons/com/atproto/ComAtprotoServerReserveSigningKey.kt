@@ -1,0 +1,53 @@
+// Lexicon: 1, ID: com.atproto.server.reserveSigningKey
+// Reserve a repo signing key, for use with account creation. Necessary so that a DID PLC update operation can be constructed during an account migraiton. Public and does not require auth; implemented by PDS. NOTE: this endpoint may change when full account migration is implemented.
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object ComAtprotoServerReserveSigningKeyDefs {
+    const val TYPE_IDENTIFIER = "com.atproto.server.reserveSigningKey"
+}
+
+@Serializable
+    data class ComAtprotoServerReserveSigningKeyInput(
+// The DID to reserve a key for.        @SerialName("did")
+        val did: DID? = null    )
+
+    @Serializable
+    data class ComAtprotoServerReserveSigningKeyOutput(
+// The public key for the reserved signing key, in did:key serialization.        @SerialName("signingKey")
+        val signingKey: String    )
+
+/**
+ * Reserve a repo signing key, for use with account creation. Necessary so that a DID PLC update operation can be constructed during an account migraiton. Public and does not require auth; implemented by PDS. NOTE: this endpoint may change when full account migration is implemented.
+ *
+ * Endpoint: com.atproto.server.reserveSigningKey
+ */
+suspend fun ATProtoClient.Com.Atproto.Server.reserveSigningKey(
+input: ComAtprotoServerReserveSigningKeyInput): ATProtoResponse<ComAtprotoServerReserveSigningKeyOutput> {
+    val endpoint = "com.atproto.server.reserveSigningKey"
+
+    // JSON serialization
+    val body = Json.encodeToString(input)
+    val contentType = "application/json"
+
+    val queryItems: List<Pair<String, String>>? = null
+
+    return client.networkService.performRequest(
+        method = "POST",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf(
+            "Content-Type" to contentType,
+            "Accept" to "application/json"
+        ),
+        body = body
+    )
+}

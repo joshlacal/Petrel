@@ -1,0 +1,52 @@
+// Lexicon: 1, ID: app.bsky.graph.getKnownFollowers
+// Enumerates accounts which follow a specified account (actor) and are followed by the viewer.
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object AppBskyGraphGetKnownFollowersDefs {
+    const val TYPE_IDENTIFIER = "app.bsky.graph.getKnownFollowers"
+}
+
+@Serializable
+    data class AppBskyGraphGetKnownFollowersParameters(
+        @SerialName("actor")
+        val actor: ATIdentifier,        @SerialName("limit")
+        val limit: Int? = null,        @SerialName("cursor")
+        val cursor: String? = null    )
+
+    @Serializable
+    data class AppBskyGraphGetKnownFollowersOutput(
+        @SerialName("subject")
+        val subject: AppBskyActorDefsProfileView,        @SerialName("cursor")
+        val cursor: String? = null,        @SerialName("followers")
+        val followers: List<AppBskyActorDefsProfileView>    )
+
+/**
+ * Enumerates accounts which follow a specified account (actor) and are followed by the viewer.
+ *
+ * Endpoint: app.bsky.graph.getKnownFollowers
+ */
+suspend fun ATProtoClient.App.Bsky.Graph.getKnownFollowers(
+parameters: AppBskyGraphGetKnownFollowersParameters): ATProtoResponse<AppBskyGraphGetKnownFollowersOutput> {
+    val endpoint = "app.bsky.graph.getKnownFollowers"
+
+    // List<Pair<String, String>> preserves repeated keys, which ATProto
+    // array-valued query params rely on (e.g. `?actors=a&actors=b`).
+    val queryItems = parameters.toQueryItems()
+
+    return client.networkService.performRequest(
+        method = "GET",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf("Accept" to "application/json"),
+        body = null
+    )
+}
