@@ -1,3 +1,5 @@
+import Foundation
+
 public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValue {
     case knownType(any ATProtocolValue)
     case string(String)
@@ -12,11 +14,15 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
     case unknownType(String, ATProtocolValueContainer)
     case decodeError(String)
     
-    // A factory for resolving decoders based on type string
-    struct TypeDecoderFactory {
-        typealias DecoderFunction = @Sendable (Decoder) throws -> ATProtocolValueContainer
+    public typealias DecoderFunction = @Sendable (Decoder) throws -> ATProtocolValueContainer
 
-        private let decoders: [String: DecoderFunction]
+    // A factory for resolving decoders based on type string. Extensible so
+    // overlay packages (extra lexicon namespaces generated against this core)
+    // can register their own typed decoders at startup; unregistered types
+    // decode as .unknownType.
+    final class TypeDecoderFactory: @unchecked Sendable {
+        private var decoders: [String: DecoderFunction]
+        private let lock = NSLock()
 
         init() {
             var decoders: [String: DecoderFunction] = [:]
@@ -35,11 +41,38 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
         }
 
         func decoder(for type: String) -> DecoderFunction? {
+            lock.lock()
+            defer { lock.unlock() }
             return decoders[type]
+        }
+
+        func register(_ type: String, _ decoderFunction: @escaping DecoderFunction) {
+            lock.lock()
+            defer { lock.unlock() }
+            decoders[type] = decoderFunction
         }
     }
 
     private static let decoderFactory = TypeDecoderFactory()
+
+    /// Registers a decoder for a lexicon type id (e.g. "blue.catbird.mlsChat.defs#convoView").
+    /// Overlay packages call this once at startup for each of their generated types so
+    /// values embedded in core responses decode as .knownType instead of .unknownType.
+    public static func registerDecoder(forType type: String, _ decoderFunction: @escaping DecoderFunction) {
+        decoderFactory.register(type, decoderFunction)
+    }
+
+    /// Convenience registration: decodes `type` as the given ATProtocolValue conformer.
+    public static func registerDecoder<T: ATProtocolValue & Decodable>(forType type: String, as valueType: T.Type) {
+        decoderFactory.register(type) { decoder in
+            do {
+                return .knownType(try T(from: decoder))
+            } catch {
+                LogManager.logDebug("Error decoding \(type): \(error)")
+                return .decodeError("Error decoding \(type): \(error)")
+            }
+        }
+    }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: DynamicCodingKeys.self)

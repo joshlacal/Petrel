@@ -210,8 +210,8 @@ def generate_swift_namespace_classes(namespace_hierarchy, network_manager="Netwo
                 swift_code += f"@available(*, deprecated, renamed: \"{prop_name}\")\n"
                 swift_code += f"public var {namespace.lower()}: {namespace_class} {{ {prop_name} }}\n\n"
             swift_code += f"public final class {namespace_class}: @unchecked Sendable {{\n"
-            swift_code += f"    internal let networkService: NetworkService\n"
-            swift_code += f"    internal init(networkService: NetworkService) {{\n"
+            swift_code += f"    public let networkService: NetworkService\n"
+            swift_code += f"    public init(networkService: NetworkService) {{\n"
             swift_code += f"        self.networkService = networkService\n    }}\n\n"
             swift_code += generate_swift_namespace_classes(sub_hierarchy, network_manager, depth + 1)
             swift_code += "}\n\n"
@@ -225,8 +225,8 @@ def generate_swift_namespace_classes(namespace_hierarchy, network_manager="Netwo
                 swift_code += f"{indent}@available(*, deprecated, renamed: \"{prop_name}\")\n"
                 swift_code += f"{indent}public var {namespace.lower()}: {class_name} {{ {prop_name} }}\n\n"
             swift_code += f"{indent}public final class {class_name}: @unchecked Sendable {{\n"
-            swift_code += f"{indent}    internal let networkService: NetworkService\n"
-            swift_code += f"{indent}    internal init(networkService: NetworkService) {{\n"
+            swift_code += f"{indent}    public let networkService: NetworkService\n"
+            swift_code += f"{indent}    public init(networkService: NetworkService) {{\n"
             swift_code += f"{indent}        self.networkService = networkService\n{indent}    }}\n\n"
             if sub_namespaces:
                 swift_code += generate_swift_namespace_classes(sub_namespaces, network_manager, depth + 1)

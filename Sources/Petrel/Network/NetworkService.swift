@@ -301,10 +301,10 @@ protocol NetworkServiceProtocol: Sendable {
 }
 
 /// Class responsible for handling network operations.
-actor NetworkService: NetworkServiceProtocol {
+public actor NetworkService: NetworkServiceProtocol {
     // MARK: - Properties
 
-    private(set) var baseURL: URL
+    public private(set) var baseURL: URL
     private var authProvider: AuthenticationProvider?
     private var headers: [String: String] = [:]
     private let session: URLSession
@@ -340,7 +340,7 @@ actor NetworkService: NetworkServiceProtocol {
     /// - Parameters:
     ///   - baseURL: The base URL for API requests.
     ///   - authService: The authentication service to use for authenticated requests.
-    init(baseURL: URL, authService: AuthenticationProvider? = nil) {
+    public init(baseURL: URL, authService: AuthenticationProvider? = nil) {
         self.baseURL = baseURL
         authProvider = authService
 
@@ -390,14 +390,14 @@ actor NetworkService: NetworkServiceProtocol {
 
     /// Sets the base URL for API requests.
     /// - Parameter url: The new base URL.
-    func setBaseURL(_ url: URL) async {
+    public func setBaseURL(_ url: URL) async {
         baseURL = url
         LogManager.logInfo("Network Service - Base URL updated to: \(url)")
     }
 
     /// Enables gateway mode where all xrpc requests require auth
     /// and the gateway handles OAuth/DPoP complexity
-    func setGatewayMode(_ enabled: Bool) async {
+    public func setGatewayMode(_ enabled: Bool) async {
         gatewayMode = enabled
         LogManager.logInfo("🔍 [GATEWAY DEBUG] setGatewayMode called with: \(enabled)")
     }
@@ -406,7 +406,7 @@ actor NetworkService: NetworkServiceProtocol {
     /// - Parameters:
     ///   - name: The header name.
     ///   - value: The header value.
-    func setHeader(name: String, value: String) async {
+    public func setHeader(name: String, value: String) async {
         LogManager.logSensitiveValue(value, label: "Network Service - Setting header: \(name)", category: .network)
         headers[name] = value
     }
@@ -420,7 +420,7 @@ actor NetworkService: NetworkServiceProtocol {
 
     /// Removes a custom header
     /// - Parameter name: Header name to remove
-    func removeHeader(name: String) async {
+    public func removeHeader(name: String) async {
         LogManager.logDebug("Network Service - Removing header: \(name)")
         headers.removeValue(forKey: name)
     }
@@ -433,7 +433,7 @@ actor NetworkService: NetworkServiceProtocol {
 
     /// Sets the User-Agent header
     /// - Parameter userAgent: The user agent string
-    func setUserAgent(_ userAgent: String) async {
+    public func setUserAgent(_ userAgent: String) async {
         self.userAgent = userAgent
         await setHeader(name: "User-Agent", value: userAgent)
     }
@@ -470,7 +470,7 @@ actor NetworkService: NetworkServiceProtocol {
     /// - Parameters:
     ///   - serviceDID: The service DID (e.g., "did:web:api.bsky.app#bsky_appview")
     ///   - namespace: The lexicon namespace prefix (e.g., "app.bsky", "chat.bsky")
-    func setServiceDID(_ serviceDID: String, for namespace: String) async {
+    public func setServiceDID(_ serviceDID: String, for namespace: String) async {
         serviceDIDMapping[namespace] = serviceDID
         LogManager.logInfo("Network Service - Set service DID '\(serviceDID)' for namespace '\(namespace)'")
         LogManager.logDebug("Network Service - Current service DID mappings: \(serviceDIDMapping)")
@@ -479,7 +479,7 @@ actor NetworkService: NetworkServiceProtocol {
     /// Gets the service DID for a given endpoint, if configured
     /// - Parameter endpoint: The full endpoint (e.g., "app.bsky.feed.getTimeline")
     /// - Returns: The service DID if one is configured for this endpoint's namespace, nil otherwise
-    func getServiceDID(for endpoint: String) async -> String? {
+    public func getServiceDID(for endpoint: String) async -> String? {
         // Special case: preferences endpoints go directly to PDS, never proxied
         if neverProxyEndpoints.contains(endpoint) {
             LogManager.logDebug("Network Service - getServiceDID for preferences endpoint '\(endpoint)': nil (PDS direct)")
@@ -517,13 +517,13 @@ actor NetworkService: NetworkServiceProtocol {
 
     /// Sets the authentication provider for authenticated requests
     /// - Parameter provider: The authentication provider
-    func setAuthenticationProvider(_ provider: AuthenticationProvider) {
+    public func setAuthenticationProvider(_ provider: AuthenticationProvider) {
         authProvider = provider
     }
 
     /// Sets the connection policy adapter for controlling connection routing
     /// - Parameter adapter: The connection policy adapter
-    func setConnectionPolicyAdapter(_ adapter: (any ConnectionPolicyAdapter)?) {
+    public func setConnectionPolicyAdapter(_ adapter: (any ConnectionPolicyAdapter)?) {
         connectionPolicyAdapter = adapter
         LogManager.logInfo("Network Service - Connection policy adapter \(adapter == nil ? "removed" : "set")")
     }
@@ -1308,7 +1308,7 @@ actor NetworkService: NetworkServiceProtocol {
     ///   - body: The HTTP body data.
     ///   - queryItems: Optional query parameters.
     /// - Returns: The configured URLRequest.
-    func createURLRequest(
+    public func createURLRequest(
         endpoint: String,
         method: String,
         headers: [String: String],
@@ -1403,7 +1403,7 @@ actor NetworkService: NetworkServiceProtocol {
     ///   - skipTokenRefresh: Whether to skip token refresh.
     ///   - additionalHeaders: Optional additional headers to include with this specific request.
     /// - Returns: A tuple containing the response data and HTTPURLResponse.
-    func performRequest(_ request: URLRequest, skipTokenRefresh: Bool, additionalHeaders: [String: String]? = nil) async throws -> (
+    public func performRequest(_ request: URLRequest, skipTokenRefresh: Bool, additionalHeaders: [String: String]? = nil) async throws -> (
         Data, HTTPURLResponse
     ) {
         let (data, response) = try await self.request(request, skipTokenRefresh: skipTokenRefresh, additionalHeaders: additionalHeaders)
@@ -1418,7 +1418,7 @@ actor NetworkService: NetworkServiceProtocol {
     ///   - request: The URLRequest to perform.
     ///   - skipTokenRefresh: Whether to skip token refresh.
     /// - Returns: A tuple containing the response data and HTTPURLResponse.
-    func performRequest(_ request: URLRequest, skipTokenRefresh: Bool) async throws -> (
+    public func performRequest(_ request: URLRequest, skipTokenRefresh: Bool) async throws -> (
         Data, HTTPURLResponse
     ) {
         try await performRequest(request, skipTokenRefresh: skipTokenRefresh, additionalHeaders: nil)
@@ -1513,7 +1513,7 @@ actor NetworkService: NetworkServiceProtocol {
     ///   - endpoint: The subscription endpoint
     ///   - parameters: Optional query parameters
     /// - Returns: An async throwing stream of decoded messages
-    func subscribe<Message: Codable & Sendable>(
+    public func subscribe<Message: Codable & Sendable>(
         endpoint: String,
         parameters: (any Parametrizable)?
     ) async throws -> AsyncThrowingStream<Message, Error> {

@@ -20,7 +20,7 @@ public struct PetrelLogEvent: Sendable {
 }
 
 /// Internal logger that also broadcasts events to optional observers.
-class LogManager {
+public class LogManager {
     /// Bootstrap swift-log with OSLogHandler on Apple platforms (runs once before any logger is created)
     private static let bootstrapOnce: Void = {
         #if canImport(os)
@@ -113,13 +113,13 @@ class LogManager {
         }
     }
 
-    static func logInfo(_ message: @autoclosure () -> String, category: LogCategory = .general) {
+    public static func logInfo(_ message: @autoclosure () -> String, category: LogCategory = .general) {
         let msg = message()
         getLogger(for: category).info("\(msg)")
         notifyObservers(.init(level: .info, category: category, message: msg))
     }
 
-    static func logDebug(_ message: @autoclosure () -> String, category: LogCategory = .general) {
+    public static func logDebug(_ message: @autoclosure () -> String, category: LogCategory = .general) {
         #if DEBUG
             let msg = message()
             getLogger(for: category).debug("\(msg)")
@@ -129,20 +129,20 @@ class LogManager {
     }
 
     /// Warning-level logging for noteworthy but non-fatal issues
-    static func logWarning(_ message: @autoclosure () -> String, category: LogCategory = .general) {
+    public static func logWarning(_ message: @autoclosure () -> String, category: LogCategory = .general) {
         let msg = message()
         getLogger(for: category).warning("\(msg)")
         notifyObservers(.init(level: .warning, category: category, message: msg))
     }
 
-    static func logError(_ message: @autoclosure () -> String, category: LogCategory = .general) {
+    public static func logError(_ message: @autoclosure () -> String, category: LogCategory = .general) {
         let msg = message()
         getLogger(for: category).error("\(msg)")
         notifyObservers(.init(level: .error, category: category, message: msg))
     }
 
     /// Logs a sensitive value with only the first few characters visible
-    static func logSensitiveValue(_ value: String?, label: String, category: LogCategory = .authentication) {
+    public static func logSensitiveValue(_ value: String?, label: String, category: LogCategory = .authentication) {
         #if DEBUG
             if let value = value, !value.isEmpty {
                 logDebug("\(label): \(value.prefix(4))…(\(value.count) chars)", category: category)
@@ -153,11 +153,11 @@ class LogManager {
     }
 
     /// Returns a DID for logging (DIDs are public identifiers, not sensitive)
-    static func logDID(_ did: String?) -> String {
+    public static func logDID(_ did: String?) -> String {
         return did ?? "nil"
     }
 
-    static func logRequest(_ request: URLRequest) {
+    public static func logRequest(_ request: URLRequest) {
         #if DEBUG
             let url = request.url?.absoluteString ?? "N/A"
             var debugMessage = "Request URL: \(url)\n"
@@ -191,7 +191,7 @@ class LogManager {
         #endif
     }
 
-    static func logResponse(_ response: HTTPURLResponse, data: Data) {
+    public static func logResponse(_ response: HTTPURLResponse, data: Data) {
         #if DEBUG
             let url = response.url?.absoluteString ?? "N/A"
             var debugMessage = "Response URL: \(url)\n"
@@ -307,7 +307,7 @@ class LogManager {
         )
     }
 
-    static func logError(_ error: Error, category: LogCategory = .general) {
+    public static func logError(_ error: Error, category: LogCategory = .general) {
         logError("Error: \(error.localizedDescription)", category: category)
     }
 
@@ -316,7 +316,7 @@ class LogManager {
     ///   - type: Incident type (e.g., "RefreshInvalidGrant", "AccountAutoSwitched", "LogoutNoAutoSwitch")
     ///   - details: Arbitrary key-value context (strings, numbers, bools)
     ///   - category: Log category (defaults to authentication)
-    static func logAuthIncident(_ type: String, details: [String: Any], category: LogCategory = .authentication) {
+    public static func logAuthIncident(_ type: String, details: [String: Any], category: LogCategory = .authentication) {
         var payload: [String: Any] = [
             "type": type,
             "ts": Int(Date().timeIntervalSince1970),
