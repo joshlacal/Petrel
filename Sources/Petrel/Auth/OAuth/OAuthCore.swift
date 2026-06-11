@@ -41,6 +41,16 @@ actor OAuthCore {
   var ambiguousRefreshUntil: [String: Date] = [:]
   var nextRefreshResourceOverride: String?
 
+  /// Sessions that were successfully refreshed server-side but could not be
+  /// persisted to the keychain (e.g. device locked). Held in memory so the
+  /// running process keeps working; `getSession`'s pending-key handling covers
+  /// the next launch. Keyed by DID.
+  var unpersistedSessions: [String: Session] = [:]
+
+  /// Upper bound for `usedRefreshTokens`; entries only matter within a process
+  /// lifetime, so the set is cleared when it grows past this.
+  private static let usedRefreshTokenCap = 64
+
   /// Strategy-specific refresh implementation.
   /// Set by the owning strategy after init via `setPerformActualRefresh`.
   var performActualRefresh: (@Sendable (Account, Session) async throws -> TokenRefreshResult)?
@@ -548,7 +558,7 @@ actor OAuthCore {
 
   func refreshTokenIfNeeded(forceRefresh: Bool) async throws -> TokenRefreshResult {
     guard let account = await accountManager.getCurrentAccount(),
-          let session = try? await storage.getSession(for: account.did)
+          let session = await currentSession(for: account.did)
     else {
       throw AuthError.noActiveAccount
     }
@@ -566,11 +576,18 @@ actor OAuthCore {
     // Check expiry
     if !forceRefresh && !session.isExpiringSoon { return .stillValid }
 
-    usedRefreshTokens.insert(refreshToken)
-
     guard let performRefresh = performActualRefresh else {
       throw AuthError.tokenRefreshFailed
     }
+
+    // Guard against concurrent reuse while the request is in flight. The token is
+    // only treated as permanently consumed when the server definitively used it
+    // (success, or invalid_grant); a transient failure (timeout, offline, 5xx)
+    // must NOT burn it, or every later refresh fails until app restart.
+    if usedRefreshTokens.count > Self.usedRefreshTokenCap {
+      usedRefreshTokens.removeAll()
+    }
+    usedRefreshTokens.insert(refreshToken)
 
     let task = Task<TokenRefreshResult, Error> {
       try await performRefresh(account, session)
@@ -578,7 +595,70 @@ actor OAuthCore {
     activeRefreshTasks[did] = task
     defer { activeRefreshTasks.removeValue(forKey: did) }
 
-    return try await task.value
+    do {
+      return try await task.value
+    } catch {
+      if !Self.isDefinitiveRefreshRejection(error) {
+        usedRefreshTokens.remove(refreshToken)
+      }
+      throw error
+    }
+  }
+
+  /// True when the auth server definitively consumed or revoked the refresh token
+  /// (it must never be retried); false for transient failures that are safe to retry.
+  static func isDefinitiveRefreshRejection(_ error: Error) -> Bool {
+    (error as? AuthError) == .invalidCredentials
+  }
+
+  /// Returns the freshest known session for `did`: an unpersisted in-memory session
+  /// (from a refresh whose keychain save failed) wins over the stored one when newer.
+  /// The stored read bypasses the in-memory cache so a rotation performed by another
+  /// process sharing the access group (e.g. an app extension) is observed before
+  /// this process attempts to rotate an already-consumed token.
+  func currentSession(for did: String) async -> Session? {
+    let stored = try? await storage.getSession(for: did, bypassCache: true)
+    guard let unpersisted = unpersistedSessions[did] else { return stored }
+    if let stored, stored.createdAt >= unpersisted.createdAt {
+      unpersistedSessions.removeValue(forKey: did)
+      return stored
+    }
+    return unpersisted
+  }
+
+  /// Persists a session obtained from a successful token refresh. At this point the
+  /// server has already rotated the (single-use) refresh token, so losing `session`
+  /// means losing the account: retry the atomic save, then fall back to a single-write
+  /// pending key plus an in-memory copy. Persistence failure is deliberately not an
+  /// error — the refresh itself succeeded.
+  func persistRefreshedSession(_ session: Session, for account: Account) async {
+    let did = account.did
+    for attempt in 1 ... 3 {
+      do {
+        try await storage.saveAccountAndSession(account, session: session, for: did)
+        unpersistedSessions.removeValue(forKey: did)
+        return
+      } catch {
+        LogManager.logWarning(
+          "Refreshed-session persist attempt \(attempt)/3 failed for DID: \(LogManager.logDID(did)), error: \(error)"
+        )
+        if attempt < 3 {
+          try? await Task.sleep(nanoseconds: UInt64(attempt) * 150_000_000)
+        }
+      }
+    }
+
+    unpersistedSessions[did] = session
+    do {
+      try await storage.savePendingSession(session, for: did)
+      LogManager.logError(
+        "Refreshed session could not be saved atomically for DID: \(LogManager.logDID(did)); wrote pending key and holding in memory"
+      )
+    } catch {
+      LogManager.logError(
+        "CRITICAL: refreshed session for DID: \(LogManager.logDID(did)) could not be persisted at all; holding in memory only. Error: \(error)"
+      )
+    }
   }
 }
 

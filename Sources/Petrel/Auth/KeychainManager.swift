@@ -98,7 +98,7 @@ enum KeychainManager {
     // MARK: - Storage Backend
 
     /// The secure storage backend used by this manager
-    private static let storage: SecureStorage = {
+    private static let defaultStorage: SecureStorage = {
         #if os(iOS) || os(macOS)
             return AppleKeychainStore()
         #elseif os(Linux)
@@ -107,6 +107,21 @@ enum KeychainManager {
             #error("Unsupported platform")
         #endif
     }()
+
+    /// Test-only override of the storage backend, protected by a lock.
+    private static let storageOverrideState = Mutex<SecureStorage?>(nil)
+
+    /// The active storage backend (test override if set, otherwise the platform default)
+    private static var storage: SecureStorage {
+        storageOverrideState.withLock { $0 } ?? defaultStorage
+    }
+
+    /// Injects a storage backend for testing. Pass `nil` to restore the platform default.
+    /// Clears all caches so cached reads cannot leak across backends.
+    static func _setStorageOverride(_ backend: SecureStorage?) {
+        storageOverrideState.withLock { $0 = backend }
+        clearCacheStorage()
+    }
 
     #if os(Linux)
         /// Create appropriate storage backend for Linux
@@ -137,7 +152,7 @@ enum KeychainManager {
         return cache
     }()
 
-    private nonisolated(unsafe) static var dpopKeyCache: NSCache<NSString, CachedDPoPKey> = {
+    private nonisolated(unsafe) static let dpopKeyCache: NSCache<NSString, CachedDPoPKey> = {
         let cache = NSCache<NSString, CachedDPoPKey>()
         cache.countLimit = 100
         return cache
@@ -310,15 +325,20 @@ enum KeychainManager {
     }
 
     /// Retrieves data from the keychain for a specified key and namespace.
+    /// - Parameter bypassCache: When true, skips the in-memory cache and reads the
+    ///   keychain directly (still refreshing the cache with the result). Use for
+    ///   reads that must observe writes made by other processes sharing the access
+    ///   group, e.g. the session read preceding a token refresh.
     static func retrieve(
         key: String,
         namespace: String,
-        accessGroup: String? = nil
+        accessGroup: String? = nil,
+        bypassCache: Bool = false
     ) throws -> Data {
         let namespacedKey = "\(namespace).\(key)"
 
         // Check cache first
-        if let cachedData = dataCache.object(forKey: namespacedKey as NSString) {
+        if !bypassCache, let cachedData = dataCache.object(forKey: namespacedKey as NSString) {
             LogManager.logDebug("KeychainManager - Retrieved item from cache for key \(namespacedKey).")
             return cachedData as Data
         }
@@ -626,12 +646,15 @@ enum KeychainManager {
     static func retrieveAsync(
         key: String,
         namespace: String,
-        accessGroup: String? = nil
+        accessGroup: String? = nil,
+        bypassCache: Bool = false
     ) async throws -> Data {
         try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
-                    let data = try retrieve(key: key, namespace: namespace, accessGroup: accessGroup)
+                    let data = try retrieve(
+                        key: key, namespace: namespace, accessGroup: accessGroup, bypassCache: bypassCache
+                    )
                     continuation.resume(returning: data)
                 } catch {
                     continuation.resume(throwing: error)

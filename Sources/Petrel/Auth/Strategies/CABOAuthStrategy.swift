@@ -540,7 +540,15 @@ actor CABOAuthStrategy: AuthStrategy {
   // MARK: - Token Refresh (Strategy-Specific)
 
   private func performActualRefresh(for account: Account, session: Session) async throws -> TokenRefreshResult {
-    let (data, response) = try await performTokenRefresh(for: account.did, session: session)
+    let data: Data
+    let response: HTTPURLResponse
+    do {
+      (data, response) = try await performTokenRefresh(for: account.did, session: session)
+    } catch let error as NetworkError {
+      // Transport never reached a definitive answer: the refresh token may still be valid.
+      await core.refreshCircuitBreaker.recordFailure(for: account.did, kind: .network)
+      throw AuthError.networkError(error)
+    }
 
     if (200 ..< 300).contains(response.statusCode) {
       let tokenResponse = try JSONDecoder().decode(TokenResponse.self, from: data)
@@ -552,13 +560,29 @@ actor CABOAuthStrategy: AuthStrategy {
         tokenType: session.tokenType,
         did: account.did
       )
-      let storage = await core.storage
-      try await storage.saveAccountAndSession(account, session: newSession, for: account.did)
+      // The server has rotated the refresh token; persistence failures are handled
+      // inside (retry + pending key + in-memory) and must not fail the refresh.
+      await core.persistRefreshedSession(newSession, for: account)
       await core.refreshCircuitBreaker.recordSuccess(for: account.did)
       return .refreshedSuccessfully
-    } else {
-      throw AuthError.tokenRefreshFailed
     }
+
+    // Distinguish a definitive rejection (token consumed/revoked — never retry it)
+    // from transient server trouble (safe to retry with the same token).
+    if response.statusCode == 400 || response.statusCode == 401,
+       let errorResponse = try? JSONDecoder().decode(OAuthErrorResponse.self, from: data),
+       errorResponse.error == "invalid_grant"
+    {
+      LogManager.logError(
+        "Token refresh definitively rejected (invalid_grant) for DID: \(LogManager.logDID(account.did))"
+      )
+      await core.refreshCircuitBreaker.recordFailure(for: account.did, kind: .invalidGrant)
+      throw AuthError.invalidCredentials
+    }
+
+    let kind: RefreshCircuitBreaker.RefreshFailureKind = (500 ..< 600).contains(response.statusCode) ? .server : .other
+    await core.refreshCircuitBreaker.recordFailure(for: account.did, kind: kind)
+    throw AuthError.tokenRefreshFailed
   }
 
   private func performTokenRefresh(for did: String, session: Session) async throws -> (Data, HTTPURLResponse) {

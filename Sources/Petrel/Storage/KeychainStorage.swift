@@ -59,7 +59,32 @@ public actor KeychainStorage {
         let accountData = try JSONEncoder().encode(account)
         let sessionData = try JSONEncoder().encode(session)
 
+        // Newest-wins guard: refresh tokens are single-use and rotate on every refresh,
+        // so overwriting a newer session with an older one bricks the account.
+        if isStaleSessionWrite(session, for: did) {
+            LogManager.logWarning(
+                "Refusing to overwrite newer stored session with stale one (createdAt \(session.createdAt)) for DID: \(LogManager.logDID(did))"
+            )
+            return
+        }
+
         LogManager.logDebug("Starting atomic account+session save for DID: \(LogManager.logDID(did))")
+
+        // Update the accounts list before the commit sequence: addToAccountsList is the
+        // only suspension point, and suspending mid-commit lets other actor calls
+        // interleave with a half-written account+session pair. A listed DID without
+        // data is harmless (validation treats it as an orphan); the reverse is not.
+        try await addToAccountsList(did)
+
+        // Re-check after the suspension above: another save may have committed a
+        // newer session while this call was suspended. The commit block below is
+        // fully synchronous, so this check cannot be bypassed again.
+        if isStaleSessionWrite(session, for: did) {
+            LogManager.logWarning(
+                "Newer session committed while suspended; skipping stale save for DID: \(LogManager.logDID(did))"
+            )
+            return
+        }
 
         do {
             // Step 1: Create backups of existing data if they exist
@@ -115,10 +140,7 @@ public actor KeychainStorage {
                 "Account+session save verification successful for DID: \(LogManager.logDID(did))"
             )
 
-            // Step 5: Add to accounts list if not already present
-            try await addToAccountsList(did)
-
-            // Step 6: Cleanup temporary and backup files
+            // Step 5: Cleanup temporary and backup files
             try? KeychainManager.delete(key: tempAccountKey, namespace: namespace, accessGroup: accessGroup)
             try? KeychainManager.delete(key: tempSessionKey, namespace: namespace, accessGroup: accessGroup)
             try? KeychainManager.delete(key: backupAccountKey, namespace: namespace, accessGroup: accessGroup)
@@ -365,6 +387,15 @@ public actor KeychainStorage {
             throw KeychainError.dataFormatError
         }
 
+        // Newest-wins guard: never replace a newer stored session with an older one
+        // (single-use rotating refresh tokens make stale overwrites unrecoverable).
+        if isStaleSessionWrite(session, for: did) {
+            LogManager.logWarning(
+                "Refusing to overwrite newer stored session with stale one (createdAt \(session.createdAt)) for DID: \(LogManager.logDID(did))"
+            )
+            return
+        }
+
         LogManager.logDebug("Starting session save for DID: \(LogManager.logDID(did))")
 
         // Enhanced atomic save operation with comprehensive error handling
@@ -542,70 +573,121 @@ public actor KeychainStorage {
     }
 
     /// Retrieves a session from the keychain.
-    /// - Parameter did: The DID associated with the session to retrieve
+    ///
+    /// Resolution order is newest-wins: a pending session (written when a post-refresh
+    /// save could not complete) is promoted over an older primary; temp/backup copies
+    /// are only used when the primary is unreadable, and never resurrect a session
+    /// older than the newest readable copy.
+    /// - Parameters:
+    ///   - did: The DID associated with the session to retrieve
+    ///   - bypassCache: When true, reads the keychain directly instead of the
+    ///     in-memory cache — required to observe rotations made by other processes
+    ///     sharing the access group (e.g. app extensions) before refreshing.
     /// - Returns: The session if found, or nil if not found
-    public func getSession(for did: String) async throws -> Session? {
+    public func getSession(for did: String, bypassCache: Bool = false) async throws -> Session? {
         let key = makeKey("session", did: did)
         let tempKey = makeKey("session.temp", did: did)
         let backupKey = makeKey("session.backup", did: did)
+        let pendingKey = makeKey("session.pending", did: did)
 
-        do {
-            let data = try await KeychainManager.retrieveAsync(key: key, namespace: namespace, accessGroup: accessGroup)
-            return try JSONDecoder().decode(Session.self, from: data)
-        } catch {
-            LogManager.logDebug(
-                "Failed to retrieve session from primary location for DID: \(LogManager.logDID(did)), attempting recovery"
+        let primary = decodeSession(
+            try? await KeychainManager.retrieveAsync(
+                key: key, namespace: namespace, accessGroup: accessGroup, bypassCache: bypassCache
             )
+        )
 
-            // Try to recover from temporary location if primary failed
-            if let tempData = try? await KeychainManager.retrieveAsync(key: tempKey, namespace: namespace, accessGroup: accessGroup) {
-                do {
-                    let session = try JSONDecoder().decode(Session.self, from: tempData)
-                    LogManager.logDebug(
-                        "Session recovered from temporary location for DID: \(LogManager.logDID(did))"
-                    )
-
-                    // Try to restore to primary location
-                    try? await KeychainManager.storeAsync(key: key, value: tempData, namespace: namespace, accessGroup: accessGroup)
-                    try? await KeychainManager.deleteAsync(key: tempKey, namespace: namespace, accessGroup: accessGroup)
-
-                    return session
-                } catch {
-                    LogManager.logError(
-                        "Failed to decode session from temporary location for DID: \(LogManager.logDID(did))"
-                    )
-                }
+        // A pending session exists only if a refresh succeeded but the atomic save
+        // failed. The server has already rotated the refresh token, so the pending
+        // copy is authoritative when newer: promote it to primary.
+        if let pending = decodeSession(
+            try? await KeychainManager.retrieveAsync(
+                key: pendingKey, namespace: namespace, accessGroup: accessGroup, bypassCache: bypassCache
+            )
+        ), primary == nil || pending.createdAt > primary!.createdAt {
+            LogManager.logInfo(
+                "Promoting pending session to primary for DID: \(LogManager.logDID(did))"
+            )
+            if let data = try? JSONEncoder().encode(pending),
+               (try? await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)) != nil
+            {
+                try? await KeychainManager.deleteAsync(key: pendingKey, namespace: namespace, accessGroup: accessGroup)
             }
+            return pending
+        }
 
-            // Try to recover from backup location if primary and temp failed
-            if let backupData = try? await KeychainManager.retrieveAsync(key: backupKey, namespace: namespace, accessGroup: accessGroup) {
-                do {
-                    let session = try JSONDecoder().decode(Session.self, from: backupData)
-                    LogManager.logDebug(
-                        "Session recovered from backup location for DID: \(LogManager.logDID(did))"
-                    )
+        if let primary {
+            return primary
+        }
 
-                    // Try to restore to primary location
-                    try? await KeychainManager.storeAsync(key: key, value: backupData, namespace: namespace, accessGroup: accessGroup)
-                    try? await KeychainManager.deleteAsync(key: backupKey, namespace: namespace, accessGroup: accessGroup)
+        LogManager.logDebug(
+            "Failed to retrieve session from primary location for DID: \(LogManager.logDID(did)), attempting recovery"
+        )
 
-                    return session
-                } catch {
-                    LogManager.logError(
-                        "Failed to decode session from backup location for DID: \(LogManager.logDID(did))"
-                    )
-                }
-            }
+        // Primary unreadable: recover the NEWEST of temp/backup. Restoring blindly
+        // could resurrect an already-rotated (single-use) refresh token, so pick by
+        // createdAt and only write back because no readable primary exists.
+        let temp = decodeSession(
+            try? await KeychainManager.retrieveAsync(key: tempKey, namespace: namespace, accessGroup: accessGroup)
+        )
+        let backup = decodeSession(
+            try? await KeychainManager.retrieveAsync(key: backupKey, namespace: namespace, accessGroup: accessGroup)
+        )
 
+        let candidates = [(temp, tempKey, "temporary"), (backup, backupKey, "backup")]
+            .compactMap { session, sourceKey, label in session.map { ($0, sourceKey, label) } }
+            .sorted { $0.0.createdAt > $1.0.createdAt }
+
+        guard let (recovered, sourceKey, label) = candidates.first else {
             return nil
         }
+
+        LogManager.logInfo(
+            "Session recovered from \(label) location for DID: \(LogManager.logDID(did))"
+        )
+        if let data = try? JSONEncoder().encode(recovered),
+           (try? await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)) != nil
+        {
+            try? await KeychainManager.deleteAsync(key: sourceKey, namespace: namespace, accessGroup: accessGroup)
+        }
+        return recovered
     }
 
-    /// Deletes a session from the keychain.
+    /// Decodes a session from optional raw keychain data, returning nil on any failure.
+    private func decodeSession(_ data: Data?) -> Session? {
+        guard let data else { return nil }
+        return try? JSONDecoder().decode(Session.self, from: data)
+    }
+
+    /// Returns true if a decodable stored session for `did` is newer than `session`.
+    /// Used by save paths so interleaved writers converge on the newest session.
+    private func isStaleSessionWrite(_ session: Session, for did: String) -> Bool {
+        let key = makeKey("session", did: did)
+        guard
+            let data = try? KeychainManager.retrieve(key: key, namespace: namespace, accessGroup: accessGroup),
+            let existing = try? JSONDecoder().decode(Session.self, from: data)
+        else { return false }
+        return session.createdAt < existing.createdAt
+    }
+
+    /// Persists a refreshed session with a single keychain write, for use when the
+    /// multi-step atomic save fails after the server has already rotated the refresh
+    /// token. `getSession` prefers this copy when it is newer than the primary.
+    public func savePendingSession(_ session: Session, for did: String) async throws {
+        let key = makeKey("session.pending", did: did)
+        let data = try JSONEncoder().encode(session)
+        try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+        LogManager.logInfo("KeychainStorage - Saved pending session for DID: \(LogManager.logDID(did))")
+    }
+
+    /// Deletes a session from the keychain, including pending/temp/backup copies
+    /// so no recovery path can resurrect it.
     /// - Parameter did: The DID associated with the session to delete
     public func deleteSession(for did: String) async throws {
         let key = makeKey("session", did: did)
         try KeychainManager.delete(key: key, namespace: namespace, accessGroup: accessGroup)
+        for suffix in ["session.pending", "session.temp", "session.backup"] {
+            try? KeychainManager.delete(key: makeKey(suffix, did: did), namespace: namespace, accessGroup: accessGroup)
+        }
     }
 
     // MARK: - Session Backup and Recovery
