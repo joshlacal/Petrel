@@ -24,3 +24,5 @@ petrel-kotlin/build/
 petrel-kotlin/.gradle/
 petrel-kotlin/.idea/
 
+petrel-kotlin/bin/
+_trash/
