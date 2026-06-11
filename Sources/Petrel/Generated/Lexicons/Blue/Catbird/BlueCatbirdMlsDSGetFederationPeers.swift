@@ -52,56 +52,74 @@ public enum BlueCatbirdMlsDSGetFederationPeers {
             do {
                 trustScore = try container.decodeIfPresent(Int.self, forKey: .trustScore)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'trustScore': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'trustScore' — degrading to nil: \(error)")
+                trustScore = nil
             }
             do {
                 maxRequestsPerMinute = try container.decodeIfPresent(Int.self, forKey: .maxRequestsPerMinute)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'maxRequestsPerMinute': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'maxRequestsPerMinute' — degrading to nil: \(error)")
+                maxRequestsPerMinute = nil
             }
             do {
                 note = try container.decodeIfPresent(String.self, forKey: .note)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'note': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'note' — degrading to nil: \(error)")
+                note = nil
             }
             do {
                 invalidTokenCount = try container.decodeIfPresent(Int.self, forKey: .invalidTokenCount)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'invalidTokenCount': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'invalidTokenCount' — degrading to nil: \(error)")
+                invalidTokenCount = nil
             }
             do {
                 rejectedRequestCount = try container.decodeIfPresent(Int.self, forKey: .rejectedRequestCount)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'rejectedRequestCount': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'rejectedRequestCount' — degrading to nil: \(error)")
+                rejectedRequestCount = nil
             }
             do {
                 successfulRequestCount = try container.decodeIfPresent(Int.self, forKey: .successfulRequestCount)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'successfulRequestCount': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'successfulRequestCount' — degrading to nil: \(error)")
+                successfulRequestCount = nil
             }
             do {
                 lastSeenAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .lastSeenAt)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'lastSeenAt': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'lastSeenAt' — degrading to nil: \(error)")
+                lastSeenAt = nil
             }
             do {
                 createdAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .createdAt)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'createdAt': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'createdAt' — degrading to nil: \(error)")
+                createdAt = nil
             }
             do {
                 updatedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .updatedAt)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'updatedAt': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'updatedAt' — degrading to nil: \(error)")
+                updatedAt = nil
             }
         }
 

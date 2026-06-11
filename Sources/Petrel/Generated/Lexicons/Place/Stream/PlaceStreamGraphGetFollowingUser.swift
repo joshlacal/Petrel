@@ -31,7 +31,13 @@ public enum PlaceStreamGraphGetFollowingUser {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            follow = try container.decodeIfPresent(ComAtprotoRepoStrongRef.self, forKey: .follow)
+            do {
+                follow = try container.decodeIfPresent(ComAtprotoRepoStrongRef.self, forKey: .follow)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'follow' — degrading to nil: \(error)")
+                follow = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

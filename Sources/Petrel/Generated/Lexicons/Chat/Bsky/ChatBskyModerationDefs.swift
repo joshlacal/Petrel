@@ -36,8 +36,10 @@ public enum ChatBskyModerationDefs {
             do {
                 kind = try container.decodeIfPresent(ConvoViewKindUnion.self, forKey: .kind)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'kind': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'kind' — degrading to nil: \(error)")
+                kind = nil
             }
         }
 
@@ -167,8 +169,10 @@ public enum ChatBskyModerationDefs {
             do {
                 joinLink = try container.decodeIfPresent(ChatBskyGroupDefs.JoinLinkView.self, forKey: .joinLink)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'joinLink': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'joinLink' — degrading to nil: \(error)")
+                joinLink = nil
             }
             do {
                 joinRequestCount = try container.decode(Int.self, forKey: .joinRequestCount)

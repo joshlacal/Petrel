@@ -115,6 +115,9 @@ public actor ATProtoClient {
     /// The authentication mode.
     public let authMode: AuthMode
 
+    /// Default service entrypoint used when no base URL is provided.
+    public static let defaultBaseURL = URL(staticString: "https://bsky.social")
+
     // MARK: - Unauthenticated Initialization
 
     /// Creates a lightweight unauthenticated client for public XRPC calls.
@@ -158,7 +161,7 @@ public actor ATProtoClient {
     ///   - bskyAppViewDID: Optional custom Bluesky AppView service DID (default: did:web:api.bsky.app#bsky_appview).
     ///   - bskyChatDID: Optional custom Bluesky Chat service DID (default: did:web:api.bsky.chat#bsky_chat).
     public init(
-        baseURL: URL = URL(string: "https://bsky.social")!,
+        baseURL: URL = ATProtoClient.defaultBaseURL,
         oauthConfig: OAuthConfig,
         namespace: String,
         authMode: AuthMode = .publicOAuth,
@@ -410,7 +413,7 @@ public actor ATProtoClient {
     /// Starts the OAuth flow for account creation
     /// - Parameter pdsURL: The PDS URL to use (defaults to bsky.social)
     /// - Returns: The authorization URL to present to the user
-    public func startSignUpFlow(pdsURL: URL = URL(string: "https://bsky.social")!) async throws -> URL {
+    public func startSignUpFlow(pdsURL: URL = ATProtoClient.defaultBaseURL) async throws -> URL {
         guard let authManager else {
             throw APIError.unauthenticatedClient("Cannot start sign-up flow on an unauthenticated client")
         }

@@ -28,8 +28,10 @@ public enum ComAtprotoModerationCreateReport {
             do {
                 meta = try container.decodeIfPresent(ATProtocolValueContainer.self, forKey: .meta)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'meta': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'meta' — degrading to nil: \(error)")
+                meta = nil
             }
         }
 
@@ -186,7 +188,13 @@ public enum ComAtprotoModerationCreateReport {
 
             reasonType = try container.decode(ComAtprotoModerationDefs.ReasonType.self, forKey: .reasonType)
 
-            reason = try container.decodeIfPresent(String.self, forKey: .reason)
+            do {
+                reason = try container.decodeIfPresent(String.self, forKey: .reason)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'reason' — degrading to nil: \(error)")
+                reason = nil
+            }
 
             subject = try container.decode(OutputSubjectUnion.self, forKey: .subject)
 

@@ -443,6 +443,14 @@ public struct DID: ATProtocolValue, CustomStringConvertible, QueryParameterConve
     public let segments: [String]
     private let originalString: String
 
+    /// Per https://atproto.com/specs/did the method must be lowercase letters, the
+    /// method-specific identifier allows [a-zA-Z0-9._:%-] (including empty colon-separated
+    /// segments), and the final character cannot be ":" or "%".
+    private static let didPattern = "^did:[a-z]+:[a-zA-Z0-9._:%-]*[a-zA-Z0-9._-]$"
+
+    /// Cached compiled regex - compiled once, reused forever
+    private static let didRegex: NSRegularExpression? = try? NSRegularExpression(pattern: didPattern, options: [])
+
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
         let didString = try container.decode(String.self)
@@ -452,30 +460,31 @@ public struct DID: ATProtocolValue, CustomStringConvertible, QueryParameterConve
     public init(didString: String) throws {
         originalString = didString
 
-        guard didString.hasPrefix("did:"),
-              didString.utf8.count <= 8192
+        guard didString.utf8.count <= 8192,
+              DID.isValidDID(didString)
         else {
             throw ATProtocolError.invalidURI("Invalid DID format or length")
         }
 
-        // Safe DID string parsing with bounds checking
-        guard didString.count > 4 else {
-            throw ATProtocolError.invalidURI("Invalid DID: too short")
-        }
+        // The regex guarantees a "did:" prefix, a non-empty method, and at least one
+        // character of method-specific identifier (so components.count >= 2).
         let components = didString.dropFirst(4).split(separator: ":", omittingEmptySubsequences: false)
 
-        guard !components.isEmpty, !components[0].isEmpty else {
-            throw ATProtocolError.invalidURI("Invalid DID: missing or empty method")
-        }
-
         method = String(components[0])
+        // The method-specific identifier may contain empty colon-separated segments
+        // (e.g. "did:method::."), so the authority segment may legitimately be empty.
+        authority = components.count > 1 ? String(components[1]) : ""
+        segments = components.count > 2 ? components.dropFirst(2).map { String($0) } : []
+    }
 
-        guard components.count > 1, !components[1].isEmpty else {
-            throw ATProtocolError.invalidURI("Invalid DID: missing or empty authority")
+    private static func isValidDID(_ did: String) -> Bool {
+        guard let regex = didRegex else {
+            // Fallback validation without regex
+            return did.hasPrefix("did:") && did.count > 4
         }
 
-        authority = String(components[1])
-        segments = components.count > 2 ? components.dropFirst(2).map { String($0) } : []
+        let range = NSRange(location: 0, length: did.utf16.count)
+        return regex.firstMatch(in: did, options: [], range: range) != nil
     }
 
     public var description: String {
@@ -524,8 +533,9 @@ public struct DID: ATProtocolValue, CustomStringConvertible, QueryParameterConve
 public struct Handle: ATProtocolValue, CustomStringConvertible, QueryParameterConvertible {
     public let value: String
 
+    /// Per https://atproto.com/specs/handle the final segment (TLD) cannot start with a digit
     private static let handlePattern =
-        "^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)(\\.([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?))+$"
+        "^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\.)+[a-zA-Z]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$"
 
     /// Cached compiled regex - compiled once, reused forever
     private static let handleRegex: NSRegularExpression? = try? NSRegularExpression(pattern: handlePattern, options: [])
@@ -753,8 +763,8 @@ public struct NSID: ATProtocolValue, CustomStringConvertible, QueryParameterConv
 public struct RecordKey: ATProtocolValue, CustomStringConvertible, QueryParameterConvertible {
     public let value: String
 
-    /// Pattern for "any" record key format
-    private static let recordKeyPattern = "^[a-zA-Z0-9\\-_.:%]+$"
+    /// Pattern for "any" record key format (https://atproto.com/specs/record-key allows "~")
+    private static let recordKeyPattern = "^[a-zA-Z0-9\\-_.:~%]+$"
 
     /// Cached compiled regex - compiled once, reused forever
     private static let recordKeyRegex: NSRegularExpression? = try? NSRegularExpression(pattern: recordKeyPattern, options: [])
@@ -782,7 +792,7 @@ public struct RecordKey: ATProtocolValue, CustomStringConvertible, QueryParamete
         guard let regex = recordKeyRegex else {
             // Fallback validation without regex
             return key.allSatisfy { char in
-                char.isLetter || char.isNumber || "-_.:%".contains(char)
+                char.isLetter || char.isNumber || "-_.:~%".contains(char)
             }
         }
 
@@ -834,8 +844,9 @@ public struct TID: ATProtocolValue, CustomStringConvertible, QueryParameterConve
     /// Fixed length of TID strings
     private static let TID_LENGTH = 13
 
-    /// Valid first characters (first half of base32 chars)
-    private static let validFirstChars = "234567abcdefghij"
+    /// Valid first characters. Timestamp-based TIDs always lead with a digit; the
+    /// interop test fixtures treat letter-leading strings as invalid TIDs.
+    private static let validFirstChars = "234567"
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
@@ -857,12 +868,12 @@ public struct TID: ATProtocolValue, CustomStringConvertible, QueryParameterConve
             }
         }
 
-        // Validate first character (must be 2-j)
+        // Validate first character (must be 2-7)
         guard let firstChar = tidString.first,
               Self.validFirstChars.contains(firstChar)
         else {
             throw ATProtocolError.invalidURI(
-                "Invalid TID string format: first character must be in 234567abcdefghij"
+                "Invalid TID string format: first character must be in 234567"
             )
         }
 
@@ -944,7 +955,7 @@ public struct TID: ATProtocolValue, CustomStringConvertible, QueryParameterConve
             }
         }
 
-        // First character must be 2-j
+        // First character must be 2-7
         guard let firstChar = str.first,
               validFirstChars.contains(firstChar)
         else {

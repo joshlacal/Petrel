@@ -36,8 +36,10 @@ public enum BlueCatbirdMlsChatOptIn {
             do {
                 optedInAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .optedInAt)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'optedInAt': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'optedInAt' — degrading to nil: \(error)")
+                optedInAt = nil
             }
         }
 
@@ -224,19 +226,61 @@ public enum BlueCatbirdMlsChatOptIn {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            success = try container.decodeIfPresent(Bool.self, forKey: .success)
+            do {
+                success = try container.decodeIfPresent(Bool.self, forKey: .success)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'success' — degrading to nil: \(error)")
+                success = nil
+            }
 
-            optedIn = try container.decodeIfPresent(Bool.self, forKey: .optedIn)
+            do {
+                optedIn = try container.decodeIfPresent(Bool.self, forKey: .optedIn)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'optedIn' — degrading to nil: \(error)")
+                optedIn = nil
+            }
 
-            optedInAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .optedInAt)
+            do {
+                optedInAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .optedInAt)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'optedInAt' — degrading to nil: \(error)")
+                optedInAt = nil
+            }
 
-            statuses = try container.decodeIfPresent([OptInStatus].self, forKey: .statuses)
+            do {
+                statuses = try container.decodeIfPresent([OptInStatus].self, forKey: .statuses)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'statuses' — degrading to nil: \(error)")
+                statuses = nil
+            }
 
-            allowFollowersBypass = try container.decodeIfPresent(Bool.self, forKey: .allowFollowersBypass)
+            do {
+                allowFollowersBypass = try container.decodeIfPresent(Bool.self, forKey: .allowFollowersBypass)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'allowFollowersBypass' — degrading to nil: \(error)")
+                allowFollowersBypass = nil
+            }
 
-            allowFollowingBypass = try container.decodeIfPresent(Bool.self, forKey: .allowFollowingBypass)
+            do {
+                allowFollowingBypass = try container.decodeIfPresent(Bool.self, forKey: .allowFollowingBypass)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'allowFollowingBypass' — degrading to nil: \(error)")
+                allowFollowingBypass = nil
+            }
 
-            autoExpireDays = try container.decodeIfPresent(Int.self, forKey: .autoExpireDays)
+            do {
+                autoExpireDays = try container.decodeIfPresent(Int.self, forKey: .autoExpireDays)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'autoExpireDays' — degrading to nil: \(error)")
+                autoExpireDays = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

@@ -57,11 +57,14 @@
                 {%- endif %}
             } catch {
                 {% if prop.optional -%}
-                LogManager.logDebug("Decoding error for optional property '{{ prop.name }}': \(error)")
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property '{{ prop.name }}' — degrading to nil: \(error)")
+                self.{% if prop.boxed %}_{{ prop.name }}{% else %}{{ prop.name }}{% endif %} = nil
                 {%- else -%}
                 LogManager.logError("Decoding error for required property '{{ prop.name }}': \(error)")
-                {%- endif %}
                 throw error
+                {%- endif %}
             }
             {%- endfor %}
             {%- else %}

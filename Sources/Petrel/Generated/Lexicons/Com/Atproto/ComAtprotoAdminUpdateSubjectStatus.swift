@@ -74,7 +74,13 @@ public enum ComAtprotoAdminUpdateSubjectStatus {
 
             subject = try container.decode(OutputSubjectUnion.self, forKey: .subject)
 
-            takedown = try container.decodeIfPresent(ComAtprotoAdminDefs.StatusAttr.self, forKey: .takedown)
+            do {
+                takedown = try container.decodeIfPresent(ComAtprotoAdminDefs.StatusAttr.self, forKey: .takedown)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'takedown' — degrading to nil: \(error)")
+                takedown = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

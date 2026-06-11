@@ -78,7 +78,13 @@ public enum BlueCatbirdMlsChatReissueWelcome {
 
             requestedAt = try container.decode(ATProtocolDate.self, forKey: .requestedAt)
 
-            inviterDevice = try container.decodeIfPresent(DID.self, forKey: .inviterDevice)
+            do {
+                inviterDevice = try container.decodeIfPresent(DID.self, forKey: .inviterDevice)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'inviterDevice' — degrading to nil: \(error)")
+                inviterDevice = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

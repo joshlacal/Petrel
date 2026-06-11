@@ -143,7 +143,13 @@ public enum AppBskyUnspeccedGetPostThreadV2 {
 
             thread = try container.decode([ThreadItem].self, forKey: .thread)
 
-            threadgate = try container.decodeIfPresent(AppBskyFeedDefs.ThreadgateView.self, forKey: .threadgate)
+            do {
+                threadgate = try container.decodeIfPresent(AppBskyFeedDefs.ThreadgateView.self, forKey: .threadgate)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'threadgate' — degrading to nil: \(error)")
+                threadgate = nil
+            }
 
             hasOtherReplies = try container.decode(Bool.self, forKey: .hasOtherReplies)
         }

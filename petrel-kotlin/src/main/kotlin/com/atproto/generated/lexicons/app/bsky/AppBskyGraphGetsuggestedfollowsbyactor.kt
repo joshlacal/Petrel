@@ -23,8 +23,9 @@ object AppBskyGraphGetSuggestedFollowsByActorDefs {
     @Serializable
     data class AppBskyGraphGetSuggestedFollowsByActorOutput(
         @SerialName("suggestions")
-        val suggestions: List<AppBskyActorDefsProfileView>,// If true, response has fallen-back to generic results, and is not scoped using relativeToDid        @SerialName("isFallback")
-        val isFallback: Boolean? = null,// Snowflake for this recommendation, use when submitting recommendation events.        @SerialName("recId")
+        val suggestions: List<AppBskyActorDefsProfileView>,// Snowflake for this recommendation, use when submitting recommendation events.        @SerialName("recIdStr")
+        val recIdStr: String? = null,// DEPRECATED, unused. Previously: if true, response has fallen-back to generic results, and is not scoped using relativeToDid        @SerialName("isFallback")
+        val isFallback: Boolean? = null,// DEPRECATED: use recIdStr instead.        @SerialName("recId")
         val recId: Int? = null    )
 
 /**

@@ -78,8 +78,10 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
             do {
                 aspectRatio = try container.decodeIfPresent(AppBskyEmbedDefs.AspectRatio.self, forKey: .aspectRatio)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'aspectRatio': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'aspectRatio' — degrading to nil: \(error)")
+                aspectRatio = nil
             }
         }
 
@@ -236,8 +238,10 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
             do {
                 aspectRatio = try container.decodeIfPresent(AppBskyEmbedDefs.AspectRatio.self, forKey: .aspectRatio)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'aspectRatio': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'aspectRatio' — degrading to nil: \(error)")
+                aspectRatio = nil
             }
         }
 

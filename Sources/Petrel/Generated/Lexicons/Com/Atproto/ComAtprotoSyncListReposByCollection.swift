@@ -97,7 +97,13 @@ public enum ComAtprotoSyncListReposByCollection {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+            do {
+                cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
+                cursor = nil
+            }
 
             repos = try container.decode([Repo].self, forKey: .repos)
         }

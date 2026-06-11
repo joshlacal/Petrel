@@ -33,9 +33,21 @@ public enum ComAtprotoTempCheckSignupQueue {
 
             activated = try container.decode(Bool.self, forKey: .activated)
 
-            placeInQueue = try container.decodeIfPresent(Int.self, forKey: .placeInQueue)
+            do {
+                placeInQueue = try container.decodeIfPresent(Int.self, forKey: .placeInQueue)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'placeInQueue' — degrading to nil: \(error)")
+                placeInQueue = nil
+            }
 
-            estimatedTimeMs = try container.decodeIfPresent(Int.self, forKey: .estimatedTimeMs)
+            do {
+                estimatedTimeMs = try container.decodeIfPresent(Int.self, forKey: .estimatedTimeMs)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'estimatedTimeMs' — degrading to nil: \(error)")
+                estimatedTimeMs = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

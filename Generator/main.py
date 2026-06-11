@@ -30,6 +30,8 @@ async def generate_swift_from_lexicons_recursive(folder_path: str, output_folder
 
     # First pass: Load all lexicons and build dependency graph
     for root, dirs, files in os.walk(folder_path):
+        dirs.sort()   # deterministic traversal so generated output is byte-stable
+        files.sort()
         for filename in files:
             if filename.endswith('.json'):
                 filepath = os.path.join(root, filename)
@@ -152,6 +154,14 @@ def generate_ATProtocolValueContainer_enum(type_dict):
     json_value_enum_code = template.render(type_cases=type_cases)
     return json_value_enum_code
 
+def lower_camel(segment):
+    """Lexicon namespace segment -> lowerCamelCase Swift property name.
+
+    Segments are already camelCase in lexicon ids (e.g. authManageLabelerService);
+    only the first character needs lowering. The previous .lower() collapsed them
+    to unreadable all-lowercase names (authmanagelabelerservice)."""
+    return segment[0].lower() + segment[1:] if segment else segment
+
 def generate_swift_namespace_classes(namespace_hierarchy, network_manager="NetworkService", depth=0):
     swift_code = ""
     indent = "    " * depth
@@ -159,8 +169,12 @@ def generate_swift_namespace_classes(namespace_hierarchy, network_manager="Netwo
     if depth == 0:
         for namespace, sub_hierarchy in namespace_hierarchy.items():
             namespace_class = convert_to_camel_case(namespace)
-            swift_code += f"public lazy var {namespace.lower()}: {namespace_class} = {{\n"
+            prop_name = lower_camel(namespace)
+            swift_code += f"public lazy var {prop_name}: {namespace_class} = {{\n"
             swift_code += f"    return {namespace_class}(networkService: self.networkService)\n}}()\n\n"
+            if prop_name != namespace.lower():
+                swift_code += f"@available(*, deprecated, renamed: \"{prop_name}\")\n"
+                swift_code += f"public var {namespace.lower()}: {namespace_class} {{ {prop_name} }}\n\n"
             swift_code += f"public final class {namespace_class}: @unchecked Sendable {{\n"
             swift_code += f"    internal let networkService: NetworkService\n"
             swift_code += f"    internal init(networkService: NetworkService) {{\n"
@@ -170,8 +184,12 @@ def generate_swift_namespace_classes(namespace_hierarchy, network_manager="Netwo
     else:
         for namespace, sub_namespaces in namespace_hierarchy.items():
             class_name = convert_to_camel_case(namespace)
-            swift_code += f"{indent}public lazy var {namespace.lower()}: {class_name} = {{\n"
+            prop_name = lower_camel(namespace)
+            swift_code += f"{indent}public lazy var {prop_name}: {class_name} = {{\n"
             swift_code += f"{indent}    return {class_name}(networkService: self.networkService)\n{indent}}}()\n\n"
+            if prop_name != namespace.lower():
+                swift_code += f"{indent}@available(*, deprecated, renamed: \"{prop_name}\")\n"
+                swift_code += f"{indent}public var {namespace.lower()}: {class_name} {{ {prop_name} }}\n\n"
             swift_code += f"{indent}public final class {class_name}: @unchecked Sendable {{\n"
             swift_code += f"{indent}    internal let networkService: NetworkService\n"
             swift_code += f"{indent}    internal init(networkService: NetworkService) {{\n"
@@ -195,6 +213,8 @@ async def generate_kotlin_from_lexicons_recursive(folder_path: str, output_folde
 
     # First pass: Load all lexicons and build dependency graph
     for root, dirs, files in os.walk(folder_path):
+        dirs.sort()   # deterministic traversal so generated output is byte-stable
+        files.sort()
         for filename in files:
             if filename.endswith('.json'):
                 filepath = os.path.join(root, filename)
@@ -290,7 +310,11 @@ def generate_kotlin_namespace_classes(namespace_hierarchy, depth=0):
         # Generate only the inner namespace content (injected into template)
         for namespace, sub_hierarchy in namespace_hierarchy.items():
             namespace_class = convert_to_pascal_case(namespace)
-            kotlin_code += f"    val {namespace.lower()}: {namespace_class} = {namespace_class}()\n\n"
+            prop_name = lower_camel(namespace)
+            kotlin_code += f"    val {prop_name}: {namespace_class} = {namespace_class}()\n\n"
+            if prop_name != namespace.lower():
+                kotlin_code += f"    @Deprecated(\"Renamed\", ReplaceWith(\"{prop_name}\"))\n"
+                kotlin_code += f"    val {namespace.lower()}: {namespace_class} get() = {prop_name}\n\n"
             kotlin_code += f"    inner class {namespace_class} {{\n"
             kotlin_code += f"        val client: ATProtoClient get() = this@ATProtoClient\n"
             kotlin_code += generate_kotlin_namespace_classes(sub_hierarchy, depth + 2)
@@ -298,7 +322,11 @@ def generate_kotlin_namespace_classes(namespace_hierarchy, depth=0):
     else:
         for namespace, sub_namespaces in namespace_hierarchy.items():
             class_name = convert_to_pascal_case(namespace)
-            kotlin_code += f"{indent}val {namespace.lower()}: {class_name} = {class_name}()\n\n"
+            prop_name = lower_camel(namespace)
+            kotlin_code += f"{indent}val {prop_name}: {class_name} = {class_name}()\n\n"
+            if prop_name != namespace.lower():
+                kotlin_code += f"{indent}@Deprecated(\"Renamed\", ReplaceWith(\"{prop_name}\"))\n"
+                kotlin_code += f"{indent}val {namespace.lower()}: {class_name} get() = {prop_name}\n\n"
             kotlin_code += f"{indent}inner class {class_name} {{\n"
             kotlin_code += f"{indent}    val client: ATProtoClient get() = this@ATProtoClient\n"
             if sub_namespaces:

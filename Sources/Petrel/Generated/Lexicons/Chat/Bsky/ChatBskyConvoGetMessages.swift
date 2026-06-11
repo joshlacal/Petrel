@@ -46,11 +46,23 @@ public enum ChatBskyConvoGetMessages {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+            do {
+                cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
+                cursor = nil
+            }
 
             messages = try container.decode([OutputMessagesUnion].self, forKey: .messages)
 
-            relatedProfiles = try container.decodeIfPresent([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .relatedProfiles)
+            do {
+                relatedProfiles = try container.decodeIfPresent([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .relatedProfiles)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'relatedProfiles' — degrading to nil: \(error)")
+                relatedProfiles = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

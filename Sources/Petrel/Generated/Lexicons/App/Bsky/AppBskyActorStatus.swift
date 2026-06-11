@@ -19,8 +19,20 @@ public struct AppBskyActorStatus: ATProtocolCodable, ATProtocolValue {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         status = try container.decode(String.self, forKey: .status)
-        embed = try container.decodeIfPresent(AppBskyActorStatusEmbedUnion.self, forKey: .embed)
-        durationMinutes = try container.decodeIfPresent(Int.self, forKey: .durationMinutes)
+        do {
+            embed = try container.decodeIfPresent(AppBskyActorStatusEmbedUnion.self, forKey: .embed)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'embed' — degrading to nil: \(error)")
+            embed = nil
+        }
+        do {
+            durationMinutes = try container.decodeIfPresent(Int.self, forKey: .durationMinutes)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'durationMinutes' — degrading to nil: \(error)")
+            durationMinutes = nil
+        }
         createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
     }
 

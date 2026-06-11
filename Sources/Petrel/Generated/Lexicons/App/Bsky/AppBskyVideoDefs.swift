@@ -50,26 +50,34 @@ public enum AppBskyVideoDefs {
             do {
                 progress = try container.decodeIfPresent(Int.self, forKey: .progress)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'progress': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'progress' — degrading to nil: \(error)")
+                progress = nil
             }
             do {
                 blob = try container.decodeIfPresent(Blob.self, forKey: .blob)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'blob': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'blob' — degrading to nil: \(error)")
+                blob = nil
             }
             do {
                 error = try container.decodeIfPresent(String.self, forKey: .error)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'error': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'error' — degrading to nil: \(error)")
+                self.error = nil
             }
             do {
                 message = try container.decodeIfPresent(String.self, forKey: .message)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'message': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'message' — degrading to nil: \(error)")
+                message = nil
             }
         }
 

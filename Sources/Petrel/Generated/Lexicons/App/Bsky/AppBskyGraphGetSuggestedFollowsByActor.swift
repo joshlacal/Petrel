@@ -17,6 +17,8 @@ public enum AppBskyGraphGetSuggestedFollowsByActor {
     public struct Output: ATProtocolCodable {
         public let suggestions: [AppBskyActorDefs.ProfileView]
 
+        public let recIdStr: String?
+
         public let isFallback: Bool?
 
         public let recId: Int?
@@ -25,12 +27,16 @@ public enum AppBskyGraphGetSuggestedFollowsByActor {
         public init(
             suggestions: [AppBskyActorDefs.ProfileView],
 
+            recIdStr: String? = nil,
+
             isFallback: Bool? = nil,
 
             recId: Int? = nil
 
         ) {
             self.suggestions = suggestions
+
+            self.recIdStr = recIdStr
 
             self.isFallback = isFallback
 
@@ -42,15 +48,38 @@ public enum AppBskyGraphGetSuggestedFollowsByActor {
 
             suggestions = try container.decode([AppBskyActorDefs.ProfileView].self, forKey: .suggestions)
 
-            isFallback = try container.decodeIfPresent(Bool.self, forKey: .isFallback)
+            do {
+                recIdStr = try container.decodeIfPresent(String.self, forKey: .recIdStr)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'recIdStr' — degrading to nil: \(error)")
+                recIdStr = nil
+            }
 
-            recId = try container.decodeIfPresent(Int.self, forKey: .recId)
+            do {
+                isFallback = try container.decodeIfPresent(Bool.self, forKey: .isFallback)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'isFallback' — degrading to nil: \(error)")
+                isFallback = nil
+            }
+
+            do {
+                recId = try container.decodeIfPresent(Int.self, forKey: .recId)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'recId' — degrading to nil: \(error)")
+                recId = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(suggestions, forKey: .suggestions)
+
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(recIdStr, forKey: .recIdStr)
 
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(isFallback, forKey: .isFallback)
@@ -64,6 +93,12 @@ public enum AppBskyGraphGetSuggestedFollowsByActor {
 
             let suggestionsValue = try suggestions.toCBORValue()
             map = map.adding(key: "suggestions", value: suggestionsValue)
+
+            if let value = recIdStr {
+                // Encode optional property even if it's an empty array for CBOR
+                let recIdStrValue = try value.toCBORValue()
+                map = map.adding(key: "recIdStr", value: recIdStrValue)
+            }
 
             if let value = isFallback {
                 // Encode optional property even if it's an empty array for CBOR
@@ -82,6 +117,7 @@ public enum AppBskyGraphGetSuggestedFollowsByActor {
 
         private enum CodingKeys: String, CodingKey {
             case suggestions
+            case recIdStr
             case isFallback
             case recId
         }

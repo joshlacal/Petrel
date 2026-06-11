@@ -119,11 +119,29 @@ public enum BlueCatbirdMlsChatReportRecoveryFailure {
 
             memberCount = try container.decode(Int.self, forKey: .memberCount)
 
-            reason = try container.decodeIfPresent(String.self, forKey: .reason)
+            do {
+                reason = try container.decodeIfPresent(String.self, forKey: .reason)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'reason' — degrading to nil: \(error)")
+                reason = nil
+            }
 
-            newGroupId = try container.decodeIfPresent(String.self, forKey: .newGroupId)
+            do {
+                newGroupId = try container.decodeIfPresent(String.self, forKey: .newGroupId)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'newGroupId' — degrading to nil: \(error)")
+                newGroupId = nil
+            }
 
-            resetGeneration = try container.decodeIfPresent(Int.self, forKey: .resetGeneration)
+            do {
+                resetGeneration = try container.decodeIfPresent(Int.self, forKey: .resetGeneration)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'resetGeneration' — degrading to nil: \(error)")
+                resetGeneration = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

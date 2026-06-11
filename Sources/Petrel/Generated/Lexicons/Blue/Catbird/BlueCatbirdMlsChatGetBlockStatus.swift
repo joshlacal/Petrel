@@ -44,8 +44,10 @@ public enum BlueCatbirdMlsChatGetBlockStatus {
             do {
                 blockUri = try container.decodeIfPresent(ATProtocolURI.self, forKey: .blockUri)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'blockUri': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'blockUri' — degrading to nil: \(error)")
+                blockUri = nil
             }
         }
 

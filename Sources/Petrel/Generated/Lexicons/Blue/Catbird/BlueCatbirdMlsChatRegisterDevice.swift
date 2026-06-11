@@ -265,7 +265,13 @@ public enum BlueCatbirdMlsChatRegisterDevice {
 
             autoJoinedConvos = try container.decode([String].self, forKey: .autoJoinedConvos)
 
-            welcomeMessages = try container.decodeIfPresent([WelcomeMessage].self, forKey: .welcomeMessages)
+            do {
+                welcomeMessages = try container.decodeIfPresent([WelcomeMessage].self, forKey: .welcomeMessages)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'welcomeMessages' — degrading to nil: \(error)")
+                welcomeMessages = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

@@ -206,14 +206,18 @@ public enum ChatBskyGroupDefs {
             do {
                 convo = try container.decodeIfPresent(ChatBskyConvoDefs.ConvoView.self, forKey: .convo)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'convo': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'convo' — degrading to nil: \(error)")
+                convo = nil
             }
             do {
                 viewer = try container.decodeIfPresent(JoinLinkViewerState.self, forKey: .viewer)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'viewer': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'viewer' — degrading to nil: \(error)")
+                viewer = nil
             }
         }
 
@@ -464,8 +468,10 @@ public enum ChatBskyGroupDefs {
             do {
                 requestedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .requestedAt)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'requestedAt': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'requestedAt' — degrading to nil: \(error)")
+                requestedAt = nil
             }
         }
 

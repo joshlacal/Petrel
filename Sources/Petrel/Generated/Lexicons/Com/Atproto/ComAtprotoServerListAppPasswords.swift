@@ -36,8 +36,10 @@ public enum ComAtprotoServerListAppPasswords {
             do {
                 privileged = try container.decodeIfPresent(Bool.self, forKey: .privileged)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'privileged': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'privileged' — degrading to nil: \(error)")
+                privileged = nil
             }
         }
 

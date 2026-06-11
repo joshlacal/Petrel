@@ -22,7 +22,13 @@ public enum PlaceStreamConfigGetEnv {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            playbackWorkerUrl = try container.decodeIfPresent(String.self, forKey: .playbackWorkerUrl)
+            do {
+                playbackWorkerUrl = try container.decodeIfPresent(String.self, forKey: .playbackWorkerUrl)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'playbackWorkerUrl' — degrading to nil: \(error)")
+                playbackWorkerUrl = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

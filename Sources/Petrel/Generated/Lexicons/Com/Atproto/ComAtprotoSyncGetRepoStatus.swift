@@ -50,9 +50,21 @@ public enum ComAtprotoSyncGetRepoStatus {
 
             active = try container.decode(Bool.self, forKey: .active)
 
-            status = try container.decodeIfPresent(String.self, forKey: .status)
+            do {
+                status = try container.decodeIfPresent(String.self, forKey: .status)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'status' — degrading to nil: \(error)")
+                status = nil
+            }
 
-            rev = try container.decodeIfPresent(TID.self, forKey: .rev)
+            do {
+                rev = try container.decodeIfPresent(TID.self, forKey: .rev)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'rev' — degrading to nil: \(error)")
+                rev = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

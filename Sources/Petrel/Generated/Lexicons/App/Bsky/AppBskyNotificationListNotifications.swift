@@ -60,8 +60,10 @@ public enum AppBskyNotificationListNotifications {
             do {
                 reasonSubject = try container.decodeIfPresent(ATProtocolURI.self, forKey: .reasonSubject)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'reasonSubject': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'reasonSubject' — degrading to nil: \(error)")
+                reasonSubject = nil
             }
             do {
                 record = try container.decode(ATProtocolValueContainer.self, forKey: .record)
@@ -84,8 +86,10 @@ public enum AppBskyNotificationListNotifications {
             do {
                 labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'labels': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'labels' — degrading to nil: \(error)")
+                labels = nil
             }
         }
 
@@ -255,13 +259,31 @@ public enum AppBskyNotificationListNotifications {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+            do {
+                cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
+                cursor = nil
+            }
 
             notifications = try container.decode([Notification].self, forKey: .notifications)
 
-            priority = try container.decodeIfPresent(Bool.self, forKey: .priority)
+            do {
+                priority = try container.decodeIfPresent(Bool.self, forKey: .priority)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'priority' — degrading to nil: \(error)")
+                priority = nil
+            }
 
-            seenAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .seenAt)
+            do {
+                seenAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .seenAt)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'seenAt' — degrading to nil: \(error)")
+                seenAt = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

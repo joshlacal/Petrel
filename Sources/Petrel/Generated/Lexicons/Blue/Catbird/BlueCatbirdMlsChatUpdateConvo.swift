@@ -30,38 +30,50 @@ public enum BlueCatbirdMlsChatUpdateConvo {
             do {
                 allowInvites = try container.decodeIfPresent(Bool.self, forKey: .allowInvites)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'allowInvites': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'allowInvites' — degrading to nil: \(error)")
+                allowInvites = nil
             }
             do {
                 adminOnlyInvites = try container.decodeIfPresent(Bool.self, forKey: .adminOnlyInvites)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'adminOnlyInvites': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'adminOnlyInvites' — degrading to nil: \(error)")
+                adminOnlyInvites = nil
             }
             do {
                 allowMemberAdd = try container.decodeIfPresent(Bool.self, forKey: .allowMemberAdd)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'allowMemberAdd': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'allowMemberAdd' — degrading to nil: \(error)")
+                allowMemberAdd = nil
             }
             do {
                 allowMemberRemove = try container.decodeIfPresent(Bool.self, forKey: .allowMemberRemove)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'allowMemberRemove': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'allowMemberRemove' — degrading to nil: \(error)")
+                allowMemberRemove = nil
             }
             do {
                 requireAdminApproval = try container.decodeIfPresent(Bool.self, forKey: .requireAdminApproval)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'requireAdminApproval': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'requireAdminApproval' — degrading to nil: \(error)")
+                requireAdminApproval = nil
             }
             do {
                 maxMembers = try container.decodeIfPresent(Int.self, forKey: .maxMembers)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'maxMembers': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'maxMembers' — degrading to nil: \(error)")
+                maxMembers = nil
             }
         }
 
@@ -256,8 +268,10 @@ public enum BlueCatbirdMlsChatUpdateConvo {
             do {
                 updatedBy = try container.decodeIfPresent(DID.self, forKey: .updatedBy)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'updatedBy': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'updatedBy' — degrading to nil: \(error)")
+                updatedBy = nil
             }
         }
 
@@ -468,9 +482,21 @@ public enum BlueCatbirdMlsChatUpdateConvo {
 
             success = try container.decode(Bool.self, forKey: .success)
 
-            newEpoch = try container.decodeIfPresent(Int.self, forKey: .newEpoch)
+            do {
+                newEpoch = try container.decodeIfPresent(Int.self, forKey: .newEpoch)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'newEpoch' — degrading to nil: \(error)")
+                newEpoch = nil
+            }
 
-            policy = try container.decodeIfPresent(PolicyView.self, forKey: .policy)
+            do {
+                policy = try container.decodeIfPresent(PolicyView.self, forKey: .policy)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'policy' — degrading to nil: \(error)")
+                policy = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

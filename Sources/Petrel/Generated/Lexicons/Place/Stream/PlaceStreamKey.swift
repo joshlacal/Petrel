@@ -18,7 +18,13 @@ public struct PlaceStreamKey: ATProtocolCodable, ATProtocolValue {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         signingKey = try container.decode(String.self, forKey: .signingKey)
         createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
-        createdBy = try container.decodeIfPresent(String.self, forKey: .createdBy)
+        do {
+            createdBy = try container.decodeIfPresent(String.self, forKey: .createdBy)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'createdBy' — degrading to nil: \(error)")
+            createdBy = nil
+        }
     }
 
     public func encode(to encoder: Encoder) throws {

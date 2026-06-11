@@ -20,8 +20,20 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
         post = try container.decode(ATProtocolURI.self, forKey: .post)
-        detachedEmbeddingUris = try container.decodeIfPresent([ATProtocolURI].self, forKey: .detachedEmbeddingUris)
-        embeddingRules = try container.decodeIfPresent([AppBskyFeedPostgateEmbeddingRulesUnion].self, forKey: .embeddingRules)
+        do {
+            detachedEmbeddingUris = try container.decodeIfPresent([ATProtocolURI].self, forKey: .detachedEmbeddingUris)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'detachedEmbeddingUris' — degrading to nil: \(error)")
+            detachedEmbeddingUris = nil
+        }
+        do {
+            embeddingRules = try container.decodeIfPresent([AppBskyFeedPostgateEmbeddingRulesUnion].self, forKey: .embeddingRules)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'embeddingRules' — degrading to nil: \(error)")
+            embeddingRules = nil
+        }
     }
 
     public func encode(to encoder: Encoder) throws {

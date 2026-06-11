@@ -152,7 +152,13 @@ public enum ComAtprotoServerCreateAccount {
 
             did = try container.decode(DID.self, forKey: .did)
 
-            didDoc = try container.decodeIfPresent(DIDDocument.self, forKey: .didDoc)
+            do {
+                didDoc = try container.decodeIfPresent(DIDDocument.self, forKey: .didDoc)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'didDoc' — degrading to nil: \(error)")
+                didDoc = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

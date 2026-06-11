@@ -46,14 +46,18 @@ public enum ComAtprotoSyncListRepos {
             do {
                 active = try container.decodeIfPresent(Bool.self, forKey: .active)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'active': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'active' — degrading to nil: \(error)")
+                active = nil
             }
             do {
                 status = try container.decodeIfPresent(String.self, forKey: .status)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'status': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'status' — degrading to nil: \(error)")
+                status = nil
             }
         }
 
@@ -170,7 +174,13 @@ public enum ComAtprotoSyncListRepos {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+            do {
+                cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
+                cursor = nil
+            }
 
             repos = try container.decode([Repo].self, forKey: .repos)
         }

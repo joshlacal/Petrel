@@ -21,7 +21,13 @@ public struct PlaceStreamModerationPermission: ATProtocolCodable, ATProtocolValu
         moderator = try container.decode(DID.self, forKey: .moderator)
         permissions = try container.decode([String].self, forKey: .permissions)
         createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
-        expirationTime = try container.decodeIfPresent(ATProtocolDate.self, forKey: .expirationTime)
+        do {
+            expirationTime = try container.decodeIfPresent(ATProtocolDate.self, forKey: .expirationTime)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'expirationTime' — degrading to nil: \(error)")
+            expirationTime = nil
+        }
     }
 
     public func encode(to encoder: Encoder) throws {

@@ -22,7 +22,13 @@ public enum AppBskyContactGetSyncStatus {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            syncStatus = try container.decodeIfPresent(AppBskyContactDefs.SyncStatus.self, forKey: .syncStatus)
+            do {
+                syncStatus = try container.decodeIfPresent(AppBskyContactDefs.SyncStatus.self, forKey: .syncStatus)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'syncStatus' — degrading to nil: \(error)")
+                syncStatus = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

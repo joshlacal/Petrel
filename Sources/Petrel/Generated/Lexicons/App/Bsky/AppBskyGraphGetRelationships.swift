@@ -37,7 +37,13 @@ public enum AppBskyGraphGetRelationships {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            actor = try container.decodeIfPresent(DID.self, forKey: .actor)
+            do {
+                actor = try container.decodeIfPresent(DID.self, forKey: .actor)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'actor' — degrading to nil: \(error)")
+                actor = nil
+            }
 
             relationships = try container.decode([OutputRelationshipsUnion].self, forKey: .relationships)
         }

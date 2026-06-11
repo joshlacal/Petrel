@@ -19,9 +19,21 @@ public struct PlaceStreamChatPinnedRecord: ATProtocolCodable, ATProtocolValue {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         pinnedMessage = try container.decode(ATProtocolURI.self, forKey: .pinnedMessage)
-        pinnedBy = try container.decodeIfPresent(DID.self, forKey: .pinnedBy)
+        do {
+            pinnedBy = try container.decodeIfPresent(DID.self, forKey: .pinnedBy)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'pinnedBy' — degrading to nil: \(error)")
+            pinnedBy = nil
+        }
         createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
-        expiresAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .expiresAt)
+        do {
+            expiresAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .expiresAt)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'expiresAt' — degrading to nil: \(error)")
+            expiresAt = nil
+        }
     }
 
     public func encode(to encoder: Encoder) throws {

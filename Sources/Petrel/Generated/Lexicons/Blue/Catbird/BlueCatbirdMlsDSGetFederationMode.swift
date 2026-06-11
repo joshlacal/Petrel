@@ -33,7 +33,13 @@ public enum BlueCatbirdMlsDSGetFederationMode {
 
             effectiveMode = try container.decode(String.self, forKey: .effectiveMode)
 
-            overrideMode = try container.decodeIfPresent(String.self, forKey: .overrideMode)
+            do {
+                overrideMode = try container.decodeIfPresent(String.self, forKey: .overrideMode)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'overrideMode' — degrading to nil: \(error)")
+                overrideMode = nil
+            }
 
             envMode = try container.decode(String.self, forKey: .envMode)
         }

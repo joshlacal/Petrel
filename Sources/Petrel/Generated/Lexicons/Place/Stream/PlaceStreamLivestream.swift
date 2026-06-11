@@ -33,16 +33,70 @@ public struct PlaceStreamLivestream: ATProtocolCodable, ATProtocolValue {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         title = try container.decode(String.self, forKey: .title)
-        url = try container.decodeIfPresent(URI.self, forKey: .url)
+        do {
+            url = try container.decodeIfPresent(URI.self, forKey: .url)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'url' — degrading to nil: \(error)")
+            url = nil
+        }
         createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
-        lastSeenAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .lastSeenAt)
-        endedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .endedAt)
-        idleTimeoutSeconds = try container.decodeIfPresent(Int.self, forKey: .idleTimeoutSeconds)
-        post = try container.decodeIfPresent(ComAtprotoRepoStrongRef.self, forKey: .post)
-        agent = try container.decodeIfPresent(String.self, forKey: .agent)
-        canonicalUrl = try container.decodeIfPresent(URI.self, forKey: .canonicalUrl)
-        thumb = try container.decodeIfPresent(Blob.self, forKey: .thumb)
-        notificationSettings = try container.decodeIfPresent(PlaceStreamLivestream.NotificationSettings.self, forKey: .notificationSettings)
+        do {
+            lastSeenAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .lastSeenAt)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'lastSeenAt' — degrading to nil: \(error)")
+            lastSeenAt = nil
+        }
+        do {
+            endedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .endedAt)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'endedAt' — degrading to nil: \(error)")
+            endedAt = nil
+        }
+        do {
+            idleTimeoutSeconds = try container.decodeIfPresent(Int.self, forKey: .idleTimeoutSeconds)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'idleTimeoutSeconds' — degrading to nil: \(error)")
+            idleTimeoutSeconds = nil
+        }
+        do {
+            post = try container.decodeIfPresent(ComAtprotoRepoStrongRef.self, forKey: .post)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'post' — degrading to nil: \(error)")
+            post = nil
+        }
+        do {
+            agent = try container.decodeIfPresent(String.self, forKey: .agent)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'agent' — degrading to nil: \(error)")
+            agent = nil
+        }
+        do {
+            canonicalUrl = try container.decodeIfPresent(URI.self, forKey: .canonicalUrl)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'canonicalUrl' — degrading to nil: \(error)")
+            canonicalUrl = nil
+        }
+        do {
+            thumb = try container.decodeIfPresent(Blob.self, forKey: .thumb)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'thumb' — degrading to nil: \(error)")
+            thumb = nil
+        }
+        do {
+            notificationSettings = try container.decodeIfPresent(PlaceStreamLivestream.NotificationSettings.self, forKey: .notificationSettings)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'notificationSettings' — degrading to nil: \(error)")
+            notificationSettings = nil
+        }
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -229,8 +283,10 @@ public struct PlaceStreamLivestream: ATProtocolCodable, ATProtocolValue {
             do {
                 pushNotification = try container.decodeIfPresent(Bool.self, forKey: .pushNotification)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'pushNotification': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'pushNotification' — degrading to nil: \(error)")
+                pushNotification = nil
             }
         }
 
@@ -331,8 +387,10 @@ public struct PlaceStreamLivestream: ATProtocolCodable, ATProtocolValue {
             do {
                 viewerCount = try container.decodeIfPresent(ViewerCount.self, forKey: .viewerCount)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'viewerCount': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'viewerCount' — degrading to nil: \(error)")
+                viewerCount = nil
             }
         }
 
@@ -509,8 +567,10 @@ public struct PlaceStreamLivestream: ATProtocolCodable, ATProtocolValue {
             do {
                 chatProfile = try container.decodeIfPresent(PlaceStreamChatProfile.self, forKey: .chatProfile)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'chatProfile': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'chatProfile' — degrading to nil: \(error)")
+                chatProfile = nil
             }
             do {
                 viewerCount = try container.decode(Int.self, forKey: .viewerCount)

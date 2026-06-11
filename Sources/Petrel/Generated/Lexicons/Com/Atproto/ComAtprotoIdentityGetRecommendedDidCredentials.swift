@@ -37,13 +37,37 @@ public enum ComAtprotoIdentityGetRecommendedDidCredentials {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            rotationKeys = try container.decodeIfPresent([String].self, forKey: .rotationKeys)
+            do {
+                rotationKeys = try container.decodeIfPresent([String].self, forKey: .rotationKeys)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'rotationKeys' — degrading to nil: \(error)")
+                rotationKeys = nil
+            }
 
-            alsoKnownAs = try container.decodeIfPresent([String].self, forKey: .alsoKnownAs)
+            do {
+                alsoKnownAs = try container.decodeIfPresent([String].self, forKey: .alsoKnownAs)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'alsoKnownAs' — degrading to nil: \(error)")
+                alsoKnownAs = nil
+            }
 
-            verificationMethods = try container.decodeIfPresent(ATProtocolValueContainer.self, forKey: .verificationMethods)
+            do {
+                verificationMethods = try container.decodeIfPresent(ATProtocolValueContainer.self, forKey: .verificationMethods)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'verificationMethods' — degrading to nil: \(error)")
+                verificationMethods = nil
+            }
 
-            services = try container.decodeIfPresent(ATProtocolValueContainer.self, forKey: .services)
+            do {
+                services = try container.decodeIfPresent(ATProtocolValueContainer.self, forKey: .services)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'services' — degrading to nil: \(error)")
+                services = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

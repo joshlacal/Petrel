@@ -86,8 +86,10 @@ public enum AppBskyBookmarkDefs {
             do {
                 createdAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .createdAt)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'createdAt': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'createdAt' — degrading to nil: \(error)")
+                createdAt = nil
             }
             do {
                 item = try container.decode(BookmarkViewItemUnion.self, forKey: .item)

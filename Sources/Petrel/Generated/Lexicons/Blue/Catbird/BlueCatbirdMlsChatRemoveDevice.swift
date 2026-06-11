@@ -62,9 +62,21 @@ public enum BlueCatbirdMlsChatRemoveDevice {
 
             deleted = try container.decode(Bool.self, forKey: .deleted)
 
-            keyPackagesDeleted = try container.decodeIfPresent(Int.self, forKey: .keyPackagesDeleted)
+            do {
+                keyPackagesDeleted = try container.decodeIfPresent(Int.self, forKey: .keyPackagesDeleted)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'keyPackagesDeleted' — degrading to nil: \(error)")
+                keyPackagesDeleted = nil
+            }
 
-            conversationsLeft = try container.decodeIfPresent(Int.self, forKey: .conversationsLeft)
+            do {
+                conversationsLeft = try container.decodeIfPresent(Int.self, forKey: .conversationsLeft)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'conversationsLeft' — degrading to nil: \(error)")
+                conversationsLeft = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

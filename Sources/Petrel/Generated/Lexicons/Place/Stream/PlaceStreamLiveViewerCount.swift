@@ -21,7 +21,13 @@ public struct PlaceStreamLiveViewerCount: ATProtocolCodable, ATProtocolValue {
         streamer = try container.decode(DID.self, forKey: .streamer)
         server = try container.decode(DID.self, forKey: .server)
         count = try container.decode(Int.self, forKey: .count)
-        updatedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .updatedAt)
+        do {
+            updatedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .updatedAt)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'updatedAt' — degrading to nil: \(error)")
+            updatedAt = nil
+        }
     }
 
     public func encode(to encoder: Encoder) throws {

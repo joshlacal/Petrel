@@ -44,8 +44,10 @@ public enum BlueCatbirdMlsChatGetPendingDevices {
             do {
                 welcome = try container.decodeIfPresent(Bytes.self, forKey: .welcome)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'welcome': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'welcome' — degrading to nil: \(error)")
+                welcome = nil
             }
         }
 

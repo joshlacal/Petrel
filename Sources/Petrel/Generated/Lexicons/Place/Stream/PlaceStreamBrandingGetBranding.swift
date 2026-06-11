@@ -42,26 +42,34 @@ public enum PlaceStreamBrandingGetBranding {
             do {
                 url = try container.decodeIfPresent(String.self, forKey: .url)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'url': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'url' — degrading to nil: \(error)")
+                url = nil
             }
             do {
                 data = try container.decodeIfPresent(String.self, forKey: .data)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'data': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'data' — degrading to nil: \(error)")
+                data = nil
             }
             do {
                 width = try container.decodeIfPresent(Int.self, forKey: .width)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'width': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'width' — degrading to nil: \(error)")
+                width = nil
             }
             do {
                 height = try container.decodeIfPresent(Int.self, forKey: .height)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'height': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'height' — degrading to nil: \(error)")
+                height = nil
             }
         }
 

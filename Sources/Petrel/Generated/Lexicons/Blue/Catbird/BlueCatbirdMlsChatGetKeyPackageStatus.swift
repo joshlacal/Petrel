@@ -36,8 +36,10 @@ public enum BlueCatbirdMlsChatGetKeyPackageStatus {
             do {
                 byDevice = try container.decodeIfPresent([DeviceKeyPackageCount].self, forKey: .byDevice)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'byDevice': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'byDevice' — degrading to nil: \(error)")
+                byDevice = nil
             }
         }
 
@@ -220,8 +222,10 @@ public enum BlueCatbirdMlsChatGetKeyPackageStatus {
             do {
                 expiresAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .expiresAt)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'expiresAt': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'expiresAt' — degrading to nil: \(error)")
+                expiresAt = nil
             }
             do {
                 consumed = try container.decode(Bool.self, forKey: .consumed)
@@ -352,8 +356,10 @@ public enum BlueCatbirdMlsChatGetKeyPackageStatus {
             do {
                 consumedByDid = try container.decodeIfPresent(DID.self, forKey: .consumedByDid)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'consumedByDid': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'consumedByDid' — degrading to nil: \(error)")
+                consumedByDid = nil
             }
         }
 
@@ -477,13 +483,37 @@ public enum BlueCatbirdMlsChatGetKeyPackageStatus {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            stats = try container.decodeIfPresent(KeyPackageStats.self, forKey: .stats)
+            do {
+                stats = try container.decodeIfPresent(KeyPackageStats.self, forKey: .stats)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'stats' — degrading to nil: \(error)")
+                stats = nil
+            }
 
-            status = try container.decodeIfPresent([KeyPackageStatusItem].self, forKey: .status)
+            do {
+                status = try container.decodeIfPresent([KeyPackageStatusItem].self, forKey: .status)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'status' — degrading to nil: \(error)")
+                status = nil
+            }
 
-            history = try container.decodeIfPresent([KeyPackageHistoryItem].self, forKey: .history)
+            do {
+                history = try container.decodeIfPresent([KeyPackageHistoryItem].self, forKey: .history)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'history' — degrading to nil: \(error)")
+                history = nil
+            }
 
-            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+            do {
+                cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
+                cursor = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

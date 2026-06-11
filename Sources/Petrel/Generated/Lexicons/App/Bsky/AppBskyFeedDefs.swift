@@ -72,38 +72,50 @@ public enum AppBskyFeedDefs {
             do {
                 embed = try container.decodeIfPresent(PostViewEmbedUnion.self, forKey: .embed)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'embed': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'embed' — degrading to nil: \(error)")
+                embed = nil
             }
             do {
                 bookmarkCount = try container.decodeIfPresent(Int.self, forKey: .bookmarkCount)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'bookmarkCount': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'bookmarkCount' — degrading to nil: \(error)")
+                bookmarkCount = nil
             }
             do {
                 replyCount = try container.decodeIfPresent(Int.self, forKey: .replyCount)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'replyCount': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'replyCount' — degrading to nil: \(error)")
+                replyCount = nil
             }
             do {
                 repostCount = try container.decodeIfPresent(Int.self, forKey: .repostCount)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'repostCount': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'repostCount' — degrading to nil: \(error)")
+                repostCount = nil
             }
             do {
                 likeCount = try container.decodeIfPresent(Int.self, forKey: .likeCount)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'likeCount': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'likeCount' — degrading to nil: \(error)")
+                likeCount = nil
             }
             do {
                 quoteCount = try container.decodeIfPresent(Int.self, forKey: .quoteCount)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'quoteCount': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'quoteCount' — degrading to nil: \(error)")
+                quoteCount = nil
             }
             do {
                 indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
@@ -114,26 +126,34 @@ public enum AppBskyFeedDefs {
             do {
                 viewer = try container.decodeIfPresent(ViewerState.self, forKey: .viewer)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'viewer': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'viewer' — degrading to nil: \(error)")
+                viewer = nil
             }
             do {
                 labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'labels': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'labels' — degrading to nil: \(error)")
+                labels = nil
             }
             do {
                 threadgate = try container.decodeIfPresent(ThreadgateView.self, forKey: .threadgate)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'threadgate': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'threadgate' — degrading to nil: \(error)")
+                threadgate = nil
             }
             do {
                 debug = try container.decodeIfPresent(ATProtocolValueContainer.self, forKey: .debug)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'debug': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'debug' — degrading to nil: \(error)")
+                debug = nil
             }
         }
 
@@ -372,44 +392,58 @@ public enum AppBskyFeedDefs {
             do {
                 repost = try container.decodeIfPresent(ATProtocolURI.self, forKey: .repost)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'repost': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'repost' — degrading to nil: \(error)")
+                repost = nil
             }
             do {
                 like = try container.decodeIfPresent(ATProtocolURI.self, forKey: .like)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'like': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'like' — degrading to nil: \(error)")
+                like = nil
             }
             do {
                 bookmarked = try container.decodeIfPresent(Bool.self, forKey: .bookmarked)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'bookmarked': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'bookmarked' — degrading to nil: \(error)")
+                bookmarked = nil
             }
             do {
                 threadMuted = try container.decodeIfPresent(Bool.self, forKey: .threadMuted)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'threadMuted': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'threadMuted' — degrading to nil: \(error)")
+                threadMuted = nil
             }
             do {
                 replyDisabled = try container.decodeIfPresent(Bool.self, forKey: .replyDisabled)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'replyDisabled': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'replyDisabled' — degrading to nil: \(error)")
+                replyDisabled = nil
             }
             do {
                 embeddingDisabled = try container.decodeIfPresent(Bool.self, forKey: .embeddingDisabled)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'embeddingDisabled': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'embeddingDisabled' — degrading to nil: \(error)")
+                embeddingDisabled = nil
             }
             do {
                 pinned = try container.decodeIfPresent(Bool.self, forKey: .pinned)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'pinned': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'pinned' — degrading to nil: \(error)")
+                pinned = nil
             }
         }
 
@@ -554,8 +588,10 @@ public enum AppBskyFeedDefs {
             do {
                 rootAuthorLike = try container.decodeIfPresent(ATProtocolURI.self, forKey: .rootAuthorLike)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'rootAuthorLike': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'rootAuthorLike' — degrading to nil: \(error)")
+                rootAuthorLike = nil
             }
         }
 
@@ -630,26 +666,34 @@ public enum AppBskyFeedDefs {
             do {
                 reply = try container.decodeIfPresent(ReplyRef.self, forKey: .reply)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'reply': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'reply' — degrading to nil: \(error)")
+                reply = nil
             }
             do {
                 reason = try container.decodeIfPresent(FeedViewPostReasonUnion.self, forKey: .reason)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'reason': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'reason' — degrading to nil: \(error)")
+                reason = nil
             }
             do {
                 feedContext = try container.decodeIfPresent(String.self, forKey: .feedContext)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'feedContext': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'feedContext' — degrading to nil: \(error)")
+                feedContext = nil
             }
             do {
                 reqId = try container.decodeIfPresent(String.self, forKey: .reqId)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'reqId': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'reqId' — degrading to nil: \(error)")
+                reqId = nil
             }
         }
 
@@ -776,8 +820,10 @@ public enum AppBskyFeedDefs {
             do {
                 grandparentAuthor = try container.decodeIfPresent(AppBskyActorDefs.ProfileViewBasic.self, forKey: .grandparentAuthor)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'grandparentAuthor': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'grandparentAuthor' — degrading to nil: \(error)")
+                grandparentAuthor = nil
             }
         }
 
@@ -866,14 +912,18 @@ public enum AppBskyFeedDefs {
             do {
                 uri = try container.decodeIfPresent(ATProtocolURI.self, forKey: .uri)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'uri': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'uri' — degrading to nil: \(error)")
+                uri = nil
             }
             do {
                 cid = try container.decodeIfPresent(CID.self, forKey: .cid)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'cid': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'cid' — degrading to nil: \(error)")
+                cid = nil
             }
             do {
                 indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
@@ -1017,20 +1067,26 @@ public enum AppBskyFeedDefs {
             do {
                 parent = try container.decodeIfPresent(ThreadViewPostParentUnion.self, forKey: .parent)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'parent': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'parent' — degrading to nil: \(error)")
+                parent = nil
             }
             do {
                 replies = try container.decodeIfPresent([ThreadViewPostRepliesUnion].self, forKey: .replies)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'replies': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'replies' — degrading to nil: \(error)")
+                replies = nil
             }
             do {
                 threadContext = try container.decodeIfPresent(ThreadContext.self, forKey: .threadContext)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'threadContext': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'threadContext' — degrading to nil: \(error)")
+                threadContext = nil
             }
         }
 
@@ -1295,8 +1351,10 @@ public enum AppBskyFeedDefs {
             do {
                 viewer = try container.decodeIfPresent(AppBskyActorDefs.ViewerState.self, forKey: .viewer)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'viewer': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'viewer' — degrading to nil: \(error)")
+                viewer = nil
             }
         }
 
@@ -1421,50 +1479,66 @@ public enum AppBskyFeedDefs {
             do {
                 description = try container.decodeIfPresent(String.self, forKey: .description)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'description': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'description' — degrading to nil: \(error)")
+                description = nil
             }
             do {
                 descriptionFacets = try container.decodeIfPresent([AppBskyRichtextFacet].self, forKey: .descriptionFacets)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'descriptionFacets': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'descriptionFacets' — degrading to nil: \(error)")
+                descriptionFacets = nil
             }
             do {
                 avatar = try container.decodeIfPresent(URI.self, forKey: .avatar)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'avatar': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'avatar' — degrading to nil: \(error)")
+                avatar = nil
             }
             do {
                 likeCount = try container.decodeIfPresent(Int.self, forKey: .likeCount)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'likeCount': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'likeCount' — degrading to nil: \(error)")
+                likeCount = nil
             }
             do {
                 acceptsInteractions = try container.decodeIfPresent(Bool.self, forKey: .acceptsInteractions)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'acceptsInteractions': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'acceptsInteractions' — degrading to nil: \(error)")
+                acceptsInteractions = nil
             }
             do {
                 labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'labels': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'labels' — degrading to nil: \(error)")
+                labels = nil
             }
             do {
                 viewer = try container.decodeIfPresent(GeneratorViewerState.self, forKey: .viewer)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'viewer': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'viewer' — degrading to nil: \(error)")
+                viewer = nil
             }
             do {
                 contentMode = try container.decodeIfPresent(String.self, forKey: .contentMode)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'contentMode': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'contentMode' — degrading to nil: \(error)")
+                contentMode = nil
             }
             do {
                 indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
@@ -1677,8 +1751,10 @@ public enum AppBskyFeedDefs {
             do {
                 like = try container.decodeIfPresent(ATProtocolURI.self, forKey: .like)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'like': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'like' — degrading to nil: \(error)")
+                like = nil
             }
         }
 
@@ -1749,14 +1825,18 @@ public enum AppBskyFeedDefs {
             do {
                 reason = try container.decodeIfPresent(SkeletonFeedPostReasonUnion.self, forKey: .reason)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'reason': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'reason' — degrading to nil: \(error)")
+                reason = nil
             }
             do {
                 feedContext = try container.decodeIfPresent(String.self, forKey: .feedContext)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'feedContext': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'feedContext' — degrading to nil: \(error)")
+                feedContext = nil
             }
         }
 
@@ -1936,26 +2016,34 @@ public enum AppBskyFeedDefs {
             do {
                 uri = try container.decodeIfPresent(ATProtocolURI.self, forKey: .uri)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'uri': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'uri' — degrading to nil: \(error)")
+                uri = nil
             }
             do {
                 cid = try container.decodeIfPresent(CID.self, forKey: .cid)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'cid': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'cid' — degrading to nil: \(error)")
+                cid = nil
             }
             do {
                 record = try container.decodeIfPresent(ATProtocolValueContainer.self, forKey: .record)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'record': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'record' — degrading to nil: \(error)")
+                record = nil
             }
             do {
                 lists = try container.decodeIfPresent([AppBskyGraphDefs.ListViewBasic].self, forKey: .lists)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'lists': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'lists' — degrading to nil: \(error)")
+                lists = nil
             }
         }
 
@@ -2064,26 +2152,34 @@ public enum AppBskyFeedDefs {
             do {
                 item = try container.decodeIfPresent(ATProtocolURI.self, forKey: .item)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'item': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'item' — degrading to nil: \(error)")
+                item = nil
             }
             do {
                 event = try container.decodeIfPresent(String.self, forKey: .event)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'event': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'event' — degrading to nil: \(error)")
+                event = nil
             }
             do {
                 feedContext = try container.decodeIfPresent(String.self, forKey: .feedContext)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'feedContext': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'feedContext' — degrading to nil: \(error)")
+                feedContext = nil
             }
             do {
                 reqId = try container.decodeIfPresent(String.self, forKey: .reqId)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'reqId': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'reqId' — degrading to nil: \(error)")
+                reqId = nil
             }
         }
 

@@ -64,7 +64,13 @@ public enum BlueCatbirdMlsChatGetSubscriptionTicket {
 
             ticket = try container.decode(String.self, forKey: .ticket)
 
-            endpoint = try container.decodeIfPresent(URI.self, forKey: .endpoint)
+            do {
+                endpoint = try container.decodeIfPresent(URI.self, forKey: .endpoint)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'endpoint' — degrading to nil: \(error)")
+                endpoint = nil
+            }
 
             expiresAt = try container.decode(ATProtocolDate.self, forKey: .expiresAt)
         }

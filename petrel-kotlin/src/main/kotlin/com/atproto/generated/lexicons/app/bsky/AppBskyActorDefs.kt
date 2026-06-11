@@ -752,7 +752,8 @@ enum class AppBskyActorDefsMutedWordTarget {
     @Serializable
     data class AppBskyActorDefsProfileAssociatedChat(
         @SerialName("allowIncoming")
-        val allowIncoming: String    ) {
+        val allowIncoming: String,        @SerialName("allowGroupInvites")
+        val allowGroupInvites: String? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyActorDefsProfileAssociatedChat"
         }
@@ -830,7 +831,9 @@ enum class AppBskyActorDefsMutedWordTarget {
     @Serializable
     data class AppBskyActorDefsVerificationView(
 /** The user who issued this verification. */        @SerialName("issuer")
-        val issuer: DID,/** The AT-URI of the verification record. */        @SerialName("uri")
+        val issuer: DID,/** The display name of the issuer. */        @SerialName("issuerDisplayName")
+        val issuerDisplayName: String? = null,/** The handle of the issuer. */        @SerialName("issuerHandle")
+        val issuerHandle: Handle? = null,/** The AT-URI of the verification record. */        @SerialName("uri")
         val uri: ATProtocolURI,/** True if the verification passes validation, otherwise false. */        @SerialName("isValid")
         val isValid: Boolean,/** Timestamp when the verification was created. */        @SerialName("createdAt")
         val createdAt: ATProtocolDate    ) {
@@ -1086,7 +1089,8 @@ enum class AppBskyActorDefsMutedWordTarget {
         val cid: CID? = null,/** The status for the account. */        @SerialName("status")
         val status: String,        @SerialName("record")
         val record: JsonElement,/** An optional embed associated with the status. */        @SerialName("embed")
-        val embed: AppBskyActorDefsStatusViewEmbedUnion? = null,/** The date when this status will expire. The application might choose to no longer return the status after expiration. */        @SerialName("expiresAt")
+        val embed: AppBskyActorDefsStatusViewEmbedUnion? = null,        @SerialName("labels")
+        val labels: List<ComAtprotoLabelDefsLabel>? = null,/** The date when this status will expire. The application might choose to no longer return the status after expiration. */        @SerialName("expiresAt")
         val expiresAt: ATProtocolDate? = null,/** True if the status is not expired, false if it is expired. Only present if expiration was set. */        @SerialName("isActive")
         val isActive: Boolean? = null,/** True if the user's go-live access has been disabled by a moderator, false otherwise. */        @SerialName("isDisabled")
         val isDisabled: Boolean? = null    ) {

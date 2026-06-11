@@ -65,17 +65,53 @@ public enum ComAtprotoServerGetSession {
 
             did = try container.decode(DID.self, forKey: .did)
 
-            didDoc = try container.decodeIfPresent(DIDDocument.self, forKey: .didDoc)
+            do {
+                didDoc = try container.decodeIfPresent(DIDDocument.self, forKey: .didDoc)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'didDoc' — degrading to nil: \(error)")
+                didDoc = nil
+            }
 
-            email = try container.decodeIfPresent(String.self, forKey: .email)
+            do {
+                email = try container.decodeIfPresent(String.self, forKey: .email)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'email' — degrading to nil: \(error)")
+                email = nil
+            }
 
-            emailConfirmed = try container.decodeIfPresent(Bool.self, forKey: .emailConfirmed)
+            do {
+                emailConfirmed = try container.decodeIfPresent(Bool.self, forKey: .emailConfirmed)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'emailConfirmed' — degrading to nil: \(error)")
+                emailConfirmed = nil
+            }
 
-            emailAuthFactor = try container.decodeIfPresent(Bool.self, forKey: .emailAuthFactor)
+            do {
+                emailAuthFactor = try container.decodeIfPresent(Bool.self, forKey: .emailAuthFactor)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'emailAuthFactor' — degrading to nil: \(error)")
+                emailAuthFactor = nil
+            }
 
-            active = try container.decodeIfPresent(Bool.self, forKey: .active)
+            do {
+                active = try container.decodeIfPresent(Bool.self, forKey: .active)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'active' — degrading to nil: \(error)")
+                active = nil
+            }
 
-            status = try container.decodeIfPresent(String.self, forKey: .status)
+            do {
+                status = try container.decodeIfPresent(String.self, forKey: .status)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'status' — degrading to nil: \(error)")
+                status = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

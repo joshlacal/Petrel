@@ -15,7 +15,13 @@ public struct ChatBskyActorDeclaration: ATProtocolCodable, ATProtocolValue {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         allowIncoming = try container.decode(String.self, forKey: .allowIncoming)
-        allowGroupInvites = try container.decodeIfPresent(String.self, forKey: .allowGroupInvites)
+        do {
+            allowGroupInvites = try container.decodeIfPresent(String.self, forKey: .allowGroupInvites)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'allowGroupInvites' — degrading to nil: \(error)")
+            allowGroupInvites = nil
+        }
     }
 
     public func encode(to encoder: Encoder) throws {

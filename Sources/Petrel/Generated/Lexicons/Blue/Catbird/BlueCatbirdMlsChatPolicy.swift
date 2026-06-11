@@ -20,10 +20,34 @@ public struct BlueCatbirdMlsChatPolicy: ATProtocolCodable, ATProtocolValue {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        whoCanMessageMe = try container.decodeIfPresent(String.self, forKey: .whoCanMessageMe)
-        allowFollowersBypass = try container.decodeIfPresent(Bool.self, forKey: .allowFollowersBypass)
-        allowFollowingBypass = try container.decodeIfPresent(Bool.self, forKey: .allowFollowingBypass)
-        autoExpireDays = try container.decodeIfPresent(Int.self, forKey: .autoExpireDays)
+        do {
+            whoCanMessageMe = try container.decodeIfPresent(String.self, forKey: .whoCanMessageMe)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'whoCanMessageMe' — degrading to nil: \(error)")
+            whoCanMessageMe = nil
+        }
+        do {
+            allowFollowersBypass = try container.decodeIfPresent(Bool.self, forKey: .allowFollowersBypass)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'allowFollowersBypass' — degrading to nil: \(error)")
+            allowFollowersBypass = nil
+        }
+        do {
+            allowFollowingBypass = try container.decodeIfPresent(Bool.self, forKey: .allowFollowingBypass)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'allowFollowingBypass' — degrading to nil: \(error)")
+            allowFollowingBypass = nil
+        }
+        do {
+            autoExpireDays = try container.decodeIfPresent(Int.self, forKey: .autoExpireDays)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'autoExpireDays' — degrading to nil: \(error)")
+            autoExpireDays = nil
+        }
         createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
     }
 

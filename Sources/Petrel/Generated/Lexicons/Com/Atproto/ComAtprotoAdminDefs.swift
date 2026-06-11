@@ -28,8 +28,10 @@ public enum ComAtprotoAdminDefs {
             do {
                 ref = try container.decodeIfPresent(String.self, forKey: .ref)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'ref': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'ref' — degrading to nil: \(error)")
+                ref = nil
             }
         }
 
@@ -132,14 +134,18 @@ public enum ComAtprotoAdminDefs {
             do {
                 email = try container.decodeIfPresent(String.self, forKey: .email)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'email': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'email' — degrading to nil: \(error)")
+                email = nil
             }
             do {
                 relatedRecords = try container.decodeIfPresent([ATProtocolValueContainer].self, forKey: .relatedRecords)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'relatedRecords': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'relatedRecords' — degrading to nil: \(error)")
+                relatedRecords = nil
             }
             do {
                 indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
@@ -150,44 +156,58 @@ public enum ComAtprotoAdminDefs {
             do {
                 invitedBy = try container.decodeIfPresent(ComAtprotoServerDefs.InviteCode.self, forKey: .invitedBy)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'invitedBy': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'invitedBy' — degrading to nil: \(error)")
+                invitedBy = nil
             }
             do {
                 invites = try container.decodeIfPresent([ComAtprotoServerDefs.InviteCode].self, forKey: .invites)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'invites': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'invites' — degrading to nil: \(error)")
+                invites = nil
             }
             do {
                 invitesDisabled = try container.decodeIfPresent(Bool.self, forKey: .invitesDisabled)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'invitesDisabled': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'invitesDisabled' — degrading to nil: \(error)")
+                invitesDisabled = nil
             }
             do {
                 emailConfirmedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .emailConfirmedAt)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'emailConfirmedAt': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'emailConfirmedAt' — degrading to nil: \(error)")
+                emailConfirmedAt = nil
             }
             do {
                 inviteNote = try container.decodeIfPresent(String.self, forKey: .inviteNote)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'inviteNote': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'inviteNote' — degrading to nil: \(error)")
+                inviteNote = nil
             }
             do {
                 deactivatedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .deactivatedAt)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'deactivatedAt': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'deactivatedAt' — degrading to nil: \(error)")
+                deactivatedAt = nil
             }
             do {
                 threatSignatures = try container.decodeIfPresent([ThreatSignature].self, forKey: .threatSignatures)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'threatSignatures': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'threatSignatures' — degrading to nil: \(error)")
+                threatSignatures = nil
             }
         }
 
@@ -456,8 +476,10 @@ public enum ComAtprotoAdminDefs {
             do {
                 recordUri = try container.decodeIfPresent(ATProtocolURI.self, forKey: .recordUri)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'recordUri': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'recordUri' — degrading to nil: \(error)")
+                recordUri = nil
             }
         }
 

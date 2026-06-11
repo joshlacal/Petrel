@@ -39,7 +39,13 @@ public enum BlueCatbirdMlsChatGetKeyPackages {
 
             keyPackages = try container.decode([BlueCatbirdMlsChatDefs.KeyPackageRef].self, forKey: .keyPackages)
 
-            missing = try container.decodeIfPresent([DID].self, forKey: .missing)
+            do {
+                missing = try container.decodeIfPresent([DID].self, forKey: .missing)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'missing' — degrading to nil: \(error)")
+                missing = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

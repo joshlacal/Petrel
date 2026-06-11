@@ -31,7 +31,13 @@ public enum PlaceStreamLiveGetLiveUsers {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            streams = try container.decodeIfPresent([PlaceStreamLivestream.LivestreamView].self, forKey: .streams)
+            do {
+                streams = try container.decodeIfPresent([PlaceStreamLivestream.LivestreamView].self, forKey: .streams)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'streams' — degrading to nil: \(error)")
+                streams = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

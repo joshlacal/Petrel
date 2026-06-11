@@ -36,8 +36,10 @@ public enum ComAtprotoLabelDefs {
             do {
                 ver = try container.decodeIfPresent(Int.self, forKey: .ver)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'ver': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'ver' — degrading to nil: \(error)")
+                ver = nil
             }
             do {
                 src = try container.decode(DID.self, forKey: .src)
@@ -54,8 +56,10 @@ public enum ComAtprotoLabelDefs {
             do {
                 cid = try container.decodeIfPresent(CID.self, forKey: .cid)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'cid': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'cid' — degrading to nil: \(error)")
+                cid = nil
             }
             do {
                 val = try container.decode(String.self, forKey: .val)
@@ -66,8 +70,10 @@ public enum ComAtprotoLabelDefs {
             do {
                 neg = try container.decodeIfPresent(Bool.self, forKey: .neg)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'neg': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'neg' — degrading to nil: \(error)")
+                neg = nil
             }
             do {
                 cts = try container.decode(ATProtocolDate.self, forKey: .cts)
@@ -78,14 +84,18 @@ public enum ComAtprotoLabelDefs {
             do {
                 exp = try container.decodeIfPresent(ATProtocolDate.self, forKey: .exp)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'exp': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'exp' — degrading to nil: \(error)")
+                exp = nil
             }
             do {
                 sig = try container.decodeIfPresent(Bytes.self, forKey: .sig)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'sig': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'sig' — degrading to nil: \(error)")
+                sig = nil
             }
         }
 
@@ -374,14 +384,18 @@ public enum ComAtprotoLabelDefs {
             do {
                 defaultSetting = try container.decodeIfPresent(String.self, forKey: .defaultSetting)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'defaultSetting': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'defaultSetting' — degrading to nil: \(error)")
+                defaultSetting = nil
             }
             do {
                 adultOnly = try container.decodeIfPresent(Bool.self, forKey: .adultOnly)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'adultOnly': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'adultOnly' — degrading to nil: \(error)")
+                adultOnly = nil
             }
             do {
                 locales = try container.decode([LabelValueDefinitionStrings].self, forKey: .locales)
@@ -574,15 +588,9 @@ public enum ComAtprotoLabelDefs {
         ///
         public static let exclamationhide = LabelValue(rawValue: "!hide")
         ///
-        public static let exclamationnodashpromote = LabelValue(rawValue: "!no-promote")
-        ///
         public static let exclamationwarn = LabelValue(rawValue: "!warn")
         ///
         public static let exclamationnodashunauthenticated = LabelValue(rawValue: "!no-unauthenticated")
-        ///
-        public static let dmcadashviolation = LabelValue(rawValue: "dmca-violation")
-        ///
-        public static let doxxing = LabelValue(rawValue: "doxxing")
         ///
         public static let porn = LabelValue(rawValue: "porn")
         ///
@@ -590,9 +598,9 @@ public enum ComAtprotoLabelDefs {
         ///
         public static let nudity = LabelValue(rawValue: "nudity")
         ///
-        public static let nsfl = LabelValue(rawValue: "nsfl")
+        public static let graphicdashmedia = LabelValue(rawValue: "graphic-media")
         ///
-        public static let gore = LabelValue(rawValue: "gore")
+        public static let bot = LabelValue(rawValue: "bot")
 
         public init(rawValue: String) {
             self.rawValue = rawValue
@@ -623,16 +631,13 @@ public enum ComAtprotoLabelDefs {
         public static var predefinedValues: [LabelValue] {
             return [
                 .exclamationhide,
-                .exclamationnodashpromote,
                 .exclamationwarn,
                 .exclamationnodashunauthenticated,
-                .dmcadashviolation,
-                .doxxing,
                 .porn,
                 .sexual,
                 .nudity,
-                .nsfl,
-                .gore,
+                .graphicdashmedia,
+                .bot,
             ]
         }
     }

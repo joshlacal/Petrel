@@ -22,9 +22,27 @@ public struct ComGermnetworkDeclaration: ATProtocolCodable, ATProtocolValue {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         version = try container.decode(String.self, forKey: .version)
         currentKey = try container.decode(Bytes.self, forKey: .currentKey)
-        messageMe = try container.decodeIfPresent(MessageMe.self, forKey: .messageMe)
-        keyPackage = try container.decodeIfPresent(Bytes.self, forKey: .keyPackage)
-        continuityProofs = try container.decodeIfPresent([Bytes].self, forKey: .continuityProofs)
+        do {
+            messageMe = try container.decodeIfPresent(MessageMe.self, forKey: .messageMe)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'messageMe' — degrading to nil: \(error)")
+            messageMe = nil
+        }
+        do {
+            keyPackage = try container.decodeIfPresent(Bytes.self, forKey: .keyPackage)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'keyPackage' — degrading to nil: \(error)")
+            keyPackage = nil
+        }
+        do {
+            continuityProofs = try container.decodeIfPresent([Bytes].self, forKey: .continuityProofs)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'continuityProofs' — degrading to nil: \(error)")
+            continuityProofs = nil
+        }
     }
 
     public func encode(to encoder: Encoder) throws {

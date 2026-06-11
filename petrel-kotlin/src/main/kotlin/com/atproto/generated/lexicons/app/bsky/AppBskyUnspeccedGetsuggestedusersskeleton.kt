@@ -25,8 +25,9 @@ object AppBskyUnspeccedGetSuggestedUsersSkeletonDefs {
     @Serializable
     data class AppBskyUnspeccedGetSuggestedUsersSkeletonOutput(
         @SerialName("dids")
-        val dids: List<DID>,// Snowflake for this recommendation, use when submitting recommendation events.        @SerialName("recId")
-        val recId: String? = null    )
+        val dids: List<DID>,// DEPRECATED: use recIdStr instead.        @SerialName("recId")
+        val recId: String? = null,// Snowflake for this recommendation, use when submitting recommendation events.        @SerialName("recIdStr")
+        val recIdStr: String? = null    )
 
 /**
  * Get a skeleton of suggested users. Intended to be called and hydrated by app.bsky.unspecced.getSuggestedUsers

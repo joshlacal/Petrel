@@ -2,7 +2,7 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.draft.defs
 
-public enum AppBskyDraftDefs {
+public struct AppBskyDraftDefs {
     public static let typeIdentifier = "app.bsky.draft.defs"
 
     public struct DraftWithId: ATProtocolCodable, ATProtocolValue {
@@ -102,14 +102,18 @@ public enum AppBskyDraftDefs {
             do {
                 deviceId = try container.decodeIfPresent(String.self, forKey: .deviceId)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'deviceId': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'deviceId' — degrading to nil: \(error)")
+                deviceId = nil
             }
             do {
                 deviceName = try container.decodeIfPresent(String.self, forKey: .deviceName)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'deviceName': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'deviceName' — degrading to nil: \(error)")
+                deviceName = nil
             }
             do {
                 posts = try container.decode([DraftPost].self, forKey: .posts)
@@ -120,20 +124,26 @@ public enum AppBskyDraftDefs {
             do {
                 langs = try container.decodeIfPresent([LanguageCodeContainer].self, forKey: .langs)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'langs': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'langs' — degrading to nil: \(error)")
+                langs = nil
             }
             do {
                 postgateEmbeddingRules = try container.decodeIfPresent([DraftPostgateEmbeddingRulesUnion].self, forKey: .postgateEmbeddingRules)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'postgateEmbeddingRules': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'postgateEmbeddingRules' — degrading to nil: \(error)")
+                postgateEmbeddingRules = nil
             }
             do {
                 threadgateAllow = try container.decodeIfPresent([DraftThreadgateAllowUnion].self, forKey: .threadgateAllow)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'threadgateAllow': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'threadgateAllow' — degrading to nil: \(error)")
+                threadgateAllow = nil
             }
         }
 
@@ -248,16 +258,18 @@ public enum AppBskyDraftDefs {
         public let text: String
         public let labels: DraftPostLabelsUnion?
         public let embedImages: [DraftEmbedImage]?
+        public let embedGallery: DraftEmbedGallery?
         public let embedVideos: [DraftEmbedVideo]?
         public let embedExternals: [DraftEmbedExternal]?
         public let embedRecords: [DraftEmbedRecord]?
 
         public init(
-            text: String, labels: DraftPostLabelsUnion?, embedImages: [DraftEmbedImage]?, embedVideos: [DraftEmbedVideo]?, embedExternals: [DraftEmbedExternal]?, embedRecords: [DraftEmbedRecord]?
+            text: String, labels: DraftPostLabelsUnion?, embedImages: [DraftEmbedImage]?, embedGallery: DraftEmbedGallery?, embedVideos: [DraftEmbedVideo]?, embedExternals: [DraftEmbedExternal]?, embedRecords: [DraftEmbedRecord]?
         ) {
             self.text = text
             self.labels = labels
             self.embedImages = embedImages
+            self.embedGallery = embedGallery
             self.embedVideos = embedVideos
             self.embedExternals = embedExternals
             self.embedRecords = embedRecords
@@ -274,32 +286,50 @@ public enum AppBskyDraftDefs {
             do {
                 labels = try container.decodeIfPresent(DraftPostLabelsUnion.self, forKey: .labels)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'labels': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'labels' — degrading to nil: \(error)")
+                labels = nil
             }
             do {
                 embedImages = try container.decodeIfPresent([DraftEmbedImage].self, forKey: .embedImages)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'embedImages': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'embedImages' — degrading to nil: \(error)")
+                embedImages = nil
+            }
+            do {
+                embedGallery = try container.decodeIfPresent(DraftEmbedGallery.self, forKey: .embedGallery)
+            } catch {
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'embedGallery' — degrading to nil: \(error)")
+                embedGallery = nil
             }
             do {
                 embedVideos = try container.decodeIfPresent([DraftEmbedVideo].self, forKey: .embedVideos)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'embedVideos': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'embedVideos' — degrading to nil: \(error)")
+                embedVideos = nil
             }
             do {
                 embedExternals = try container.decodeIfPresent([DraftEmbedExternal].self, forKey: .embedExternals)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'embedExternals': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'embedExternals' — degrading to nil: \(error)")
+                embedExternals = nil
             }
             do {
                 embedRecords = try container.decodeIfPresent([DraftEmbedRecord].self, forKey: .embedRecords)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'embedRecords': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'embedRecords' — degrading to nil: \(error)")
+                embedRecords = nil
             }
         }
 
@@ -309,6 +339,7 @@ public enum AppBskyDraftDefs {
             try container.encode(text, forKey: .text)
             try container.encodeIfPresent(labels, forKey: .labels)
             try container.encodeIfPresent(embedImages, forKey: .embedImages)
+            try container.encodeIfPresent(embedGallery, forKey: .embedGallery)
             try container.encodeIfPresent(embedVideos, forKey: .embedVideos)
             try container.encodeIfPresent(embedExternals, forKey: .embedExternals)
             try container.encodeIfPresent(embedRecords, forKey: .embedRecords)
@@ -322,6 +353,11 @@ public enum AppBskyDraftDefs {
                 hasher.combine(nil as Int?)
             }
             if let value = embedImages {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = embedGallery {
                 hasher.combine(value)
             } else {
                 hasher.combine(nil as Int?)
@@ -354,6 +390,9 @@ public enum AppBskyDraftDefs {
             if embedImages != other.embedImages {
                 return false
             }
+            if embedGallery != other.embedGallery {
+                return false
+            }
             if embedVideos != other.embedVideos {
                 return false
             }
@@ -383,6 +422,10 @@ public enum AppBskyDraftDefs {
                 let embedImagesValue = try value.toCBORValue()
                 map = map.adding(key: "embedImages", value: embedImagesValue)
             }
+            if let value = embedGallery {
+                let embedGalleryValue = try value.toCBORValue()
+                map = map.adding(key: "embedGallery", value: embedGalleryValue)
+            }
             if let value = embedVideos {
                 let embedVideosValue = try value.toCBORValue()
                 map = map.adding(key: "embedVideos", value: embedVideosValue)
@@ -403,6 +446,7 @@ public enum AppBskyDraftDefs {
             case text
             case labels
             case embedImages
+            case embedGallery
             case embedVideos
             case embedExternals
             case embedRecords
@@ -641,6 +685,62 @@ public enum AppBskyDraftDefs {
         }
     }
 
+    public struct DraftEmbedGallery: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.draft.defs#draftEmbedGallery"
+        public let items: DraftEmbedGalleryItems
+
+        public init(
+            items: DraftEmbedGalleryItems
+        ) {
+            self.items = items
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                items = try container.decode(DraftEmbedGalleryItems.self, forKey: .items)
+            } catch {
+                LogManager.logError("Decoding error for required property 'items': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            try container.encode(items, forKey: .items)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(items)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+            if items != other.items {
+                return false
+            }
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            let itemsValue = try items.toCBORValue()
+            map = map.adding(key: "items", value: itemsValue)
+            return map
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case items
+        }
+    }
+
     public struct DraftEmbedImage: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.draft.defs#draftEmbedImage"
         public let localRef: DraftEmbedLocalRef
@@ -664,8 +764,10 @@ public enum AppBskyDraftDefs {
             do {
                 alt = try container.decodeIfPresent(String.self, forKey: .alt)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'alt': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'alt' — degrading to nil: \(error)")
+                alt = nil
             }
         }
 
@@ -744,14 +846,18 @@ public enum AppBskyDraftDefs {
             do {
                 alt = try container.decodeIfPresent(String.self, forKey: .alt)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'alt': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'alt' — degrading to nil: \(error)")
+                alt = nil
             }
             do {
                 captions = try container.decodeIfPresent([DraftEmbedCaption].self, forKey: .captions)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'captions': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'captions' — degrading to nil: \(error)")
+                captions = nil
             }
         }
 
@@ -1306,6 +1412,149 @@ public enum AppBskyDraftDefs {
             switch self {
             case let .comAtprotoLabelDefsSelfLabels(value):
                 map = map.adding(key: "$type", value: "com.atproto.label.defs#selfLabels")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .unexpected(container):
+                return try container.toCBORValue()
+            }
+        }
+    }
+
+    // Union Array Type
+
+    public struct DraftEmbedGalleryItems: Codable, ATProtocolCodable, ATProtocolValue {
+        public let items: [DraftEmbedGalleryItemsForUnionArray]
+
+        public init(items: [DraftEmbedGalleryItemsForUnionArray]) {
+            self.items = items
+        }
+
+        public init(from decoder: Decoder) throws {
+            var container = try decoder.unkeyedContainer()
+            var items = [DraftEmbedGalleryItemsForUnionArray]()
+            while !container.isAtEnd {
+                let item = try container.decode(DraftEmbedGalleryItemsForUnionArray.self)
+                items.append(item)
+            }
+            self.items = items
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            // Encode the array regardless of whether it's empty
+            var container = encoder.unkeyedContainer()
+            for item in items {
+                try container.encode(item)
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? DraftEmbedGalleryItems else { return false }
+
+            if items != other.items {
+                return false
+            }
+
+            return true
+        }
+
+        /// DAGCBOR encoding with field ordering
+        public func toCBORValue() throws -> Any {
+            // For union arrays, we need to encode each item while preserving its order
+            var itemsArray = [Any]()
+
+            for item in items {
+                let itemValue = try item.toCBORValue()
+                itemsArray.append(itemValue)
+            }
+
+            return itemsArray
+        }
+    }
+
+    public enum DraftEmbedGalleryItemsForUnionArray: Codable, ATProtocolCodable, ATProtocolValue {
+        case draftEmbedImage(DraftEmbedImage)
+        case unexpected(ATProtocolValueContainer)
+        public init(_ value: DraftEmbedImage) {
+            self = .draftEmbedImage(value)
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let typeValue = try container.decode(String.self, forKey: .type)
+
+            switch typeValue {
+            case "app.bsky.draft.defs#draftEmbedImage":
+                let value = try DraftEmbedImage(from: decoder)
+                self = .draftEmbedImage(value)
+            default:
+                let unknownValue = try ATProtocolValueContainer(from: decoder)
+                self = .unexpected(unknownValue)
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            switch self {
+            case let .draftEmbedImage(value):
+                try container.encode("app.bsky.draft.defs#draftEmbedImage", forKey: .type)
+                try value.encode(to: encoder)
+            case let .unexpected(ATProtocolValueContainer):
+                try ATProtocolValueContainer.encode(to: encoder)
+            }
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            switch self {
+            case let .draftEmbedImage(value):
+                hasher.combine("app.bsky.draft.defs#draftEmbedImage")
+                hasher.combine(value)
+            case let .unexpected(ATProtocolValueContainer):
+                hasher.combine("unexpected")
+                hasher.combine(ATProtocolValueContainer)
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let otherValue = other as? DraftEmbedGalleryItemsForUnionArray else { return false }
+
+            switch (self, otherValue) {
+            case let (
+                .draftEmbedImage(selfValue),
+                .draftEmbedImage(otherValue)
+            ):
+                return selfValue == otherValue
+            case let (.unexpected(selfValue), .unexpected(otherValue)):
+                return selfValue.isEqual(to: otherValue)
+            default:
+                return false
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case type = "$type"
+        }
+
+        /// DAGCBOR encoding with field ordering
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+
+            switch self {
+            case let .draftEmbedImage(value):
+                map = map.adding(key: "$type", value: "app.bsky.draft.defs#draftEmbedImage")
 
                 let valueDict = try value.toCBORValue()
 

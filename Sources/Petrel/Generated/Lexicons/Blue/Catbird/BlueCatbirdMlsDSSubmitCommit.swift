@@ -107,7 +107,13 @@ public enum BlueCatbirdMlsDSSubmitCommit {
 
             sequencerTerm = try container.decode(Int.self, forKey: .sequencerTerm)
 
-            receipt = try container.decodeIfPresent(String.self, forKey: .receipt)
+            do {
+                receipt = try container.decodeIfPresent(String.self, forKey: .receipt)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'receipt' — degrading to nil: \(error)")
+                receipt = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

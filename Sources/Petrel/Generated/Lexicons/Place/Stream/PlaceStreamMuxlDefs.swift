@@ -42,26 +42,34 @@ public enum PlaceStreamMuxlDefs {
             do {
                 width = try container.decodeIfPresent(Int.self, forKey: .width)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'width': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'width' — degrading to nil: \(error)")
+                width = nil
             }
             do {
                 height = try container.decodeIfPresent(Int.self, forKey: .height)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'height': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'height' — degrading to nil: \(error)")
+                height = nil
             }
             do {
                 rate = try container.decodeIfPresent(Int.self, forKey: .rate)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'rate': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'rate' — degrading to nil: \(error)")
+                rate = nil
             }
             do {
                 channels = try container.decodeIfPresent(Int.self, forKey: .channels)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'channels': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'channels' — degrading to nil: \(error)")
+                channels = nil
             }
         }
 

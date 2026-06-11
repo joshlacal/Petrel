@@ -198,6 +198,104 @@ object AppBskyDraftDefsDraftPostLabelsUnionSerializer : kotlinx.serialization.KS
     }
 }
 
+@Serializable(with = AppBskyDraftDefsDraftEmbedGalleryItemsDraftEmbedGalleryItemsUnionSerializer::class)
+sealed interface AppBskyDraftDefsDraftEmbedGalleryItemsDraftEmbedGalleryItemsUnion {
+    @Serializable
+    data class DraftEmbedImage(val value: com.atproto.generated.AppBskyDraftDefsDraftEmbedImage) : AppBskyDraftDefsDraftEmbedGalleryItemsDraftEmbedGalleryItemsUnion
+
+    @Serializable
+    data class Unexpected(val value: JsonElement) : AppBskyDraftDefsDraftEmbedGalleryItemsDraftEmbedGalleryItemsUnion
+}
+
+object AppBskyDraftDefsDraftEmbedGalleryItemsDraftEmbedGalleryItemsUnionSerializer : kotlinx.serialization.KSerializer<AppBskyDraftDefsDraftEmbedGalleryItemsDraftEmbedGalleryItemsUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyDraftDefsDraftEmbedGalleryItemsDraftEmbedGalleryItemsUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyDraftDefsDraftEmbedGalleryItemsDraftEmbedGalleryItemsUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is AppBskyDraftDefsDraftEmbedGalleryItemsDraftEmbedGalleryItemsUnion.DraftEmbedImage -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyDraftDefsDraftEmbedImage.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.draft.defs#draftEmbedImage")
+                })
+            }
+            is AppBskyDraftDefsDraftEmbedGalleryItemsDraftEmbedGalleryItemsUnion.Unexpected -> value.value
+            // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
+            // subscription codegen) are runtime-only sentinels; JSON round-trip
+            // serialises them as an empty object tagged with the variant class
+            // name. Consumers should filter these before JSON serialisation.
+            else -> kotlinx.serialization.json.buildJsonObject {
+                put("\$type", kotlinx.serialization.json.JsonPrimitive(value::class.simpleName ?: "Unknown"))
+            }
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyDraftDefsDraftEmbedGalleryItemsDraftEmbedGalleryItemsUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "app.bsky.draft.defs#draftEmbedImage" -> AppBskyDraftDefsDraftEmbedGalleryItemsDraftEmbedGalleryItemsUnion.DraftEmbedImage(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyDraftDefsDraftEmbedImage.serializer(), element)
+            )
+            else -> AppBskyDraftDefsDraftEmbedGalleryItemsDraftEmbedGalleryItemsUnion.Unexpected(element)
+        }
+    }
+}
+
+@Serializable(with = AppBskyDraftDefsDraftEmbedGalleryItemsUnionSerializer::class)
+sealed interface AppBskyDraftDefsDraftEmbedGalleryItemsUnion {
+    @Serializable
+    data class DraftEmbedImage(val value: com.atproto.generated.AppBskyDraftDefsDraftEmbedImage) : AppBskyDraftDefsDraftEmbedGalleryItemsUnion
+
+    @Serializable
+    data class Unexpected(val value: JsonElement) : AppBskyDraftDefsDraftEmbedGalleryItemsUnion
+}
+
+object AppBskyDraftDefsDraftEmbedGalleryItemsUnionSerializer : kotlinx.serialization.KSerializer<AppBskyDraftDefsDraftEmbedGalleryItemsUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyDraftDefsDraftEmbedGalleryItemsUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyDraftDefsDraftEmbedGalleryItemsUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is AppBskyDraftDefsDraftEmbedGalleryItemsUnion.DraftEmbedImage -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyDraftDefsDraftEmbedImage.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.draft.defs#draftEmbedImage")
+                })
+            }
+            is AppBskyDraftDefsDraftEmbedGalleryItemsUnion.Unexpected -> value.value
+            // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
+            // subscription codegen) are runtime-only sentinels; JSON round-trip
+            // serialises them as an empty object tagged with the variant class
+            // name. Consumers should filter these before JSON serialisation.
+            else -> kotlinx.serialization.json.buildJsonObject {
+                put("\$type", kotlinx.serialization.json.JsonPrimitive(value::class.simpleName ?: "Unknown"))
+            }
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyDraftDefsDraftEmbedGalleryItemsUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "app.bsky.draft.defs#draftEmbedImage" -> AppBskyDraftDefsDraftEmbedGalleryItemsUnion.DraftEmbedImage(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyDraftDefsDraftEmbedImage.serializer(), element)
+            )
+            else -> AppBskyDraftDefsDraftEmbedGalleryItemsUnion.Unexpected(element)
+        }
+    }
+}
+
     /**
      * A draft with an identifier, used to store drafts in private storage (stash).
      */
@@ -233,10 +331,11 @@ object AppBskyDraftDefsDraftPostLabelsUnionSerializer : kotlinx.serialization.KS
      */
     @Serializable
     data class AppBskyDraftDefsDraftPost(
-/** The primary post content. */        @SerialName("text")
+/** The primary post content. It has a higher limit than post contents to allow storing a larger text that can later be refined into smaller posts. */        @SerialName("text")
         val text: String,/** Self-label values for this post. Effectively content warnings. */        @SerialName("labels")
         val labels: AppBskyDraftDefsDraftPostLabelsUnion? = null,        @SerialName("embedImages")
-        val embedImages: List<AppBskyDraftDefsDraftEmbedImage>? = null,        @SerialName("embedVideos")
+        val embedImages: List<AppBskyDraftDefsDraftEmbedImage>? = null,        @SerialName("embedGallery")
+        val embedGallery: AppBskyDraftDefsDraftEmbedGallery? = null,        @SerialName("embedVideos")
         val embedVideos: List<AppBskyDraftDefsDraftEmbedVideo>? = null,        @SerialName("embedExternals")
         val embedExternals: List<AppBskyDraftDefsDraftEmbedExternal>? = null,        @SerialName("embedRecords")
         val embedRecords: List<AppBskyDraftDefsDraftEmbedRecord>? = null    ) {
@@ -278,6 +377,20 @@ object AppBskyDraftDefsDraftPostLabelsUnionSerializer : kotlinx.serialization.KS
             const val TYPE_IDENTIFIER = "#appBskyDraftDefsDraftEmbedCaption"
         }
     }
+
+    @Serializable
+    data class AppBskyDraftDefsDraftEmbedGallery(
+        @SerialName("items")
+        val items: AppBskyDraftDefsDraftEmbedGalleryItems    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#appBskyDraftDefsDraftEmbedGallery"
+        }
+    }
+
+    /**
+     * The schema-level maxLength of 20 is a future-proof ceiling. Clients should currently enforce a soft limit of 10 items in authoring UIs.
+     */
+    typealias AppBskyDraftDefsDraftEmbedGalleryItems = List<AppBskyDraftDefsDraftEmbedGalleryItemsDraftEmbedGalleryItemsUnion>
 
     @Serializable
     data class AppBskyDraftDefsDraftEmbedImage(

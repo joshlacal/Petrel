@@ -36,9 +36,21 @@ public enum PlaceStreamBroadcastGetBroadcaster {
 
             broadcaster = try container.decode(DID.self, forKey: .broadcaster)
 
-            server = try container.decodeIfPresent(DID.self, forKey: .server)
+            do {
+                server = try container.decodeIfPresent(DID.self, forKey: .server)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'server' — degrading to nil: \(error)")
+                server = nil
+            }
 
-            admins = try container.decodeIfPresent([DID].self, forKey: .admins)
+            do {
+                admins = try container.decodeIfPresent([DID].self, forKey: .admins)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'admins' — degrading to nil: \(error)")
+                admins = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

@@ -36,7 +36,13 @@ public enum ChatBskyConvoGetConvoAvailability {
 
             canChat = try container.decode(Bool.self, forKey: .canChat)
 
-            convo = try container.decodeIfPresent(ChatBskyConvoDefs.ConvoView.self, forKey: .convo)
+            do {
+                convo = try container.decodeIfPresent(ChatBskyConvoDefs.ConvoView.self, forKey: .convo)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'convo' — degrading to nil: \(error)")
+                convo = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

@@ -236,8 +236,10 @@ public enum BlueCatbirdMlsChatCommitGroupChange {
             do {
                 deviceName = try container.decodeIfPresent(String.self, forKey: .deviceName)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'deviceName': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'deviceName' — degrading to nil: \(error)")
+                deviceName = nil
             }
             do {
                 deviceCredentialDid = try container.decode(String.self, forKey: .deviceCredentialDid)
@@ -254,8 +256,10 @@ public enum BlueCatbirdMlsChatCommitGroupChange {
             do {
                 claimedBy = try container.decodeIfPresent(DID.self, forKey: .claimedBy)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'claimedBy': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'claimedBy' — degrading to nil: \(error)")
+                claimedBy = nil
             }
             do {
                 createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
@@ -550,15 +554,45 @@ public enum BlueCatbirdMlsChatCommitGroupChange {
 
             success = try container.decode(Bool.self, forKey: .success)
 
-            newEpoch = try container.decodeIfPresent(Int.self, forKey: .newEpoch)
+            do {
+                newEpoch = try container.decodeIfPresent(Int.self, forKey: .newEpoch)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'newEpoch' — degrading to nil: \(error)")
+                newEpoch = nil
+            }
 
-            rejoinedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .rejoinedAt)
+            do {
+                rejoinedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .rejoinedAt)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'rejoinedAt' — degrading to nil: \(error)")
+                rejoinedAt = nil
+            }
 
-            pendingAdditions = try container.decodeIfPresent([PendingDeviceAddition].self, forKey: .pendingAdditions)
+            do {
+                pendingAdditions = try container.decodeIfPresent([PendingDeviceAddition].self, forKey: .pendingAdditions)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'pendingAdditions' — degrading to nil: \(error)")
+                pendingAdditions = nil
+            }
 
-            claimedAddition = try container.decodeIfPresent(PendingDeviceAddition.self, forKey: .claimedAddition)
+            do {
+                claimedAddition = try container.decodeIfPresent(PendingDeviceAddition.self, forKey: .claimedAddition)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'claimedAddition' — degrading to nil: \(error)")
+                claimedAddition = nil
+            }
 
-            confirmationTag = try container.decodeIfPresent(Bytes.self, forKey: .confirmationTag)
+            do {
+                confirmationTag = try container.decodeIfPresent(Bytes.self, forKey: .confirmationTag)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'confirmationTag' — degrading to nil: \(error)")
+                confirmationTag = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

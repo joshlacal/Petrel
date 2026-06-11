@@ -44,8 +44,10 @@ public enum PlaceStreamBadgeDefs {
             do {
                 signature = try container.decodeIfPresent(String.self, forKey: .signature)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'signature': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'signature' — degrading to nil: \(error)")
+                signature = nil
             }
         }
 

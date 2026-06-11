@@ -32,20 +32,26 @@ public enum ComAtprotoSyncListHosts {
             do {
                 seq = try container.decodeIfPresent(Int.self, forKey: .seq)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'seq': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'seq' — degrading to nil: \(error)")
+                seq = nil
             }
             do {
                 accountCount = try container.decodeIfPresent(Int.self, forKey: .accountCount)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'accountCount': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'accountCount' — degrading to nil: \(error)")
+                accountCount = nil
             }
             do {
                 status = try container.decodeIfPresent(ComAtprotoSyncDefs.HostStatus.self, forKey: .status)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'status': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'status' — degrading to nil: \(error)")
+                status = nil
             }
         }
 
@@ -160,7 +166,13 @@ public enum ComAtprotoSyncListHosts {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+            do {
+                cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
+                cursor = nil
+            }
 
             hosts = try container.decode([Host].self, forKey: .hosts)
         }

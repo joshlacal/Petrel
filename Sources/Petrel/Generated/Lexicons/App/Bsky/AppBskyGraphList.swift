@@ -26,10 +26,34 @@ public struct AppBskyGraphList: ATProtocolCodable, ATProtocolValue {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         purpose = try container.decode(AppBskyGraphDefs.ListPurpose.self, forKey: .purpose)
         name = try container.decode(String.self, forKey: .name)
-        description = try container.decodeIfPresent(String.self, forKey: .description)
-        descriptionFacets = try container.decodeIfPresent([AppBskyRichtextFacet].self, forKey: .descriptionFacets)
-        avatar = try container.decodeIfPresent(Blob.self, forKey: .avatar)
-        labels = try container.decodeIfPresent(AppBskyGraphListLabelsUnion.self, forKey: .labels)
+        do {
+            description = try container.decodeIfPresent(String.self, forKey: .description)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'description' — degrading to nil: \(error)")
+            description = nil
+        }
+        do {
+            descriptionFacets = try container.decodeIfPresent([AppBskyRichtextFacet].self, forKey: .descriptionFacets)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'descriptionFacets' — degrading to nil: \(error)")
+            descriptionFacets = nil
+        }
+        do {
+            avatar = try container.decodeIfPresent(Blob.self, forKey: .avatar)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'avatar' — degrading to nil: \(error)")
+            avatar = nil
+        }
+        do {
+            labels = try container.decodeIfPresent(AppBskyGraphListLabelsUnion.self, forKey: .labels)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'labels' — degrading to nil: \(error)")
+            labels = nil
+        }
         createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
     }
 

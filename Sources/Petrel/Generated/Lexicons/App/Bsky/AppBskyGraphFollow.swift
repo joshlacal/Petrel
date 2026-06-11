@@ -18,7 +18,13 @@ public struct AppBskyGraphFollow: ATProtocolCodable, ATProtocolValue {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         subject = try container.decode(DID.self, forKey: .subject)
         createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
-        via = try container.decodeIfPresent(ComAtprotoRepoStrongRef.self, forKey: .via)
+        do {
+            via = try container.decodeIfPresent(ComAtprotoRepoStrongRef.self, forKey: .via)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'via' — degrading to nil: \(error)")
+            via = nil
+        }
     }
 
     public func encode(to encoder: Encoder) throws {

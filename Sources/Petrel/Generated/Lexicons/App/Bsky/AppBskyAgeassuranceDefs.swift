@@ -24,8 +24,10 @@ public enum AppBskyAgeassuranceDefs {
             do {
                 lastInitiatedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .lastInitiatedAt)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'lastInitiatedAt': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'lastInitiatedAt' — degrading to nil: \(error)")
+                lastInitiatedAt = nil
             }
             do {
                 status = try container.decode(AppBskyAgeassuranceDefs.Status.self, forKey: .status)
@@ -114,8 +116,10 @@ public enum AppBskyAgeassuranceDefs {
             do {
                 accountCreatedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .accountCreatedAt)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'accountCreatedAt': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'accountCreatedAt' — degrading to nil: \(error)")
+                accountCreatedAt = nil
             }
         }
 
@@ -244,8 +248,10 @@ public enum AppBskyAgeassuranceDefs {
             do {
                 regionCode = try container.decodeIfPresent(String.self, forKey: .regionCode)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'regionCode': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'regionCode' — degrading to nil: \(error)")
+                regionCode = nil
             }
             do {
                 minAccessAge = try container.decode(Int.self, forKey: .minAccessAge)
@@ -880,38 +886,50 @@ public enum AppBskyAgeassuranceDefs {
             do {
                 regionCode = try container.decodeIfPresent(String.self, forKey: .regionCode)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'regionCode': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'regionCode' — degrading to nil: \(error)")
+                regionCode = nil
             }
             do {
                 email = try container.decodeIfPresent(String.self, forKey: .email)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'email': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'email' — degrading to nil: \(error)")
+                email = nil
             }
             do {
                 initIp = try container.decodeIfPresent(String.self, forKey: .initIp)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'initIp': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'initIp' — degrading to nil: \(error)")
+                initIp = nil
             }
             do {
                 initUa = try container.decodeIfPresent(String.self, forKey: .initUa)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'initUa': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'initUa' — degrading to nil: \(error)")
+                initUa = nil
             }
             do {
                 completeIp = try container.decodeIfPresent(String.self, forKey: .completeIp)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'completeIp': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'completeIp' — degrading to nil: \(error)")
+                completeIp = nil
             }
             do {
                 completeUa = try container.decodeIfPresent(String.self, forKey: .completeUa)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'completeUa': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'completeUa' — degrading to nil: \(error)")
+                completeUa = nil
             }
         }
 

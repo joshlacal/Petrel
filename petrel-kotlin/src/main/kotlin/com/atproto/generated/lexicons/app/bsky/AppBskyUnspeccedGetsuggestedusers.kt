@@ -24,8 +24,9 @@ object AppBskyUnspeccedGetSuggestedUsersDefs {
     @Serializable
     data class AppBskyUnspeccedGetSuggestedUsersOutput(
         @SerialName("actors")
-        val actors: List<AppBskyActorDefsProfileView>,// Snowflake for this recommendation, use when submitting recommendation events.        @SerialName("recId")
-        val recId: String? = null    )
+        val actors: List<AppBskyActorDefsProfileView>,// DEPRECATED: use recIdStr instead.        @SerialName("recId")
+        val recId: String? = null,// Snowflake for this recommendation, use when submitting recommendation events.        @SerialName("recIdStr")
+        val recIdStr: String? = null    )
 
 /**
  * Get a list of suggested users

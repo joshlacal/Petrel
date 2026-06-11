@@ -218,8 +218,10 @@ public enum BlueCatbirdMlsChatPublishKeyPackages {
             do {
                 orphanedHashes = try container.decodeIfPresent([String].self, forKey: .orphanedHashes)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'orphanedHashes': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'orphanedHashes' — degrading to nil: \(error)")
+                orphanedHashes = nil
             }
             do {
                 deletedCount = try container.decode(Int.self, forKey: .deletedCount)
@@ -230,8 +232,10 @@ public enum BlueCatbirdMlsChatPublishKeyPackages {
             do {
                 remainingAvailable = try container.decodeIfPresent(Int.self, forKey: .remainingAvailable)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'remainingAvailable': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'remainingAvailable' — degrading to nil: \(error)")
+                remainingAvailable = nil
             }
             do {
                 deviceId = try container.decode(String.self, forKey: .deviceId)
@@ -360,8 +364,10 @@ public enum BlueCatbirdMlsChatPublishKeyPackages {
             do {
                 errors = try container.decodeIfPresent([BatchError].self, forKey: .errors)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'errors': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'errors' — degrading to nil: \(error)")
+                errors = nil
             }
         }
 
@@ -717,11 +723,29 @@ public enum BlueCatbirdMlsChatPublishKeyPackages {
 
             stats = try container.decode(KeyPackageStats.self, forKey: .stats)
 
-            syncResult = try container.decodeIfPresent(SyncResult.self, forKey: .syncResult)
+            do {
+                syncResult = try container.decodeIfPresent(SyncResult.self, forKey: .syncResult)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'syncResult' — degrading to nil: \(error)")
+                syncResult = nil
+            }
 
-            publishResult = try container.decodeIfPresent(PublishResult.self, forKey: .publishResult)
+            do {
+                publishResult = try container.decodeIfPresent(PublishResult.self, forKey: .publishResult)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'publishResult' — degrading to nil: \(error)")
+                publishResult = nil
+            }
 
-            replenishResult = try container.decodeIfPresent(ReplenishResult.self, forKey: .replenishResult)
+            do {
+                replenishResult = try container.decodeIfPresent(ReplenishResult.self, forKey: .replenishResult)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'replenishResult' — degrading to nil: \(error)")
+                replenishResult = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

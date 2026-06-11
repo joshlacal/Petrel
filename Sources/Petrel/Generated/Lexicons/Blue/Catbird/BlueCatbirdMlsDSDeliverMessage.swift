@@ -34,26 +34,34 @@ public enum BlueCatbirdMlsDSDeliverMessage {
             do {
                 msgId = try container.decodeIfPresent(String.self, forKey: .msgId)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'msgId': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'msgId' — degrading to nil: \(error)")
+                msgId = nil
             }
             do {
                 convoId = try container.decodeIfPresent(String.self, forKey: .convoId)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'convoId': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'convoId' — degrading to nil: \(error)")
+                convoId = nil
             }
             do {
                 epoch = try container.decodeIfPresent(Int.self, forKey: .epoch)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'epoch': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'epoch' — degrading to nil: \(error)")
+                epoch = nil
             }
             do {
                 term = try container.decodeIfPresent(Int.self, forKey: .term)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'term': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'term' — degrading to nil: \(error)")
+                term = nil
             }
         }
 
@@ -275,7 +283,13 @@ public enum BlueCatbirdMlsDSDeliverMessage {
 
             deliveryId = try container.decode(String.self, forKey: .deliveryId)
 
-            ack = try container.decodeIfPresent(DeliveryAck.self, forKey: .ack)
+            do {
+                ack = try container.decodeIfPresent(DeliveryAck.self, forKey: .ack)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'ack' — degrading to nil: \(error)")
+                ack = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

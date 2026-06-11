@@ -57,11 +57,29 @@ public enum BlueCatbirdMlsChatGetConvos {
 
             conversations = try container.decode([BlueCatbirdMlsChatDefs.ConvoView].self, forKey: .conversations)
 
-            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+            do {
+                cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
+                cursor = nil
+            }
 
-            pendingCount = try container.decodeIfPresent(Int.self, forKey: .pendingCount)
+            do {
+                pendingCount = try container.decodeIfPresent(Int.self, forKey: .pendingCount)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'pendingCount' — degrading to nil: \(error)")
+                pendingCount = nil
+            }
 
-            requestCount = try container.decodeIfPresent(Int.self, forKey: .requestCount)
+            do {
+                requestCount = try container.decodeIfPresent(Int.self, forKey: .requestCount)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'requestCount' — degrading to nil: \(error)")
+                requestCount = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

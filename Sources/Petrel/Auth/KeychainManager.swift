@@ -160,6 +160,15 @@ enum KeychainManager {
 
     private static let defaultAccessGroupState = Mutex<String?>(nil)
 
+    /// Configures the keychain accessibility level applied to new writes on Apple
+    /// platforms (no-op elsewhere). Existing items keep their previous attribute
+    /// until rewritten.
+    static func configureAccessibility(_ accessibility: KeychainAccessibility) {
+        #if os(iOS) || os(macOS)
+            AppleKeychainStore.configureAccessibility(accessibility)
+        #endif
+    }
+
     static func configureDefaultAccessGroup(_ accessGroup: String?) {
         let didChange = defaultAccessGroupState.withLock { currentAccessGroup in
             guard currentAccessGroup != accessGroup else { return false }

@@ -16,9 +16,27 @@ public struct PlaceStreamMetadataConfiguration: ATProtocolCodable, ATProtocolVal
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        contentWarnings = try container.decodeIfPresent(PlaceStreamMetadataContentWarnings.self, forKey: .contentWarnings)
-        contentRights = try container.decodeIfPresent(PlaceStreamMetadataContentRights.self, forKey: .contentRights)
-        distributionPolicy = try container.decodeIfPresent(PlaceStreamMetadataDistributionPolicy.self, forKey: .distributionPolicy)
+        do {
+            contentWarnings = try container.decodeIfPresent(PlaceStreamMetadataContentWarnings.self, forKey: .contentWarnings)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'contentWarnings' — degrading to nil: \(error)")
+            contentWarnings = nil
+        }
+        do {
+            contentRights = try container.decodeIfPresent(PlaceStreamMetadataContentRights.self, forKey: .contentRights)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'contentRights' — degrading to nil: \(error)")
+            contentRights = nil
+        }
+        do {
+            distributionPolicy = try container.decodeIfPresent(PlaceStreamMetadataDistributionPolicy.self, forKey: .distributionPolicy)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'distributionPolicy' — degrading to nil: \(error)")
+            distributionPolicy = nil
+        }
     }
 
     public func encode(to encoder: Encoder) throws {

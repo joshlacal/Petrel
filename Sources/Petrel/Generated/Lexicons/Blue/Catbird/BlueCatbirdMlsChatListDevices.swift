@@ -46,8 +46,10 @@ public enum BlueCatbirdMlsChatListDevices {
             do {
                 deviceUUID = try container.decodeIfPresent(String.self, forKey: .deviceUUID)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'deviceUUID': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'deviceUUID' — degrading to nil: \(error)")
+                deviceUUID = nil
             }
             do {
                 credentialDid = try container.decode(String.self, forKey: .credentialDid)
@@ -76,8 +78,10 @@ public enum BlueCatbirdMlsChatListDevices {
             do {
                 pushTokenRegistered = try container.decodeIfPresent(Bool.self, forKey: .pushTokenRegistered)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'pushTokenRegistered': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'pushTokenRegistered' — degrading to nil: \(error)")
+                pushTokenRegistered = nil
             }
         }
 

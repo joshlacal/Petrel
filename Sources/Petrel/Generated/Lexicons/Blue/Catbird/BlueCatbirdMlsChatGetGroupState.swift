@@ -55,13 +55,37 @@ public enum BlueCatbirdMlsChatGetGroupState {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            groupInfo = try container.decodeIfPresent(Bytes.self, forKey: .groupInfo)
+            do {
+                groupInfo = try container.decodeIfPresent(Bytes.self, forKey: .groupInfo)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'groupInfo' — degrading to nil: \(error)")
+                groupInfo = nil
+            }
 
-            epoch = try container.decodeIfPresent(Int.self, forKey: .epoch)
+            do {
+                epoch = try container.decodeIfPresent(Int.self, forKey: .epoch)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'epoch' — degrading to nil: \(error)")
+                epoch = nil
+            }
 
-            welcome = try container.decodeIfPresent(Bytes.self, forKey: .welcome)
+            do {
+                welcome = try container.decodeIfPresent(Bytes.self, forKey: .welcome)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'welcome' — degrading to nil: \(error)")
+                welcome = nil
+            }
 
-            expiresAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .expiresAt)
+            do {
+                expiresAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .expiresAt)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'expiresAt' — degrading to nil: \(error)")
+                expiresAt = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

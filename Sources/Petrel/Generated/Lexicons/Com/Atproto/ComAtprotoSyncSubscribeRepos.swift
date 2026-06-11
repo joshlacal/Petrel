@@ -102,8 +102,10 @@ public enum ComAtprotoSyncSubscribeRepos {
             do {
                 prevData = try container.decodeIfPresent(CID.self, forKey: .prevData)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'prevData': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'prevData' — degrading to nil: \(error)")
+                prevData = nil
             }
             do {
                 time = try container.decode(ATProtocolDate.self, forKey: .time)
@@ -402,8 +404,10 @@ public enum ComAtprotoSyncSubscribeRepos {
             do {
                 handle = try container.decodeIfPresent(Handle.self, forKey: .handle)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'handle': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'handle' — degrading to nil: \(error)")
+                handle = nil
             }
         }
 
@@ -520,8 +524,10 @@ public enum ComAtprotoSyncSubscribeRepos {
             do {
                 status = try container.decodeIfPresent(String.self, forKey: .status)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'status': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'status' — degrading to nil: \(error)")
+                status = nil
             }
         }
 
@@ -622,8 +628,10 @@ public enum ComAtprotoSyncSubscribeRepos {
             do {
                 message = try container.decodeIfPresent(String.self, forKey: .message)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'message': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'message' — degrading to nil: \(error)")
+                message = nil
             }
         }
 
@@ -716,8 +724,10 @@ public enum ComAtprotoSyncSubscribeRepos {
             do {
                 prev = try container.decodeIfPresent(CID.self, forKey: .prev)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'prev': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'prev' — degrading to nil: \(error)")
+                prev = nil
             }
         }
 

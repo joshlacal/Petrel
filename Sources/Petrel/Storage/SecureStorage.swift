@@ -12,6 +12,23 @@
 #endif
 import Foundation
 
+/// Keychain accessibility levels for items Petrel stores (tokens, session data,
+/// DPoP keys). Trade-off: device-only levels never leave the device (no iCloud
+/// keychain sync, not restored to a new device), which is correct for
+/// DPoP-bound sessions — the DPoP private key is device-bound regardless, so a
+/// synced token would be unusable on another device anyway. Ignored on non-Apple
+/// platforms.
+public enum KeychainAccessibility: Sendable {
+    /// Available after the first unlock following boot; never leaves this device. Default.
+    case afterFirstUnlockThisDeviceOnly
+    /// Available after the first unlock; included in encrypted backups and
+    /// restorable to other devices. Use only if you migrate sessions yourself.
+    case afterFirstUnlock
+    /// Available only while the device is unlocked; never leaves this device.
+    /// Strictest — background token refresh fails while the device is locked.
+    case whenUnlockedThisDeviceOnly
+}
+
 /// Protocol for secure storage backends across different platforms
 protocol SecureStorage: Sendable {
     /// Store data securely

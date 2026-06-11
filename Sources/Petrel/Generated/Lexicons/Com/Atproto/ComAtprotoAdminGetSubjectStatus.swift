@@ -48,9 +48,21 @@ public enum ComAtprotoAdminGetSubjectStatus {
 
             subject = try container.decode(OutputSubjectUnion.self, forKey: .subject)
 
-            takedown = try container.decodeIfPresent(ComAtprotoAdminDefs.StatusAttr.self, forKey: .takedown)
+            do {
+                takedown = try container.decodeIfPresent(ComAtprotoAdminDefs.StatusAttr.self, forKey: .takedown)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'takedown' — degrading to nil: \(error)")
+                takedown = nil
+            }
 
-            deactivated = try container.decodeIfPresent(ComAtprotoAdminDefs.StatusAttr.self, forKey: .deactivated)
+            do {
+                deactivated = try container.decodeIfPresent(ComAtprotoAdminDefs.StatusAttr.self, forKey: .deactivated)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'deactivated' — degrading to nil: \(error)")
+                deactivated = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

@@ -115,6 +115,9 @@ public actor ATProtoClient {
     /// The authentication mode.
     public let authMode: AuthMode
 
+    /// Default service entrypoint used when no base URL is provided.
+    public static let defaultBaseURL = URL(staticString: "https://bsky.social")
+
     // MARK: - Unauthenticated Initialization
 
     /// Creates a lightweight unauthenticated client for public XRPC calls.
@@ -158,7 +161,7 @@ public actor ATProtoClient {
     ///   - bskyAppViewDID: Optional custom Bluesky AppView service DID (default: did:web:api.bsky.app#bsky_appview).
     ///   - bskyChatDID: Optional custom Bluesky Chat service DID (default: did:web:api.bsky.chat#bsky_chat).
     public init(
-        baseURL: URL = URL(string: "https://bsky.social")!,
+        baseURL: URL = ATProtoClient.defaultBaseURL,
         oauthConfig: OAuthConfig,
         namespace: String,
         authMode: AuthMode = .publicOAuth,
@@ -410,7 +413,7 @@ public actor ATProtoClient {
     /// Starts the OAuth flow for account creation
     /// - Parameter pdsURL: The PDS URL to use (defaults to bsky.social)
     /// - Returns: The authorization URL to present to the user
-    public func startSignUpFlow(pdsURL: URL = URL(string: "https://bsky.social")!) async throws -> URL {
+    public func startSignUpFlow(pdsURL: URL = ATProtoClient.defaultBaseURL) async throws -> URL {
         guard let authManager else {
             throw APIError.unauthenticatedClient("Cannot start sign-up flow on an unauthenticated client")
         }
@@ -750,34 +753,12 @@ public actor ATProtoClient {
                 self.networkService = networkService
             }
 
-            public lazy var authmanagelabelerservice: AuthManageLabelerService = .init(networkService: self.networkService)
+            public lazy var authCreatePosts: AuthCreatePosts = .init(networkService: self.networkService)
 
-            public final class AuthManageLabelerService: @unchecked Sendable {
-                let networkService: NetworkService
-                init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
+            @available(*, deprecated, renamed: "authCreatePosts")
+            public var authcreateposts: AuthCreatePosts {
+                authCreatePosts
             }
-
-            public lazy var authmanagenotifications: AuthManageNotifications = .init(networkService: self.networkService)
-
-            public final class AuthManageNotifications: @unchecked Sendable {
-                let networkService: NetworkService
-                init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
-            public lazy var authdeletecontent: AuthDeleteContent = .init(networkService: self.networkService)
-
-            public final class AuthDeleteContent: @unchecked Sendable {
-                let networkService: NetworkService
-                init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
-            public lazy var authcreateposts: AuthCreatePosts = .init(networkService: self.networkService)
 
             public final class AuthCreatePosts: @unchecked Sendable {
                 let networkService: NetworkService
@@ -786,7 +767,26 @@ public actor ATProtoClient {
                 }
             }
 
-            public lazy var authfullapp: AuthFullApp = .init(networkService: self.networkService)
+            public lazy var authDeleteContent: AuthDeleteContent = .init(networkService: self.networkService)
+
+            @available(*, deprecated, renamed: "authDeleteContent")
+            public var authdeletecontent: AuthDeleteContent {
+                authDeleteContent
+            }
+
+            public final class AuthDeleteContent: @unchecked Sendable {
+                let networkService: NetworkService
+                init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+
+            public lazy var authFullApp: AuthFullApp = .init(networkService: self.networkService)
+
+            @available(*, deprecated, renamed: "authFullApp")
+            public var authfullapp: AuthFullApp {
+                authFullApp
+            }
 
             public final class AuthFullApp: @unchecked Sendable {
                 let networkService: NetworkService
@@ -795,25 +795,12 @@ public actor ATProtoClient {
                 }
             }
 
-            public lazy var authmanagemoderation: AuthManageModeration = .init(networkService: self.networkService)
+            public lazy var authManageFeedDeclarations: AuthManageFeedDeclarations = .init(networkService: self.networkService)
 
-            public final class AuthManageModeration: @unchecked Sendable {
-                let networkService: NetworkService
-                init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
+            @available(*, deprecated, renamed: "authManageFeedDeclarations")
+            public var authmanagefeeddeclarations: AuthManageFeedDeclarations {
+                authManageFeedDeclarations
             }
-
-            public lazy var authviewall: AuthViewAll = .init(networkService: self.networkService)
-
-            public final class AuthViewAll: @unchecked Sendable {
-                let networkService: NetworkService
-                init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
-            public lazy var authmanagefeeddeclarations: AuthManageFeedDeclarations = .init(networkService: self.networkService)
 
             public final class AuthManageFeedDeclarations: @unchecked Sendable {
                 let networkService: NetworkService
@@ -822,7 +809,54 @@ public actor ATProtoClient {
                 }
             }
 
-            public lazy var authmanageprofile: AuthManageProfile = .init(networkService: self.networkService)
+            public lazy var authManageLabelerService: AuthManageLabelerService = .init(networkService: self.networkService)
+
+            @available(*, deprecated, renamed: "authManageLabelerService")
+            public var authmanagelabelerservice: AuthManageLabelerService {
+                authManageLabelerService
+            }
+
+            public final class AuthManageLabelerService: @unchecked Sendable {
+                let networkService: NetworkService
+                init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+
+            public lazy var authManageModeration: AuthManageModeration = .init(networkService: self.networkService)
+
+            @available(*, deprecated, renamed: "authManageModeration")
+            public var authmanagemoderation: AuthManageModeration {
+                authManageModeration
+            }
+
+            public final class AuthManageModeration: @unchecked Sendable {
+                let networkService: NetworkService
+                init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+
+            public lazy var authManageNotifications: AuthManageNotifications = .init(networkService: self.networkService)
+
+            @available(*, deprecated, renamed: "authManageNotifications")
+            public var authmanagenotifications: AuthManageNotifications {
+                authManageNotifications
+            }
+
+            public final class AuthManageNotifications: @unchecked Sendable {
+                let networkService: NetworkService
+                init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+
+            public lazy var authManageProfile: AuthManageProfile = .init(networkService: self.networkService)
+
+            @available(*, deprecated, renamed: "authManageProfile")
+            public var authmanageprofile: AuthManageProfile {
+                authManageProfile
+            }
 
             public final class AuthManageProfile: @unchecked Sendable {
                 let networkService: NetworkService
@@ -831,99 +865,14 @@ public actor ATProtoClient {
                 }
             }
 
-            public lazy var draft: Draft = .init(networkService: self.networkService)
+            public lazy var authViewAll: AuthViewAll = .init(networkService: self.networkService)
 
-            public final class Draft: @unchecked Sendable {
-                let networkService: NetworkService
-                init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
+            @available(*, deprecated, renamed: "authViewAll")
+            public var authviewall: AuthViewAll {
+                authViewAll
             }
 
-            public lazy var video: Video = .init(networkService: self.networkService)
-
-            public final class Video: @unchecked Sendable {
-                let networkService: NetworkService
-                init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
-            public lazy var contact: Contact = .init(networkService: self.networkService)
-
-            public final class Contact: @unchecked Sendable {
-                let networkService: NetworkService
-                init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
-            public lazy var bookmark: Bookmark = .init(networkService: self.networkService)
-
-            public final class Bookmark: @unchecked Sendable {
-                let networkService: NetworkService
-                init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
-            public lazy var embed: Embed = .init(networkService: self.networkService)
-
-            public final class Embed: @unchecked Sendable {
-                let networkService: NetworkService
-                init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
-            public lazy var notification: Notification = .init(networkService: self.networkService)
-
-            public final class Notification: @unchecked Sendable {
-                let networkService: NetworkService
-                init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
-            public lazy var unspecced: Unspecced = .init(networkService: self.networkService)
-
-            public final class Unspecced: @unchecked Sendable {
-                let networkService: NetworkService
-                init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
-            public lazy var graph: Graph = .init(networkService: self.networkService)
-
-            public final class Graph: @unchecked Sendable {
-                let networkService: NetworkService
-                init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
-            public lazy var feed: Feed = .init(networkService: self.networkService)
-
-            public final class Feed: @unchecked Sendable {
-                let networkService: NetworkService
-                init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
-            public lazy var richtext: Richtext = .init(networkService: self.networkService)
-
-            public final class Richtext: @unchecked Sendable {
-                let networkService: NetworkService
-                init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
-            public lazy var ageassurance: Ageassurance = .init(networkService: self.networkService)
-
-            public final class Ageassurance: @unchecked Sendable {
+            public final class AuthViewAll: @unchecked Sendable {
                 let networkService: NetworkService
                 init(networkService: NetworkService) {
                     self.networkService = networkService
@@ -939,9 +888,163 @@ public actor ATProtoClient {
                 }
             }
 
+            public lazy var ageassurance: Ageassurance = .init(networkService: self.networkService)
+
+            public final class Ageassurance: @unchecked Sendable {
+                let networkService: NetworkService
+                init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+
+            public lazy var bookmark: Bookmark = .init(networkService: self.networkService)
+
+            public final class Bookmark: @unchecked Sendable {
+                let networkService: NetworkService
+                init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+
+            public lazy var contact: Contact = .init(networkService: self.networkService)
+
+            public final class Contact: @unchecked Sendable {
+                let networkService: NetworkService
+                init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+
+            public lazy var draft: Draft = .init(networkService: self.networkService)
+
+            public final class Draft: @unchecked Sendable {
+                let networkService: NetworkService
+                init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+
+            public lazy var embed: Embed = .init(networkService: self.networkService)
+
+            public final class Embed: @unchecked Sendable {
+                let networkService: NetworkService
+                init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+
+            public lazy var feed: Feed = .init(networkService: self.networkService)
+
+            public final class Feed: @unchecked Sendable {
+                let networkService: NetworkService
+                init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+
+            public lazy var graph: Graph = .init(networkService: self.networkService)
+
+            public final class Graph: @unchecked Sendable {
+                let networkService: NetworkService
+                init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+
             public lazy var labeler: Labeler = .init(networkService: self.networkService)
 
             public final class Labeler: @unchecked Sendable {
+                let networkService: NetworkService
+                init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+
+            public lazy var notification: Notification = .init(networkService: self.networkService)
+
+            public final class Notification: @unchecked Sendable {
+                let networkService: NetworkService
+                init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+
+            public lazy var richtext: Richtext = .init(networkService: self.networkService)
+
+            public final class Richtext: @unchecked Sendable {
+                let networkService: NetworkService
+                init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+
+            public lazy var unspecced: Unspecced = .init(networkService: self.networkService)
+
+            public final class Unspecced: @unchecked Sendable {
+                let networkService: NetworkService
+                init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+
+            public lazy var video: Video = .init(networkService: self.networkService)
+
+            public final class Video: @unchecked Sendable {
+                let networkService: NetworkService
+                init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+        }
+    }
+
+    public lazy var blue: Blue = .init(networkService: self.networkService)
+
+    public final class Blue: @unchecked Sendable {
+        let networkService: NetworkService
+        init(networkService: NetworkService) {
+            self.networkService = networkService
+        }
+
+        public lazy var catbird: Catbird = .init(networkService: self.networkService)
+
+        public final class Catbird: @unchecked Sendable {
+            let networkService: NetworkService
+            init(networkService: NetworkService) {
+                self.networkService = networkService
+            }
+
+            public lazy var bskychat: Bskychat = .init(networkService: self.networkService)
+
+            public final class Bskychat: @unchecked Sendable {
+                let networkService: NetworkService
+                init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+
+            public lazy var mlsChat: MlsChat = .init(networkService: self.networkService)
+
+            @available(*, deprecated, renamed: "mlsChat")
+            public var mlschat: MlsChat {
+                mlsChat
+            }
+
+            public final class MlsChat: @unchecked Sendable {
+                let networkService: NetworkService
+                init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+
+            public lazy var mlsDS: MlsDS = .init(networkService: self.networkService)
+
+            @available(*, deprecated, renamed: "mlsDS")
+            public var mlsds: MlsDS {
+                mlsDS
+            }
+
+            public final class MlsDS: @unchecked Sendable {
                 let networkService: NetworkService
                 init(networkService: NetworkService) {
                     self.networkService = networkService
@@ -966,9 +1069,23 @@ public actor ATProtoClient {
                 self.networkService = networkService
             }
 
-            public lazy var authfullchatclient: AuthFullChatClient = .init(networkService: self.networkService)
+            public lazy var authFullChatClient: AuthFullChatClient = .init(networkService: self.networkService)
+
+            @available(*, deprecated, renamed: "authFullChatClient")
+            public var authfullchatclient: AuthFullChatClient {
+                authFullChatClient
+            }
 
             public final class AuthFullChatClient: @unchecked Sendable {
+                let networkService: NetworkService
+                init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+
+            public lazy var actor: Actor = .init(networkService: self.networkService)
+
+            public final class Actor: @unchecked Sendable {
                 let networkService: NetworkService
                 init(networkService: NetworkService) {
                     self.networkService = networkService
@@ -1002,9 +1119,63 @@ public actor ATProtoClient {
                 }
             }
 
-            public lazy var actor: Actor = .init(networkService: self.networkService)
+            public lazy var moderation: Moderation = .init(networkService: self.networkService)
 
-            public final class Actor: @unchecked Sendable {
+            public final class Moderation: @unchecked Sendable {
+                let networkService: NetworkService
+                init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+        }
+    }
+
+    public lazy var com: Com = .init(networkService: self.networkService)
+
+    public final class Com: @unchecked Sendable {
+        let networkService: NetworkService
+        init(networkService: NetworkService) {
+            self.networkService = networkService
+        }
+
+        public lazy var atproto: Atproto = .init(networkService: self.networkService)
+
+        public final class Atproto: @unchecked Sendable {
+            let networkService: NetworkService
+            init(networkService: NetworkService) {
+                self.networkService = networkService
+            }
+
+            public lazy var admin: Admin = .init(networkService: self.networkService)
+
+            public final class Admin: @unchecked Sendable {
+                let networkService: NetworkService
+                init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+
+            public lazy var identity: Identity = .init(networkService: self.networkService)
+
+            public final class Identity: @unchecked Sendable {
+                let networkService: NetworkService
+                init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+
+            public lazy var label: Label = .init(networkService: self.networkService)
+
+            public final class Label: @unchecked Sendable {
+                let networkService: NetworkService
+                init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+
+            public lazy var lexicon: Lexicon = .init(networkService: self.networkService)
+
+            public final class Lexicon: @unchecked Sendable {
                 let networkService: NetworkService
                 init(networkService: NetworkService) {
                     self.networkService = networkService
@@ -1019,46 +1190,55 @@ public actor ATProtoClient {
                     self.networkService = networkService
                 }
             }
+
+            public lazy var repo: Repo = .init(networkService: self.networkService)
+
+            public final class Repo: @unchecked Sendable {
+                let networkService: NetworkService
+                init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+
+            public lazy var server: Server = .init(networkService: self.networkService)
+
+            public final class Server: @unchecked Sendable {
+                let networkService: NetworkService
+                init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+
+            public lazy var sync: Sync = .init(networkService: self.networkService)
+
+            public final class Sync: @unchecked Sendable {
+                let networkService: NetworkService
+                init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+
+            public lazy var temp: Temp = .init(networkService: self.networkService)
+
+            public final class Temp: @unchecked Sendable {
+                let networkService: NetworkService
+                init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
         }
-    }
 
-    public lazy var blue: Blue = .init(networkService: self.networkService)
+        public lazy var germnetwork: Germnetwork = .init(networkService: self.networkService)
 
-    public final class Blue: @unchecked Sendable {
-        let networkService: NetworkService
-        init(networkService: NetworkService) {
-            self.networkService = networkService
-        }
-
-        public lazy var catbird: Catbird = .init(networkService: self.networkService)
-
-        public final class Catbird: @unchecked Sendable {
+        public final class Germnetwork: @unchecked Sendable {
             let networkService: NetworkService
             init(networkService: NetworkService) {
                 self.networkService = networkService
             }
 
-            public lazy var mlschat: MlsChat = .init(networkService: self.networkService)
+            public lazy var declaration: Declaration = .init(networkService: self.networkService)
 
-            public final class MlsChat: @unchecked Sendable {
-                let networkService: NetworkService
-                init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
-            public lazy var bskychat: Bskychat = .init(networkService: self.networkService)
-
-            public final class Bskychat: @unchecked Sendable {
-                let networkService: NetworkService
-                init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
-            public lazy var mlsds: MlsDS = .init(networkService: self.networkService)
-
-            public final class MlsDS: @unchecked Sendable {
+            public final class Declaration: @unchecked Sendable {
                 let networkService: NetworkService
                 init(networkService: NetworkService) {
                     self.networkService = networkService
@@ -1092,15 +1272,6 @@ public actor ATProtoClient {
                 }
             }
 
-            public lazy var livestream: Livestream = .init(networkService: self.networkService)
-
-            public final class Livestream: @unchecked Sendable {
-                let networkService: NetworkService
-                init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
             public lazy var key: Key = .init(networkService: self.networkService)
 
             public final class Key: @unchecked Sendable {
@@ -1110,9 +1281,9 @@ public actor ATProtoClient {
                 }
             }
 
-            public lazy var video: Video = .init(networkService: self.networkService)
+            public lazy var livestream: Livestream = .init(networkService: self.networkService)
 
-            public final class Video: @unchecked Sendable {
+            public final class Livestream: @unchecked Sendable {
                 let networkService: NetworkService
                 init(networkService: NetworkService) {
                     self.networkService = networkService
@@ -1128,9 +1299,36 @@ public actor ATProtoClient {
                 }
             }
 
+            public lazy var video: Video = .init(networkService: self.networkService)
+
+            public final class Video: @unchecked Sendable {
+                let networkService: NetworkService
+                init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+
+            public lazy var badge: Badge = .init(networkService: self.networkService)
+
+            public final class Badge: @unchecked Sendable {
+                let networkService: NetworkService
+                init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+
             public lazy var branding: Branding = .init(networkService: self.networkService)
 
             public final class Branding: @unchecked Sendable {
+                let networkService: NetworkService
+                init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+
+            public lazy var broadcast: Broadcast = .init(networkService: self.networkService)
+
+            public final class Broadcast: @unchecked Sendable {
                 let networkService: NetworkService
                 init(networkService: NetworkService) {
                     self.networkService = networkService
@@ -1155,9 +1353,9 @@ public actor ATProtoClient {
                 }
             }
 
-            public lazy var multistream: Multistream = .init(networkService: self.networkService)
+            public lazy var graph: Graph = .init(networkService: self.networkService)
 
-            public final class Multistream: @unchecked Sendable {
+            public final class Graph: @unchecked Sendable {
                 let networkService: NetworkService
                 init(networkService: NetworkService) {
                     self.networkService = networkService
@@ -1173,54 +1371,9 @@ public actor ATProtoClient {
                 }
             }
 
-            public lazy var graph: Graph = .init(networkService: self.networkService)
-
-            public final class Graph: @unchecked Sendable {
-                let networkService: NetworkService
-                init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
-            public lazy var server: Server = .init(networkService: self.networkService)
-
-            public final class Server: @unchecked Sendable {
-                let networkService: NetworkService
-                init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
-            public lazy var playback: Playback = .init(networkService: self.networkService)
-
-            public final class Playback: @unchecked Sendable {
-                let networkService: NetworkService
-                init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
             public lazy var live: Live = .init(networkService: self.networkService)
 
             public final class Live: @unchecked Sendable {
-                let networkService: NetworkService
-                init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
-            public lazy var richtext: Richtext = .init(networkService: self.networkService)
-
-            public final class Richtext: @unchecked Sendable {
-                let networkService: NetworkService
-                init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
-            public lazy var muxl: Muxl = .init(networkService: self.networkService)
-
-            public final class Muxl: @unchecked Sendable {
                 let networkService: NetworkService
                 init(networkService: NetworkService) {
                     self.networkService = networkService
@@ -1236,24 +1389,6 @@ public actor ATProtoClient {
                 }
             }
 
-            public lazy var broadcast: Broadcast = .init(networkService: self.networkService)
-
-            public final class Broadcast: @unchecked Sendable {
-                let networkService: NetworkService
-                init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
-            public lazy var badge: Badge = .init(networkService: self.networkService)
-
-            public final class Badge: @unchecked Sendable {
-                let networkService: NetworkService
-                init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
             public lazy var moderation: Moderation = .init(networkService: self.networkService)
 
             public final class Moderation: @unchecked Sendable {
@@ -1262,73 +1397,37 @@ public actor ATProtoClient {
                     self.networkService = networkService
                 }
             }
-        }
-    }
 
-    public lazy var com: Com = .init(networkService: self.networkService)
+            public lazy var multistream: Multistream = .init(networkService: self.networkService)
 
-    public final class Com: @unchecked Sendable {
-        let networkService: NetworkService
-        init(networkService: NetworkService) {
-            self.networkService = networkService
-        }
-
-        public lazy var germnetwork: Germnetwork = .init(networkService: self.networkService)
-
-        public final class Germnetwork: @unchecked Sendable {
-            let networkService: NetworkService
-            init(networkService: NetworkService) {
-                self.networkService = networkService
-            }
-
-            public lazy var declaration: Declaration = .init(networkService: self.networkService)
-
-            public final class Declaration: @unchecked Sendable {
-                let networkService: NetworkService
-                init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-        }
-
-        public lazy var atproto: Atproto = .init(networkService: self.networkService)
-
-        public final class Atproto: @unchecked Sendable {
-            let networkService: NetworkService
-            init(networkService: NetworkService) {
-                self.networkService = networkService
-            }
-
-            public lazy var temp: Temp = .init(networkService: self.networkService)
-
-            public final class Temp: @unchecked Sendable {
+            public final class Multistream: @unchecked Sendable {
                 let networkService: NetworkService
                 init(networkService: NetworkService) {
                     self.networkService = networkService
                 }
             }
 
-            public lazy var identity: Identity = .init(networkService: self.networkService)
+            public lazy var muxl: Muxl = .init(networkService: self.networkService)
 
-            public final class Identity: @unchecked Sendable {
+            public final class Muxl: @unchecked Sendable {
                 let networkService: NetworkService
                 init(networkService: NetworkService) {
                     self.networkService = networkService
                 }
             }
 
-            public lazy var admin: Admin = .init(networkService: self.networkService)
+            public lazy var playback: Playback = .init(networkService: self.networkService)
 
-            public final class Admin: @unchecked Sendable {
+            public final class Playback: @unchecked Sendable {
                 let networkService: NetworkService
                 init(networkService: NetworkService) {
                     self.networkService = networkService
                 }
             }
 
-            public lazy var label: Label = .init(networkService: self.networkService)
+            public lazy var richtext: Richtext = .init(networkService: self.networkService)
 
-            public final class Label: @unchecked Sendable {
+            public final class Richtext: @unchecked Sendable {
                 let networkService: NetworkService
                 init(networkService: NetworkService) {
                     self.networkService = networkService
@@ -1338,42 +1437,6 @@ public actor ATProtoClient {
             public lazy var server: Server = .init(networkService: self.networkService)
 
             public final class Server: @unchecked Sendable {
-                let networkService: NetworkService
-                init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
-            public lazy var lexicon: Lexicon = .init(networkService: self.networkService)
-
-            public final class Lexicon: @unchecked Sendable {
-                let networkService: NetworkService
-                init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
-            public lazy var sync: Sync = .init(networkService: self.networkService)
-
-            public final class Sync: @unchecked Sendable {
-                let networkService: NetworkService
-                init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
-            public lazy var repo: Repo = .init(networkService: self.networkService)
-
-            public final class Repo: @unchecked Sendable {
-                let networkService: NetworkService
-                init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
-            public lazy var moderation: Moderation = .init(networkService: self.networkService)
-
-            public final class Moderation: @unchecked Sendable {
                 let networkService: NetworkService
                 init(networkService: NetworkService) {
                     self.networkService = networkService

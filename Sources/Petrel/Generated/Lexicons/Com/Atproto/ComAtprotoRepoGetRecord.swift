@@ -51,7 +51,13 @@ public enum ComAtprotoRepoGetRecord {
 
             uri = try container.decode(ATProtocolURI.self, forKey: .uri)
 
-            cid = try container.decodeIfPresent(CID.self, forKey: .cid)
+            do {
+                cid = try container.decodeIfPresent(CID.self, forKey: .cid)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'cid' — degrading to nil: \(error)")
+                cid = nil
+            }
 
             value = try container.decode(ATProtocolValueContainer.self, forKey: .value)
         }

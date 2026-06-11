@@ -19,26 +19,20 @@ object ComAtprotoLabelDefsDefs {
 enum class ComAtprotoLabelDefsLabelValue {
     @SerialName("!hide")
     _HIDE,
-    @SerialName("!no-promote")
-    _NO_PROMOTE,
     @SerialName("!warn")
     _WARN,
     @SerialName("!no-unauthenticated")
     _NO_UNAUTHENTICATED,
-    @SerialName("dmca-violation")
-    DMCA_VIOLATION,
-    @SerialName("doxxing")
-    DOXXING,
     @SerialName("porn")
     PORN,
     @SerialName("sexual")
     SEXUAL,
     @SerialName("nudity")
     NUDITY,
-    @SerialName("nsfl")
-    NSFL,
-    @SerialName("gore")
-    GORE}
+    @SerialName("graphic-media")
+    GRAPHIC_MEDIA,
+    @SerialName("bot")
+    BOT}
 
     /**
      * Metadata tag on an atproto resource (eg, repo or record).

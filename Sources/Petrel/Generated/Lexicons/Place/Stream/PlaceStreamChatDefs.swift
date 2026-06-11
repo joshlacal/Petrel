@@ -66,26 +66,34 @@ public enum PlaceStreamChatDefs {
             do {
                 chatProfile = try container.decodeIfPresent(PlaceStreamChatProfile.self, forKey: .chatProfile)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'chatProfile': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'chatProfile' — degrading to nil: \(error)")
+                chatProfile = nil
             }
             do {
                 replyTo = try container.decodeIfPresent(MessageViewReplyToUnion.self, forKey: .replyTo)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'replyTo': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'replyTo' — degrading to nil: \(error)")
+                replyTo = nil
             }
             do {
                 deleted = try container.decodeIfPresent(Bool.self, forKey: .deleted)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'deleted': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'deleted' — degrading to nil: \(error)")
+                deleted = nil
             }
             do {
                 badges = try container.decodeIfPresent([PlaceStreamBadgeDefs.BadgeView].self, forKey: .badges)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'badges': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'badges' — degrading to nil: \(error)")
+                badges = nil
             }
         }
 
@@ -262,14 +270,18 @@ public enum PlaceStreamChatDefs {
             do {
                 pinnedBy = try container.decodeIfPresent(PlaceStreamChatProfile.self, forKey: .pinnedBy)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'pinnedBy': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'pinnedBy' — degrading to nil: \(error)")
+                pinnedBy = nil
             }
             do {
                 message = try container.decodeIfPresent(MessageView.self, forKey: .message)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'message': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'message' — degrading to nil: \(error)")
+                message = nil
             }
         }
 

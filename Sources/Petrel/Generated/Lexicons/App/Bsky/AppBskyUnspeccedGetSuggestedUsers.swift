@@ -22,16 +22,22 @@ public enum AppBskyUnspeccedGetSuggestedUsers {
 
         public let recId: String?
 
+        public let recIdStr: String?
+
         /// Standard public initializer
         public init(
             actors: [AppBskyActorDefs.ProfileView],
 
-            recId: String? = nil
+            recId: String? = nil,
+
+            recIdStr: String? = nil
 
         ) {
             self.actors = actors
 
             self.recId = recId
+
+            self.recIdStr = recIdStr
         }
 
         public init(from decoder: Decoder) throws {
@@ -39,7 +45,21 @@ public enum AppBskyUnspeccedGetSuggestedUsers {
 
             actors = try container.decode([AppBskyActorDefs.ProfileView].self, forKey: .actors)
 
-            recId = try container.decodeIfPresent(String.self, forKey: .recId)
+            do {
+                recId = try container.decodeIfPresent(String.self, forKey: .recId)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'recId' — degrading to nil: \(error)")
+                recId = nil
+            }
+
+            do {
+                recIdStr = try container.decodeIfPresent(String.self, forKey: .recIdStr)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'recIdStr' — degrading to nil: \(error)")
+                recIdStr = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -49,6 +69,9 @@ public enum AppBskyUnspeccedGetSuggestedUsers {
 
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(recId, forKey: .recId)
+
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(recIdStr, forKey: .recIdStr)
         }
 
         public func toCBORValue() throws -> Any {
@@ -63,12 +86,19 @@ public enum AppBskyUnspeccedGetSuggestedUsers {
                 map = map.adding(key: "recId", value: recIdValue)
             }
 
+            if let value = recIdStr {
+                // Encode optional property even if it's an empty array for CBOR
+                let recIdStrValue = try value.toCBORValue()
+                map = map.adding(key: "recIdStr", value: recIdStrValue)
+            }
+
             return map
         }
 
         private enum CodingKeys: String, CodingKey {
             case actors
             case recId
+            case recIdStr
         }
     }
 }

@@ -48,11 +48,29 @@ public enum ComAtprotoSyncGetHostStatus {
 
             hostname = try container.decode(String.self, forKey: .hostname)
 
-            seq = try container.decodeIfPresent(Int.self, forKey: .seq)
+            do {
+                seq = try container.decodeIfPresent(Int.self, forKey: .seq)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'seq' — degrading to nil: \(error)")
+                seq = nil
+            }
 
-            accountCount = try container.decodeIfPresent(Int.self, forKey: .accountCount)
+            do {
+                accountCount = try container.decodeIfPresent(Int.self, forKey: .accountCount)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'accountCount' — degrading to nil: \(error)")
+                accountCount = nil
+            }
 
-            status = try container.decodeIfPresent(ComAtprotoSyncDefs.HostStatus.self, forKey: .status)
+            do {
+                status = try container.decodeIfPresent(ComAtprotoSyncDefs.HostStatus.self, forKey: .status)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'status' — degrading to nil: \(error)")
+                status = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

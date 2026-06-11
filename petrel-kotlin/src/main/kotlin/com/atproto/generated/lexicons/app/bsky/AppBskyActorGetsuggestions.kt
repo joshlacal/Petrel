@@ -25,8 +25,9 @@ object AppBskyActorGetSuggestionsDefs {
     data class AppBskyActorGetSuggestionsOutput(
         @SerialName("cursor")
         val cursor: String? = null,        @SerialName("actors")
-        val actors: List<AppBskyActorDefsProfileView>,// Snowflake for this recommendation, use when submitting recommendation events.        @SerialName("recId")
-        val recId: Int? = null    )
+        val actors: List<AppBskyActorDefsProfileView>,// DEPRECATED: use recIdStr instead.        @SerialName("recId")
+        val recId: Int? = null,// Snowflake for this recommendation, use when submitting recommendation events.        @SerialName("recIdStr")
+        val recIdStr: String? = null    )
 
 /**
  * Get a list of suggested actors. Expected use is discovery of accounts to follow during new account onboarding.

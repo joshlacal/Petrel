@@ -32,6 +32,8 @@ public enum AppBskyUnspeccedGetSuggestionsSkeleton {
 
         public let recId: Int?
 
+        public let recIdStr: String?
+
         /// Standard public initializer
         public init(
             cursor: String? = nil,
@@ -40,7 +42,9 @@ public enum AppBskyUnspeccedGetSuggestionsSkeleton {
 
             relativeToDid: DID? = nil,
 
-            recId: Int? = nil
+            recId: Int? = nil,
+
+            recIdStr: String? = nil
 
         ) {
             self.cursor = cursor
@@ -50,18 +54,46 @@ public enum AppBskyUnspeccedGetSuggestionsSkeleton {
             self.relativeToDid = relativeToDid
 
             self.recId = recId
+
+            self.recIdStr = recIdStr
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+            do {
+                cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
+                cursor = nil
+            }
 
             actors = try container.decode([AppBskyUnspeccedDefs.SkeletonSearchActor].self, forKey: .actors)
 
-            relativeToDid = try container.decodeIfPresent(DID.self, forKey: .relativeToDid)
+            do {
+                relativeToDid = try container.decodeIfPresent(DID.self, forKey: .relativeToDid)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'relativeToDid' — degrading to nil: \(error)")
+                relativeToDid = nil
+            }
 
-            recId = try container.decodeIfPresent(Int.self, forKey: .recId)
+            do {
+                recId = try container.decodeIfPresent(Int.self, forKey: .recId)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'recId' — degrading to nil: \(error)")
+                recId = nil
+            }
+
+            do {
+                recIdStr = try container.decodeIfPresent(String.self, forKey: .recIdStr)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'recIdStr' — degrading to nil: \(error)")
+                recIdStr = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -77,6 +109,9 @@ public enum AppBskyUnspeccedGetSuggestionsSkeleton {
 
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(recId, forKey: .recId)
+
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(recIdStr, forKey: .recIdStr)
         }
 
         public func toCBORValue() throws -> Any {
@@ -103,6 +138,12 @@ public enum AppBskyUnspeccedGetSuggestionsSkeleton {
                 map = map.adding(key: "recId", value: recIdValue)
             }
 
+            if let value = recIdStr {
+                // Encode optional property even if it's an empty array for CBOR
+                let recIdStrValue = try value.toCBORValue()
+                map = map.adding(key: "recIdStr", value: recIdStrValue)
+            }
+
             return map
         }
 
@@ -111,6 +152,7 @@ public enum AppBskyUnspeccedGetSuggestionsSkeleton {
             case actors
             case relativeToDid
             case recId
+            case recIdStr
         }
     }
 }

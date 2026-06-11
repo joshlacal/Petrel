@@ -128,7 +128,13 @@ public enum PlaceStreamMultistreamListTargets {
 
             targets = try container.decode([PlaceStreamMultistreamDefs.TargetView].self, forKey: .targets)
 
-            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+            do {
+                cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
+                cursor = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

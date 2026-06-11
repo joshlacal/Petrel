@@ -23,10 +23,28 @@ public struct AppBskyGraphStarterpack: ATProtocolCodable, ATProtocolValue {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         name = try container.decode(String.self, forKey: .name)
-        description = try container.decodeIfPresent(String.self, forKey: .description)
-        descriptionFacets = try container.decodeIfPresent([AppBskyRichtextFacet].self, forKey: .descriptionFacets)
+        do {
+            description = try container.decodeIfPresent(String.self, forKey: .description)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'description' — degrading to nil: \(error)")
+            description = nil
+        }
+        do {
+            descriptionFacets = try container.decodeIfPresent([AppBskyRichtextFacet].self, forKey: .descriptionFacets)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'descriptionFacets' — degrading to nil: \(error)")
+            descriptionFacets = nil
+        }
         list = try container.decode(ATProtocolURI.self, forKey: .list)
-        feeds = try container.decodeIfPresent([FeedItem].self, forKey: .feeds)
+        do {
+            feeds = try container.decodeIfPresent([FeedItem].self, forKey: .feeds)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'feeds' — degrading to nil: \(error)")
+            feeds = nil
+        }
         createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
     }
 

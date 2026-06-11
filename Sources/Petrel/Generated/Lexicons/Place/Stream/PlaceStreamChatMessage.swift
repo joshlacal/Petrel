@@ -22,9 +22,21 @@ public struct PlaceStreamChatMessage: ATProtocolCodable, ATProtocolValue {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         text = try container.decode(String.self, forKey: .text)
         createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
-        facets = try container.decodeIfPresent([PlaceStreamRichtextFacet].self, forKey: .facets)
+        do {
+            facets = try container.decodeIfPresent([PlaceStreamRichtextFacet].self, forKey: .facets)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'facets' — degrading to nil: \(error)")
+            facets = nil
+        }
         streamer = try container.decode(DID.self, forKey: .streamer)
-        reply = try container.decodeIfPresent(ReplyRef.self, forKey: .reply)
+        do {
+            reply = try container.decodeIfPresent(ReplyRef.self, forKey: .reply)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'reply' — degrading to nil: \(error)")
+            reply = nil
+        }
     }
 
     public func encode(to encoder: Encoder) throws {

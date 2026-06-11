@@ -100,8 +100,10 @@ public enum ComAtprotoLabelSubscribeLabels {
             do {
                 message = try container.decodeIfPresent(String.self, forKey: .message)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'message': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'message' — degrading to nil: \(error)")
+                message = nil
             }
         }
 

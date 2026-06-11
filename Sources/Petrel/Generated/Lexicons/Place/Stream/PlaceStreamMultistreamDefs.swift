@@ -44,8 +44,10 @@ public enum PlaceStreamMultistreamDefs {
             do {
                 latestEvent = try container.decodeIfPresent(PlaceStreamMultistreamDefs.Event.self, forKey: .latestEvent)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'latestEvent': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'latestEvent' — degrading to nil: \(error)")
+                latestEvent = nil
             }
         }
 

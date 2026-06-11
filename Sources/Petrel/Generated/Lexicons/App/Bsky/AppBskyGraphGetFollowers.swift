@@ -48,7 +48,13 @@ public enum AppBskyGraphGetFollowers {
 
             subject = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: .subject)
 
-            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+            do {
+                cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
+                cursor = nil
+            }
 
             followers = try container.decode([AppBskyActorDefs.ProfileView].self, forKey: .followers)
         }

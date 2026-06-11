@@ -46,11 +46,23 @@ public enum AppBskyFeedGetFeedSkeleton {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+            do {
+                cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
+                cursor = nil
+            }
 
             feed = try container.decode([AppBskyFeedDefs.SkeletonFeedPost].self, forKey: .feed)
 
-            reqId = try container.decodeIfPresent(String.self, forKey: .reqId)
+            do {
+                reqId = try container.decodeIfPresent(String.self, forKey: .reqId)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'reqId' — degrading to nil: \(error)")
+                reqId = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

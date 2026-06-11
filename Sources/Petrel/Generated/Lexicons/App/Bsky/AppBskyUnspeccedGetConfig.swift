@@ -97,9 +97,21 @@ public enum AppBskyUnspeccedGetConfig {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            checkEmailConfirmed = try container.decodeIfPresent(Bool.self, forKey: .checkEmailConfirmed)
+            do {
+                checkEmailConfirmed = try container.decodeIfPresent(Bool.self, forKey: .checkEmailConfirmed)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'checkEmailConfirmed' — degrading to nil: \(error)")
+                checkEmailConfirmed = nil
+            }
 
-            liveNow = try container.decodeIfPresent([LiveNowConfig].self, forKey: .liveNow)
+            do {
+                liveNow = try container.decodeIfPresent([LiveNowConfig].self, forKey: .liveNow)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'liveNow' — degrading to nil: \(error)")
+                liveNow = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

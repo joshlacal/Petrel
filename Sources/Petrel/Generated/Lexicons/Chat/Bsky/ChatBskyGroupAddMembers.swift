@@ -63,7 +63,13 @@ public enum ChatBskyGroupAddMembers {
 
             convo = try container.decode(ChatBskyConvoDefs.ConvoView.self, forKey: .convo)
 
-            addedMembers = try container.decodeIfPresent([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .addedMembers)
+            do {
+                addedMembers = try container.decodeIfPresent([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .addedMembers)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'addedMembers' — degrading to nil: \(error)")
+                addedMembers = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

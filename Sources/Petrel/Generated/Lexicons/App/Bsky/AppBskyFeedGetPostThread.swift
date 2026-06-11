@@ -42,7 +42,13 @@ public enum AppBskyFeedGetPostThread {
 
             thread = try container.decode(OutputThreadUnion.self, forKey: .thread)
 
-            threadgate = try container.decodeIfPresent(AppBskyFeedDefs.ThreadgateView.self, forKey: .threadgate)
+            do {
+                threadgate = try container.decodeIfPresent(AppBskyFeedDefs.ThreadgateView.self, forKey: .threadgate)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'threadgate' — degrading to nil: \(error)")
+                threadgate = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

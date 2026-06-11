@@ -91,7 +91,13 @@ public enum BlueCatbirdMlsDSDeliverWelcome {
 
             accepted = try container.decode(Bool.self, forKey: .accepted)
 
-            ack = try container.decodeIfPresent(BlueCatbirdMlsDSDeliverMessage.DeliveryAck.self, forKey: .ack)
+            do {
+                ack = try container.decodeIfPresent(BlueCatbirdMlsDSDeliverMessage.DeliveryAck.self, forKey: .ack)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'ack' — degrading to nil: \(error)")
+                ack = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

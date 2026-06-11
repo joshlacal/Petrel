@@ -12,7 +12,13 @@ public struct PlaceStreamServerSettings: ATProtocolCodable, ATProtocolValue {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        debugRecording = try container.decodeIfPresent(Bool.self, forKey: .debugRecording)
+        do {
+            debugRecording = try container.decodeIfPresent(Bool.self, forKey: .debugRecording)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'debugRecording' — degrading to nil: \(error)")
+            debugRecording = nil
+        }
     }
 
     public func encode(to encoder: Encoder) throws {

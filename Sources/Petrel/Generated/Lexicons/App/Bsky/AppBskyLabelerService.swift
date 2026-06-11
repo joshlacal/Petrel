@@ -23,11 +23,35 @@ public struct AppBskyLabelerService: ATProtocolCodable, ATProtocolValue {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         policies = try container.decode(AppBskyLabelerDefs.LabelerPolicies.self, forKey: .policies)
-        labels = try container.decodeIfPresent(AppBskyLabelerServiceLabelsUnion.self, forKey: .labels)
+        do {
+            labels = try container.decodeIfPresent(AppBskyLabelerServiceLabelsUnion.self, forKey: .labels)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'labels' — degrading to nil: \(error)")
+            labels = nil
+        }
         createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
-        reasonTypes = try container.decodeIfPresent([ComAtprotoModerationDefs.ReasonType].self, forKey: .reasonTypes)
-        subjectTypes = try container.decodeIfPresent([ComAtprotoModerationDefs.SubjectType].self, forKey: .subjectTypes)
-        subjectCollections = try container.decodeIfPresent([NSID].self, forKey: .subjectCollections)
+        do {
+            reasonTypes = try container.decodeIfPresent([ComAtprotoModerationDefs.ReasonType].self, forKey: .reasonTypes)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'reasonTypes' — degrading to nil: \(error)")
+            reasonTypes = nil
+        }
+        do {
+            subjectTypes = try container.decodeIfPresent([ComAtprotoModerationDefs.SubjectType].self, forKey: .subjectTypes)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'subjectTypes' — degrading to nil: \(error)")
+            subjectTypes = nil
+        }
+        do {
+            subjectCollections = try container.decodeIfPresent([NSID].self, forKey: .subjectCollections)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'subjectCollections' — degrading to nil: \(error)")
+            subjectCollections = nil
+        }
     }
 
     public func encode(to encoder: Encoder) throws {

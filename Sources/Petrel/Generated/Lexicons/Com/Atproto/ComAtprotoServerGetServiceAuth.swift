@@ -5,12 +5,12 @@ import Foundation
 public enum ComAtprotoServerGetServiceAuth {
     public static let typeIdentifier = "com.atproto.server.getServiceAuth"
     public struct Parameters: Parametrizable {
-        public let aud: DID
+        public let aud: String
         public let exp: Int?
         public let lxm: NSID?
 
         public init(
-            aud: DID,
+            aud: String,
             exp: Int? = nil,
             lxm: NSID? = nil
         ) {

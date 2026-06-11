@@ -46,6 +46,49 @@ public struct ATProtocolDate: Codable, Hashable, Equatable, Sendable, ATProtocol
     // MARK: - Parsing and Formatting
 
     private static func parseDate(from dateString: String) -> Date? {
+        if let date = parseWithFoundation(dateString) {
+            return date
+        }
+
+        // Foundation cannot parse very high-precision fractional seconds, but the
+        // atproto datetime spec allows arbitrary precision. Validate the string shape,
+        // truncate the fraction, and retry.
+        if let truncated = truncatingLongFractionalSeconds(dateString) {
+            return parseWithFoundation(truncated)
+        }
+
+        return nil
+    }
+
+    /// Matches a full ISO 8601 datetime with seven or more fractional second digits,
+    /// capturing the date-time prefix, the fraction, and the timezone suffix.
+    private static let longFractionRegex: NSRegularExpression? = try? NSRegularExpression(
+        pattern: "^([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2})\\.([0-9]{7,})(Z|[+-][0-9]{2}:[0-9]{2})$",
+        options: []
+    )
+
+    /// Truncates fractional seconds to microsecond precision so Foundation can parse them,
+    /// while still validating the overall datetime shape. Returns nil if the string does not
+    /// match a datetime with an overlong fraction.
+    private static func truncatingLongFractionalSeconds(_ dateString: String) -> String? {
+        guard let regex = longFractionRegex else {
+            return nil
+        }
+
+        let range = NSRange(location: 0, length: dateString.utf16.count)
+        guard let match = regex.firstMatch(in: dateString, options: [], range: range),
+              let prefixRange = Range(match.range(at: 1), in: dateString),
+              let fractionRange = Range(match.range(at: 2), in: dateString),
+              let zoneRange = Range(match.range(at: 3), in: dateString)
+        else {
+            return nil
+        }
+
+        let fraction = dateString[fractionRange].prefix(6)
+        return "\(dateString[prefixRange]).\(fraction)\(dateString[zoneRange])"
+    }
+
+    private static func parseWithFoundation(_ dateString: String) -> Date? {
         // Create a more flexible ISO8601 parsing strategy
         let strategy = Date.ISO8601FormatStyle(
             dateSeparator: .dash,

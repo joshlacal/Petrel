@@ -28,8 +28,10 @@ public enum AppBskyGraphGetListsWithMembership {
             do {
                 listItem = try container.decodeIfPresent(AppBskyGraphDefs.ListItemView.self, forKey: .listItem)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'listItem': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'listItem' — degrading to nil: \(error)")
+                listItem = nil
             }
         }
 
@@ -122,7 +124,13 @@ public enum AppBskyGraphGetListsWithMembership {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+            do {
+                cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
+                cursor = nil
+            }
 
             listsWithMembership = try container.decode([ListWithMembership].self, forKey: .listsWithMembership)
         }

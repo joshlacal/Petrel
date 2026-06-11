@@ -21,10 +21,14 @@ public actor KeychainStorage {
     /// - Parameters:
     ///   - namespace: A unique identifier for this application's keychain items
     ///   - accessGroup: Optional access group for keychain sharing between apps
-    public init(namespace: String, accessGroup: String? = nil) {
+    ///   - accessibility: Keychain accessibility for new writes on Apple platforms.
+    ///     Defaults to `.afterFirstUnlockThisDeviceOnly` (no iCloud sync / device
+    ///     transfer — DPoP-bound sessions are device-bound regardless).
+    public init(namespace: String, accessGroup: String? = nil, accessibility: KeychainAccessibility = .afterFirstUnlockThisDeviceOnly) {
         self.namespace = namespace
         self.accessGroup = accessGroup
         KeychainManager.configureDefaultAccessGroup(accessGroup)
+        KeychainManager.configureAccessibility(accessibility)
     }
 
     // MARK: - Account Management

@@ -78,14 +78,18 @@ public enum AppBskyFeedDescribeFeedGenerator {
             do {
                 privacyPolicy = try container.decodeIfPresent(String.self, forKey: .privacyPolicy)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'privacyPolicy': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'privacyPolicy' — degrading to nil: \(error)")
+                privacyPolicy = nil
             }
             do {
                 termsOfService = try container.decodeIfPresent(String.self, forKey: .termsOfService)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'termsOfService': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'termsOfService' — degrading to nil: \(error)")
+                termsOfService = nil
             }
         }
 
@@ -175,7 +179,13 @@ public enum AppBskyFeedDescribeFeedGenerator {
 
             feeds = try container.decode([Feed].self, forKey: .feeds)
 
-            links = try container.decodeIfPresent(Links.self, forKey: .links)
+            do {
+                links = try container.decodeIfPresent(Links.self, forKey: .links)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'links' — degrading to nil: \(error)")
+                links = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

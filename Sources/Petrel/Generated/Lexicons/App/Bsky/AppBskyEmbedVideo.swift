@@ -224,26 +224,34 @@ public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue {
             do {
                 thumbnail = try container.decodeIfPresent(URI.self, forKey: .thumbnail)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'thumbnail': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'thumbnail' — degrading to nil: \(error)")
+                thumbnail = nil
             }
             do {
                 alt = try container.decodeIfPresent(String.self, forKey: .alt)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'alt': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'alt' — degrading to nil: \(error)")
+                alt = nil
             }
             do {
                 aspectRatio = try container.decodeIfPresent(AppBskyEmbedDefs.AspectRatio.self, forKey: .aspectRatio)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'aspectRatio': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'aspectRatio' — degrading to nil: \(error)")
+                aspectRatio = nil
             }
             do {
                 presentation = try container.decodeIfPresent(String.self, forKey: .presentation)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'presentation': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'presentation' — degrading to nil: \(error)")
+                presentation = nil
             }
         }
 

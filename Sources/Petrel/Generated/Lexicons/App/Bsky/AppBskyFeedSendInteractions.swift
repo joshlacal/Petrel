@@ -5,31 +5,40 @@ import Foundation
 public enum AppBskyFeedSendInteractions {
     public static let typeIdentifier = "app.bsky.feed.sendInteractions"
     public struct Input: ATProtocolCodable {
+        public let feed: ATProtocolURI?
         public let interactions: [AppBskyFeedDefs.Interaction]
 
         /// Standard public initializer
-        public init(interactions: [AppBskyFeedDefs.Interaction]) {
+        public init(feed: ATProtocolURI? = nil, interactions: [AppBskyFeedDefs.Interaction]) {
+            self.feed = feed
             self.interactions = interactions
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            feed = try container.decodeIfPresent(ATProtocolURI.self, forKey: .feed)
             interactions = try container.decode([AppBskyFeedDefs.Interaction].self, forKey: .interactions)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encodeIfPresent(feed, forKey: .feed)
             try container.encode(interactions, forKey: .interactions)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
+            if let value = feed {
+                let feedValue = try value.toCBORValue()
+                map = map.adding(key: "feed", value: feedValue)
+            }
             let interactionsValue = try interactions.toCBORValue()
             map = map.adding(key: "interactions", value: interactionsValue)
             return map
         }
 
         private enum CodingKeys: String, CodingKey {
+            case feed
             case interactions
         }
     }

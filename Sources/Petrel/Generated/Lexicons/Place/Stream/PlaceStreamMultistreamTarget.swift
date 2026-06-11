@@ -21,7 +21,13 @@ public struct PlaceStreamMultistreamTarget: ATProtocolCodable, ATProtocolValue {
         url = try container.decode(URI.self, forKey: .url)
         active = try container.decode(Bool.self, forKey: .active)
         createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
-        name = try container.decodeIfPresent(String.self, forKey: .name)
+        do {
+            name = try container.decodeIfPresent(String.self, forKey: .name)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'name' — degrading to nil: \(error)")
+            name = nil
+        }
     }
 
     public func encode(to encoder: Encoder) throws {

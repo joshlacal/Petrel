@@ -17,8 +17,8 @@ object ComAtprotoServerGetServiceAuthDefs {
 
 @Serializable
     data class ComAtprotoServerGetServiceAuthParameters(
-// The DID of the service that the token will be used to authenticate with        @SerialName("aud")
-        val aud: DID,// The time in Unix Epoch seconds that the JWT expires. Defaults to 60 seconds in the future. The service may enforce certain time bounds on tokens depending on the requested scope.        @SerialName("exp")
+// The DID or `did#serviceId` reference of the service that the token will be used to authenticate with.        @SerialName("aud")
+        val aud: String,// The time in Unix Epoch seconds that the JWT expires. Defaults to 60 seconds in the future. The service may enforce certain time bounds on tokens depending on the requested scope.        @SerialName("exp")
         val exp: Int? = null,// Lexicon (XRPC) method to bind the requested token to        @SerialName("lxm")
         val lxm: NSID? = null    )
 

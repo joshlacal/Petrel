@@ -29,13 +29,55 @@ public struct AppBskyFeedPost: ATProtocolCodable, ATProtocolValue {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         text = try container.decode(String.self, forKey: .text)
-        entities = try container.decodeIfPresent([Entity].self, forKey: .entities)
-        facets = try container.decodeIfPresent([AppBskyRichtextFacet].self, forKey: .facets)
-        reply = try container.decodeIfPresent(ReplyRef.self, forKey: .reply)
-        embed = try container.decodeIfPresent(AppBskyFeedPostEmbedUnion.self, forKey: .embed)
-        langs = try container.decodeIfPresent([LanguageCodeContainer].self, forKey: .langs)
-        labels = try container.decodeIfPresent(AppBskyFeedPostLabelsUnion.self, forKey: .labels)
-        tags = try container.decodeIfPresent([String].self, forKey: .tags)
+        do {
+            entities = try container.decodeIfPresent([Entity].self, forKey: .entities)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'entities' — degrading to nil: \(error)")
+            entities = nil
+        }
+        do {
+            facets = try container.decodeIfPresent([AppBskyRichtextFacet].self, forKey: .facets)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'facets' — degrading to nil: \(error)")
+            facets = nil
+        }
+        do {
+            reply = try container.decodeIfPresent(ReplyRef.self, forKey: .reply)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'reply' — degrading to nil: \(error)")
+            reply = nil
+        }
+        do {
+            embed = try container.decodeIfPresent(AppBskyFeedPostEmbedUnion.self, forKey: .embed)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'embed' — degrading to nil: \(error)")
+            embed = nil
+        }
+        do {
+            langs = try container.decodeIfPresent([LanguageCodeContainer].self, forKey: .langs)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'langs' — degrading to nil: \(error)")
+            langs = nil
+        }
+        do {
+            labels = try container.decodeIfPresent(AppBskyFeedPostLabelsUnion.self, forKey: .labels)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'labels' — degrading to nil: \(error)")
+            labels = nil
+        }
+        do {
+            tags = try container.decodeIfPresent([String].self, forKey: .tags)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'tags' — degrading to nil: \(error)")
+            tags = nil
+        }
         createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
     }
 

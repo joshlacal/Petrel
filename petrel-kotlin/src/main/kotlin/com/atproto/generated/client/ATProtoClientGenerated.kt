@@ -179,123 +179,84 @@ class ATProtoClient(val networkService: NetworkService) {
 
         inner class Bsky {
             val client: ATProtoClient get() = this@ATProtoClient
-            val authmanagelabelerservice: AuthManageLabelerService = AuthManageLabelerService()
+            val authCreatePosts: AuthCreatePosts = AuthCreatePosts()
 
-            inner class AuthManageLabelerService {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
-            val authmanagenotifications: AuthManageNotifications = AuthManageNotifications()
-
-            inner class AuthManageNotifications {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
-            val authdeletecontent: AuthDeleteContent = AuthDeleteContent()
-
-            inner class AuthDeleteContent {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
-            val authcreateposts: AuthCreatePosts = AuthCreatePosts()
+            @Deprecated("Renamed", ReplaceWith("authCreatePosts"))
+            val authcreateposts: AuthCreatePosts get() = authCreatePosts
 
             inner class AuthCreatePosts {
                 val client: ATProtoClient get() = this@ATProtoClient
             }
 
-            val authfullapp: AuthFullApp = AuthFullApp()
+            val authDeleteContent: AuthDeleteContent = AuthDeleteContent()
+
+            @Deprecated("Renamed", ReplaceWith("authDeleteContent"))
+            val authdeletecontent: AuthDeleteContent get() = authDeleteContent
+
+            inner class AuthDeleteContent {
+                val client: ATProtoClient get() = this@ATProtoClient
+            }
+
+            val authFullApp: AuthFullApp = AuthFullApp()
+
+            @Deprecated("Renamed", ReplaceWith("authFullApp"))
+            val authfullapp: AuthFullApp get() = authFullApp
 
             inner class AuthFullApp {
                 val client: ATProtoClient get() = this@ATProtoClient
             }
 
-            val authmanagemoderation: AuthManageModeration = AuthManageModeration()
+            val authManageFeedDeclarations: AuthManageFeedDeclarations = AuthManageFeedDeclarations()
 
-            inner class AuthManageModeration {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
-            val authviewall: AuthViewAll = AuthViewAll()
-
-            inner class AuthViewAll {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
-            val authmanagefeeddeclarations: AuthManageFeedDeclarations = AuthManageFeedDeclarations()
+            @Deprecated("Renamed", ReplaceWith("authManageFeedDeclarations"))
+            val authmanagefeeddeclarations: AuthManageFeedDeclarations get() = authManageFeedDeclarations
 
             inner class AuthManageFeedDeclarations {
                 val client: ATProtoClient get() = this@ATProtoClient
             }
 
-            val authmanageprofile: AuthManageProfile = AuthManageProfile()
+            val authManageLabelerService: AuthManageLabelerService = AuthManageLabelerService()
+
+            @Deprecated("Renamed", ReplaceWith("authManageLabelerService"))
+            val authmanagelabelerservice: AuthManageLabelerService get() = authManageLabelerService
+
+            inner class AuthManageLabelerService {
+                val client: ATProtoClient get() = this@ATProtoClient
+            }
+
+            val authManageModeration: AuthManageModeration = AuthManageModeration()
+
+            @Deprecated("Renamed", ReplaceWith("authManageModeration"))
+            val authmanagemoderation: AuthManageModeration get() = authManageModeration
+
+            inner class AuthManageModeration {
+                val client: ATProtoClient get() = this@ATProtoClient
+            }
+
+            val authManageNotifications: AuthManageNotifications = AuthManageNotifications()
+
+            @Deprecated("Renamed", ReplaceWith("authManageNotifications"))
+            val authmanagenotifications: AuthManageNotifications get() = authManageNotifications
+
+            inner class AuthManageNotifications {
+                val client: ATProtoClient get() = this@ATProtoClient
+            }
+
+            val authManageProfile: AuthManageProfile = AuthManageProfile()
+
+            @Deprecated("Renamed", ReplaceWith("authManageProfile"))
+            val authmanageprofile: AuthManageProfile get() = authManageProfile
 
             inner class AuthManageProfile {
                 val client: ATProtoClient get() = this@ATProtoClient
             }
 
-            val draft: Draft = Draft()
+            val authViewAll: AuthViewAll = AuthViewAll()
 
-            inner class Draft {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
+            @Deprecated("Renamed", ReplaceWith("authViewAll"))
+            val authviewall: AuthViewAll get() = authViewAll
 
-            val video: Video = Video()
-
-            inner class Video {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
-            val contact: Contact = Contact()
-
-            inner class Contact {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
-            val bookmark: Bookmark = Bookmark()
-
-            inner class Bookmark {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
-            val embed: Embed = Embed()
-
-            inner class Embed {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
-            val notification: Notification = Notification()
-
-            inner class Notification {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
-            val unspecced: Unspecced = Unspecced()
-
-            inner class Unspecced {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
-            val graph: Graph = Graph()
-
-            inner class Graph {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
-            val feed: Feed = Feed()
-
-            inner class Feed {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
-            val richtext: Richtext = Richtext()
-
-            inner class Richtext {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
-            val ageassurance: Ageassurance = Ageassurance()
-
-            inner class Ageassurance {
+            inner class AuthViewAll {
                 val client: ATProtoClient get() = this@ATProtoClient
             }
 
@@ -305,9 +266,111 @@ class ATProtoClient(val networkService: NetworkService) {
                 val client: ATProtoClient get() = this@ATProtoClient
             }
 
+            val ageassurance: Ageassurance = Ageassurance()
+
+            inner class Ageassurance {
+                val client: ATProtoClient get() = this@ATProtoClient
+            }
+
+            val bookmark: Bookmark = Bookmark()
+
+            inner class Bookmark {
+                val client: ATProtoClient get() = this@ATProtoClient
+            }
+
+            val contact: Contact = Contact()
+
+            inner class Contact {
+                val client: ATProtoClient get() = this@ATProtoClient
+            }
+
+            val draft: Draft = Draft()
+
+            inner class Draft {
+                val client: ATProtoClient get() = this@ATProtoClient
+            }
+
+            val embed: Embed = Embed()
+
+            inner class Embed {
+                val client: ATProtoClient get() = this@ATProtoClient
+            }
+
+            val feed: Feed = Feed()
+
+            inner class Feed {
+                val client: ATProtoClient get() = this@ATProtoClient
+            }
+
+            val graph: Graph = Graph()
+
+            inner class Graph {
+                val client: ATProtoClient get() = this@ATProtoClient
+            }
+
             val labeler: Labeler = Labeler()
 
             inner class Labeler {
+                val client: ATProtoClient get() = this@ATProtoClient
+            }
+
+            val notification: Notification = Notification()
+
+            inner class Notification {
+                val client: ATProtoClient get() = this@ATProtoClient
+            }
+
+            val richtext: Richtext = Richtext()
+
+            inner class Richtext {
+                val client: ATProtoClient get() = this@ATProtoClient
+            }
+
+            val unspecced: Unspecced = Unspecced()
+
+            inner class Unspecced {
+                val client: ATProtoClient get() = this@ATProtoClient
+            }
+
+            val video: Video = Video()
+
+            inner class Video {
+                val client: ATProtoClient get() = this@ATProtoClient
+            }
+
+        }
+
+    }
+
+    val blue: Blue = Blue()
+
+    inner class Blue {
+        val client: ATProtoClient get() = this@ATProtoClient
+        val catbird: Catbird = Catbird()
+
+        inner class Catbird {
+            val client: ATProtoClient get() = this@ATProtoClient
+            val bskychat: Bskychat = Bskychat()
+
+            inner class Bskychat {
+                val client: ATProtoClient get() = this@ATProtoClient
+            }
+
+            val mlsChat: MlsChat = MlsChat()
+
+            @Deprecated("Renamed", ReplaceWith("mlsChat"))
+            val mlschat: MlsChat get() = mlsChat
+
+            inner class MlsChat {
+                val client: ATProtoClient get() = this@ATProtoClient
+            }
+
+            val mlsDS: MlsDS = MlsDS()
+
+            @Deprecated("Renamed", ReplaceWith("mlsDS"))
+            val mlsds: MlsDS get() = mlsDS
+
+            inner class MlsDS {
                 val client: ATProtoClient get() = this@ATProtoClient
             }
 
@@ -323,9 +386,18 @@ class ATProtoClient(val networkService: NetworkService) {
 
         inner class Bsky {
             val client: ATProtoClient get() = this@ATProtoClient
-            val authfullchatclient: AuthFullChatClient = AuthFullChatClient()
+            val authFullChatClient: AuthFullChatClient = AuthFullChatClient()
+
+            @Deprecated("Renamed", ReplaceWith("authFullChatClient"))
+            val authfullchatclient: AuthFullChatClient get() = authFullChatClient
 
             inner class AuthFullChatClient {
+                val client: ATProtoClient get() = this@ATProtoClient
+            }
+
+            val actor: Actor = Actor()
+
+            inner class Actor {
                 val client: ATProtoClient get() = this@ATProtoClient
             }
 
@@ -347,12 +419,6 @@ class ATProtoClient(val networkService: NetworkService) {
                 val client: ATProtoClient get() = this@ATProtoClient
             }
 
-            val actor: Actor = Actor()
-
-            inner class Actor {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
             val moderation: Moderation = Moderation()
 
             inner class Moderation {
@@ -363,29 +429,77 @@ class ATProtoClient(val networkService: NetworkService) {
 
     }
 
-    val blue: Blue = Blue()
+    val com: Com = Com()
 
-    inner class Blue {
+    inner class Com {
         val client: ATProtoClient get() = this@ATProtoClient
-        val catbird: Catbird = Catbird()
+        val atproto: Atproto = Atproto()
 
-        inner class Catbird {
+        inner class Atproto {
             val client: ATProtoClient get() = this@ATProtoClient
-            val mlschat: MlsChat = MlsChat()
+            val admin: Admin = Admin()
 
-            inner class MlsChat {
+            inner class Admin {
                 val client: ATProtoClient get() = this@ATProtoClient
             }
 
-            val bskychat: Bskychat = Bskychat()
+            val identity: Identity = Identity()
 
-            inner class Bskychat {
+            inner class Identity {
                 val client: ATProtoClient get() = this@ATProtoClient
             }
 
-            val mlsds: MlsDS = MlsDS()
+            val label: Label = Label()
 
-            inner class MlsDS {
+            inner class Label {
+                val client: ATProtoClient get() = this@ATProtoClient
+            }
+
+            val lexicon: Lexicon = Lexicon()
+
+            inner class Lexicon {
+                val client: ATProtoClient get() = this@ATProtoClient
+            }
+
+            val moderation: Moderation = Moderation()
+
+            inner class Moderation {
+                val client: ATProtoClient get() = this@ATProtoClient
+            }
+
+            val repo: Repo = Repo()
+
+            inner class Repo {
+                val client: ATProtoClient get() = this@ATProtoClient
+            }
+
+            val server: Server = Server()
+
+            inner class Server {
+                val client: ATProtoClient get() = this@ATProtoClient
+            }
+
+            val sync: Sync = Sync()
+
+            inner class Sync {
+                val client: ATProtoClient get() = this@ATProtoClient
+            }
+
+            val temp: Temp = Temp()
+
+            inner class Temp {
+                val client: ATProtoClient get() = this@ATProtoClient
+            }
+
+        }
+
+        val germnetwork: Germnetwork = Germnetwork()
+
+        inner class Germnetwork {
+            val client: ATProtoClient get() = this@ATProtoClient
+            val declaration: Declaration = Declaration()
+
+            inner class Declaration {
                 val client: ATProtoClient get() = this@ATProtoClient
             }
 
@@ -407,21 +521,15 @@ class ATProtoClient(val networkService: NetworkService) {
                 val client: ATProtoClient get() = this@ATProtoClient
             }
 
-            val livestream: Livestream = Livestream()
-
-            inner class Livestream {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
             val key: Key = Key()
 
             inner class Key {
                 val client: ATProtoClient get() = this@ATProtoClient
             }
 
-            val video: Video = Video()
+            val livestream: Livestream = Livestream()
 
-            inner class Video {
+            inner class Livestream {
                 val client: ATProtoClient get() = this@ATProtoClient
             }
 
@@ -431,9 +539,27 @@ class ATProtoClient(val networkService: NetworkService) {
                 val client: ATProtoClient get() = this@ATProtoClient
             }
 
+            val video: Video = Video()
+
+            inner class Video {
+                val client: ATProtoClient get() = this@ATProtoClient
+            }
+
+            val badge: Badge = Badge()
+
+            inner class Badge {
+                val client: ATProtoClient get() = this@ATProtoClient
+            }
+
             val branding: Branding = Branding()
 
             inner class Branding {
+                val client: ATProtoClient get() = this@ATProtoClient
+            }
+
+            val broadcast: Broadcast = Broadcast()
+
+            inner class Broadcast {
                 val client: ATProtoClient get() = this@ATProtoClient
             }
 
@@ -449,9 +575,9 @@ class ATProtoClient(val networkService: NetworkService) {
                 val client: ATProtoClient get() = this@ATProtoClient
             }
 
-            val multistream: Multistream = Multistream()
+            val graph: Graph = Graph()
 
-            inner class Multistream {
+            inner class Graph {
                 val client: ATProtoClient get() = this@ATProtoClient
             }
 
@@ -461,39 +587,9 @@ class ATProtoClient(val networkService: NetworkService) {
                 val client: ATProtoClient get() = this@ATProtoClient
             }
 
-            val graph: Graph = Graph()
-
-            inner class Graph {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
-            val server: Server = Server()
-
-            inner class Server {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
-            val playback: Playback = Playback()
-
-            inner class Playback {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
             val live: Live = Live()
 
             inner class Live {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
-            val richtext: Richtext = Richtext()
-
-            inner class Richtext {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
-            val muxl: Muxl = Muxl()
-
-            inner class Muxl {
                 val client: ATProtoClient get() = this@ATProtoClient
             }
 
@@ -503,99 +599,39 @@ class ATProtoClient(val networkService: NetworkService) {
                 val client: ATProtoClient get() = this@ATProtoClient
             }
 
-            val broadcast: Broadcast = Broadcast()
-
-            inner class Broadcast {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
-            val badge: Badge = Badge()
-
-            inner class Badge {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
             val moderation: Moderation = Moderation()
 
             inner class Moderation {
                 val client: ATProtoClient get() = this@ATProtoClient
             }
 
-        }
+            val multistream: Multistream = Multistream()
 
-    }
-
-    val com: Com = Com()
-
-    inner class Com {
-        val client: ATProtoClient get() = this@ATProtoClient
-        val germnetwork: Germnetwork = Germnetwork()
-
-        inner class Germnetwork {
-            val client: ATProtoClient get() = this@ATProtoClient
-            val declaration: Declaration = Declaration()
-
-            inner class Declaration {
+            inner class Multistream {
                 val client: ATProtoClient get() = this@ATProtoClient
             }
 
-        }
+            val muxl: Muxl = Muxl()
 
-        val atproto: Atproto = Atproto()
-
-        inner class Atproto {
-            val client: ATProtoClient get() = this@ATProtoClient
-            val temp: Temp = Temp()
-
-            inner class Temp {
+            inner class Muxl {
                 val client: ATProtoClient get() = this@ATProtoClient
             }
 
-            val identity: Identity = Identity()
+            val playback: Playback = Playback()
 
-            inner class Identity {
+            inner class Playback {
                 val client: ATProtoClient get() = this@ATProtoClient
             }
 
-            val admin: Admin = Admin()
+            val richtext: Richtext = Richtext()
 
-            inner class Admin {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
-            val label: Label = Label()
-
-            inner class Label {
+            inner class Richtext {
                 val client: ATProtoClient get() = this@ATProtoClient
             }
 
             val server: Server = Server()
 
             inner class Server {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
-            val lexicon: Lexicon = Lexicon()
-
-            inner class Lexicon {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
-            val sync: Sync = Sync()
-
-            inner class Sync {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
-            val repo: Repo = Repo()
-
-            inner class Repo {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
-            val moderation: Moderation = Moderation()
-
-            inner class Moderation {
                 val client: ATProtoClient get() = this@ATProtoClient
             }
 

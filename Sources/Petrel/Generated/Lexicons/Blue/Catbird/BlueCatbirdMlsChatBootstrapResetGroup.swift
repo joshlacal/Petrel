@@ -202,7 +202,13 @@ public enum BlueCatbirdMlsChatBootstrapResetGroup {
 
             convo = try container.decode(BlueCatbirdMlsChatDefs.ConvoView.self, forKey: .convo)
 
-            generation = try container.decodeIfPresent(Int.self, forKey: .generation)
+            do {
+                generation = try container.decodeIfPresent(Int.self, forKey: .generation)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'generation' — degrading to nil: \(error)")
+                generation = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

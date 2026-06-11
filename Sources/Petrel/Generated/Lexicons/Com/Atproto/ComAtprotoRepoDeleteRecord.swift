@@ -80,7 +80,13 @@ public enum ComAtprotoRepoDeleteRecord {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            commit = try container.decodeIfPresent(ComAtprotoRepoDefs.CommitMeta.self, forKey: .commit)
+            do {
+                commit = try container.decodeIfPresent(ComAtprotoRepoDefs.CommitMeta.self, forKey: .commit)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'commit' — degrading to nil: \(error)")
+                commit = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

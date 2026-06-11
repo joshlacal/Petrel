@@ -18,7 +18,13 @@ public struct PlaceStreamLiveTeleport: ATProtocolCodable, ATProtocolValue {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         streamer = try container.decode(DID.self, forKey: .streamer)
         startsAt = try container.decode(ATProtocolDate.self, forKey: .startsAt)
-        durationSeconds = try container.decodeIfPresent(Int.self, forKey: .durationSeconds)
+        do {
+            durationSeconds = try container.decodeIfPresent(Int.self, forKey: .durationSeconds)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'durationSeconds' — degrading to nil: \(error)")
+            durationSeconds = nil
+        }
     }
 
     public func encode(to encoder: Encoder) throws {

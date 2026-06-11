@@ -146,9 +146,21 @@ public enum AppBskyFeedGetLikes {
 
             uri = try container.decode(ATProtocolURI.self, forKey: .uri)
 
-            cid = try container.decodeIfPresent(CID.self, forKey: .cid)
+            do {
+                cid = try container.decodeIfPresent(CID.self, forKey: .cid)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'cid' — degrading to nil: \(error)")
+                cid = nil
+            }
 
-            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+            do {
+                cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
+                cursor = nil
+            }
 
             likes = try container.decode([Like].self, forKey: .likes)
         }

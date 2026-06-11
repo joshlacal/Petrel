@@ -21,10 +21,28 @@ public struct PlaceStreamVideo: ATProtocolCodable, ATProtocolValue {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         title = try container.decode(String.self, forKey: .title)
-        duration = try container.decodeIfPresent(Int.self, forKey: .duration)
+        do {
+            duration = try container.decodeIfPresent(Int.self, forKey: .duration)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'duration' — degrading to nil: \(error)")
+            duration = nil
+        }
         createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
-        thumb = try container.decodeIfPresent(Blob.self, forKey: .thumb)
-        description = try container.decodeIfPresent(String.self, forKey: .description)
+        do {
+            thumb = try container.decodeIfPresent(Blob.self, forKey: .thumb)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'thumb' — degrading to nil: \(error)")
+            thumb = nil
+        }
+        do {
+            description = try container.decodeIfPresent(String.self, forKey: .description)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'description' — degrading to nil: \(error)")
+            description = nil
+        }
     }
 
     public func encode(to encoder: Encoder) throws {

@@ -63,7 +63,13 @@ public enum AppBskyNotificationPutActivitySubscription {
 
             subject = try container.decode(DID.self, forKey: .subject)
 
-            activitySubscription = try container.decodeIfPresent(AppBskyNotificationDefs.ActivitySubscription.self, forKey: .activitySubscription)
+            do {
+                activitySubscription = try container.decodeIfPresent(AppBskyNotificationDefs.ActivitySubscription.self, forKey: .activitySubscription)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'activitySubscription' — degrading to nil: \(error)")
+                activitySubscription = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

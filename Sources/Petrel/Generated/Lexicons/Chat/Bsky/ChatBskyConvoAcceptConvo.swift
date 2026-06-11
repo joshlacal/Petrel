@@ -48,7 +48,13 @@ public enum ChatBskyConvoAcceptConvo {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            rev = try container.decodeIfPresent(String.self, forKey: .rev)
+            do {
+                rev = try container.decodeIfPresent(String.self, forKey: .rev)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'rev' — degrading to nil: \(error)")
+                rev = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

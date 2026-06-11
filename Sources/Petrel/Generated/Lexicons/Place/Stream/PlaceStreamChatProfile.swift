@@ -12,7 +12,13 @@ public struct PlaceStreamChatProfile: ATProtocolCodable, ATProtocolValue {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        color = try container.decodeIfPresent(Color.self, forKey: .color)
+        do {
+            color = try container.decodeIfPresent(Color.self, forKey: .color)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'color' — degrading to nil: \(error)")
+            color = nil
+        }
     }
 
     public func encode(to encoder: Encoder) throws {

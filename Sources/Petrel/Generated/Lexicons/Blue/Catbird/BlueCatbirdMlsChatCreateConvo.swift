@@ -100,8 +100,10 @@ public enum BlueCatbirdMlsChatCreateConvo {
             do {
                 code = try container.decodeIfPresent(String.self, forKey: .code)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'code': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'code' — degrading to nil: \(error)")
+                code = nil
             }
         }
 
@@ -265,9 +267,21 @@ public enum BlueCatbirdMlsChatCreateConvo {
 
             convo = try container.decode(BlueCatbirdMlsChatDefs.ConvoView.self, forKey: .convo)
 
-            inviteCode = try container.decodeIfPresent(String.self, forKey: .inviteCode)
+            do {
+                inviteCode = try container.decodeIfPresent(String.self, forKey: .inviteCode)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'inviteCode' — degrading to nil: \(error)")
+                inviteCode = nil
+            }
 
-            sequencerDs = try container.decodeIfPresent(DID.self, forKey: .sequencerDs)
+            do {
+                sequencerDs = try container.decodeIfPresent(DID.self, forKey: .sequencerDs)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'sequencerDs' — degrading to nil: \(error)")
+                sequencerDs = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

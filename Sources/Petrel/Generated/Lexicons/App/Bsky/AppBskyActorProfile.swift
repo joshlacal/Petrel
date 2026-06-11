@@ -30,16 +30,76 @@ public struct AppBskyActorProfile: ATProtocolCodable, ATProtocolValue {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
-        description = try container.decodeIfPresent(String.self, forKey: .description)
-        pronouns = try container.decodeIfPresent(String.self, forKey: .pronouns)
-        website = try container.decodeIfPresent(URI.self, forKey: .website)
-        avatar = try container.decodeIfPresent(Blob.self, forKey: .avatar)
-        banner = try container.decodeIfPresent(Blob.self, forKey: .banner)
-        labels = try container.decodeIfPresent(AppBskyActorProfileLabelsUnion.self, forKey: .labels)
-        joinedViaStarterPack = try container.decodeIfPresent(ComAtprotoRepoStrongRef.self, forKey: .joinedViaStarterPack)
-        pinnedPost = try container.decodeIfPresent(ComAtprotoRepoStrongRef.self, forKey: .pinnedPost)
-        createdAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .createdAt)
+        do {
+            displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'displayName' — degrading to nil: \(error)")
+            displayName = nil
+        }
+        do {
+            description = try container.decodeIfPresent(String.self, forKey: .description)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'description' — degrading to nil: \(error)")
+            description = nil
+        }
+        do {
+            pronouns = try container.decodeIfPresent(String.self, forKey: .pronouns)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'pronouns' — degrading to nil: \(error)")
+            pronouns = nil
+        }
+        do {
+            website = try container.decodeIfPresent(URI.self, forKey: .website)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'website' — degrading to nil: \(error)")
+            website = nil
+        }
+        do {
+            avatar = try container.decodeIfPresent(Blob.self, forKey: .avatar)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'avatar' — degrading to nil: \(error)")
+            avatar = nil
+        }
+        do {
+            banner = try container.decodeIfPresent(Blob.self, forKey: .banner)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'banner' — degrading to nil: \(error)")
+            banner = nil
+        }
+        do {
+            labels = try container.decodeIfPresent(AppBskyActorProfileLabelsUnion.self, forKey: .labels)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'labels' — degrading to nil: \(error)")
+            labels = nil
+        }
+        do {
+            joinedViaStarterPack = try container.decodeIfPresent(ComAtprotoRepoStrongRef.self, forKey: .joinedViaStarterPack)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'joinedViaStarterPack' — degrading to nil: \(error)")
+            joinedViaStarterPack = nil
+        }
+        do {
+            pinnedPost = try container.decodeIfPresent(ComAtprotoRepoStrongRef.self, forKey: .pinnedPost)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'pinnedPost' — degrading to nil: \(error)")
+            pinnedPost = nil
+        }
+        do {
+            createdAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .createdAt)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'createdAt' — degrading to nil: \(error)")
+            createdAt = nil
+        }
     }
 
     public func encode(to encoder: Encoder) throws {

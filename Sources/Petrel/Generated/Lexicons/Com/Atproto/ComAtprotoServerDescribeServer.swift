@@ -22,14 +22,18 @@ public enum ComAtprotoServerDescribeServer {
             do {
                 privacyPolicy = try container.decodeIfPresent(URI.self, forKey: .privacyPolicy)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'privacyPolicy': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'privacyPolicy' — degrading to nil: \(error)")
+                privacyPolicy = nil
             }
             do {
                 termsOfService = try container.decodeIfPresent(URI.self, forKey: .termsOfService)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'termsOfService': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'termsOfService' — degrading to nil: \(error)")
+                termsOfService = nil
             }
         }
 
@@ -104,8 +108,10 @@ public enum ComAtprotoServerDescribeServer {
             do {
                 email = try container.decodeIfPresent(String.self, forKey: .email)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'email': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'email' — degrading to nil: \(error)")
+                email = nil
             }
         }
 
@@ -195,15 +201,39 @@ public enum ComAtprotoServerDescribeServer {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            inviteCodeRequired = try container.decodeIfPresent(Bool.self, forKey: .inviteCodeRequired)
+            do {
+                inviteCodeRequired = try container.decodeIfPresent(Bool.self, forKey: .inviteCodeRequired)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'inviteCodeRequired' — degrading to nil: \(error)")
+                inviteCodeRequired = nil
+            }
 
-            phoneVerificationRequired = try container.decodeIfPresent(Bool.self, forKey: .phoneVerificationRequired)
+            do {
+                phoneVerificationRequired = try container.decodeIfPresent(Bool.self, forKey: .phoneVerificationRequired)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'phoneVerificationRequired' — degrading to nil: \(error)")
+                phoneVerificationRequired = nil
+            }
 
             availableUserDomains = try container.decode([String].self, forKey: .availableUserDomains)
 
-            links = try container.decodeIfPresent(Links.self, forKey: .links)
+            do {
+                links = try container.decodeIfPresent(Links.self, forKey: .links)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'links' — degrading to nil: \(error)")
+                links = nil
+            }
 
-            contact = try container.decodeIfPresent(Contact.self, forKey: .contact)
+            do {
+                contact = try container.decodeIfPresent(Contact.self, forKey: .contact)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'contact' — degrading to nil: \(error)")
+                contact = nil
+            }
 
             did = try container.decode(DID.self, forKey: .did)
         }

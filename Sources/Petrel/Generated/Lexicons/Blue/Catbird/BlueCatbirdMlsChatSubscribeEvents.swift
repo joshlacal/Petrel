@@ -38,14 +38,18 @@ public enum BlueCatbirdMlsChatSubscribeEvents {
             do {
                 ephemeral = try container.decodeIfPresent(Bool.self, forKey: .ephemeral)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'ephemeral': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'ephemeral' — degrading to nil: \(error)")
+                ephemeral = nil
             }
             do {
                 epoch = try container.decodeIfPresent(Int.self, forKey: .epoch)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'epoch': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'epoch' — degrading to nil: \(error)")
+                epoch = nil
             }
         }
 
@@ -412,8 +416,10 @@ public enum BlueCatbirdMlsChatSubscribeEvents {
             do {
                 deviceName = try container.decodeIfPresent(String.self, forKey: .deviceName)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'deviceName': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'deviceName' — degrading to nil: \(error)")
+                deviceName = nil
             }
             do {
                 deviceCredentialDid = try container.decode(String.self, forKey: .deviceCredentialDid)
@@ -658,20 +664,26 @@ public enum BlueCatbirdMlsChatSubscribeEvents {
             do {
                 infoType = try container.decodeIfPresent(String.self, forKey: .infoType)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'infoType': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'infoType' — degrading to nil: \(error)")
+                infoType = nil
             }
             do {
                 convoId = try container.decodeIfPresent(String.self, forKey: .convoId)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'convoId': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'convoId' — degrading to nil: \(error)")
+                convoId = nil
             }
             do {
                 requestedBy = try container.decodeIfPresent(DID.self, forKey: .requestedBy)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'requestedBy': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'requestedBy' — degrading to nil: \(error)")
+                requestedBy = nil
             }
         }
 
@@ -812,20 +824,26 @@ public enum BlueCatbirdMlsChatSubscribeEvents {
             do {
                 resetBy = try container.decodeIfPresent(DID.self, forKey: .resetBy)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'resetBy': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'resetBy' — degrading to nil: \(error)")
+                resetBy = nil
             }
             do {
                 cipherSuite = try container.decodeIfPresent(String.self, forKey: .cipherSuite)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'cipherSuite': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'cipherSuite' — degrading to nil: \(error)")
+                cipherSuite = nil
             }
             do {
                 reason = try container.decodeIfPresent(String.self, forKey: .reason)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'reason': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'reason' — degrading to nil: \(error)")
+                reason = nil
             }
         }
 
@@ -1068,14 +1086,18 @@ public enum BlueCatbirdMlsChatSubscribeEvents {
             do {
                 requestedBy = try container.decodeIfPresent(DID.self, forKey: .requestedBy)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'requestedBy': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'requestedBy' — degrading to nil: \(error)")
+                requestedBy = nil
             }
             do {
                 requestedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .requestedAt)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'requestedAt': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'requestedAt' — degrading to nil: \(error)")
+                requestedAt = nil
             }
         }
 
@@ -1184,14 +1206,18 @@ public enum BlueCatbirdMlsChatSubscribeEvents {
             do {
                 requestedBy = try container.decodeIfPresent(DID.self, forKey: .requestedBy)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'requestedBy': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'requestedBy' — degrading to nil: \(error)")
+                requestedBy = nil
             }
             do {
                 requestedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .requestedAt)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'requestedAt': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'requestedAt' — degrading to nil: \(error)")
+                requestedAt = nil
             }
         }
 
@@ -1438,20 +1464,26 @@ public enum BlueCatbirdMlsChatSubscribeEvents {
             do {
                 expectedNewMlsGroupId = try container.decodeIfPresent(String.self, forKey: .expectedNewMlsGroupId)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'expectedNewMlsGroupId': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'expectedNewMlsGroupId' — degrading to nil: \(error)")
+                expectedNewMlsGroupId = nil
             }
             do {
                 reason = try container.decodeIfPresent(String.self, forKey: .reason)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'reason': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'reason' — degrading to nil: \(error)")
+                reason = nil
             }
             do {
                 requestedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .requestedAt)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'requestedAt': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'requestedAt' — degrading to nil: \(error)")
+                requestedAt = nil
             }
         }
 

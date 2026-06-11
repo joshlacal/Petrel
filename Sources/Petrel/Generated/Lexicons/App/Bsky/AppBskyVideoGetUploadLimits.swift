@@ -45,13 +45,37 @@ public enum AppBskyVideoGetUploadLimits {
 
             canUpload = try container.decode(Bool.self, forKey: .canUpload)
 
-            remainingDailyVideos = try container.decodeIfPresent(Int.self, forKey: .remainingDailyVideos)
+            do {
+                remainingDailyVideos = try container.decodeIfPresent(Int.self, forKey: .remainingDailyVideos)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'remainingDailyVideos' — degrading to nil: \(error)")
+                remainingDailyVideos = nil
+            }
 
-            remainingDailyBytes = try container.decodeIfPresent(Int.self, forKey: .remainingDailyBytes)
+            do {
+                remainingDailyBytes = try container.decodeIfPresent(Int.self, forKey: .remainingDailyBytes)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'remainingDailyBytes' — degrading to nil: \(error)")
+                remainingDailyBytes = nil
+            }
 
-            message = try container.decodeIfPresent(String.self, forKey: .message)
+            do {
+                message = try container.decodeIfPresent(String.self, forKey: .message)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'message' — degrading to nil: \(error)")
+                message = nil
+            }
 
-            error = try container.decodeIfPresent(String.self, forKey: .error)
+            do {
+                error = try container.decodeIfPresent(String.self, forKey: .error)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'error' — degrading to nil: \(error)")
+                self.error = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

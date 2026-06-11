@@ -28,8 +28,9 @@ object AppBskyUnspeccedGetSuggestionsSkeletonDefs {
         @SerialName("cursor")
         val cursor: String? = null,        @SerialName("actors")
         val actors: List<AppBskyUnspeccedDefsSkeletonSearchActor>,// DID of the account these suggestions are relative to. If this is returned undefined, suggestions are based on the viewer.        @SerialName("relativeToDid")
-        val relativeToDid: DID? = null,// Snowflake for this recommendation, use when submitting recommendation events.        @SerialName("recId")
-        val recId: Int? = null    )
+        val relativeToDid: DID? = null,// DEPRECATED: use recIdStr instead.        @SerialName("recId")
+        val recId: Int? = null,// Snowflake for this recommendation, use when submitting recommendation events.        @SerialName("recIdStr")
+        val recIdStr: String? = null    )
 
 /**
  * Get a skeleton of suggested actors. Intended to be called and then hydrated through app.bsky.actor.getSuggestions

@@ -19,9 +19,21 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         post = try container.decode(ATProtocolURI.self, forKey: .post)
-        allow = try container.decodeIfPresent([AppBskyFeedThreadgateAllowUnion].self, forKey: .allow)
+        do {
+            allow = try container.decodeIfPresent([AppBskyFeedThreadgateAllowUnion].self, forKey: .allow)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'allow' — degrading to nil: \(error)")
+            allow = nil
+        }
         createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
-        hiddenReplies = try container.decodeIfPresent([ATProtocolURI].self, forKey: .hiddenReplies)
+        do {
+            hiddenReplies = try container.decodeIfPresent([ATProtocolURI].self, forKey: .hiddenReplies)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'hiddenReplies' — degrading to nil: \(error)")
+            hiddenReplies = nil
+        }
     }
 
     public func encode(to encoder: Encoder) throws {

@@ -70,20 +70,26 @@ public enum PlaceStreamServerDefs {
             do {
                 prefix = try container.decodeIfPresent(String.self, forKey: .prefix)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'prefix': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'prefix' — degrading to nil: \(error)")
+                prefix = nil
             }
             do {
                 suffix = try container.decodeIfPresent(String.self, forKey: .suffix)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'suffix': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'suffix' — degrading to nil: \(error)")
+                suffix = nil
             }
             do {
                 rewrite = try container.decodeIfPresent([RewriteRule].self, forKey: .rewrite)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'rewrite': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'rewrite' — degrading to nil: \(error)")
+                rewrite = nil
             }
             do {
                 createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
@@ -94,38 +100,50 @@ public enum PlaceStreamServerDefs {
             do {
                 updatedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .updatedAt)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'updatedAt': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'updatedAt' — degrading to nil: \(error)")
+                updatedAt = nil
             }
             do {
                 name = try container.decodeIfPresent(String.self, forKey: .name)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'name': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'name' — degrading to nil: \(error)")
+                name = nil
             }
             do {
                 description = try container.decodeIfPresent(String.self, forKey: .description)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'description': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'description' — degrading to nil: \(error)")
+                description = nil
             }
             do {
                 lastTriggered = try container.decodeIfPresent(ATProtocolDate.self, forKey: .lastTriggered)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'lastTriggered': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'lastTriggered' — degrading to nil: \(error)")
+                lastTriggered = nil
             }
             do {
                 errorCount = try container.decodeIfPresent(Int.self, forKey: .errorCount)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'errorCount': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'errorCount' — degrading to nil: \(error)")
+                errorCount = nil
             }
             do {
                 muteWords = try container.decodeIfPresent([String].self, forKey: .muteWords)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'muteWords': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'muteWords' — degrading to nil: \(error)")
+                muteWords = nil
             }
         }
 

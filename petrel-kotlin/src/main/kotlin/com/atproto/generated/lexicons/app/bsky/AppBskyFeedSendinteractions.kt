@@ -17,7 +17,8 @@ object AppBskyFeedSendInteractionsDefs {
 
 @Serializable
     data class AppBskyFeedSendInteractionsInput(
-        @SerialName("interactions")
+        @SerialName("feed")
+        val feed: ATProtocolURI? = null,        @SerialName("interactions")
         val interactions: List<AppBskyFeedDefsInteraction>    )
 
     @Serializable

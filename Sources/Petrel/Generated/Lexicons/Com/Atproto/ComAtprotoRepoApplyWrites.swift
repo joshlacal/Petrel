@@ -30,8 +30,10 @@ public enum ComAtprotoRepoApplyWrites {
             do {
                 rkey = try container.decodeIfPresent(RecordKey.self, forKey: .rkey)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'rkey': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'rkey' — degrading to nil: \(error)")
+                rkey = nil
             }
             do {
                 value = try container.decode(ATProtocolValueContainer.self, forKey: .value)
@@ -290,8 +292,10 @@ public enum ComAtprotoRepoApplyWrites {
             do {
                 validationStatus = try container.decodeIfPresent(String.self, forKey: .validationStatus)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'validationStatus': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'validationStatus' — degrading to nil: \(error)")
+                validationStatus = nil
             }
         }
 
@@ -384,8 +388,10 @@ public enum ComAtprotoRepoApplyWrites {
             do {
                 validationStatus = try container.decodeIfPresent(String.self, forKey: .validationStatus)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'validationStatus': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'validationStatus' — degrading to nil: \(error)")
+                validationStatus = nil
             }
         }
 
@@ -557,9 +563,21 @@ public enum ComAtprotoRepoApplyWrites {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            commit = try container.decodeIfPresent(ComAtprotoRepoDefs.CommitMeta.self, forKey: .commit)
+            do {
+                commit = try container.decodeIfPresent(ComAtprotoRepoDefs.CommitMeta.self, forKey: .commit)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'commit' — degrading to nil: \(error)")
+                commit = nil
+            }
 
-            results = try container.decodeIfPresent([OutputResultsUnion].self, forKey: .results)
+            do {
+                results = try container.decodeIfPresent([OutputResultsUnion].self, forKey: .results)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'results' — degrading to nil: \(error)")
+                results = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

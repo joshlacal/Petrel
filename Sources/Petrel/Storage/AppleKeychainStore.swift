@@ -14,18 +14,35 @@
     #endif
     import Foundation
     import Security
+    import Synchronization
+
+    extension KeychainAccessibility {
+        var cfValue: CFString {
+            switch self {
+            case .afterFirstUnlockThisDeviceOnly: return kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            case .afterFirstUnlock: return kSecAttrAccessibleAfterFirstUnlock
+            case .whenUnlockedThisDeviceOnly: return kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+            }
+        }
+    }
 
     /// Secure storage implementation using Apple's Keychain Services
     final class AppleKeychainStore: SecureStorage {
         // MARK: - Platform-specific Configuration
 
-        /// Returns the appropriate keychain accessibility for the current platform
+        /// Process-wide accessibility setting, configurable via
+        /// `KeychainManager.configureAccessibility(_:)`. Items written before a
+        /// change keep their old attribute until the next write (store is
+        /// delete+add, so any rewrite applies the current setting).
+        private static let accessibilityState = Mutex<KeychainAccessibility>(.afterFirstUnlockThisDeviceOnly)
+
+        static func configureAccessibility(_ accessibility: KeychainAccessibility) {
+            accessibilityState.withLock { $0 = accessibility }
+        }
+
+        /// Returns the configured keychain accessibility for new writes
         private static var defaultAccessibility: CFString {
-            #if os(iOS)
-                return kSecAttrAccessibleAfterFirstUnlock
-            #elseif os(macOS)
-                return kSecAttrAccessibleAfterFirstUnlock
-            #endif
+            accessibilityState.withLock { $0 }.cfValue
         }
 
         /// Returns platform-specific keychain query attributes

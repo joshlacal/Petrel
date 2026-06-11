@@ -73,9 +73,21 @@ public enum AppBskyFeedSearchPosts {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+            do {
+                cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
+                cursor = nil
+            }
 
-            hitsTotal = try container.decodeIfPresent(Int.self, forKey: .hitsTotal)
+            do {
+                hitsTotal = try container.decodeIfPresent(Int.self, forKey: .hitsTotal)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'hitsTotal' — degrading to nil: \(error)")
+                hitsTotal = nil
+            }
 
             posts = try container.decode([AppBskyFeedDefs.PostView].self, forKey: .posts)
         }

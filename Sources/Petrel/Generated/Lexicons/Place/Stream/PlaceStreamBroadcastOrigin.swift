@@ -24,10 +24,28 @@ public struct PlaceStreamBroadcastOrigin: ATProtocolCodable, ATProtocolValue {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         streamer = try container.decode(DID.self, forKey: .streamer)
         server = try container.decode(DID.self, forKey: .server)
-        broadcaster = try container.decodeIfPresent(DID.self, forKey: .broadcaster)
+        do {
+            broadcaster = try container.decodeIfPresent(DID.self, forKey: .broadcaster)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'broadcaster' — degrading to nil: \(error)")
+            broadcaster = nil
+        }
         updatedAt = try container.decode(ATProtocolDate.self, forKey: .updatedAt)
-        irohTicket = try container.decodeIfPresent(String.self, forKey: .irohTicket)
-        websocketURL = try container.decodeIfPresent(URI.self, forKey: .websocketURL)
+        do {
+            irohTicket = try container.decodeIfPresent(String.self, forKey: .irohTicket)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'irohTicket' — degrading to nil: \(error)")
+            irohTicket = nil
+        }
+        do {
+            websocketURL = try container.decodeIfPresent(URI.self, forKey: .websocketURL)
+        } catch {
+            // Forward compatibility: a malformed optional field must not fail the whole record.
+            LogManager.logWarning("Decoding error for optional property 'websocketURL' — degrading to nil: \(error)")
+            websocketURL = nil
+        }
     }
 
     public func encode(to encoder: Encoder) throws {

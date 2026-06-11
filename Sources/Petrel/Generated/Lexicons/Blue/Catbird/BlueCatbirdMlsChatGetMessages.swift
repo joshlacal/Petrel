@@ -155,11 +155,29 @@ public enum BlueCatbirdMlsChatGetMessages {
 
             messages = try container.decode([BlueCatbirdMlsChatDefs.MessageView].self, forKey: .messages)
 
-            lastSeq = try container.decodeIfPresent(Int.self, forKey: .lastSeq)
+            do {
+                lastSeq = try container.decodeIfPresent(Int.self, forKey: .lastSeq)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'lastSeq' — degrading to nil: \(error)")
+                lastSeq = nil
+            }
 
-            gapInfo = try container.decodeIfPresent(GapInfo.self, forKey: .gapInfo)
+            do {
+                gapInfo = try container.decodeIfPresent(GapInfo.self, forKey: .gapInfo)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'gapInfo' — degrading to nil: \(error)")
+                gapInfo = nil
+            }
 
-            suppressedBeforeJoin = try container.decodeIfPresent(Int.self, forKey: .suppressedBeforeJoin)
+            do {
+                suppressedBeforeJoin = try container.decodeIfPresent(Int.self, forKey: .suppressedBeforeJoin)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'suppressedBeforeJoin' — degrading to nil: \(error)")
+                suppressedBeforeJoin = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {

@@ -162,38 +162,50 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
             do {
                 labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'labels': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'labels' — degrading to nil: \(error)")
+                labels = nil
             }
             do {
                 replyCount = try container.decodeIfPresent(Int.self, forKey: .replyCount)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'replyCount': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'replyCount' — degrading to nil: \(error)")
+                replyCount = nil
             }
             do {
                 repostCount = try container.decodeIfPresent(Int.self, forKey: .repostCount)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'repostCount': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'repostCount' — degrading to nil: \(error)")
+                repostCount = nil
             }
             do {
                 likeCount = try container.decodeIfPresent(Int.self, forKey: .likeCount)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'likeCount': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'likeCount' — degrading to nil: \(error)")
+                likeCount = nil
             }
             do {
                 quoteCount = try container.decodeIfPresent(Int.self, forKey: .quoteCount)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'quoteCount': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'quoteCount' — degrading to nil: \(error)")
+                quoteCount = nil
             }
             do {
                 embeds = try container.decodeIfPresent([ViewRecordEmbedsUnion].self, forKey: .embeds)
             } catch {
-                LogManager.logDebug("Decoding error for optional property 'embeds': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'embeds' — degrading to nil: \(error)")
+                embeds = nil
             }
             do {
                 indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
