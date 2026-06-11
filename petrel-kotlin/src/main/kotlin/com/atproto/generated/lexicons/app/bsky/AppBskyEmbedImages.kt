@@ -17,7 +17,7 @@ object AppBskyEmbedImagesDefs {
 
     @Serializable
     data class AppBskyEmbedImagesImage(
-        @SerialName("image")
+/** The raw image file. May be up to 2 MB, formerly limited to 1 MB. */        @SerialName("image")
         val image: Blob,/** Alt text description of the image, for accessibility. */        @SerialName("alt")
         val alt: String,        @SerialName("aspectRatio")
         val aspectRatio: AppBskyEmbedDefsAspectRatio? = null    ) {

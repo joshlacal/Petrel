@@ -24,6 +24,9 @@ sealed interface AppBskyFeedPostEmbedUnion {
     data class Video(val value: com.atproto.generated.AppBskyEmbedVideo) : AppBskyFeedPostEmbedUnion
 
     @Serializable
+    data class Gallery(val value: com.atproto.generated.AppBskyEmbedGallery) : AppBskyFeedPostEmbedUnion
+
+    @Serializable
     data class External(val value: com.atproto.generated.AppBskyEmbedExternal) : AppBskyFeedPostEmbedUnion
 
     @Serializable
@@ -53,6 +56,12 @@ object AppBskyFeedPostEmbedUnionSerializer : kotlinx.serialization.KSerializer<A
                 val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyEmbedVideo.serializer(), value.value)
                 kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
                     it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.video")
+                })
+            }
+            is AppBskyFeedPostEmbedUnion.Gallery -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyEmbedGallery.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.gallery")
                 })
             }
             is AppBskyFeedPostEmbedUnion.External -> {
@@ -97,6 +106,9 @@ object AppBskyFeedPostEmbedUnionSerializer : kotlinx.serialization.KSerializer<A
             )
             "app.bsky.embed.video" -> AppBskyFeedPostEmbedUnion.Video(
                 jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyEmbedVideo.serializer(), element)
+            )
+            "app.bsky.embed.gallery" -> AppBskyFeedPostEmbedUnion.Gallery(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyEmbedGallery.serializer(), element)
             )
             "app.bsky.embed.external" -> AppBskyFeedPostEmbedUnion.External(
                 jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyEmbedExternal.serializer(), element)

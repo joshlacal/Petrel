@@ -24,6 +24,9 @@ sealed interface AppBskyEmbedRecordWithMediaViewMediaUnion {
     data class AppBskyEmbedVideoView(val value: com.atproto.generated.AppBskyEmbedVideoView) : AppBskyEmbedRecordWithMediaViewMediaUnion
 
     @Serializable
+    data class AppBskyEmbedGalleryView(val value: com.atproto.generated.AppBskyEmbedGalleryView) : AppBskyEmbedRecordWithMediaViewMediaUnion
+
+    @Serializable
     data class AppBskyEmbedExternalView(val value: com.atproto.generated.AppBskyEmbedExternalView) : AppBskyEmbedRecordWithMediaViewMediaUnion
 
     @Serializable
@@ -47,6 +50,12 @@ object AppBskyEmbedRecordWithMediaViewMediaUnionSerializer : kotlinx.serializati
                 val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyEmbedVideoView.serializer(), value.value)
                 kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
                     it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.video#view")
+                })
+            }
+            is AppBskyEmbedRecordWithMediaViewMediaUnion.AppBskyEmbedGalleryView -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyEmbedGalleryView.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.gallery#view")
                 })
             }
             is AppBskyEmbedRecordWithMediaViewMediaUnion.AppBskyEmbedExternalView -> {
@@ -80,6 +89,9 @@ object AppBskyEmbedRecordWithMediaViewMediaUnionSerializer : kotlinx.serializati
             "app.bsky.embed.video#view" -> AppBskyEmbedRecordWithMediaViewMediaUnion.AppBskyEmbedVideoView(
                 jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyEmbedVideoView.serializer(), element)
             )
+            "app.bsky.embed.gallery#view" -> AppBskyEmbedRecordWithMediaViewMediaUnion.AppBskyEmbedGalleryView(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyEmbedGalleryView.serializer(), element)
+            )
             "app.bsky.embed.external#view" -> AppBskyEmbedRecordWithMediaViewMediaUnion.AppBskyEmbedExternalView(
                 jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyEmbedExternalView.serializer(), element)
             )
@@ -95,6 +107,9 @@ sealed interface AppBskyEmbedRecordWithMediaMediaUnion {
 
     @Serializable
     data class Video(val value: com.atproto.generated.AppBskyEmbedVideo) : AppBskyEmbedRecordWithMediaMediaUnion
+
+    @Serializable
+    data class Gallery(val value: com.atproto.generated.AppBskyEmbedGallery) : AppBskyEmbedRecordWithMediaMediaUnion
 
     @Serializable
     data class External(val value: com.atproto.generated.AppBskyEmbedExternal) : AppBskyEmbedRecordWithMediaMediaUnion
@@ -120,6 +135,12 @@ object AppBskyEmbedRecordWithMediaMediaUnionSerializer : kotlinx.serialization.K
                 val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyEmbedVideo.serializer(), value.value)
                 kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
                     it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.video")
+                })
+            }
+            is AppBskyEmbedRecordWithMediaMediaUnion.Gallery -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(com.atproto.generated.AppBskyEmbedGallery.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.gallery")
                 })
             }
             is AppBskyEmbedRecordWithMediaMediaUnion.External -> {
@@ -152,6 +173,9 @@ object AppBskyEmbedRecordWithMediaMediaUnionSerializer : kotlinx.serialization.K
             )
             "app.bsky.embed.video" -> AppBskyEmbedRecordWithMediaMediaUnion.Video(
                 jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyEmbedVideo.serializer(), element)
+            )
+            "app.bsky.embed.gallery" -> AppBskyEmbedRecordWithMediaMediaUnion.Gallery(
+                jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyEmbedGallery.serializer(), element)
             )
             "app.bsky.embed.external" -> AppBskyEmbedRecordWithMediaMediaUnion.External(
                 jsonDecoder.json.decodeFromJsonElement(com.atproto.generated.AppBskyEmbedExternal.serializer(), element)

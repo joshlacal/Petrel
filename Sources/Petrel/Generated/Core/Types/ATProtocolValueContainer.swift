@@ -291,6 +291,46 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
 
+            decoders["app.bsky.embed.gallery"] = { decoder in
+                do {
+                    let decodedObject = try AppBskyEmbedGallery(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding AppBskyEmbedGallery: \(error)")
+                    return .decodeError("Error decoding AppBskyEmbedGallery: \(error)")
+                }
+            }
+
+            decoders["app.bsky.embed.gallery#image"] = { decoder in
+                do {
+                    let decodedObject = try AppBskyEmbedGallery.Image(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding AppBskyEmbedGallery.Image: \(error)")
+                    return .decodeError("Error decoding AppBskyEmbedGallery.Image: \(error)")
+                }
+            }
+
+            decoders["app.bsky.embed.gallery#view"] = { decoder in
+                do {
+                    let decodedObject = try AppBskyEmbedGallery.View(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding AppBskyEmbedGallery.View: \(error)")
+                    return .decodeError("Error decoding AppBskyEmbedGallery.View: \(error)")
+                }
+            }
+
+            decoders["app.bsky.embed.gallery#viewImage"] = { decoder in
+                do {
+                    let decodedObject = try AppBskyEmbedGallery.ViewImage(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding AppBskyEmbedGallery.ViewImage: \(error)")
+                    return .decodeError("Error decoding AppBskyEmbedGallery.ViewImage: \(error)")
+                }
+            }
+
             decoders["app.bsky.embed.recordWithMedia"] = { decoder in
                 do {
                     let decodedObject = try AppBskyEmbedRecordWithMedia(from: decoder)

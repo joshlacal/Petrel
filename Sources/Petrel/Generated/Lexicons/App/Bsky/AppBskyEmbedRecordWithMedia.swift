@@ -133,6 +133,7 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
     public enum ViewMediaUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
         case appBskyEmbedImagesView(AppBskyEmbedImages.View)
         case appBskyEmbedVideoView(AppBskyEmbedVideo.View)
+        case appBskyEmbedGalleryView(AppBskyEmbedGallery.View)
         case appBskyEmbedExternalView(AppBskyEmbedExternal.View)
         case unexpected(ATProtocolValueContainer)
         public init(_ value: AppBskyEmbedImages.View) {
@@ -141,6 +142,10 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
 
         public init(_ value: AppBskyEmbedVideo.View) {
             self = .appBskyEmbedVideoView(value)
+        }
+
+        public init(_ value: AppBskyEmbedGallery.View) {
+            self = .appBskyEmbedGalleryView(value)
         }
 
         public init(_ value: AppBskyEmbedExternal.View) {
@@ -158,6 +163,9 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
             case "app.bsky.embed.video#view":
                 let value = try AppBskyEmbedVideo.View(from: decoder)
                 self = .appBskyEmbedVideoView(value)
+            case "app.bsky.embed.gallery#view":
+                let value = try AppBskyEmbedGallery.View(from: decoder)
+                self = .appBskyEmbedGalleryView(value)
             case "app.bsky.embed.external#view":
                 let value = try AppBskyEmbedExternal.View(from: decoder)
                 self = .appBskyEmbedExternalView(value)
@@ -177,6 +185,9 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
             case let .appBskyEmbedVideoView(value):
                 try container.encode("app.bsky.embed.video#view", forKey: .type)
                 try value.encode(to: encoder)
+            case let .appBskyEmbedGalleryView(value):
+                try container.encode("app.bsky.embed.gallery#view", forKey: .type)
+                try value.encode(to: encoder)
             case let .appBskyEmbedExternalView(value):
                 try container.encode("app.bsky.embed.external#view", forKey: .type)
                 try value.encode(to: encoder)
@@ -192,6 +203,9 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
                 hasher.combine(value)
             case let .appBskyEmbedVideoView(value):
                 hasher.combine("app.bsky.embed.video#view")
+                hasher.combine(value)
+            case let .appBskyEmbedGalleryView(value):
+                hasher.combine("app.bsky.embed.gallery#view")
                 hasher.combine(value)
             case let .appBskyEmbedExternalView(value):
                 hasher.combine("app.bsky.embed.external#view")
@@ -216,6 +230,11 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
             case let (
                 .appBskyEmbedVideoView(lhsValue),
                 .appBskyEmbedVideoView(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .appBskyEmbedGalleryView(lhsValue),
+                .appBskyEmbedGalleryView(rhsValue)
             ):
                 return lhsValue == rhsValue
             case let (
@@ -275,6 +294,23 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
                     }
                 }
                 return map
+            case let .appBskyEmbedGalleryView(value):
+                map = map.adding(key: "$type", value: "app.bsky.embed.gallery#view")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
             case let .appBskyEmbedExternalView(value):
                 map = map.adding(key: "$type", value: "app.bsky.embed.external#view")
 
@@ -301,6 +337,7 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
     public enum AppBskyEmbedRecordWithMediaMediaUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
         case appBskyEmbedImages(AppBskyEmbedImages)
         case appBskyEmbedVideo(AppBskyEmbedVideo)
+        case appBskyEmbedGallery(AppBskyEmbedGallery)
         case appBskyEmbedExternal(AppBskyEmbedExternal)
         case unexpected(ATProtocolValueContainer)
         public init(_ value: AppBskyEmbedImages) {
@@ -309,6 +346,10 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
 
         public init(_ value: AppBskyEmbedVideo) {
             self = .appBskyEmbedVideo(value)
+        }
+
+        public init(_ value: AppBskyEmbedGallery) {
+            self = .appBskyEmbedGallery(value)
         }
 
         public init(_ value: AppBskyEmbedExternal) {
@@ -326,6 +367,9 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
             case "app.bsky.embed.video":
                 let value = try AppBskyEmbedVideo(from: decoder)
                 self = .appBskyEmbedVideo(value)
+            case "app.bsky.embed.gallery":
+                let value = try AppBskyEmbedGallery(from: decoder)
+                self = .appBskyEmbedGallery(value)
             case "app.bsky.embed.external":
                 let value = try AppBskyEmbedExternal(from: decoder)
                 self = .appBskyEmbedExternal(value)
@@ -345,6 +389,9 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
             case let .appBskyEmbedVideo(value):
                 try container.encode("app.bsky.embed.video", forKey: .type)
                 try value.encode(to: encoder)
+            case let .appBskyEmbedGallery(value):
+                try container.encode("app.bsky.embed.gallery", forKey: .type)
+                try value.encode(to: encoder)
             case let .appBskyEmbedExternal(value):
                 try container.encode("app.bsky.embed.external", forKey: .type)
                 try value.encode(to: encoder)
@@ -360,6 +407,9 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
                 hasher.combine(value)
             case let .appBskyEmbedVideo(value):
                 hasher.combine("app.bsky.embed.video")
+                hasher.combine(value)
+            case let .appBskyEmbedGallery(value):
+                hasher.combine("app.bsky.embed.gallery")
                 hasher.combine(value)
             case let .appBskyEmbedExternal(value):
                 hasher.combine("app.bsky.embed.external")
@@ -384,6 +434,11 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
             case let (
                 .appBskyEmbedVideo(lhsValue),
                 .appBskyEmbedVideo(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .appBskyEmbedGallery(lhsValue),
+                .appBskyEmbedGallery(rhsValue)
             ):
                 return lhsValue == rhsValue
             case let (
@@ -428,6 +483,23 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
                 return map
             case let .appBskyEmbedVideo(value):
                 map = map.adding(key: "$type", value: "app.bsky.embed.video")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .appBskyEmbedGallery(value):
+                map = map.adding(key: "$type", value: "app.bsky.embed.gallery")
 
                 let valueDict = try value.toCBORValue()
 
