@@ -18,9 +18,12 @@ final class KeychainStorageRaceConditionTests: XCTestCase {
         try await super.setUp()
         keychainStorage = KeychainStorage(namespace: testNamespace)
 
-        // Clean up any existing test data
+        // Clean up any existing test data (including temp/backup copies, which
+        // deleteSession does not remove and getSession would otherwise auto-recover)
         try? await keychainStorage.deleteAccount(for: testDID)
         try? await keychainStorage.deleteSession(for: testDID)
+        try? await keychainStorage.deleteSessionTemp(for: testDID)
+        try? await keychainStorage.deleteSessionBackup(for: testDID)
         try? await keychainStorage.deleteGatewaySession(for: testDID)
     }
 
@@ -28,6 +31,8 @@ final class KeychainStorageRaceConditionTests: XCTestCase {
         // Clean up test data
         try? await keychainStorage.deleteAccount(for: testDID)
         try? await keychainStorage.deleteSession(for: testDID)
+        try? await keychainStorage.deleteSessionTemp(for: testDID)
+        try? await keychainStorage.deleteSessionBackup(for: testDID)
         try? await keychainStorage.deleteGatewaySession(for: testDID)
         try await super.tearDown()
     }
@@ -68,63 +73,61 @@ final class KeychainStorageRaceConditionTests: XCTestCase {
         // Should detect inconsistent state
         XCTAssertTrue(result.hasIssues)
         XCTAssertTrue(result.inconsistentStates.contains(testDID))
-        XCTAssertTrue(result.cleanedOrphanedAccounts.contains(testDID))
 
-        // Account should be cleaned up since session couldn't be recovered
+        // Current policy: the account is intentionally NOT deleted when the session
+        // can't be recovered (aggressive cleanup broke gateway-auth users); the DID
+        // is flagged for re-authentication instead.
+        XCTAssertTrue(result.requiresReauth.contains(testDID))
         let retrievedAccount = try await keychainStorage.getAccount(for: testDID)
-        XCTAssertNil(retrievedAccount)
+        XCTAssertNotNil(retrievedAccount)
     }
 
     func testSessionRecoveryFromTemporaryLocation() async throws {
+        let account = createTestAccount()
         let session = createTestSession()
 
-        // Manually place session in temporary location (simulating interrupted save)
-        let tempKey = "\(testNamespace).session.temp.\(testDID)"
+        // Save the account, then manually place the session only in the temporary
+        // location (simulating a save interrupted before the atomic move).
+        // KeychainManager prepends the namespace itself, so keys must not include it.
+        try await keychainStorage.saveAccount(account, for: testDID)
+        let tempKey = "session.temp.\(testDID)"
         let sessionData = try JSONEncoder().encode(session)
         try KeychainManager.store(key: tempKey, value: sessionData, namespace: testNamespace)
 
-        // Add account to accounts list so validation finds it
-        let accountDIDs = [testDID]
-        let accountDIDsKey = "\(testNamespace).accountDIDs"
-        let accountDIDsData = try JSONEncoder().encode(accountDIDs)
-        try KeychainManager.store(key: accountDIDsKey, value: accountDIDsData, namespace: testNamespace)
-
-        // Run validation - should recover session
-        let result = await keychainStorage.validateAndRepairAuthenticationState()
-
-        // Should have recovered the session
-        XCTAssertTrue(result.recoveredSessions.contains(testDID))
-
-        // Session should now be available at the correct location
+        // getSession transparently recovers from the temporary location and
+        // promotes the session back to the primary location.
         let retrievedSession = try await keychainStorage.getSession(for: testDID)
         XCTAssertNotNil(retrievedSession)
         XCTAssertEqual(retrievedSession?.accessToken, session.accessToken)
+
+        // State should now be fully consistent.
+        let result = await keychainStorage.validateAndRepairAuthenticationState()
+        XCTAssertFalse(result.inconsistentStates.contains(testDID))
+        XCTAssertFalse(result.cleanedOrphanedAccounts.contains(testDID))
     }
 
     func testSessionRecoveryFromBackupLocation() async throws {
+        let account = createTestAccount()
         let session = createTestSession()
 
-        // Manually place session in backup location (simulating interrupted save)
-        let backupKey = "\(testNamespace).session.backup.\(testDID)"
+        // Save the account, then manually place the session only in the backup
+        // location (simulating an interrupted save).
+        // KeychainManager prepends the namespace itself, so keys must not include it.
+        try await keychainStorage.saveAccount(account, for: testDID)
+        let backupKey = "session.backup.\(testDID)"
         let sessionData = try JSONEncoder().encode(session)
         try KeychainManager.store(key: backupKey, value: sessionData, namespace: testNamespace)
 
-        // Add account to accounts list so validation finds it
-        let accountDIDs = [testDID]
-        let accountDIDsKey = "\(testNamespace).accountDIDs"
-        let accountDIDsData = try JSONEncoder().encode(accountDIDs)
-        try KeychainManager.store(key: accountDIDsKey, value: accountDIDsData, namespace: testNamespace)
-
-        // Run validation - should recover session
-        let result = await keychainStorage.validateAndRepairAuthenticationState()
-
-        // Should have recovered the session
-        XCTAssertTrue(result.recoveredSessions.contains(testDID))
-
-        // Session should now be available at the correct location
+        // getSession transparently recovers from the backup location and
+        // promotes the session back to the primary location.
         let retrievedSession = try await keychainStorage.getSession(for: testDID)
         XCTAssertNotNil(retrievedSession)
         XCTAssertEqual(retrievedSession?.accessToken, session.accessToken)
+
+        // State should now be fully consistent.
+        let result = await keychainStorage.validateAndRepairAuthenticationState()
+        XCTAssertFalse(result.inconsistentStates.contains(testDID))
+        XCTAssertFalse(result.cleanedOrphanedAccounts.contains(testDID))
     }
 
     // MARK: - Error Handling Tests
@@ -135,7 +138,7 @@ final class KeychainStorageRaceConditionTests: XCTestCase {
             refreshToken: "refresh123",
             createdAt: Date(),
             expiresIn: 3600,
-            tokenType: "Bearer",
+            tokenType: .bearer,
             did: testDID
         )
 
@@ -151,8 +154,12 @@ final class KeychainStorageRaceConditionTests: XCTestCase {
     func testOrphanedSessionCleanup() async throws {
         let session = createTestSession()
 
-        // Save session without account (simulating orphaned state)
+        // Save session without account (simulating orphaned state).
+        // Validation only visits DIDs in the accounts list, so register the DID
+        // there to model an account whose record was lost mid-write.
         try await keychainStorage.saveSession(session, for: testDID)
+        let accountDIDsData = try JSONEncoder().encode([testDID])
+        try KeychainManager.store(key: "accountDIDs", value: accountDIDsData, namespace: testNamespace)
 
         // Run validation
         let result = await keychainStorage.validateAndRepairAuthenticationState()
@@ -203,16 +210,18 @@ final class KeychainStorageRaceConditionTests: XCTestCase {
                 refreshToken: "refresh\(i)",
                 createdAt: Date(),
                 expiresIn: 3600,
-                tokenType: "Bearer",
+                tokenType: .bearer,
                 did: testDID
             )
         }
 
         // Perform concurrent atomic saves
+        let storage = try XCTUnwrap(keychainStorage)
+        let did = testDID
         await withTaskGroup(of: Void.self) { group in
             for session in sessions {
                 group.addTask {
-                    try? await self.keychainStorage.saveAccountAndSession(account, session: session, for: self.testDID)
+                    try? await storage.saveAccountAndSession(account, session: session, for: did)
                 }
             }
         }
@@ -247,7 +256,7 @@ final class KeychainStorageRaceConditionTests: XCTestCase {
             refreshToken: "test_refresh_token_456",
             createdAt: Date(),
             expiresIn: 3600,
-            tokenType: "Bearer",
+            tokenType: .bearer,
             did: testDID
         )
     }

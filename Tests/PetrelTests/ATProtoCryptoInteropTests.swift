@@ -72,12 +72,12 @@ struct ATProtoCryptoInteropTests {
                     try DID(didString: fixture.publicKeyDid)
                 }
 
-                // Verify message can be decoded
-                let messageData = Data(base64Encoded: fixture.messageBase64)
+                // Verify message can be decoded (fixtures use unpadded base64)
+                let messageData = Data(unpaddedBase64: fixture.messageBase64)
                 #expect(messageData != nil, "Message should be valid base64: \(fixture.messageBase64)")
 
                 // Verify signature can be decoded
-                let signatureData = Data(base64Encoded: fixture.signatureBase64)
+                let signatureData = Data(unpaddedBase64: fixture.signatureBase64)
                 #expect(signatureData != nil, "Signature should be valid base64: \(fixture.signatureBase64)")
 
                 // Check algorithm is supported
@@ -283,7 +283,7 @@ struct ATProtoCryptoInteropTests {
             ]
 
             for message in validBase64Messages {
-                let decoded = Data(base64Encoded: message)
+                let decoded = Data(unpaddedBase64: message)
                 #expect(decoded != nil, "Should be valid base64: \(message)")
             }
         }
@@ -296,7 +296,7 @@ struct ATProtoCryptoInteropTests {
             ]
 
             for signature in validBase64Signatures {
-                let decoded = Data(base64Encoded: signature)
+                let decoded = Data(unpaddedBase64: signature)
                 #expect(decoded != nil, "Should be valid base64: \(signature)")
                 #expect(decoded?.count == 64, "ECDSA signatures should be 64 bytes (32+32)")
             }
@@ -310,7 +310,7 @@ struct ATProtoCryptoInteropTests {
             ]
 
             for signature in derSignatures {
-                let decoded = Data(base64Encoded: signature)
+                let decoded = Data(unpaddedBase64: signature)
                 #expect(decoded != nil, "Should be valid base64: \(signature)")
                 // DER signatures are variable length, not fixed 64 bytes
                 #expect(try #require(decoded?.count) != 64, "DER signatures should not be 64 bytes")
@@ -323,6 +323,15 @@ struct ATProtoCryptoInteropTests {
 // MARK: - Helper Extensions
 
 extension Data {
+    /// Create Data from base64 that may be missing padding.
+    /// The atproto interop fixtures use unpadded base64, while Foundation's
+    /// Data(base64Encoded:) requires padding.
+    init?(unpaddedBase64 string: String) {
+        let remainder = string.count % 4
+        let padded = remainder == 0 ? string : string + String(repeating: "=", count: 4 - remainder)
+        self.init(base64Encoded: padded)
+    }
+
     /// Create Data from hex string
     init?(hexString: String) {
         let len = hexString.count / 2

@@ -12,11 +12,11 @@ struct NetworkErrorTests {
         let requestFailedError = NetworkError.requestFailed
         #expect(requestFailedError.localizedDescription.contains("request"))
 
-        let invalidResponseError = NetworkError.invalidResponse
+        let invalidResponseError = NetworkError.invalidResponse(description: "unexpected payload")
         #expect(invalidResponseError.localizedDescription.contains("response"))
 
         let decodingError = NetworkError.decodingError
-        #expect(decodingError.localizedDescription.contains("decoding"))
+        #expect(decodingError.localizedDescription.contains("decode"))
     }
 
     @Test("NetworkError should handle various HTTP status codes")
@@ -50,16 +50,16 @@ struct AuthErrorTests {
     @Test("AuthError descriptions should be informative")
     func authErrorDescriptions() {
         let invalidCredentialsError = AuthError.invalidCredentials
-        #expect(invalidCredentialsError.localizedDescription.contains("credentials"))
+        #expect(invalidCredentialsError.localizedDescription.contains("username or password"))
 
         let authFailedError = AuthError.authorizationFailed
-        #expect(authFailedError.localizedDescription.contains("authorization"))
+        #expect(authFailedError.localizedDescription.contains("Authentication failed"))
 
         let invalidResponseError = AuthError.invalidResponse
         #expect(invalidResponseError.localizedDescription.contains("response"))
 
         let networkError = AuthError.networkError(NSError(domain: "Network", code: 123))
-        #expect(networkError.localizedDescription.contains("network"))
+        #expect(networkError.localizedDescription.localizedCaseInsensitiveContains("network"))
 
         let invalidConfigError = AuthError.invalidOAuthConfiguration
         #expect(invalidConfigError.localizedDescription.contains("OAuth") || invalidConfigError.localizedDescription.contains("configuration"))

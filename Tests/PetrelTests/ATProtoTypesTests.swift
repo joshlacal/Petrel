@@ -10,7 +10,8 @@ struct ATProtoTypesTests {
         func validDIDCreation() throws {
             #expect(try DID(didString: "did:plc:abcd1234").description == "did:plc:abcd1234")
             #expect(try DID(didString: "did:web:example.com").description == "did:web:example.com")
-            #expect(! try DID(didString: "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK").description.isEmpty)
+            let keyDID = try DID(didString: "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK")
+            #expect(!keyDID.description.isEmpty)
         }
 
         @Test("Invalid DID creation")
@@ -51,17 +52,17 @@ struct ATProtoTypesTests {
         @Test("Valid URI creation")
         func validURICreation() throws {
             let uri = try ATProtocolURI(uriString: "at://did:plc:test/app.bsky.feed.post/abc123")
-            #expect(uri.repo == "did:plc:test")
+            #expect(uri.authority == "did:plc:test")
             #expect(uri.collection == "app.bsky.feed.post")
-            #expect(uri.rkey == "abc123")
+            #expect(uri.recordKey == "abc123")
         }
 
         @Test("URI without rkey")
         func uRIWithoutRkey() throws {
             let uri = try ATProtocolURI(uriString: "at://did:plc:test/app.bsky.feed.post")
-            #expect(uri.repo == "did:plc:test")
+            #expect(uri.authority == "did:plc:test")
             #expect(uri.collection == "app.bsky.feed.post")
-            #expect(uri.rkey == nil)
+            #expect(uri.recordKey == nil)
         }
 
         @Test("Invalid URI creation")
@@ -123,7 +124,8 @@ struct ATProtoTypesTests {
                 try Handle(handleString: longHandle)
             }
 
-            let validLengthHandle = String(repeating: "a", count: 240) + ".com"
+            // Individual DNS labels are limited to 63 characters; build a long-but-valid handle
+            let validLengthHandle = (0 ..< 4).map { _ in String(repeating: "a", count: 60) }.joined(separator: ".") + ".com"
             #expect(throws: Never.self) {
                 try Handle(handleString: validLengthHandle)
             }
@@ -161,7 +163,8 @@ struct ATProtoTypesTests {
                 try NSID(nsidString: longNSID)
             }
 
-            let validLengthNSID = "app.bsky." + String(repeating: "a", count: 500)
+            // NSID segments are limited to 63 characters; build a long-but-valid NSID
+            let validLengthNSID = "app.bsky." + String(repeating: "a", count: 63)
             #expect(throws: Never.self) {
                 try NSID(nsidString: validLengthNSID)
             }

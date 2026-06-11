@@ -19,12 +19,13 @@ final class ServiceDIDMappingTests: XCTestCase {
         let chatDID = await networkService.getServiceDID(for: "chat.bsky.convo.listConvos")
         XCTAssertEqual(chatDID, "did:web:api.bsky.chat#bsky_chat")
 
-        // Test preferences endpoints always use app.bsky DID
+        // Preferences endpoints are never proxied: they go directly to the PDS,
+        // so no service DID is returned for them.
         let getPreferencesDID = await networkService.getServiceDID(for: "app.bsky.actor.getPreferences")
-        XCTAssertEqual(getPreferencesDID, "did:web:api.bsky.app#bsky_appview")
+        XCTAssertNil(getPreferencesDID)
 
         let putPreferencesDID = await networkService.getServiceDID(for: "app.bsky.actor.putPreferences")
-        XCTAssertEqual(putPreferencesDID, "did:web:api.bsky.app#bsky_appview")
+        XCTAssertNil(putPreferencesDID)
 
         // Test endpoint without configured service DID
         let unknownDID = await networkService.getServiceDID(for: "com.atproto.server.createSession")
@@ -44,8 +45,8 @@ final class ServiceDIDMappingTests: XCTestCase {
         let appBskyDID = await networkService.getServiceDID(for: "app.bsky.feed.getTimeline")
         XCTAssertEqual(appBskyDID, customDID)
 
-        // Verify preferences still use the custom DID (since it's the app.bsky DID)
+        // Preferences endpoints are never proxied (PDS direct), even with a custom DID
         let preferencesDID = await networkService.getServiceDID(for: "app.bsky.actor.getPreferences")
-        XCTAssertEqual(preferencesDID, customDID)
+        XCTAssertNil(preferencesDID)
     }
 }

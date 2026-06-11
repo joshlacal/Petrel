@@ -112,7 +112,7 @@ struct CIDTests {
 
     // MARK: - CBOR Encoding Tests
 
-    @Test("CID CBOR encoding returns string")
+    @Test("CID CBOR encoding returns Tag 42 link wrapper")
     func cidCBOREncoding() throws {
         let testData = "Hello, AT Protocol!".data(using: .utf8)!
         let cid = CID.fromDAGCBOR(testData)
@@ -121,10 +121,10 @@ struct CIDTests {
         let cborValue = try cid.toCBORValue()
         print("✓ CID.toCBORValue() returns: \(type(of: cborValue)) = \(cborValue)")
 
-        // Should return string representation (current implementation)
-        #expect(cborValue is String, "CID.toCBORValue() should return String")
-        if let cidString = cborValue as? String {
-            #expect(cidString == cid.string, "Should return CID string representation")
+        // CIDs now use Tag 42 encoding in all CBOR contexts via the CIDAsLink wrapper
+        #expect(cborValue is CIDAsLink, "CID.toCBORValue() should return CIDAsLink")
+        if let link = cborValue as? CIDAsLink {
+            #expect(link.cid == cid, "Wrapper should carry the original CID")
         }
     }
 
@@ -210,14 +210,14 @@ struct CIDTests {
         let linkCBORValue = try atprotoLink.toCBORValue()
         print("✓ ATProtoLink.toCBORValue() returns: \(type(of: linkCBORValue))")
 
-        // Test direct CID encoding (should be string)
+        // Test direct CID encoding (also Tag 42 via CIDAsLink in all CID contexts)
         let cidCBORValue = try testCID.toCBORValue()
         print("✓ CID.toCBORValue() returns: \(type(of: cidCBORValue))")
 
-        // They should be different
+        // Both encode uniformly as Tag 42 links
         #expect(
-            type(of: linkCBORValue) != type(of: cidCBORValue),
-            "ATProtoLink and CID should encode differently"
+            type(of: linkCBORValue) == type(of: cidCBORValue),
+            "ATProtoLink and CID should both encode as Tag 42 links"
         )
 
         // Test full CBOR encoding

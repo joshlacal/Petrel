@@ -35,8 +35,8 @@ final class CircularReferenceTests: XCTestCase {
 
         XCTAssertEqual(result.count, 1)
         XCTAssertEqual(result.followers.count, 1)
-        XCTAssertEqual(result.followers[0].did.value, "did:plc:test123")
-        XCTAssertEqual(result.followers[0].handle.value, "test.bsky.social")
+        XCTAssertEqual(result.followers[0].did.didString(), "did:plc:test123")
+        XCTAssertEqual(result.followers[0].handle.description, "test.bsky.social")
 
         // Verify nested knownFollowers
         XCTAssertNotNil(result.followers[0].viewer)
@@ -49,16 +49,18 @@ final class CircularReferenceTests: XCTestCase {
             count: 1,
             followers: [
                 AppBskyActorDefs.ProfileViewBasic(
-                    did: DID(value: "did:plc:test123"),
-                    handle: Handle(value: "test.bsky.social"),
+                    did: try DID(didString: "did:plc:test123"),
+                    handle: try Handle(handleString: "test.bsky.social"),
                     displayName: nil,
+                    pronouns: nil,
                     avatar: nil,
                     associated: nil,
                     viewer: nil,
                     labels: nil,
                     createdAt: nil,
                     verification: nil,
-                    status: nil
+                    status: nil,
+                    debug: nil
                 ),
             ]
         )

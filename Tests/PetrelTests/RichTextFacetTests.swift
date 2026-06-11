@@ -15,7 +15,7 @@ struct RichTextFacetTests {
             attributed[range].link = URL(string: "https://bsky.social")
         }
 
-        let facets = try #require(attributed.toFacets())
+        let facets = try #require(try attributed.toFacets())
         #expect(facets.count == 1)
 
         let byteSlice = facets[0].index

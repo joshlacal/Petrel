@@ -77,7 +77,7 @@ struct BasicSwiftTestingTests {
         let now = Date()
         let atDate = ATProtocolDate(date: now)
 
-        #expect(atDate.date.timeIntervalSince1970 == now.timeIntervalSince1970, accuracy: 1.0)
+        #expect(abs(atDate.date.timeIntervalSince1970 - now.timeIntervalSince1970) < 1.0)
     }
 
     @Test("Basic async test functionality")

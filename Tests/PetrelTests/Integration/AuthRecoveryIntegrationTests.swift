@@ -54,15 +54,16 @@ struct AuthRecoveryIntegrationTests {
         )
         try await storage.saveSessionBackup(originalSession, for: did)
 
-        // Primary session should not exist (we only saved to backup)
-        let primarySession = try await storage.getSession(for: did)
-        #expect(primarySession == nil)
-
-        // Recover from backup
-        let recovered = try await storage.recoverSessionFromBackup(for: did)
+        // getSession transparently recovers from the backup location and
+        // promotes the session to the primary location.
+        let recovered = try await storage.getSession(for: did)
         #expect(recovered != nil)
         #expect(recovered?.did == did)
         #expect(recovered?.accessToken == "original-access-token")
+
+        // The session should now live at the primary location
+        let primarySession = try await storage.getSession(for: did)
+        #expect(primarySession?.accessToken == "original-access-token")
 
         // Cleanup
         try? await storage.deleteSession(for: did)

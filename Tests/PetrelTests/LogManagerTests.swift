@@ -8,9 +8,9 @@ struct LogManagerTests {
     func logManagerNilSafety() {
         // These should not crash
         LogManager.logSensitiveValue(nil, label: "test")
-        LogManager.logDID(nil, label: "testDID")
+        #expect(LogManager.logDID(nil) == "nil")
         LogManager.logSensitiveValue("", label: "empty")
-        LogManager.logDID("", label: "emptyDID")
+        #expect(LogManager.logDID("") == "")
     }
 
     @Test("LogManager categories should work")
