@@ -32,12 +32,13 @@ def is_excluded(lexicon_id, exclude_namespaces):
         for ns in exclude_namespaces
     )
 
-async def load_lexicons(dirs, exclude_namespaces, cycle_detector, emit=True):
+async def load_lexicons(dirs, exclude_namespaces, cycle_detector, skip_ids=()):
     """Load lexicon JSONs from `dirs`, registering all types with `cycle_detector`.
 
-    Returns [(filepath, lexicon)] for code emission when `emit` is true; with
-    emit=False (overlay reference set) types are registered for cross-package
-    type resolution but no files are returned for generation.
+    Returns [(filepath, lexicon)]. `skip_ids` skips lexicons by id — used so an
+    overlay's emit set shadows identically-named lexicons in the reference set
+    (avoids double type registration). Both emit and reference sets register
+    types for cross-package type resolution.
     """
     loaded = []
     for folder_path in dirs:
@@ -55,6 +56,8 @@ async def load_lexicons(dirs, exclude_namespaces, cycle_detector, emit=True):
 
                 if is_excluded(lexicon_id, exclude_namespaces):
                     continue
+                if lexicon_id in skip_ids:
+                    continue
 
                 # Register types with cycle detector
                 defs = lexicon.get('defs', {})
@@ -68,15 +71,25 @@ async def load_lexicons(dirs, exclude_namespaces, cycle_detector, emit=True):
                     if output_schema.get('type') == 'object':
                         cycle_detector.add_output_type(lexicon_id, output_schema)
 
-                if emit:
-                    loaded.append((filepath, lexicon))
+                loaded.append((filepath, lexicon))
     return loaded
+
+def build_namespace_hierarchy(lexicon_ids):
+    """Builds the 3-level namespace tree used for client namespace classes."""
+    hierarchy = {}
+    for lexicon_id in lexicon_ids:
+        current = hierarchy
+        for part in lexicon_id.split('.')[:3]:
+            current = current.setdefault(part, {})
+    return hierarchy
 
 async def generate_swift_from_lexicons_recursive(
     folder_path,
     output_folder: str,
     exclude_namespaces=DEFAULT_EXCLUDED_NAMESPACES,
     reference_dirs=(),
+    overlay=False,
+    package_name='Petrel',
 ):
     type_dict = {}
     namespace_hierarchy = {}
@@ -87,9 +100,18 @@ async def generate_swift_from_lexicons_recursive(
 
     emit_dirs = folder_path if isinstance(folder_path, (list, tuple)) else [folder_path]
 
-    # First pass: load reference lexicons (type resolution only), then emit set
-    await load_lexicons(reference_dirs, exclude_namespaces, cycle_detector, emit=False)
-    lexicons = await load_lexicons(emit_dirs, exclude_namespaces, cycle_detector, emit=True)
+    # First pass: load the emit set, then the reference set (type resolution only).
+    # The emit set shadows the reference set: a lexicon present in both (e.g. while
+    # custom lexicons still live in the core tree during migration) is treated as
+    # overlay-owned and excluded from the reference hierarchy.
+    lexicons = await load_lexicons(emit_dirs, exclude_namespaces, cycle_detector)
+    emit_ids = {lex.get('id', '') for _, lex in lexicons}
+    reference_lexicons = await load_lexicons(
+        reference_dirs, exclude_namespaces, cycle_detector, skip_ids=emit_ids
+    )
+    reference_hierarchy = build_namespace_hierarchy(
+        lex.get('id', '') for _, lex in reference_lexicons
+    )
 
     # Detect circular dependencies
     cycle_detector.detect_cycles()
@@ -134,6 +156,10 @@ async def generate_swift_from_lexicons_recursive(
 
         swift_code = SwiftCodeGenerator(lexicon, cycle_detector).convert()
 
+        if overlay:
+            # Overlay files compile in a separate module and need the core import.
+            swift_code = swift_code.replace('import Foundation', 'import Foundation\nimport Petrel', 1)
+
         # Create hierarchical output path based on lexicon namespace
         # e.g., "app.bsky.feed.post" -> "Lexicons/App/Bsky/"
         namespace_path = get_namespace_path(lexicon_id)
@@ -152,23 +178,42 @@ async def generate_swift_from_lexicons_recursive(
 
     await asyncio.gather(*tasks)
 
-    type_factory_code = generate_ATProtocolValueContainer_enum(type_dict)
-    swift_namespace_classes = generate_swift_namespace_classes(namespace_hierarchy)
-    atproto_client = render_atproto_client(swift_namespace_classes)
-
-    # Output ATProtocolValueContainer to Core/Types within output folder
-    core_types_dir = os.path.join(output_folder, 'Core', 'Types')
-    os.makedirs(core_types_dir, exist_ok=True)
-    type_factory_file_path = os.path.join(core_types_dir, 'ATProtocolValueContainer.swift')
-    async with aiofiles.open(type_factory_file_path, 'w') as type_factory_file:
-        await type_factory_file.write(type_factory_code)
-
-    # Output main client file to Client directory within output folder
     client_dir = os.path.join(output_folder, 'Client')
     os.makedirs(client_dir, exist_ok=True)
-    class_factory_file_path = os.path.join(client_dir, 'ATProtoClient+Generated.swift')
-    async with aiofiles.open(class_factory_file_path, 'w') as class_factory_file:
-        await class_factory_file.write(atproto_client)
+
+    if overlay:
+        # Overlay: extend the core client's namespace tree instead of regenerating it,
+        # and register this package's types with the core decoder registry.
+        overlay_namespaces = generate_swift_overlay_namespaces(namespace_hierarchy, reference_hierarchy)
+        overlay_client = (
+            "import Foundation\nimport Petrel\n\n"
+            f"// Generated namespace extensions for the {package_name} overlay package.\n\n"
+            + overlay_namespaces
+        )
+        overlay_client_path = os.path.join(client_dir, f'ATProtoClient+{package_name}.swift')
+        async with aiofiles.open(overlay_client_path, 'w') as f:
+            await f.write(overlay_client)
+
+        registration_code = generate_overlay_registration(type_dict, package_name)
+        registration_path = os.path.join(client_dir, f'{package_name}Lexicons.swift')
+        async with aiofiles.open(registration_path, 'w') as f:
+            await f.write(registration_code)
+    else:
+        type_factory_code = generate_ATProtocolValueContainer_enum(type_dict)
+        swift_namespace_classes = generate_swift_namespace_classes(namespace_hierarchy)
+        atproto_client = render_atproto_client(swift_namespace_classes)
+
+        # Output ATProtocolValueContainer to Core/Types within output folder
+        core_types_dir = os.path.join(output_folder, 'Core', 'Types')
+        os.makedirs(core_types_dir, exist_ok=True)
+        type_factory_file_path = os.path.join(core_types_dir, 'ATProtocolValueContainer.swift')
+        async with aiofiles.open(type_factory_file_path, 'w') as type_factory_file:
+            await type_factory_file.write(type_factory_code)
+
+        # Output main client file to Client directory within output folder
+        class_factory_file_path = os.path.join(client_dir, 'ATProtoClient+Generated.swift')
+        async with aiofiles.open(class_factory_file_path, 'w') as class_factory_file:
+            await class_factory_file.write(atproto_client)
 
 def render_atproto_client(generated_classes):
     from templates import TemplateManager
@@ -187,6 +232,81 @@ def generate_ATProtocolValueContainer_enum(type_dict):
     
     json_value_enum_code = template.render(type_cases=type_cases)
     return json_value_enum_code
+
+def generate_swift_overlay_namespaces(emit_hierarchy, reference_hierarchy):
+    """Namespace tree for an overlay package, as extensions on the core client.
+
+    Nodes that already exist in the core (reference) hierarchy are extended;
+    new nodes become nested classes declared inside an extension, so e.g.
+    ATProtoClient.Blue.Catbird.MlsChat resolves exactly like a core namespace
+    and the per-lexicon method extensions attach unchanged.
+    """
+    sections = []
+
+    def class_path(parts):
+        return 'ATProtoClient' + ''.join('.' + convert_to_camel_case(p) for p in parts)
+
+    def render_new_class_tree(name, sub, depth):
+        indent = '    ' * depth
+        class_name = convert_to_camel_case(name)
+        code = f"{indent}public final class {class_name}: @unchecked Sendable {{\n"
+        code += f"{indent}    public let networkService: NetworkService\n"
+        code += f"{indent}    public init(networkService: NetworkService) {{\n"
+        code += f"{indent}        self.networkService = networkService\n"
+        code += f"{indent}    }}\n\n"
+        for child_name, child_sub in sub.items():
+            child_class = convert_to_camel_case(child_name)
+            code += f"{indent}    public lazy var {lower_camel(child_name)}: {child_class} = .init(networkService: networkService)\n\n"
+            code += render_new_class_tree(child_name, child_sub, depth + 1)
+        code += f"{indent}}}\n\n"
+        return code
+
+    def render_extension(parent_parts, name, sub):
+        target = class_path(parent_parts)
+        class_name = convert_to_camel_case(name)
+        prop = lower_camel(name)
+        code = f"public extension {target} {{\n"
+        # Computed (not lazy: extensions cannot add stored state). On the actor this is
+        # actor-isolated, matching the core namespaces' lazy vars (`await client.blue`).
+        code += f"    var {prop}: {class_name} {{ {class_name}(networkService: networkService) }}\n\n"
+        code += render_new_class_tree(name, sub, 1)
+        code += "}\n\n"
+        return code
+
+    def walk(emit_node, ref_node, parts):
+        for name, sub in emit_node.items():
+            if ref_node is not None and name in ref_node:
+                walk(sub, ref_node[name], parts + [name])
+            else:
+                sections.append(render_extension(parts, name, sub))
+
+    walk(emit_hierarchy, reference_hierarchy, [])
+    return ''.join(sections)
+
+
+def generate_overlay_registration(type_dict, package_name):
+    """Startup registration of overlay types with the core decoder registry."""
+    lines = [
+        'import Foundation',
+        'import Petrel',
+        '',
+        f'/// Registers all {package_name} lexicon types with Petrel\'s ATProtocolValueContainer',
+        '/// decoder registry so they decode as .knownType when embedded in core responses.',
+        '/// Call once at app startup, before decoding any responses containing these types.',
+        f'public enum {package_name}Lexicons {{',
+        '    public static func register() {',
+    ]
+    for type_key, swift_type in type_dict.items():
+        lines.append(
+            f'        ATProtocolValueContainer.registerDecoder(forType: "{type_key}", as: {swift_type}.self)'
+        )
+    lines += [
+        '    }',
+        '}',
+        '',
+    ]
+    return '\n'.join(lines)
+
 
 def lower_camel(segment):
     """Lexicon namespace segment -> lowerCamelCase Swift property name.
@@ -252,8 +372,8 @@ async def generate_kotlin_from_lexicons_recursive(
     emit_dirs = folder_path if isinstance(folder_path, (list, tuple)) else [folder_path]
 
     # First pass: load reference lexicons (type resolution only), then emit set
-    await load_lexicons(reference_dirs, exclude_namespaces, cycle_detector, emit=False)
-    lexicons = await load_lexicons(emit_dirs, exclude_namespaces, cycle_detector, emit=True)
+    await load_lexicons(reference_dirs, exclude_namespaces, cycle_detector)
+    lexicons = await load_lexicons(emit_dirs, exclude_namespaces, cycle_detector)
 
     # Detect circular dependencies (less critical for Kotlin but still useful)
     cycle_detector.detect_cycles()
@@ -374,10 +494,12 @@ async def run_manifest(manifest_path, language='both'):
     reference_dirs = lex.get('reference', [])
     exclude = tuple(lex.get('exclude_namespaces', []))
     kind = manifest.get('package', {}).get('kind', 'core')
+    package_name = manifest.get('package', {}).get('name', 'Petrel')
     if kind not in ('core', 'overlay'):
         raise ValueError(f"Unknown package.kind '{kind}' in {manifest_path}")
-    if kind == 'overlay':
-        raise NotImplementedError("overlay manifests are handled in a later stage")
+    overlay = kind == 'overlay'
+    if overlay and not reference_dirs:
+        raise ValueError(f"overlay manifest {manifest_path} must declare lexicons.reference dirs")
 
     tasks = []
     swift_cfg = manifest.get('swift')
@@ -385,9 +507,12 @@ async def run_manifest(manifest_path, language='both'):
         tasks.append(generate_swift_from_lexicons_recursive(
             emit_dirs, swift_cfg['output'],
             exclude_namespaces=exclude, reference_dirs=reference_dirs,
+            overlay=overlay, package_name=package_name,
         ))
     kotlin_cfg = manifest.get('kotlin')
     if kotlin_cfg and language in ('kotlin', 'both'):
+        if overlay:
+            raise NotImplementedError("Kotlin overlay generation is not implemented yet; omit the kotlin section in overlay manifests")
         tasks.append(generate_kotlin_from_lexicons_recursive(
             emit_dirs, kotlin_cfg['output'],
             exclude_namespaces=exclude, reference_dirs=reference_dirs,
