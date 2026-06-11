@@ -22,6 +22,7 @@ enum KeychainError: Error, LocalizedError {
     case dataFormatError
     case unableToCreateKey
     case deletionError(status: Int)
+    case storageUnavailable(String)
 
     var errorDescription: String? {
         switch self {
@@ -35,6 +36,8 @@ enum KeychainError: Error, LocalizedError {
             return "Failed to create cryptographic key from keychain data."
         case let .deletionError(status):
             return "Failed to delete item from keychain (Status: \(status))."
+        case let .storageUnavailable(reason):
+            return "No secure storage backend could be initialized: \(reason)"
         }
     }
 
@@ -137,9 +140,31 @@ enum KeychainManager {
             do {
                 return try FileEncryptedStore()
             } catch {
+                // A library must not kill the host process: surface the failure as a
+                // thrown error on first storage use instead.
                 LogManager.logError("KeychainManager - Failed to initialize FileEncryptedStore: \(error)")
-                fatalError("Unable to initialize secure storage on Linux: \(error)")
+                return UnavailableSecureStorage(underlyingError: error)
             }
+        }
+
+        /// Placeholder backend used when no secure storage could be initialized;
+        /// every operation throws so callers see a recoverable error instead of
+        /// the process aborting.
+        private struct UnavailableSecureStorage: SecureStorage {
+            let underlyingError: Error
+
+            private func unavailable() -> KeychainError {
+                LogManager.logError("KeychainManager - Secure storage unavailable: \(underlyingError)")
+                return KeychainError.storageUnavailable(String(describing: underlyingError))
+            }
+
+            func store(key _: String, value _: Data, namespace _: String, accessGroup _: String?) throws { throw unavailable() }
+            func retrieve(key _: String, namespace _: String, accessGroup _: String?) throws -> Data { throw unavailable() }
+            func delete(key _: String, namespace _: String, accessGroup _: String?) throws { throw unavailable() }
+            func deleteAll(namespace _: String, accessGroup _: String?) throws { throw unavailable() }
+            func storeDPoPKey(_: P256.Signing.PrivateKey, keyTag _: String, accessGroup _: String?) throws { throw unavailable() }
+            func retrieveDPoPKey(keyTag _: String, accessGroup _: String?) throws -> P256.Signing.PrivateKey { throw unavailable() }
+            func deleteDPoPKey(keyTag _: String, accessGroup _: String?) throws { throw unavailable() }
         }
     #endif
 

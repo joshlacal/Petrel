@@ -55,7 +55,7 @@ import Foundation
                             }
                             attributedString[range].richText.tagLink = tagFeature.tag
                         case let .unexpected(unexpected):
-                            print("Unexpected facet getting a red color: \(unexpected.textRepresentation)")
+                            LogManager.logDebug("RichText - Unexpected facet feature: \(unexpected.textRepresentation)")
                             attributedString[range].foregroundColor = .red
                         }
                     }

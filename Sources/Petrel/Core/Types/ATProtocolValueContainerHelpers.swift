@@ -133,7 +133,7 @@ public extension ATProtocolValueContainer {
             }
             return ["type": typeName, "value": jsonDict]
         case let .decodeError(value):
-            print("Decode Error: \(value.debugDescription)")
+            LogManager.logDebug("ATProtocolValueContainer - Decode error: \(value.debugDescription)")
             return value
         }
     }

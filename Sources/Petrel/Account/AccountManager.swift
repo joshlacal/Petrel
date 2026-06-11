@@ -65,25 +65,19 @@ actor AccountManager: AccountManaging {
     /// Initializes a new AccountManager with the specified storage.
     /// - Parameter storage: The KeychainStorage instance to use for account data.
     init(storage: KeychainStorage) async {
-        fputs("[AccountManager] init starting...\n", stderr)
         self.storage = storage
 
         // Attempt to load the last active DID
         do {
-            fputs("[AccountManager] Calling storage.getCurrentDID()...\n", stderr)
             currentDID = try await storage.getCurrentDID()
-            fputs("[AccountManager] getCurrentDID returned: \(currentDID ?? "nil")\n", stderr)
             LogManager.logInfo("AccountManager initialized with current DID: \(currentDID ?? "none")")
 
             // Perform startup recovery to detect and clean up inconsistent states
-            fputs("[AccountManager] Starting performStartupRecovery...\n", stderr)
             await performStartupRecovery()
-            fputs("[AccountManager] performStartupRecovery completed\n", stderr)
         } catch {
-            fputs("[AccountManager] Error in init: \(error)\n", stderr)
+            LogManager.logError("AccountManager - Error in init: \(error)")
             LogManager.logError("AccountManager initialization - Failed to load current DID: \(error)")
         }
-        fputs("[AccountManager] init complete\n", stderr)
     }
 
     /// Performs startup recovery to detect and clean up inconsistent authentication states
