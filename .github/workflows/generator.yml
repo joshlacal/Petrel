@@ -23,7 +23,7 @@ jobs:
       - name: Install SwiftFormat
         run: brew install swiftformat
       - name: Regenerate from manifest
-        run: python3 run.py --manifest Generator/manifests/petrel-core.json
+        run: python3 run.py --manifest generator/manifests/petrel-core.json
       - name: Apply canonical formatting
         run: swiftformat Sources/Petrel/Generated
       - name: Committed generated code must match regenerated output

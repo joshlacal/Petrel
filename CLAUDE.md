@@ -21,14 +21,14 @@ swift test
 ### Regenerating Code from Lexicons
 ```bash
 # Canonical: manifest-driven, Swift + Kotlin, then REQUIRED formatting pass
-python3 run.py --manifest Generator/manifests/petrel-core.json
+python3 run.py --manifest generator/manifests/petrel-core.json
 swiftformat Sources/Petrel/Generated
 
 # Overlay package (PetrelCatbird — Catbird's custom lexicons), run from this repo root
 python3 run.py --manifest ../PetrelCatbird/manifests/petrel-catbird.json
 
 # Legacy positional CLI still works:
-python3 run.py Generator/lexicons Sources/Petrel/Generated --language both
+python3 run.py generator/lexicons Sources/Petrel/Generated --language both
 ```
 The committed generated code is post-SwiftFormat; raw generator output differs
 until `swiftformat Sources/Petrel/Generated` runs (CI enforces the regen+format
@@ -38,10 +38,10 @@ round-trip producing an empty diff).
 
 ### Code Generation Pipeline
 The project uses a Python-based generator that reads Lexicon JSON files and produces Swift and Kotlin code:
-- Entry point: `run.py` → `Generator/main.py`; configuration via JSON manifests in `Generator/manifests/`
-- Templates: `Generator/templates/` (Jinja2; `kotlin/` subdir for Kotlin)
-- Input: `Generator/lexicons/` (standard namespaces only, synced from bluesky-social/atproto; custom lexicons live in overlay packages such as ../PetrelCatbird)
-- Output: `Sources/Petrel/Generated/` (Swift), `petrel-kotlin/src/main/kotlin/com/atproto/generated/` (Kotlin)
+- Entry point: `run.py` → `generator/main.py`; configuration via JSON manifests in `generator/manifests/`
+- Templates: `generator/templates/` (Jinja2; `kotlin/` subdir for Kotlin)
+- Input: `generator/lexicons/` (standard namespaces only, synced from bluesky-social/atproto; custom lexicons live in overlay packages such as ../PetrelCatbird)
+- Output: `Sources/Petrel/Generated/` (Swift), `kotlin/src/main/kotlin/com/atproto/generated/` (Kotlin)
 - `exclude_namespaces` in the manifest filters generation (default excludes `tools.ozone`)
 - Overlay mode (`package.kind: "overlay"`): generates a separate package against this core — extension-declared client namespaces + decoder-registry registration
 

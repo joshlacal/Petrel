@@ -5,7 +5,7 @@
     "name": "Petrel"
   },
   "lexicons": {
-    "emit": ["Generator/lexicons"],
+    "emit": ["generator/lexicons"],
     "reference": [],
     "exclude_namespaces": ["tools.ozone", "site.standard", "internal.bsky"]
   },
@@ -13,6 +13,6 @@
     "output": "Sources/Petrel/Generated"
   },
   "kotlin": {
-    "output": "petrel-kotlin/src/main/kotlin/com/atproto/generated"
+    "output": "kotlin/src/main/kotlin/com/atproto/generated"
   }
 }

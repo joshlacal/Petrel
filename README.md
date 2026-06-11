@@ -7,7 +7,7 @@ Petrel generates strongly-typed clients from the official atproto lexicons — e
 | | |
 |---|---|
 | **Swift** | Swift 6 package; iOS 18+ / macOS 15+ / Linux |
-| **Kotlin** | JVM 17 module (`petrel-kotlin/`), Ktor + kotlinx.serialization |
+| **Kotlin** | JVM 17 module (`kotlin/`), Ktor + kotlinx.serialization |
 | **Auth** | Public OAuth (PAR + PKCE + DPoP), confidential gateway/BFF mode, client-assertion backend, legacy app passwords |
 | **License** | MIT |
 
@@ -23,7 +23,7 @@ dependencies: [
 
 ### Kotlin
 
-The Kotlin package lives in `petrel-kotlin/` and is consumable today via a Gradle [composite build](https://docs.gradle.org/current/userguide/composite_builds.html) or `publishToMavenLocal`; Maven Central publication is planned.
+The Kotlin package lives in `kotlin/` and is consumable today via a Gradle [composite build](https://docs.gradle.org/current/userguide/composite_builds.html) or `publishToMavenLocal`; Maven Central publication is planned.
 
 ## Quick start (Swift)
 
@@ -74,11 +74,11 @@ val timeline = client.app.bsky.feed.getTimeline(AppBskyFeedGetTimelineParameters
 
 ## Extending with custom lexicons
 
-The generator supports **overlay packages**: keep your own lexicon namespaces in a separate package generated against the public core, without forking Petrel. See `Generator/manifests/` and `KOTLIN_GENERATOR.md`.
+The generator supports **overlay packages**: keep your own lexicon namespaces in a separate package generated against the public core, without forking Petrel. See `generator/manifests/` and `KOTLIN_GENERATOR.md`.
 
 ```bash
 # Regenerate from lexicons (core)
-python3 run.py --manifest Generator/manifests/petrel-core.json
+python3 run.py --manifest generator/manifests/petrel-core.json
 swiftformat Sources/Petrel/Generated
 ```
 

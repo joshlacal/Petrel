@@ -4,7 +4,7 @@ import asyncio
 import argparse
 
 # Add the Generator directory to the Python path
-generator_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'Generator'))
+generator_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'generator'))
 sys.path.insert(0, generator_dir)
 
 from main import main, run_manifest

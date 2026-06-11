@@ -22,7 +22,7 @@ jobs:
       - name: Sync standard namespaces
         run: |
           for ns in app chat com tools; do
-            rsync -a --delete "/tmp/atproto/lexicons/$ns/" "Generator/lexicons/$ns/"
+            rsync -a --delete "/tmp/atproto/lexicons/$ns/" "generator/lexicons/$ns/"
           done
       - uses: actions/setup-python@v5
         with:
@@ -33,7 +33,7 @@ jobs:
         run: brew install swiftformat
       - name: Regenerate
         run: |
-          python3 run.py --manifest Generator/manifests/petrel-core.json
+          python3 run.py --manifest generator/manifests/petrel-core.json
           swiftformat Sources/Petrel/Generated
       - name: Open PR if changed
         uses: peter-evans/create-pull-request@v7
