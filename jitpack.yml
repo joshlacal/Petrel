@@ -1,0 +1,5 @@
+# JitPack configuration: the Kotlin package lives in petrel-kotlin/, not the repo root.
+jdk:
+  - openjdk17
+install:
+  - ./gradlew -p petrel-kotlin publishToMavenLocal

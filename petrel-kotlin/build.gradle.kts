@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "com.atproto"
-version = "0.1.0"
+version = providers.gradleProperty("version").orNull?.takeIf { it != "unspecified" } ?: "0.1.0"
 
 dependencies {
     // Kotlin standard library
@@ -40,6 +40,11 @@ kotlin {
     jvmToolchain(17)
 }
 
+java {
+    withSourcesJar()
+    withJavadocJar()
+}
+
 tasks.test {
     useJUnitPlatform()
 }
@@ -48,6 +53,43 @@ publishing {
     publications {
         create<MavenPublication>("maven") {
             from(components["java"])
+
+            pom {
+                name.set("petrel-kotlin")
+                description.set("Kotlin SDK for the AT Protocol and Bluesky, generated from the official lexicons")
+                url.set("https://github.com/joshlacal/Petrel")
+                licenses {
+                    license {
+                        name.set("MIT License")
+                        url.set("https://opensource.org/licenses/MIT")
+                    }
+                }
+                developers {
+                    developer {
+                        id.set("joshlacal")
+                        name.set("Josh LaCalamito")
+                    }
+                }
+                scm {
+                    url.set("https://github.com/joshlacal/Petrel")
+                    connection.set("scm:git:https://github.com/joshlacal/Petrel.git")
+                    developerConnection.set("scm:git:ssh://git@github.com/joshlacal/Petrel.git")
+                }
+            }
         }
+    }
+}
+
+// Signing is required by Maven Central but must not break local/CI builds:
+// only active when a key is provided (ORG_GRADLE_PROJECT_signingKey /
+// ORG_GRADLE_PROJECT_signingPassword environment variables).
+if (providers.gradleProperty("signingKey").isPresent) {
+    apply(plugin = "signing")
+    configure<SigningExtension> {
+        useInMemoryPgpKeys(
+            providers.gradleProperty("signingKey").get(),
+            providers.gradleProperty("signingPassword").orNull ?: ""
+        )
+        sign(extensions.getByType<PublishingExtension>().publications["maven"])
     }
 }
