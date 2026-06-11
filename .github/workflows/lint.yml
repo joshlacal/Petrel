@@ -1,0 +1,35 @@
+name: Lint
+
+on:
+  push:
+    branches: [main, restructure]
+  pull_request:
+
+concurrency:
+  group: lint-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  swiftformat:
+    name: SwiftFormat (generated tree)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install SwiftFormat
+        run: brew install swiftformat
+      - name: Lint generated sources
+        run: swiftformat --lint Sources/Petrel/Generated
+
+  hygiene:
+    name: No print() in library code
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Forbid print()/fputs() in Sources/Petrel
+        run: |
+          matches=$(grep -rnE '^[^/]*\bprint\(|fputs\(' Sources/Petrel --include='*.swift' || true)
+          if [ -n "$matches" ]; then
+            echo "print()/fputs() found in library sources — use LogManager:"
+            echo "$matches"
+            exit 1
+          fi

@@ -1,0 +1,49 @@
+name: Sync lexicons from upstream
+
+on:
+  schedule:
+    - cron: '17 6 * * 1'   # weekly, Monday 06:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    name: Sync and open PR
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch upstream lexicons
+        run: |
+          git clone --depth 1 --filter=blob:none --sparse https://github.com/bluesky-social/atproto.git /tmp/atproto
+          git -C /tmp/atproto sparse-checkout set lexicons
+      - name: Sync standard namespaces
+        run: |
+          for ns in app chat com tools; do
+            rsync -a --delete "/tmp/atproto/lexicons/$ns/" "Generator/lexicons/$ns/"
+          done
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install generator dependencies
+        run: pip install orjson aiofiles jinja2
+      - name: Install SwiftFormat
+        run: brew install swiftformat
+      - name: Regenerate
+        run: |
+          python3 run.py --manifest Generator/manifests/petrel-core.json
+          swiftformat Sources/Petrel/Generated
+      - name: Open PR if changed
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: bot/sync-lexicons
+          title: 'Sync lexicons from bluesky-social/atproto'
+          commit-message: 'Sync standard lexicons from upstream + regenerate'
+          body: |
+            Automated weekly sync of `app`, `chat`, `com`, `tools` lexicon namespaces
+            from [bluesky-social/atproto](https://github.com/bluesky-social/atproto),
+            followed by regeneration (Swift + Kotlin) and SwiftFormat.
+
+            Review the generated-code diff before merging.

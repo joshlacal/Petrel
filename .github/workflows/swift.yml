@@ -1,0 +1,36 @@
+name: Swift
+
+on:
+  push:
+    branches: [main, restructure]
+  pull_request:
+
+concurrency:
+  group: swift-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos:
+    name: macOS build & test
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.4.app || sudo xcode-select -s /Applications/Xcode_16.2.app
+      - name: Build
+        run: swift build
+      - name: Test
+        run: swift test
+
+  linux:
+    name: Linux build & test
+    runs-on: ubuntu-latest
+    container: swift:6.0
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install system dependencies
+        run: apt-get update && apt-get install -y libsecret-1-dev libglib2.0-dev pkg-config
+      - name: Build
+        run: swift build
+      - name: Test
+        run: swift test

@@ -1,0 +1,30 @@
+name: Generator determinism
+
+on:
+  push:
+    branches: [main, restructure]
+  pull_request:
+
+concurrency:
+  group: generator-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  regen-diff:
+    name: Regenerate and diff
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install generator dependencies
+        run: pip install orjson aiofiles jinja2
+      - name: Install SwiftFormat
+        run: brew install swiftformat
+      - name: Regenerate from manifest
+        run: python3 run.py --manifest Generator/manifests/petrel-core.json
+      - name: Apply canonical formatting
+        run: swiftformat Sources/Petrel/Generated
+      - name: Committed generated code must match regenerated output
+        run: git diff --exit-code
