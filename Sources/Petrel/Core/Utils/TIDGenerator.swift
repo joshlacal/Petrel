@@ -68,7 +68,12 @@ public actor TIDGenerator {
     /// Generate a new TID struct
     public func nextTID() -> TID {
         let tidStr = nextStr()
-        return try! TID(tidString: tidStr)
+        guard let tid = try? TID(tidString: tidStr) else {
+            // nextStr() always produces a 13-char base32-sortable string; reaching
+            // this means the generator and validator have diverged.
+            preconditionFailure("TIDGenerator produced an invalid TID: \(tidStr)")
+        }
+        return tid
     }
 
     /// Static convenience method for TID struct

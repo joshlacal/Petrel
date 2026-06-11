@@ -67,6 +67,16 @@ public struct JSONValue: Codable {
 }
 
 public extension ATProtocolValueContainer {
+    /// Decodes a `.knownType` payload as a concrete generated type, e.g.
+    /// `postView.record.decoded(AppBskyFeedPost.self)`. Returns nil when the
+    /// container holds a different type or an unknown/primitive value.
+    func decoded<T: ATProtocolValue>(_: T.Type = T.self) -> T? {
+        if case let .knownType(value) = self {
+            return value as? T
+        }
+        return nil
+    }
+
     var textRepresentation: String {
         switch self {
         case let .knownType(value):
