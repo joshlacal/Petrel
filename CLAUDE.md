@@ -20,22 +20,30 @@ swift test
 
 ### Regenerating Code from Lexicons
 ```bash
-# Swift only (default)
-python run.py Generator/lexicons Sources/Petrel/Generated
+# Canonical: manifest-driven, Swift + Kotlin, then REQUIRED formatting pass
+python3 run.py --manifest Generator/manifests/petrel-core.json
+swiftformat Sources/Petrel/Generated
 
-# Swift + Kotlin (for Android)
-python run.py Generator/lexicons Sources/Petrel/Generated --language both
+# Overlay package (PetrelCatbird — Catbird's custom lexicons), run from this repo root
+python3 run.py --manifest ../PetrelCatbird/manifests/petrel-catbird.json
+
+# Legacy positional CLI still works:
+python3 run.py Generator/lexicons Sources/Petrel/Generated --language both
 ```
+The committed generated code is post-SwiftFormat; raw generator output differs
+until `swiftformat Sources/Petrel/Generated` runs (CI enforces the regen+format
+round-trip producing an empty diff).
 
 ## High-Level Architecture
 
 ### Code Generation Pipeline
-The project uses a Python-based generator that reads Lexicon JSON files and produces Swift code:
-- Entry point: `run.py` → `Generator/main.py`
-- Templates: `Generator/templates/` (Jinja2)
-- Input: `Generator/lexicons/` (JSON files from Bluesky)
-- Output: `Sources/Petrel/Generated/`
-- Note: The generator filters out `subscribe` endpoints and Ozone-related code
+The project uses a Python-based generator that reads Lexicon JSON files and produces Swift and Kotlin code:
+- Entry point: `run.py` → `Generator/main.py`; configuration via JSON manifests in `Generator/manifests/`
+- Templates: `Generator/templates/` (Jinja2; `kotlin/` subdir for Kotlin)
+- Input: `Generator/lexicons/` (standard namespaces only, synced from bluesky-social/atproto; custom lexicons live in overlay packages such as ../PetrelCatbird)
+- Output: `Sources/Petrel/Generated/` (Swift), `petrel-kotlin/src/main/kotlin/com/atproto/generated/` (Kotlin)
+- `exclude_namespaces` in the manifest filters generation (default excludes `tools.ozone`)
+- Overlay mode (`package.kind: "overlay"`): generates a separate package against this core — extension-declared client namespaces + decoder-registry registration
 
 ### Authentication Architecture
 The authentication system supports both OAuth and legacy authentication:
