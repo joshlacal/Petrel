@@ -20,7 +20,7 @@ data class {{ message_union }}Unexpected(val type: String, val payload: kotlinx.
  * underlying WebSocket disconnects. Reconnect / cursor-resume is the caller's
  * responsibility — wrap in `retryWhen { ... }` with backoff as needed.
  */
-fun ATProtoClient.{{ namespace_path }}.{{ function_name }}(
+fun {{ receiver_type }}.{{ function_name }}(
     {% if has_parameters %}parameters: {{ parameters_type }}? = null,
     {% endif %}hostOverride: String? = null,
     websocketClient: io.ktor.client.HttpClient? = null,

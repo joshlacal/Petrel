@@ -3,7 +3,7 @@
  *
  * Endpoint: {{ endpoint }}
  */
-suspend fun ATProtoClient.{{ namespace_path }}.{{ function_name }}(
+suspend fun {{ receiver_type }}.{{ function_name }}(
     {% if has_parameters %}parameters: {{ parameters_type }}{% endif %}
 ): ATProtoResponse<{% if output_type %}{{ output_type }}{% else %}Unit{% endif %}> {
     val endpoint = "{{ endpoint }}"

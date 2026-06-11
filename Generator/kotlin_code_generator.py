@@ -11,7 +11,8 @@ from kotlin_templates import KotlinTemplateManager
 class KotlinCodeGenerator(BaseCodeGenerator):
     """Generates Kotlin code from lexicons."""
 
-    def __init__(self, lexicon: Dict[str, Any], cycle_detector=None):
+    def __init__(self, lexicon: Dict[str, Any], cycle_detector=None, overlay=False):
+        self.overlay = overlay
         super().__init__(lexicon, cycle_detector)
 
         self.class_name = convert_to_pascal_case(self.lexicon_id)
@@ -358,6 +359,19 @@ class KotlinCodeGenerator(BaseCodeGenerator):
             class_name=self.class_name
         )
 
+
+    def _receiver_type(self, namespace_parts):
+        """Extension receiver for endpoint functions.
+
+        Core: nested inner classes on the client (ATProtoClient.Chat.Bsky.Convo).
+        Overlay: standalone namespace classes generated alongside this package
+        (BlueCatbirdMlsChatNamespace), since Kotlin cannot add nested classes
+        to another module's type.
+        """
+        if self.overlay:
+            return ''.join(convert_to_pascal_case(p) for p in namespace_parts) + 'Namespace'
+        return 'ATProtoClient.' + '.'.join(convert_to_pascal_case(p) for p in namespace_parts)
+
     def generate_query_function(self) -> str:
         """Generate suspend function for query endpoint."""
         # Determine namespace
@@ -377,7 +391,7 @@ class KotlinCodeGenerator(BaseCodeGenerator):
         output_encoding = self.main_def.get('output', {}).get('encoding', 'application/json')
 
         return self.template_manager.query_template.render(
-            namespace_path=namespace_path,
+            receiver_type=self._receiver_type(namespace_parts),
             function_name=function_name,
             has_parameters=has_parameters,
             parameters_type=parameters_type,
@@ -409,7 +423,7 @@ class KotlinCodeGenerator(BaseCodeGenerator):
         parameters_type = f"{self.class_name}Parameters" if has_parameters else None
 
         return self.template_manager.procedure_template.render(
-            namespace_path=namespace_path,
+            receiver_type=self._receiver_type(namespace_parts),
             function_name=function_name,
             has_input=has_input,
             has_parameters=has_parameters,
@@ -493,7 +507,7 @@ class KotlinCodeGenerator(BaseCodeGenerator):
                     })
 
         return self.template_manager.subscription_template.render(
-            namespace_path=namespace_path,
+            receiver_type=self._receiver_type(namespace_parts),
             function_name=function_name,
             has_parameters=has_parameters,
             parameters_type=parameters_type,

@@ -3,7 +3,7 @@
  *
  * Endpoint: {{ endpoint }}
  */
-suspend fun ATProtoClient.{{ namespace_path }}.{{ function_name }}(
+suspend fun {{ receiver_type }}.{{ function_name }}(
     {% if has_input and has_parameters %}input: {{ input_type }},
     params: {{ parameters_type }}{% elif has_input %}input: {{ input_type }}{% elif has_parameters %}params: {{ parameters_type }}{% endif %}
 ): ATProtoResponse<{% if output_type %}{{ output_type }}{% else %}Unit{% endif %}> {

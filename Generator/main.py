@@ -359,6 +359,8 @@ async def generate_kotlin_from_lexicons_recursive(
     output_folder: str,
     exclude_namespaces=DEFAULT_EXCLUDED_NAMESPACES,
     reference_dirs=(),
+    overlay=False,
+    package_name='Petrel',
 ):
     """Generate Kotlin code from lexicons."""
     namespace_hierarchy = {}
@@ -371,9 +373,16 @@ async def generate_kotlin_from_lexicons_recursive(
 
     emit_dirs = folder_path if isinstance(folder_path, (list, tuple)) else [folder_path]
 
-    # First pass: load reference lexicons (type resolution only), then emit set
-    await load_lexicons(reference_dirs, exclude_namespaces, cycle_detector)
+    # First pass: load the emit set, then the reference set (type resolution only).
+    # Emit shadows reference (see Swift counterpart).
     lexicons = await load_lexicons(emit_dirs, exclude_namespaces, cycle_detector)
+    emit_ids = {lex.get('id', '') for _, lex in lexicons}
+    reference_lexicons = await load_lexicons(
+        reference_dirs, exclude_namespaces, cycle_detector, skip_ids=emit_ids
+    )
+    reference_hierarchy = build_namespace_hierarchy(
+        lex.get('id', '') for _, lex in reference_lexicons
+    )
 
     # Detect circular dependencies (less critical for Kotlin but still useful)
     cycle_detector.detect_cycles()
@@ -393,7 +402,7 @@ async def generate_kotlin_from_lexicons_recursive(
             current_level = current_level[part]
 
         # Generate Kotlin code
-        kotlin_code = KotlinCodeGenerator(lexicon, cycle_detector).convert()
+        kotlin_code = KotlinCodeGenerator(lexicon, cycle_detector, overlay=overlay).convert()
 
         # Create hierarchical output path based on lexicon namespace
         # e.g., "app.bsky.feed.post" -> "lexicons/app/bsky/"
@@ -414,15 +423,22 @@ async def generate_kotlin_from_lexicons_recursive(
     await asyncio.gather(*tasks)
 
     # Generate namespace classes for Kotlin (inner content only, like Swift)
-    kotlin_namespace_classes = generate_kotlin_namespace_classes(namespace_hierarchy)
-    kotlin_client = render_kotlin_atproto_client(kotlin_namespace_classes)
-
-    # Output main client file to client directory within output folder
     client_dir = os.path.join(output_folder, 'client')
     os.makedirs(client_dir, exist_ok=True)
-    client_main_file_path = os.path.join(client_dir, 'ATProtoClientGenerated.kt')
-    async with aiofiles.open(client_main_file_path, 'w') as client_file:
-        await client_file.write(kotlin_client)
+
+    if overlay:
+        overlay_namespaces = generate_kotlin_overlay_namespaces(namespace_hierarchy, reference_hierarchy)
+        overlay_path = os.path.join(client_dir, f'{package_name}Namespaces.kt')
+        async with aiofiles.open(overlay_path, 'w') as f:
+            await f.write(overlay_namespaces)
+    else:
+        kotlin_namespace_classes = generate_kotlin_namespace_classes(namespace_hierarchy)
+        kotlin_client = render_kotlin_atproto_client(kotlin_namespace_classes)
+
+        # Output main client file to client directory within output folder
+        client_main_file_path = os.path.join(client_dir, 'ATProtoClientGenerated.kt')
+        async with aiofiles.open(client_main_file_path, 'w') as client_file:
+            await client_file.write(kotlin_client)
 
     print(f"Kotlin generation complete: {len(lexicons)} files generated")
 
@@ -471,6 +487,56 @@ def generate_kotlin_namespace_classes(namespace_hierarchy, depth=0):
     return kotlin_code
 
 
+def generate_kotlin_overlay_namespaces(emit_hierarchy, reference_hierarchy):
+    """Namespace tree for a Kotlin overlay module.
+
+    Kotlin cannot add nested classes to another module's type, so new namespace
+    nodes become standalone classes (BlueCatbirdMlsChatNamespace) reached via
+    extension vals on the core client (or on an existing core inner class)."""
+    extensions = []
+    classes = []
+
+    def pascal_concat(parts):
+        return ''.join(convert_to_pascal_case(p) for p in parts)
+
+    def declare_tree(parts, name, sub):
+        cls = pascal_concat(parts + [name]) + 'Namespace'
+        lines = [f"class {cls}(val client: ATProtoClient) {{"]
+        for child, child_sub in sub.items():
+            child_cls = pascal_concat(parts + [name, child]) + 'Namespace'
+            lines.append(f"    val {lower_camel(child)}: {child_cls} get() = {child_cls}(client)")
+        lines.append("}")
+        classes.append('\n'.join(lines))
+        for child, child_sub in sub.items():
+            declare_tree(parts + [name], child, child_sub)
+
+    def emit_new(parent_parts, name, sub):
+        cls = pascal_concat(parent_parts + [name]) + 'Namespace'
+        prop = lower_camel(name)
+        if not parent_parts:
+            extensions.append(f"val ATProtoClient.{prop}: {cls} get() = {cls}(this)")
+        else:
+            parent_target = 'ATProtoClient.' + '.'.join(convert_to_pascal_case(p) for p in parent_parts)
+            extensions.append(f"val {parent_target}.{prop}: {cls} get() = {cls}(client)")
+        declare_tree(parent_parts, name, sub)
+
+    def walk(emit_node, ref_node, parts):
+        for name, sub in emit_node.items():
+            if ref_node is not None and name in ref_node:
+                walk(sub, ref_node[name], parts + [name])
+            else:
+                emit_new(parts, name, sub)
+
+    walk(emit_hierarchy, reference_hierarchy, [])
+
+    header = (
+        "// Generated namespace extensions for an overlay package.\n\n"
+        "package com.atproto.generated\n\n"
+        "import com.atproto.client.*\n\n"
+    )
+    return header + '\n'.join(extensions) + '\n\n' + '\n\n'.join(classes) + '\n'
+
+
 def _resolve_kotlin_output():
     """Resolve the petrel-kotlin generated source root.
 
@@ -511,11 +577,10 @@ async def run_manifest(manifest_path, language='both'):
         ))
     kotlin_cfg = manifest.get('kotlin')
     if kotlin_cfg and language in ('kotlin', 'both'):
-        if overlay:
-            raise NotImplementedError("Kotlin overlay generation is not implemented yet; omit the kotlin section in overlay manifests")
         tasks.append(generate_kotlin_from_lexicons_recursive(
             emit_dirs, kotlin_cfg['output'],
             exclude_namespaces=exclude, reference_dirs=reference_dirs,
+            overlay=overlay, package_name=package_name,
         ))
     await asyncio.gather(*tasks)
 
