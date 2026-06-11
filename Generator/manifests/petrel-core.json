@@ -1,0 +1,18 @@
+{
+  "$comment": "Generation manifest for the public Petrel core package. Paths are relative to the repo root (the directory run.py is invoked from).",
+  "package": {
+    "kind": "core",
+    "name": "Petrel"
+  },
+  "lexicons": {
+    "emit": ["Generator/lexicons"],
+    "reference": [],
+    "exclude_namespaces": ["tools.ozone", "site.standard", "internal.bsky"]
+  },
+  "swift": {
+    "output": "Sources/Petrel/Generated"
+  },
+  "kotlin": {
+    "output": "petrel-kotlin/src/main/kotlin/com/atproto/generated"
+  }
+}

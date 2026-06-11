@@ -19,43 +19,77 @@ def get_namespace_path(lexicon_id: str) -> str:
         return '/'.join(part.capitalize() for part in parts[:2])
     return parts[0].capitalize()
 
-async def generate_swift_from_lexicons_recursive(folder_path: str, output_folder: str):
+DEFAULT_EXCLUDED_NAMESPACES = ('tools.ozone',)
+
+def load_manifest(path):
+    """Load a generation manifest (JSON). Paths inside are relative to CWD."""
+    with open(path, 'rb') as f:
+        return orjson.loads(f.read())
+
+def is_excluded(lexicon_id, exclude_namespaces):
+    return any(
+        lexicon_id == ns or lexicon_id.startswith(ns + '.')
+        for ns in exclude_namespaces
+    )
+
+async def load_lexicons(dirs, exclude_namespaces, cycle_detector, emit=True):
+    """Load lexicon JSONs from `dirs`, registering all types with `cycle_detector`.
+
+    Returns [(filepath, lexicon)] for code emission when `emit` is true; with
+    emit=False (overlay reference set) types are registered for cross-package
+    type resolution but no files are returned for generation.
+    """
+    loaded = []
+    for folder_path in dirs:
+        for root, dirnames, files in os.walk(folder_path):
+            dirnames.sort()   # deterministic traversal so generated output is byte-stable
+            files.sort()
+            for filename in files:
+                if not filename.endswith('.json'):
+                    continue
+                filepath = os.path.join(root, filename)
+                async with aiofiles.open(filepath, 'rb') as f:
+                    content = await f.read()
+                lexicon = orjson.loads(content)
+                lexicon_id = lexicon.get('id', '')
+
+                if is_excluded(lexicon_id, exclude_namespaces):
+                    continue
+
+                # Register types with cycle detector
+                defs = lexicon.get('defs', {})
+                for def_name, def_schema in defs.items():
+                    cycle_detector.add_type(lexicon_id, def_name, def_schema)
+
+                # Also register query/procedure output unions
+                main_def = defs.get('main', {})
+                if main_def.get('type') in ['query', 'procedure']:
+                    output_schema = main_def.get('output', {}).get('schema', {})
+                    if output_schema.get('type') == 'object':
+                        cycle_detector.add_output_type(lexicon_id, output_schema)
+
+                if emit:
+                    loaded.append((filepath, lexicon))
+    return loaded
+
+async def generate_swift_from_lexicons_recursive(
+    folder_path,
+    output_folder: str,
+    exclude_namespaces=DEFAULT_EXCLUDED_NAMESPACES,
+    reference_dirs=(),
+):
     type_dict = {}
     namespace_hierarchy = {}
     cycle_detector = CycleDetector()
-    lexicons = []  # Store all lexicons for two-pass processing
 
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
 
-    # First pass: Load all lexicons and build dependency graph
-    for root, dirs, files in os.walk(folder_path):
-        dirs.sort()   # deterministic traversal so generated output is byte-stable
-        files.sort()
-        for filename in files:
-            if filename.endswith('.json'):
-                filepath = os.path.join(root, filename)
-                async with aiofiles.open(filepath, 'rb') as f:
-                    content = await f.read()
-                    lexicon = orjson.loads(content)
-                    lexicon_id = lexicon.get('id', '')
+    emit_dirs = folder_path if isinstance(folder_path, (list, tuple)) else [folder_path]
 
-                    if 'ozone' in lexicon_id:
-                        continue
-
-                    lexicons.append((filepath, lexicon))
-
-                    # Register types with cycle detector
-                    defs = lexicon.get('defs', {})
-                    for def_name, def_schema in defs.items():
-                        cycle_detector.add_type(lexicon_id, def_name, def_schema)
-
-                    # Also register query/procedure output unions
-                    main_def = defs.get('main', {})
-                    if main_def.get('type') in ['query', 'procedure']:
-                        output_schema = main_def.get('output', {}).get('schema', {})
-                        if output_schema.get('type') == 'object':
-                            cycle_detector.add_output_type(lexicon_id, output_schema)
+    # First pass: load reference lexicons (type resolution only), then emit set
+    await load_lexicons(reference_dirs, exclude_namespaces, cycle_detector, emit=False)
+    lexicons = await load_lexicons(emit_dirs, exclude_namespaces, cycle_detector, emit=True)
 
     # Detect circular dependencies
     cycle_detector.detect_cycles()
@@ -200,45 +234,26 @@ def generate_swift_namespace_classes(namespace_hierarchy, network_manager="Netwo
 
     return swift_code
 
-async def generate_kotlin_from_lexicons_recursive(folder_path: str, output_folder: str):
+async def generate_kotlin_from_lexicons_recursive(
+    folder_path,
+    output_folder: str,
+    exclude_namespaces=DEFAULT_EXCLUDED_NAMESPACES,
+    reference_dirs=(),
+):
     """Generate Kotlin code from lexicons."""
     namespace_hierarchy = {}
     cycle_detector = CycleDetector()
-    lexicons = []
 
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
 
     print("Generating Kotlin code...")
 
-    # First pass: Load all lexicons and build dependency graph
-    for root, dirs, files in os.walk(folder_path):
-        dirs.sort()   # deterministic traversal so generated output is byte-stable
-        files.sort()
-        for filename in files:
-            if filename.endswith('.json'):
-                filepath = os.path.join(root, filename)
-                async with aiofiles.open(filepath, 'rb') as f:
-                    content = await f.read()
-                    lexicon = orjson.loads(content)
-                    lexicon_id = lexicon.get('id', '')
+    emit_dirs = folder_path if isinstance(folder_path, (list, tuple)) else [folder_path]
 
-                    if 'ozone' in lexicon_id:
-                        continue
-
-                    lexicons.append((filepath, lexicon))
-
-                    # Register types with cycle detector
-                    defs = lexicon.get('defs', {})
-                    for def_name, def_schema in defs.items():
-                        cycle_detector.add_type(lexicon_id, def_name, def_schema)
-
-                    # Also register query/procedure output unions
-                    main_def = defs.get('main', {})
-                    if main_def.get('type') in ['query', 'procedure']:
-                        output_schema = main_def.get('output', {}).get('schema', {})
-                        if output_schema.get('type') == 'object':
-                            cycle_detector.add_output_type(lexicon_id, output_schema)
+    # First pass: load reference lexicons (type resolution only), then emit set
+    await load_lexicons(reference_dirs, exclude_namespaces, cycle_detector, emit=False)
+    lexicons = await load_lexicons(emit_dirs, exclude_namespaces, cycle_detector, emit=True)
 
     # Detect circular dependencies (less critical for Kotlin but still useful)
     cycle_detector.detect_cycles()
@@ -351,8 +366,37 @@ def _resolve_kotlin_output():
     )
 
 
+async def run_manifest(manifest_path, language='both'):
+    """Generate from a manifest file (see Generator/manifests/*.json)."""
+    manifest = load_manifest(manifest_path)
+    lex = manifest.get('lexicons', {})
+    emit_dirs = lex.get('emit', [])
+    reference_dirs = lex.get('reference', [])
+    exclude = tuple(lex.get('exclude_namespaces', []))
+    kind = manifest.get('package', {}).get('kind', 'core')
+    if kind not in ('core', 'overlay'):
+        raise ValueError(f"Unknown package.kind '{kind}' in {manifest_path}")
+    if kind == 'overlay':
+        raise NotImplementedError("overlay manifests are handled in a later stage")
+
+    tasks = []
+    swift_cfg = manifest.get('swift')
+    if swift_cfg and language in ('swift', 'both'):
+        tasks.append(generate_swift_from_lexicons_recursive(
+            emit_dirs, swift_cfg['output'],
+            exclude_namespaces=exclude, reference_dirs=reference_dirs,
+        ))
+    kotlin_cfg = manifest.get('kotlin')
+    if kotlin_cfg and language in ('kotlin', 'both'):
+        tasks.append(generate_kotlin_from_lexicons_recursive(
+            emit_dirs, kotlin_cfg['output'],
+            exclude_namespaces=exclude, reference_dirs=reference_dirs,
+        ))
+    await asyncio.gather(*tasks)
+
+
 async def main(input_dir, output_dir, language='swift'):
-    """Main entry point supporting multiple languages."""
+    """Main entry point supporting multiple languages (legacy positional CLI)."""
     if language == 'swift':
         await generate_swift_from_lexicons_recursive(input_dir, output_dir)
     elif language == 'kotlin':
@@ -370,8 +414,14 @@ async def main(input_dir, output_dir, language='swift'):
 
 
 if __name__ == "__main__":
+    if len(sys.argv) >= 3 and sys.argv[1] == '--manifest':
+        language = sys.argv[3] if len(sys.argv) > 3 else 'both'
+        asyncio.run(run_manifest(sys.argv[2], language))
+        sys.exit(0)
+
     if len(sys.argv) < 3:
         print("Usage: python main.py <input_dir> <output_dir> [language]")
+        print("       python main.py --manifest <manifest.json> [language]")
         sys.exit(1)
 
     input_dir = sys.argv[1]
