@@ -68,19 +68,22 @@
         func store(key: String, value: Data, namespace: String, accessGroup: String?) throws {
             let namespacedKey = "\(namespace).\(key)"
 
-            var query: [String: Any] = [
+            // Search attributes only: kSecAttrAccessible must NOT scope the
+            // delete/update, or items written under a previous accessibility
+            // setting never match and the add below collides (-25299).
+            let searchQuery: [String: Any] = [
                 kSecClass as String: kSecClassGenericPassword,
                 kSecAttrAccount as String: namespacedKey,
-                kSecValueData as String: value,
-                kSecAttrAccessible as String: Self.defaultAccessibility,
             ]
+            .merging(Self.platformSpecificAttributes()) { _, new in new }
+            .merging(Self.accessGroupAttributes(accessGroup)) { _, new in new }
 
-            // Add platform-specific attributes
-            query.merge(Self.platformSpecificAttributes()) { _, new in new }
-            query.merge(Self.accessGroupAttributes(accessGroup)) { _, new in new }
+            var addQuery = searchQuery
+            addQuery[kSecValueData as String] = value
+            addQuery[kSecAttrAccessible as String] = Self.defaultAccessibility
 
             // Delete any existing item with the same key
-            let deleteStatus = SecItemDelete(query as CFDictionary)
+            let deleteStatus = SecItemDelete(searchQuery as CFDictionary)
             if deleteStatus != errSecSuccess, deleteStatus != errSecItemNotFound {
                 LogManager.logError(
                     "AppleKeychainStore - Failed to delete existing item for key \(namespacedKey). Status: \(deleteStatus)"
@@ -89,10 +92,27 @@
             }
 
             // Add the new item to the keychain
-            let status = SecItemAdd(query as CFDictionary, nil)
+            let status = SecItemAdd(addQuery as CFDictionary, nil)
             if status == errSecDuplicateItem {
-                LogManager.logError("AppleKeychainStore - Duplicate item for key \(namespacedKey).")
-                throw KeychainError.itemStoreError(status: Int(status))
+                // Cross-process race or an item the delete could not match:
+                // update in place, migrating value and accessibility.
+                let updateAttributes: [String: Any] = [
+                    kSecValueData as String: value,
+                    kSecAttrAccessible as String: Self.defaultAccessibility,
+                ]
+                let updateStatus = SecItemUpdate(
+                    searchQuery as CFDictionary, updateAttributes as CFDictionary
+                )
+                guard updateStatus == errSecSuccess else {
+                    LogManager.logError(
+                        "AppleKeychainStore - Duplicate item for key \(namespacedKey); update fallback failed. Status: \(updateStatus)"
+                    )
+                    throw KeychainError.itemStoreError(status: Int(updateStatus))
+                }
+                LogManager.logDebug(
+                    "AppleKeychainStore - Updated existing item for key \(namespacedKey) after duplicate add."
+                )
+                return
             }
             guard status == errSecSuccess else {
                 LogManager.logError(
