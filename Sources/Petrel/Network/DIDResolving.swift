@@ -93,6 +93,31 @@ actor DIDResolutionService: DIDResolving {
     private let networkService: NetworkService
     private let cache: NSCache<NSString, CacheEntry>
 
+    static func didFromTXTRecord(_ txt: String) -> String? {
+        let trimmed = txt.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let rawDID: String
+        if trimmed.hasPrefix("did=") {
+            rawDID = String(trimmed.dropFirst(4)).trimmingCharacters(in: .whitespacesAndNewlines)
+        } else if trimmed.hasPrefix("did:") {
+            rawDID = trimmed
+        } else {
+            return nil
+        }
+
+        let normalized: String
+        if rawDID.hasPrefix("did:did:") {
+            normalized = "did:" + rawDID.dropFirst("did:did:".count)
+        } else {
+            normalized = rawDID
+        }
+
+        guard normalized.count > "did:".count else {
+            return nil
+        }
+        return normalized
+    }
+
     init(networkService: NetworkService) async {
         self.networkService = networkService
         cache = NSCache<NSString, CacheEntry>()
@@ -268,14 +293,9 @@ actor DIDResolutionService: DIDResolving {
             // For user-specific records
             for (index, record) in records.enumerated() {
                 logger.debug("Examining record [\(index)]: \(record.txt)")
-                // Accept both formats: direct "did:..." and "did=did:..."
-                if record.txt.starts(with: "did:") {
-                    logger.info("Found matching user-specific DID record: \(record.txt)")
-                    return record.txt
-                } else if record.txt.hasPrefix("did=") {
-                    let didValue = record.txt.dropFirst(4)
-                    logger.info("Found matching user-specific DID record with did= prefix: \(didValue)")
-                    return String(didValue)
+                if let did = Self.didFromTXTRecord(record.txt) {
+                    logger.info("Found matching user-specific DID record: \(did)")
+                    return did
                 }
             }
 
