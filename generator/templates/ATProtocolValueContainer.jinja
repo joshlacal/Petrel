@@ -199,7 +199,7 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
         case .bool(let bool):
             return bool
         case .null:
-            return nil as Any?
+            return NSNull()
         case .link(let link):
             return link
         case .bytes(let bytes):
