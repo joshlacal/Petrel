@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: chat.bsky.group.approveJoinRequest
-// [NOTE: This is under active development and should be considered unstable while this note is here]. Approves a request to join a group (via join link) the user owns. Action taken by the group owner.
+// Approves a request to join a group (via join link) the user owns. Action taken by the group owner.
 package blue.catbird.petrel.generated
 
 import kotlinx.serialization.*
@@ -33,7 +33,7 @@ sealed class ChatBskyGroupApproveJoinRequestError(val name: String, val descript
     }
 
 /**
- * [NOTE: This is under active development and should be considered unstable while this note is here]. Approves a request to join a group (via join link) the user owns. Action taken by the group owner.
+ * Approves a request to join a group (via join link) the user owns. Action taken by the group owner.
  *
  * Endpoint: chat.bsky.group.approveJoinRequest
  */

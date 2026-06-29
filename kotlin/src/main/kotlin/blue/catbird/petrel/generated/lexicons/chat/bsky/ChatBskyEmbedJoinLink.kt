@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: chat.bsky.embed.joinLink
-// [NOTE: This is under active development and should be considered unstable while this note is here]. A join link embedded in a chat message.
+// A join link embedded in a chat message.
 package blue.catbird.petrel.generated
 
 import kotlinx.serialization.*

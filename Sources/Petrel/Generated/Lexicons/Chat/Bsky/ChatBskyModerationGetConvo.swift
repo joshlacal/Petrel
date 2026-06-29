@@ -68,7 +68,7 @@ public enum ChatBskyModerationGetConvo {
 public extension ATProtoClient.Chat.Bsky.Moderation {
     // MARK: - getConvo
 
-    /// [NOTE: This is under active development and should be considered unstable while this note is here]. Gets an existing conversation by its ID, for moderation purposes. Does not require the requester to be a member of the conversation.
+    /// Gets an existing conversation by its ID, for moderation purposes. Does not require the requester to be a member of the conversation.
     ///
     /// - Parameter input: The input parameters for the request
     ///

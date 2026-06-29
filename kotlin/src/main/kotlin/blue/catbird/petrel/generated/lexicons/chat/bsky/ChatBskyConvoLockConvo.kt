@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: chat.bsky.convo.lockConvo
-// [NOTE: This is under active development and should be considered unstable while this note is here]. Locks a group convo so no more content (messages, reactions) can be added to it.
+// Locks a group convo so no more content (messages, reactions) can be added to it.
 package blue.catbird.petrel.generated
 
 import kotlinx.serialization.*
@@ -32,7 +32,7 @@ sealed class ChatBskyConvoLockConvoError(val name: String, val description: Stri
     }
 
 /**
- * [NOTE: This is under active development and should be considered unstable while this note is here]. Locks a group convo so no more content (messages, reactions) can be added to it.
+ * Locks a group convo so no more content (messages, reactions) can be added to it.
  *
  * Endpoint: chat.bsky.convo.lockConvo
  */

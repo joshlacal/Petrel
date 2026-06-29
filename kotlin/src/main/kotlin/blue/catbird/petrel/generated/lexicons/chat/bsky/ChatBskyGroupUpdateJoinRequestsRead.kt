@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: chat.bsky.group.updateJoinRequestsRead
-// [NOTE: This is under active development and should be considered unstable while this note is here]. Marks all join requests as read for the group owner.
+// Marks all join requests as read for the group owner.
 package blue.catbird.petrel.generated
 
 import kotlinx.serialization.*
@@ -29,7 +29,7 @@ sealed class ChatBskyGroupUpdateJoinRequestsReadError(val name: String, val desc
     }
 
 /**
- * [NOTE: This is under active development and should be considered unstable while this note is here]. Marks all join requests as read for the group owner.
+ * Marks all join requests as read for the group owner.
  *
  * Endpoint: chat.bsky.group.updateJoinRequestsRead
  */

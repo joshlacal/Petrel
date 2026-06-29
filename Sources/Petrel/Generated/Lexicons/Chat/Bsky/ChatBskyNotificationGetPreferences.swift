@@ -1,0 +1,100 @@
+import Foundation
+
+// lexicon: 1, id: chat.bsky.notification.getPreferences
+
+public enum ChatBskyNotificationGetPreferences {
+    public static let typeIdentifier = "chat.bsky.notification.getPreferences"
+
+    public struct Output: ATProtocolCodable {
+        public let preferences: ChatBskyNotificationDefs.Preferences
+
+        /// Standard public initializer
+        public init(
+            preferences: ChatBskyNotificationDefs.Preferences
+
+        ) {
+            self.preferences = preferences
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            preferences = try container.decode(ChatBskyNotificationDefs.Preferences.self, forKey: .preferences)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            try container.encode(preferences, forKey: .preferences)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+
+            let preferencesValue = try preferences.toCBORValue()
+            map = map.adding(key: "preferences", value: preferencesValue)
+
+            return map
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case preferences
+        }
+    }
+}
+
+public extension ATProtoClient.Chat.Bsky.Notification {
+    // MARK: - getPreferences
+
+    /// Get the requesting account's chat notification preferences. Defaults are returned for accounts that have not set any preferences. Requires auth.
+    ///
+    /// - Returns: A tuple containing the HTTP response code and the decoded response data
+    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    func getPreferences() async throws -> (responseCode: Int, data: ChatBskyNotificationGetPreferences.Output?) {
+        let endpoint = "chat.bsky.notification.getPreferences"
+
+        let queryItems: [URLQueryItem]? = nil
+
+        let urlRequest = try await networkService.createURLRequest(
+            endpoint: endpoint,
+            method: "GET",
+            headers: ["Accept": "application/json"],
+            body: nil,
+            queryItems: queryItems
+        )
+
+        // Determine service DID for this endpoint
+        let serviceDID = await networkService.getServiceDID(for: "chat.bsky.notification.getPreferences")
+        let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
+        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let responseCode = response.statusCode
+
+        // Only validate Content-Type and decode on success. Error responses
+        // (4xx/5xx) may have missing or different Content-Type headers and
+        // are handled via the status code / structured error parser below.
+        if (200 ... 299).contains(responseCode) {
+            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+            }
+
+            if !contentType.lowercased().contains("application/json") {
+                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+            }
+
+            do {
+                let decoder = JSONDecoder()
+                let decodedData = try decoder.decode(ChatBskyNotificationGetPreferences.Output.self, from: responseData)
+
+                return (responseCode, decodedData)
+            } catch {
+                // Log the decoding error for debugging but still return the response code
+                LogManager.logError("Failed to decode successful response for chat.bsky.notification.getPreferences: \(error)")
+                return (responseCode, nil)
+            }
+        } else {
+            // If we can't parse a structured error, return the response code
+            // (maintains backward compatibility for endpoints without defined errors)
+            return (responseCode, nil)
+        }
+    }
+}

@@ -147,6 +147,7 @@ public enum ChatBskyConvoSendMessageBatch {
     public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
         case convoLocked = "ConvoLocked."
         case invalidConvo = "InvalidConvo."
+        case replyTargetNotFound = "ReplyTargetNotFound."
         public var description: String {
             return rawValue
         }

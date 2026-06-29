@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: chat.bsky.group.editJoinLink
-// [NOTE: This is under active development and should be considered unstable while this note is here]. Edits the existing join link settings for the group convo.
+// Edits the existing join link settings for the group convo.
 package blue.catbird.petrel.generated
 
 import kotlinx.serialization.*
@@ -34,7 +34,7 @@ sealed class ChatBskyGroupEditJoinLinkError(val name: String, val description: S
     }
 
 /**
- * [NOTE: This is under active development and should be considered unstable while this note is here]. Edits the existing join link settings for the group convo.
+ * Edits the existing join link settings for the group convo.
  *
  * Endpoint: chat.bsky.group.editJoinLink
  */

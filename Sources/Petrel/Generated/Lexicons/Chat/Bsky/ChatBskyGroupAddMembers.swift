@@ -128,7 +128,7 @@ public enum ChatBskyGroupAddMembers {
 public extension ATProtoClient.Chat.Bsky.Group {
     // MARK: - addMembers
 
-    // [NOTE: This is under active development and should be considered unstable while this note is here]. Adds members to a group. The members are added in 'request' status, so they have to accept it. This creates convo memberships.
+    // Adds members to a group. The members are added in 'request' status, so they have to accept it. This creates convo memberships.
     //
     // - Parameter input: The input parameters for the request
 

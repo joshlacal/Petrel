@@ -97,7 +97,7 @@ public enum ChatBskyGroupApproveJoinRequest {
 public extension ATProtoClient.Chat.Bsky.Group {
     // MARK: - approveJoinRequest
 
-    // [NOTE: This is under active development and should be considered unstable while this note is here]. Approves a request to join a group (via join link) the user owns. Action taken by the group owner.
+    // Approves a request to join a group (via join link) the user owns. Action taken by the group owner.
     //
     // - Parameter input: The input parameters for the request
 

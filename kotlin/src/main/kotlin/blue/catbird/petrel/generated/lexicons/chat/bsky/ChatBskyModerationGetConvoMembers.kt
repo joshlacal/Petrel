@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: chat.bsky.moderation.getConvoMembers
-// [NOTE: This is under active development and should be considered unstable while this note is here]. Returns a paginated list of members from a conversation, for moderation purposes. Does not require the requester to be a member of the conversation.
+// Returns a paginated list of members from a conversation, for moderation purposes. Does not require the requester to be a member of the conversation.
 package blue.catbird.petrel.generated
 
 import kotlinx.serialization.*
@@ -33,7 +33,7 @@ sealed class ChatBskyModerationGetConvoMembersError(val name: String, val descri
     }
 
 /**
- * [NOTE: This is under active development and should be considered unstable while this note is here]. Returns a paginated list of members from a conversation, for moderation purposes. Does not require the requester to be a member of the conversation.
+ * Returns a paginated list of members from a conversation, for moderation purposes. Does not require the requester to be a member of the conversation.
  *
  * Endpoint: chat.bsky.moderation.getConvoMembers
  */

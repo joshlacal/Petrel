@@ -74,7 +74,7 @@ public enum ChatBskyGroupUpdateJoinRequestsRead {
 public extension ATProtoClient.Chat.Bsky.Group {
     // MARK: - updateJoinRequestsRead
 
-    // [NOTE: This is under active development and should be considered unstable while this note is here]. Marks all join requests as read for the group owner.
+    // Marks all join requests as read for the group owner.
     //
     // - Parameter input: The input parameters for the request
 

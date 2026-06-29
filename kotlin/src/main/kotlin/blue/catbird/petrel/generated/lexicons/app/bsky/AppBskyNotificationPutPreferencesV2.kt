@@ -17,7 +17,7 @@ object AppBskyNotificationPutPreferencesV2Defs {
 
 @Serializable
     data class AppBskyNotificationPutPreferencesV2Input(
-        @SerialName("chat")
+// Deprecated: use chat.bsky.notification preferences instead. Setting this won't stick and the default values will be returned.        @SerialName("chat")
         val chat: AppBskyNotificationDefsChatPreference? = null,        @SerialName("follow")
         val follow: AppBskyNotificationDefsFilterablePreference? = null,        @SerialName("like")
         val like: AppBskyNotificationDefsFilterablePreference? = null,        @SerialName("likeViaRepost")

@@ -389,6 +389,12 @@ class ATProtoClient(val networkService: NetworkService) {
                 val client: ATProtoClient get() = this@ATProtoClient
             }
 
+            val notification: Notification = Notification()
+
+            inner class Notification {
+                val client: ATProtoClient get() = this@ATProtoClient
+            }
+
         }
 
     }

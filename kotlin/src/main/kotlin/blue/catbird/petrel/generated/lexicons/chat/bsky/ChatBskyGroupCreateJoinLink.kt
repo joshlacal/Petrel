@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: chat.bsky.group.createJoinLink
-// [NOTE: This is under active development and should be considered unstable while this note is here]. Creates a join link for the group convo.
+// Creates a join link for the group convo.
 package blue.catbird.petrel.generated
 
 import kotlinx.serialization.*
@@ -34,7 +34,7 @@ sealed class ChatBskyGroupCreateJoinLinkError(val name: String, val description:
     }
 
 /**
- * [NOTE: This is under active development and should be considered unstable while this note is here]. Creates a join link for the group convo.
+ * Creates a join link for the group convo.
  *
  * Endpoint: chat.bsky.group.createJoinLink
  */

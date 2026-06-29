@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: chat.bsky.convo.listConvoRequests
-// [NOTE: This is under active development and should be considered unstable while this note is here]. Returns a page of incoming conversation requests for the user. Direct convo requests are returned as convoView; group join requests made by the user are returned as joinRequestConvoView.
+// Returns a page of incoming conversation requests for the user. Direct convo requests are returned as convoView; group join requests made by the user are returned as joinRequestConvoView.
 package blue.catbird.petrel.generated
 
 import kotlinx.serialization.*
@@ -89,7 +89,7 @@ object ChatBskyConvoListConvoRequestsOutputRequestsUnionSerializer : kotlinx.ser
         val requests: List<ChatBskyConvoListConvoRequestsOutputRequestsUnion>    )
 
 /**
- * [NOTE: This is under active development and should be considered unstable while this note is here]. Returns a page of incoming conversation requests for the user. Direct convo requests are returned as convoView; group join requests made by the user are returned as joinRequestConvoView.
+ * Returns a page of incoming conversation requests for the user. Direct convo requests are returned as convoView; group join requests made by the user are returned as joinRequestConvoView.
  *
  * Endpoint: chat.bsky.convo.listConvoRequests
  */

@@ -117,7 +117,7 @@ public enum ChatBskyGroupRequestJoin {
 public extension ATProtoClient.Chat.Bsky.Group {
     // MARK: - requestJoin
 
-    // [NOTE: This is under active development and should be considered unstable while this note is here]. Sends a request to join a group (via join link) to the group owner. Action taken by the prospective group member.
+    // Sends a request to join a group (via join link) to the group owner. Action taken by the prospective group member.
     //
     // - Parameter input: The input parameters for the request
 

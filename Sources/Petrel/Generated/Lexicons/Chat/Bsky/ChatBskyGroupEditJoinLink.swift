@@ -108,7 +108,7 @@ public enum ChatBskyGroupEditJoinLink {
 public extension ATProtoClient.Chat.Bsky.Group {
     // MARK: - editJoinLink
 
-    // [NOTE: This is under active development and should be considered unstable while this note is here]. Edits the existing join link settings for the group convo.
+    // Edits the existing join link settings for the group convo.
     //
     // - Parameter input: The input parameters for the request
 

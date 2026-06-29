@@ -90,7 +90,7 @@ public enum ChatBskyGroupDisableJoinLink {
 public extension ATProtoClient.Chat.Bsky.Group {
     // MARK: - disableJoinLink
 
-    // [NOTE: This is under active development and should be considered unstable while this note is here]. Disables the active join link for the group convo.
+    // Disables the active join link for the group convo.
     //
     // - Parameter input: The input parameters for the request
 

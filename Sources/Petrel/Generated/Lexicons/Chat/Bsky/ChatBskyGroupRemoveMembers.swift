@@ -96,7 +96,7 @@ public enum ChatBskyGroupRemoveMembers {
 public extension ATProtoClient.Chat.Bsky.Group {
     // MARK: - removeMembers
 
-    // [NOTE: This is under active development and should be considered unstable while this note is here]. Removes members from a group. This deletes convo memberships, doesn't just set a status.
+    // Removes members from a group. This deletes convo memberships, doesn't just set a status.
     //
     // - Parameter input: The input parameters for the request
 

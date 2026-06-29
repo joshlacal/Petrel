@@ -1072,6 +1072,15 @@ public actor ATProtoClient {
                     self.networkService = networkService
                 }
             }
+
+            public lazy var notification: Notification = .init(networkService: self.networkService)
+
+            public final class Notification: @unchecked Sendable {
+                public let networkService: NetworkService
+                public init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
         }
     }
 
