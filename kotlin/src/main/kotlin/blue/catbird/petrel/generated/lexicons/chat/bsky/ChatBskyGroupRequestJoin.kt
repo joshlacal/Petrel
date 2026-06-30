@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: chat.bsky.group.requestJoin
-// [NOTE: This is under active development and should be considered unstable while this note is here]. Sends a request to join a group (via join link) to the group owner. Action taken by the prospective group member.
+// Sends a request to join a group (via join link) to the group owner. Action taken by the prospective group member.
 package blue.catbird.petrel.generated
 
 import kotlinx.serialization.*
@@ -36,7 +36,7 @@ sealed class ChatBskyGroupRequestJoinError(val name: String, val description: St
     }
 
 /**
- * [NOTE: This is under active development and should be considered unstable while this note is here]. Sends a request to join a group (via join link) to the group owner. Action taken by the prospective group member.
+ * Sends a request to join a group (via join link) to the group owner. Action taken by the prospective group member.
  *
  * Endpoint: chat.bsky.group.requestJoin
  */

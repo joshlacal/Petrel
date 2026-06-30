@@ -114,9 +114,6 @@ enum class ChatBskyActorDefsMemberRole {
         }
     }
 
-    /**
-     * [NOTE: This is under active development and should be considered unstable while this note is here].
-     */
     @Serializable
     class ChatBskyActorDefsDirectConvoMember {
         companion object {
@@ -125,7 +122,7 @@ enum class ChatBskyActorDefsMemberRole {
     }
 
     /**
-     * [NOTE: This is under active development and should be considered unstable while this note is here]. A current group convo member.
+     * A current group convo member.
      */
     @Serializable
     data class ChatBskyActorDefsGroupConvoMember(
@@ -138,7 +135,7 @@ enum class ChatBskyActorDefsMemberRole {
     }
 
     /**
-     * [NOTE: This is under active development and should be considered unstable while this note is here]. A past group convo member.
+     * A past group convo member.
      */
     @Serializable
     class ChatBskyActorDefsPastGroupConvoMember {

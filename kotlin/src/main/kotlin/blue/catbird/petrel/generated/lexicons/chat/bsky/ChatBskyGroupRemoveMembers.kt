@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: chat.bsky.group.removeMembers
-// [NOTE: This is under active development and should be considered unstable while this note is here]. Removes members from a group. This deletes convo memberships, doesn't just set a status.
+// Removes members from a group. This deletes convo memberships, doesn't just set a status.
 package blue.catbird.petrel.generated
 
 import kotlinx.serialization.*
@@ -32,7 +32,7 @@ sealed class ChatBskyGroupRemoveMembersError(val name: String, val description: 
     }
 
 /**
- * [NOTE: This is under active development and should be considered unstable while this note is here]. Removes members from a group. This deletes convo memberships, doesn't just set a status.
+ * Removes members from a group. This deletes convo memberships, doesn't just set a status.
  *
  * Endpoint: chat.bsky.group.removeMembers
  */

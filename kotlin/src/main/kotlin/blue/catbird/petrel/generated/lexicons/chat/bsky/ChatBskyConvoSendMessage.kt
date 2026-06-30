@@ -26,6 +26,7 @@ object ChatBskyConvoSendMessageDefs {
 sealed class ChatBskyConvoSendMessageError(val name: String, val description: String?) {
         object ConvoLocked: ChatBskyConvoSendMessageError("ConvoLocked", "")
         object InvalidConvo: ChatBskyConvoSendMessageError("InvalidConvo", "")
+        object ReplyTargetNotFound: ChatBskyConvoSendMessageError("ReplyTargetNotFound", "")
     }
 
 /**

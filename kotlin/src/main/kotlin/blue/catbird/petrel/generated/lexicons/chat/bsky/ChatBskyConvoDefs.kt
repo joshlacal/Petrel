@@ -137,6 +137,79 @@ object ChatBskyConvoDefsMessageViewEmbedUnionSerializer : kotlinx.serialization.
     }
 }
 
+@Serializable(with = ChatBskyConvoDefsMessageViewReplyToUnionSerializer::class)
+sealed interface ChatBskyConvoDefsMessageViewReplyToUnion {
+    @Serializable
+    data class MessageView(val value: blue.catbird.petrel.generated.ChatBskyConvoDefsMessageView) : ChatBskyConvoDefsMessageViewReplyToUnion
+
+    @Serializable
+    data class DeletedMessageView(val value: blue.catbird.petrel.generated.ChatBskyConvoDefsDeletedMessageView) : ChatBskyConvoDefsMessageViewReplyToUnion
+
+    @Serializable
+    data class MessageBeforeUserJoinedGroupView(val value: blue.catbird.petrel.generated.ChatBskyConvoDefsMessageBeforeUserJoinedGroupView) : ChatBskyConvoDefsMessageViewReplyToUnion
+
+    @Serializable
+    data class Unexpected(val value: JsonElement) : ChatBskyConvoDefsMessageViewReplyToUnion
+}
+
+object ChatBskyConvoDefsMessageViewReplyToUnionSerializer : kotlinx.serialization.KSerializer<ChatBskyConvoDefsMessageViewReplyToUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("ChatBskyConvoDefsMessageViewReplyToUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ChatBskyConvoDefsMessageViewReplyToUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is ChatBskyConvoDefsMessageViewReplyToUnion.MessageView -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsMessageView.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#messageView")
+                })
+            }
+            is ChatBskyConvoDefsMessageViewReplyToUnion.DeletedMessageView -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsDeletedMessageView.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#deletedMessageView")
+                })
+            }
+            is ChatBskyConvoDefsMessageViewReplyToUnion.MessageBeforeUserJoinedGroupView -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsMessageBeforeUserJoinedGroupView.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#messageBeforeUserJoinedGroupView")
+                })
+            }
+            is ChatBskyConvoDefsMessageViewReplyToUnion.Unexpected -> value.value
+            // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
+            // subscription codegen) are runtime-only sentinels; JSON round-trip
+            // serialises them as an empty object tagged with the variant class
+            // name. Consumers should filter these before JSON serialisation.
+            else -> kotlinx.serialization.json.buildJsonObject {
+                put("\$type", kotlinx.serialization.json.JsonPrimitive(value::class.simpleName ?: "Unknown"))
+            }
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ChatBskyConvoDefsMessageViewReplyToUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "chat.bsky.convo.defs#messageView" -> ChatBskyConvoDefsMessageViewReplyToUnion.MessageView(
+                jsonDecoder.json.decodeFromJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsMessageView.serializer(), element)
+            )
+            "chat.bsky.convo.defs#deletedMessageView" -> ChatBskyConvoDefsMessageViewReplyToUnion.DeletedMessageView(
+                jsonDecoder.json.decodeFromJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsDeletedMessageView.serializer(), element)
+            )
+            "chat.bsky.convo.defs#messageBeforeUserJoinedGroupView" -> ChatBskyConvoDefsMessageViewReplyToUnion.MessageBeforeUserJoinedGroupView(
+                jsonDecoder.json.decodeFromJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsMessageBeforeUserJoinedGroupView.serializer(), element)
+            )
+            else -> ChatBskyConvoDefsMessageViewReplyToUnion.Unexpected(element)
+        }
+    }
+}
+
 @Serializable(with = ChatBskyConvoDefsSystemMessageViewDataUnionSerializer::class)
 sealed interface ChatBskyConvoDefsSystemMessageViewDataUnion {
     @Serializable
@@ -940,9 +1013,22 @@ enum class ChatBskyConvoDefsConvoStatus {
         @SerialName("text")
         val text: String,/** Annotations of text (mentions, URLs, hashtags, etc) */        @SerialName("facets")
         val facets: List<AppBskyRichtextFacet>? = null,        @SerialName("embed")
-        val embed: ChatBskyConvoDefsMessageInputEmbedUnion? = null    ) {
+        val embed: ChatBskyConvoDefsMessageInputEmbedUnion? = null,/** If set, the message this message is replying to. The referenced message must be in the same convo. */        @SerialName("replyTo")
+        val replyTo: ChatBskyConvoDefsReplyRef? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#chatBskyConvoDefsMessageInput"
+        }
+    }
+
+    /**
+     * A reference to another message within the same convo, used to indicate that a message is a reply to it.
+     */
+    @Serializable
+    data class ChatBskyConvoDefsReplyRef(
+        @SerialName("messageId")
+        val messageId: String    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#chatBskyConvoDefsReplyRef"
         }
     }
 
@@ -954,7 +1040,8 @@ enum class ChatBskyConvoDefsConvoStatus {
         val text: String,/** Annotations of text (mentions, URLs, hashtags, etc) */        @SerialName("facets")
         val facets: List<AppBskyRichtextFacet>? = null,        @SerialName("embed")
         val embed: ChatBskyConvoDefsMessageViewEmbedUnion? = null,/** Reactions to this message, in ascending order of creation time. */        @SerialName("reactions")
-        val reactions: List<ChatBskyConvoDefsReactionView>? = null,        @SerialName("sender")
+        val reactions: List<ChatBskyConvoDefsReactionView>? = null,/** If set, the message this message is replying to. The full view of the referenced message is embedded so the client can render it inline. Only a single level is embedded: the embedded message will not itself have a populated 'replyTo' field even if it was also a reply. */        @SerialName("replyTo")
+        val replyTo: ChatBskyConvoDefsMessageViewReplyToUnion? = null,        @SerialName("sender")
         val sender: ChatBskyConvoDefsMessageViewSender,        @SerialName("sentAt")
         val sentAt: ATProtocolDate    ) {
         companion object {
@@ -971,9 +1058,6 @@ enum class ChatBskyConvoDefsConvoStatus {
         }
     }
 
-    /**
-     * [NOTE: This is under active development and should be considered unstable while this note is here].
-     */
     @Serializable
     data class ChatBskyConvoDefsSystemMessageView(
         @SerialName("id")
@@ -987,7 +1071,7 @@ enum class ChatBskyConvoDefsConvoStatus {
     }
 
     /**
-     * [NOTE: This is under active development and should be considered unstable while this note is here]. System message indicating a user was added to the group convo.
+     * System message indicating a user was added to the group convo.
      */
     @Serializable
     data class ChatBskyConvoDefsSystemMessageDataAddMember(
@@ -1001,7 +1085,7 @@ enum class ChatBskyConvoDefsConvoStatus {
     }
 
     /**
-     * [NOTE: This is under active development and should be considered unstable while this note is here]. System message indicating a user was removed from the group convo.
+     * System message indicating a user was removed from the group convo.
      */
     @Serializable
     data class ChatBskyConvoDefsSystemMessageDataRemoveMember(
@@ -1014,7 +1098,7 @@ enum class ChatBskyConvoDefsConvoStatus {
     }
 
     /**
-     * [NOTE: This is under active development and should be considered unstable while this note is here]. System message indicating a user joined the group convo via join link.
+     * System message indicating a user joined the group convo via join link.
      */
     @Serializable
     data class ChatBskyConvoDefsSystemMessageDataMemberJoin(
@@ -1028,7 +1112,7 @@ enum class ChatBskyConvoDefsConvoStatus {
     }
 
     /**
-     * [NOTE: This is under active development and should be considered unstable while this note is here]. System message indicating a user voluntarily left the group convo.
+     * System message indicating a user voluntarily left the group convo.
      */
     @Serializable
     data class ChatBskyConvoDefsSystemMessageDataMemberLeave(
@@ -1040,7 +1124,7 @@ enum class ChatBskyConvoDefsConvoStatus {
     }
 
     /**
-     * [NOTE: This is under active development and should be considered unstable while this note is here]. System message indicating the group convo was locked.
+     * System message indicating the group convo was locked.
      */
     @Serializable
     data class ChatBskyConvoDefsSystemMessageDataLockConvo(
@@ -1052,7 +1136,7 @@ enum class ChatBskyConvoDefsConvoStatus {
     }
 
     /**
-     * [NOTE: This is under active development and should be considered unstable while this note is here]. System message indicating the group convo was unlocked.
+     * System message indicating the group convo was unlocked.
      */
     @Serializable
     data class ChatBskyConvoDefsSystemMessageDataUnlockConvo(
@@ -1064,7 +1148,7 @@ enum class ChatBskyConvoDefsConvoStatus {
     }
 
     /**
-     * [NOTE: This is under active development and should be considered unstable while this note is here]. System message indicating the group convo was locked permanently.
+     * System message indicating the group convo was locked permanently.
      */
     @Serializable
     data class ChatBskyConvoDefsSystemMessageDataLockConvoPermanently(
@@ -1076,7 +1160,7 @@ enum class ChatBskyConvoDefsConvoStatus {
     }
 
     /**
-     * [NOTE: This is under active development and should be considered unstable while this note is here]. System message indicating the group info was edited.
+     * System message indicating the group info was edited.
      */
     @Serializable
     data class ChatBskyConvoDefsSystemMessageDataEditGroup(
@@ -1089,7 +1173,7 @@ enum class ChatBskyConvoDefsConvoStatus {
     }
 
     /**
-     * [NOTE: This is under active development and should be considered unstable while this note is here]. System message indicating the group join link was created.
+     * System message indicating the group join link was created.
      */
     @Serializable
     class ChatBskyConvoDefsSystemMessageDataCreateJoinLink {
@@ -1099,7 +1183,7 @@ enum class ChatBskyConvoDefsConvoStatus {
     }
 
     /**
-     * [NOTE: This is under active development and should be considered unstable while this note is here]. System message indicating the group join link was edited.
+     * System message indicating the group join link was edited.
      */
     @Serializable
     class ChatBskyConvoDefsSystemMessageDataEditJoinLink {
@@ -1109,7 +1193,7 @@ enum class ChatBskyConvoDefsConvoStatus {
     }
 
     /**
-     * [NOTE: This is under active development and should be considered unstable while this note is here]. System message indicating the group join link was enabled.
+     * System message indicating the group join link was enabled.
      */
     @Serializable
     class ChatBskyConvoDefsSystemMessageDataEnableJoinLink {
@@ -1119,7 +1203,7 @@ enum class ChatBskyConvoDefsConvoStatus {
     }
 
     /**
-     * [NOTE: This is under active development and should be considered unstable while this note is here]. System message indicating the group join link was disabled.
+     * System message indicating the group join link was disabled.
      */
     @Serializable
     class ChatBskyConvoDefsSystemMessageDataDisableJoinLink {
@@ -1137,6 +1221,16 @@ enum class ChatBskyConvoDefsConvoStatus {
         val sentAt: ATProtocolDate    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#chatBskyConvoDefsDeletedMessageView"
+        }
+    }
+
+    /**
+     * Placeholder embedded in place of a reply's parent message when that parent was sent before the viewer joined the group convo. The viewer has no access to that history, so no message data is carried.
+     */
+    @Serializable
+    class ChatBskyConvoDefsMessageBeforeUserJoinedGroupView {
+        companion object {
+            const val TYPE_IDENTIFIER = "#chatBskyConvoDefsMessageBeforeUserJoinedGroupView"
         }
     }
 
@@ -1196,9 +1290,6 @@ enum class ChatBskyConvoDefsConvoStatus {
         }
     }
 
-    /**
-     * [NOTE: This is under active development and should be considered unstable while this note is here].
-     */
     @Serializable
     class ChatBskyConvoDefsDirectConvo {
         companion object {
@@ -1206,9 +1297,6 @@ enum class ChatBskyConvoDefsConvoStatus {
         }
     }
 
-    /**
-     * [NOTE: This is under active development and should be considered unstable while this note is here].
-     */
     @Serializable
     data class ChatBskyConvoDefsGroupConvo(
         @SerialName("createdAt")
@@ -1367,7 +1455,7 @@ enum class ChatBskyConvoDefsConvoStatus {
     }
 
     /**
-     * [NOTE: This is under active development and should be considered unstable while this note is here]. Event indicating a convo was read up to a certain message.
+     * Event indicating a convo was read up to a certain message.
      */
     @Serializable
     data class ChatBskyConvoDefsLogReadConvo(
@@ -1381,7 +1469,7 @@ enum class ChatBskyConvoDefsConvoStatus {
     }
 
     /**
-     * [NOTE: This is under active development and should be considered unstable while this note is here]. Event indicating a member was added to a group convo. The member who was added gets a logBeginConvo (to create the convo) but also a logAddMember (to show the system message as the first message the user sees).
+     * Event indicating a member was added to a group convo. The member who was added gets a logBeginConvo (to create the convo) but also a logAddMember (to show the system message as the first message the user sees).
      */
     @Serializable
     data class ChatBskyConvoDefsLogAddMember(
@@ -1396,7 +1484,7 @@ enum class ChatBskyConvoDefsConvoStatus {
     }
 
     /**
-     * [NOTE: This is under active development and should be considered unstable while this note is here]. Event indicating a member was removed from a group convo. The member who was removed gets a logLeaveConvo (to leave the convo) but not a logRemoveMember (because they already left, so can't see the system message).
+     * Event indicating a member was removed from a group convo. The member who was removed gets a logLeaveConvo (to leave the convo) but not a logRemoveMember (because they already left, so can't see the system message).
      */
     @Serializable
     data class ChatBskyConvoDefsLogRemoveMember(
@@ -1411,7 +1499,7 @@ enum class ChatBskyConvoDefsConvoStatus {
     }
 
     /**
-     * [NOTE: This is under active development and should be considered unstable while this note is here]. Event indicating a member joined a group convo via join link. The member who was added gets a logBeginConvo (to create the convo) but also a logMemberJoin (to show the system message as the first message the user sees).
+     * Event indicating a member joined a group convo via join link. The member who was added gets a logBeginConvo (to create the convo) but also a logMemberJoin (to show the system message as the first message the user sees).
      */
     @Serializable
     data class ChatBskyConvoDefsLogMemberJoin(
@@ -1426,7 +1514,7 @@ enum class ChatBskyConvoDefsConvoStatus {
     }
 
     /**
-     * [NOTE: This is under active development and should be considered unstable while this note is here]. Event indicating a member voluntarily left a group convo. The member who was removed gets a logLeaveConvo (to leave the convo) but not a logMemberLeave (because they already left, so can't see the system message).
+     * Event indicating a member voluntarily left a group convo. The member who was removed gets a logLeaveConvo (to leave the convo) but not a logMemberLeave (because they already left, so can't see the system message).
      */
     @Serializable
     data class ChatBskyConvoDefsLogMemberLeave(
@@ -1441,7 +1529,7 @@ enum class ChatBskyConvoDefsConvoStatus {
     }
 
     /**
-     * [NOTE: This is under active development and should be considered unstable while this note is here]. Event indicating a group convo was locked.
+     * Event indicating a group convo was locked.
      */
     @Serializable
     data class ChatBskyConvoDefsLogLockConvo(
@@ -1456,7 +1544,7 @@ enum class ChatBskyConvoDefsConvoStatus {
     }
 
     /**
-     * [NOTE: This is under active development and should be considered unstable while this note is here]. Event indicating a group convo was unlocked.
+     * Event indicating a group convo was unlocked.
      */
     @Serializable
     data class ChatBskyConvoDefsLogUnlockConvo(
@@ -1471,7 +1559,7 @@ enum class ChatBskyConvoDefsConvoStatus {
     }
 
     /**
-     * [NOTE: This is under active development and should be considered unstable while this note is here]. Event indicating a group convo was locked permanently.
+     * Event indicating a group convo was locked permanently.
      */
     @Serializable
     data class ChatBskyConvoDefsLogLockConvoPermanently(
@@ -1486,7 +1574,7 @@ enum class ChatBskyConvoDefsConvoStatus {
     }
 
     /**
-     * [NOTE: This is under active development and should be considered unstable while this note is here]. Event indicating info about group convo was edited.
+     * Event indicating info about group convo was edited.
      */
     @Serializable
     data class ChatBskyConvoDefsLogEditGroup(
@@ -1500,7 +1588,7 @@ enum class ChatBskyConvoDefsConvoStatus {
     }
 
     /**
-     * [NOTE: This is under active development and should be considered unstable while this note is here]. Event indicating a join link was created for a group convo.
+     * Event indicating a join link was created for a group convo.
      */
     @Serializable
     data class ChatBskyConvoDefsLogCreateJoinLink(
@@ -1514,7 +1602,7 @@ enum class ChatBskyConvoDefsConvoStatus {
     }
 
     /**
-     * [NOTE: This is under active development and should be considered unstable while this note is here]. Event indicating a settings about a join link for a group convo were edited.
+     * Event indicating a settings about a join link for a group convo were edited.
      */
     @Serializable
     data class ChatBskyConvoDefsLogEditJoinLink(
@@ -1528,7 +1616,7 @@ enum class ChatBskyConvoDefsConvoStatus {
     }
 
     /**
-     * [NOTE: This is under active development and should be considered unstable while this note is here]. Event indicating a join link was enabled for a group convo.
+     * Event indicating a join link was enabled for a group convo.
      */
     @Serializable
     data class ChatBskyConvoDefsLogEnableJoinLink(
@@ -1542,7 +1630,7 @@ enum class ChatBskyConvoDefsConvoStatus {
     }
 
     /**
-     * [NOTE: This is under active development and should be considered unstable while this note is here]. Event indicating a join link was disabled for a group convo.
+     * Event indicating a join link was disabled for a group convo.
      */
     @Serializable
     data class ChatBskyConvoDefsLogDisableJoinLink(
@@ -1556,7 +1644,7 @@ enum class ChatBskyConvoDefsConvoStatus {
     }
 
     /**
-     * [NOTE: This is under active development and should be considered unstable while this note is here]. Event indicating a join request was made to a group the viewer owns. Only the owner gets this.
+     * Event indicating a join request was made to a group the viewer owns. Only the owner gets this.
      */
     @Serializable
     data class ChatBskyConvoDefsLogIncomingJoinRequest(
@@ -1570,7 +1658,7 @@ enum class ChatBskyConvoDefsConvoStatus {
     }
 
     /**
-     * [NOTE: This is under active development and should be considered unstable while this note is here]. Event indicating a join request was approved by the viewer. Only the owner gets this. The approved member gets a logBeginConvo.
+     * Event indicating a join request was approved by the viewer. Only the owner gets this. The approved member gets a logBeginConvo.
      */
     @Serializable
     data class ChatBskyConvoDefsLogApproveJoinRequest(
@@ -1584,7 +1672,7 @@ enum class ChatBskyConvoDefsConvoStatus {
     }
 
     /**
-     * [NOTE: This is under active development and should be considered unstable while this note is here]. Event indicating a join request was rejected by the viewer. Only the owner gets this.
+     * Event indicating a join request was rejected by the viewer. Only the owner gets this.
      */
     @Serializable
     data class ChatBskyConvoDefsLogRejectJoinRequest(
@@ -1598,7 +1686,7 @@ enum class ChatBskyConvoDefsConvoStatus {
     }
 
     /**
-     * [NOTE: This is under active development and should be considered unstable while this note is here]. Event indicating a join request was made by the requester. Only requester actor gets this.
+     * Event indicating a join request was made by the requester. Only requester actor gets this.
      */
     @Serializable
     data class ChatBskyConvoDefsLogOutgoingJoinRequest(
@@ -1611,7 +1699,7 @@ enum class ChatBskyConvoDefsConvoStatus {
     }
 
     /**
-     * [NOTE: This is under active development and should be considered unstable while this note is here]. Event indicating a prospective member withdrew their join request. Only the owner gets this.
+     * Event indicating a prospective member withdrew their join request. Only the owner gets this.
      */
     @Serializable
     data class ChatBskyConvoDefsLogWithdrawIncomingJoinRequest(
@@ -1625,7 +1713,7 @@ enum class ChatBskyConvoDefsConvoStatus {
     }
 
     /**
-     * [NOTE: This is under active development and should be considered unstable while this note is here]. Event indicating the viewer withdrew their own join request. Only requester actor gets this.
+     * Event indicating the viewer withdrew their own join request. Only requester actor gets this.
      */
     @Serializable
     data class ChatBskyConvoDefsLogWithdrawOutgoingJoinRequest(
@@ -1638,7 +1726,7 @@ enum class ChatBskyConvoDefsConvoStatus {
     }
 
     /**
-     * [NOTE: This is under active development and should be considered unstable while this note is here]. Event indicating the group owner marked join requests as read. Only the owner gets this.
+     * Event indicating the group owner marked join requests as read. Only the owner gets this.
      */
     @Serializable
     data class ChatBskyConvoDefsLogReadJoinRequests(

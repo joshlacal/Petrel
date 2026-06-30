@@ -97,7 +97,7 @@ public enum ChatBskyGroupEditGroup {
 public extension ATProtoClient.Chat.Bsky.Group {
     // MARK: - editGroup
 
-    // [NOTE: This is under active development and should be considered unstable while this note is here]. Edits group settings.
+    // Edits group settings.
     //
     // - Parameter input: The input parameters for the request
 

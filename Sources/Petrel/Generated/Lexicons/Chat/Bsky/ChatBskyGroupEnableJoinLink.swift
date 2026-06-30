@@ -91,7 +91,7 @@ public enum ChatBskyGroupEnableJoinLink {
 public extension ATProtoClient.Chat.Bsky.Group {
     // MARK: - enableJoinLink
 
-    // [NOTE: This is under active development and should be considered unstable while this note is here]. Re-enables a previously disabled join link for the group convo.
+    // Re-enables a previously disabled join link for the group convo.
     //
     // - Parameter input: The input parameters for the request
 

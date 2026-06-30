@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: chat.bsky.group.listJoinRequests
-// [NOTE: This is under active development and should be considered unstable while this note is here]. Lists a page of request to join a group (via join link) the user owns. Shows the data from the owner's point of view.
+// Lists a page of request to join a group (via join link) the user owns. Shows the data from the owner's point of view.
 package blue.catbird.petrel.generated
 
 import kotlinx.serialization.*
@@ -34,7 +34,7 @@ sealed class ChatBskyGroupListJoinRequestsError(val name: String, val descriptio
     }
 
 /**
- * [NOTE: This is under active development and should be considered unstable while this note is here]. Lists a page of request to join a group (via join link) the user owns. Shows the data from the owner's point of view.
+ * Lists a page of request to join a group (via join link) the user owns. Shows the data from the owner's point of view.
  *
  * Endpoint: chat.bsky.group.listJoinRequests
  */

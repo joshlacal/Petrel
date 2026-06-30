@@ -4,6 +4,15 @@ import Foundation
 
 public enum ChatBskyConvoGetUnreadCounts {
     public static let typeIdentifier = "chat.bsky.convo.getUnreadCounts"
+    public struct Parameters: Parametrizable {
+        public let includeGroupChats: Bool?
+
+        public init(
+            includeGroupChats: Bool? = nil
+        ) {
+            self.includeGroupChats = includeGroupChats
+        }
+    }
 
     public struct Output: ATProtocolCodable {
         public let unreadAcceptedConvos: Int
@@ -60,14 +69,16 @@ public enum ChatBskyConvoGetUnreadCounts {
 public extension ATProtoClient.Chat.Bsky.Convo {
     // MARK: - getUnreadCounts
 
-    /// Returns unread conversation counts equivalent to one page of chat.bsky.convo.listConvos with readState=unread and lockStatus=unlocked, split by convo status. The combined total is capped at 31, where 31 means more than 30.
+    /// Returns unread conversation counts for conversations that are unlocked, not muted, split by convo status. Direct convos are excluded when a block relationship exists between the actor and the other member, or when the other member's account is deleted or deactivated. Group convos are considered unread if they have unread join request counts.
+    ///
+    /// - Parameter input: The input parameters for the request
     ///
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
-    func getUnreadCounts() async throws -> (responseCode: Int, data: ChatBskyConvoGetUnreadCounts.Output?) {
+    func getUnreadCounts(input: ChatBskyConvoGetUnreadCounts.Parameters) async throws -> (responseCode: Int, data: ChatBskyConvoGetUnreadCounts.Output?) {
         let endpoint = "chat.bsky.convo.getUnreadCounts"
 
-        let queryItems: [URLQueryItem]? = nil
+        let queryItems = input.asQueryItems()
 
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,

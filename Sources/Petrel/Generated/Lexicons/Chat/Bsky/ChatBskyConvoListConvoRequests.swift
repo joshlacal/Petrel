@@ -214,7 +214,7 @@ public enum ChatBskyConvoListConvoRequests {
 public extension ATProtoClient.Chat.Bsky.Convo {
     // MARK: - listConvoRequests
 
-    /// [NOTE: This is under active development and should be considered unstable while this note is here]. Returns a page of incoming conversation requests for the user. Direct convo requests are returned as convoView; group join requests made by the user are returned as joinRequestConvoView.
+    /// Returns a page of incoming conversation requests for the user. Direct convo requests are returned as convoView; group join requests made by the user are returned as joinRequestConvoView.
     ///
     /// - Parameter input: The input parameters for the request
     ///

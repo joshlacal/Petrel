@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: chat.bsky.group.withdrawJoinRequest
-// [NOTE: This is under active development and should be considered unstable while this note is here]. Withdraws a pending request to join a group. Action taken by the prospective member who originally requested to join.
+// Withdraws a pending request to join a group. Action taken by the prospective member who originally requested to join.
 package blue.catbird.petrel.generated
 
 import kotlinx.serialization.*
@@ -28,7 +28,7 @@ sealed class ChatBskyGroupWithdrawJoinRequestError(val name: String, val descrip
     }
 
 /**
- * [NOTE: This is under active development and should be considered unstable while this note is here]. Withdraws a pending request to join a group. Action taken by the prospective member who originally requested to join.
+ * Withdraws a pending request to join a group. Action taken by the prospective member who originally requested to join.
  *
  * Endpoint: chat.bsky.group.withdrawJoinRequest
  */

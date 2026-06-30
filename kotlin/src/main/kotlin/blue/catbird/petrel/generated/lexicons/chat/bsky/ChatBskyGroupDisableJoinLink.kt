@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: chat.bsky.group.disableJoinLink
-// [NOTE: This is under active development and should be considered unstable while this note is here]. Disables the active join link for the group convo.
+// Disables the active join link for the group convo.
 package blue.catbird.petrel.generated
 
 import kotlinx.serialization.*
@@ -32,7 +32,7 @@ sealed class ChatBskyGroupDisableJoinLinkError(val name: String, val description
     }
 
 /**
- * [NOTE: This is under active development and should be considered unstable while this note is here]. Disables the active join link for the group convo.
+ * Disables the active join link for the group convo.
  *
  * Endpoint: chat.bsky.group.disableJoinLink
  */

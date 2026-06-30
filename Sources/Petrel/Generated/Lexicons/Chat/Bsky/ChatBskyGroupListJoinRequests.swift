@@ -99,7 +99,7 @@ public enum ChatBskyGroupListJoinRequests {
 public extension ATProtoClient.Chat.Bsky.Group {
     // MARK: - listJoinRequests
 
-    /// [NOTE: This is under active development and should be considered unstable while this note is here]. Lists a page of request to join a group (via join link) the user owns. Shows the data from the owner's point of view.
+    /// Lists a page of request to join a group (via join link) the user owns. Shows the data from the owner's point of view.
     ///
     /// - Parameter input: The input parameters for the request
     ///

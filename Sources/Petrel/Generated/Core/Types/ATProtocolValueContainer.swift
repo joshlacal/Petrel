@@ -1917,6 +1917,16 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
 
+            decoders["chat.bsky.convo.defs#replyRef"] = { decoder in
+                do {
+                    let decodedObject = try ChatBskyConvoDefs.ReplyRef(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding ChatBskyConvoDefs.ReplyRef: \(error)")
+                    return .decodeError("Error decoding ChatBskyConvoDefs.ReplyRef: \(error)")
+                }
+            }
+
             decoders["chat.bsky.convo.defs#messageView"] = { decoder in
                 do {
                     let decodedObject = try ChatBskyConvoDefs.MessageView(from: decoder)
@@ -2074,6 +2084,16 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 } catch {
                     LogManager.logDebug("Error decoding ChatBskyConvoDefs.DeletedMessageView: \(error)")
                     return .decodeError("Error decoding ChatBskyConvoDefs.DeletedMessageView: \(error)")
+                }
+            }
+
+            decoders["chat.bsky.convo.defs#messageBeforeUserJoinedGroupView"] = { decoder in
+                do {
+                    let decodedObject = try ChatBskyConvoDefs.MessageBeforeUserJoinedGroupView(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding ChatBskyConvoDefs.MessageBeforeUserJoinedGroupView: \(error)")
+                    return .decodeError("Error decoding ChatBskyConvoDefs.MessageBeforeUserJoinedGroupView: \(error)")
                 }
             }
 
@@ -2694,6 +2714,26 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 } catch {
                     LogManager.logDebug("Error decoding ChatBskyModerationSubscribeModEvents.EventRateLimitExceeded: \(error)")
                     return .decodeError("Error decoding ChatBskyModerationSubscribeModEvents.EventRateLimitExceeded: \(error)")
+                }
+            }
+
+            decoders["chat.bsky.notification.defs#preferences"] = { decoder in
+                do {
+                    let decodedObject = try ChatBskyNotificationDefs.Preferences(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding ChatBskyNotificationDefs.Preferences: \(error)")
+                    return .decodeError("Error decoding ChatBskyNotificationDefs.Preferences: \(error)")
+                }
+            }
+
+            decoders["chat.bsky.notification.defs#chatPreference"] = { decoder in
+                do {
+                    let decodedObject = try ChatBskyNotificationDefs.ChatPreference(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding ChatBskyNotificationDefs.ChatPreference: \(error)")
+                    return .decodeError("Error decoding ChatBskyNotificationDefs.ChatPreference: \(error)")
                 }
             }
 

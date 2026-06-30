@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: chat.bsky.group.defs
-// [NOTE: This is under active development and should be considered unstable while this note is here].
+
 package blue.catbird.petrel.generated
 
 import kotlinx.serialization.*

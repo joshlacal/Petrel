@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: chat.bsky.convo.unlockConvo
-// [NOTE: This is under active development and should be considered unstable while this note is here]. Unlocks a group convo so it is able to receive new content.
+// Unlocks a group convo so it is able to receive new content.
 package blue.catbird.petrel.generated
 
 import kotlinx.serialization.*
@@ -32,7 +32,7 @@ sealed class ChatBskyConvoUnlockConvoError(val name: String, val description: St
     }
 
 /**
- * [NOTE: This is under active development and should be considered unstable while this note is here]. Unlocks a group convo so it is able to receive new content.
+ * Unlocks a group convo so it is able to receive new content.
  *
  * Endpoint: chat.bsky.convo.unlockConvo
  */

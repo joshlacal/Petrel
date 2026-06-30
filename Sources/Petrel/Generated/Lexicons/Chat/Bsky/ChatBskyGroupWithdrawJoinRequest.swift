@@ -73,7 +73,7 @@ public enum ChatBskyGroupWithdrawJoinRequest {
 public extension ATProtoClient.Chat.Bsky.Group {
     // MARK: - withdrawJoinRequest
 
-    // [NOTE: This is under active development and should be considered unstable while this note is here]. Withdraws a pending request to join a group. Action taken by the prospective member who originally requested to join.
+    // Withdraws a pending request to join a group. Action taken by the prospective member who originally requested to join.
     //
     // - Parameter input: The input parameters for the request
 

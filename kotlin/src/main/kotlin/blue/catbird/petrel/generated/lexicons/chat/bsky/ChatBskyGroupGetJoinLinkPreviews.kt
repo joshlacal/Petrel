@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: chat.bsky.group.getJoinLinkPreviews
-// [NOTE: This is under active development and should be considered unstable while this note is here]. Get public information about groups from join links. The output array matches the input codes one-to-one by position (and each view also carries its 'code'). Disabled codes return a disabledJoinLinkPreviewView, and codes that do not map to a previewable link return an invalidJoinLinkPreviewView.
+// Get public information about groups from join links. The output array matches the input codes one-to-one by position (and each view also carries its 'code'). Disabled codes return a disabledJoinLinkPreviewView, and codes that do not map to a previewable link return an invalidJoinLinkPreviewView.
 package blue.catbird.petrel.generated
 
 import kotlinx.serialization.*
@@ -99,7 +99,7 @@ object ChatBskyGroupGetJoinLinkPreviewsOutputJoinLinkPreviewsUnionSerializer : k
         val joinLinkPreviews: List<ChatBskyGroupGetJoinLinkPreviewsOutputJoinLinkPreviewsUnion>    )
 
 /**
- * [NOTE: This is under active development and should be considered unstable while this note is here]. Get public information about groups from join links. The output array matches the input codes one-to-one by position (and each view also carries its 'code'). Disabled codes return a disabledJoinLinkPreviewView, and codes that do not map to a previewable link return an invalidJoinLinkPreviewView.
+ * Get public information about groups from join links. The output array matches the input codes one-to-one by position (and each view also carries its 'code'). Disabled codes return a disabledJoinLinkPreviewView, and codes that do not map to a previewable link return an invalidJoinLinkPreviewView.
  *
  * Endpoint: chat.bsky.group.getJoinLinkPreviews
  */

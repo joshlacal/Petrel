@@ -170,13 +170,15 @@ public enum ChatBskyConvoDefs {
         public let text: String
         public let facets: [AppBskyRichtextFacet]?
         public let embed: MessageInputEmbedUnion?
+        public let replyTo: ReplyRef?
 
         public init(
-            text: String, facets: [AppBskyRichtextFacet]?, embed: MessageInputEmbedUnion?
+            text: String, facets: [AppBskyRichtextFacet]?, embed: MessageInputEmbedUnion?, replyTo: ReplyRef?
         ) {
             self.text = text
             self.facets = facets
             self.embed = embed
+            self.replyTo = replyTo
         }
 
         public init(from decoder: Decoder) throws {
@@ -203,6 +205,14 @@ public enum ChatBskyConvoDefs {
                 LogManager.logWarning("Decoding error for optional property 'embed' — degrading to nil: \(error)")
                 embed = nil
             }
+            do {
+                replyTo = try container.decodeIfPresent(ReplyRef.self, forKey: .replyTo)
+            } catch {
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'replyTo' — degrading to nil: \(error)")
+                replyTo = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -211,6 +221,7 @@ public enum ChatBskyConvoDefs {
             try container.encode(text, forKey: .text)
             try container.encodeIfPresent(facets, forKey: .facets)
             try container.encodeIfPresent(embed, forKey: .embed)
+            try container.encodeIfPresent(replyTo, forKey: .replyTo)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -221,6 +232,11 @@ public enum ChatBskyConvoDefs {
                 hasher.combine(nil as Int?)
             }
             if let value = embed {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = replyTo {
                 hasher.combine(value)
             } else {
                 hasher.combine(nil as Int?)
@@ -236,6 +252,9 @@ public enum ChatBskyConvoDefs {
                 return false
             }
             if embed != other.embed {
+                return false
+            }
+            if replyTo != other.replyTo {
                 return false
             }
             return true
@@ -258,6 +277,10 @@ public enum ChatBskyConvoDefs {
                 let embedValue = try value.toCBORValue()
                 map = map.adding(key: "embed", value: embedValue)
             }
+            if let value = replyTo {
+                let replyToValue = try value.toCBORValue()
+                map = map.adding(key: "replyTo", value: replyToValue)
+            }
             return map
         }
 
@@ -266,6 +289,63 @@ public enum ChatBskyConvoDefs {
             case text
             case facets
             case embed
+            case replyTo
+        }
+    }
+
+    public struct ReplyRef: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "chat.bsky.convo.defs#replyRef"
+        public let messageId: String
+
+        public init(
+            messageId: String
+        ) {
+            self.messageId = messageId
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                messageId = try container.decode(String.self, forKey: .messageId)
+            } catch {
+                LogManager.logError("Decoding error for required property 'messageId': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            try container.encode(messageId, forKey: .messageId)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(messageId)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+            if messageId != other.messageId {
+                return false
+            }
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            let messageIdValue = try messageId.toCBORValue()
+            map = map.adding(key: "messageId", value: messageIdValue)
+            return map
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case messageId
         }
     }
 
@@ -277,11 +357,12 @@ public enum ChatBskyConvoDefs {
         public let facets: [AppBskyRichtextFacet]?
         public let embed: MessageViewEmbedUnion?
         public let reactions: [ReactionView]?
+        public let replyTo: MessageViewReplyToUnion?
         public let sender: MessageViewSender
         public let sentAt: ATProtocolDate
 
         public init(
-            id: String, rev: String, text: String, facets: [AppBskyRichtextFacet]?, embed: MessageViewEmbedUnion?, reactions: [ReactionView]?, sender: MessageViewSender, sentAt: ATProtocolDate
+            id: String, rev: String, text: String, facets: [AppBskyRichtextFacet]?, embed: MessageViewEmbedUnion?, reactions: [ReactionView]?, replyTo: MessageViewReplyToUnion?, sender: MessageViewSender, sentAt: ATProtocolDate
         ) {
             self.id = id
             self.rev = rev
@@ -289,6 +370,7 @@ public enum ChatBskyConvoDefs {
             self.facets = facets
             self.embed = embed
             self.reactions = reactions
+            self.replyTo = replyTo
             self.sender = sender
             self.sentAt = sentAt
         }
@@ -338,6 +420,14 @@ public enum ChatBskyConvoDefs {
                 reactions = nil
             }
             do {
+                replyTo = try container.decodeIfPresent(MessageViewReplyToUnion.self, forKey: .replyTo)
+            } catch {
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'replyTo' — degrading to nil: \(error)")
+                replyTo = nil
+            }
+            do {
                 sender = try container.decode(MessageViewSender.self, forKey: .sender)
             } catch {
                 LogManager.logError("Decoding error for required property 'sender': \(error)")
@@ -360,6 +450,7 @@ public enum ChatBskyConvoDefs {
             try container.encodeIfPresent(facets, forKey: .facets)
             try container.encodeIfPresent(embed, forKey: .embed)
             try container.encodeIfPresent(reactions, forKey: .reactions)
+            try container.encodeIfPresent(replyTo, forKey: .replyTo)
             try container.encode(sender, forKey: .sender)
             try container.encode(sentAt, forKey: .sentAt)
         }
@@ -379,6 +470,11 @@ public enum ChatBskyConvoDefs {
                 hasher.combine(nil as Int?)
             }
             if let value = reactions {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = replyTo {
                 hasher.combine(value)
             } else {
                 hasher.combine(nil as Int?)
@@ -405,6 +501,9 @@ public enum ChatBskyConvoDefs {
                 return false
             }
             if reactions != other.reactions {
+                return false
+            }
+            if replyTo != other.replyTo {
                 return false
             }
             if sender != other.sender {
@@ -441,6 +540,10 @@ public enum ChatBskyConvoDefs {
                 let reactionsValue = try value.toCBORValue()
                 map = map.adding(key: "reactions", value: reactionsValue)
             }
+            if let value = replyTo {
+                let replyToValue = try value.toCBORValue()
+                map = map.adding(key: "replyTo", value: replyToValue)
+            }
             let senderValue = try sender.toCBORValue()
             map = map.adding(key: "sender", value: senderValue)
             let sentAtValue = try sentAt.toCBORValue()
@@ -456,6 +559,7 @@ public enum ChatBskyConvoDefs {
             case facets
             case embed
             case reactions
+            case replyTo
             case sender
             case sentAt
         }
@@ -1430,6 +1534,41 @@ public enum ChatBskyConvoDefs {
             case rev
             case sender
             case sentAt
+        }
+    }
+
+    public struct MessageBeforeUserJoinedGroupView: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "chat.bsky.convo.defs#messageBeforeUserJoinedGroupView"
+
+        public init() {}
+
+        public init(from decoder: Decoder) throws {
+            _ = decoder
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+        }
+
+        public func hash(into hasher: inout Hasher) {}
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            return other is Self
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            return map
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
         }
     }
 
@@ -5267,6 +5406,174 @@ public enum ChatBskyConvoDefs {
                 return map
             case let .chatBskyEmbedJoinLinkView(value):
                 map = map.adding(key: "$type", value: "chat.bsky.embed.joinLink#view")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .unexpected(container):
+                return try container.toCBORValue()
+            }
+        }
+    }
+
+    public indirect enum MessageViewReplyToUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
+        case chatBskyConvoDefsMessageView(ChatBskyConvoDefs.MessageView)
+        case chatBskyConvoDefsDeletedMessageView(ChatBskyConvoDefs.DeletedMessageView)
+        case chatBskyConvoDefsMessageBeforeUserJoinedGroupView(ChatBskyConvoDefs.MessageBeforeUserJoinedGroupView)
+        case unexpected(ATProtocolValueContainer)
+        public init(_ value: ChatBskyConvoDefs.MessageView) {
+            self = .chatBskyConvoDefsMessageView(value)
+        }
+
+        public init(_ value: ChatBskyConvoDefs.DeletedMessageView) {
+            self = .chatBskyConvoDefsDeletedMessageView(value)
+        }
+
+        public init(_ value: ChatBskyConvoDefs.MessageBeforeUserJoinedGroupView) {
+            self = .chatBskyConvoDefsMessageBeforeUserJoinedGroupView(value)
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let typeValue = try container.decode(String.self, forKey: .type)
+
+            switch typeValue {
+            case "chat.bsky.convo.defs#messageView":
+                let value = try ChatBskyConvoDefs.MessageView(from: decoder)
+                self = .chatBskyConvoDefsMessageView(value)
+            case "chat.bsky.convo.defs#deletedMessageView":
+                let value = try ChatBskyConvoDefs.DeletedMessageView(from: decoder)
+                self = .chatBskyConvoDefsDeletedMessageView(value)
+            case "chat.bsky.convo.defs#messageBeforeUserJoinedGroupView":
+                let value = try ChatBskyConvoDefs.MessageBeforeUserJoinedGroupView(from: decoder)
+                self = .chatBskyConvoDefsMessageBeforeUserJoinedGroupView(value)
+            default:
+                let unknownValue = try ATProtocolValueContainer(from: decoder)
+                self = .unexpected(unknownValue)
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            switch self {
+            case let .chatBskyConvoDefsMessageView(value):
+                try container.encode("chat.bsky.convo.defs#messageView", forKey: .type)
+                try value.encode(to: encoder)
+            case let .chatBskyConvoDefsDeletedMessageView(value):
+                try container.encode("chat.bsky.convo.defs#deletedMessageView", forKey: .type)
+                try value.encode(to: encoder)
+            case let .chatBskyConvoDefsMessageBeforeUserJoinedGroupView(value):
+                try container.encode("chat.bsky.convo.defs#messageBeforeUserJoinedGroupView", forKey: .type)
+                try value.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
+            }
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            switch self {
+            case let .chatBskyConvoDefsMessageView(value):
+                hasher.combine("chat.bsky.convo.defs#messageView")
+                hasher.combine(value)
+            case let .chatBskyConvoDefsDeletedMessageView(value):
+                hasher.combine("chat.bsky.convo.defs#deletedMessageView")
+                hasher.combine(value)
+            case let .chatBskyConvoDefsMessageBeforeUserJoinedGroupView(value):
+                hasher.combine("chat.bsky.convo.defs#messageBeforeUserJoinedGroupView")
+                hasher.combine(value)
+            case let .unexpected(container):
+                hasher.combine("unexpected")
+                hasher.combine(container)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case type = "$type"
+        }
+
+        public static func == (lhs: MessageViewReplyToUnion, rhs: MessageViewReplyToUnion) -> Bool {
+            switch (lhs, rhs) {
+            case let (
+                .chatBskyConvoDefsMessageView(lhsValue),
+                .chatBskyConvoDefsMessageView(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .chatBskyConvoDefsDeletedMessageView(lhsValue),
+                .chatBskyConvoDefsDeletedMessageView(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .chatBskyConvoDefsMessageBeforeUserJoinedGroupView(lhsValue),
+                .chatBskyConvoDefsMessageBeforeUserJoinedGroupView(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
+            default:
+                return false
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? MessageViewReplyToUnion else { return false }
+            return self == other
+        }
+
+        /// DAGCBOR encoding with field ordering
+        public func toCBORValue() throws -> Any {
+            // Create an ordered map to maintain field order
+            var map = OrderedCBORMap()
+
+            switch self {
+            case let .chatBskyConvoDefsMessageView(value):
+                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#messageView")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .chatBskyConvoDefsDeletedMessageView(value):
+                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#deletedMessageView")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .chatBskyConvoDefsMessageBeforeUserJoinedGroupView(value):
+                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#messageBeforeUserJoinedGroupView")
 
                 let valueDict = try value.toCBORValue()
 

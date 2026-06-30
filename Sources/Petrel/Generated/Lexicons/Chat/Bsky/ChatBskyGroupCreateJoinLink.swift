@@ -106,7 +106,7 @@ public enum ChatBskyGroupCreateJoinLink {
 public extension ATProtoClient.Chat.Bsky.Group {
     // MARK: - createJoinLink
 
-    // [NOTE: This is under active development and should be considered unstable while this note is here]. Creates a join link for the group convo.
+    // Creates a join link for the group convo.
     //
     // - Parameter input: The input parameters for the request
 

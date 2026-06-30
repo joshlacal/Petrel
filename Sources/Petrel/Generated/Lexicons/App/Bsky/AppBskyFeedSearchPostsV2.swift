@@ -1,0 +1,280 @@
+import Foundation
+
+// lexicon: 1, id: app.bsky.feed.searchPostsV2
+
+public enum AppBskyFeedSearchPostsV2 {
+    public static let typeIdentifier = "app.bsky.feed.searchPostsV2"
+    public struct Parameters: Parametrizable {
+        public let cursor: String?
+        public let limit: Int?
+        public let query: String?
+        public let sort: String?
+        public let authors: [ATIdentifier]?
+        public let mentions: [ATIdentifier]?
+        public let domains: [String]?
+        public let urls: [URI]?
+        public let embeddedAtUris: [ATProtocolURI]?
+        public let hashtags: [String]?
+        public let excludeAuthors: [ATIdentifier]?
+        public let excludeMentions: [ATIdentifier]?
+        public let excludeDomains: [String]?
+        public let excludeUrls: [URI]?
+        public let excludeEmbeddedAtUris: [ATProtocolURI]?
+        public let excludeHashtags: [String]?
+        public let since: String?
+        public let until: String?
+        public let allTime: Bool?
+        public let languages: [LanguageCodeContainer]?
+        public let excludeLanguages: [LanguageCodeContainer]?
+        public let hasMedia: Bool?
+        public let hasVideo: Bool?
+        public let replyParentUri: ATProtocolURI?
+        public let threadRootUri: ATProtocolURI?
+        public let excludeReplies: Bool?
+        public let repliesOnly: Bool?
+        public let following: Bool?
+        public let queryLanguage: String?
+
+        public init(
+            cursor: String? = nil,
+            limit: Int? = nil,
+            query: String? = nil,
+            sort: String? = nil,
+            authors: [ATIdentifier]? = nil,
+            mentions: [ATIdentifier]? = nil,
+            domains: [String]? = nil,
+            urls: [URI]? = nil,
+            embeddedAtUris: [ATProtocolURI]? = nil,
+            hashtags: [String]? = nil,
+            excludeAuthors: [ATIdentifier]? = nil,
+            excludeMentions: [ATIdentifier]? = nil,
+            excludeDomains: [String]? = nil,
+            excludeUrls: [URI]? = nil,
+            excludeEmbeddedAtUris: [ATProtocolURI]? = nil,
+            excludeHashtags: [String]? = nil,
+            since: String? = nil,
+            until: String? = nil,
+            allTime: Bool? = nil,
+            languages: [LanguageCodeContainer]? = nil,
+            excludeLanguages: [LanguageCodeContainer]? = nil,
+            hasMedia: Bool? = nil,
+            hasVideo: Bool? = nil,
+            replyParentUri: ATProtocolURI? = nil,
+            threadRootUri: ATProtocolURI? = nil,
+            excludeReplies: Bool? = nil,
+            repliesOnly: Bool? = nil,
+            following: Bool? = nil,
+            queryLanguage: String? = nil
+        ) {
+            self.cursor = cursor
+            self.limit = limit
+            self.query = query
+            self.sort = sort
+            self.authors = authors
+            self.mentions = mentions
+            self.domains = domains
+            self.urls = urls
+            self.embeddedAtUris = embeddedAtUris
+            self.hashtags = hashtags
+            self.excludeAuthors = excludeAuthors
+            self.excludeMentions = excludeMentions
+            self.excludeDomains = excludeDomains
+            self.excludeUrls = excludeUrls
+            self.excludeEmbeddedAtUris = excludeEmbeddedAtUris
+            self.excludeHashtags = excludeHashtags
+            self.since = since
+            self.until = until
+            self.allTime = allTime
+            self.languages = languages
+            self.excludeLanguages = excludeLanguages
+            self.hasMedia = hasMedia
+            self.hasVideo = hasVideo
+            self.replyParentUri = replyParentUri
+            self.threadRootUri = threadRootUri
+            self.excludeReplies = excludeReplies
+            self.repliesOnly = repliesOnly
+            self.following = following
+            self.queryLanguage = queryLanguage
+        }
+    }
+
+    public struct Output: ATProtocolCodable {
+        public let cursor: String?
+
+        public let hitsTotal: Int?
+
+        public let posts: [AppBskyFeedDefs.PostView]
+
+        public let detectedQueryLanguages: [String]?
+
+        /// Standard public initializer
+        public init(
+            cursor: String? = nil,
+
+            hitsTotal: Int? = nil,
+
+            posts: [AppBskyFeedDefs.PostView],
+
+            detectedQueryLanguages: [String]? = nil
+
+        ) {
+            self.cursor = cursor
+
+            self.hitsTotal = hitsTotal
+
+            self.posts = posts
+
+            self.detectedQueryLanguages = detectedQueryLanguages
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            do {
+                cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
+                cursor = nil
+            }
+
+            do {
+                hitsTotal = try container.decodeIfPresent(Int.self, forKey: .hitsTotal)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'hitsTotal' — degrading to nil: \(error)")
+                hitsTotal = nil
+            }
+
+            posts = try container.decode([AppBskyFeedDefs.PostView].self, forKey: .posts)
+
+            do {
+                detectedQueryLanguages = try container.decodeIfPresent([String].self, forKey: .detectedQueryLanguages)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'detectedQueryLanguages' — degrading to nil: \(error)")
+                detectedQueryLanguages = nil
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(cursor, forKey: .cursor)
+
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(hitsTotal, forKey: .hitsTotal)
+
+            try container.encode(posts, forKey: .posts)
+
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(detectedQueryLanguages, forKey: .detectedQueryLanguages)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+
+            if let value = cursor {
+                // Encode optional property even if it's an empty array for CBOR
+                let cursorValue = try value.toCBORValue()
+                map = map.adding(key: "cursor", value: cursorValue)
+            }
+
+            if let value = hitsTotal {
+                // Encode optional property even if it's an empty array for CBOR
+                let hitsTotalValue = try value.toCBORValue()
+                map = map.adding(key: "hitsTotal", value: hitsTotalValue)
+            }
+
+            let postsValue = try posts.toCBORValue()
+            map = map.adding(key: "posts", value: postsValue)
+
+            if let value = detectedQueryLanguages {
+                // Encode optional property even if it's an empty array for CBOR
+                let detectedQueryLanguagesValue = try value.toCBORValue()
+                map = map.adding(key: "detectedQueryLanguages", value: detectedQueryLanguagesValue)
+            }
+
+            return map
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case cursor
+            case hitsTotal
+            case posts
+            case detectedQueryLanguages
+        }
+    }
+
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case badQueryString = "BadQueryString."
+        public var description: String {
+            return rawValue
+        }
+
+        public var errorName: String {
+            // Extract just the error name from the raw value
+            let parts = rawValue.split(separator: ".")
+            return String(parts.first ?? "")
+        }
+    }
+}
+
+public extension ATProtoClient.App.Bsky.Feed {
+    // MARK: - searchPostsV2
+
+    /// Find posts matching a search query or filters, returning search hits for matching post records.
+    ///
+    /// - Parameter input: The input parameters for the request
+    ///
+    /// - Returns: A tuple containing the HTTP response code and the decoded response data
+    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    func searchPostsV2(input: AppBskyFeedSearchPostsV2.Parameters) async throws -> (responseCode: Int, data: AppBskyFeedSearchPostsV2.Output?) {
+        let endpoint = "app.bsky.feed.searchPostsV2"
+
+        let queryItems = input.asQueryItems()
+
+        let urlRequest = try await networkService.createURLRequest(
+            endpoint: endpoint,
+            method: "GET",
+            headers: ["Accept": "application/json"],
+            body: nil,
+            queryItems: queryItems
+        )
+
+        // Determine service DID for this endpoint
+        let serviceDID = await networkService.getServiceDID(for: "app.bsky.feed.searchPostsV2")
+        let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
+        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let responseCode = response.statusCode
+
+        // Only validate Content-Type and decode on success. Error responses
+        // (4xx/5xx) may have missing or different Content-Type headers and
+        // are handled via the status code / structured error parser below.
+        if (200 ... 299).contains(responseCode) {
+            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+            }
+
+            if !contentType.lowercased().contains("application/json") {
+                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+            }
+
+            do {
+                let decoder = JSONDecoder()
+                let decodedData = try decoder.decode(AppBskyFeedSearchPostsV2.Output.self, from: responseData)
+
+                return (responseCode, decodedData)
+            } catch {
+                // Log the decoding error for debugging but still return the response code
+                LogManager.logError("Failed to decode successful response for app.bsky.feed.searchPostsV2: \(error)")
+                return (responseCode, nil)
+            }
+        } else {
+            // If we can't parse a structured error, return the response code
+            // (maintains backward compatibility for endpoints without defined errors)
+            return (responseCode, nil)
+        }
+    }
+}

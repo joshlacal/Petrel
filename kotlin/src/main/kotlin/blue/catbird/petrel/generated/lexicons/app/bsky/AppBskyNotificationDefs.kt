@@ -22,6 +22,9 @@ object AppBskyNotificationDefsDefs {
         }
     }
 
+    /**
+     * Deprecated: use chat.bsky.notification preferences instead. This will only return a default value.
+     */
     @Serializable
     data class AppBskyNotificationDefsChatPreference(
         @SerialName("include")
@@ -55,7 +58,7 @@ object AppBskyNotificationDefsDefs {
 
     @Serializable
     data class AppBskyNotificationDefsPreferences(
-        @SerialName("chat")
+/** Deprecated: use chat.bsky.notification preferences instead. This will only return a default value. */        @SerialName("chat")
         val chat: AppBskyNotificationDefsChatPreference,        @SerialName("follow")
         val follow: AppBskyNotificationDefsFilterablePreference,        @SerialName("like")
         val like: AppBskyNotificationDefsFilterablePreference,        @SerialName("likeViaRepost")

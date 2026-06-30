@@ -38,6 +38,7 @@ object ChatBskyConvoSendMessageBatchDefs {
 sealed class ChatBskyConvoSendMessageBatchError(val name: String, val description: String?) {
         object ConvoLocked: ChatBskyConvoSendMessageBatchError("ConvoLocked", "")
         object InvalidConvo: ChatBskyConvoSendMessageBatchError("InvalidConvo", "")
+        object ReplyTargetNotFound: ChatBskyConvoSendMessageBatchError("ReplyTargetNotFound", "")
     }
 
 /**

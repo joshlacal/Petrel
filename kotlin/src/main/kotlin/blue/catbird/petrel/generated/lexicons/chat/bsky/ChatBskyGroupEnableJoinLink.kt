@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: chat.bsky.group.enableJoinLink
-// [NOTE: This is under active development and should be considered unstable while this note is here]. Re-enables a previously disabled join link for the group convo.
+// Re-enables a previously disabled join link for the group convo.
 package blue.catbird.petrel.generated
 
 import kotlinx.serialization.*
@@ -33,7 +33,7 @@ sealed class ChatBskyGroupEnableJoinLinkError(val name: String, val description:
     }
 
 /**
- * [NOTE: This is under active development and should be considered unstable while this note is here]. Re-enables a previously disabled join link for the group convo.
+ * Re-enables a previously disabled join link for the group convo.
  *
  * Endpoint: chat.bsky.group.enableJoinLink
  */

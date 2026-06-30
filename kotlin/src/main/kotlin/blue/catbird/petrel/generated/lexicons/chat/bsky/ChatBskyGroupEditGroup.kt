@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: chat.bsky.group.editGroup
-// [NOTE: This is under active development and should be considered unstable while this note is here]. Edits group settings.
+// Edits group settings.
 package blue.catbird.petrel.generated
 
 import kotlinx.serialization.*
@@ -33,7 +33,7 @@ sealed class ChatBskyGroupEditGroupError(val name: String, val description: Stri
     }
 
 /**
- * [NOTE: This is under active development and should be considered unstable while this note is here]. Edits group settings.
+ * Edits group settings.
  *
  * Endpoint: chat.bsky.group.editGroup
  */

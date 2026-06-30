@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: chat.bsky.group.addMembers
-// [NOTE: This is under active development and should be considered unstable while this note is here]. Adds members to a group. The members are added in 'request' status, so they have to accept it. This creates convo memberships.
+// Adds members to a group. The members are added in 'request' status, so they have to accept it. This creates convo memberships.
 package blue.catbird.petrel.generated
 
 import kotlinx.serialization.*
@@ -41,7 +41,7 @@ sealed class ChatBskyGroupAddMembersError(val name: String, val description: Str
     }
 
 /**
- * [NOTE: This is under active development and should be considered unstable while this note is here]. Adds members to a group. The members are added in 'request' status, so they have to accept it. This creates convo memberships.
+ * Adds members to a group. The members are added in 'request' status, so they have to accept it. This creates convo memberships.
  *
  * Endpoint: chat.bsky.group.addMembers
  */

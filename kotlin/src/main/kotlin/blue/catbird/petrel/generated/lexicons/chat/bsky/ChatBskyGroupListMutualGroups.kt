@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: chat.bsky.group.listMutualGroups
-// [NOTE: This is under active development and should be considered unstable while this note is here]. Returns a page of group conversations that both the requester and the specified actor are members of.
+// Returns a page of group conversations that both the requester and the specified actor are members of.
 package blue.catbird.petrel.generated
 
 import kotlinx.serialization.*
@@ -29,7 +29,7 @@ object ChatBskyGroupListMutualGroupsDefs {
         val convos: List<ChatBskyConvoDefsConvoView>    )
 
 /**
- * [NOTE: This is under active development and should be considered unstable while this note is here]. Returns a page of group conversations that both the requester and the specified actor are members of.
+ * Returns a page of group conversations that both the requester and the specified actor are members of.
  *
  * Endpoint: chat.bsky.group.listMutualGroups
  */
