@@ -226,14 +226,16 @@ public enum AppBskyAgeassuranceDefs {
         public let countryCode: String
         public let regionCode: String?
         public let minAccessAge: Int
+        public let additionalVerificationMethods: [String]?
         public let rules: [ConfigRegionRulesUnion]
 
         public init(
-            countryCode: String, regionCode: String?, minAccessAge: Int, rules: [ConfigRegionRulesUnion]
+            countryCode: String, regionCode: String?, minAccessAge: Int, additionalVerificationMethods: [String]?, rules: [ConfigRegionRulesUnion]
         ) {
             self.countryCode = countryCode
             self.regionCode = regionCode
             self.minAccessAge = minAccessAge
+            self.additionalVerificationMethods = additionalVerificationMethods
             self.rules = rules
         }
 
@@ -260,6 +262,14 @@ public enum AppBskyAgeassuranceDefs {
                 throw error
             }
             do {
+                additionalVerificationMethods = try container.decodeIfPresent([String].self, forKey: .additionalVerificationMethods)
+            } catch {
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'additionalVerificationMethods' — degrading to nil: \(error)")
+                additionalVerificationMethods = nil
+            }
+            do {
                 rules = try container.decode([ConfigRegionRulesUnion].self, forKey: .rules)
             } catch {
                 LogManager.logError("Decoding error for required property 'rules': \(error)")
@@ -273,6 +283,7 @@ public enum AppBskyAgeassuranceDefs {
             try container.encode(countryCode, forKey: .countryCode)
             try container.encodeIfPresent(regionCode, forKey: .regionCode)
             try container.encode(minAccessAge, forKey: .minAccessAge)
+            try container.encodeIfPresent(additionalVerificationMethods, forKey: .additionalVerificationMethods)
             try container.encode(rules, forKey: .rules)
         }
 
@@ -284,6 +295,11 @@ public enum AppBskyAgeassuranceDefs {
                 hasher.combine(nil as Int?)
             }
             hasher.combine(minAccessAge)
+            if let value = additionalVerificationMethods {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
             hasher.combine(rules)
         }
 
@@ -296,6 +312,9 @@ public enum AppBskyAgeassuranceDefs {
                 return false
             }
             if minAccessAge != other.minAccessAge {
+                return false
+            }
+            if additionalVerificationMethods != other.additionalVerificationMethods {
                 return false
             }
             if rules != other.rules {
@@ -319,6 +338,10 @@ public enum AppBskyAgeassuranceDefs {
             }
             let minAccessAgeValue = try minAccessAge.toCBORValue()
             map = map.adding(key: "minAccessAge", value: minAccessAgeValue)
+            if let value = additionalVerificationMethods {
+                let additionalVerificationMethodsValue = try value.toCBORValue()
+                map = map.adding(key: "additionalVerificationMethods", value: additionalVerificationMethodsValue)
+            }
             let rulesValue = try rules.toCBORValue()
             map = map.adding(key: "rules", value: rulesValue)
             return map
@@ -329,6 +352,7 @@ public enum AppBskyAgeassuranceDefs {
             case countryCode
             case regionCode
             case minAccessAge
+            case additionalVerificationMethods
             case rules
         }
     }
