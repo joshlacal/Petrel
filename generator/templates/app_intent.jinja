@@ -1,0 +1,41 @@
+{{ header }}
+import Foundation
+import AppIntents
+import Petrel
+
+@available({{ availability }}, *)
+struct {{ struct_name }}: AppIntent {
+    static let title: LocalizedStringResource = "{{ title }}"
+    static let description = IntentDescription("{{ description }}")
+
+    @Parameter(title: "Account")
+    var account: AccountEntity?
+{% for p in parameters %}
+    @Parameter(title: "{{ p.title }}")
+    var {{ p.name }}: {{ p.swift_type }}{% if p.optional %}?{% endif %}
+{% endfor %}
+
+    init() {}
+
+    func perform() async throws -> some IntentResult{% if returns_type %} & ReturnsValue<{{ returns_type }}>{% endif %} {
+{% if confirmation %}
+        try await requestConfirmation()
+{% endif %}
+        let did = account?.id ?? IntentAccountResolver.activeDID()
+        let client = try await IntentClientProvider.shared.client(for: did)
+{% if has_input %}
+        let params = {{ params_expr }}
+{% endif %}
+{% if has_output %}
+        let output = try unwrapIntentResponse(await client.{{ client_call }})
+{% if result_expr %}
+        return .result(value: {{ result_expr }})
+{% else %}
+        return .result()
+{% endif %}
+{% else %}
+        _ = try await client.{{ client_call }}
+        return .result()
+{% endif %}
+    }
+}

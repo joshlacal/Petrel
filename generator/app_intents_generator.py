@@ -1,0 +1,1010 @@
+"""App Intents emit mode for the lexicon code generator.
+
+Reads a manifest with `package.kind == "app-intents"` and emits Swift
+`AppIntent` / `AppEntity` / `AppEnum` source directly from a curated slice of
+the referenced lexicons. This does NOT reuse `SwiftCodeGenerator` — an App
+Intent's parameters and an AppEntity's stored properties are a small,
+hand-curated projection of a query/procedure/def's shape (exclusions,
+entity-resolved parameters, single-vs-collection results), not a 1:1 mirror
+of it, so a bespoke generator driven by explicit manifest curation is a
+better fit than threading a new emit mode through the existing per-lexicon
+pipeline.
+
+Manifest schema (package.kind == "app-intents"):
+
+    {
+      "package": {"kind": "app-intents", "name": "<display>"},
+      "lexicons": {"reference": ["<dirs relative to this manifest file>"]},
+      "swift": {"output": "<dir relative to this manifest file>"},
+      "appIntents": {
+        "availability": "iOS 18.0",
+        "intents": [
+          {
+            "id": "<nsid>", "kind": "query"|"procedure"|"recordWrite",
+            "structName": "...", "title": "...", "description": "...",
+            "parameters": {"<name>": {"title": "...", "requestValue": true}},
+            "excludeParameters": ["cursor"],
+            "parameterOverrides": {"<name>": {"resolveAs": "<EntityName>", "bridge": "<entity field>"}},
+            "confirmation": false,
+            "returns": {"entity": "<EntityName>", "outputPath": "<output field, or omitted/'.' for the whole output>"}
+          }
+        ],
+        "entities": [
+          {
+            "name": "...", "source": "<nsid>#<def>", "identifier": "<prop>",
+            "syncable": true,
+            "display": {"title": "<prop>", "titleFallback": "<prop>", "subtitle": "<prop>", "image": "<prop>"},
+            "properties": ["..."],
+            "query": {
+              "kind": "string", "nsid": "...", "param": "q", "resultsPath": "...",
+              "byIds": {"nsid": "...", "param": "...", "resultsPath": "..."}
+            }
+          }
+        ]
+      }
+    }
+
+Design decisions (see also the header comment on `intent_facing_type` in
+type_converter.py):
+
+  * Paths under `lexicons.reference` / `swift.output` are resolved relative to
+    the manifest FILE's own directory, not the process CWD. This is a
+    deliberate departure from the core/overlay manifest convention (paths
+    relative to CWD) — app-intents manifests are meant to be authored and run
+    from anywhere (including pointing `swift.output` at a scratch directory
+    for validation), so anchoring to the manifest file avoids CWD coupling.
+
+  * Query intents must always declare `returns` (an App Intent that fetches
+    data and throws it away is not a sensible MVP shape); procedures may omit
+    it for a void action.
+
+  * `returns.outputPath` omitted (or `"."`) means "whole output" and requires
+    the query's output schema to itself be a `$ref` (a typealias output, e.g.
+    `app.bsky.actor.getProfile` aliasing straight to `profileViewDetailed`) —
+    this is the "single entity" mode (`ReturnsValue<Entity>`, not an array).
+    A named `outputPath` must resolve to a required array-of-$ref (collection
+    mode, `ReturnsValue<[Entity]>`) or a required scalar $ref (single mode
+    reading one field instead of the whole output).
+
+  * An entity's `source` field names ONE view def, but real endpoints often
+    return siblings of that view (e.g. `searchActors` returns
+    `profileView` while `getProfile` returns `profileViewDetailed`). Rather
+    than requiring the manifest to enumerate every sibling, this generator
+    auto-collects every distinct view ref actually used by the entity's own
+    `query`/`query.byIds` endpoints AND by any intent whose `returns.entity`
+    points at this entity, then emits one `init(from:)` overload per distinct
+    ref. This is the "simplest thing that compiles" for reconciling
+    `ProfileView` vs `ProfileViewDetailed` in the starter manifest: two
+    overloads on one struct, rather than two manifest-level entities or a
+    protocol-erased view abstraction.
+
+  * Entity stored properties are restricted to String/Date/URL (scalar,
+    non-composite) projections — see `intent_entity_extraction` in
+    type_converter.py. A property missing from some (but not all) of an
+    entity's resolved source views is treated as optional and synthesized as
+    `nil` in the `init(from:)` overloads where it doesn't exist, rather than
+    being a hard error, so long as it resolves to the same Swift type
+    wherever it IS present.
+
+  * `kind: "recordWrite"` intents are validated for manifest shape (id/kind/
+    structName present) and then hard-fail with a clear "not yet supported"
+    error — no code is emitted for them.
+
+Determinism: this generator is invoked as a fresh `python3` process for each
+of the two runs in the byte-stability check, and Python's string hashing is
+randomized per-process by default. Every ordered collection that feeds
+generated text is therefore either a `list` (JSON array / manifest order,
+inherently stable) or a `dict` used purely as an insertion-ordered set/map
+(Python dicts preserve insertion order — this is a language guarantee, unlike
+`set()`, whose iteration order additionally depends on hash randomization).
+No `set()` literal in this module is ever iterated in a way that reaches
+generated output; the few that exist are membership-only.
+"""
+
+import os
+
+import aiofiles
+
+from cycle_detector import CycleDetector
+from main import DEFAULT_EXCLUDED_NAMESPACES, load_lexicons, lower_camel
+from templates import TemplateManager
+from type_converter import CurationError, intent_entity_extraction, intent_facing_type
+from utils import convert_ref, convert_to_camel_case
+
+
+# ---------------------------------------------------------------------------
+# Manifest schema validation
+# ---------------------------------------------------------------------------
+#
+# Allow-lists for every object boundary in the app-intents manifest schema (see
+# the module docstring above for the full shape). Without these, an unknown/
+# misspelled key (e.g. "requestVlaue" instead of "requestValue") is silently
+# ignored by `dict.get(..., default)` instead of erroring — the manifest exits
+# 0 but emits the wrong Swift. Every nested object a manifest author can write
+# into gets an explicit check.
+_TOP_LEVEL_KEYS = {'$comment', 'package', 'lexicons', 'swift', 'appIntents'}
+_PACKAGE_KEYS = {'kind', 'name'}
+_LEXICONS_KEYS = {'reference', 'exclude_namespaces'}
+_SWIFT_KEYS = {'output'}
+_APP_INTENTS_KEYS = {'availability', 'intents', 'entities'}
+_INTENT_KEYS = {
+    'id', 'kind', 'structName', 'title', 'description', 'parameters',
+    'excludeParameters', 'parameterOverrides', 'confirmation', 'returns',
+}
+_ENTITY_KEYS = {'name', 'source', 'identifier', 'syncable', 'display', 'properties', 'query'}
+_PARAMETER_META_KEYS = {'title', 'requestValue'}
+_PARAMETER_OVERRIDE_KEYS = {'resolveAs', 'bridge'}
+_DISPLAY_KEYS = {'title', 'titleFallback', 'subtitle', 'image'}
+_QUERY_KEYS = {'kind', 'nsid', 'param', 'resultsPath', 'byIds'}
+_QUERY_BY_IDS_KEYS = {'nsid', 'param', 'resultsPath'}
+
+
+def _check_known_keys(obj: dict, allowed: set, context: str):
+    """Raise CurationError naming every key in `obj` outside `allowed`, plus
+    `context` (the manifest path, or the enclosing intent/entity id and the
+    object's own path within it) so an unrecognized key errors immediately
+    instead of silently no-op'ing via `dict.get(..., default)`."""
+    unknown = sorted(set(obj.keys()) - allowed)
+    if unknown:
+        raise CurationError(
+            f"{context}: unknown key(s) {', '.join(unknown)} (allowed: {', '.join(sorted(allowed))})"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Path / ref resolution helpers
+# ---------------------------------------------------------------------------
+
+def _resolve_path(manifest_dir: str, path: str) -> str:
+    return path if os.path.isabs(path) else os.path.normpath(os.path.join(manifest_dir, path))
+
+
+def normalize_ref(ref: str, current_lexicon_id: str):
+    """Split a lexicon `ref` string into (lexicon_id, def_name), resolving a
+    local `#foo` ref against `current_lexicon_id`."""
+    if ref.startswith('#'):
+        return current_lexicon_id, ref[1:]
+    if '#' in ref:
+        lex_id, def_name = ref.split('#', 1)
+        return lex_id, def_name
+    return ref, 'main'
+
+
+def swift_method_name(nsid_last_part: str) -> str:
+    """The lowerCamelCase client method name for the last NSID segment —
+    mirrors the `lowerCamelCase` Jinja filter's net effect on the PascalCase
+    form `SwiftCodeGenerator.generate_query_function`/`..._procedure_function`
+    already produce (see generator/templates.py TemplateManager.lowerCamelCase)."""
+    pascal = convert_to_camel_case(nsid_last_part)
+    return pascal[0].lower() + pascal[1:] if pascal else pascal
+
+
+def client_path(lexicon_id: str) -> str:
+    """The `client.foo.bar.baz(...)` call path for an NSID, matching the
+    namespace properties `generate_swift_namespace_classes` emits on
+    `ATProtoClient` (lowerCamelCase segments) plus the method name."""
+    parts = lexicon_id.split('.')
+    namespace = '.'.join(lower_camel(p) for p in parts[:-1])
+    return f"{namespace}.{swift_method_name(parts[-1])}"
+
+
+def _escape_swift_string(s: str) -> str:
+    return s.replace('\\', '\\\\').replace('"', '\\"').replace('\n', ' ')
+
+
+class LexiconIndex:
+    """id -> lexicon lookup plus ref resolution, built once per generator run."""
+
+    def __init__(self, lexicons_by_id: dict):
+        self._by_id = lexicons_by_id
+
+    def get(self, lexicon_id: str) -> dict:
+        lexicon = self._by_id.get(lexicon_id)
+        if lexicon is None:
+            raise CurationError(f"lexicon '{lexicon_id}' not found in the manifest's reference set")
+        return lexicon
+
+    def resolve_def(self, raw_ref: str, current_lexicon_id: str) -> dict:
+        lex_id, def_name = normalize_ref(raw_ref, current_lexicon_id)
+        defs = self.get(lex_id).get('defs', {})
+        if def_name not in defs:
+            raise CurationError(f"def '{def_name}' not found in lexicon '{lex_id}' (from ref '{raw_ref}')")
+        return defs[def_name]
+
+    def qualify(self, raw_ref: str, current_lexicon_id: str) -> str:
+        lex_id, def_name = normalize_ref(raw_ref, current_lexicon_id)
+        return f"{lex_id}#{def_name}"
+
+
+async def load_reference_index(dirs, exclude_namespaces=DEFAULT_EXCLUDED_NAMESPACES) -> LexiconIndex:
+    # `load_lexicons` (generator/main.py) is the same walk core/overlay manifests
+    # use; it requires a CycleDetector to register types into, but app-intents
+    # curation never needs cycle/indirect-enum analysis, so the detector here is
+    # write-only (constructed to satisfy the shared function's API, never read).
+    cycle_detector = CycleDetector()
+    loaded = await load_lexicons(dirs, exclude_namespaces, cycle_detector)
+    by_id = {}
+    for _, lexicon in loaded:
+        lexicon_id = lexicon.get('id', '')
+        if lexicon_id:
+            by_id[lexicon_id] = lexicon
+    return LexiconIndex(by_id)
+
+
+def _results_ref(lex_index: LexiconIndex, nsid: str, main_def: dict, results_path: str):
+    """Resolve a query's output property to (ref, is_array); requires the
+    property to be a required array-of-$ref (the only shape entity query
+    results support)."""
+    output_obj = main_def.get('output')
+    if not output_obj:
+        raise CurationError(f"'{nsid}' has no output; cannot use it as an entity query source")
+    schema = output_obj.get('schema', {})
+    props = schema.get('properties', {})
+    if results_path not in props:
+        raise CurationError(f"'{nsid}': resultsPath '{results_path}' not found in output properties")
+    if results_path not in schema.get('required', []):
+        raise CurationError(f"'{nsid}': resultsPath '{results_path}' must be a required output field")
+    prop = props[results_path]
+    if prop.get('type') != 'array' or prop.get('items', {}).get('type') != 'ref':
+        raise CurationError(f"'{nsid}': resultsPath '{results_path}' must be an array of $ref")
+    return prop['items']['ref'], True
+
+
+def resolve_output_element_ref(nsid: str, main_def: dict, output_path):
+    """Resolve `returns.outputPath` (or the whole-output '.'/omitted form) to
+    (ref, mode, field). mode is 'collection' (array of $ref) or 'single'
+    (whole output ref, or a scalar $ref field)."""
+    output_obj = main_def.get('output')
+    if not output_obj:
+        raise CurationError(f"intent '{nsid}': 'returns' declared but the lexicon has no output")
+    schema = output_obj.get('schema', {})
+
+    if output_path in (None, '', '.'):
+        if schema.get('type') != 'ref':
+            raise CurationError(
+                f"intent '{nsid}': outputPath omitted/'.' requires the output schema to be a "
+                "$ref (whole-output single-entity mode) — use an explicit outputPath field name "
+                "for an inline-object output instead"
+            )
+        return schema['ref'], 'single', None
+
+    props = schema.get('properties', {})
+    if output_path not in props:
+        raise CurationError(f"intent '{nsid}': outputPath '{output_path}' not found in output properties")
+    if output_path not in schema.get('required', []):
+        raise CurationError(f"intent '{nsid}': outputPath '{output_path}' must be a required output field")
+    prop = props[output_path]
+    if prop.get('type') == 'array':
+        item = prop.get('items', {})
+        if item.get('type') != 'ref':
+            raise CurationError(f"intent '{nsid}': outputPath '{output_path}' array items must be $ref")
+        return item['ref'], 'collection', output_path
+    if prop.get('type') == 'ref':
+        return prop['ref'], 'single', output_path
+    raise CurationError(f"intent '{nsid}': outputPath '{output_path}' must be a $ref or an array of $ref")
+
+
+# ---------------------------------------------------------------------------
+# Intent curation
+# ---------------------------------------------------------------------------
+
+def resolve_intent_source(lex_index: LexiconIndex, nsid: str, kind: str) -> dict:
+    lexicon = lex_index.get(nsid)
+    main_def = lexicon.get('defs', {}).get('main', {})
+    lex_type = main_def.get('type')
+
+    if kind == 'query':
+        if lex_type != 'query':
+            raise CurationError(f"intent '{nsid}': manifest kind 'query' but lexicon main type is '{lex_type}'")
+        params_obj = main_def.get('parameters', {})
+        return {
+            'lexicon': lexicon,
+            'main_def': main_def,
+            'properties': params_obj.get('properties', {}),
+            'required': params_obj.get('required', []),
+            'has_input': 'parameters' in main_def,
+            'struct_name': 'Parameters',
+        }
+
+    if kind == 'procedure':
+        if lex_type != 'procedure':
+            raise CurationError(f"intent '{nsid}': manifest kind 'procedure' but lexicon main type is '{lex_type}'")
+        if 'parameters' in main_def:
+            raise CurationError(
+                f"intent '{nsid}': procedures with BOTH `parameters` (query string) and `input` "
+                "are not supported by app_intents_generator — curate `input` only"
+            )
+        input_obj = main_def.get('input', {})
+        if input_obj and input_obj.get('encoding', 'application/json') != 'application/json':
+            raise CurationError(f"intent '{nsid}': only application/json procedure input is supported")
+        schema = input_obj.get('schema', {})
+        if schema.get('type') == 'ref':
+            raise CurationError(
+                f"intent '{nsid}': procedure input is a $ref (not an inline object schema) — unsupported"
+            )
+        return {
+            'lexicon': lexicon,
+            'main_def': main_def,
+            'properties': schema.get('properties', {}),
+            'required': schema.get('required', []),
+            'has_input': 'input' in main_def,
+            'struct_name': 'Input',
+        }
+
+    raise CurationError(f"intent '{nsid}': unsupported kind '{kind}'")
+
+
+def build_bridge_expr(param: dict) -> str:
+    """Build the Swift argument expression for one curated parameter.
+
+    `param['value_source']` is either the @Parameter's own name (plain
+    curation) or `"<paramName>.<bridgeField>"` (a `parameterOverrides` entity
+    resolution). When the @Parameter is Optional, bridging goes through
+    `.map` (Optional.map is `rethrows`, so `try name.map { try Ctor($0) }` is
+    valid Swift and only requires the outer `try` when the inner call
+    throws); when non-Optional, the bridge template is substituted directly
+    and inlined (Swift allows an inline `try` on a throwing sub-expression
+    inside a larger non-throwing call, e.g. `Foo(x: try bar())`).
+    """
+    template = param['bridge_template']
+    receiver = param['name']
+    base = param['value_source']
+    is_override = base != receiver
+    field = base.split('.', 1)[1] if is_override else None
+
+    if param['optional']:
+        if template == '{v}' and not is_override:
+            return receiver
+        v = '$0' if not is_override else f"$0.{field}"
+        inner = template.format(v=v)
+        prefix = 'try ' if param['needs_throws'] else ''
+        return f"{prefix}{receiver}.map {{ {inner} }}"
+
+    v = base if is_override else receiver
+    return template.format(v=v)
+
+
+def curate_parameters(nsid: str, intent_struct_name: str, source: dict, intent_cfg: dict):
+    excluded = intent_cfg.get('excludeParameters', [])
+    overrides_meta = intent_cfg.get('parameters', {})
+    overrides_resolve = intent_cfg.get('parameterOverrides', {})
+
+    # Every name referenced by excludeParameters/parameters/parameterOverrides must
+    # be an actual lexicon parameter — otherwise a typo (e.g. excluding "terms"
+    # instead of "term") silently no-ops instead of curating what the author meant.
+    known_names = source['properties'].keys()
+    for field_name, names in (
+        ('excludeParameters', excluded),
+        ('parameters', overrides_meta),
+        ('parameterOverrides', overrides_resolve),
+    ):
+        for name in names:
+            if name not in known_names:
+                raise CurationError(
+                    f"intent '{nsid}': {field_name} references unknown parameter '{name}' "
+                    f"(lexicon '{nsid}' has: {', '.join(known_names) or '(none)'})"
+                )
+
+    for name in excluded:
+        if name in source['required']:
+            raise CurationError(f"intent '{nsid}': excludeParameters cannot drop required field '{name}'")
+
+    curated = []
+    enums = []  # list of (enum_type_name, [knownValues...])
+
+    for name, prop in source['properties'].items():
+        if name in excluded:
+            continue
+        is_required = name in source['required']
+        meta = overrides_meta.get(name, {})
+        _check_known_keys(meta, _PARAMETER_META_KEYS, f"intent '{nsid}' parameters.{name}")
+        request_value = bool(meta.get('requestValue', False))
+        # requestValue forces the @Parameter to be non-Optional (so Shortcuts/Siri
+        # always prompts for it) even though the lexicon marks the field optional.
+        # A lexicon-required field is always non-Optional regardless of this flag.
+        emit_optional = (not is_required) and not request_value
+
+        resolve = overrides_resolve.get(name)
+        if resolve:
+            _check_known_keys(resolve, _PARAMETER_OVERRIDE_KEYS, f"intent '{nsid}' parameterOverrides.{name}")
+            resolve_as = resolve.get('resolveAs')
+            bridge_field = resolve.get('bridge')
+            if not resolve_as or not bridge_field:
+                raise CurationError(
+                    f"intent '{nsid}' parameter '{name}': parameterOverrides needs both "
+                    "'resolveAs' and 'bridge'"
+                )
+            try:
+                bridge_info = intent_facing_type(prop)
+            except CurationError as e:
+                raise CurationError(f"intent '{nsid}' parameter '{name}': {e}") from e
+            swift_type = resolve_as
+            value_source = f"{name}.{bridge_field}"
+        else:
+            enum_type_name = None
+            if prop.get('type') == 'string' and prop.get('knownValues'):
+                enum_type_name = f"{intent_struct_name}{convert_to_camel_case(name)}Option"
+            try:
+                bridge_info = intent_facing_type(prop, enum_type_name=enum_type_name)
+            except CurationError as e:
+                raise CurationError(f"intent '{nsid}' parameter '{name}': {e}") from e
+            swift_type = bridge_info['swift_type']
+            value_source = name
+            if bridge_info.get('is_enum'):
+                enums.append((enum_type_name, prop['knownValues']))
+
+        title = meta.get('title') or prop.get('description') or name
+        curated.append({
+            'name': name,
+            'title': _escape_swift_string(title),
+            'swift_type': swift_type,
+            'optional': emit_optional,
+            'bridge_template': bridge_info['bridge_expr_template'],
+            'needs_throws': bridge_info['needs_throws'],
+            'value_source': value_source,
+        })
+
+    return curated, enums
+
+
+def resolve_returns(nsid: str, main_def: dict, returns_cfg: dict, entities_by_name: dict):
+    entity_name = returns_cfg.get('entity')
+    if not entity_name or entity_name not in entities_by_name:
+        raise CurationError(
+            f"intent '{nsid}': returns.entity '{entity_name}' is not declared in appIntents.entities"
+        )
+    output_path = returns_cfg.get('outputPath')
+    ref, mode, field = resolve_output_element_ref(nsid, main_def, output_path)
+    return {'entity': entity_name, 'ref': ref, 'mode': mode, 'field': field}
+
+
+def resolve_intent(lex_index: LexiconIndex, intent_cfg: dict, entities_by_name: dict, idx: int) -> dict:
+    _check_known_keys(intent_cfg, _INTENT_KEYS, f"appIntents.intents[{idx}]")
+    nsid = intent_cfg.get('id')
+    kind = intent_cfg.get('kind')
+    struct_name = intent_cfg.get('structName')
+    if not nsid or not kind or not struct_name:
+        raise CurationError(
+            f"appIntents.intents[{idx}]: every intent needs 'id', 'kind', and 'structName' "
+            f"(got: id={nsid!r}, kind={kind!r}, structName={struct_name!r})"
+        )
+    if kind == 'recordWrite':
+        raise CurationError(f"intent '{nsid}': kind 'recordWrite' not yet supported")
+    if kind not in ('query', 'procedure'):
+        raise CurationError(f"intent '{nsid}': unknown kind '{kind}'")
+
+    source = resolve_intent_source(lex_index, nsid, kind)
+    main_def = source['main_def']
+
+    curated_params, enums = curate_parameters(nsid, struct_name, source, intent_cfg)
+
+    returns_cfg = intent_cfg.get('returns')
+    if kind == 'query' and not returns_cfg:
+        raise CurationError(f"intent '{nsid}': query intents must declare 'returns'")
+    returns = resolve_returns(nsid, main_def, returns_cfg, entities_by_name) if returns_cfg else None
+
+    has_output = 'output' in main_def
+    if returns and not has_output:
+        raise CurationError(f"intent '{nsid}': returns declared but lexicon has no output")
+
+    if source['has_input']:
+        args = ', '.join(f"{p['name']}: {build_bridge_expr(p)}" for p in curated_params)
+        params_expr = f"{convert_to_camel_case(nsid)}.{source['struct_name']}({args})"
+        call_args = 'input: params'
+    else:
+        params_expr = None
+        call_args = ''
+    client_call = f"{client_path(nsid)}({call_args})"
+
+    returns_type = None
+    result_expr = None
+    if returns:
+        if returns['mode'] == 'collection':
+            returns_type = f"[{returns['entity']}]"
+            result_expr = f"output.{returns['field']}.map {{ {returns['entity']}(from: $0) }}"
+        else:
+            returns_type = returns['entity']
+            if returns['field']:
+                result_expr = f"{returns['entity']}(from: output.{returns['field']})"
+            else:
+                result_expr = f"{returns['entity']}(from: output)"
+
+    return {
+        'source_nsid': nsid,
+        'kind': kind,
+        'struct_name': struct_name,
+        'title': _escape_swift_string(intent_cfg.get('title') or struct_name),
+        'description': _escape_swift_string(intent_cfg.get('description', '')),
+        'confirmation': bool(intent_cfg.get('confirmation', False)),
+        'parameters': curated_params,
+        'enums': enums,
+        'has_input': source['has_input'],
+        'has_output': has_output,
+        'params_expr': params_expr,
+        'client_call': client_call,
+        'returns': returns,
+        'returns_type': returns_type,
+        'result_expr': result_expr,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Entity curation
+# ---------------------------------------------------------------------------
+
+def _build_string_query_body(lex_index: LexiconIndex, entity_name: str, query_cfg: dict) -> str:
+    nsid = query_cfg['nsid']
+    param_name = query_cfg['param']
+    results_path = query_cfg['resultsPath']
+    lexicon = lex_index.get(nsid)
+    main_def = lexicon.get('defs', {}).get('main', {})
+    if main_def.get('type') != 'query':
+        raise CurationError(f"entity '{entity_name}': query.nsid '{nsid}' must be a query")
+
+    params_obj = main_def.get('parameters', {})
+    properties = params_obj.get('properties', {})
+    required = params_obj.get('required', [])
+    if param_name not in properties:
+        raise CurationError(f"entity '{entity_name}': query.param '{param_name}' not found in '{nsid}' parameters")
+    other_required = [r for r in required if r != param_name]
+    if other_required:
+        raise CurationError(
+            f"entity '{entity_name}': query nsid '{nsid}' has other required parameters "
+            f"{other_required}; unsupported for entity string queries"
+        )
+
+    try:
+        bridge = intent_facing_type(properties[param_name])
+    except CurationError as e:
+        raise CurationError(f"entity '{entity_name}': query.param '{param_name}': {e}") from e
+    if bridge['swift_type'] != 'String':
+        raise CurationError(
+            f"entity '{entity_name}': query.param '{param_name}' must be String-typed for a string query"
+        )
+    value_expr = bridge['bridge_expr_template'].format(v='string')
+
+    _ref, _mode = _results_ref(lex_index, nsid, main_def, results_path)
+
+    call = f"client.{client_path(nsid)}(input: {convert_to_camel_case(nsid)}.Parameters({param_name}: {value_expr}))"
+    return (
+        "        let did = IntentAccountResolver.activeDID()\n"
+        "        let client = try await IntentClientProvider.shared.client(for: did)\n"
+        f"        let output = try unwrapIntentResponse(await {call})\n"
+        f"        return output.{results_path}.map {{ {entity_name}(from: $0) }}"
+    )
+
+
+def _build_by_ids_body(lex_index: LexiconIndex, entity_name: str, by_ids_cfg: dict) -> str:
+    nsid = by_ids_cfg['nsid']
+    param_name = by_ids_cfg['param']
+    results_path = by_ids_cfg['resultsPath']
+    lexicon = lex_index.get(nsid)
+    main_def = lexicon.get('defs', {}).get('main', {})
+    if main_def.get('type') != 'query':
+        raise CurationError(f"entity '{entity_name}': query.byIds.nsid '{nsid}' must be a query")
+
+    params_obj = main_def.get('parameters', {})
+    properties = params_obj.get('properties', {})
+    required = params_obj.get('required', [])
+    if param_name not in properties:
+        raise CurationError(f"entity '{entity_name}': byIds.param '{param_name}' not found in '{nsid}' parameters")
+    other_required = [r for r in required if r != param_name]
+    if other_required:
+        raise CurationError(
+            f"entity '{entity_name}': byIds nsid '{nsid}' has other required parameters "
+            f"{other_required}; unsupported"
+        )
+
+    prop = properties[param_name]
+    if prop.get('type') != 'array':
+        raise CurationError(f"entity '{entity_name}': byIds.param '{param_name}' must be an array")
+    try:
+        item_bridge = intent_facing_type(prop.get('items', {}))
+    except CurationError as e:
+        raise CurationError(f"entity '{entity_name}': byIds.param '{param_name}' items: {e}") from e
+    if item_bridge['swift_type'] != 'String':
+        raise CurationError(f"entity '{entity_name}': byIds.param '{param_name}' items must be String-typed")
+    item_expr = item_bridge['bridge_expr_template'].format(v='$0')
+    map_prefix = 'try ' if item_bridge['needs_throws'] else ''
+    array_expr = f"{map_prefix}identifiers.map {{ {item_expr} }}"
+
+    _ref, _mode = _results_ref(lex_index, nsid, main_def, results_path)
+
+    call = f"client.{client_path(nsid)}(input: {convert_to_camel_case(nsid)}.Parameters({param_name}: {array_expr}))"
+    return (
+        "        let did = IntentAccountResolver.activeDID()\n"
+        "        let client = try await IntentClientProvider.shared.client(for: did)\n"
+        f"        let output = try unwrapIntentResponse(await {call})\n"
+        f"        return output.{results_path}.map {{ {entity_name}(from: $0) }}"
+    )
+
+
+def _build_fallback_by_ids_body(entity_name: str) -> str:
+    """No `byIds` endpoint configured: resolve each identifier by re-running
+    the string query and keeping the matching id. O(n) round trips — fine for
+    the handful of identifiers Shortcuts/Siri typically resolves at once."""
+    return (
+        f"        var results: [{entity_name}] = []\n"
+        "        for identifier in identifiers {\n"
+        "            let matches = try await entities(matching: identifier)\n"
+        "            if let match = matches.first(where: { $0.id == identifier }) {\n"
+        "                results.append(match)\n"
+        "            }\n"
+        "        }\n"
+        "        return results"
+    )
+
+
+def resolve_entity(lex_index: LexiconIndex, entity_cfg: dict, resolved_intents: list, idx: int) -> dict:
+    _check_known_keys(entity_cfg, _ENTITY_KEYS, f"appIntents.entities[{idx}]")
+    name = entity_cfg.get('name')
+    source_ref = entity_cfg.get('source')
+    identifier_prop = entity_cfg.get('identifier')
+    if not name or not source_ref or not identifier_prop:
+        raise CurationError(
+            f"appIntents.entities[{idx}]: every entity needs 'name', 'source', and 'identifier' "
+            f"(got: name={name!r}, source={source_ref!r}, identifier={identifier_prop!r})"
+        )
+    properties = entity_cfg.get('properties', [])
+    display_cfg = entity_cfg.get('display', {})
+    _check_known_keys(display_cfg, _DISPLAY_KEYS, f"entity '{name}' display")
+    query_cfg = entity_cfg.get('query')
+    syncable = bool(entity_cfg.get('syncable', False))
+
+    if not query_cfg:
+        raise CurationError(f"entity '{name}': a 'query' config is required (no query-less entities yet)")
+    _check_known_keys(query_cfg, _QUERY_KEYS, f"entity '{name}' query")
+    if query_cfg.get('kind') != 'string':
+        raise CurationError(f"entity '{name}': only query.kind == 'string' is supported")
+
+    # --- Collect distinct source view refs (dict-as-insertion-ordered-set; see
+    # module docstring on determinism — this MUST NOT be a `set()`) ---
+    sources_seen = {}
+    sources = []
+
+    def add_source(raw_ref: str, owner_nsid: str):
+        qualified = lex_index.qualify(raw_ref, owner_nsid)
+        if qualified in sources_seen:
+            return
+        sources_seen[qualified] = True
+        def_schema = lex_index.resolve_def(raw_ref, owner_nsid)
+        sources.append({'qualified': qualified, 'raw_ref': raw_ref, 'schema': def_schema})
+
+    # `source` is always authored fully-qualified ("<nsid>#<def>"), so the owner
+    # passed here is never actually consulted for local-'#' resolution.
+    add_source(source_ref, source_ref.split('#', 1)[0])
+
+    q_nsid = query_cfg['nsid']
+    q_main = lex_index.get(q_nsid).get('defs', {}).get('main', {})
+    results_ref, _ = _results_ref(lex_index, q_nsid, q_main, query_cfg['resultsPath'])
+    add_source(results_ref, q_nsid)
+
+    by_ids_cfg = query_cfg.get('byIds')
+    if by_ids_cfg:
+        _check_known_keys(by_ids_cfg, _QUERY_BY_IDS_KEYS, f"entity '{name}' query.byIds")
+        b_nsid = by_ids_cfg['nsid']
+        b_main = lex_index.get(b_nsid).get('defs', {}).get('main', {})
+        by_ids_ref, _ = _results_ref(lex_index, b_nsid, b_main, by_ids_cfg['resultsPath'])
+        add_source(by_ids_ref, b_nsid)
+
+    for resolved in resolved_intents:
+        returns = resolved.get('returns')
+        if returns and returns['entity'] == name:
+            add_source(returns['ref'], resolved['source_nsid'])
+
+    # --- Identifier: must be present, required, and String-bridgeable in every source ---
+    id_extract_by_source = {}
+    for src in sources:
+        prop_schema = src['schema'].get('properties', {}).get(identifier_prop)
+        if prop_schema is None:
+            raise CurationError(
+                f"entity '{name}': identifier property '{identifier_prop}' missing from source "
+                f"'{src['qualified']}'"
+            )
+        if identifier_prop not in src['schema'].get('required', []):
+            raise CurationError(
+                f"entity '{name}': identifier property '{identifier_prop}' must be required in "
+                f"every source view (optional in '{src['qualified']}')"
+            )
+        extraction = intent_entity_extraction(prop_schema)
+        if extraction is None or extraction['swift_type'] != 'String':
+            raise CurationError(
+                f"entity '{name}': identifier property '{identifier_prop}' must resolve to a "
+                f"String-bridgeable scalar (source '{src['qualified']}')"
+            )
+        id_extract_by_source[src['qualified']] = extraction['direct_template'].format(v=f"view.{identifier_prop}")
+
+    # --- Stored properties ---
+    resolved_props = []
+    for prop_name in properties:
+        swift_type = None
+        overall_optional = False
+        per_source_expr = {}
+        for src in sources:
+            props = src['schema'].get('properties', {})
+            if prop_name not in props:
+                overall_optional = True
+                per_source_expr[src['qualified']] = 'nil'
+                continue
+            prop_schema = props[prop_name]
+            extraction = intent_entity_extraction(prop_schema)
+            if extraction is None:
+                raise CurationError(
+                    f"entity '{name}': property '{prop_name}' has an unsupported type in source "
+                    f"'{src['qualified']}' (only String/Date/URL-bridgeable scalars are supported)"
+                )
+            if swift_type is None:
+                swift_type = extraction['swift_type']
+            elif swift_type != extraction['swift_type']:
+                raise CurationError(
+                    f"entity '{name}': property '{prop_name}' resolves to different Swift types "
+                    f"across sources ('{swift_type}' vs '{extraction['swift_type']}' in "
+                    f"'{src['qualified']}') — unsupported"
+                )
+            source_optional = prop_name not in src['schema'].get('required', [])
+            is_url = extraction['swift_type'] == 'URL'
+            if source_optional or is_url:
+                overall_optional = True
+                template = extraction['optional_chain_template']
+            else:
+                template = extraction['direct_template']
+            per_source_expr[src['qualified']] = template.format(v=f"view.{prop_name}")
+        if swift_type is None:
+            raise CurationError(f"entity '{name}': property '{prop_name}' not found in any resolved source view")
+        resolved_props.append({
+            'name': prop_name,
+            'swift_type': swift_type,
+            'optional': overall_optional,
+            'per_source_expr': per_source_expr,
+        })
+
+    prop_names = [p['name'] for p in resolved_props]
+
+    def find_prop(pname):
+        for p in resolved_props:
+            if p['name'] == pname:
+                return p
+        return None
+
+    def display_prop(key, required=True):
+        pname = display_cfg.get(key)
+        if not pname:
+            if required:
+                raise CurationError(f"entity '{name}': display.{key} is required")
+            return None
+        if pname not in prop_names:
+            raise CurationError(f"entity '{name}': display.{key} references undeclared property '{pname}'")
+        return find_prop(pname)
+
+    title_prop = display_prop('title')
+    fallback_name = display_cfg.get('titleFallback')
+    fallback_prop = None
+    if fallback_name:
+        if fallback_name not in prop_names:
+            raise CurationError(
+                f"entity '{name}': display.titleFallback references undeclared property '{fallback_name}'"
+            )
+        fallback_prop = find_prop(fallback_name)
+    if title_prop['optional']:
+        if not fallback_prop:
+            raise CurationError(
+                f"entity '{name}': display.title '{title_prop['name']}' is optional and needs a display.titleFallback"
+            )
+        if fallback_prop['optional']:
+            # `title ?? fallback` only yields a non-Optional result when `fallback`
+            # is itself guaranteed non-Optional in EVERY resolved source view. If
+            # the fallback can also be nil in some source, `??` still produces an
+            # Optional, and the string-interpolated title silently prints "nil"
+            # instead of failing to compile.
+            raise CurationError(
+                f"entity '{name}': display.titleFallback '{fallback_prop['name']}' must be non-optional "
+                "in every resolved source view (it is optional or missing in at least one source) "
+                f"because display.title '{title_prop['name']}' is optional"
+            )
+    title_swift_expr = f"{title_prop['name']} ?? {fallback_prop['name']}" if title_prop['optional'] else title_prop['name']
+    title_expr = f'"\\({title_swift_expr})"'
+
+    subtitle_prop = display_prop('subtitle', required=False)
+    if subtitle_prop is None:
+        subtitle_expr = 'nil'
+    elif subtitle_prop['optional']:
+        subtitle_expr = f'{subtitle_prop["name"]}.map {{ "\\($0)" }}'
+    else:
+        subtitle_expr = f'"\\({subtitle_prop["name"]})"'
+
+    image_prop = display_prop('image', required=False)
+    if image_prop is None:
+        image_expr = 'nil'
+    else:
+        if image_prop['swift_type'] != 'URL':
+            raise CurationError(f"entity '{name}': display.image must reference a URL-typed property")
+        image_expr = (
+            f'{image_prop["name"]}.map {{ DisplayRepresentation.Image(url: $0) }}'
+            if image_prop['optional']
+            else f'DisplayRepresentation.Image(url: {image_prop["name"]})'
+        )
+
+    string_query_body = _build_string_query_body(lex_index, name, query_cfg)
+    by_ids_body = (
+        _build_by_ids_body(lex_index, name, by_ids_cfg)
+        if by_ids_cfg
+        else _build_fallback_by_ids_body(name)
+    )
+
+    swift_sources = []
+    for src in sources:
+        prop_exprs = {p['name']: p['per_source_expr'][src['qualified']] for p in resolved_props}
+        swift_sources.append({
+            # Use the resolved-and-qualified "<nsid>#<def>" form, not the verbatim
+            # lexicon `raw_ref` — a lexicon-LOCAL ref (bare "#fragment", resolved
+            # against its owning lexicon by LexiconIndex.qualify) has no namespace
+            # prefix on its own and produces an unqualified (garbage) Swift type
+            # name if passed to convert_ref directly.
+            'swift_type': convert_ref(src['qualified']),
+            'id_expr': id_extract_by_source[src['qualified']],
+            'prop_exprs': prop_exprs,
+        })
+
+    display_type_name = name[:-len('Entity')] if name.endswith('Entity') else name
+
+    return {
+        'name': name,
+        'display_type_name': display_type_name,
+        'properties': resolved_props,
+        'sources': swift_sources,
+        'source_refs': [src['qualified'] for src in sources],
+        'title_expr': title_expr,
+        'subtitle_expr': subtitle_expr,
+        'image_expr': image_expr,
+        'string_query': True,
+        'string_query_body': string_query_body,
+        'by_ids_body': by_ids_body,
+        'syncable': syncable,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Rendering
+# ---------------------------------------------------------------------------
+
+def _gen_header(source_note: str) -> str:
+    return f"// GENERATED by app_intents_generator.py — DO NOT EDIT\n// Source: {source_note}"
+
+
+def render_intent(template_manager: TemplateManager, resolved: dict, availability: str) -> str:
+    return template_manager.app_intent_template.render(
+        header=_gen_header(resolved['source_nsid']),
+        availability=availability,
+        struct_name=resolved['struct_name'],
+        title=resolved['title'],
+        description=resolved['description'],
+        parameters=resolved['parameters'],
+        confirmation=resolved['confirmation'],
+        has_input=resolved['has_input'],
+        has_output=resolved['has_output'],
+        params_expr=resolved['params_expr'],
+        client_call=resolved['client_call'],
+        returns_type=resolved['returns_type'],
+        result_expr=resolved['result_expr'],
+    )
+
+
+def render_enum(template_manager: TemplateManager, enum_name: str, values: list, source_nsid: str, availability: str) -> str:
+    labeled = [(v, (v[0].upper() + v[1:]) if v else v) for v in values]
+    return template_manager.app_enum_template.render(
+        header=_gen_header(source_nsid),
+        availability=availability,
+        enum_name=enum_name,
+        values=labeled,
+    )
+
+
+def render_entity(template_manager: TemplateManager, resolved: dict, availability: str) -> str:
+    return template_manager.app_entity_template.render(
+        header=_gen_header(', '.join(resolved['source_refs'])),
+        availability=availability,
+        name=resolved['name'],
+        display_type_name=resolved['display_type_name'],
+        properties=resolved['properties'],
+        sources=resolved['sources'],
+        title_expr=resolved['title_expr'],
+        subtitle_expr=resolved['subtitle_expr'],
+        image_expr=resolved['image_expr'],
+        string_query=resolved['string_query'],
+        string_query_body=resolved['string_query_body'],
+        by_ids_body=resolved['by_ids_body'],
+        syncable=resolved['syncable'],
+    )
+
+
+async def _write_file(path: str, content: str):
+    async with aiofiles.open(path, 'w') as f:
+        await f.write(content)
+
+
+class AppIntentsGenerator:
+    """Drives app-intents manifest generation end to end: loads the reference
+    lexicon set, curates every intent and entity, and writes the resulting
+    Swift files under `swift.output`."""
+
+    def __init__(self, manifest: dict, manifest_path: str):
+        self.manifest = manifest
+        self.manifest_path = manifest_path
+
+    async def generate(self):
+        manifest = self.manifest
+        manifest_path = self.manifest_path
+
+        _check_known_keys(manifest, _TOP_LEVEL_KEYS, manifest_path)
+        _check_known_keys(manifest.get('package') or {}, _PACKAGE_KEYS, f"{manifest_path}: package")
+
+        ai_cfg = manifest.get('appIntents')
+        if not ai_cfg:
+            raise CurationError(f"{manifest_path}: package.kind 'app-intents' requires an 'appIntents' section")
+        _check_known_keys(ai_cfg, _APP_INTENTS_KEYS, f"{manifest_path}: appIntents")
+        swift_cfg = manifest.get('swift')
+        if not swift_cfg or not swift_cfg.get('output'):
+            raise CurationError(f"{manifest_path}: app-intents manifest requires swift.output")
+        _check_known_keys(swift_cfg, _SWIFT_KEYS, f"{manifest_path}: swift")
+        lex_cfg = manifest.get('lexicons', {})
+        _check_known_keys(lex_cfg, _LEXICONS_KEYS, f"{manifest_path}: lexicons")
+        reference_dirs_raw = lex_cfg.get('reference', [])
+        if not reference_dirs_raw:
+            raise CurationError(f"{manifest_path}: app-intents manifest requires lexicons.reference")
+        exclude = tuple(lex_cfg.get('exclude_namespaces', DEFAULT_EXCLUDED_NAMESPACES))
+
+        manifest_dir = os.path.dirname(os.path.abspath(manifest_path))
+        reference_dirs = [_resolve_path(manifest_dir, d) for d in reference_dirs_raw]
+        output_dir = _resolve_path(manifest_dir, swift_cfg['output'])
+
+        availability = ai_cfg.get('availability', 'iOS 18.0')
+
+        lex_index = await load_reference_index(reference_dirs, exclude)
+
+        entities_cfg = ai_cfg.get('entities', [])
+        intents_cfg = ai_cfg.get('intents', [])
+        if not intents_cfg:
+            raise CurationError(f"{manifest_path}: appIntents.intents must declare at least one intent")
+
+        entities_by_name = {}
+        for idx, entity_cfg in enumerate(entities_cfg):
+            entity_name = entity_cfg.get('name')
+            if not entity_name:
+                raise CurationError(
+                    f"appIntents.entities[{idx}]: every entity needs a 'name' (got: name={entity_name!r})"
+                )
+            entities_by_name[entity_name] = entity_cfg
+
+        # Pass 1: intents (entity property resolution in pass 2 needs to see every
+        # intent's resolved `returns` ref, so intents must resolve first).
+        resolved_intents = [
+            resolve_intent(lex_index, cfg, entities_by_name, idx) for idx, cfg in enumerate(intents_cfg)
+        ]
+
+        # Pass 2: entities.
+        resolved_entities = {}
+        for idx, entity_cfg in enumerate(entities_cfg):
+            resolved_entities[entity_cfg['name']] = resolve_entity(lex_index, entity_cfg, resolved_intents, idx)
+
+        template_manager = TemplateManager()
+
+        intents_dir = os.path.join(output_dir, 'Intents')
+        entities_dir = os.path.join(output_dir, 'Entities')
+        enums_dir = os.path.join(output_dir, 'Enums')
+        for d in (intents_dir, entities_dir, enums_dir):
+            os.makedirs(d, exist_ok=True)
+
+        written_enum_names = {}  # insertion-ordered set (dict), see module docstring
+        for resolved in resolved_intents:
+            code = render_intent(template_manager, resolved, availability)
+            await _write_file(os.path.join(intents_dir, f"{resolved['struct_name']}.swift"), code)
+            for enum_name, values in resolved['enums']:
+                if enum_name in written_enum_names:
+                    continue
+                written_enum_names[enum_name] = True
+                enum_code = render_enum(template_manager, enum_name, values, resolved['source_nsid'], availability)
+                await _write_file(os.path.join(enums_dir, f"{enum_name}.swift"), enum_code)
+
+        for entity_name, resolved in resolved_entities.items():
+            code = render_entity(template_manager, resolved, availability)
+            await _write_file(os.path.join(entities_dir, f"{entity_name}.swift"), code)

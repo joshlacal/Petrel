@@ -1,0 +1,51 @@
+{{ header }}
+import Foundation
+import AppIntents
+import Petrel
+
+@available({{ availability }}, *)
+struct {{ name }}: AppEntity {
+    static var typeDisplayRepresentation: TypeDisplayRepresentation = "{{ display_type_name }}"
+    static var defaultQuery = {{ name }}Query()
+
+    let id: String
+{% for prop in properties %}
+    let {{ prop.name }}: {{ prop.swift_type }}{% if prop.optional %}?{% endif %}
+{% endfor %}
+
+    var displayRepresentation: DisplayRepresentation {
+        DisplayRepresentation(
+            title: {{ title_expr }},
+            subtitle: {{ subtitle_expr }},
+            image: {{ image_expr }}
+        )
+    }
+{% for source in sources %}
+    init(from view: {{ source.swift_type }}) {
+        id = {{ source.id_expr }}
+{% for prop in properties %}
+        {{ prop.name }} = {{ source.prop_exprs[prop.name] }}
+{% endfor %}
+    }
+{% endfor %}
+}
+
+@available({{ availability }}, *)
+struct {{ name }}Query: EntityQuery{% if string_query %}, EntityStringQuery{% endif %} {
+    init() {}
+
+    func entities(for identifiers: [String]) async throws -> [{{ name }}] {
+{{ by_ids_body }}
+    }
+{% if string_query %}
+
+    func entities(matching string: String) async throws -> [{{ name }}] {
+{{ string_query_body }}
+    }
+{% endif %}
+}
+{% if syncable %}
+
+@available(iOS 27.0, *)
+extension {{ name }}: SyncableEntity {}
+{% endif %}
