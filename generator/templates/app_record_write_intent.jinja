@@ -1,0 +1,61 @@
+{{ header }}
+import Foundation
+import AppIntents
+import Petrel
+
+@available({{ availability }}, *)
+struct {{ struct_name }}: AppIntent {
+    static let title: LocalizedStringResource = "{{ title }}"
+    static let description = IntentDescription("{{ description }}")
+
+    @Parameter(title: "Account")
+    var account: AccountEntity?
+
+    @Parameter(title: "{{ rw.param_title }}")
+    var {{ rw.param_name }}: {{ rw.entity }}
+
+    init() {}
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+{% if confirmation %}
+        try await requestConfirmation()
+{% endif %}
+        let did = account?.id ?? IntentAccountResolver.activeDID()
+        let client = try await IntentClientProvider.shared.client(for: did)
+
+        let output = try unwrapIntentResponse(await client.{{ rw.hydrate_call }})
+        guard let view = output.{{ rw.results_path }}.first else {
+            throw IntentError.invalidParameter("{{ rw.missing_message }}")
+        }
+{% if rw.action == 'create' %}
+        if {{ rw.viewer_chain }} != nil {
+            return .result(dialog: IntentDialog(stringLiteral: "{{ rw.already_dialog }}"))
+        }
+        let record = {{ rw.record_expr }}
+        let userDID = try await client.getDid()
+        let input = ComAtprotoRepoCreateRecord.Input(
+            repo: try ATIdentifier(string: userDID),
+            collection: try NSID(nsidString: "{{ rw.record_nsid }}"),
+            record: .knownType(record)
+        )
+        _ = try unwrapIntentResponse(await client.com.atproto.repo.createRecord(input: input))
+        return .result(dialog: IntentDialog(stringLiteral: "{{ rw.success_dialog }}"))
+{% else %}
+        guard let existingURI = {{ rw.viewer_chain }} else {
+            return .result(dialog: IntentDialog(stringLiteral: "{{ rw.already_dialog }}"))
+        }
+        let rkey = try IntentRecordWriteSupport.recordKey(fromViewerURI: existingURI)
+        let userDID = try await client.getDid()
+        let input = ComAtprotoRepoDeleteRecord.Input(
+            repo: try ATIdentifier(string: userDID),
+            collection: try NSID(nsidString: "{{ rw.record_nsid }}"),
+            rkey: rkey
+        )
+        let (responseCode, _) = try await client.com.atproto.repo.deleteRecord(input: input)
+        guard (200..<300).contains(responseCode) else {
+            throw IntentError.httpError(responseCode)
+        }
+        return .result(dialog: IntentDialog(stringLiteral: "{{ rw.success_dialog }}"))
+{% endif %}
+    }
+}

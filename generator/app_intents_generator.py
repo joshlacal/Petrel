@@ -86,9 +86,17 @@ type_converter.py):
     being a hard error, so long as it resolves to the same Swift type
     wherever it IS present.
 
-  * `kind: "recordWrite"` intents are validated for manifest shape (id/kind/
-    structName present) and then hard-fail with a clear "not yet supported"
-    error — no code is emitted for them.
+  * `kind: "recordWrite"` intents perform a com.atproto.repo record
+    create/delete with a hydrate-then-write pattern: the intent takes ONE
+    entity parameter (the subject), re-fetches its fresh view via
+    `recordWrite.subject.hydrate` (supplying the strongRef `cid` and viewer
+    state), then creates the record (skipping when `recordWrite.viewerPath`
+    already names a record URI) or deletes the record named by that viewer URI
+    (skipping when absent). `id` is the RECORD NSID (e.g. app.bsky.feed.like)
+    and is intentionally shared by the create/delete pair for one collection;
+    `structName` (also the output filename) carries uniqueness. Records are
+    synthesized from the lexicon's properties: `subject` + `createdAt` are
+    required, anything else must be optional and is emitted as `nil`.
 
 Determinism: this generator is invoked as a fresh `python3` process for each
 of the two runs in the byte-stability check, and Python's string hashing is
@@ -130,14 +138,20 @@ _APP_INTENTS_KEYS = {'availability', 'intents', 'entities'}
 _INTENT_KEYS = {
     'id', 'kind', 'structName', 'title', 'description', 'parameters',
     'excludeParameters', 'parameterOverrides', 'confirmation', 'returns',
+    'dialog', 'recordWrite',
 }
-_ENTITY_KEYS = {'name', 'source', 'identifier', 'syncable', 'display', 'properties', 'query'}
+_ENTITY_KEYS = {'name', 'source', 'identifier', 'syncable', 'indexed', 'display', 'properties', 'query'}
 _PARAMETER_META_KEYS = {'title', 'requestValue'}
 _PARAMETER_OVERRIDE_KEYS = {'resolveAs', 'bridge'}
 _DISPLAY_KEYS = {'title', 'titleFallback', 'subtitle', 'image'}
 _QUERY_KEYS = {'kind', 'nsid', 'param', 'resultsPath', 'byIds'}
 _QUERY_BY_IDS_KEYS = {'nsid', 'param', 'resultsPath'}
 _RETURNS_KEYS = {'entity', 'outputPath', 'scalar'}
+_RECORD_WRITE_KEYS = {'action', 'subject', 'viewerPath', 'dialog'}
+_RW_SUBJECT_KEYS = {'kind', 'parameter', 'hydrate'}
+_RW_PARAM_KEYS = {'name', 'title', 'entity'}
+_RW_HYDRATE_KEYS = {'nsid', 'param', 'resultsPath'}
+_RW_DIALOG_KEYS = {'success', 'alreadyDone'}
 
 # Lexicon output-field type -> Swift scalar type, for `returns.scalar` (a
 # ReturnsValue<Int>/<Bool>/<Double> query, e.g. getUnreadCount's `count`) —
@@ -197,6 +211,26 @@ def client_path(lexicon_id: str) -> str:
 
 def _escape_swift_string(s: str) -> str:
     return s.replace('\\', '\\\\').replace('"', '\\"').replace('\n', ' ')
+
+
+def _display_noun(display_type_name: str) -> str:
+    """Human-readable lowercase noun for an entity display type name, for use
+    in spoken dialogs: 'Post' -> 'post', 'FeedGenerator' -> 'feed generator'."""
+    words = []
+    current = ''
+    for ch in display_type_name:
+        if ch.isupper() and current:
+            words.append(current)
+            current = ch
+        else:
+            current += ch
+    if current:
+        words.append(current)
+    return ' '.join(w.lower() for w in words)
+
+
+def _entity_display_type_name(entity_name: str) -> str:
+    return entity_name[:-len('Entity')] if entity_name.endswith('Entity') else entity_name
 
 
 class LexiconIndex:
@@ -598,7 +632,7 @@ def resolve_intent(lex_index: LexiconIndex, intent_cfg: dict, entities_by_name: 
             f"(got: id={nsid!r}, kind={kind!r}, structName={struct_name!r})"
         )
     if kind == 'recordWrite':
-        raise CurationError(f"intent '{nsid}': kind 'recordWrite' not yet supported")
+        return resolve_record_write(lex_index, intent_cfg, entities_by_name, idx)
     if kind not in ('query', 'procedure'):
         raise CurationError(f"intent '{nsid}': unknown kind '{kind}'")
 
@@ -655,6 +689,26 @@ def resolve_intent(lex_index: LexiconIndex, intent_cfg: dict, entities_by_name: 
         returns_type = scalar_return['swift_type']
         result_expr = f"output.{scalar_return['field']}"
 
+    dialog_override = intent_cfg.get('dialog')
+    if dialog_override is not None:
+        if not isinstance(dialog_override, str) or not dialog_override:
+            raise CurationError(f"intent '{nsid}': 'dialog' must be a non-empty string")
+        if returns:
+            raise CurationError(
+                f"intent '{nsid}': 'dialog' overrides are only supported for scalar returns and "
+                "void procedures — entity-returning dialogs are derived automatically"
+            )
+
+    result_block = _build_result_block(
+        nsid=nsid,
+        client_call=client_call,
+        has_output=has_output,
+        returns=returns,
+        scalar_return=scalar_return,
+        result_expr=result_expr,
+        dialog_override=dialog_override,
+    )
+
     return {
         'source_nsid': nsid,
         'kind': kind,
@@ -665,12 +719,298 @@ def resolve_intent(lex_index: LexiconIndex, intent_cfg: dict, entities_by_name: 
         'parameters': curated_params,
         'enums': enums,
         'has_input': source['has_input'],
-        'has_output': has_output,
         'params_expr': params_expr,
         'client_call': client_call,
         'returns': returns,
         'returns_type': returns_type,
-        'result_expr': result_expr,
+        'result_block': result_block,
+    }
+
+
+def _build_result_block(nsid, client_call, has_output, returns, scalar_return,
+                        result_expr, dialog_override) -> str:
+    """The Swift statements after the client is bound: issue the call, map the
+    output, and return `.result(...)` with a spoken IntentDialog. Every intent
+    provides a dialog so Siri has something to say — collection/single entity
+    dialogs are derived from the returned entities' displayRepresentation;
+    scalar and void dialogs default to generic text overridable per intent via
+    the manifest `dialog` key ("{value}" interpolates the scalar result)."""
+    indent = '        '
+
+    if returns:
+        noun = _display_noun(_entity_display_type_name(returns['entity']))
+        noun_plural = noun + 's'
+        if returns['mode'] == 'collection':
+            found_line = (
+                f'Found \\(value.count) \\(value.count == 1 ? "{noun}" : "{noun_plural}"). '
+                'First: \\(String(localized: first.displayRepresentation.title)).'
+            )
+            return (
+                f"{indent}let output = try unwrapIntentResponse(await client.{client_call})\n"
+                f"{indent}let value = {result_expr}\n"
+                f"{indent}let dialog: IntentDialog\n"
+                f"{indent}if let first = value.first {{\n"
+                f'{indent}    dialog = IntentDialog(stringLiteral: "{found_line}")\n'
+                f"{indent}}} else {{\n"
+                f'{indent}    dialog = IntentDialog(stringLiteral: "No {noun_plural} found.")\n'
+                f"{indent}}}\n"
+                f"{indent}return .result(value: value, dialog: dialog)"
+            )
+        label = _entity_display_type_name(returns['entity'])
+        return (
+            f"{indent}let output = try unwrapIntentResponse(await client.{client_call})\n"
+            f"{indent}let value = {result_expr}\n"
+            f"{indent}return .result(value: value, dialog: IntentDialog(stringLiteral: "
+            f'"{label}: \\(String(localized: value.displayRepresentation.title))"))'
+        )
+
+    if scalar_return:
+        template = dialog_override or 'Result: {value}'
+        if '{value}' in template:
+            prefix, _, suffix = template.partition('{value}')
+            dialog_text = f"{_escape_swift_string(prefix)}\\(value){_escape_swift_string(suffix)}"
+        else:
+            dialog_text = _escape_swift_string(template)
+        return (
+            f"{indent}let output = try unwrapIntentResponse(await client.{client_call})\n"
+            f"{indent}let value = {result_expr}\n"
+            f"{indent}return .result(value: value, dialog: IntentDialog(stringLiteral: \"{dialog_text}\"))"
+        )
+
+    done_text = _escape_swift_string(dialog_override or 'Done.')
+    if has_output:
+        return (
+            f"{indent}_ = try unwrapIntentResponse(await client.{client_call})\n"
+            f"{indent}return .result(dialog: IntentDialog(stringLiteral: \"{done_text}\"))"
+        )
+    # No-output procedures return a bare response code from the generated
+    # client — check it instead of discarding it so failures actually throw.
+    return (
+        f"{indent}let responseCode = try await client.{client_call}\n"
+        f"{indent}guard (200..<300).contains(responseCode) else {{\n"
+        f"{indent}    throw IntentError.httpError(responseCode)\n"
+        f"{indent}}}\n"
+        f"{indent}return .result(dialog: IntentDialog(stringLiteral: \"{done_text}\"))"
+    )
+
+
+def resolve_record_write(lex_index: LexiconIndex, intent_cfg: dict, entities_by_name: dict, idx: int) -> dict:
+    """Resolve a `kind: "recordWrite"` intent: a com.atproto.repo record
+    create/delete driven by a hydrate-then-write pattern. The intent takes ONE
+    entity parameter (the subject), re-fetches the subject's fresh view via the
+    declared hydrate endpoint (which supplies both the strongRef `cid` and the
+    viewer state), then either creates the record (skipping when the viewer URI
+    at `viewerPath` shows it already exists) or deletes the record named by
+    that viewer URI (skipping when absent). `id` is the RECORD NSID (e.g.
+    app.bsky.feed.like), shared by the create and delete intents for one
+    collection — `structName` uniqueness is what tells them apart."""
+    nsid = intent_cfg['id']
+    struct_name = intent_cfg['structName']
+    context = f"intent '{nsid}' ({struct_name})"
+
+    rw = intent_cfg.get('recordWrite')
+    if not rw:
+        raise CurationError(f"{context}: kind 'recordWrite' requires a 'recordWrite' object")
+    _check_known_keys(rw, _RECORD_WRITE_KEYS, f"{context} recordWrite")
+    if intent_cfg.get('returns') is not None:
+        raise CurationError(f"{context}: recordWrite intents cannot declare 'returns' (dialog-only)")
+    if intent_cfg.get('dialog') is not None:
+        raise CurationError(f"{context}: use recordWrite.dialog, not the top-level 'dialog' key")
+    for unsupported in ('parameters', 'excludeParameters', 'parameterOverrides'):
+        if intent_cfg.get(unsupported) is not None:
+            raise CurationError(f"{context}: '{unsupported}' is not supported on recordWrite intents")
+
+    action = rw.get('action')
+    if action not in ('create', 'delete'):
+        raise CurationError(f"{context}: recordWrite.action must be 'create' or 'delete' (got {action!r})")
+
+    # --- Record lexicon shape ---
+    lexicon = lex_index.get(nsid)
+    main_def = lexicon.get('defs', {}).get('main', {})
+    if main_def.get('type') != 'record':
+        raise CurationError(
+            f"{context}: recordWrite id must name a record lexicon (main type is '{main_def.get('type')}')"
+        )
+    record_schema = main_def.get('record', {})
+    record_props = record_schema.get('properties', {})
+    record_required = record_schema.get('required', [])
+    extra_required = [r for r in record_required if r not in ('subject', 'createdAt')]
+    if extra_required:
+        raise CurationError(
+            f"{context}: record requires fields beyond subject/createdAt ({', '.join(extra_required)}) "
+            "— unsupported (only subject+createdAt records can be synthesized)"
+        )
+    if 'subject' not in record_props or 'createdAt' not in record_props:
+        raise CurationError(f"{context}: recordWrite requires the record to declare 'subject' and 'createdAt'")
+
+    # --- Subject: manifest kind must match the record's declared subject shape ---
+    subject_cfg = rw.get('subject') or {}
+    _check_known_keys(subject_cfg, _RW_SUBJECT_KEYS, f"{context} recordWrite.subject")
+    subject_kind = subject_cfg.get('kind')
+    subject_schema = record_props['subject']
+    if subject_kind == 'strongRef':
+        ref_target = normalize_ref(subject_schema.get('ref', ''), nsid)[0] if subject_schema.get('type') == 'ref' else None
+        if ref_target != 'com.atproto.repo.strongRef':
+            raise CurationError(
+                f"{context}: subject.kind 'strongRef' but the record's subject is not a "
+                "com.atproto.repo.strongRef ref"
+            )
+    elif subject_kind == 'did':
+        if subject_schema.get('type') != 'string' or subject_schema.get('format') != 'did':
+            raise CurationError(
+                f"{context}: subject.kind 'did' but the record's subject is not a string with format did"
+            )
+    else:
+        raise CurationError(f"{context}: recordWrite.subject.kind must be 'strongRef' or 'did'")
+
+    param_cfg = subject_cfg.get('parameter') or {}
+    _check_known_keys(param_cfg, _RW_PARAM_KEYS, f"{context} recordWrite.subject.parameter")
+    param_name = param_cfg.get('name')
+    entity_name = param_cfg.get('entity')
+    if not param_name or not entity_name:
+        raise CurationError(f"{context}: recordWrite.subject.parameter needs 'name' and 'entity'")
+    if entity_name not in entities_by_name:
+        raise CurationError(
+            f"{context}: recordWrite.subject.parameter.entity '{entity_name}' is not declared in "
+            "appIntents.entities"
+        )
+    param_title = param_cfg.get('title') or param_name
+
+    # --- Hydrate endpoint: array-of-identifiers query returning the subject's view ---
+    hydrate_cfg = subject_cfg.get('hydrate') or {}
+    _check_known_keys(hydrate_cfg, _RW_HYDRATE_KEYS, f"{context} recordWrite.subject.hydrate")
+    h_nsid = hydrate_cfg.get('nsid')
+    h_param = hydrate_cfg.get('param')
+    h_results = hydrate_cfg.get('resultsPath')
+    if not h_nsid or not h_param or not h_results:
+        raise CurationError(f"{context}: recordWrite.subject.hydrate needs 'nsid', 'param', and 'resultsPath'")
+    h_main = lex_index.get(h_nsid).get('defs', {}).get('main', {})
+    if h_main.get('type') != 'query':
+        raise CurationError(f"{context}: hydrate.nsid '{h_nsid}' must be a query")
+    h_params_obj = h_main.get('parameters', {})
+    h_props = h_params_obj.get('properties', {})
+    if h_param not in h_props:
+        raise CurationError(f"{context}: hydrate.param '{h_param}' not found in '{h_nsid}' parameters")
+    other_required = [r for r in h_params_obj.get('required', []) if r != h_param]
+    if other_required:
+        raise CurationError(
+            f"{context}: hydrate nsid '{h_nsid}' has other required parameters {other_required}; unsupported"
+        )
+    h_prop = h_props[h_param]
+    if h_prop.get('type') != 'array':
+        raise CurationError(f"{context}: hydrate.param '{h_param}' must be an array of identifiers")
+    try:
+        item_bridge = intent_facing_type(h_prop.get('items', {}))
+    except CurationError as e:
+        raise CurationError(f"{context}: hydrate.param '{h_param}' items: {e}") from e
+    if item_bridge['swift_type'] != 'String':
+        raise CurationError(f"{context}: hydrate.param '{h_param}' items must be String-typed")
+
+    view_ref, _ = _results_ref(lex_index, h_nsid, h_main, h_results)
+    view_def = lex_index.resolve_def(view_ref, h_nsid)
+    view_props = view_def.get('properties', {})
+    view_required = view_def.get('required', [])
+    view_qualified = lex_index.qualify(view_ref, h_nsid)
+
+    # --- Subject construction from the hydrated view ---
+    if subject_kind == 'strongRef':
+        for field, fmt in (('uri', 'at-uri'), ('cid', 'cid')):
+            fp = view_props.get(field)
+            if fp is None or field not in view_required or fp.get('type') != 'string' or fp.get('format') != fmt:
+                raise CurationError(
+                    f"{context}: hydrated view '{view_qualified}' must declare required '{field}' "
+                    f"(string, format {fmt}) to build a strongRef subject"
+                )
+        subject_expr = 'ComAtprotoRepoStrongRef(uri: view.uri, cid: view.cid)'
+    else:
+        fp = view_props.get('did')
+        if fp is None or 'did' not in view_required or fp.get('type') != 'string' or fp.get('format') != 'did':
+            raise CurationError(
+                f"{context}: hydrated view '{view_qualified}' must declare required 'did' "
+                "(string, format did) to build a did subject"
+            )
+        subject_expr = 'view.did'
+
+    # --- viewerPath: '<viewerField>.<leaf>' resolving to an optional at-uri ---
+    viewer_path = rw.get('viewerPath')
+    if not viewer_path or viewer_path.count('.') != 1:
+        raise CurationError(
+            f"{context}: recordWrite.viewerPath must be '<viewerField>.<leaf>' (e.g. 'viewer.like')"
+        )
+    viewer_field, viewer_leaf = viewer_path.split('.')
+    vf = view_props.get(viewer_field)
+    if vf is None or vf.get('type') != 'ref':
+        raise CurationError(
+            f"{context}: viewerPath '{viewer_path}': '{viewer_field}' must be a $ref field on "
+            f"'{view_qualified}'"
+        )
+    owner_nsid = view_qualified.split('#', 1)[0]
+    viewer_def = lex_index.resolve_def(vf['ref'], owner_nsid)
+    leaf_prop = viewer_def.get('properties', {}).get(viewer_leaf)
+    if leaf_prop is None or leaf_prop.get('type') != 'string' or leaf_prop.get('format') != 'at-uri':
+        raise CurationError(
+            f"{context}: viewerPath '{viewer_path}': leaf '{viewer_leaf}' must be a string with "
+            f"format at-uri on '{lex_index.qualify(vf['ref'], owner_nsid)}'"
+        )
+    viewer_optional = viewer_field not in view_required
+    leaf_optional = viewer_leaf not in viewer_def.get('required', [])
+    if not (viewer_optional or leaf_optional):
+        raise CurationError(
+            f"{context}: viewerPath '{viewer_path}' resolves to a non-optional field — recordWrite "
+            "needs an optional viewer URI to distinguish already-done from to-do"
+        )
+    viewer_chain = f"view.{viewer_field}{'?' if viewer_optional else ''}.{viewer_leaf}"
+
+    # --- Dialogs ---
+    dialog_cfg = rw.get('dialog') or {}
+    _check_known_keys(dialog_cfg, _RW_DIALOG_KEYS, f"{context} recordWrite.dialog")
+    success_dialog = _escape_swift_string(dialog_cfg.get('success') or 'Done.')
+    already_dialog = _escape_swift_string(dialog_cfg.get('alreadyDone') or 'Nothing to change.')
+
+    # --- Record constructor args, in lexicon property order (extras are all
+    # optional per the required-subset check above and synthesized as nil) ---
+    args = []
+    for pname in record_props:
+        if pname == 'subject':
+            args.append(f"subject: {subject_expr}")
+        elif pname == 'createdAt':
+            args.append("createdAt: ATProtocolDate(date: Date())")
+        else:
+            args.append(f"{pname}: nil")
+    record_expr = f"{convert_to_camel_case(nsid)}({', '.join(args)})"
+
+    # Bridge templates already carry their own inline `try` when throwing (see
+    # build_bridge_expr) — substitute the entity id directly.
+    item_expr = item_bridge['bridge_expr_template'].format(v=f"{param_name}.id")
+    hydrate_call = (
+        f"{client_path(h_nsid)}(input: {convert_to_camel_case(h_nsid)}.Parameters({h_param}: [{item_expr}]))"
+    )
+
+    noun = _display_noun(_entity_display_type_name(entity_name))
+
+    return {
+        'source_nsid': nsid,
+        'kind': 'recordWrite',
+        'struct_name': struct_name,
+        'title': _escape_swift_string(intent_cfg.get('title') or struct_name),
+        'description': _escape_swift_string(intent_cfg.get('description', '')),
+        'confirmation': bool(intent_cfg.get('confirmation', False)),
+        'enums': [],
+        'returns': None,
+        'record_write': {
+            'action': action,
+            'param_name': param_name,
+            'param_title': _escape_swift_string(param_title),
+            'entity': entity_name,
+            'hydrate_call': hydrate_call,
+            'results_path': h_results,
+            'viewer_chain': viewer_chain,
+            'record_expr': record_expr,
+            'record_nsid': nsid,
+            'success_dialog': success_dialog,
+            'already_dialog': already_dialog,
+            'missing_message': _escape_swift_string(f"Catbird couldn't load that {noun}."),
+        },
     }
 
 
@@ -911,6 +1251,7 @@ def resolve_entity(lex_index: LexiconIndex, entity_cfg: dict, resolved_intents: 
     _check_known_keys(display_cfg, _DISPLAY_KEYS, f"entity '{name}' display")
     query_cfg = entity_cfg.get('query')
     syncable = bool(entity_cfg.get('syncable', False))
+    indexed = bool(entity_cfg.get('indexed', False))
 
     if not query_cfg:
         raise CurationError(f"entity '{name}': a 'query' config is required (no query-less entities yet)")
@@ -1159,6 +1500,7 @@ def resolve_entity(lex_index: LexiconIndex, entity_cfg: dict, resolved_intents: 
         'string_query_body': string_query_body,
         'by_ids_body': by_ids_body,
         'syncable': syncable,
+        'indexed': indexed,
     }
 
 
@@ -1171,6 +1513,16 @@ def _gen_header(source_note: str) -> str:
 
 
 def render_intent(template_manager: TemplateManager, resolved: dict, availability: str) -> str:
+    if resolved['kind'] == 'recordWrite':
+        return template_manager.app_record_write_intent_template.render(
+            header=_gen_header(resolved['source_nsid']),
+            availability=availability,
+            struct_name=resolved['struct_name'],
+            title=resolved['title'],
+            description=resolved['description'],
+            confirmation=resolved['confirmation'],
+            rw=resolved['record_write'],
+        )
     return template_manager.app_intent_template.render(
         header=_gen_header(resolved['source_nsid']),
         availability=availability,
@@ -1180,11 +1532,9 @@ def render_intent(template_manager: TemplateManager, resolved: dict, availabilit
         parameters=resolved['parameters'],
         confirmation=resolved['confirmation'],
         has_input=resolved['has_input'],
-        has_output=resolved['has_output'],
         params_expr=resolved['params_expr'],
-        client_call=resolved['client_call'],
         returns_type=resolved['returns_type'],
-        result_expr=resolved['result_expr'],
+        result_block=resolved['result_block'],
     )
 
 
@@ -1213,6 +1563,7 @@ def render_entity(template_manager: TemplateManager, resolved: dict, availabilit
         string_query_body=resolved['string_query_body'],
         by_ids_body=resolved['by_ids_body'],
         syncable=resolved['syncable'],
+        indexed=resolved['indexed'],
     )
 
 
@@ -1279,6 +1630,20 @@ class AppIntentsGenerator:
         resolved_intents = [
             resolve_intent(lex_index, cfg, entities_by_name, idx) for idx, cfg in enumerate(intents_cfg)
         ]
+
+        # `id` is no longer unique across intents (a recordWrite create/delete
+        # pair shares one record NSID), so structName carries uniqueness — and
+        # it's also the output filename, so a duplicate would silently
+        # overwrite a sibling intent's Swift file.
+        seen_struct_names = {}
+        for resolved in resolved_intents:
+            if resolved['struct_name'] in seen_struct_names:
+                raise CurationError(
+                    f"appIntents.intents: duplicate structName '{resolved['struct_name']}' "
+                    f"(used by both '{seen_struct_names[resolved['struct_name']]}' and "
+                    f"'{resolved['source_nsid']}')"
+                )
+            seen_struct_names[resolved['struct_name']] = resolved['source_nsid']
 
         # Pass 2: entities.
         resolved_entities = {}
