@@ -137,6 +137,13 @@ _PARAMETER_OVERRIDE_KEYS = {'resolveAs', 'bridge'}
 _DISPLAY_KEYS = {'title', 'titleFallback', 'subtitle', 'image'}
 _QUERY_KEYS = {'kind', 'nsid', 'param', 'resultsPath', 'byIds'}
 _QUERY_BY_IDS_KEYS = {'nsid', 'param', 'resultsPath'}
+_RETURNS_KEYS = {'entity', 'outputPath', 'scalar'}
+
+# Lexicon output-field type -> Swift scalar type, for `returns.scalar` (a
+# ReturnsValue<Int>/<Bool>/<Double> query, e.g. getUnreadCount's `count`) —
+# the counterpart to entity-returning intents for endpoints whose useful
+# output is a single primitive rather than a $ref.
+_SCALAR_RETURN_TYPES = {'integer': 'Int', 'boolean': 'Bool', 'number': 'Double'}
 
 
 def _check_known_keys(obj: dict, allowed: set, context: str):
@@ -250,10 +257,15 @@ def _results_ref(lex_index: LexiconIndex, nsid: str, main_def: dict, results_pat
     return prop['items']['ref'], True
 
 
-def resolve_output_element_ref(nsid: str, main_def: dict, output_path):
+def resolve_output_element_ref(lex_index: LexiconIndex, nsid: str, main_def: dict, output_path):
     """Resolve `returns.outputPath` (or the whole-output '.'/omitted form) to
     (ref, mode, field). mode is 'collection' (array of $ref) or 'single'
-    (whole output ref, or a scalar $ref field)."""
+    (whole output ref, or a scalar $ref field). `field` is either a plain
+    string (existing single-level outputPath) or, for the one-level
+    array-element nesting form ("feed.post"), a dict
+    `{'array_field': ..., 'leaf_field': ...}` — see the module docstring's
+    "array-element outputPath nesting" note. Callers must branch on
+    `isinstance(field, dict)` when building the result expression."""
     output_obj = main_def.get('output')
     if not output_obj:
         raise CurationError(f"intent '{nsid}': 'returns' declared but the lexicon has no output")
@@ -269,6 +281,60 @@ def resolve_output_element_ref(nsid: str, main_def: dict, output_path):
         return schema['ref'], 'single', None
 
     props = schema.get('properties', {})
+
+    # One-level array-element nesting: "feed.post" reads the required array
+    # field `feed` (of $ref items, e.g. feedViewPost) and, for each element,
+    # extracts a required $ref leaf field (e.g. `post`, a postView ref) —
+    # mirrors the entity display/properties nested-ref-path extension in
+    # STEP 1, but for a query's array output instead of an entity's stored
+    # properties. Deeper paths and non-ref leaves are hard errors, same
+    # rationale as the entity-side extension.
+    if '.' in output_path:
+        parts = output_path.split('.')
+        if len(parts) != 2 or not parts[0] or not parts[1]:
+            raise CurationError(
+                f"intent '{nsid}': outputPath '{output_path}' is not a valid array-element nested "
+                "path — only '<arrayField>.<leafRefField>' one level deep is supported"
+            )
+        array_field, leaf_field = parts
+        if array_field not in props:
+            raise CurationError(f"intent '{nsid}': outputPath '{output_path}': '{array_field}' not found in output properties")
+        if array_field not in schema.get('required', []):
+            raise CurationError(f"intent '{nsid}': outputPath '{output_path}': '{array_field}' must be a required output field")
+        array_prop = props[array_field]
+        if array_prop.get('type') != 'array':
+            raise CurationError(f"intent '{nsid}': outputPath '{output_path}': '{array_field}' must be an array")
+        item = array_prop.get('items', {})
+        if item.get('type') != 'ref':
+            raise CurationError(f"intent '{nsid}': outputPath '{output_path}': '{array_field}' array items must be $ref")
+        # The item type (e.g. feedViewPost) may live in a different lexicon
+        # file than the intent itself (getTimeline vs feed/defs.json) — its
+        # OWN leaf refs (e.g. feedViewPost's local "#postView") must be
+        # qualified against ITS lexicon id, not the intent's, or a bare local
+        # ref resolves against the wrong file downstream.
+        item_lex_id, _ = normalize_ref(item['ref'], nsid)
+        item_def = lex_index.resolve_def(item['ref'], nsid)
+        item_props = item_def.get('properties', {})
+        if leaf_field not in item_props:
+            qualified_item = lex_index.qualify(item['ref'], nsid)
+            raise CurationError(
+                f"intent '{nsid}': outputPath '{output_path}': leaf '{leaf_field}' not found on "
+                f"array element type '{qualified_item}'"
+            )
+        if leaf_field not in item_def.get('required', []):
+            raise CurationError(
+                f"intent '{nsid}': outputPath '{output_path}': leaf '{leaf_field}' must be required "
+                f"on array element type (array-element nesting requires a non-optional nested ref)"
+            )
+        leaf_prop = item_props[leaf_field]
+        if leaf_prop.get('type') != 'ref':
+            raise CurationError(
+                f"intent '{nsid}': outputPath '{output_path}': leaf '{leaf_field}' must itself be a "
+                "$ref — array-element nesting only supports ref leaves"
+            )
+        qualified_leaf_ref = lex_index.qualify(leaf_prop['ref'], item_lex_id)
+        return qualified_leaf_ref, 'collection', {'array_field': array_field, 'leaf_field': leaf_field}
+
     if output_path not in props:
         raise CurationError(f"intent '{nsid}': outputPath '{output_path}' not found in output properties")
     if output_path not in schema.get('required', []):
@@ -332,6 +398,29 @@ def resolve_intent_source(lex_index: LexiconIndex, nsid: str, kind: str) -> dict
         }
 
     raise CurationError(f"intent '{nsid}': unsupported kind '{kind}'")
+
+
+def _clamp_bridge_template(prop: dict, bridge_info: dict) -> dict:
+    """For a lexicon `integer` parameter carrying `minimum`/`maximum`, rewrite
+    `bridge_info['bridge_expr_template']` so the emitted Swift clamps the
+    intent-facing Int into the lexicon's declared range before it reaches the
+    Parameters/Input constructor — an out-of-range Shortcuts value would
+    otherwise reach the server as-is and come back a 400. Leaves `bridge_info`
+    untouched for non-integer params or integers with no min/max declared.
+    Does not touch the @Parameter's Swift type (still plain `Int`/`Int?`)."""
+    if prop.get('type') != 'integer':
+        return bridge_info
+    lo = prop.get('minimum')
+    hi = prop.get('maximum')
+    if lo is None and hi is None:
+        return bridge_info
+    if lo is not None and hi is not None:
+        clamp_template = f"min(max({{v}}, {lo}), {hi})"
+    elif lo is not None:
+        clamp_template = f"max({{v}}, {lo})"
+    else:
+        clamp_template = f"min({{v}}, {hi})"
+    return {**bridge_info, 'bridge_expr_template': clamp_template}
 
 
 def build_bridge_expr(param: dict) -> str:
@@ -428,6 +517,7 @@ def curate_parameters(nsid: str, intent_struct_name: str, source: dict, intent_c
                 bridge_info = intent_facing_type(prop, enum_type_name=enum_type_name)
             except CurationError as e:
                 raise CurationError(f"intent '{nsid}' parameter '{name}': {e}") from e
+            bridge_info = _clamp_bridge_template(prop, bridge_info)
             swift_type = bridge_info['swift_type']
             value_source = name
             if bridge_info.get('is_enum'):
@@ -447,15 +537,54 @@ def curate_parameters(nsid: str, intent_struct_name: str, source: dict, intent_c
     return curated, enums
 
 
-def resolve_returns(nsid: str, main_def: dict, returns_cfg: dict, entities_by_name: dict):
+def resolve_returns(lex_index: LexiconIndex, nsid: str, main_def: dict, returns_cfg: dict, entities_by_name: dict):
     entity_name = returns_cfg.get('entity')
     if not entity_name or entity_name not in entities_by_name:
         raise CurationError(
             f"intent '{nsid}': returns.entity '{entity_name}' is not declared in appIntents.entities"
         )
     output_path = returns_cfg.get('outputPath')
-    ref, mode, field = resolve_output_element_ref(nsid, main_def, output_path)
+    ref, mode, field = resolve_output_element_ref(lex_index, nsid, main_def, output_path)
     return {'entity': entity_name, 'ref': ref, 'mode': mode, 'field': field}
+
+
+def resolve_scalar_return(nsid: str, main_def: dict, returns_cfg: dict) -> dict:
+    """Resolve `returns.scalar` — a query whose useful output is a single
+    lexicon integer/boolean/number field (e.g. `getUnreadCount`'s `count`)
+    rather than a $ref, so it can't go through the entity-returning path at
+    all. Requires an explicit, required, top-level `outputPath` naming that
+    field; no nesting/array support (a manifest author who needs one of those
+    should use `returns.entity` + `outputPath` instead)."""
+    scalar_type = returns_cfg.get('scalar')
+    output_path = returns_cfg.get('outputPath')
+    if not output_path:
+        raise CurationError(f"intent '{nsid}': returns.scalar requires an explicit outputPath")
+    output_obj = main_def.get('output')
+    if not output_obj:
+        raise CurationError(f"intent '{nsid}': 'returns' declared but the lexicon has no output")
+    schema = output_obj.get('schema', {})
+    props = schema.get('properties', {})
+    if output_path not in props:
+        raise CurationError(f"intent '{nsid}': returns.outputPath '{output_path}' not found in output properties")
+    if output_path not in schema.get('required', []):
+        raise CurationError(
+            f"intent '{nsid}': returns.outputPath '{output_path}' must be a required output field "
+            "for a scalar return"
+        )
+    prop = props[output_path]
+    prop_type = prop.get('type')
+    expected_swift = _SCALAR_RETURN_TYPES.get(prop_type)
+    if expected_swift is None:
+        raise CurationError(
+            f"intent '{nsid}': returns.outputPath '{output_path}' has lexicon type '{prop_type}', "
+            "which is not a supported scalar return (integer/boolean/number only)"
+        )
+    if expected_swift != scalar_type:
+        raise CurationError(
+            f"intent '{nsid}': returns.scalar '{scalar_type}' does not match outputPath "
+            f"'{output_path}''s lexicon-derived Swift type '{expected_swift}'"
+        )
+    return {'swift_type': expected_swift, 'field': output_path}
 
 
 def resolve_intent(lex_index: LexiconIndex, intent_cfg: dict, entities_by_name: dict, idx: int) -> dict:
@@ -481,10 +610,19 @@ def resolve_intent(lex_index: LexiconIndex, intent_cfg: dict, entities_by_name: 
     returns_cfg = intent_cfg.get('returns')
     if kind == 'query' and not returns_cfg:
         raise CurationError(f"intent '{nsid}': query intents must declare 'returns'")
-    returns = resolve_returns(nsid, main_def, returns_cfg, entities_by_name) if returns_cfg else None
+    returns = None
+    scalar_return = None
+    if returns_cfg:
+        _check_known_keys(returns_cfg, _RETURNS_KEYS, f"intent '{nsid}' returns")
+        if returns_cfg.get('entity') and returns_cfg.get('scalar'):
+            raise CurationError(f"intent '{nsid}': returns cannot declare both 'entity' and 'scalar'")
+        if returns_cfg.get('scalar'):
+            scalar_return = resolve_scalar_return(nsid, main_def, returns_cfg)
+        else:
+            returns = resolve_returns(lex_index, nsid, main_def, returns_cfg, entities_by_name)
 
     has_output = 'output' in main_def
-    if returns and not has_output:
+    if (returns or scalar_return) and not has_output:
         raise CurationError(f"intent '{nsid}': returns declared but lexicon has no output")
 
     if source['has_input']:
@@ -501,13 +639,21 @@ def resolve_intent(lex_index: LexiconIndex, intent_cfg: dict, entities_by_name: 
     if returns:
         if returns['mode'] == 'collection':
             returns_type = f"[{returns['entity']}]"
-            result_expr = f"output.{returns['field']}.map {{ {returns['entity']}(from: $0) }}"
+            if isinstance(returns['field'], dict):
+                array_field = returns['field']['array_field']
+                leaf_field = returns['field']['leaf_field']
+                result_expr = f"output.{array_field}.map {{ {returns['entity']}(from: $0.{leaf_field}) }}"
+            else:
+                result_expr = f"output.{returns['field']}.map {{ {returns['entity']}(from: $0) }}"
         else:
             returns_type = returns['entity']
             if returns['field']:
                 result_expr = f"{returns['entity']}(from: output.{returns['field']})"
             else:
                 result_expr = f"{returns['entity']}(from: output)"
+    elif scalar_return:
+        returns_type = scalar_return['swift_type']
+        result_expr = f"output.{scalar_return['field']}"
 
     return {
         'source_nsid': nsid,
@@ -525,6 +671,96 @@ def resolve_intent(lex_index: LexiconIndex, intent_cfg: dict, entities_by_name: 
         'returns': returns,
         'returns_type': returns_type,
         'result_expr': result_expr,
+    }
+
+
+def _split_nested_property(entity_name: str, prop_name: str):
+    """Split a manifest `properties`/`display` entry into a one-level nested
+    ref path, or return `(None, None)` for a plain (non-dotted) scalar name.
+
+    Only exactly one dot is supported ("author.handle") — deeper paths
+    ("a.b.c") and empty segments (".foo", "foo.") hard-fail immediately so a
+    manifest typo doesn't silently resolve to nothing."""
+    if '.' not in prop_name:
+        return None, None
+    parts = prop_name.split('.')
+    if len(parts) != 2 or not parts[0] or not parts[1]:
+        raise CurationError(
+            f"entity '{entity_name}': property '{prop_name}' is not a valid one-level ref path — "
+            "only paths of the form '<ref>.<leaf>' (e.g. 'author.handle') are supported"
+        )
+    return parts[0], parts[1]
+
+
+def _nested_swift_property_name(ref_name: str, leaf_name: str) -> str:
+    """The Swift-safe stored-property identifier for a nested ref path
+    ("author" + "handle" -> "authorHandle"). Dots are not valid in Swift
+    identifiers, so the dot-path manifest key (used for matching `display`/
+    `properties` config) and the generated Swift field name are kept as two
+    separate strings — see `resolve_entity`."""
+    return ref_name + leaf_name[0].upper() + leaf_name[1:]
+
+
+def _resolve_nested_property(lex_index: LexiconIndex, entity_name: str, prop_name: str,
+                              ref_name: str, leaf_name: str, src: dict):
+    """Resolve one source view's contribution to a one-level nested ref path
+    property (e.g. `author.handle` on a `postView`-sourced entity).
+
+    Returns `None` when `ref_name` itself is absent from this source's schema
+    (treated the same as a missing direct property — optional, synthesized as
+    `nil` — since real sibling view defs can differ). Any OTHER shape problem
+    (the field isn't a $ref, the leaf isn't found on the ref'd def, the leaf
+    isn't a supported scalar, or the leaf is itself another $ref) is a hard
+    CurationError: those indicate a manifest authoring mistake, not a benign
+    cross-view difference, per the "hard-fail on deeper nesting / non-scalar
+    leaf / nested-in-nested refs" rule.
+    """
+    props = src['schema'].get('properties', {})
+    if ref_name not in props:
+        return None
+
+    ref_prop_schema = props[ref_name]
+    if ref_prop_schema.get('type') != 'ref':
+        raise CurationError(
+            f"entity '{entity_name}': property '{prop_name}': '{ref_name}' in source "
+            f"'{src['qualified']}' has type '{ref_prop_schema.get('type')}', not 'ref' — nested "
+            "dot-paths are only supported for $ref fields"
+        )
+
+    owner_nsid = src['qualified'].split('#', 1)[0]
+    nested_def = lex_index.resolve_def(ref_prop_schema['ref'], owner_nsid)
+    nested_props = nested_def.get('properties', {})
+    if leaf_name not in nested_props:
+        qualified_nested = lex_index.qualify(ref_prop_schema['ref'], owner_nsid)
+        raise CurationError(
+            f"entity '{entity_name}': property '{prop_name}': leaf '{leaf_name}' not found on "
+            f"ref'd type '{qualified_nested}' (source '{src['qualified']}')"
+        )
+
+    leaf_schema = nested_props[leaf_name]
+    extraction = intent_entity_extraction(leaf_schema)
+    if extraction is None:
+        raise CurationError(
+            f"entity '{entity_name}': property '{prop_name}': leaf '{leaf_name}' on "
+            f"'{lex_index.qualify(ref_prop_schema['ref'], owner_nsid)}' has an unsupported type for "
+            "entity projection (only String/Date/URL-bridgeable scalars are supported one level "
+            "deep — nested-in-nested $refs are not supported)"
+        )
+
+    ref_optional = ref_name not in src['schema'].get('required', [])
+    leaf_optional = leaf_name not in nested_def.get('required', [])
+    is_url = extraction['swift_type'] == 'URL'
+    # Optionality composes: either link being optional (or a URI's inherently-
+    # Optional `.url` accessor) makes the whole projected value Optional.
+    source_optional = ref_optional or leaf_optional or is_url
+
+    base_chain = f"view.{ref_name}" + ('?' if ref_optional else '') + f".{leaf_name}"
+    template = extraction['optional_chain_template'] if source_optional else extraction['direct_template']
+
+    return {
+        'swift_type': extraction['swift_type'],
+        'optional': source_optional,
+        'expr': template.format(v=base_chain),
     }
 
 
@@ -606,11 +842,36 @@ def _build_by_ids_body(lex_index: LexiconIndex, entity_name: str, by_ids_cfg: di
         raise CurationError(f"entity '{entity_name}': byIds.param '{param_name}' items must be String-typed")
     item_expr = item_bridge['bridge_expr_template'].format(v='$0')
     map_prefix = 'try ' if item_bridge['needs_throws'] else ''
-    array_expr = f"{map_prefix}identifiers.map {{ {item_expr} }}"
 
     _ref, _mode = _results_ref(lex_index, nsid, main_def, results_path)
 
-    call = f"client.{client_path(nsid)}(input: {convert_to_camel_case(nsid)}.Parameters({param_name}: {array_expr}))"
+    client_call = f"client.{client_path(nsid)}"
+    params_ctor = f"{convert_to_camel_case(nsid)}.Parameters"
+
+    # The lexicon caps how many identifiers a single call accepts (e.g.
+    # getProfiles.actors / getPosts.uris both maxLength: 25). Read that cap
+    # from the lexicon rather than hardcoding it, and when present, chunk
+    # `identifiers` into request-sized batches, issuing one client call per
+    # chunk and concatenating results in order. Endpoints with no maxLength
+    # (e.g. getFeedGenerators.feeds) keep the original single-call form.
+    max_length = prop.get('maxLength')
+    if max_length:
+        chunk_expr = f"{map_prefix}chunk.map {{ {item_expr} }}"
+        call = f"{client_call}(input: {params_ctor}({param_name}: {chunk_expr}))"
+        return (
+            "        let did = IntentAccountResolver.activeDID()\n"
+            "        let client = try await IntentClientProvider.shared.client(for: did)\n"
+            f"        var results: [{entity_name}] = []\n"
+            f"        for start in stride(from: 0, to: identifiers.count, by: {max_length}) {{\n"
+            f"            let chunk = Array(identifiers[start..<min(start + {max_length}, identifiers.count)])\n"
+            f"            let output = try unwrapIntentResponse(await {call})\n"
+            f"            results.append(contentsOf: output.{results_path}.map {{ {entity_name}(from: $0) }})\n"
+            "        }\n"
+            "        return results"
+        )
+
+    array_expr = f"{map_prefix}identifiers.map {{ {item_expr} }}"
+    call = f"{client_call}(input: {params_ctor}({param_name}: {array_expr}))"
     return (
         "        let did = IntentAccountResolver.activeDID()\n"
         "        let client = try await IntentClientProvider.shared.client(for: did)\n"
@@ -717,10 +978,33 @@ def resolve_entity(lex_index: LexiconIndex, entity_cfg: dict, resolved_intents: 
     # --- Stored properties ---
     resolved_props = []
     for prop_name in properties:
+        ref_name, leaf_name = _split_nested_property(name, prop_name)
+        is_nested = ref_name is not None
+        swift_name = _nested_swift_property_name(ref_name, leaf_name) if is_nested else prop_name
+
         swift_type = None
         overall_optional = False
         per_source_expr = {}
         for src in sources:
+            if is_nested:
+                result = _resolve_nested_property(lex_index, name, prop_name, ref_name, leaf_name, src)
+                if result is None:
+                    overall_optional = True
+                    per_source_expr[src['qualified']] = 'nil'
+                    continue
+                if swift_type is None:
+                    swift_type = result['swift_type']
+                elif swift_type != result['swift_type']:
+                    raise CurationError(
+                        f"entity '{name}': property '{prop_name}' resolves to different Swift types "
+                        f"across sources ('{swift_type}' vs '{result['swift_type']}' in "
+                        f"'{src['qualified']}') — unsupported"
+                    )
+                if result['optional']:
+                    overall_optional = True
+                per_source_expr[src['qualified']] = result['expr']
+                continue
+
             props = src['schema'].get('properties', {})
             if prop_name not in props:
                 overall_optional = True
@@ -753,10 +1037,21 @@ def resolve_entity(lex_index: LexiconIndex, entity_cfg: dict, resolved_intents: 
             raise CurationError(f"entity '{name}': property '{prop_name}' not found in any resolved source view")
         resolved_props.append({
             'name': prop_name,
+            'swift_name': swift_name,
             'swift_type': swift_type,
             'optional': overall_optional,
             'per_source_expr': per_source_expr,
         })
+
+    seen_swift_names = {}
+    for p in resolved_props:
+        if p['swift_name'] in seen_swift_names:
+            raise CurationError(
+                f"entity '{name}': properties '{seen_swift_names[p['swift_name']]}' and '{p['name']}' "
+                f"both generate the Swift field name '{p['swift_name']}' — rename one to avoid a "
+                "duplicate declaration"
+            )
+        seen_swift_names[p['swift_name']] = p['name']
 
     prop_names = [p['name'] for p in resolved_props]
 
@@ -801,16 +1096,20 @@ def resolve_entity(lex_index: LexiconIndex, entity_cfg: dict, resolved_intents: 
                 "in every resolved source view (it is optional or missing in at least one source) "
                 f"because display.title '{title_prop['name']}' is optional"
             )
-    title_swift_expr = f"{title_prop['name']} ?? {fallback_prop['name']}" if title_prop['optional'] else title_prop['name']
+    title_swift_expr = (
+        f"{title_prop['swift_name']} ?? {fallback_prop['swift_name']}"
+        if title_prop['optional']
+        else title_prop['swift_name']
+    )
     title_expr = f'"\\({title_swift_expr})"'
 
     subtitle_prop = display_prop('subtitle', required=False)
     if subtitle_prop is None:
         subtitle_expr = 'nil'
     elif subtitle_prop['optional']:
-        subtitle_expr = f'{subtitle_prop["name"]}.map {{ "\\($0)" }}'
+        subtitle_expr = f'{subtitle_prop["swift_name"]}.map {{ "\\($0)" }}'
     else:
-        subtitle_expr = f'"\\({subtitle_prop["name"]})"'
+        subtitle_expr = f'"\\({subtitle_prop["swift_name"]})"'
 
     image_prop = display_prop('image', required=False)
     if image_prop is None:
@@ -819,9 +1118,9 @@ def resolve_entity(lex_index: LexiconIndex, entity_cfg: dict, resolved_intents: 
         if image_prop['swift_type'] != 'URL':
             raise CurationError(f"entity '{name}': display.image must reference a URL-typed property")
         image_expr = (
-            f'{image_prop["name"]}.map {{ DisplayRepresentation.Image(url: $0) }}'
+            f'{image_prop["swift_name"]}.map {{ DisplayRepresentation.Image(url: $0) }}'
             if image_prop['optional']
-            else f'DisplayRepresentation.Image(url: {image_prop["name"]})'
+            else f'DisplayRepresentation.Image(url: {image_prop["swift_name"]})'
         )
 
     string_query_body = _build_string_query_body(lex_index, name, query_cfg)
@@ -833,7 +1132,7 @@ def resolve_entity(lex_index: LexiconIndex, entity_cfg: dict, resolved_intents: 
 
     swift_sources = []
     for src in sources:
-        prop_exprs = {p['name']: p['per_source_expr'][src['qualified']] for p in resolved_props}
+        prop_exprs = {p['swift_name']: p['per_source_expr'][src['qualified']] for p in resolved_props}
         swift_sources.append({
             # Use the resolved-and-qualified "<nsid>#<def>" form, not the verbatim
             # lexicon `raw_ref` — a lexicon-LOCAL ref (bare "#fragment", resolved
