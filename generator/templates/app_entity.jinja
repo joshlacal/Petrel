@@ -10,7 +10,7 @@ struct {{ name }}: AppEntity {
 
     let id: String
 {% for prop in properties %}
-    let {{ prop.name }}: {{ prop.swift_type }}{% if prop.optional %}?{% endif %}
+    let {{ prop.swift_name }}: {{ prop.swift_type }}{% if prop.optional %}?{% endif %}
 {% endfor %}
 
     var displayRepresentation: DisplayRepresentation {
@@ -24,7 +24,7 @@ struct {{ name }}: AppEntity {
     init(from view: {{ source.swift_type }}) {
         id = {{ source.id_expr }}
 {% for prop in properties %}
-        {{ prop.name }} = {{ source.prop_exprs[prop.name] }}
+        {{ prop.swift_name }} = {{ source.prop_exprs[prop.swift_name] }}
 {% endfor %}
     }
 {% endfor %}
