@@ -555,6 +555,22 @@ def _resolve_kotlin_output():
 async def run_manifest(manifest_path, language='both'):
     """Generate from a manifest file (see Generator/manifests/*.json)."""
     manifest = load_manifest(manifest_path)
+    kind = manifest.get('package', {}).get('kind', 'core')
+
+    if kind == 'app-intents':
+        # App Intents manifests are Swift-only and use a bespoke curation-driven
+        # generator (generator/app_intents_generator.py) rather than the
+        # per-lexicon SwiftCodeGenerator pipeline below — see that module's
+        # docstring for why. Deferred import to avoid import-time coupling with
+        # the core/overlay path for manifest kinds that never touch it.
+        if language == 'kotlin':
+            raise ValueError(f"app-intents manifest {manifest_path} does not support --language kotlin")
+        if manifest.get('kotlin'):
+            raise ValueError(f"app-intents manifest {manifest_path} must not declare a 'kotlin' output")
+        from app_intents_generator import AppIntentsGenerator
+        await AppIntentsGenerator(manifest, manifest_path).generate()
+        return
+
     lex = manifest.get('lexicons', {})
     emit_dirs = lex.get('emit', [])
     reference_dirs = lex.get('reference', [])

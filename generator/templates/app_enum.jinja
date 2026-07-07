@@ -1,0 +1,18 @@
+{{ header }}
+import Foundation
+import AppIntents
+
+@available({{ availability }}, *)
+enum {{ enum_name }}: String, AppEnum {
+{%- for value, label in values %}
+    case {{ value | enum_case }} = "{{ value }}"
+{%- endfor %}
+
+    static var typeDisplayRepresentation: TypeDisplayRepresentation = "{{ enum_name }}"
+
+    static var caseDisplayRepresentations: [{{ enum_name }}: DisplayRepresentation] = [
+{%- for value, label in values %}
+        .{{ value | enum_case }}: "{{ label }}",
+{%- endfor %}
+    ]
+}

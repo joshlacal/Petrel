@@ -25,6 +25,11 @@ class TemplateManager:
         self.subscription_template = self.env.get_template('subscription.jinja')
         self.message_union_template = self.env.get_template('messageUnion.jinja')
 
+        # App Intents emit mode (generator/app_intents_generator.py)
+        self.app_intent_template = self.env.get_template('app_intent.jinja')
+        self.app_entity_template = self.env.get_template('app_entity.jinja')
+        self.app_enum_template = self.env.get_template('app_enum.jinja')
+
     @staticmethod
     def lowerCamelCase(s):
         parts = s.split('.')
