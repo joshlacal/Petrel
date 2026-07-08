@@ -75,4 +75,15 @@ struct PARParameterTests {
     #expect(params["client_id"] == "https://client.example/oauth-client-metadata.json")
     #expect(params.count == 9)
   }
+
+  @Test("Additional parameters override base entries on key collision")
+  func additionalParametersOverrideCollisions() async {
+    let core = makeCore(namespace: "test.par.collision")
+    let params = await core.buildPARParameters(
+      codeChallenge: "c", identifier: nil, state: "s",
+      additionalParameters: ["client_id": "https://override.example/meta.json"]
+    )
+    #expect(params["client_id"] == "https://override.example/meta.json")
+    #expect(params.count == 7)
+  }
 }
