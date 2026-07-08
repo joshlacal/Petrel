@@ -15,6 +15,7 @@ FROM swift:6.1-noble-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=build /repo/Server/.build/release/petrel-cab-server /usr/local/bin/petrel-cab-server
+WORKDIR /etc/cab
 EXPOSE 8080
 ENTRYPOINT ["petrel-cab-server"]
 CMD ["serve"]

@@ -40,8 +40,9 @@ curl -s http://127.0.0.1:8080/.well-known/jwks.json | jq .  # → JWKS document
 In your Petrel client, configure OAuth with the CAB backend:
 
 ```swift
-let client = ATProtoClient(
+let client = try await ATProtoClient(
   oauthConfig: myOAuthConfig,
+  namespace: "my-app",
   authMode: .cab(backendURL: URL(string: "https://cab.example.com")!)
 )
 ```
@@ -60,13 +61,14 @@ All fields in `config.example.json` can be overridden by environment variables:
 | `port` | `8080` | Bind port | `CAB_PORT` |
 | `keys` | required | Array of signing keys; each has `kid` and `pem_path` | `CAB_KEY_PEM_BASE64` (for inline key) and `CAB_KEY_KID` |
 | `active_kid` | required | Which `kid` to use for new assertions | `CAB_ACTIVE_KID` |
-| `allowed_origins` | `[]` | CORS whitelist; empty allows all | `CAB_ALLOWED_ORIGINS` (comma-separated) |
+| `allowed_origins` | `[]` | CORS whitelist; browser clients must have their Origin listed here; empty list rejects all requests with an Origin header, but requests without Origin (native apps, curl) pass unless `require_origin` is true | `CAB_ALLOWED_ORIGINS` (comma-separated) |
 | `require_origin` | `false` | If true, reject requests without Origin header | (none) |
 | `aud_allowlist` | `null` | If set, only mint assertions for these ATProto server URLs | (none) |
 | `assertion_ttl_seconds` | `60` | How long assertions remain valid (AS enforces 60s max) | (none) |
 | `iat_window_seconds` | `300` | Allowable clock skew for assertion `iat` (±5 minutes) | (none) |
-| `require_nonce` | `false` | If true, require and validate nonce in requests | (none) |
-| `denied_jkts` | `[]` | List of JKT values to rate-limit or reject | (none) |
+| `require_nonce` | `false` | If true, require and validate nonce in requests | `CAB_REQUIRE_NONCE` |
+| `nonce_secret_base64` | `null` | Base64-encoded shared secret for nonce validation; if not set with `require_nonce: true`, each process generates a random secret (nonces will fail across restarts or load-balanced instances) | `CAB_NONCE_SECRET_BASE64` |
+| `denied_jkts` | `[]` | List of JKT values to rate-limit or reject | `CAB_DENIED_JKTS` (comma-separated) |
 | `rate_limit.requests_per_minute` | `60` | Per-JKT rate limit | (none) |
 | `client_metadata.*` | (embedded) | OAuth client metadata served at `client_id` URL; see OAuth metadata spec | (none) |
 
@@ -102,7 +104,7 @@ The CAB server is an open endpoint by design:
 - **DPoP-bound**: Assertions are bound to the requester's DPoP key via the `cnf` claim. An attacker who intercepts an assertion cannot use it without the DPoP key.
 - **Rate limiting and deny list**: The server rate-limits per JKT (DPoP public key hash) and supports a deny list for compromised keys. Combine these to mitigate flooding or key leaks.
 - **No token custody**: The server does not store tokens, refresh tokens, or user state. The client presents a valid assertion to the AS, which returns tokens directly. This minimizes the server's attack surface.
-- **Hardening knobs** (optional): Set `require_nonce` and `aud_allowlist` to further restrict who can mint assertions. Use these if you operate a private network or want to gate access.
+- **Hardening knobs** (optional): Set `require_nonce` and `aud_allowlist` to further restrict who can mint assertions. Use these if you operate a private network or want to gate access. **Important**: If you enable `require_nonce` without setting a shared `nonce_secret_base64`, each process/restart generates a random secret and nonces silently stop validating. Production deployments using nonce validation MUST set a stable shared secret via `CAB_NONCE_SECRET_BASE64` and share it across all instances and restarts.
 - **Run behind TLS**: The server itself does not serve TLS. Run it behind a reverse proxy (nginx, cloudflare, etc.) with `public_url` set to the external URL. This ensures the AS and clients communicate over encrypted channels.
 
 ## Deployment
