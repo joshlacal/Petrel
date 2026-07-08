@@ -42,6 +42,17 @@ struct Refresh: AsyncParsableCommand {
       authMode: .cab(backendURL: backendURL),
       userAgent: "petrel-cab-demo/1.0"
     )
+    // `attemptRecoveryFromServerFailures` silently returns (no throw) when there
+    // is no current account — CABOAuthStrategy's `guard let did = targetDID else
+    // { return }` — which would otherwise print a false PASS with zero backend
+    // contact if `refresh` is run without a prior `login`. Require a stored
+    // session up front.
+    let (did, _, _) = await client.getActiveAccountInfo()
+    guard did != nil else {
+      print("REFRESH RESULT: FAIL — no_stored_session")
+      throw ExitCode.failure
+    }
+
     // `client.refreshToken()` short-circuits to `.stillValid` (→ `false`) whenever
     // the stored token isn't within its expiry buffer yet, so a healthy session
     // would report FAIL without ever contacting the backend. Force a real refresh
