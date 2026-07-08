@@ -42,10 +42,17 @@ struct Refresh: AsyncParsableCommand {
       authMode: .cab(backendURL: backendURL),
       userAgent: "petrel-cab-demo/1.0"
     )
+    // `client.refreshToken()` short-circuits to `.stillValid` (→ `false`) whenever
+    // the stored token isn't within its expiry buffer yet, so a healthy session
+    // would report FAIL without ever contacting the backend. Force a real refresh
+    // instead: `attemptRecoveryFromServerFailures` resets the local circuit
+    // breaker and calls the strategy's `refreshTokenIfNeeded(forceRefresh: true)`,
+    // which never short-circuits and never returns a silent `false` — the backend
+    // either approves the exchange (no throw) or vetoes it (throws), so a thrown
+    // error here is a genuine backend refusal.
     do {
-      let refreshed = try await client.refreshToken()
-      print("REFRESH RESULT: \(refreshed ? "PASS" : "FAIL")")
-      if !refreshed { throw ExitCode.failure }
+      try await client.attemptRecoveryFromServerFailures()
+      print("REFRESH RESULT: PASS")
     } catch {
       print("REFRESH RESULT: FAIL — \(error)")
       throw ExitCode.failure
@@ -123,11 +130,21 @@ struct Login: AsyncParsableCommand {
     print("[4/5] Authenticated as \(session.handle) (\(session.did))")
 
     // 5. Forced refresh (assertion-authenticated), then prove the new
-    //    tokens work.
-    let refreshed = try await client.refreshToken()
+    //    tokens work. `client.refreshToken()` would short-circuit to `.stillValid`
+    //    (→ `false`) here since the token minted in step 3 is fresh — that would
+    //    fail this gate on every healthy run. `attemptRecoveryFromServerFailures`
+    //    forces a real `refreshTokenIfNeeded(forceRefresh: true)` network call,
+    //    which never short-circuits: it either succeeds (no throw) or the backend
+    //    veto surfaces as a thrown error.
+    do {
+      try await client.attemptRecoveryFromServerFailures()
+    } catch {
+      print("E2E RESULT: FAIL — forced refresh failed: \(error)")
+      throw ExitCode.failure
+    }
     let (codeAfter, _) = try await client.com.atproto.server.getSession()
-    guard refreshed, codeAfter == 200 else {
-      print("E2E RESULT: FAIL — refresh=\(refreshed) getSessionAfter=\(codeAfter)")
+    guard codeAfter == 200 else {
+      print("E2E RESULT: FAIL — getSessionAfter=\(codeAfter)")
       throw ExitCode.failure
     }
     print("[5/5] Forced token refresh + re-verified session.")
