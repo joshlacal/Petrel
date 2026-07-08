@@ -353,14 +353,15 @@ actor OAuthCore {
     throw lastError ?? AuthError.networkError(NetworkError.requestFailed)
   }
 
-  func pushAuthorizationRequest(
+  /// Builds the form parameters for a pushed authorization request.
+  /// `additionalParameters` (e.g. a confidential client's `client_assertion`)
+  /// override base entries on key collision.
+  func buildPARParameters(
     codeChallenge: String,
     identifier: String?,
-    endpoint: String,
-    authServerURL: URL,
     state: String,
-    ephemeralKeyForFlow: P256.Signing.PrivateKey?
-  ) async throws -> (requestURI: String, parNonce: String?) {
+    additionalParameters: [String: String]? = nil
+  ) -> [String: String] {
     var parameters: [String: String] = [
       "client_id": oauthConfig.clientId,
       "redirect_uri": oauthConfig.redirectUri,
@@ -371,9 +372,32 @@ actor OAuthCore {
       "scope": oauthConfig.scope,
     ]
 
-    if let identifier = identifier {
+    if let identifier {
       parameters["login_hint"] = identifier
     }
+
+    if let additionalParameters {
+      parameters.merge(additionalParameters) { _, new in new }
+    }
+
+    return parameters
+  }
+
+  func pushAuthorizationRequest(
+    codeChallenge: String,
+    identifier: String?,
+    endpoint: String,
+    authServerURL: URL,
+    state: String,
+    ephemeralKeyForFlow: P256.Signing.PrivateKey?,
+    additionalParameters: [String: String]? = nil
+  ) async throws -> (requestURI: String, parNonce: String?) {
+    let parameters = buildPARParameters(
+      codeChallenge: codeChallenge,
+      identifier: identifier,
+      state: state,
+      additionalParameters: additionalParameters
+    )
 
     let body = encodeFormData(parameters)
 

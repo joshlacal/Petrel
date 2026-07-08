@@ -42,6 +42,11 @@ actor CABOAuthStrategy: AuthStrategy {
   let core: OAuthCore
   let backendURL: URL
 
+  /// Transport for backend assertion fetches — injectable for tests.
+  let urlSession: URLSession
+
+  static let clientAssertionTypeJWTBearer = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
+
   // Delegates
   private weak var progressDelegate: AuthProgressDelegate?
   private weak var failureDelegate: AuthFailureDelegate?
@@ -58,9 +63,11 @@ actor CABOAuthStrategy: AuthStrategy {
     accountManager: AccountManaging,
     networkService: NetworkService,
     oauthConfig: OAuthConfig,
-    didResolver: DIDResolving
+    didResolver: DIDResolving,
+    urlSession: URLSession = .shared
   ) {
     self.backendURL = backendURL
+    self.urlSession = urlSession
     self.core = OAuthCore(
       storage: storage,
       accountManager: accountManager,
@@ -139,6 +146,7 @@ actor CABOAuthStrategy: AuthStrategy {
       code: code,
       codeVerifier: oauthState.codeVerifier,
       tokenEndpoint: metadata.tokenEndpoint,
+      issuer: metadata.issuer,
       authServerURL: authServerURL,
       ephemeralKey: ephemeralKey,
       initialNonce: oauthState.parResponseNonce,
@@ -327,13 +335,25 @@ actor CABOAuthStrategy: AuthStrategy {
     let ephemeralKey = P256.Signing.PrivateKey()
 
     let oauthConfig = await core.oauthConfig
+
+    // Confidential clients authenticate at PAR too. Assertions are
+    // single-use (the AS replay-checks jti), so this one is fetched fresh
+    // and used only for this PAR request.
+    let parAssertion = try await fetchClientAssertion(
+      aud: metadata.issuer, ephemeralKey: ephemeralKey
+    )
+
     let (requestURI, parNonce) = try await core.pushAuthorizationRequest(
       codeChallenge: codeChallenge,
       identifier: identifier,
       endpoint: metadata.pushedAuthorizationRequestEndpoint,
       authServerURL: authServerURL,
       state: stateToken,
-      ephemeralKeyForFlow: ephemeralKey
+      ephemeralKeyForFlow: ephemeralKey,
+      additionalParameters: [
+        "client_assertion": parAssertion.clientAssertion,
+        "client_assertion_type": Self.clientAssertionTypeJWTBearer,
+      ]
     )
 
     let oauthState = OAuthState(
@@ -365,7 +385,26 @@ actor CABOAuthStrategy: AuthStrategy {
 
   // MARK: - Client Assertion Fetch
 
-  private func fetchClientAssertion(ephemeralKey: P256.Signing.PrivateKey? = nil, did: String? = nil, nonce: String? = nil) async throws -> ClientAssertionResponse {
+  /// Fetches a DPoP-bound client assertion for the given authorization
+  /// server issuer. Retries exactly once when the backend answers
+  /// 400 `use_dpop_nonce` with a `DPoP-Nonce` header.
+  func fetchClientAssertion(
+    aud: String,
+    ephemeralKey: P256.Signing.PrivateKey? = nil,
+    did: String? = nil
+  ) async throws -> ClientAssertionResponse {
+    try await fetchClientAssertionAttempt(
+      aud: aud, ephemeralKey: ephemeralKey, did: did, nonce: nil, isRetry: false
+    )
+  }
+
+  private func fetchClientAssertionAttempt(
+    aud: String,
+    ephemeralKey: P256.Signing.PrivateKey?,
+    did: String?,
+    nonce: String?,
+    isRetry: Bool
+  ) async throws -> ClientAssertionResponse {
     let assertionURL = backendURL.appendingPathComponent("oauth/client-assertion")
 
     let dpopProof: String
@@ -383,7 +422,8 @@ actor CABOAuthStrategy: AuthStrategy {
         for: "POST",
         url: assertionURL.absoluteString,
         type: .tokenRefresh,
-        did: did
+        did: did,
+        nonce: nonce
       )
     } else {
       throw AuthError.dpopKeyError
@@ -392,18 +432,30 @@ actor CABOAuthStrategy: AuthStrategy {
     var request = URLRequest(url: assertionURL)
     request.httpMethod = "POST"
     request.setValue(dpopProof, forHTTPHeaderField: "DPoP")
-    request.setValue("0", forHTTPHeaderField: "Content-Length")
+    request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+    request.httpBody = await core.encodeFormData(["aud": aud])
     request.timeoutInterval = 30.0
 
-    let (data, response) = try await URLSession.shared.data(for: request)
-
-    guard let httpResponse = response as? HTTPURLResponse,
-          (200 ..< 300).contains(httpResponse.statusCode)
-    else {
-      throw AuthError.invalidOAuthConfiguration
+    let (data, response) = try await urlSession.data(for: request)
+    guard let httpResponse = response as? HTTPURLResponse else {
+      throw AuthError.invalidResponse
     }
 
-    return try JSONDecoder().decode(ClientAssertionResponse.self, from: data)
+    if (200 ..< 300).contains(httpResponse.statusCode) {
+      return try JSONDecoder().decode(ClientAssertionResponse.self, from: data)
+    }
+
+    let oauthError = try? JSONDecoder().decode(OAuthErrorResponse.self, from: data)
+    if !isRetry,
+       oauthError?.error == "use_dpop_nonce",
+       let serverNonce = await core.extractNonceFromHeaders(httpResponse.allHeaderFields)
+    {
+      return try await fetchClientAssertionAttempt(
+        aud: aud, ephemeralKey: ephemeralKey, did: did, nonce: serverNonce, isRetry: true
+      )
+    }
+
+    throw AuthError.clientAssertionBackendError(httpResponse.statusCode, oauthError?.error)
   }
 
   // MARK: - Token Exchange (Strategy-Specific)
@@ -412,6 +464,7 @@ actor CABOAuthStrategy: AuthStrategy {
     code: String,
     codeVerifier: String,
     tokenEndpoint: String,
+    issuer: String,
     authServerURL: URL,
     ephemeralKey: P256.Signing.PrivateKey?,
     initialNonce: String?,
@@ -425,7 +478,9 @@ actor CABOAuthStrategy: AuthStrategy {
     }
 
     // Fetch client assertion from backend
-    let assertionResponse = try await fetchClientAssertion(ephemeralKey: key, nonce: initialNonce)
+    // The AS's PAR nonce is deliberately NOT sent to the backend — backend
+    // nonces come only from the backend's own challenge.
+    let assertionResponse = try await fetchClientAssertion(aud: issuer, ephemeralKey: key)
 
     var request = URLRequest(url: url)
     request.httpMethod = "POST"
@@ -440,7 +495,7 @@ actor CABOAuthStrategy: AuthStrategy {
       "client_id": assertionResponse.clientId,
       "code_verifier": codeVerifier,
       "client_assertion": assertionResponse.clientAssertion,
-      "client_assertion_type": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+      "client_assertion_type": Self.clientAssertionTypeJWTBearer,
     ]
     if let resourceURL {
       params["resource"] = resourceURL.absoluteString
@@ -599,7 +654,7 @@ actor CABOAuthStrategy: AuthStrategy {
     }
 
     // Fetch client assertion from backend
-    let assertionResponse = try await fetchClientAssertion(did: did)
+    let assertionResponse = try await fetchClientAssertion(aud: metadata.issuer, did: did)
 
     var request = URLRequest(url: endpointURL)
     request.httpMethod = "POST"
@@ -611,7 +666,7 @@ actor CABOAuthStrategy: AuthStrategy {
       "refresh_token": refreshToken,
       "client_id": assertionResponse.clientId,
       "client_assertion": assertionResponse.clientAssertion,
-      "client_assertion_type": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+      "client_assertion_type": Self.clientAssertionTypeJWTBearer,
     ]
     request.httpBody = await core.encodeFormData(params)
 
