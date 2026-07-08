@@ -32,15 +32,41 @@ struct RateLimiterTests {
     let limiter = RateLimiter(requestsPerMinute: 3)
     let start = Date(timeIntervalSince1970: 4_000_000)
 
-    // A distinct key per call, as an attacker rotating DPoP keys would do.
-    for i in 0 ..< 50 {
+    // The prune sweep is amortized to every ~100 calls, so a distinct key
+    // per call up to (but under) that interval leaves every bucket in
+    // place — no sweep has run yet.
+    for i in 0 ..< 99 {
       #expect(await limiter.allow(key: "rotating-\(i)", now: start) == true)
     }
-    #expect(await limiter.bucketCountForTesting == 50)
+    #expect(await limiter.bucketCountForTesting == 99)
 
-    // Past the eviction horizon (2× the full-refill window): the sweep on
-    // the next call drops every idle bucket, keeping only the one just
-    // touched.
+    // The 100th call both trips the amortization counter and lands past
+    // the eviction horizon (2× the full-refill window) for every prior
+    // bucket, so the sweep it triggers drops them all, keeping only the
+    // bucket just touched.
+    #expect(await limiter.allow(key: "sweep-trigger", now: start.addingTimeInterval(121)) == true)
+    #expect(await limiter.bucketCountForTesting == 1)
+  }
+
+  @Test("Between sweeps buckets can grow past a single interval, but the next sweep reclaims them all")
+  func transientGrowthIsBoundedByAmortizationInterval() async {
+    let limiter = RateLimiter(requestsPerMinute: 3)
+    let start = Date(timeIntervalSince1970: 4_500_000)
+
+    // 199 distinct rotating keys at the same instant, crossing one
+    // internal sweep boundary (at call 100) along the way. Since none of
+    // them are actually stale yet (no time has passed), that sweep evicts
+    // nothing — the dict grows past what an eager per-call prune would
+    // ever allow it to reach, even for a moment.
+    for i in 0 ..< 199 {
+      _ = await limiter.allow(key: "rotating-\(i)", now: start)
+    }
+    #expect(await limiter.bucketCountForTesting == 199)
+
+    // The 200th call both trips the next sweep and lands past the
+    // eviction horizon for all of them, collapsing the dict back down to
+    // just the bucket just touched: growth between sweeps was real, but
+    // still bounded and eventually reclaimed, never unbounded.
     #expect(await limiter.allow(key: "sweep-trigger", now: start.addingTimeInterval(121)) == true)
     #expect(await limiter.bucketCountForTesting == 1)
   }

@@ -90,6 +90,56 @@ struct ServerConfigTests {
     #expect(config.activeKid == "envkey")
   }
 
+  @Test("CAB_KEY_PEM_BASE64 replaces file-configured keys and wins active_kid, rather than appending")
+  func envKeyReplacesFileKeys() throws {
+    let path = try write(
+      """
+      {
+        "client_id": "https://file.example/meta.json",
+        "public_url": "https://file.example",
+        "keys": [
+          { "kid": "file-key-1", "pem_path": "/nonexistent/should-never-be-read.pem" }
+        ],
+        "active_kid": "file-key-1"
+      }
+      """
+    )
+    let config = try ServerConfig.load(
+      path: path,
+      environment: [
+        "CAB_KEY_PEM_BASE64": "aWdub3JlZA==",
+        "CAB_KEY_KID": "env-key-1",
+      ]
+    )
+    // The file key is gone entirely — not merely superseded by activeKid —
+    // so KeyStore never attempts to read the (missing) file pem_path.
+    #expect(config.keys == [KeyConfig(kid: "env-key-1", pemBase64: "aWdub3JlZA==")])
+    #expect(config.activeKid == "env-key-1")
+  }
+
+  @Test("CAB_KEY_PEM_BASE64 wins active_kid even when the file sets its own active_kid")
+  func envKeyWinsActiveKidOverFile() throws {
+    let path = try write(
+      """
+      {
+        "client_id": "https://file.example/meta.json",
+        "public_url": "https://file.example",
+        "keys": [
+          { "kid": "file-key-1", "pem_base64": "aWdub3JlZA==" }
+        ],
+        "active_kid": "file-key-1"
+      }
+      """
+    )
+    let config = try ServerConfig.load(
+      path: path,
+      environment: ["CAB_KEY_PEM_BASE64": "ZW52a2V5"]
+    )
+    // Defaults to "cab-key-1" when CAB_KEY_KID isn't set.
+    #expect(config.activeKid == "cab-key-1")
+    #expect(config.keys == [KeyConfig(kid: "cab-key-1", pemBase64: "ZW52a2V5")])
+  }
+
   @Test("Validation rejects unknown active_kid")
   func unknownActiveKid() throws {
     let path = try write(

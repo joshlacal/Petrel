@@ -15,7 +15,7 @@ cd Server
 swift run petrel-cab-server generate-key --kid cab-key-1
 ```
 
-Copy the PEM output to `keys/cab-key-1.pem`. Then copy and edit the config:
+Copy the PEM output to `keys/cab-key-1.pem` (`Server/keys/` and `*.pem` are gitignored — never commit this file). Then copy and edit the config:
 
 ```bash
 cp config.example.json config.json

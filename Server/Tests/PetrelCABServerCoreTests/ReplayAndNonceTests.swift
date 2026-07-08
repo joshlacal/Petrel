@@ -20,8 +20,48 @@ struct ReplayStoreTests {
     // Within TTL: still a replay.
     #expect(await store.checkAndInsert("jti-x", now: start.addingTimeInterval(5)) == false)
     // Past TTL: treated as fresh again (the proof's own iat window has
-    // long since rejected proofs this old anyway).
+    // long since rejected proofs this old anyway). This holds even though
+    // the internal prune sweep is amortized and hasn't necessarily run —
+    // checkAndInsert compares expiry directly.
     #expect(await store.checkAndInsert("jti-x", now: start.addingTimeInterval(11)) == true)
+  }
+
+  @Test("Amortized pruning never drops an unexpired jti, even across the sweep boundary")
+  func unexpiredSurvivesAmortizationBoundary() async {
+    let store = ReplayStore(ttl: 10_000)
+    let start = Date(timeIntervalSince1970: 1_000_000)
+    #expect(await store.checkAndInsert("jti-first", now: start) == true)
+
+    // Flood with 150 distinct jtis — enough calls to cross the ~100-call
+    // amortization threshold and trigger at least one internal sweep.
+    for i in 0 ..< 150 {
+      _ = await store.checkAndInsert("jti-flood-\(i)", now: start.addingTimeInterval(Double(i) * 0.01))
+    }
+
+    // "jti-first" has a 10,000s TTL and under 2s has elapsed — still
+    // unexpired, so it must still be recognized as a replay regardless of
+    // whether a sweep ran in between.
+    #expect(await store.checkAndInsert("jti-first", now: start.addingTimeInterval(2)) == false)
+  }
+
+  @Test("A sweep still reclaims memory: expired entries are pruned once the interval is hit")
+  func expiredEntriesAreEventuallyPruned() async {
+    let store = ReplayStore(ttl: 1)
+    let start = Date(timeIntervalSince1970: 2_000_000)
+
+    // 99 short-lived jtis, all already past their 1s TTL by the time we
+    // check, but under the ~100-call amortization threshold — no sweep
+    // has run yet, so they're all still sitting in `seen`.
+    for i in 0 ..< 99 {
+      _ = await store.checkAndInsert("jti-\(i)", now: start)
+    }
+    #expect(await store.seenCountForTesting == 99)
+
+    // The 100th call trips the sweep; every prior entry is well past its
+    // 1s TTL by now, so the sweep prunes them all, leaving only the entry
+    // just inserted.
+    _ = await store.checkAndInsert("sweep-trigger", now: start.addingTimeInterval(2))
+    #expect(await store.seenCountForTesting == 1)
   }
 }
 

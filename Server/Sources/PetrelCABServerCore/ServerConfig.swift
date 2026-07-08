@@ -127,9 +127,14 @@ public struct ServerConfig: Codable, Sendable, Equatable {
     if let value = environment["CAB_PORT"], let port = Int(value) { config.port = port }
     if let value = environment["CAB_ACTIVE_KID"] { config.activeKid = value }
     if let value = environment["CAB_KEY_PEM_BASE64"] {
+      // The env-provided key takes precedence over any file-configured
+      // keys: replace (not append), and force activeKid to match — a
+      // stale file activeKid pointing at a now-absent file key would
+      // otherwise abort startup (or KeyStore would keep trying the file's
+      // pem_path), defeating the env override for containerized deploys.
       let kid = environment["CAB_KEY_KID"] ?? "cab-key-1"
-      config.keys.append(KeyConfig(kid: kid, pemBase64: value))
-      if config.activeKid.isEmpty { config.activeKid = kid }
+      config.keys = [KeyConfig(kid: kid, pemBase64: value)]
+      config.activeKid = kid
     }
     if let value = environment["CAB_ALLOWED_ORIGINS"] {
       config.allowedOrigins = value.split(separator: ",").map {

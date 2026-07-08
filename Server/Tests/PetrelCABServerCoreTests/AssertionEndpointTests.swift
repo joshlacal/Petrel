@@ -203,6 +203,33 @@ struct AssertionEndpointTests {
     }
   }
 
+  @Test("Origin policy: a \"*\" entry allows any browser origin through, echoing the concrete origin")
+  func originPolicyWildcard() async throws {
+    let (config, _) = try makeTestConfig { $0.allowedOrigins = ["*"] }
+    let server = try CABServer(config: config)
+    let app = Application(router: server.buildRouter())
+    try await app.test(.router) { client in
+      let ok = try await postAssertion(
+        client, proof: try makeDPoPProof(htu: endpointHTU), origin: "https://anything.example"
+      )
+      #expect(ok.status == .ok)
+      // The concrete request origin is echoed back — never the literal
+      // "*" — since credentialed/DPoP requests require a specific value.
+      #expect(
+        ok.headers[HTTPField.Name("Access-Control-Allow-Origin")!] == "https://anything.example"
+      )
+
+      let otherOrigin = try await postAssertion(
+        client, proof: try makeDPoPProof(htu: endpointHTU), origin: "https://another.example"
+      )
+      #expect(otherOrigin.status == .ok)
+      #expect(
+        otherOrigin.headers[HTTPField.Name("Access-Control-Allow-Origin")!]
+          == "https://another.example"
+      )
+    }
+  }
+
   @Test(
     "Origin policy is scoped to the assertion endpoint: health/JWKS stay open without an Origin header even under require_origin, while the assertion route stays gated"
   )

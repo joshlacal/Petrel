@@ -12,6 +12,14 @@ public actor RateLimiter {
   /// next `allow(key:)` for that key recreates an identical full bucket.
   /// Set to twice the time a bucket takes to fully refill.
   private let staleHorizon: TimeInterval
+  /// Amortizes the prune sweep: running `buckets.filter` on every call is
+  /// O(n) per call, which is O(n^2) CPU under a flood of rotated keys.
+  /// Sweeping only every `cleanupInterval` calls keeps the average cost
+  /// O(1) per call; `buckets` can transiently exceed the live-key count by
+  /// at most `cleanupInterval` entries between sweeps, so memory stays
+  /// bounded even though it's no longer pruned on every single call.
+  private var cleanupCounter = 0
+  private let cleanupInterval = 100
 
   public init(requestsPerMinute: Int) {
     capacity = Double(requestsPerMinute)
@@ -21,9 +29,11 @@ public actor RateLimiter {
   }
 
   public func allow(key: String, now: Date = Date()) -> Bool {
-    // O(n) prune per call — same trade-off ReplayStore makes — so a caller
-    // rotating a fresh key per request can't grow `buckets` without bound.
-    buckets = buckets.filter { now.timeIntervalSince($0.value.lastRefill) < staleHorizon }
+    cleanupCounter += 1
+    if cleanupCounter >= cleanupInterval {
+      cleanupCounter = 0
+      buckets = buckets.filter { now.timeIntervalSince($0.value.lastRefill) < staleHorizon }
+    }
 
     var bucket = buckets[key] ?? (tokens: capacity, lastRefill: now)
     bucket.tokens = min(

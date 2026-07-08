@@ -27,3 +27,8 @@ petrel-kotlin/.idea/
 petrel-kotlin/bin/
 _trash/
 .superpowers/
+
+# CAB server signing keys (Server/README.md quickstart writes these) —
+# private key material must never be committed.
+Server/keys/
+*.pem

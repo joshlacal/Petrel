@@ -30,9 +30,12 @@ struct OriginPolicyMiddleware<Context: RequestContext>: RouterMiddleware {
     if requireOrigin, origin == nil {
       return Self.forbidden("Origin header required")
     }
-    if let origin, !allowedOrigins.contains(origin) {
+    if let origin, !allowedOrigins.contains(origin), !allowedOrigins.contains("*") {
       // With no configured origins, any browser origin is refused —
-      // configure allowed_origins to serve browser clients.
+      // configure allowed_origins to serve browser clients. A literal "*"
+      // entry allows any origin through, but the response below always
+      // echoes the concrete request Origin (never the literal "*"), since
+      // credentialed/DPoP requests require a specific origin value.
       return Self.forbidden("origin not allowed")
     }
 
