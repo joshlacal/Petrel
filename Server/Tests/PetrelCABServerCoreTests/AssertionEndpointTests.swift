@@ -202,4 +202,35 @@ struct AssertionEndpointTests {
       )
     }
   }
+
+  @Test(
+    "Origin policy is scoped to the assertion endpoint: health/JWKS stay open without an Origin header even under require_origin, while the assertion route stays gated"
+  )
+  func originPolicyScopedToAssertionEndpoint() async throws {
+    let (config, _) = try makeTestConfig {
+      $0.requireOrigin = true
+      $0.allowedOrigins = ["https://app.example"]
+    }
+    let server = try CABServer(config: config)
+    let app = Application(router: server.buildRouter())
+    try await app.test(.router) { client in
+      // The AS fetches these server-to-server (no Origin header) to
+      // validate assertions and serve metadata; load balancers probe
+      // /health the same way. None of these are the assertion endpoint,
+      // so require_origin must not gate them.
+      try await client.execute(uri: "/health", method: .get) { response in
+        #expect(response.status == .ok)
+      }
+      try await client.execute(uri: "/.well-known/jwks.json", method: .get) { response in
+        #expect(response.status == .ok)
+      }
+
+      // The assertion endpoint itself is still gated: no Origin header
+      // plus require_origin is still refused.
+      let refused = try await postAssertion(
+        client, proof: try makeDPoPProof(htu: endpointHTU)
+      )
+      #expect(refused.status == .forbidden)
+    }
+  }
 }

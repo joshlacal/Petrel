@@ -23,7 +23,12 @@ public struct CABServer: Sendable {
       endpointURL: Self.assertionEndpoint(publicUrl: config.publicUrl),
       iatWindow: TimeInterval(config.iatWindowSeconds)
     )
-    replayStore = ReplayStore(ttl: TimeInterval(config.iatWindowSeconds))
+    // The iat check is symmetric ±iatWindow (DPoPValidator.swift), so a
+    // proof stays acceptable across the full 2×iatWindow span. Replay
+    // memory must outlast that whole span, not just one side of it, or a
+    // jti near the boundary could be replayed after its record expires but
+    // while the proof itself is still within the acceptance window.
+    replayStore = ReplayStore(ttl: TimeInterval(config.iatWindowSeconds * 2))
     nonceService = NonceService(secretBase64: config.nonceSecretBase64)
     deviceStore = InMemoryDeviceStore(deniedJKTs: config.deniedJkts)
     minter = AssertionMinter(
@@ -41,12 +46,6 @@ public struct CABServer: Sendable {
 
   public func buildRouter() -> Router<BasicRequestContext> {
     let router = Router(context: BasicRequestContext.self)
-    router.middlewares.add(
-      OriginPolicyMiddleware(
-        allowedOrigins: Set(config.allowedOrigins),
-        requireOrigin: config.requireOrigin
-      )
-    )
 
     router.get("/health") { _, _ in "OK" }
 
@@ -81,7 +80,25 @@ public struct CABServer: Sendable {
     let minter = self.minter
     let rateLimiter = self.rateLimiter
 
-    router.post("/oauth/client-assertion") { request, context -> Response in
+    // Origin policy is scoped to the assertion endpoint only. /health,
+    // JWKS, and client-metadata must stay reachable without an Origin
+    // header — the AS fetches them server-to-server and load balancers
+    // probe /health — so this middleware lives on a route group instead of
+    // `router.middlewares`, which would gate every route above.
+    let assertionRoutes = router.group("/oauth/client-assertion")
+      .add(
+        middleware: OriginPolicyMiddleware(
+          allowedOrigins: Set(config.allowedOrigins),
+          requireOrigin: config.requireOrigin
+        )
+      )
+
+    // Registered explicitly (rather than relying on the router's 404
+    // fallback) so a CORS preflight still reaches OriginPolicyMiddleware,
+    // which short-circuits OPTIONS+Origin requests before this ever runs.
+    assertionRoutes.on("", method: .options) { _, _ in Response(status: .noContent) }
+
+    assertionRoutes.post { request, context -> Response in
       do {
         guard let proof = request.headers[.dpop] else {
           throw CABRequestError.invalidDPoPProof("missing DPoP header")

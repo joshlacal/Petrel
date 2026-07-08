@@ -26,6 +26,41 @@ struct RateLimiterTests {
     // Twenty-one seconds refills > 1 token.
     #expect(await limiter.allow(key: "k", now: start.addingTimeInterval(21)) == true)
   }
+
+  @Test("Idle buckets are evicted so a caller rotating keys can't grow memory without bound")
+  func staleBucketsAreEvicted() async {
+    let limiter = RateLimiter(requestsPerMinute: 3)
+    let start = Date(timeIntervalSince1970: 4_000_000)
+
+    // A distinct key per call, as an attacker rotating DPoP keys would do.
+    for i in 0 ..< 50 {
+      #expect(await limiter.allow(key: "rotating-\(i)", now: start) == true)
+    }
+    #expect(await limiter.bucketCountForTesting == 50)
+
+    // Past the eviction horizon (2× the full-refill window): the sweep on
+    // the next call drops every idle bucket, keeping only the one just
+    // touched.
+    #expect(await limiter.allow(key: "sweep-trigger", now: start.addingTimeInterval(121)) == true)
+    #expect(await limiter.bucketCountForTesting == 1)
+  }
+
+  @Test("Eviction never discounts a live bucket's accumulated usage")
+  func evictionPreservesLiveBucketAccuracy() async {
+    let limiter = RateLimiter(requestsPerMinute: 3)
+    let start = Date(timeIntervalSince1970: 5_000_000)
+
+    // Exhaust "k"'s budget, then keep it alive with unrelated traffic on
+    // other keys spaced so no sweep ever finds "k" stale.
+    #expect(await limiter.allow(key: "k", now: start) == true)
+    #expect(await limiter.allow(key: "k", now: start) == true)
+    #expect(await limiter.allow(key: "k", now: start) == true)
+    #expect(await limiter.allow(key: "k", now: start) == false)
+
+    // Ten seconds later "k" is still within its refill window and remains
+    // refused — the sweep must not have reset it to a fresh, full bucket.
+    #expect(await limiter.allow(key: "k", now: start.addingTimeInterval(10)) == false)
+  }
 }
 
 @Suite("Rate-limited endpoint")
