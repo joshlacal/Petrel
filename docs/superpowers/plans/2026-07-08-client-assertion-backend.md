@@ -3351,7 +3351,7 @@ Create `Server/README.md` covering, in this order (write real prose, not stubs):
 3. **Using it from Petrel** — the three-line client change: `ATProtoClient(oauthConfig:..., authMode: .cab(backendURL: URL(string: "https://cab.example.com")!))`, plus a note that `client_id` in `OAuthConfig` must equal the backend's `client_id`.
 4. **Configuration reference** — a table of every field in `config.example.json` (name, default, meaning) plus the env overrides `CAB_CLIENT_ID`, `CAB_PUBLIC_URL`, `CAB_HOST`, `CAB_PORT`, `CAB_ACTIVE_KID`, `CAB_KEY_PEM_BASE64`, `CAB_KEY_KID`, `CAB_ALLOWED_ORIGINS`, `CAB_REQUIRE_NONCE`, `CAB_NONCE_SECRET_BASE64`, `CAB_DENIED_JKTS`.
 5. **Key rotation = mass session revocation** — the AS pins the client-auth key (`kid`/`alg`/`jkt`) per session at initial token issuance and rejects refreshes signed by any other key (`invalid_grant` → users re-login). Switching `active_kid` therefore deliberately revokes every existing session — this is the proposal's mass-revocation lever, not a gentle rotation. Keep superseded keys listed in `keys` briefly only so assertions minted seconds before the switch still verify.
-6. **AS constraints today** (verified against @atproto/oauth-provider, 2026-07): `application_type` must be `web` with https redirect URIs (native + private_key_jwt is rejected until the client-assertion-backend proposal is adopted upstream); client assertions must have `iat` within 60 s (CLIENT_ASSERTION_MAX_AGE) — keep server clocks NTP-synced; the `cnf`/`jkt` binding is not yet AS-enforced (forward-compatible).
+6. **AS constraints today** (verified against @atproto/oauth-provider, 2026-07): `application_type` must be `web` with https redirect URIs (native + private_key_jwt is rejected until the client-assertion-backend proposal is adopted upstream; `http://localhost` redirects are rejected for everyone); client assertions must have `iat` within 60 s (CLIENT_ASSERTION_MAX_AGE) — keep server clocks NTP-synced; the `cnf`/`jkt` binding is not yet AS-enforced (forward-compatible). The AS fetches `client_id` and `jwks_uri` through an SSRF-guarded client: public **https only, standard port, no IP-literal hosts, ≤512 kB, redirects rejected**, metadata must be served with `Content-Type: application/json`, and both documents are cached for **10 minutes** — `client_id` must also have a non-root path (e.g. `/oauth-client-metadata.json`) with no trailing slash.
 7. **Security model** — condensed from the spec: open endpoint by design, DPoP-bound, per-jkt rate limit + deny list, no token custody; `require_nonce` and `aud_allowlist` hardening knobs; run behind TLS (reverse proxy) with `public_url` set to the external URL.
 8. **Deployment** — Docker build/run commands (below) and the systemd unit.
 
@@ -3900,6 +3900,10 @@ git commit -m "docs: sync spec/contract/CLAUDE.md with verified AS constraints"
 - Produces: the plan's done-criteria — `E2E RESULT: PASS` against BOTH a bsky.social account and the self-hosted PDS account, with evidence committed.
 
 This is interactive (a real browser login) — run it with the user present or drive the login form with browser automation. Never print passwords; source them from `../.env`.
+
+Headless fallback (verified in the oauth-provider source): the authorize UI's own backend is scriptable — `POST {issuer}/@atproto/oauth-provider/~api/sign-in` with JSON `{locale, username, password, remember?}` plus self-set `Origin`/`Referer`/`Sec-Fetch-Mode: same-origin`/`Sec-Fetch-Site: same-origin` headers and the device cookie from first GETting the authorize URL, then `POST …/~api/consent`. Those guards are browser anti-CSRF, not a bot barrier. Use only if interactive login is impractical.
+
+Timing note: the AS caches fetched client metadata and JWKS for 10 minutes — if you edit `client_metadata` mid-run (not needed in the steps below), expect staleness.
 
 - [ ] **Step 1: Install cloudflared (not currently installed)**
 
