@@ -13,6 +13,7 @@ public struct CABServer: Sendable {
   let nonceService: NonceService
   let deviceStore: any DeviceStore
   let minter: AssertionMinter
+  let rateLimiter: RateLimiter?
 
   public init(config: ServerConfig) throws {
     self.config = config
@@ -30,6 +31,7 @@ public struct CABServer: Sendable {
       signingKey: loadedKeyStore.activeKey,
       ttl: TimeInterval(config.assertionTtlSeconds)
     )
+    rateLimiter = config.rateLimit.map { RateLimiter(requestsPerMinute: $0.requestsPerMinute) }
   }
 
   static func assertionEndpoint(publicUrl: String) -> String {
@@ -58,12 +60,26 @@ public struct CABServer: Sendable {
       )
     }
 
+    if let metadata = config.clientMetadata {
+      let encoder = JSONEncoder()
+      encoder.outputFormatting = [.sortedKeys]
+      let metadataBody = (try? encoder.encode(metadata)) ?? Data()
+      router.get("/oauth-client-metadata.json") { _, _ -> Response in
+        Response(
+          status: .ok,
+          headers: [.contentType: "application/json", .cacheControl: "public, max-age=300"],
+          body: .init(byteBuffer: ByteBuffer(data: metadataBody))
+        )
+      }
+    }
+
     let config = self.config
     let validator = self.validator
     let replayStore = self.replayStore
     let nonceService = self.nonceService
     let deviceStore = self.deviceStore
     let minter = self.minter
+    let rateLimiter = self.rateLimiter
 
     router.post("/oauth/client-assertion") { request, context -> Response in
       do {
@@ -85,6 +101,9 @@ public struct CABServer: Sendable {
             "device refused", metadata: ["jkt": .string(validated.jkt)]
           )
           throw CABRequestError.accessDenied("device refused by policy")
+        }
+        if let rateLimiter, await rateLimiter.allow(key: "jkt:\(validated.jkt)") == false {
+          throw CABRequestError.rateLimited()
         }
         await deviceStore.record(jkt: validated.jkt, now: Date())
 
