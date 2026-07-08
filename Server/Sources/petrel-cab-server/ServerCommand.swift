@@ -7,7 +7,7 @@ struct ServerCommand: AsyncParsableCommand {
   static let configuration = CommandConfiguration(
     commandName: "petrel-cab-server",
     abstract: "ATProto OAuth client assertion backend",
-    subcommands: [Serve.self],
+    subcommands: [Serve.self, GenerateKey.self],
     defaultSubcommand: Serve.self
   )
 }
@@ -39,5 +39,40 @@ struct Serve: AsyncParsableCommand {
       ]
     )
     try await server.buildApplication(logger: logger).runService()
+  }
+}
+
+#if canImport(CryptoKit)
+  import CryptoKit
+#else
+  import Crypto
+#endif
+import Foundation
+import JSONWebAlgorithms
+import JSONWebKey
+
+struct GenerateKey: ParsableCommand {
+  static let configuration = CommandConfiguration(
+    commandName: "generate-key",
+    abstract: "Generate a P-256 signing key and print its PEM + public JWK"
+  )
+
+  @Option(name: .long, help: "Key ID to embed in the JWK")
+  var kid: String = "cab-key-1"
+
+  func run() throws {
+    let key = P256.Signing.PrivateKey()
+    var jwk = key.publicKey.jwkRepresentation
+    jwk.keyID = kid
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+    let jwkJSON = String(data: try encoder.encode(jwk), encoding: .utf8) ?? "{}"
+
+    print("Private key PEM (store securely — e.g. keys/\(kid).pem):\n")
+    print(key.pemRepresentation)
+    print("\nPublic JWK (\(kid)):\n")
+    print(jwkJSON)
+    print("\nBase64 PEM (for the CAB_KEY_PEM_BASE64 env var):\n")
+    print(Data(key.pemRepresentation.utf8).base64EncodedString())
   }
 }
