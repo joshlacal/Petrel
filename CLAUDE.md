@@ -6,6 +6,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Petrel is a Swift library providing a complete implementation of the ATProtocol and Bluesky APIs. The codebase uses automated code generation from Bluesky's Lexicon JSON files to create Swift types and networking code.
 
+## CAB Server (Server/)
+
+`Server/` is an independent SPM package (NOT part of the Petrel library):
+`petrel-cab-server`, a client-assertion backend implementing
+`docs/cab-backend-contract.md` for `AuthMode.cab`. Build/test it from
+`Server/` (`cd Server && swift test`). The Petrel SDK must never depend on it.
+Kotlin parity for `AuthMode.cab` v2 (aud + PAR assertion) is an open
+follow-up — the Kotlin client still implements the v1 contract.
+
 ## Common Development Tasks
 
 ### Building the Project

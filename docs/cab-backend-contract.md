@@ -66,3 +66,9 @@ OAuth-style JSON: `{ "error": "...", "error_description": "..." }`.
 - The `cnf`/`jkt` binding is not yet enforced by `@atproto/oauth-provider`
   (verified 2026-07-06); it is forward-compatible and enforced by the
   backend's own policy meanwhile.
+- @atproto/oauth-provider constraints (verified 2026-07): confidential
+  clients must publish `application_type: "web"` with https redirect URIs;
+  assertion `iat` must be within 60 s (CLIENT_ASSERTION_MAX_AGE); the AS pins
+  the client-auth key (`kid`/`alg`/`jkt`) per session at initial issuance, so
+  backend key rotation revokes all existing sessions (`invalid_grant` on
+  refresh) — that is the intended mass-revocation mechanism.
