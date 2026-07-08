@@ -12,8 +12,8 @@ Petrel is a Swift library providing a complete implementation of the ATProtocol 
 `petrel-cab-server`, a client-assertion backend implementing
 `docs/cab-backend-contract.md` for `AuthMode.cab`. Build/test it from
 `Server/` (`cd Server && swift test`). The Petrel SDK must never depend on it.
-Kotlin parity for `AuthMode.cab` v2 (aud + PAR assertion) is an open
-follow-up — the Kotlin client still implements the v1 contract.
+Kotlin has no `AuthMode.cab` implementation yet — CAB support (assertion fetch,
+aud, PAR injection) is an open follow-up for the Kotlin client.
 
 ## Common Development Tasks
 
