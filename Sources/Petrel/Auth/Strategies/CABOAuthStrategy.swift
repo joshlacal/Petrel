@@ -335,13 +335,25 @@ actor CABOAuthStrategy: AuthStrategy {
     let ephemeralKey = P256.Signing.PrivateKey()
 
     let oauthConfig = await core.oauthConfig
+
+    // Confidential clients authenticate at PAR too. Assertions are
+    // single-use (the AS replay-checks jti), so this one is fetched fresh
+    // and used only for this PAR request.
+    let parAssertion = try await fetchClientAssertion(
+      aud: metadata.issuer, ephemeralKey: ephemeralKey
+    )
+
     let (requestURI, parNonce) = try await core.pushAuthorizationRequest(
       codeChallenge: codeChallenge,
       identifier: identifier,
       endpoint: metadata.pushedAuthorizationRequestEndpoint,
       authServerURL: authServerURL,
       state: stateToken,
-      ephemeralKeyForFlow: ephemeralKey
+      ephemeralKeyForFlow: ephemeralKey,
+      additionalParameters: [
+        "client_assertion": parAssertion.clientAssertion,
+        "client_assertion_type": Self.clientAssertionTypeJWTBearer,
+      ]
     )
 
     let oauthState = OAuthState(
