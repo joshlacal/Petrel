@@ -42,12 +42,27 @@ public struct NonceService: Sendable {
     guard abs(now.timeIntervalSince1970 - TimeInterval(timestamp)) <= validity else {
       return false
     }
-    // Nonces are freshness markers, not secrets — plain comparison is fine.
-    return mac(String(parts[0])) == String(parts[1])
+    guard let submittedMAC = Self.decodeBase64URL(String(parts[1])) else { return false }
+    // MAC verification must be constant-time to avoid a timing oracle,
+    // even though the nonce value itself isn't a secret.
+    return HMAC<SHA256>.isValidAuthenticationCode(
+      submittedMAC, authenticating: Data(String(parts[0]).utf8), using: secret
+    )
   }
 
   private func mac(_ value: String) -> String {
     let digest = HMAC<SHA256>.authenticationCode(for: Data(value.utf8), using: secret)
     return Data(digest).base64URLEncodedString()
+  }
+
+  private static func decodeBase64URL(_ value: String) -> Data? {
+    var base64 = value
+      .replacingOccurrences(of: "-", with: "+")
+      .replacingOccurrences(of: "_", with: "/")
+    let remainder = base64.count % 4
+    if remainder > 0 {
+      base64.append(String(repeating: "=", count: 4 - remainder))
+    }
+    return Data(base64Encoded: base64)
   }
 }
