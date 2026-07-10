@@ -141,7 +141,8 @@ _INTENT_KEYS = {
     'excludeParameters', 'parameterOverrides', 'confirmation', 'returns',
     'dialog', 'recordWrite',
 }
-_ENTITY_KEYS = {'name', 'source', 'identifier', 'syncable', 'indexed', 'display', 'properties', 'query'}
+_ENTITY_KEYS = {'name', 'source', 'identifier', 'syncable', 'indexed', 'display', 'properties', 'customProperties', 'query'}
+_CUSTOM_PROPERTY_KEYS = {'name', 'swiftType', 'optional', 'title', 'expr'}
 _PARAMETER_META_KEYS = {'title', 'requestValue'}
 _PARAMETER_OVERRIDE_KEYS = {'resolveAs', 'bridge'}
 _DISPLAY_KEYS = {'title', 'titleFallback', 'subtitle', 'image'}
@@ -1403,6 +1404,26 @@ def resolve_entity(lex_index: LexiconIndex, entity_cfg: dict, resolved_intents: 
             'optional': overall_optional,
             'per_source_expr': per_source_expr,
             'title': prop_cfg['title'] or _default_property_title(swift_name),
+        })
+
+    # --- Custom (bridged) properties: manifest-authored Swift expressions for
+    # fields the lexicon type system can't project (e.g. postView.record is
+    # 'unknown'; the post text needs a runtime decode via a hand-written
+    # helper in the app target). The expression sees `view`, the init param. ---
+    for i, cp in enumerate(entity_cfg.get('customProperties', [])):
+        _check_known_keys(cp, _CUSTOM_PROPERTY_KEYS, f"entity '{name}' customProperties[{i}]")
+        cp_name, cp_type, cp_expr = cp.get('name'), cp.get('swiftType'), cp.get('expr')
+        if not cp_name or not cp_type or not cp_expr:
+            raise CurationError(
+                f"entity '{name}' customProperties[{i}]: 'name', 'swiftType', and 'expr' are required"
+            )
+        resolved_props.append({
+            'name': cp_name,
+            'swift_name': cp_name,
+            'swift_type': cp_type,
+            'optional': bool(cp.get('optional', False)),
+            'title': cp.get('title') or _default_property_title(cp_name),
+            'per_source_expr': {src['qualified']: cp_expr for src in sources},
         })
 
     seen_swift_names = {}
