@@ -271,12 +271,19 @@ def intent_entity_extraction(prop: Dict[str, Any]) -> Optional[Dict[str, str]]:
 
     Returns a dict (swift_type, direct_template, optional_chain_template) or
     None when the property type is not supported for entity projection —
-    integer/boolean/number, refs, unions, arrays, objects, 'unknown', 'bytes',
+    boolean/number, refs, unions, arrays, objects, 'unknown', 'bytes',
     'blob', 'cid-link', and the 'language' string format (BCP-47 language tags
     have no natural String/Date/URL projection worth guessing at; a manifest
-    author who needs one should exclude it). Callers must turn None into a
-    CurationError that names the offending property for context.
+    author who needs one should exclude it). Integers project as Int.
+    Callers must turn None into a CurationError that names the offending
+    property for context.
     """
+    if prop.get('type') == 'integer':
+        return {
+            'swift_type': 'Int',
+            'direct_template': '{v}',
+            'optional_chain_template': '{v}',
+        }
     if prop.get('type') != 'string':
         return None
 
