@@ -10,7 +10,8 @@ struct {{ name }}: AppEntity {
 
     let id: String
 {% for prop in properties %}
-    let {{ prop.swift_name }}: {{ prop.swift_type }}{% if prop.optional %}?{% endif %}
+    @Property(title: "{{ prop.title }}")
+    var {{ prop.swift_name }}: {{ prop.swift_type }}{% if prop.optional %}?{% endif %}
 {% endfor %}
 
     var displayRepresentation: DisplayRepresentation {

@@ -110,6 +110,7 @@ generated output; the few that exist are membership-only.
 """
 
 import os
+import re
 
 import aiofiles
 
@@ -231,6 +232,12 @@ def _display_noun(display_type_name: str) -> str:
 
 def _entity_display_type_name(entity_name: str) -> str:
     return entity_name[:-len('Entity')] if entity_name.endswith('Entity') else entity_name
+
+
+def _default_property_title(swift_name: str) -> str:
+    """authorDisplayName -> 'Author Display Name'."""
+    spaced = re.sub(r'(?<!^)(?=[A-Z])', ' ', swift_name)
+    return spaced[:1].upper() + spaced[1:]
 
 
 class LexiconIndex:
@@ -1246,7 +1253,19 @@ def resolve_entity(lex_index: LexiconIndex, entity_cfg: dict, resolved_intents: 
             f"appIntents.entities[{idx}]: every entity needs 'name', 'source', and 'identifier' "
             f"(got: name={name!r}, source={source_ref!r}, identifier={identifier_prop!r})"
         )
-    properties = entity_cfg.get('properties', [])
+    _PROPERTY_ENTRY_KEYS = {'path', 'title'}
+    prop_cfgs = []
+    for i, p in enumerate(entity_cfg.get('properties', [])):
+        if isinstance(p, str):
+            prop_cfgs.append({'path': p, 'title': None})
+        elif isinstance(p, dict):
+            _check_known_keys(p, _PROPERTY_ENTRY_KEYS, f"entity '{name}' properties[{i}]")
+            if 'path' not in p:
+                raise CurationError(f"entity '{name}' properties[{i}]: object entries need a 'path'")
+            prop_cfgs.append({'path': p['path'], 'title': p.get('title')})
+        else:
+            raise CurationError(f"entity '{name}' properties[{i}]: must be a string or object")
+    properties = [pc['path'] for pc in prop_cfgs]
     display_cfg = entity_cfg.get('display', {})
     _check_known_keys(display_cfg, _DISPLAY_KEYS, f"entity '{name}' display")
     query_cfg = entity_cfg.get('query')
@@ -1318,7 +1337,8 @@ def resolve_entity(lex_index: LexiconIndex, entity_cfg: dict, resolved_intents: 
 
     # --- Stored properties ---
     resolved_props = []
-    for prop_name in properties:
+    for prop_cfg in prop_cfgs:
+        prop_name = prop_cfg['path']
         ref_name, leaf_name = _split_nested_property(name, prop_name)
         is_nested = ref_name is not None
         swift_name = _nested_swift_property_name(ref_name, leaf_name) if is_nested else prop_name
@@ -1382,6 +1402,7 @@ def resolve_entity(lex_index: LexiconIndex, entity_cfg: dict, resolved_intents: 
             'swift_type': swift_type,
             'optional': overall_optional,
             'per_source_expr': per_source_expr,
+            'title': prop_cfg['title'] or _default_property_title(swift_name),
         })
 
     seen_swift_names = {}
