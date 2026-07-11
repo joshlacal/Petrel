@@ -1318,8 +1318,16 @@ def resolve_entity(lex_index: LexiconIndex, entity_cfg: dict, resolved_intents: 
         sources.append({'qualified': qualified, 'raw_ref': raw_ref, 'schema': def_schema})
 
     # `source` is always authored fully-qualified ("<nsid>#<def>"), so the owner
-    # passed here is never actually consulted for local-'#' resolution.
-    add_source(source_ref, source_ref.split('#', 1)[0])
+    # passed here is never actually consulted for local-'#' resolution. A list
+    # authors additional init(from:) sources beyond what queries/returns imply
+    # (e.g. profileViewBasic, so post-author profiles seed the local store).
+    source_refs = source_ref if isinstance(source_ref, list) else [source_ref]
+    for ref in source_refs:
+        if not isinstance(ref, str) or '#' not in ref:
+            raise CurationError(
+                f"entity '{name}': source entries must be fully-qualified '<nsid>#<def>' strings (got {ref!r})"
+            )
+        add_source(ref, ref.split('#', 1)[0])
 
     q_nsid = query_cfg['nsid']
     q_main = lex_index.get(q_nsid).get('defs', {}).get('main', {})
