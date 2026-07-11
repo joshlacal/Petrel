@@ -187,7 +187,7 @@ sealed class ATIdentifier {
     data class DIDIdentifier(val did: DID) : ATIdentifier()
     data class HandleIdentifier(val handle: Handle) : ATIdentifier()
 
-    override fun toString(): String = when (this) {
+    final override fun toString(): String = when (this) {
         is DIDIdentifier -> did.toString()
         is HandleIdentifier -> handle.toString()
     }
@@ -208,7 +208,16 @@ object ATIdentifierSerializer : KSerializer<ATIdentifier> {
         PrimitiveSerialDescriptor("ATIdentifier", PrimitiveKind.STRING)
 
     override fun serialize(encoder: Encoder, value: ATIdentifier) {
-        encoder.encodeString(value.toString())
+        // Encode via explicit dispatch rather than relying on virtual toString():
+        // data-class subclasses of a sealed base can shadow the base toString()
+        // with a compiler-generated one ("DIDIdentifier(did=...)"), which would
+        // corrupt the wire value. See regression test ATIdentifierSerializerTest.
+        encoder.encodeString(
+            when (value) {
+                is ATIdentifier.DIDIdentifier -> value.did.toString()
+                is ATIdentifier.HandleIdentifier -> value.handle.toString()
+            }
+        )
     }
 
     override fun deserialize(decoder: Decoder): ATIdentifier {
