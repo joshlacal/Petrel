@@ -147,7 +147,7 @@ _PARAMETER_META_KEYS = {'title', 'requestValue'}
 _PARAMETER_OVERRIDE_KEYS = {'resolveAs', 'bridge'}
 _DISPLAY_KEYS = {'title', 'titleFallback', 'subtitle', 'image'}
 _QUERY_KEYS = {'kind', 'nsid', 'param', 'resultsPath', 'byIds'}
-_QUERY_BY_IDS_KEYS = {'nsid', 'param', 'resultsPath'}
+_QUERY_BY_IDS_KEYS = {'nsid', 'param', 'resultsPath', 'localStore'}
 _RETURNS_KEYS = {'entity', 'outputPath', 'scalar'}
 _RECORD_WRITE_KEYS = {'action', 'subject', 'viewerPath', 'dialog'}
 _RW_SUBJECT_KEYS = {'kind', 'parameter', 'hydrate'}
@@ -1196,6 +1196,26 @@ def _build_by_ids_body(lex_index: LexiconIndex, entity_name: str, by_ids_cfg: di
     client_call = f"client.{client_path(nsid)}"
     params_ctor = f"{convert_to_camel_case(nsid)}.Parameters"
 
+    # Optional local store consulted before any network fetch. Siri's
+    # onscreen-context resolution ("this post") runs under a sub-second
+    # deadline; a client bootstrap + network round trip loses that race, so
+    # entities the app has already rendered must resolve from memory. The
+    # manifest value is a Swift expression for a hand-written store exposing
+    # `func entities(for identifiers: [String]) async -> [Entity]`.
+    local_store = by_ids_cfg.get('localStore')
+    cache_prelude = ''
+    fetch_ids = 'identifiers'
+    result_seed = f'[{entity_name}]()'
+    if local_store:
+        cache_prelude = (
+            f"        let cached = await {local_store}.entities(for: identifiers)\n"
+            "        if cached.count == identifiers.count { return cached }\n"
+            "        let cachedIDs = Set(cached.map(\\.id))\n"
+            "        let missing = identifiers.filter { !cachedIDs.contains($0) }\n"
+        )
+        fetch_ids = 'missing'
+        result_seed = 'cached'
+
     # The lexicon caps how many identifiers a single call accepts (e.g.
     # getProfiles.actors / getPosts.uris both maxLength: 25). Read that cap
     # from the lexicon rather than hardcoding it, and when present, chunk
@@ -1207,24 +1227,29 @@ def _build_by_ids_body(lex_index: LexiconIndex, entity_name: str, by_ids_cfg: di
         chunk_expr = f"{map_prefix}chunk.map {{ {item_expr} }}"
         call = f"{client_call}(input: {params_ctor}({param_name}: {chunk_expr}))"
         return (
-            "        let did = IntentAccountResolver.activeDID()\n"
+            cache_prelude
+            + "        let did = IntentAccountResolver.activeDID()\n"
             "        let client = try await IntentClientProvider.shared.client(for: did)\n"
-            f"        var results: [{entity_name}] = []\n"
-            f"        for start in stride(from: 0, to: identifiers.count, by: {max_length}) {{\n"
-            f"            let chunk = Array(identifiers[start..<min(start + {max_length}, identifiers.count)])\n"
+            f"        var results: [{entity_name}] = {result_seed}\n"
+            f"        for start in stride(from: 0, to: {fetch_ids}.count, by: {max_length}) {{\n"
+            f"            let chunk = Array({fetch_ids}[start..<min(start + {max_length}, {fetch_ids}.count)])\n"
             f"            let output = try unwrapIntentResponse(await {call})\n"
             f"            results.append(contentsOf: output.{results_path}.map {{ {entity_name}(from: $0) }})\n"
             "        }\n"
             "        return results"
         )
 
-    array_expr = f"{map_prefix}identifiers.map {{ {item_expr} }}"
+    array_expr = f"{map_prefix}{fetch_ids}.map {{ {item_expr} }}"
     call = f"{client_call}(input: {params_ctor}({param_name}: {array_expr}))"
+    network_return = f"output.{results_path}.map {{ {entity_name}(from: $0) }}"
+    if local_store:
+        network_return = f"cached + {network_return}"
     return (
-        "        let did = IntentAccountResolver.activeDID()\n"
+        cache_prelude
+        + "        let did = IntentAccountResolver.activeDID()\n"
         "        let client = try await IntentClientProvider.shared.client(for: did)\n"
         f"        let output = try unwrapIntentResponse(await {call})\n"
-        f"        return output.{results_path}.map {{ {entity_name}(from: $0) }}"
+        f"        return {network_return}"
     )
 
 
