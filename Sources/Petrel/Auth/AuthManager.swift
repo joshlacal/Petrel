@@ -7,6 +7,9 @@
 //
 
 import Foundation
+#if canImport(FoundationNetworking)
+    import FoundationNetworking
+#endif
 
 /// Coordinator class that manages authentication strategies.
 /// Holds a reference to the active strategy and forwards all AuthStrategy methods to it.
@@ -14,7 +17,7 @@ actor AuthManager: AuthStrategy {
     // MARK: - Types
 
     /// Authentication mode determining which strategy to use.
-    enum Mode: Sendable, Equatable {
+    enum Mode: Equatable {
         /// Legacy password-based authentication (App Passwords).
         case legacy
         /// Public OAuth for mobile/native apps (PAR + PKCE + DPoP).
@@ -155,7 +158,7 @@ actor AuthManager: AuthStrategy {
                 accountManager: accountManager
             )
 
-        case .cab(let backendURL):
+        case let .cab(backendURL):
             return CABOAuthStrategy(
                 backendURL: backendURL,
                 storage: storage,

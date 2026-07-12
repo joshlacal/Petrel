@@ -6,6 +6,9 @@
 //
 
 import Foundation
+#if canImport(FoundationNetworking)
+    import FoundationNetworking
+#endif
 
 /// Authentication strategy for legacy username/password authentication (App Passwords).
 /// Handles:

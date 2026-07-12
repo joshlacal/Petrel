@@ -122,8 +122,7 @@ actor AccountManager: AccountManaging {
 
         // Check for DPoP key
         do {
-            _ = try await storage.getDPoPKey(for: did)
-            hasDPoPKey = true
+            hasDPoPKey = try await storage.containsDPoPKey(for: did)
         } catch {
             LogManager.logDebug(
                 "AccountManager - Error checking DPoP key during startup recovery: \(error)"

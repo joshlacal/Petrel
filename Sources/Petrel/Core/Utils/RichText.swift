@@ -98,74 +98,74 @@ public extension String {
             RichTextAttributes.self
         }
     }
-
-    // MARK: AttributedString to facets
-
-    public extension AttributedString {
-        func toFacets() throws -> [AppBskyRichtextFacet]? {
-            let fullString = String(characters[...])
-
-            // Collect raw run data: (byteStart, byteEnd, urlString)
-            var rawRuns: [(byteStart: Int, byteEnd: Int, urlString: String)] = []
-
-            for run in runs {
-                let range = run.range
-                guard
-                    let lowerBound = String.Index(range.lowerBound, within: fullString),
-                    let upperBound = String.Index(range.upperBound, within: fullString),
-                    lowerBound < upperBound,
-                    let url = run.link
-                else {
-                    continue
-                }
-
-                let byteStart = fullString[..<lowerBound].utf8.count
-                let byteEnd = byteStart + fullString[lowerBound ..< upperBound].utf8.count
-                rawRuns.append((byteStart, byteEnd, url.absoluteString))
-            }
-
-            // Sort by byte position
-            rawRuns.sort { $0.byteStart < $1.byteStart }
-
-            // Merge adjacent runs with the same URL to avoid fragmented facets
-            var mergedRuns: [(byteStart: Int, byteEnd: Int, urlString: String)] = []
-            for run in rawRuns {
-                if let last = mergedRuns.last,
-                   last.urlString == run.urlString,
-                   last.byteEnd == run.byteStart
-                {
-                    // Extend the previous run
-                    mergedRuns[mergedRuns.count - 1].byteEnd = run.byteEnd
-                } else {
-                    mergedRuns.append(run)
-                }
-            }
-
-            // Build facets from merged runs
-            var facets: [AppBskyRichtextFacet] = []
-            for run in mergedRuns {
-                var features: [AppBskyRichtextFacet.AppBskyRichtextFacetFeaturesUnion] = []
-                let urlString = run.urlString
-
-                if urlString.starts(with: "mention://") {
-                    let encodedDID = String(urlString.dropFirst("mention://".count))
-                    let did = encodedDID.removingPercentEncoding ?? encodedDID
-                    try features.append(.appBskyRichtextFacetMention(AppBskyRichtextFacet.Mention(did: DID(didString: did))))
-                } else if urlString.starts(with: "tag://") {
-                    let tag = String(urlString.dropFirst("tag://".count))
-                    features.append(.appBskyRichtextFacetTag(AppBskyRichtextFacet.Tag(tag: tag)))
-                } else {
-                    features.append(
-                        .appBskyRichtextFacetLink(AppBskyRichtextFacet.Link(uri: URI(uriString: urlString)))
-                    )
-                }
-
-                let byteSlice = AppBskyRichtextFacet.ByteSlice(byteStart: run.byteStart, byteEnd: run.byteEnd)
-                let facet = AppBskyRichtextFacet(index: byteSlice, features: features)
-                facets.append(facet)
-            }
-
-            return facets.isEmpty ? nil : facets
-        }
-    }
 #endif
+
+// MARK: AttributedString to facets
+
+public extension AttributedString {
+    func toFacets() throws -> [AppBskyRichtextFacet]? {
+        let fullString = String(characters[...])
+
+        // Collect raw run data: (byteStart, byteEnd, urlString)
+        var rawRuns: [(byteStart: Int, byteEnd: Int, urlString: String)] = []
+
+        for run in runs {
+            let range = run.range
+            guard
+                let lowerBound = String.Index(range.lowerBound, within: fullString),
+                let upperBound = String.Index(range.upperBound, within: fullString),
+                lowerBound < upperBound,
+                let url = run.link
+            else {
+                continue
+            }
+
+            let byteStart = fullString[..<lowerBound].utf8.count
+            let byteEnd = byteStart + fullString[lowerBound ..< upperBound].utf8.count
+            rawRuns.append((byteStart, byteEnd, url.absoluteString))
+        }
+
+        // Sort by byte position
+        rawRuns.sort { $0.byteStart < $1.byteStart }
+
+        // Merge adjacent runs with the same URL to avoid fragmented facets
+        var mergedRuns: [(byteStart: Int, byteEnd: Int, urlString: String)] = []
+        for run in rawRuns {
+            if let last = mergedRuns.last,
+               last.urlString == run.urlString,
+               last.byteEnd == run.byteStart
+            {
+                // Extend the previous run
+                mergedRuns[mergedRuns.count - 1].byteEnd = run.byteEnd
+            } else {
+                mergedRuns.append(run)
+            }
+        }
+
+        // Build facets from merged runs
+        var facets: [AppBskyRichtextFacet] = []
+        for run in mergedRuns {
+            var features: [AppBskyRichtextFacet.AppBskyRichtextFacetFeaturesUnion] = []
+            let urlString = run.urlString
+
+            if urlString.starts(with: "mention://") {
+                let encodedDID = String(urlString.dropFirst("mention://".count))
+                let did = encodedDID.removingPercentEncoding ?? encodedDID
+                try features.append(.appBskyRichtextFacetMention(AppBskyRichtextFacet.Mention(did: DID(didString: did))))
+            } else if urlString.starts(with: "tag://") {
+                let tag = String(urlString.dropFirst("tag://".count))
+                features.append(.appBskyRichtextFacetTag(AppBskyRichtextFacet.Tag(tag: tag)))
+            } else {
+                features.append(
+                    .appBskyRichtextFacetLink(AppBskyRichtextFacet.Link(uri: URI(uriString: urlString)))
+                )
+            }
+
+            let byteSlice = AppBskyRichtextFacet.ByteSlice(byteStart: run.byteStart, byteEnd: run.byteEnd)
+            let facet = AppBskyRichtextFacet(index: byteSlice, features: features)
+            facets.append(facet)
+        }
+
+        return facets.isEmpty ? nil : facets
+    }
+}

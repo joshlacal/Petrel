@@ -82,37 +82,37 @@ enum ContentDecoding {
         guard !data.isEmpty else { return data }
 
         #if canImport(Compression)
-        var outputSize = max(data.count * 10, 65536)
-        var outputData = Data(count: outputSize)
+            var outputSize = max(data.count * 10, 65536)
+            var outputData = Data(count: outputSize)
 
-        for _ in 0 ..< 5 {
-            let result = data.withUnsafeBytes { sourceBuffer -> Int in
-                guard let sourcePtr = sourceBuffer.baseAddress else { return 0 }
-                return outputData.withUnsafeMutableBytes { destBuffer -> Int in
-                    guard let destPtr = destBuffer.baseAddress else { return 0 }
-                    return compression_decode_buffer(
-                        destPtr.assumingMemoryBound(to: UInt8.self),
-                        outputSize,
-                        sourcePtr.assumingMemoryBound(to: UInt8.self),
-                        data.count,
-                        nil,
-                        COMPRESSION_BROTLI
-                    )
+            for _ in 0 ..< 5 {
+                let result = data.withUnsafeBytes { sourceBuffer -> Int in
+                    guard let sourcePtr = sourceBuffer.baseAddress else { return 0 }
+                    return outputData.withUnsafeMutableBytes { destBuffer -> Int in
+                        guard let destPtr = destBuffer.baseAddress else { return 0 }
+                        return compression_decode_buffer(
+                            destPtr.assumingMemoryBound(to: UInt8.self),
+                            outputSize,
+                            sourcePtr.assumingMemoryBound(to: UInt8.self),
+                            data.count,
+                            nil,
+                            COMPRESSION_BROTLI
+                        )
+                    }
+                }
+
+                if result > 0, result < outputSize {
+                    outputData.count = result
+                    return outputData
+                } else if result == outputSize {
+                    outputSize *= 2
+                    outputData = Data(count: outputSize)
+                } else {
+                    break
                 }
             }
 
-            if result > 0, result < outputSize {
-                outputData.count = result
-                return outputData
-            } else if result == outputSize {
-                outputSize *= 2
-                outputData = Data(count: outputSize)
-            } else {
-                break
-            }
-        }
-
-        return nil
+            return nil
         #else
             // FoundationNetworking is responsible for content decoding on
             // platforms where Apple's optional Compression framework is absent.
@@ -1737,16 +1737,14 @@ public actor NetworkService: NetworkServiceProtocol {
 
     private func resolveHostIPs(host: String) -> [String] {
         var results: [String] = []
-        var hints = addrinfo(
-            ai_flags: AI_ADDRCONFIG,
-            ai_family: AF_UNSPEC,
-            ai_socktype: SOCK_STREAM,
-            ai_protocol: 0,
-            ai_addrlen: 0,
-            ai_canonname: nil,
-            ai_addr: nil,
-            ai_next: nil
-        )
+        var hints = addrinfo()
+        hints.ai_flags = AI_ADDRCONFIG
+        hints.ai_family = AF_UNSPEC
+        #if os(Linux)
+            hints.ai_socktype = Int32(SOCK_STREAM.rawValue)
+        #else
+            hints.ai_socktype = SOCK_STREAM
+        #endif
         var res: UnsafeMutablePointer<addrinfo>? = nil
         let status = getaddrinfo(host, nil, &hints, &res)
         if status == 0, let head = res {

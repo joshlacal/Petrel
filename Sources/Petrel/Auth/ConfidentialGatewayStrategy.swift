@@ -6,6 +6,9 @@
 //
 
 import Foundation
+#if canImport(FoundationNetworking)
+    import FoundationNetworking
+#endif
 import Logging
 
 private let logger = Logger(label: "blue.catbird.Petrel.ConfidentialGatewayStrategy")
@@ -327,7 +330,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         let errorCode = (payload?.error ?? "").lowercased()
         let message = (payload?.message ?? responseBody).lowercased()
 
-        let terminalCodes: Set<String> = [
+        let terminalCodes: Set = [
             "expiredtoken",
             "invalidtoken",
             "session_expired",
@@ -353,7 +356,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
             return .terminal(reason: "message_indicates_expiry")
         }
 
-        let transientCodes: Set<String> = [
+        let transientCodes: Set = [
             "temporarilyunavailable",
             "use_dpop_nonce",
             "upstream_error",

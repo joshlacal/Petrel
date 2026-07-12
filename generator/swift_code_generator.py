@@ -64,6 +64,11 @@ class SwiftCodeGenerator:
             swift_type = self.type_converter.determine_swift_type(name, prop, required_fields, current_struct_name)
             description = prop.get('description', '')
             is_optional = name not in required_fields
+            strict_optional_decode = prop.get('x-security-strict-decode', False)
+            if strict_optional_decode and (not is_optional or prop.get('type') != 'ref'):
+                raise ValueError(
+                    f"x-security-strict-decode is supported only on optional ref properties: '{name}'"
+                )
 
             # Check if this property should be boxed to break a circular reference
             should_box = False
@@ -79,7 +84,8 @@ class SwiftCodeGenerator:
                 'type': swift_type,
                 'optional': is_optional,
                 'description': description,
-                'boxed': should_box
+                'boxed': should_box,
+                'strict_optional_decode': strict_optional_decode,
             })
         return swift_properties
 
@@ -124,14 +130,16 @@ class SwiftCodeGenerator:
 
         encoding = output_obj.get('encoding', '')
         output_schema = output_obj.get('schema', {})
-        for property_name, property_schema in output_schema.get('properties', {}).items():
-            if property_schema.get('type') != 'ref':
-                continue
-            ref = property_schema.get('ref', '')
-            if ref.startswith('#') and ref[1:] not in self.defs:
-                raise ValueError(
-                    f"output property '{property_name}' references missing local definition '{ref}'"
-                )
+        if not isinstance(output_schema, dict):
+            output_schema = {}
+        output_properties = output_schema.get('properties', {})
+        if not isinstance(output_properties, dict):
+            output_properties = {}
+        output_properties = {
+            name: schema for name, schema in output_properties.items()
+            if isinstance(schema, dict)
+        }
+        output_schema = {**output_schema, 'properties': output_properties}
 
         context = {
             'conformance': ": ATProtocolCodable" if encoding == "application/json" else "",
@@ -156,6 +164,32 @@ class SwiftCodeGenerator:
             context['properties'] = self.generate_properties(output_schema.get('properties', {}), output_schema.get('required', []), "Output")
 
         return self.template_manager.output_struct_template.render(**context)
+
+    def validate_output_local_refs(self) -> None:
+        """Reject references to missing local definitions in every output shape."""
+        output = self.main_def.get('output')
+        if not isinstance(output, dict):
+            return
+        schema = output.get('schema')
+        if not isinstance(schema, dict):
+            return
+
+        def validate(node: Any, path: str) -> None:
+            if not isinstance(node, dict):
+                return
+            if node.get('type') == 'ref':
+                ref = node.get('ref', '')
+                if isinstance(ref, str) and ref.startswith('#') and ref[1:] not in self.defs:
+                    raise ValueError(
+                        f"output {path} references missing local definition '{ref}'"
+                    )
+            properties = node.get('properties')
+            if isinstance(properties, dict):
+                for name, property_schema in properties.items():
+                    validate(property_schema, f"property '{name}'")
+            validate(node.get('items'), f"{path} array item")
+
+        validate(schema, "schema")
 
     def generate_errors_enum(self, errors: Optional[List[Dict[str, str]]]) -> str:
         if not errors:
@@ -281,6 +315,9 @@ class SwiftCodeGenerator:
                     self.enum_generator.generate_enum_for_union_array(current_struct_name, prop_name, refs)
 
     def convert(self) -> str:
+        # Security-bearing local output references must fail the generation
+        # command instead of being serialized into a traceback-shaped source file.
+        self.validate_output_local_refs()
         try:
             query_parameters = ""
             input_struct = ""

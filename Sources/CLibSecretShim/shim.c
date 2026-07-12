@@ -24,18 +24,23 @@ bool secret_store_password_simple(
         }
     };
     
-    // Use the binary variant to store arbitrary data
+    // Use a SecretValue so arbitrary binary data is preserved losslessly.
+    SecretValue *value = secret_value_new(
+        password,
+        (gssize)password_len,
+        "application/octet-stream"
+    );
     gboolean result = secret_password_store_binary_sync(
         &schema,
         SECRET_COLLECTION_DEFAULT,
         label,
-        (const guchar*)password,
-        password_len,
+        value,
         NULL,  // cancellable
         &error,
         attribute_key, attribute_value,
         NULL
     );
+    secret_value_unref(value);
     
     if (error) {
         if (error_message) {
@@ -92,7 +97,7 @@ char* secret_lookup_password_simple(
     }
     
     gsize len;
-    const guchar *data = secret_value_get(value, &len);
+    const gchar *data = secret_value_get(value, &len);
     char *result = malloc(len);
     if (result) {
         memcpy(result, data, len);

@@ -9,9 +9,17 @@
     {% if def.properties %}
     data class {{ def.name }}(
         {% for prop in def.properties %}
+        {% if def.security_strict_documentation %}
+        {% if prop.description %}
+        /** {{ prop.description }} */
+        {% endif %}
+        @SerialName("{{ prop.name }}")
+        val {{ prop.name | sanitizeKeyword }}: {{ prop.type }}{% if prop.optional %} = null{% endif %}{% if not loop.last %},{% endif %}{{ '\n' -}}
+        {% else %}
         {% if prop.description %}/** {{ prop.description }} */{% endif %}
         @SerialName("{{ prop.name }}")
         val {{ prop.name | sanitizeKeyword }}: {{ prop.type }}{% if prop.optional %} = null{% endif %}{% if not loop.last %},{% endif %}
+        {% endif %}
         {% endfor %}
     ) {
         companion object {

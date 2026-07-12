@@ -36,6 +36,9 @@
             let container = try decoder.container(keyedBy: CodingKeys.self)
             {%- for prop in properties %}
             {% if prop.optional %}
+            {% if prop.strict_optional_decode %}
+            self.{{ prop.name }} = try container.decodeIfPresent({{ prop.type }}.self, forKey: .{{ prop.name }})
+            {% else %}
             do {
                 self.{{ prop.name }} = try container.decodeIfPresent({{ prop.type }}.self, forKey: .{{ prop.name }})
             } catch {
@@ -43,6 +46,7 @@
                 LogManager.logWarning("Decoding error for optional property '{{ prop.name }}' — degrading to nil: \(error)")
                 self.{{ prop.name }} = nil
             }
+            {% endif %}
             {% else %}
             self.{{ prop.name }} = try container.decode({{ prop.type }}.self, forKey: .{{ prop.name }})
             {% endif %}

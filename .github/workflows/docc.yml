@@ -12,7 +12,7 @@ on:
       - completed
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -29,31 +29,31 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
       
-    - name: Setup Swift
-      uses: swift-actions/setup-swift@v2.3.0
-      with:
-        swift-version: "6.0.3"
+    - name: Verify Xcode-provided Swift toolchain
+      run: xcrun swift --version
         
     - name: Clean Package Cache
       run: |
-        swift package clean
+        xcrun swift package clean
         
     - name: Build Documentation
       run: |
-        swift package generate-documentation \
+        xcrun swift package \
+          --allow-writing-to-directory "$GITHUB_WORKSPACE/docs-new" \
+          generate-documentation \
           --target Petrel \
           --transform-for-static-hosting \
           --hosting-base-path Petrel \
-          --output-path docs-new \
-          -Xswiftc -strict-concurrency=targeted
+          --output-path "$GITHUB_WORKSPACE/docs-new"
           
     - name: Update docs directory
       run: |
         rm -rf docs/*
-        cp -r docs-new/* docs/
-        rm -rf docs-new
+        cp -r "$GITHUB_WORKSPACE/docs-new/"* docs/
+        rm -rf "$GITHUB_WORKSPACE/docs-new"
         
     - name: Commit documentation updates
+      if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"

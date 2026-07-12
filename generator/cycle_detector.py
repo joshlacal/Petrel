@@ -112,8 +112,12 @@ class CycleDetector:
         """Register query/procedure output unions with 'Output' prefix"""
         swift_base = convert_to_camel_case(lexicon_id)
         properties = output_schema.get('properties', {})
+        if not isinstance(properties, dict):
+            return
 
         for prop_name, prop_schema in properties.items():
+            if not isinstance(prop_schema, dict):
+                continue
             # Handle union properties in output
             if prop_schema.get('type') == 'union':
                 # Output unions use "Output" as the struct name prefix
