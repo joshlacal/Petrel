@@ -124,6 +124,14 @@ class SwiftCodeGenerator:
 
         encoding = output_obj.get('encoding', '')
         output_schema = output_obj.get('schema', {})
+        for property_name, property_schema in output_schema.get('properties', {}).items():
+            if property_schema.get('type') != 'ref':
+                continue
+            ref = property_schema.get('ref', '')
+            if ref.startswith('#') and ref[1:] not in self.defs:
+                raise ValueError(
+                    f"output property '{property_name}' references missing local definition '{ref}'"
+                )
 
         context = {
             'conformance': ": ATProtocolCodable" if encoding == "application/json" else "",
