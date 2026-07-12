@@ -6,11 +6,9 @@
 //
 
 import Foundation
-import os.log
+import Logging
 
-private let logger = Logger(
-    subsystem: "blue.catbird.Petrel", category: "ConfidentialGatewayStrategy"
-)
+private let logger = Logger(label: "blue.catbird.Petrel.ConfidentialGatewayStrategy")
 
 /// Session information returned by the gateway's /auth/session endpoint.
 public struct GatewaySessionInfo: Codable, Sendable {
@@ -282,7 +280,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
             switch classifyUnauthorizedGatewayResponse(data) {
             case let .terminal(reason):
                 logger.warning(
-                    "Gateway returned terminal auth error (reason: \(reason, privacy: .public)) - clearing local session"
+                    "Gateway returned terminal auth error (reason: \(reason)) - clearing local session"
                 )
                 await clearCurrentGatewaySession()
                 throw GatewayError.sessionExpired
@@ -290,7 +288,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
             case let .transient(reason):
                 let bodyPreview = String((String(data: data, encoding: .utf8) ?? "").prefix(200))
                 logger.warning(
-                    "Gateway returned transient 401 (reason: \(reason, privacy: .public)) - preserving session. Body: \(bodyPreview, privacy: .public)"
+                    "Gateway returned transient 401 (reason: \(reason)) - preserving session. Body: \(bodyPreview)"
                 )
                 throw GatewayError.authenticationRequired
             }
@@ -382,7 +380,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
             try await storage.deleteGatewaySession(for: currentAccount.did)
         } catch {
             logger.error(
-                "Failed to delete gateway session during 401 handling: \(error, privacy: .public)"
+                "Failed to delete gateway session during 401 handling: \(error)"
             )
         }
     }
