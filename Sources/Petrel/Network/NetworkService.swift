@@ -12,7 +12,9 @@ import Foundation
 #if canImport(Network)
     import Network
 #endif
-import Compression
+#if canImport(Compression)
+    import Compression
+#endif
 
 // MARK: - Content-Encoding Decompression
 
@@ -79,6 +81,7 @@ enum ContentDecoding {
     private static func decompressBrotli(_ data: Data) -> Data? {
         guard !data.isEmpty else { return data }
 
+        #if canImport(Compression)
         var outputSize = max(data.count * 10, 65536)
         var outputData = Data(count: outputSize)
 
@@ -110,6 +113,11 @@ enum ContentDecoding {
         }
 
         return nil
+        #else
+            // FoundationNetworking is responsible for content decoding on
+            // platforms where Apple's optional Compression framework is absent.
+            return nil
+        #endif
     }
 }
 
