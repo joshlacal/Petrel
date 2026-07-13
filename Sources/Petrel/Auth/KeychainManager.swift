@@ -16,6 +16,12 @@ import Synchronization
     import Security
 #endif
 
+#if canImport(Security)
+    typealias PlatformKeychainAccessibility = CFString
+#else
+    typealias PlatformKeychainAccessibility = String
+#endif
+
 enum KeychainError: Error, LocalizedError {
     case itemStoreError(status: Int)
     case itemRetrievalError(status: Int)
@@ -158,13 +164,33 @@ enum KeychainManager {
                 return KeychainError.storageUnavailable(String(describing: underlyingError))
             }
 
-            func store(key _: String, value _: Data, namespace _: String, accessGroup _: String?) throws { throw unavailable() }
-            func retrieve(key _: String, namespace _: String, accessGroup _: String?) throws -> Data { throw unavailable() }
-            func delete(key _: String, namespace _: String, accessGroup _: String?) throws { throw unavailable() }
-            func deleteAll(namespace _: String, accessGroup _: String?) throws { throw unavailable() }
-            func storeDPoPKey(_: P256.Signing.PrivateKey, keyTag _: String, accessGroup _: String?) throws { throw unavailable() }
-            func retrieveDPoPKey(keyTag _: String, accessGroup _: String?) throws -> P256.Signing.PrivateKey { throw unavailable() }
-            func deleteDPoPKey(keyTag _: String, accessGroup _: String?) throws { throw unavailable() }
+            func store(key _: String, value _: Data, namespace _: String, accessGroup _: String?) throws {
+                throw unavailable()
+            }
+
+            func retrieve(key _: String, namespace _: String, accessGroup _: String?) throws -> Data {
+                throw unavailable()
+            }
+
+            func delete(key _: String, namespace _: String, accessGroup _: String?) throws {
+                throw unavailable()
+            }
+
+            func deleteAll(namespace _: String, accessGroup _: String?) throws {
+                throw unavailable()
+            }
+
+            func storeDPoPKey(_: P256.Signing.PrivateKey, keyTag _: String, accessGroup _: String?) throws {
+                throw unavailable()
+            }
+
+            func retrieveDPoPKey(keyTag _: String, accessGroup _: String?) throws -> P256.Signing.PrivateKey {
+                throw unavailable()
+            }
+
+            func deleteDPoPKey(keyTag _: String, accessGroup _: String?) throws {
+                throw unavailable()
+            }
         }
     #endif
 
@@ -228,7 +254,11 @@ enum KeychainManager {
 
     private static func accessGroupAttributes(_ accessGroup: String?) -> [String: Any] {
         guard let accessGroup, !accessGroup.isEmpty else { return [:] }
-        return [kSecAttrAccessGroup as String: accessGroup]
+        #if canImport(Security)
+            return [kSecAttrAccessGroup as String: accessGroup]
+        #else
+            return [:]
+        #endif
     }
 
     private static func isItemNotFound(_ error: Error) -> Bool {
@@ -267,50 +297,54 @@ enum KeychainManager {
 
     /// Clears cached items for a specific namespace
     static func clearCache(forNamespace namespace: String) {
-        // Since NSCache doesn't support partial clearing based on key prefix,
-        // we need a separate approach for namespace-specific clearing
+        #if canImport(Security)
+            // Since NSCache doesn't support partial clearing based on key prefix,
+            // we need a separate approach for namespace-specific clearing
 
-        // Get all keychain items for the namespace and remove them from cache
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecMatchLimit as String: kSecMatchLimitAll,
-            kSecReturnAttributes as String: true,
-        ]
+            // Get all keychain items for the namespace and remove them from cache
+            let query: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecMatchLimit as String: kSecMatchLimitAll,
+                kSecReturnAttributes as String: true,
+            ]
 
-        var result: AnyObject?
-        var status = SecItemCopyMatching(query as CFDictionary, &result)
+            var result: AnyObject?
+            var status = SecItemCopyMatching(query as CFDictionary, &result)
 
-        if status == errSecSuccess, let items = result as? [[String: Any]] {
-            for item in items {
-                if let account = item[kSecAttrAccount as String] as? String,
-                   account.hasPrefix("\(namespace).")
-                {
-                    // Remove from data cache
-                    dataCache.removeObject(forKey: account as NSString)
+            if status == errSecSuccess, let items = result as? [[String: Any]] {
+                for item in items {
+                    if let account = item[kSecAttrAccount as String] as? String,
+                       account.hasPrefix("\(namespace).")
+                    {
+                        // Remove from data cache
+                        dataCache.removeObject(forKey: account as NSString)
+                    }
                 }
             }
-        }
 
-        // Do the same for DPoP keys
-        let keysQuery: [String: Any] = [
-            kSecClass as String: kSecClassKey,
-            kSecMatchLimit as String: kSecMatchLimitAll,
-            kSecReturnAttributes as String: true,
-        ]
+            // Do the same for DPoP keys
+            let keysQuery: [String: Any] = [
+                kSecClass as String: kSecClassKey,
+                kSecMatchLimit as String: kSecMatchLimitAll,
+                kSecReturnAttributes as String: true,
+            ]
 
-        status = SecItemCopyMatching(keysQuery as CFDictionary, &result)
+            status = SecItemCopyMatching(keysQuery as CFDictionary, &result)
 
-        if status == errSecSuccess, let items = result as? [[String: Any]] {
-            for item in items {
-                if let tagData = item[kSecAttrApplicationTag as String] as? Data,
-                   let tagString = String(data: tagData, encoding: .utf8),
-                   tagString.hasPrefix("\(namespace).")
-                {
-                    // Remove from dpop key cache
-                    dpopKeyCache.removeObject(forKey: tagString as NSString)
+            if status == errSecSuccess, let items = result as? [[String: Any]] {
+                for item in items {
+                    if let tagData = item[kSecAttrApplicationTag as String] as? Data,
+                       let tagString = String(data: tagData, encoding: .utf8),
+                       tagString.hasPrefix("\(namespace).")
+                    {
+                        // Remove from dpop key cache
+                        dpopKeyCache.removeObject(forKey: tagString as NSString)
+                    }
                 }
             }
-        }
+        #else
+            clearCacheStorage()
+        #endif
 
         LogManager.logDebug("KeychainManager - Cache cleared for namespace: \(namespace).")
     }
@@ -340,7 +374,7 @@ enum KeychainManager {
         key: String,
         value: Data,
         namespace: String,
-        accessibility: CFString? = nil,
+        accessibility: PlatformKeychainAccessibility? = nil,
         accessGroup: String? = nil
     ) throws {
         let resolvedAccessGroup = resolvedAccessGroup(accessGroup)
@@ -615,20 +649,7 @@ enum KeychainManager {
     /// Deletes DPoP key bindings from the keychain for a specified namespace.
     static func deleteDPoPKeyBindings(namespace: String, accessGroup: String? = nil) throws {
         let bindingsKey = "\(namespace).dpopKeyBindings"
-        let resolvedAccessGroup = resolvedAccessGroup(accessGroup)
-
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrAccount as String: bindingsKey,
-        ].merging(Self.accessGroupAttributes(resolvedAccessGroup)) { _, new in new }
-
-        let status = SecItemDelete(query as CFDictionary)
-        if status != errSecSuccess, status != errSecItemNotFound {
-            LogManager.logError(
-                "KeychainManager - Failed to delete DPoP key bindings for namespace \(namespace). Status: \(status)"
-            )
-            throw KeychainError.itemStoreError(status: Int(status))
-        }
+        try deleteExplicitKey(bindingsKey, accessGroup: accessGroup)
 
         // Remove from cache
         dataCache.removeObject(forKey: bindingsKey as NSString)
@@ -645,20 +666,7 @@ enum KeychainManager {
         accessGroup: String? = nil
     ) throws {
         let bindingsKey = "\(namespace).dpopKeyBindings.\(did)"
-        let resolvedAccessGroup = resolvedAccessGroup(accessGroup)
-
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrAccount as String: bindingsKey,
-        ].merging(Self.accessGroupAttributes(resolvedAccessGroup)) { _, new in new }
-
-        let status = SecItemDelete(query as CFDictionary)
-        if status != errSecSuccess, status != errSecItemNotFound {
-            LogManager.logError(
-                "KeychainManager - Failed to delete DPoP key bindings for DID \(did). Status: \(status)"
-            )
-            throw KeychainError.itemStoreError(status: Int(status))
-        }
+        try deleteExplicitKey(bindingsKey, accessGroup: accessGroup)
 
         // Remove from cache
         dataCache.removeObject(forKey: bindingsKey as NSString)
@@ -702,7 +710,7 @@ enum KeychainManager {
         key: String,
         value: Data,
         namespace: String,
-        accessibility: CFString? = nil,
+        accessibility: PlatformKeychainAccessibility? = nil,
         accessGroup: String? = nil
     ) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in

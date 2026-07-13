@@ -67,8 +67,9 @@ async def load_lexicons(dirs, exclude_namespaces, cycle_detector, skip_ids=()):
                 # Also register query/procedure output unions
                 main_def = defs.get('main', {})
                 if main_def.get('type') in ['query', 'procedure']:
-                    output_schema = main_def.get('output', {}).get('schema', {})
-                    if output_schema.get('type') == 'object':
+                    output = main_def.get('output')
+                    output_schema = output.get('schema') if isinstance(output, dict) else None
+                    if isinstance(output_schema, dict) and output_schema.get('type') == 'object':
                         cycle_detector.add_output_type(lexicon_id, output_schema)
 
                 loaded.append((filepath, lexicon))

@@ -141,6 +141,19 @@ class KotlinCodeGenerator(BaseCodeGenerator):
     def generate_lex_definitions(self) -> str:
         """Generate nested type definitions."""
         definitions = []
+        strict_documentation_defs = set()
+        output = self.main_def.get('output')
+        if isinstance(output, dict):
+            schema = output.get('schema')
+            if isinstance(schema, dict):
+                properties = schema.get('properties')
+                if isinstance(properties, dict):
+                    for prop in properties.values():
+                        if not isinstance(prop, dict) or not prop.get('x-security-strict-decode'):
+                            continue
+                        ref = prop.get('ref')
+                        if isinstance(ref, str) and ref.startswith('#'):
+                            strict_documentation_defs.add(ref[1:])
 
         for name, def_schema in self.defs.items():
             if name == 'main':
@@ -160,7 +173,8 @@ class KotlinCodeGenerator(BaseCodeGenerator):
                     'name': class_name,
                     'type': 'data_class',
                     'properties': properties,
-                    'description': def_schema.get('description', '')
+                    'description': def_schema.get('description', ''),
+                    'security_strict_documentation': name in strict_documentation_defs,
                 })
 
             elif def_type == 'string' and 'knownValues' in def_schema:

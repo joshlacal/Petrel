@@ -811,6 +811,12 @@ public actor KeychainStorage {
         }
     }
 
+    /// Checks whether a DPoP key exists without moving private key material
+    /// across the storage actor boundary.
+    public func containsDPoPKey(for did: String) async throws -> Bool {
+        try await getDPoPKey(for: did) != nil
+    }
+
     /// Deletes a DPoP key from the keychain.
     /// - Parameter did: The DID associated with the key to delete
     public func deleteDPoPKey(for did: String) async throws {

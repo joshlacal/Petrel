@@ -32,12 +32,17 @@ let package = Package(
     targets: [
         // System library for libsecret (Linux only, ignored on other platforms)
         .systemLibrary(
-            name: "CLibSecretShim",
+            name: "CLibSecret",
             pkgConfig: "libsecret-1",
             providers: [
                 .apt(["libsecret-1-dev", "libglib2.0-dev", "pkg-config"]),
                 .yum(["libsecret-devel", "glib2-devel", "pkg-config"]),
             ]
+        ),
+        .target(
+            name: "CLibSecretShim",
+            dependencies: ["CLibSecret"],
+            publicHeadersPath: "."
         ),
 
         .target(

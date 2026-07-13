@@ -6,6 +6,9 @@
 //
 
 import Foundation
+#if canImport(Security)
+    import Security
+#endif
 #if canImport(FoundationNetworking)
     import FoundationNetworking
 #endif
@@ -32,7 +35,7 @@ final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, URLSession
         }
     }
 
-    private struct TaskContext: Sendable {
+    private struct TaskContext {
         var redirectCount = 0
         var receivedData = Data()
     }
@@ -105,54 +108,58 @@ final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, URLSession
         didReceive challenge: URLAuthenticationChallenge,
         completionHandler: @escaping @Sendable (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
     ) {
-        Task {
-            guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
-                  let serverTrust = challenge.protectionSpace.serverTrust
-            else {
-                LogManager.logError("Authentication challenge is not for server trust.")
-                completionHandler(.performDefaultHandling, nil)
-                return
+        #if canImport(Security)
+            Task {
+                guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+                      let serverTrust = challenge.protectionSpace.serverTrust
+                else {
+                    LogManager.logError("Authentication challenge is not for server trust.")
+                    completionHandler(.performDefaultHandling, nil)
+                    return
+                }
+
+                // Enforce HTTPS Scheme
+                guard challenge.protectionSpace.protocol == "https" else {
+                    LogManager.logError("Connection is not over HTTPS. Protocol: \(challenge.protectionSpace.protocol ?? "nil")")
+                    completionHandler(.cancelAuthenticationChallenge, nil)
+                    return
+                }
+
+                // Optional: Restrict to allowed hostnames (uncomment and customize if needed)
+                /*
+                 let allowedHostnames: Set<String> = [
+                     "bsky.social",
+                     // Add other pre-trusted hostnames here
+                 ]
+                 let host = challenge.protectionSpace.host.lowercased()
+                 if !allowedHostnames.contains(host) {
+                     LogManager.logError("Host \(host) is not in the list of allowed hostnames.")
+                     completionHandler(.cancelAuthenticationChallenge, nil)
+                     return
+                 }
+                 */
+
+                // Evaluate server trust
+                let policy = SecPolicyCreateSSL(true, challenge.protectionSpace.host as CFString)
+                SecTrustSetPolicies(serverTrust, policy)
+
+                var error: CFError?
+                let isServerTrustValid = SecTrustEvaluateWithError(serverTrust, &error)
+
+                if isServerTrustValid {
+                    // Proceed with the connection
+                    let credential = URLCredential(trust: serverTrust)
+                    LogManager.logInfo("Server trust evaluation succeeded for host: \(challenge.protectionSpace.host)")
+                    completionHandler(.useCredential, credential)
+                } else {
+                    // Server trust evaluation failed
+                    LogManager.logError("Server trust evaluation failed for host: \(challenge.protectionSpace.host). Error: \(error?.localizedDescription ?? "Unknown error")")
+                    completionHandler(.cancelAuthenticationChallenge, nil)
+                }
             }
-
-            // Enforce HTTPS Scheme
-            guard challenge.protectionSpace.protocol == "https" else {
-                LogManager.logError("Connection is not over HTTPS. Protocol: \(challenge.protectionSpace.protocol ?? "nil")")
-                completionHandler(.cancelAuthenticationChallenge, nil)
-                return
-            }
-
-            // Optional: Restrict to allowed hostnames (uncomment and customize if needed)
-            /*
-             let allowedHostnames: Set<String> = [
-                 "bsky.social",
-                 // Add other pre-trusted hostnames here
-             ]
-             let host = challenge.protectionSpace.host.lowercased()
-             if !allowedHostnames.contains(host) {
-                 LogManager.logError("Host \(host) is not in the list of allowed hostnames.")
-                 completionHandler(.cancelAuthenticationChallenge, nil)
-                 return
-             }
-             */
-
-            // Evaluate server trust
-            let policy = SecPolicyCreateSSL(true, challenge.protectionSpace.host as CFString)
-            SecTrustSetPolicies(serverTrust, policy)
-
-            var error: CFError?
-            let isServerTrustValid = SecTrustEvaluateWithError(serverTrust, &error)
-
-            if isServerTrustValid {
-                // Proceed with the connection
-                let credential = URLCredential(trust: serverTrust)
-                LogManager.logInfo("Server trust evaluation succeeded for host: \(challenge.protectionSpace.host)")
-                completionHandler(.useCredential, credential)
-            } else {
-                // Server trust evaluation failed
-                LogManager.logError("Server trust evaluation failed for host: \(challenge.protectionSpace.host). Error: \(error?.localizedDescription ?? "Unknown error")")
-                completionHandler(.cancelAuthenticationChallenge, nil)
-            }
-        }
+        #else
+            completionHandler(.performDefaultHandling, nil)
+        #endif
     }
 
     // MARK: - URLSessionTaskDelegate
