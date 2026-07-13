@@ -356,9 +356,16 @@ public actor NetworkService: NetworkServiceProtocol {
                 continue
             }
 
-            let snapshot = await provider.authContinuitySnapshot()
+            let providerSnapshot = await provider.authContinuityProviderSnapshot()
             guard isCurrentAuthContinuityProvider(provider, at: revision) else {
                 continue
+            }
+
+            if case let .mutationPending(mode) = providerSnapshot {
+                return AuthContinuitySnapshot(did: nil, mode: mode, generation: .max)
+            }
+            guard case let .stable(snapshot) = providerSnapshot else {
+                return nil
             }
 
             if authContinuityRevisionExhausted {
@@ -372,6 +379,43 @@ public actor NetworkService: NetworkServiceProtocol {
                 mode: snapshot.mode,
                 generation: revision
             )
+        }
+    }
+
+    func performWithExactAuthContinuity<Value: Sendable>(
+        matching expected: AuthContinuitySnapshot,
+        _ operation: @Sendable () -> Value
+    ) async -> AuthContinuityTransactionResult<Value> {
+        while true {
+            let revision = authContinuityRevision
+            guard let provider = authProvider as? any AuthContinuityProviding else {
+                return .continuityChanged
+            }
+            guard await installAuthContinuityObserverIfNeeded(for: provider, at: revision) else {
+                continue
+            }
+
+            let providerState = await provider.authContinuityProviderSnapshot()
+            guard isCurrentAuthContinuityProvider(provider, at: revision) else {
+                continue
+            }
+            guard case let .stable(providerSnapshot) = providerState else {
+                return .continuityChanged
+            }
+            guard !authContinuityRevisionExhausted else {
+                return .continuityChanged
+            }
+            let current = AuthContinuitySnapshot(
+                did: providerSnapshot.did,
+                mode: providerSnapshot.mode,
+                generation: revision
+            )
+            guard current == expected else {
+                return .continuityChanged
+            }
+
+            // Deliberately synchronous: actor isolation is the continuity lease.
+            return .performed(operation())
         }
     }
 
@@ -436,12 +480,20 @@ public actor NetworkService: NetworkServiceProtocol {
 
     private func markAuthContinuityMutation() {
         guard !authContinuityRevisionExhausted else { return }
-        guard authContinuityRevision < .max else {
+        guard authContinuityRevision < .max - 1 else {
+            authContinuityRevision = .max
             authContinuityRevisionExhausted = true
             return
         }
         authContinuityRevision += 1
     }
+
+    #if DEBUG
+        func setAuthContinuityRevisionForTesting(_ revision: UInt64) {
+            authContinuityRevision = revision
+            authContinuityRevisionExhausted = revision == .max
+        }
+    #endif
 
     /// Endpoints that go directly to PDS and should never be proxied
     private let neverProxyEndpoints: Set<String> = [
@@ -642,9 +694,9 @@ public actor NetworkService: NetworkServiceProtocol {
             return
         }
 
+        markAuthContinuityMutation()
         authProvider = provider
         authContinuityObserverProviderID = nil
-        markAuthContinuityMutation()
         if let continuityProvider = provider as? any AuthContinuityProviding {
             let revision = authContinuityRevision
             _ = await installAuthContinuityObserverIfNeeded(for: continuityProvider, at: revision)

@@ -12,6 +12,49 @@
 #endif
 import Foundation
 
+enum AuthContinuityStorageMutationEvent {
+    case willMutate(UUID)
+    case didMutate(UUID)
+}
+
+private actor AuthContinuityObserverMailbox {
+    private let observer: @Sendable (AuthContinuityStorageMutationEvent) async -> Void
+    private var deliveryTail: (id: UUID, task: Task<Void, Never>)?
+
+    init(observer: @escaping @Sendable (AuthContinuityStorageMutationEvent) async -> Void) {
+        self.observer = observer
+    }
+
+    func deliver(_ event: AuthContinuityStorageMutationEvent) async {
+        await deliver([event])
+    }
+
+    func deliver(_ events: [AuthContinuityStorageMutationEvent]) async {
+        guard !events.isEmpty else { return }
+
+        var previous = deliveryTail?.task
+        var finalID: UUID?
+        for event in events {
+            let predecessor = previous
+            let observer = observer
+            let id = UUID()
+            let task = Task {
+                if let predecessor {
+                    await predecessor.value
+                }
+                await observer(event)
+            }
+            deliveryTail = (id, task)
+            previous = task
+            finalID = id
+        }
+        await previous?.value
+        if deliveryTail?.id == finalID {
+            deliveryTail = nil
+        }
+    }
+}
+
 private actor AuthContinuityMutationHub {
     struct Scope: Hashable {
         let namespace: String
@@ -20,23 +63,45 @@ private actor AuthContinuityMutationHub {
 
     static let shared = AuthContinuityMutationHub()
 
-    private var observers: [Scope: [UUID: @Sendable () async -> Void]] = [:]
+    private var observers: [Scope: [UUID: AuthContinuityObserverMailbox]] = [:]
+    private var activeTickets: [Scope: [UUID]] = [:]
 
     func replaceObserver(
         _ previousToken: UUID?,
         for scope: Scope,
-        observer: @escaping @Sendable () async -> Void
-    ) -> UUID {
+        observer: @escaping @Sendable (AuthContinuityStorageMutationEvent) async -> Void
+    ) async -> UUID {
         if let previousToken {
             observers[scope]?.removeValue(forKey: previousToken)
         }
         let token = UUID()
-        observers[scope, default: [:]][token] = observer
+        let mailbox = AuthContinuityObserverMailbox(observer: observer)
+        observers[scope, default: [:]][token] = mailbox
+
+        // Registration and the active-ticket snapshot are one hub operation.
+        // Mailbox isolation preserves will-before-did ordering if completion
+        // re-enters this hub while a replay callback is suspended.
+        let replay = activeTickets[scope, default: []].map(AuthContinuityStorageMutationEvent.willMutate)
+        await mailbox.deliver(replay)
         return token
     }
 
-    func callbacks(for scope: Scope) -> [@Sendable () async -> Void] {
-        Array(observers[scope, default: [:]].values)
+    func beginMutation(for scope: Scope) async -> UUID {
+        let ticket = UUID()
+        activeTickets[scope, default: []].append(ticket)
+        let mailboxes = Array(observers[scope, default: [:]].values)
+        for mailbox in mailboxes {
+            await mailbox.deliver(.willMutate(ticket))
+        }
+        return ticket
+    }
+
+    func endMutation(_ ticket: UUID, for scope: Scope) async {
+        activeTickets[scope, default: []].removeAll { $0 == ticket }
+        let mailboxes = Array(observers[scope, default: [:]].values)
+        for mailbox in mailboxes {
+            await mailbox.deliver(.didMutate(ticket))
+        }
     }
 }
 
@@ -64,7 +129,9 @@ public actor KeychainStorage {
         KeychainManager.configureAccessibility(accessibility)
     }
 
-    func setAuthContinuityObserver(_ observer: @escaping @Sendable () async -> Void) async {
+    func setAuthContinuityObserver(
+        _ observer: @escaping @Sendable (AuthContinuityStorageMutationEvent) async -> Void
+    ) async {
         let scope = authContinuityScope
         authContinuityObserverToken = await AuthContinuityMutationHub.shared.replaceObserver(
             authContinuityObserverToken,
@@ -73,12 +140,23 @@ public actor KeychainStorage {
         )
     }
 
-    private func notifyAuthContinuityMutation() async {
-        let callbacks = await AuthContinuityMutationHub.shared.callbacks(for: authContinuityScope)
-        for callback in callbacks {
-            await callback()
-        }
+    private func beginAuthContinuityMutation() async -> UUID {
+        await AuthContinuityMutationHub.shared.beginMutation(for: authContinuityScope)
     }
+
+    private func endAuthContinuityMutation(_ ticket: UUID) async {
+        await AuthContinuityMutationHub.shared.endMutation(ticket, for: authContinuityScope)
+    }
+
+    #if DEBUG
+        func beginAuthContinuityMutationForTesting() async -> UUID {
+            await beginAuthContinuityMutation()
+        }
+
+        func endAuthContinuityMutationForTesting(_ ticket: UUID) async {
+            await endAuthContinuityMutation(ticket)
+        }
+    #endif
 
     // MARK: - Account Management
 
@@ -285,12 +363,12 @@ public actor KeychainStorage {
     public func saveCurrentDID(_ did: String) async throws {
         let key = makeKey("currentDID")
         let data = did.data(using: .utf8) ?? Data()
-        await notifyAuthContinuityMutation()
+        let continuityTicket = await beginAuthContinuityMutation()
         do {
             try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
-            await notifyAuthContinuityMutation()
+            await endAuthContinuityMutation(continuityTicket)
         } catch {
-            await notifyAuthContinuityMutation()
+            await endAuthContinuityMutation(continuityTicket)
             throw error
         }
     }
@@ -314,12 +392,12 @@ public actor KeychainStorage {
         let key = makeKey("gatewaySession", did: did)
         let data = session.data(using: .utf8) ?? Data()
         LogManager.logInfo("KeychainStorage - Saving gateway session with key: \(namespace).\(key) for DID: \(did.prefix(20))...")
-        await notifyAuthContinuityMutation()
+        let continuityTicket = await beginAuthContinuityMutation()
         do {
             try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
-            await notifyAuthContinuityMutation()
+            await endAuthContinuityMutation(continuityTicket)
         } catch {
-            await notifyAuthContinuityMutation()
+            await endAuthContinuityMutation(continuityTicket)
             throw error
         }
         LogManager.logInfo("KeychainStorage - Successfully saved gateway session for DID: \(did.prefix(20))...")
@@ -347,12 +425,12 @@ public actor KeychainStorage {
     /// Deletes the gateway session for a specific account
     func deleteGatewaySession(for did: String) async throws {
         let key = makeKey("gatewaySession", did: did)
-        await notifyAuthContinuityMutation()
+        let continuityTicket = await beginAuthContinuityMutation()
         do {
             try await KeychainManager.deleteAsync(key: key, namespace: namespace, accessGroup: accessGroup)
-            await notifyAuthContinuityMutation()
+            await endAuthContinuityMutation(continuityTicket)
         } catch {
-            await notifyAuthContinuityMutation()
+            await endAuthContinuityMutation(continuityTicket)
             throw error
         }
         LogManager.logDebug("KeychainStorage - Deleted gateway session for DID: \(did.prefix(20))...")
@@ -412,12 +490,12 @@ public actor KeychainStorage {
     func saveGatewaySession(_ session: String) async throws {
         let key = makeKey("gatewaySession")
         let data = session.data(using: .utf8) ?? Data()
-        await notifyAuthContinuityMutation()
+        let continuityTicket = await beginAuthContinuityMutation()
         do {
             try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
-            await notifyAuthContinuityMutation()
+            await endAuthContinuityMutation(continuityTicket)
         } catch {
-            await notifyAuthContinuityMutation()
+            await endAuthContinuityMutation(continuityTicket)
             throw error
         }
     }
@@ -436,12 +514,12 @@ public actor KeychainStorage {
     @available(*, deprecated, message: "Use deleteGatewaySession(for:) for multi-account support")
     func deleteGatewaySession() async throws {
         let key = makeKey("gatewaySession")
-        await notifyAuthContinuityMutation()
+        let continuityTicket = await beginAuthContinuityMutation()
         do {
             try await KeychainManager.deleteAsync(key: key, namespace: namespace, accessGroup: accessGroup)
-            await notifyAuthContinuityMutation()
+            await endAuthContinuityMutation(continuityTicket)
         } catch {
-            await notifyAuthContinuityMutation()
+            await endAuthContinuityMutation(continuityTicket)
             throw error
         }
     }

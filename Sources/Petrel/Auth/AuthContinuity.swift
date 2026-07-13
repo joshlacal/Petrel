@@ -30,9 +30,22 @@ public struct AuthContinuitySnapshot: Equatable, Sendable {
     }
 }
 
+/// The result of executing an operation while an exact authentication
+/// continuity snapshot remains serialized against in-process mutations.
+public enum AuthContinuityTransactionResult<Value: Sendable>: Sendable {
+    case performed(Value)
+    case continuityChanged
+}
+
+enum AuthContinuityProviderSnapshot {
+    case stable(AuthContinuitySnapshot)
+    case mutationPending(mode: AuthMode)
+}
+
 protocol AuthContinuityProviding: AnyObject, AuthenticationProvider {
     func installAuthContinuityObserver(_ observer: @escaping @Sendable () async -> Void) async
     func authContinuitySnapshot() async -> AuthContinuitySnapshot
+    func authContinuityProviderSnapshot() async -> AuthContinuityProviderSnapshot
 }
 
 struct GatewayAuthIdentity: Equatable {
@@ -125,6 +138,12 @@ struct AuthContinuityState {
             break
         }
     }
+
+    func wouldChangeWhenObservingGatewayIdentity(_ identity: GatewayAuthIdentity?) -> Bool {
+        guard mode == .gateway, !isExhausted else { return false }
+        guard case let .observed(previous) = observation else { return false }
+        return previous != identity
+    }
 }
 
 public extension ATProtoClient {
@@ -134,5 +153,20 @@ public extension ATProtoClient {
             return snapshot
         }
         return AuthContinuitySnapshot(did: nil, mode: authMode, generation: 0)
+    }
+
+    /// Executes a synchronous operation only while `expected` is the exact
+    /// current authentication continuity snapshot. Petrel-mediated auth
+    /// mutations cannot become observable until the operation returns.
+    ///
+    /// The operation must not block or call back into Petrel. It cannot suspend.
+    func performWithExactAuthContinuity<Value: Sendable>(
+        matching expected: AuthContinuitySnapshot,
+        _ operation: @Sendable () -> Value
+    ) async -> AuthContinuityTransactionResult<Value> {
+        await networkService.performWithExactAuthContinuity(
+            matching: expected,
+            operation
+        )
     }
 }
