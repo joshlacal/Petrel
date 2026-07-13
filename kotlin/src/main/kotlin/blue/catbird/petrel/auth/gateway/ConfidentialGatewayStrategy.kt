@@ -7,14 +7,17 @@ import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
+import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.Url
 import io.ktor.http.URLBuilder
 import io.ktor.http.URLProtocol
-import io.ktor.http.parseQueryString
 import io.ktor.serialization.kotlinx.json.json
+import java.net.URI
+import java.security.SecureRandom
+import java.util.Base64
 import java.util.logging.Logger
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -31,6 +34,17 @@ data class GatewaySessionResponse(
     val did: String,
     val handle: String? = null,
     val active: Boolean? = null,
+)
+
+@Serializable
+private data class GatewayExchangeRequest(
+    val code: String,
+    val browser_nonce: String,
+)
+
+@Serializable
+private data class GatewayExchangeResponse(
+    val session_id: String,
 )
 
 /** Failure modes for the gateway auth strategy. Mirrors Swift's `GatewayError`. */
@@ -82,6 +96,7 @@ data class GatewayCallbackResult(
  */
 class ConfidentialGatewayStrategy(
     gatewayBaseUrl: String,
+    callbackUrl: String,
     private val storage: GatewaySessionStorage,
     private val currentAccount: CurrentAccount,
     private val networkService: NetworkService,
@@ -98,6 +113,8 @@ class ConfidentialGatewayStrategy(
         .getOrElse { throw GatewayException.InvalidGatewayUrl() }
 
     private val gatewayHost: String = gatewayUrl.host
+
+    private val callback: CallbackConfiguration = validateCallbackUrl(callbackUrl)
 
     /**
      * Dedicated HTTP client for gateway endpoints (`/auth/login`, `/auth/session`,
@@ -117,6 +134,9 @@ class ConfidentialGatewayStrategy(
     /** Serializes all mutations of storage / currentAccount / networkService fields. */
     private val mutex = Mutex()
 
+    /** A login nonce deliberately has no persistence beyond this process. */
+    private var pendingBrowserNonce: String? = null
+
     /** Shared lenient JSON parser — created once per strategy instance. */
     private val json: Json = Json {
         ignoreUnknownKeys = true
@@ -128,46 +148,49 @@ class ConfidentialGatewayStrategy(
     // --------------------------------------------------------------------
 
     /**
-     * Build the gateway login URL. The returned URL is bare — we NEVER
-     * append `redirect_to` or `client` here; the gateway's own config drives
-     * the OAuth flow end-to-end.
+     * Build the gateway login URL with the exact configured callback and a
+     * per-login nonce retained only in this strategy instance.
      */
     suspend fun startOAuthFlow(identifier: String? = null): String {
-        val builder = URLBuilder(gatewayUrl).apply {
-            encodedPathSegments = listOf("auth", "login")
-            parameters.clear()
-            if (identifier != null) {
-                parameters.append("identifier", identifier)
-            }
-        }
-        return builder.buildString()
+        return buildLoginUrl("identifier", identifier)
     }
 
     /**
      * Variant that lets the caller propose a specific PDS host for sign-up.
      */
     suspend fun startOAuthFlowForSignUp(pdsUrl: String? = null): String {
+        return buildLoginUrl("pds", pdsUrl)
+    }
+
+    private suspend fun buildLoginUrl(optionalKey: String, optionalValue: String?): String {
+        val nonceBytes = newSecureNonce()
+        val nonce = Base64.getUrlEncoder().withoutPadding().encodeToString(nonceBytes)
+        mutex.withLock { pendingBrowserNonce = nonce }
+
         val builder = URLBuilder(gatewayUrl).apply {
             encodedPathSegments = listOf("auth", "login")
             parameters.clear()
-            if (pdsUrl != null) {
-                parameters.append("pds", pdsUrl)
+            parameters.append("browser_nonce", nonce)
+            parameters.append("redirect_to", callback.target)
+            if (optionalValue != null) {
+                parameters.append(optionalKey, optionalValue)
             }
         }
         return builder.buildString()
     }
 
     /**
-     * Handle the gateway's redirect back to our app. Parses `session_id` from
-     * the URL fragment (the gateway puts NOTHING else in the fragment), then
-     * calls `GET {gateway}/auth/session` with that bearer to retrieve the
-     * canonical DID / handle.
+     * Redeem the single-use callback code, then hydrate the session using the
+     * existing authenticated `/auth/session` endpoint.
      */
     suspend fun handleOAuthCallback(callbackUrl: String): GatewayCallbackResult {
-        val fragment = extractFragment(callbackUrl)
-            ?: throw GatewayException.InvalidCallbackUrl()
-        val sessionId = parseSessionIdFromFragment(fragment)
-            ?: throw GatewayException.InvalidCallbackUrl()
+        val code = parseCallbackCode(callbackUrl)
+        // Consume before the first suspension/network boundary. A failed or
+        // cancelled exchange can never retry with the same browser binding.
+        val browserNonce = mutex.withLock {
+            pendingBrowserNonce.also { pendingBrowserNonce = null }
+        } ?: throw GatewayException.InvalidCallbackUrl()
+        val sessionId = exchangeCode(code, browserNonce)
 
         // Fetch session details FIRST so we key the local save by the server-
         // authoritative DID.
@@ -431,26 +454,51 @@ class ConfidentialGatewayStrategy(
         networkService.authorizationHeader = null
     }
 
-    /**
-     * Pulls `session_id` out of a URL fragment like `session_id=abc123&foo=bar`.
-     * Other keys in the fragment are ignored (nest only puts `session_id`
-     * there today, but we tolerate extras).
-     */
-    internal fun parseSessionIdFromFragment(fragment: String): String? {
-        val parsed = runCatching { parseQueryString(fragment) }.getOrNull()
-        val fromParser = parsed?.get("session_id")
-        if (!fromParser.isNullOrEmpty()) return fromParser
-
-        // Fallback: manual parse matches Swift's `split("&").split("=", 1)`
-        // logic for pathological inputs.
-        for (pair in fragment.split("&")) {
-            val idx = pair.indexOf('=')
-            if (idx <= 0) continue
-            val key = pair.substring(0, idx)
-            val value = pair.substring(idx + 1)
-            if (key == "session_id" && value.isNotEmpty()) return value
+    private fun parseCallbackCode(rawUrl: String): String {
+        val uri = runCatching { URI(rawUrl) }
+            .getOrElse { throw GatewayException.InvalidCallbackUrl() }
+        if (uri.rawUserInfo != null || uri.rawFragment != null ||
+            uri.scheme?.lowercase() != callback.scheme ||
+            uri.host?.lowercase() != callback.host ||
+            normalizedPort(uri) != callback.port ||
+            (uri.rawPath.ifEmpty { "/" }) != callback.path
+        ) {
+            throw GatewayException.InvalidCallbackUrl()
         }
-        return null
+        val query = uri.rawQuery ?: throw GatewayException.InvalidCallbackUrl()
+        val pairs = query.split('&')
+        if (pairs.size != 1) throw GatewayException.InvalidCallbackUrl()
+        val pair = pairs.single().split('=', limit = 2)
+        if (pair.size != 2 || pair[0] != "code") throw GatewayException.InvalidCallbackUrl()
+        val code = pair[1]
+        if (code.length != EXCHANGE_CODE_LENGTH || !code.all(::isBase64UrlCharacter)) {
+            throw GatewayException.InvalidCallbackUrl()
+        }
+        return code
+    }
+
+    private suspend fun exchangeCode(code: String, browserNonce: String): String {
+        val response = try {
+            http.post(composeGatewayUrl("/auth/exchange")) {
+                header("Origin", callback.origin)
+                header("Content-Type", "application/json")
+                header("Accept", "application/json")
+                setBody(
+                    json.encodeToString(
+                        GatewayExchangeRequest.serializer(),
+                        GatewayExchangeRequest(code, browserNonce),
+                    ),
+                )
+            }
+        } catch (t: Throwable) {
+            throw GatewayException.NetworkError(t)
+        }
+        if (response.status != HttpStatusCode.OK) throw GatewayException.InvalidSession()
+        val payload = runCatching {
+            json.decodeFromString(GatewayExchangeResponse.serializer(), response.bodyAsText())
+        }.getOrElse { throw GatewayException.InvalidSession() }
+        return payload.session_id.takeIf(::isValidSessionId)
+            ?: throw GatewayException.InvalidSession()
     }
 
     /** GET `{gateway}/auth/session` with the candidate bearer; parse out DID/handle. */
@@ -488,14 +536,72 @@ class ConfidentialGatewayStrategy(
         }.buildString()
     }
 
-    private fun extractFragment(rawUrl: String): String? {
-        val hashIdx = rawUrl.indexOf('#')
-        if (hashIdx < 0 || hashIdx == rawUrl.length - 1) return null
-        return rawUrl.substring(hashIdx + 1)
-    }
-
     /** Release network resources. Safe to call multiple times. */
     fun close() {
         http.close()
+    }
+
+    private data class CallbackConfiguration(
+        val target: String,
+        val scheme: String,
+        val host: String,
+        val port: Int,
+        val path: String,
+        val origin: String,
+    )
+
+    companion object {
+        private const val NONCE_BYTE_COUNT = 32
+        private const val EXCHANGE_CODE_LENGTH = 43
+        private const val MIN_SESSION_ID_LENGTH = 16
+        private const val MAX_SESSION_ID_LENGTH = 256
+        private val secureRandom = SecureRandom()
+
+        private fun newSecureNonce(): ByteArray =
+            ByteArray(NONCE_BYTE_COUNT).also(secureRandom::nextBytes)
+
+        private fun isBase64UrlCharacter(character: Char): Boolean =
+            character in 'A'..'Z' ||
+                character in 'a'..'z' ||
+                character in '0'..'9' ||
+                character == '-' ||
+                character == '_'
+
+        private fun isValidSessionId(value: String): Boolean =
+            value.length in MIN_SESSION_ID_LENGTH..MAX_SESSION_ID_LENGTH &&
+                value.all {
+                    isBase64UrlCharacter(it) || it == '.' || it == '~'
+                }
+
+        private fun validateCallbackUrl(rawUrl: String): CallbackConfiguration {
+            val uri = runCatching { URI(rawUrl) }
+                .getOrElse { throw GatewayException.InvalidCallbackUrl() }
+            val scheme = uri.scheme?.lowercase() ?: throw GatewayException.InvalidCallbackUrl()
+            val host = uri.host?.lowercase() ?: throw GatewayException.InvalidCallbackUrl()
+            if (uri.rawUserInfo != null || uri.rawQuery != null || uri.rawFragment != null) {
+                throw GatewayException.InvalidCallbackUrl()
+            }
+            val port = normalizedPort(uri)
+            val allowed = when (scheme) {
+                "https" -> port == 443
+                "http" -> host in setOf("127.0.0.1", "::1") && uri.port in 1..65535
+                else -> false
+            }
+            if (!allowed) throw GatewayException.InvalidCallbackUrl()
+            val path = uri.rawPath.ifEmpty { "/" }
+            val authorityHost = if (host.contains(':')) "[$host]" else host
+            val origin = when {
+                scheme == "https" -> "https://$authorityHost"
+                else -> "http://$authorityHost:${uri.port}"
+            }
+            return CallbackConfiguration(rawUrl, scheme, host, port, path, origin)
+        }
+
+        private fun normalizedPort(uri: URI): Int = when {
+            uri.port >= 0 -> uri.port
+            uri.scheme.equals("https", ignoreCase = true) -> 443
+            uri.scheme.equals("http", ignoreCase = true) -> 80
+            else -> -1
+        }
     }
 }
