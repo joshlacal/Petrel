@@ -323,6 +323,14 @@ public actor NetworkService: NetworkServiceProtocol {
     private(set) var protectedResourceMetadata: ProtectedResourceMetadata?
     private(set) var authorizationServerMetadata: AuthorizationServerMetadata?
     private let requestDeduplicator = RequestDeduplicator()
+    private var authContinuityRevision: UInt64 = 0
+    private var authContinuityRevisionExhausted = false
+    private var authContinuityObserverProviderID: ObjectIdentifier?
+    private var authContinuityObserverInstallation: (
+        providerID: ObjectIdentifier,
+        revision: UInt64,
+        task: Task<Void, Never>
+    )?
 
     /// When true, all xrpc requests require auth and go through the gateway
     /// Gateway handles OAuth/DPoP - client just sends Bearer token
@@ -335,6 +343,105 @@ public actor NetworkService: NetworkServiceProtocol {
 
     /// Optional adapter for controlling connection routing (e.g., bypassing proxy for WebSockets)
     private var connectionPolicyAdapter: (any ConnectionPolicyAdapter)?
+
+    /// Retrieves authentication continuity without exposing provider secrets.
+    func authContinuitySnapshot() async -> AuthContinuitySnapshot? {
+        while true {
+            let revision = authContinuityRevision
+            guard let provider = authProvider as? any AuthContinuityProviding else {
+                return nil
+            }
+
+            guard await installAuthContinuityObserverIfNeeded(for: provider, at: revision) else {
+                continue
+            }
+
+            let snapshot = await provider.authContinuitySnapshot()
+            guard isCurrentAuthContinuityProvider(provider, at: revision) else {
+                continue
+            }
+
+            if authContinuityRevisionExhausted {
+                return AuthContinuitySnapshot(did: nil, mode: snapshot.mode, generation: .max)
+            }
+            // NetworkService owns the public continuity clock so provider
+            // replacement and provider-internal mutations share one monotonic,
+            // collision-free generation domain.
+            return AuthContinuitySnapshot(
+                did: snapshot.did,
+                mode: snapshot.mode,
+                generation: revision
+            )
+        }
+    }
+
+    private func installAuthContinuityObserverIfNeeded(
+        for provider: any AuthContinuityProviding,
+        at revision: UInt64
+    ) async -> Bool {
+        let providerID = ObjectIdentifier(provider)
+        if authContinuityObserverProviderID == providerID {
+            return isCurrentAuthContinuityProvider(provider, at: revision)
+        }
+
+        let installationTask: Task<Void, Never>
+        if let installation = authContinuityObserverInstallation,
+           installation.providerID == providerID,
+           installation.revision == revision
+        {
+            installationTask = installation.task
+        } else {
+            let observer: @Sendable () async -> Void = { [weak self] in
+                await self?.markAuthContinuityMutation()
+            }
+            installationTask = Task {
+                await provider.installAuthContinuityObserver(observer)
+            }
+            authContinuityObserverInstallation = (providerID, revision, installationTask)
+        }
+        await installationTask.value
+
+        guard isCurrentAuthContinuityProvider(provider, at: revision) else {
+            clearAuthContinuityObserverInstallation(providerID: providerID, revision: revision)
+            return false
+        }
+        authContinuityObserverProviderID = providerID
+        clearAuthContinuityObserverInstallation(providerID: providerID, revision: revision)
+        return true
+    }
+
+    private func clearAuthContinuityObserverInstallation(
+        providerID: ObjectIdentifier,
+        revision: UInt64
+    ) {
+        guard authContinuityObserverInstallation?.providerID == providerID,
+              authContinuityObserverInstallation?.revision == revision
+        else {
+            return
+        }
+        authContinuityObserverInstallation = nil
+    }
+
+    private func isCurrentAuthContinuityProvider(
+        _ provider: any AuthContinuityProviding,
+        at revision: UInt64
+    ) -> Bool {
+        guard authContinuityRevision == revision,
+              let currentProvider = authProvider as? any AuthContinuityProviding
+        else {
+            return false
+        }
+        return currentProvider === provider
+    }
+
+    private func markAuthContinuityMutation() {
+        guard !authContinuityRevisionExhausted else { return }
+        guard authContinuityRevision < .max else {
+            authContinuityRevisionExhausted = true
+            return
+        }
+        authContinuityRevision += 1
+    }
 
     /// Endpoints that go directly to PDS and should never be proxied
     private let neverProxyEndpoints: Set<String> = [
@@ -525,8 +632,23 @@ public actor NetworkService: NetworkServiceProtocol {
 
     /// Sets the authentication provider for authenticated requests
     /// - Parameter provider: The authentication provider
-    public func setAuthenticationProvider(_ provider: AuthenticationProvider) {
+    public func setAuthenticationProvider(_ provider: AuthenticationProvider) async {
+        if let continuityProvider = provider as? any AuthContinuityProviding,
+           let currentProvider = authProvider as? any AuthContinuityProviding,
+           currentProvider === continuityProvider
+        {
+            let revision = authContinuityRevision
+            _ = await installAuthContinuityObserverIfNeeded(for: continuityProvider, at: revision)
+            return
+        }
+
         authProvider = provider
+        authContinuityObserverProviderID = nil
+        markAuthContinuityMutation()
+        if let continuityProvider = provider as? any AuthContinuityProviding {
+            let revision = authContinuityRevision
+            _ = await installAuthContinuityObserverIfNeeded(for: continuityProvider, at: revision)
+        }
     }
 
     /// Sets the connection policy adapter for controlling connection routing

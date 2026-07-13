@@ -12,10 +12,43 @@
 #endif
 import Foundation
 
+private actor AuthContinuityMutationHub {
+    struct Scope: Hashable {
+        let namespace: String
+        let accessGroup: String?
+    }
+
+    static let shared = AuthContinuityMutationHub()
+
+    private var observers: [Scope: [UUID: @Sendable () async -> Void]] = [:]
+
+    func replaceObserver(
+        _ previousToken: UUID?,
+        for scope: Scope,
+        observer: @escaping @Sendable () async -> Void
+    ) -> UUID {
+        if let previousToken {
+            observers[scope]?.removeValue(forKey: previousToken)
+        }
+        let token = UUID()
+        observers[scope, default: [:]][token] = observer
+        return token
+    }
+
+    func callbacks(for scope: Scope) -> [@Sendable () async -> Void] {
+        Array(observers[scope, default: [:]].values)
+    }
+}
+
 /// A centralized storage layer for securely storing all persistent data using the keychain.
 public actor KeychainStorage {
     let namespace: String
     private let accessGroup: String?
+    private var authContinuityObserverToken: UUID?
+
+    private var authContinuityScope: AuthContinuityMutationHub.Scope {
+        AuthContinuityMutationHub.Scope(namespace: namespace, accessGroup: accessGroup)
+    }
 
     /// Initializes a new KeychainStorage instance.
     /// - Parameters:
@@ -29,6 +62,22 @@ public actor KeychainStorage {
         self.accessGroup = accessGroup
         KeychainManager.configureDefaultAccessGroup(accessGroup)
         KeychainManager.configureAccessibility(accessibility)
+    }
+
+    func setAuthContinuityObserver(_ observer: @escaping @Sendable () async -> Void) async {
+        let scope = authContinuityScope
+        authContinuityObserverToken = await AuthContinuityMutationHub.shared.replaceObserver(
+            authContinuityObserverToken,
+            for: scope,
+            observer: observer
+        )
+    }
+
+    private func notifyAuthContinuityMutation() async {
+        let callbacks = await AuthContinuityMutationHub.shared.callbacks(for: authContinuityScope)
+        for callback in callbacks {
+            await callback()
+        }
     }
 
     // MARK: - Account Management
@@ -236,7 +285,14 @@ public actor KeychainStorage {
     public func saveCurrentDID(_ did: String) async throws {
         let key = makeKey("currentDID")
         let data = did.data(using: .utf8) ?? Data()
-        try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+        await notifyAuthContinuityMutation()
+        do {
+            try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+            await notifyAuthContinuityMutation()
+        } catch {
+            await notifyAuthContinuityMutation()
+            throw error
+        }
     }
 
     /// Retrieves the current DID from the keychain.
@@ -258,7 +314,14 @@ public actor KeychainStorage {
         let key = makeKey("gatewaySession", did: did)
         let data = session.data(using: .utf8) ?? Data()
         LogManager.logInfo("KeychainStorage - Saving gateway session with key: \(namespace).\(key) for DID: \(did.prefix(20))...")
-        try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+        await notifyAuthContinuityMutation()
+        do {
+            try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+            await notifyAuthContinuityMutation()
+        } catch {
+            await notifyAuthContinuityMutation()
+            throw error
+        }
         LogManager.logInfo("KeychainStorage - Successfully saved gateway session for DID: \(did.prefix(20))...")
     }
 
@@ -284,7 +347,14 @@ public actor KeychainStorage {
     /// Deletes the gateway session for a specific account
     func deleteGatewaySession(for did: String) async throws {
         let key = makeKey("gatewaySession", did: did)
-        try await KeychainManager.deleteAsync(key: key, namespace: namespace, accessGroup: accessGroup)
+        await notifyAuthContinuityMutation()
+        do {
+            try await KeychainManager.deleteAsync(key: key, namespace: namespace, accessGroup: accessGroup)
+            await notifyAuthContinuityMutation()
+        } catch {
+            await notifyAuthContinuityMutation()
+            throw error
+        }
         LogManager.logDebug("KeychainStorage - Deleted gateway session for DID: \(did.prefix(20))...")
     }
 
@@ -342,7 +412,14 @@ public actor KeychainStorage {
     func saveGatewaySession(_ session: String) async throws {
         let key = makeKey("gatewaySession")
         let data = session.data(using: .utf8) ?? Data()
-        try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+        await notifyAuthContinuityMutation()
+        do {
+            try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+            await notifyAuthContinuityMutation()
+        } catch {
+            await notifyAuthContinuityMutation()
+            throw error
+        }
     }
 
     @available(*, deprecated, message: "Use getGatewaySession(for:) for multi-account support")
@@ -359,7 +436,14 @@ public actor KeychainStorage {
     @available(*, deprecated, message: "Use deleteGatewaySession(for:) for multi-account support")
     func deleteGatewaySession() async throws {
         let key = makeKey("gatewaySession")
-        try await KeychainManager.deleteAsync(key: key, namespace: namespace, accessGroup: accessGroup)
+        await notifyAuthContinuityMutation()
+        do {
+            try await KeychainManager.deleteAsync(key: key, namespace: namespace, accessGroup: accessGroup)
+            await notifyAuthContinuityMutation()
+        } catch {
+            await notifyAuthContinuityMutation()
+            throw error
+        }
     }
 
     // MARK: - Session Management
