@@ -54,6 +54,8 @@ actor AuthManager: AuthStrategy, AuthContinuityProviding {
     private let gatewayBaseURL: URL?
     private var authContinuity: AuthContinuityState
     private var authContinuityObserver: (@Sendable () async -> Void)?
+    private var pendingAuthContinuityMutations = 0
+    private var pendingStorageMutationTickets: Set<UUID> = []
 
     /// The current authentication mode.
     private(set) var currentMode: Mode
@@ -109,12 +111,13 @@ actor AuthManager: AuthStrategy, AuthContinuityProviding {
 
         // Invalidate before cancelling the old strategy because cancellation is
         // an actor suspension point and must not leave stale work authorized.
-        await invalidateAuthContinuity()
+        await beginAuthContinuityMutation()
+        defer { endAuthContinuityMutation() }
 
         // Cancel any ongoing OAuth flow before switching
         await activeStrategy.cancelOAuthFlow()
 
-        activeStrategy = try Self.createStrategy(
+        let newStrategy = try Self.createStrategy(
             mode: mode,
             storage: storage,
             accountManager: accountManager,
@@ -123,9 +126,13 @@ actor AuthManager: AuthStrategy, AuthContinuityProviding {
             didResolver: didResolver,
             gatewayBaseURL: gatewayBaseURL
         )
-        currentMode = mode
+
+        // No suspension is permitted between publishing the continuity mode and
+        // the strategy that prepares requests for it. The pre-signal above has
+        // already invalidated every exact transaction based on the old mode.
         authContinuity.commitMode(mode.authMode)
-        await notifyAuthContinuityMutation()
+        activeStrategy = newStrategy
+        currentMode = mode
     }
 
     // MARK: - Strategy Factory
@@ -206,23 +213,18 @@ actor AuthManager: AuthStrategy, AuthContinuityProviding {
     }
 
     func handleOAuthCallback(url: URL) async throws -> (did: String, handle: String?, pdsURL: URL) {
-        if currentMode == .gateway {
+        let tracksGatewayContinuity = currentMode == .gateway
+        if tracksGatewayContinuity {
             // The callback may install or replace an opaque gateway session.
             // Invalidate before the strategy performs its first await.
-            await invalidateAuthContinuity()
+            await beginAuthContinuityMutation()
         }
-        do {
-            let result = try await activeStrategy.handleOAuthCallback(url: url)
-            if currentMode == .gateway {
-                await notifyAuthContinuityMutation()
+        defer {
+            if tracksGatewayContinuity {
+                endAuthContinuityMutation()
             }
-            return result
-        } catch {
-            if currentMode == .gateway {
-                await notifyAuthContinuityMutation()
-            }
-            throw error
         }
+        return try await activeStrategy.handleOAuthCallback(url: url)
     }
 
     func loginWithPassword(
@@ -240,14 +242,9 @@ actor AuthManager: AuthStrategy, AuthContinuityProviding {
     }
 
     func logout() async throws {
-        await invalidateAuthContinuity()
-        do {
-            try await activeStrategy.logout()
-            await notifyAuthContinuityMutation()
-        } catch {
-            await notifyAuthContinuityMutation()
-            throw error
-        }
+        await beginAuthContinuityMutation()
+        defer { endAuthContinuityMutation() }
+        try await activeStrategy.logout()
     }
 
     func cancelOAuthFlow() async {
@@ -289,32 +286,21 @@ actor AuthManager: AuthStrategy, AuthContinuityProviding {
         data: Data,
         for request: URLRequest
     ) async throws -> (Data, HTTPURLResponse) {
-        if currentMode == .gateway,
-           let gatewayBaseURL,
-           isTerminalGatewayUnauthorized(data: data, request: request, gatewayURL: gatewayBaseURL)
-        {
+        let invalidatesGatewayContinuity = currentMode == .gateway
+            && gatewayBaseURL.map {
+                isTerminalGatewayUnauthorized(data: data, request: request, gatewayURL: $0)
+            } == true
+        if invalidatesGatewayContinuity {
             // The strategy will clear the local session. Change continuity
             // before forwarding across the actor boundary.
-            await invalidateAuthContinuity()
+            await beginAuthContinuityMutation()
         }
-        do {
-            let result = try await activeStrategy.handleUnauthorizedResponse(response, data: data, for: request)
-            if currentMode == .gateway,
-               let gatewayBaseURL,
-               isTerminalGatewayUnauthorized(data: data, request: request, gatewayURL: gatewayBaseURL)
-            {
-                await notifyAuthContinuityMutation()
+        defer {
+            if invalidatesGatewayContinuity {
+                endAuthContinuityMutation()
             }
-            return result
-        } catch {
-            if currentMode == .gateway,
-               let gatewayBaseURL,
-               isTerminalGatewayUnauthorized(data: data, request: request, gatewayURL: gatewayBaseURL)
-            {
-                await notifyAuthContinuityMutation()
-            }
-            throw error
         }
+        return try await activeStrategy.handleUnauthorizedResponse(response, data: data, for: request)
     }
 
     func updateDPoPNonce(for url: URL, from headers: [String: String], did: String?, jkt: String?) async {
@@ -325,33 +311,64 @@ actor AuthManager: AuthStrategy, AuthContinuityProviding {
 
     func installAuthContinuityObserver(_ observer: @escaping @Sendable () async -> Void) async {
         authContinuityObserver = observer
-        await storage.setAuthContinuityObserver { [weak self] in
-            await self?.invalidateAuthContinuityForStorageMutation()
+        await storage.setAuthContinuityObserver { [weak self] event in
+            await self?.handleAuthContinuityStorageMutation(event)
         }
     }
 
-    private func invalidateAuthContinuity() async {
-        authContinuity.invalidate()
+    private func beginAuthContinuityMutation() async {
+        pendingAuthContinuityMutations += 1
         await notifyAuthContinuityMutation()
+        authContinuity.invalidate()
+    }
+
+    private func endAuthContinuityMutation() {
+        precondition(pendingAuthContinuityMutations > 0)
+        pendingAuthContinuityMutations -= 1
     }
 
     private func notifyAuthContinuityMutation() async {
         await authContinuityObserver?()
     }
 
-    private func invalidateAuthContinuityForStorageMutation() async {
-        authContinuity.invalidate()
-        await notifyAuthContinuityMutation()
+    func handleAuthContinuityStorageMutation(_ event: AuthContinuityStorageMutationEvent) async {
+        switch event {
+        case let .willMutate(ticket):
+            guard pendingStorageMutationTickets.insert(ticket).inserted else { return }
+            await beginAuthContinuityMutation()
+        case let .didMutate(ticket):
+            guard pendingStorageMutationTickets.remove(ticket) != nil else {
+                // This observer may have joined the mutation hub after the
+                // matching willMutate event. Conservatively invalidate without
+                // clearing any other in-flight ticket.
+                await beginAuthContinuityMutation()
+                endAuthContinuityMutation()
+                return
+            }
+            await notifyAuthContinuityMutation()
+            authContinuity.invalidate()
+            endAuthContinuityMutation()
+        }
     }
 
     func authContinuitySnapshot() async -> AuthContinuitySnapshot {
+        switch await authContinuityProviderSnapshot() {
+        case let .stable(snapshot): snapshot
+        case let .mutationPending(mode): AuthContinuitySnapshot(did: nil, mode: mode, generation: .max)
+        }
+    }
+
+    func authContinuityProviderSnapshot() async -> AuthContinuityProviderSnapshot {
         while true {
+            guard pendingAuthContinuityMutations == 0 else {
+                return .mutationPending(mode: authContinuity.mode)
+            }
             let generation = authContinuity.generation
             let mode = authContinuity.mode
             let exhausted = authContinuity.isExhausted
 
             guard mode == .gateway, !exhausted else {
-                return authContinuity.snapshot
+                return .stable(authContinuity.snapshot)
             }
 
             // Use the versioned persistent selector rather than AccountManager's
@@ -369,7 +386,8 @@ actor AuthManager: AuthStrategy, AuthContinuityProviding {
             // observations from two authentication generations or modes.
             guard authContinuity.generation == generation,
                   authContinuity.mode == mode,
-                  authContinuity.isExhausted == exhausted
+                  authContinuity.isExhausted == exhausted,
+                  pendingAuthContinuityMutations == 0
             else {
                 continue
             }
@@ -379,12 +397,22 @@ actor AuthManager: AuthStrategy, AuthContinuityProviding {
             } else {
                 nil
             }
-            let previousGeneration = authContinuity.generation
-            authContinuity.observeGatewayIdentity(identity)
-            if authContinuity.generation != previousGeneration {
+            if authContinuity.wouldChangeWhenObservingGatewayIdentity(identity) {
+                pendingAuthContinuityMutations += 1
                 await notifyAuthContinuityMutation()
+                guard authContinuity.generation == generation,
+                      authContinuity.mode == mode,
+                      authContinuity.isExhausted == exhausted
+                else {
+                    endAuthContinuityMutation()
+                    continue
+                }
+                authContinuity.observeGatewayIdentity(identity)
+                endAuthContinuityMutation()
+                return .stable(authContinuity.snapshot)
             }
-            return authContinuity.snapshot
+            authContinuity.observeGatewayIdentity(identity)
+            return .stable(authContinuity.snapshot)
         }
     }
 }
