@@ -4,6 +4,7 @@ import blue.catbird.petrel.network.NetworkService
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
+import io.ktor.client.engine.mock.respondError
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.OutgoingContent
@@ -21,6 +22,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 
 class ConfidentialGatewayExchangeTest {
@@ -158,6 +160,89 @@ class ConfidentialGatewayExchangeTest {
     }
 
     @Test
+    fun `exchange rejects oversized response declared by content length`() = runTest {
+        val oversized = "{\"session_id\":\"$sessionId\",\"padding\":\"${"x".repeat(4097)}\"}"
+        val client = HttpClient(MockEngine {
+            respond(
+                content = oversized,
+                status = HttpStatusCode.OK,
+                headers = headersOf(
+                    HttpHeaders.ContentType to listOf("application/json"),
+                    HttpHeaders.ContentLength to listOf(oversized.encodeToByteArray().size.toString()),
+                ),
+            )
+        })
+        val strategy = strategy(httpClient = client)
+        strategy.startOAuthFlow()
+
+        assertFailsWith<GatewayException.InvalidSession> {
+            strategy.handleOAuthCallback("$callbackUrl?code=$code")
+        }
+        assertNull(strategyNetworkService.authorizationHeader)
+    }
+
+    @Test
+    fun `exchange rejects oversized response without content length`() = runTest {
+        val client = HttpClient(MockEngine {
+            respond(
+                content = "{\"session_id\":\"$sessionId\",\"padding\":\"${"x".repeat(4097)}\"}",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json"),
+            )
+        })
+        val strategy = strategy(httpClient = client)
+        strategy.startOAuthFlow()
+
+        assertFailsWith<GatewayException.InvalidSession> {
+            strategy.handleOAuthCallback("$callbackUrl?code=$code")
+        }
+        assertNull(strategyNetworkService.authorizationHeader)
+    }
+
+    @Test
+    fun `session hydration rejects oversized response without content length`() = runTest {
+        val client = HttpClient(MockEngine { request ->
+            when (request.url.encodedPath) {
+                "/auth/exchange" -> respond(
+                    content = "{\"session_id\":\"$sessionId\"}",
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                )
+                "/auth/session" -> respond(
+                    content = "{\"did\":\"did:plc:alice\",\"padding\":\"${"x".repeat(8193)}\"}",
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                )
+                else -> respondError(HttpStatusCode.NotFound)
+            }
+        })
+        val strategy = strategy(httpClient = client)
+        strategy.startOAuthFlow()
+
+        assertFailsWith<GatewayException.InvalidSession> {
+            strategy.handleOAuthCallback("$callbackUrl?code=$code")
+        }
+        assertNull(strategyStorage.getCurrentDid())
+        assertNull(strategyNetworkService.authorizationHeader)
+    }
+
+    @Test
+    fun `gateway requests time out and do not install credentials`() = runTest {
+        val client = HttpClient(MockEngine {
+            delay(60_000)
+            respond("{}", HttpStatusCode.OK)
+        })
+        val strategy = strategy(httpClient = client, requestTimeoutMillis = 100)
+        strategy.startOAuthFlow()
+
+        assertFailsWith<GatewayException.NetworkError> {
+            strategy.handleOAuthCallback("$callbackUrl?code=$code")
+        }
+        assertNull(strategyStorage.getCurrentDid())
+        assertNull(strategyNetworkService.authorizationHeader)
+    }
+
+    @Test
     fun `simultaneous callbacks consume nonce once and send one exchange request`() = runTest {
         val exchangeStarted = CompletableDeferred<Unit>()
         val releaseExchange = CompletableDeferred<Unit>()
@@ -214,6 +299,7 @@ class ConfidentialGatewayExchangeTest {
     private fun strategy(
         callbackUrl: String = this.callbackUrl,
         httpClient: HttpClient = HttpClient(MockEngine { error("unexpected request") }),
+        requestTimeoutMillis: Long = 10_000,
     ): ConfidentialGatewayStrategy {
         strategyStorage = InMemoryGatewaySessionStorage()
         strategyNetworkService = NetworkService("https://api.catbird.blue")
@@ -224,6 +310,7 @@ class ConfidentialGatewayExchangeTest {
             currentAccount = strategyStorage,
             networkService = strategyNetworkService,
             httpClient = httpClient,
+            requestTimeoutMillis = requestTimeoutMillis,
         )
     }
 

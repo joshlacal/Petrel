@@ -102,31 +102,14 @@ class ATProtoClient(val networkService: NetworkService) {
     }
 
     @Deprecated(
-        "Broken: parses did/handle from fragment but nest only sends session_id. " +
-            "Use ATProtoClient.configureGateway(...) + gatewayHandleCallback(url) which " +
-            "fetches canonical session info from GET /auth/session.",
+        "Disabled: URL-carried session credentials are unsafe. Use " +
+            "ATProtoClient.configureGateway(...) + gatewayHandleCallback(url).",
         ReplaceWith("gatewayHandleCallback(callbackUrl)"),
     )
     fun handleGatewayCallback(callbackUrl: String): GatewaySessionInfo {
-        val fragment = callbackUrl.substringAfter("#", "")
-        val params = fragment.split("&").associate { part ->
-            val (key, value) = part.split("=", limit = 2)
-            key to java.net.URLDecoder.decode(value, "UTF-8")
-        }
-
-        val sessionId = params["session_id"]
-            ?: throw IllegalArgumentException("Gateway callback missing session_id")
-
-        val session = GatewaySessionInfo(
-            sessionId = sessionId,
-            did = params["did"] ?: "",
-            handle = params["handle"]
+        throw UnsupportedOperationException(
+            "Legacy gateway callbacks are disabled; use the single-use exchange flow",
         )
-        gatewaySession = session
-        networkService.authenticatedDID = session.did
-        networkService.authorizationHeader = "Bearer $sessionId"
-        authMode = AuthMode.Gateway
-        return session
     }
 
     @Deprecated(
