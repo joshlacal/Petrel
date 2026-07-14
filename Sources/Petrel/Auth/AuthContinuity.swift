@@ -37,6 +37,73 @@ public enum AuthContinuityTransactionResult<Value: Sendable>: Sendable {
     case continuityChanged
 }
 
+final class ExactAuthGeneratedRequestScopeState: @unchecked Sendable {
+    private let lock = NSLock()
+    private var launchClaimed = false
+    private var responseCompleted = false
+    private var continuityFailed = false
+
+    func claimLaunch() -> Bool {
+        lock.withLock {
+            guard !launchClaimed, !continuityFailed else { return false }
+            launchClaimed = true
+            return true
+        }
+    }
+
+    func failContinuity() {
+        lock.withLock { continuityFailed = true }
+    }
+
+    func completeResponse() -> Bool {
+        lock.withLock {
+            guard launchClaimed, !responseCompleted, !continuityFailed else { return false }
+            responseCompleted = true
+            return true
+        }
+    }
+
+    var completedExactlyOneResponse: Bool {
+        lock.withLock { launchClaimed && responseCompleted && !continuityFailed }
+    }
+}
+
+struct ExactAuthRequestOrigin: Equatable {
+    let scheme: String
+    let host: String
+    let effectivePort: Int
+
+    init?(_ url: URL) {
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              components.scheme?.lowercased() == "https",
+              let host = components.host?.lowercased(),
+              !host.isEmpty,
+              components.user == nil,
+              components.password == nil
+        else {
+            return nil
+        }
+        scheme = "https"
+        self.host = host
+        effectivePort = components.port ?? 443
+    }
+}
+
+struct ExactAuthGeneratedRequestScope {
+    let id: UUID
+    let expected: AuthContinuitySnapshot
+    let networkServiceID: UUID
+    let origin: ExactAuthRequestOrigin
+    let destinationGeneration: UUID
+    let state: ExactAuthGeneratedRequestScopeState
+}
+
+enum ExactAuthGeneratedRequestScopeContext {
+    @TaskLocal static var current: ExactAuthGeneratedRequestScope?
+}
+
+struct ExactAuthGeneratedRequestContinuityError: Error {}
+
 enum AuthContinuityProviderSnapshot {
     case stable(AuthContinuitySnapshot)
     case mutationPending(mode: AuthMode)
@@ -168,5 +235,66 @@ public extension ATProtoClient {
             matching: expected,
             operation
         )
+    }
+
+    /// Executes one directly-awaited generated API operation under an exact
+    /// authentication request scope.
+    ///
+    /// The generated operation must be awaited directly and must issue exactly
+    /// one request. Child tasks inherit the scope and remain fail-closed. Do not
+    /// escape work from `operation`; detached work has no scope and is rejected
+    /// while this scope owns the network service.
+    func performGeneratedRequestWithExactAuthContinuity<Value: Sendable>(
+        matching expected: AuthContinuitySnapshot,
+        _ operation: @Sendable () async throws -> Value
+    ) async throws -> AuthContinuityTransactionResult<Value> {
+        let serviceID = networkService.exactAuthRequestScopeServiceID
+
+        if let current = ExactAuthGeneratedRequestScopeContext.current {
+            guard current.expected == expected,
+                  current.networkServiceID == serviceID,
+                  await networkService.isExactAuthGeneratedRequestScopeActive(current)
+            else {
+                current.state.failContinuity()
+                return .continuityChanged
+            }
+
+            do {
+                let value = try await operation()
+                return await networkService.isExactAuthGeneratedRequestScopeActive(current)
+                    && current.state.completedExactlyOneResponse
+                    ? .performed(value)
+                    : .continuityChanged
+            } catch is ExactAuthGeneratedRequestContinuityError {
+                current.state.failContinuity()
+                return .continuityChanged
+            }
+        }
+
+        let state = ExactAuthGeneratedRequestScopeState()
+        guard let scope = await networkService.beginExactAuthGeneratedRequestScope(
+            id: UUID(),
+            expected: expected,
+            state: state
+        ) else {
+            return .continuityChanged
+        }
+
+        do {
+            let value = try await ExactAuthGeneratedRequestScopeContext.$current.withValue(scope) {
+                try await operation()
+            }
+            await networkService.endExactAuthGeneratedRequestScope(scope)
+            return scope.state.completedExactlyOneResponse
+                ? .performed(value)
+                : .continuityChanged
+        } catch is ExactAuthGeneratedRequestContinuityError {
+            scope.state.failContinuity()
+            await networkService.endExactAuthGeneratedRequestScope(scope)
+            return .continuityChanged
+        } catch {
+            await networkService.endExactAuthGeneratedRequestScope(scope)
+            throw error
+        }
     }
 }

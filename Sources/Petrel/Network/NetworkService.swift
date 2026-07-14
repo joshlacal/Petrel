@@ -22,6 +22,18 @@ import Foundation
 /// With the fixed HardenedURLSessionDelegate (not implementing didReceive:),
 /// URLSession should handle decompression automatically. This is kept as a safety net.
 enum ContentDecoding {
+    static func headerValue(named name: String, in headerFields: [AnyHashable: Any]) -> String? {
+        for (key, value) in headerFields {
+            if let keyString = key as? String,
+               keyString.caseInsensitiveCompare(name) == .orderedSame,
+               let valueString = value as? String
+            {
+                return valueString
+            }
+        }
+        return nil
+    }
+
     /// Attempts to decompress data if it appears to still be compressed.
     /// Returns original data if already decompressed or decompression fails.
     static func decompressIfNeeded(_ data: Data, contentEncoding: String?) -> Data {
@@ -316,6 +328,7 @@ public actor NetworkService: NetworkServiceProtocol {
     private var authProvider: AuthenticationProvider?
     private var headers: [String: String] = [:]
     private let session: URLSession
+    private let exactAuthSession: URLSession
     private let jsonEncoder = JSONEncoder()
     private let jsonDecoder = JSONDecoder()
     private let maxRetries = 3
@@ -331,6 +344,20 @@ public actor NetworkService: NetworkServiceProtocol {
         revision: UInt64,
         task: Task<Void, Never>
     )?
+    nonisolated let exactAuthRequestScopeServiceID = UUID()
+    private var activeExactAuthRequestScope: ExactAuthGeneratedRequestScope?
+    private var exactAuthDestinationGeneration = UUID()
+
+    #if DEBUG
+        private nonisolated(unsafe) static var networkTestProtocolClasses: [AnyClass]?
+        private static let networkTestProtocolClassesLock = NSLock()
+
+        static func setNetworkTestProtocolClasses(_ classes: [AnyClass]?) {
+            networkTestProtocolClassesLock.withLock {
+                networkTestProtocolClasses = classes
+            }
+        }
+    #endif
 
     /// When true, all xrpc requests require auth and go through the gateway
     /// Gateway handles OAuth/DPoP - client just sends Bearer token
@@ -419,6 +446,47 @@ public actor NetworkService: NetworkServiceProtocol {
         }
     }
 
+    func beginExactAuthGeneratedRequestScope(
+        id: UUID,
+        expected: AuthContinuitySnapshot,
+        state: ExactAuthGeneratedRequestScopeState
+    ) async -> ExactAuthGeneratedRequestScope? {
+        guard activeExactAuthRequestScope == nil,
+              let origin = ExactAuthRequestOrigin(baseURL)
+        else {
+            state.failContinuity()
+            return nil
+        }
+        let destinationGeneration = exactAuthDestinationGeneration
+        guard await exactAuthSnapshot(matching: expected) != nil,
+              activeExactAuthRequestScope == nil,
+              ExactAuthRequestOrigin(baseURL) == origin,
+              exactAuthDestinationGeneration == destinationGeneration
+        else {
+            state.failContinuity()
+            return nil
+        }
+        let scope = ExactAuthGeneratedRequestScope(
+            id: id,
+            expected: expected,
+            networkServiceID: exactAuthRequestScopeServiceID,
+            origin: origin,
+            destinationGeneration: destinationGeneration,
+            state: state
+        )
+        activeExactAuthRequestScope = scope
+        return scope
+    }
+
+    func endExactAuthGeneratedRequestScope(_ scope: ExactAuthGeneratedRequestScope) {
+        guard activeExactAuthRequestScope?.id == scope.id else { return }
+        activeExactAuthRequestScope = nil
+    }
+
+    func isExactAuthGeneratedRequestScopeActive(_ scope: ExactAuthGeneratedRequestScope) -> Bool {
+        isActiveExactAuthRequestScope(scope)
+    }
+
     private func installAuthContinuityObserverIfNeeded(
         for provider: any AuthContinuityProviding,
         at revision: UInt64
@@ -478,6 +546,53 @@ public actor NetworkService: NetworkServiceProtocol {
         return currentProvider === provider
     }
 
+    private func exactAuthProvider(
+        matching expected: AuthContinuitySnapshot
+    ) async -> (provider: any AuthContinuityProviding, revision: UInt64)? {
+        let revision = authContinuityRevision
+        guard let provider = authProvider as? any AuthContinuityProviding,
+              await installAuthContinuityObserverIfNeeded(for: provider, at: revision),
+              await exactAuthSnapshot(
+                  for: provider,
+                  at: revision,
+                  matching: expected
+              )
+        else {
+            return nil
+        }
+        return (provider, revision)
+    }
+
+    private func exactAuthSnapshot(
+        matching expected: AuthContinuitySnapshot
+    ) async -> AuthContinuitySnapshot? {
+        guard await exactAuthProvider(matching: expected) != nil else { return nil }
+        return expected
+    }
+
+    private func exactAuthSnapshot(
+        for provider: any AuthContinuityProviding,
+        at revision: UInt64,
+        matching expected: AuthContinuitySnapshot
+    ) async -> Bool {
+        guard !authContinuityRevisionExhausted,
+              isCurrentAuthContinuityProvider(provider, at: revision)
+        else {
+            return false
+        }
+        let providerState = await provider.authContinuityProviderSnapshot()
+        guard isCurrentAuthContinuityProvider(provider, at: revision),
+              case let .stable(providerSnapshot) = providerState
+        else {
+            return false
+        }
+        return AuthContinuitySnapshot(
+            did: providerSnapshot.did,
+            mode: providerSnapshot.mode,
+            generation: revision
+        ) == expected
+    }
+
     private func markAuthContinuityMutation() {
         guard !authContinuityRevisionExhausted else { return }
         guard authContinuityRevision < .max - 1 else {
@@ -527,10 +642,35 @@ public actor NetworkService: NetworkServiceProtocol {
 
         config.httpMaximumConnectionsPerHost = 5
         config.httpShouldUsePipelining = true
+        #if DEBUG
+            config.protocolClasses = Self.networkTestProtocolClassesLock.withLock {
+                Self.networkTestProtocolClasses
+            }
+        #endif
 
         // Create a session with a delegate for enhanced security
         let sessionDelegate = HardenedURLSessionDelegate()
         session = URLSession(configuration: config, delegate: sessionDelegate, delegateQueue: nil)
+        let exactConfig = URLSessionConfiguration.ephemeral
+        exactConfig.timeoutIntervalForRequest = config.timeoutIntervalForRequest
+        exactConfig.timeoutIntervalForResource = config.timeoutIntervalForResource
+        exactConfig.requestCachePolicy = .reloadIgnoringLocalCacheData
+        exactConfig.httpShouldSetCookies = false
+        exactConfig.httpCookieStorage = nil
+        exactConfig.urlCredentialStorage = nil
+        exactConfig.urlCache = nil
+        exactConfig.httpMaximumConnectionsPerHost = 1
+        exactConfig.httpShouldUsePipelining = false
+        #if DEBUG
+            exactConfig.protocolClasses = Self.networkTestProtocolClassesLock.withLock {
+                Self.networkTestProtocolClasses
+            }
+        #endif
+        exactAuthSession = URLSession(
+            configuration: exactConfig,
+            delegate: HardenedURLSessionDelegate(allowsRedirects: false),
+            delegateQueue: nil
+        )
 
         // Set JSON encoder settings
         jsonEncoder.keyEncodingStrategy = .useDefaultKeys
@@ -558,6 +698,7 @@ public actor NetworkService: NetworkServiceProtocol {
     /// Sets the base URL for API requests.
     /// - Parameter url: The new base URL.
     public func setBaseURL(_ url: URL) async {
+        exactAuthDestinationGeneration = UUID()
         baseURL = url
         LogManager.logInfo("Network Service - Base URL updated to: \(url)")
     }
@@ -706,6 +847,7 @@ public actor NetworkService: NetworkServiceProtocol {
     /// Sets the connection policy adapter for controlling connection routing
     /// - Parameter adapter: The connection policy adapter
     public func setConnectionPolicyAdapter(_ adapter: (any ConnectionPolicyAdapter)?) {
+        exactAuthDestinationGeneration = UUID()
         connectionPolicyAdapter = adapter
         LogManager.logInfo("Network Service - Connection policy adapter \(adapter == nil ? "removed" : "set")")
     }
@@ -880,6 +1022,18 @@ public actor NetworkService: NetworkServiceProtocol {
     func request(_ request: URLRequest, skipTokenRefresh: Bool = false, additionalHeaders: [String: String]? = nil) async throws -> (
         Data, URLResponse
     ) {
+        if let scope = ExactAuthGeneratedRequestScopeContext.current {
+            return try await requestWithExactAuthContinuity(
+                request,
+                additionalHeaders: additionalHeaders,
+                scope: scope
+            )
+        }
+        if let activeExactAuthRequestScope {
+            activeExactAuthRequestScope.state.failContinuity()
+            throw ExactAuthGeneratedRequestContinuityError()
+        }
+
         let currentRequest = request
         var retryCount = 0
 
@@ -1399,6 +1553,124 @@ public actor NetworkService: NetworkServiceProtocol {
             "Network Service - Max retry attempts reached for \(currentRequest.url?.absoluteString ?? "Unknown URL")."
         )
         throw NetworkError.maxRetryAttemptsReached
+    }
+
+    private func requestWithExactAuthContinuity(
+        _ request: URLRequest,
+        additionalHeaders: [String: String]?,
+        scope: ExactAuthGeneratedRequestScope
+    ) async throws -> (Data, URLResponse) {
+        guard isActiveExactAuthRequestScope(scope),
+              let boundURL = request.url,
+              ExactAuthRequestOrigin(boundURL) == scope.origin,
+              request.httpBodyStream == nil,
+              !Task.isCancelled,
+              let captured = await exactAuthProvider(matching: scope.expected)
+        else {
+            scope.state.failContinuity()
+            throw ExactAuthGeneratedRequestContinuityError()
+        }
+
+        var requestToPrepare = request
+        for field in ["Authorization", "DPoP", "Cookie", "Proxy-Authorization"] {
+            requestToPrepare.setValue(nil, forHTTPHeaderField: field)
+        }
+        for (name, value) in headers {
+            guard !Self.isCredentialHeader(name) else { continue }
+            requestToPrepare.setValue(value, forHTTPHeaderField: name)
+        }
+        if let additionalHeaders {
+            for (name, value) in additionalHeaders {
+                guard !Self.isCredentialHeader(name) else { continue }
+                if name.lowercased() == "atproto-proxy",
+                   requestToPrepare.url?.host != baseURL.host
+                {
+                    continue
+                }
+                requestToPrepare.setValue(value, forHTTPHeaderField: name)
+            }
+        }
+        if let userAgent {
+            requestToPrepare.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+            requestToPrepare.setValue(userAgent, forHTTPHeaderField: "X-Catbird-Client")
+        }
+        requestToPrepare.setValue(UUID().uuidString, forHTTPHeaderField: "X-Catbird-Request-Id")
+
+        let prepared: URLRequest
+        do {
+            prepared = try await captured.provider.prepareAuthenticatedRequestWithContext(requestToPrepare).0
+        } catch {
+            scope.state.failContinuity()
+            throw ExactAuthGeneratedRequestContinuityError()
+        }
+
+        guard !Task.isCancelled,
+              isActiveExactAuthRequestScope(scope),
+              prepared.url?.absoluteString == boundURL.absoluteString,
+              prepared.httpMethod == request.httpMethod,
+              prepared.httpBody == request.httpBody,
+              prepared.httpBodyStream == nil,
+              let authorization = prepared.value(forHTTPHeaderField: "Authorization"),
+              !authorization.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              prepared.value(forHTTPHeaderField: "Cookie") == nil,
+              prepared.value(forHTTPHeaderField: "Proxy-Authorization") == nil,
+              await exactAuthSnapshot(
+                  for: captured.provider,
+                  at: captured.revision,
+                  matching: scope.expected
+              ),
+              scope.state.claimLaunch()
+        else {
+            scope.state.failContinuity()
+            throw ExactAuthGeneratedRequestContinuityError()
+        }
+
+        let (rawData, response) = try await exactAuthSession.data(for: prepared)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse(description: "Received non-HTTP response")
+        }
+        let contentEncoding = ContentDecoding.headerValue(
+            named: "Content-Encoding",
+            in: httpResponse.allHeaderFields
+        )
+        let data = ContentDecoding.decompressIfNeeded(rawData, contentEncoding: contentEncoding)
+
+        guard await exactAuthSnapshot(
+            for: captured.provider,
+            at: captured.revision,
+            matching: scope.expected
+        ),
+            isActiveExactAuthRequestScope(scope),
+            httpResponse.url?.absoluteString == boundURL.absoluteString,
+            scope.state.completeResponse()
+        else {
+            scope.state.failContinuity()
+            throw ExactAuthGeneratedRequestContinuityError()
+        }
+        return (data, httpResponse)
+    }
+
+    private func isActiveExactAuthRequestScope(_ scope: ExactAuthGeneratedRequestScope) -> Bool {
+        guard scope.networkServiceID == exactAuthRequestScopeServiceID,
+              activeExactAuthRequestScope?.id == scope.id,
+              activeExactAuthRequestScope?.expected == scope.expected,
+              activeExactAuthRequestScope?.origin == scope.origin,
+              activeExactAuthRequestScope?.destinationGeneration == scope.destinationGeneration,
+              exactAuthDestinationGeneration == scope.destinationGeneration,
+              ExactAuthRequestOrigin(baseURL) == scope.origin
+        else {
+            return false
+        }
+        return true
+    }
+
+    private nonisolated static func isCredentialHeader(_ name: String) -> Bool {
+        switch name.lowercased() {
+        case "authorization", "dpop", "cookie", "proxy-authorization":
+            return true
+        default:
+            return false
+        }
     }
 
     /// Performs a GET request to the specified endpoint.

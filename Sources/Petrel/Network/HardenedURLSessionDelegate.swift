@@ -16,6 +16,12 @@ import Foundation
 final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, URLSessionTaskDelegate, URLSessionDataDelegate, @unchecked Sendable {
     private let maxRedirects = 5
     private let maxResponseSize = 10 * 1024 * 1024 // 10 MB
+    private let allowsRedirects: Bool
+
+    init(allowsRedirects: Bool = true) {
+        self.allowsRedirects = allowsRedirects
+        super.init()
+    }
 
     private actor TaskContextManager {
         private var taskContexts = [URLSessionTask: TaskContext]()
@@ -51,6 +57,11 @@ final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, URLSession
         newRequest request: URLRequest,
         completionHandler: @escaping @Sendable (URLRequest?) -> Void
     ) {
+        guard allowsRedirects else {
+            LogManager.logInfo("Rejected redirect for exact-auth request scope")
+            completionHandler(nil)
+            return
+        }
         let requestURLString = request.url?.absoluteString ?? "unknown URL"
 
         Task {
