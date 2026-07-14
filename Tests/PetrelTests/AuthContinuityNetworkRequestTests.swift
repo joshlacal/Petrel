@@ -18,6 +18,15 @@ final class AuthContinuityNetworkRequestTests: XCTestCase {
         super.tearDown()
     }
 
+    func testExactResponseContentEncodingLookupIsCaseInsensitive() {
+        let headerFields: [AnyHashable: Any] = ["cOnTeNt-EnCoDiNg": "br"]
+
+        XCTAssertEqual(
+            ContentDecoding.headerValue(named: "Content-Encoding", in: headerFields),
+            "br"
+        )
+    }
+
     func testGeneratedEndpointUsesOnePreparedRequestWithoutRefresh() async throws {
         let fixture = await makeFixture()
         let result = try await fixture.client.performGeneratedRequestWithExactAuthContinuity(
@@ -363,6 +372,60 @@ final class AuthContinuityNetworkRequestTests: XCTestCase {
         XCTAssertEqual(requestCount, 1)
     }
 
+    func testConcurrentScopeAcquisitionDoesNotOverwriteInstalledOwner() async throws {
+        let heldSnapshotGate = AsyncGate(initiallyOpen: false)
+        let secondOperationGate = AsyncGate(initiallyOpen: false)
+        let secondOperationStarted = AsyncEvent()
+        let fixture = await makeFixture()
+        await fixture.provider.holdNextProviderSnapshot(on: heldSnapshotGate)
+
+        let first = Task {
+            try await fixture.client.performGeneratedRequestWithExactAuthContinuity(matching: fixture.snapshot) {
+                try await fixture.client.com.atproto.server.describeServer()
+            }
+        }
+        await fixture.provider.waitForHeldProviderSnapshot()
+
+        let second = Task {
+            try await fixture.client.performGeneratedRequestWithExactAuthContinuity(matching: fixture.snapshot) {
+                await secondOperationStarted.signal()
+                await secondOperationGate.wait()
+                return try await fixture.client.com.atproto.server.describeServer()
+            }
+        }
+        await secondOperationStarted.wait()
+
+        await heldSnapshotGate.open()
+        let firstResult = try await first.value
+        assertContinuityChanged(firstResult)
+
+        await secondOperationGate.open()
+        let secondResult = try await second.value
+        assertPerformed(secondResult, responseCode: 200)
+        let requestCount = await fixture.transport.requests.count
+        XCTAssertEqual(requestCount, 1)
+    }
+
+    func testDestinationGenerationDriftDuringScopeAcquisitionFailsClosed() async throws {
+        let heldSnapshotGate = AsyncGate(initiallyOpen: false)
+        let fixture = await makeFixture()
+        await fixture.provider.holdNextProviderSnapshot(on: heldSnapshotGate)
+
+        let task = Task {
+            try await fixture.client.performGeneratedRequestWithExactAuthContinuity(matching: fixture.snapshot) {
+                try await fixture.client.com.atproto.server.describeServer()
+            }
+        }
+        await fixture.provider.waitForHeldProviderSnapshot()
+        await fixture.client.networkService.setBaseURL(baseURL)
+        await heldSnapshotGate.open()
+
+        let result = try await task.value
+        assertContinuityChanged(result)
+        let requestCount = await fixture.transport.requests.count
+        XCTAssertEqual(requestCount, 0)
+    }
+
     func testZeroRequestClosureFailsClosedAndReleasesService() async throws {
         let fixture = await makeFixture()
         let empty = try await fixture.client.performGeneratedRequestWithExactAuthContinuity(matching: fixture.snapshot) {
@@ -607,6 +670,9 @@ private actor ExactAuthProvider: AuthContinuityProviding {
     private let preparedHeaders: [String: String]
     private let preparedURL: URL?
     private let prepareGate: AsyncGate?
+    private var providerSnapshotGate: AsyncGate?
+    private var shouldHoldNextProviderSnapshot = false
+    private let heldProviderSnapshotEvent = AsyncEvent()
     private var observer: (@Sendable () async -> Void)?
     private let prepareEvent = AsyncEvent()
     private(set) var refreshCount = 0
@@ -639,7 +705,21 @@ private actor ExactAuthProvider: AuthContinuityProviding {
     }
 
     func authContinuityProviderSnapshot() async -> AuthContinuityProviderSnapshot {
-        .stable(snapshot)
+        if shouldHoldNextProviderSnapshot, let providerSnapshotGate {
+            shouldHoldNextProviderSnapshot = false
+            await heldProviderSnapshotEvent.signal()
+            await providerSnapshotGate.wait()
+        }
+        return .stable(snapshot)
+    }
+
+    func holdNextProviderSnapshot(on gate: AsyncGate) {
+        providerSnapshotGate = gate
+        shouldHoldNextProviderSnapshot = true
+    }
+
+    func waitForHeldProviderSnapshot() async {
+        await heldProviderSnapshotEvent.wait()
     }
 
     func prepareAuthenticatedRequest(_ request: URLRequest) async throws -> URLRequest {

@@ -22,6 +22,18 @@ import Foundation
 /// With the fixed HardenedURLSessionDelegate (not implementing didReceive:),
 /// URLSession should handle decompression automatically. This is kept as a safety net.
 enum ContentDecoding {
+    static func headerValue(named name: String, in headerFields: [AnyHashable: Any]) -> String? {
+        for (key, value) in headerFields {
+            if let keyString = key as? String,
+               keyString.caseInsensitiveCompare(name) == .orderedSame,
+               let valueString = value as? String
+            {
+                return valueString
+            }
+        }
+        return nil
+    }
+
     /// Attempts to decompress data if it appears to still be compressed.
     /// Returns original data if already decompressed or decompression fails.
     static func decompressIfNeeded(_ data: Data, contentEncoding: String?) -> Data {
@@ -440,8 +452,16 @@ public actor NetworkService: NetworkServiceProtocol {
         state: ExactAuthGeneratedRequestScopeState
     ) async -> ExactAuthGeneratedRequestScope? {
         guard activeExactAuthRequestScope == nil,
-              let origin = ExactAuthRequestOrigin(baseURL),
-              await exactAuthSnapshot(matching: expected) != nil
+              let origin = ExactAuthRequestOrigin(baseURL)
+        else {
+            state.failContinuity()
+            return nil
+        }
+        let destinationGeneration = exactAuthDestinationGeneration
+        guard await exactAuthSnapshot(matching: expected) != nil,
+              activeExactAuthRequestScope == nil,
+              ExactAuthRequestOrigin(baseURL) == origin,
+              exactAuthDestinationGeneration == destinationGeneration
         else {
             state.failContinuity()
             return nil
@@ -451,7 +471,7 @@ public actor NetworkService: NetworkServiceProtocol {
             expected: expected,
             networkServiceID: exactAuthRequestScopeServiceID,
             origin: origin,
-            destinationGeneration: exactAuthDestinationGeneration,
+            destinationGeneration: destinationGeneration,
             state: state
         )
         activeExactAuthRequestScope = scope
@@ -1609,7 +1629,10 @@ public actor NetworkService: NetworkServiceProtocol {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse(description: "Received non-HTTP response")
         }
-        let contentEncoding = httpResponse.value(forHTTPHeaderField: "Content-Encoding")
+        let contentEncoding = ContentDecoding.headerValue(
+            named: "Content-Encoding",
+            in: httpResponse.allHeaderFields
+        )
         let data = ContentDecoding.decompressIfNeeded(rawData, contentEncoding: contentEncoding)
 
         guard await exactAuthSnapshot(
