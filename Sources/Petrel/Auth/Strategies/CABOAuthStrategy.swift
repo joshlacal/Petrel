@@ -131,7 +131,7 @@ actor CABOAuthStrategy: AuthStrategy {
               let stateToken = await core.extractState(from: url)
         else { throw AuthError.invalidCallbackURL }
 
-        let storage = await core.storage
+        let storage = core.storage
         guard let oauthState = try await storage.getOAuthState(for: stateToken) else {
             throw AuthError.invalidCallbackURL
         }
@@ -159,7 +159,7 @@ actor CABOAuthStrategy: AuthStrategy {
         guard let did = tokenResponse.sub else { throw AuthError.invalidResponse }
 
         // Resolve real PDS
-        let didResolver = await core.didResolver
+        let didResolver = core.didResolver
         let (handle, actualPDS) = try await didResolver.resolveDIDToHandleAndPDSURL(did: did)
 
         // Persist DPoP Key
@@ -178,7 +178,7 @@ actor CABOAuthStrategy: AuthStrategy {
         // Create/Update Account
         let account = Account(
             did: did,
-            handle: handle ?? oauthState.initialIdentifier,
+            handle: handle,
             pdsURL: actualPDS,
             protectedResourceMetadata: nil,
             authorizationServerMetadata: metadata,
@@ -187,10 +187,10 @@ actor CABOAuthStrategy: AuthStrategy {
         )
 
         try await storage.saveAccountAndSession(account, session: session, for: did)
-        let accountManager = await core.accountManager
+        let accountManager = core.accountManager
         try await accountManager.updateAccountFromStorage(did: did)
         try await accountManager.setCurrentAccount(did: did)
-        let networkService = await core.networkService
+        let networkService = core.networkService
         await networkService.setBaseURL(actualPDS)
 
         return (did: did, handle: account.handle, pdsURL: actualPDS)
@@ -206,10 +206,10 @@ actor CABOAuthStrategy: AuthStrategy {
     }
 
     func logout() async throws {
-        let accountManager = await core.accountManager
+        let accountManager = core.accountManager
         guard let did = await accountManager.getCurrentAccount()?.did else { return }
 
-        let storage = await core.storage
+        let storage = core.storage
         // Revoke token if possible
         if let session = try? await storage.getSession(for: did),
            let refreshToken = session.refreshToken,
@@ -286,7 +286,7 @@ actor CABOAuthStrategy: AuthStrategy {
         switch result {
         case .refreshedSuccessfully:
             let (newReq, _) = try await core.prepareAuthenticatedRequestWithContext(request)
-            let networkService = await core.networkService
+            let networkService = core.networkService
             let result = try await networkService.request(newReq)
             guard let http = result.1 as? HTTPURLResponse else { throw AuthError.invalidResponse }
             return (result.0, http)
@@ -317,7 +317,7 @@ actor CABOAuthStrategy: AuthStrategy {
         oauthStartInProgress = true
         defer { oauthStartInProgress = false }
 
-        let didResolver = await core.didResolver
+        let didResolver = core.didResolver
         let pdsURL: URL
         if let identifier {
             await emitProgress(.resolvingHandle(identifier))
@@ -337,7 +337,7 @@ actor CABOAuthStrategy: AuthStrategy {
         let stateToken = UUID().uuidString
         let ephemeralKey = P256.Signing.PrivateKey()
 
-        let oauthConfig = await core.oauthConfig
+        let oauthConfig = core.oauthConfig
 
         // Confidential clients authenticate at PAR too. Assertions are
         // single-use (the AS replay-checks jti), so this one is fetched fresh
@@ -370,7 +370,7 @@ actor CABOAuthStrategy: AuthStrategy {
             bskyAppViewDID: bskyAppViewDID,
             bskyChatDID: bskyChatDID
         )
-        let storage = await core.storage
+        let storage = core.storage
         try await storage.saveOAuthState(oauthState)
 
         guard var components = URLComponents(string: metadata.authorizationEndpoint) else {
@@ -493,7 +493,7 @@ actor CABOAuthStrategy: AuthStrategy {
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         request.timeoutInterval = 30.0
 
-        let oauthConfig = await core.oauthConfig
+        let oauthConfig = core.oauthConfig
         var params: [String: String] = [
             "grant_type": "authorization_code",
             "code": code,
@@ -544,7 +544,7 @@ actor CABOAuthStrategy: AuthStrategy {
         request.setValue(dpopProof, forHTTPHeaderField: "DPoP")
 
         do {
-            let networkService = await core.networkService
+            let networkService = core.networkService
             let (data, urlResponse) = try await networkService.request(request, skipTokenRefresh: true)
 
             guard let httpResponse = urlResponse as? HTTPURLResponse else {
@@ -647,7 +647,7 @@ actor CABOAuthStrategy: AuthStrategy {
     }
 
     private func performTokenRefresh(for did: String, session: Session) async throws -> (Data, HTTPURLResponse) {
-        let accountManager = await core.accountManager
+        let accountManager = core.accountManager
         guard let account = await accountManager.getAccount(did: did),
               let metadata = account.authorizationServerMetadata,
               let refreshToken = session.refreshToken
@@ -681,7 +681,7 @@ actor CABOAuthStrategy: AuthStrategy {
         )
         request.setValue(proof, forHTTPHeaderField: "DPoP")
 
-        let networkService = await core.networkService
+        let networkService = core.networkService
         let (data, response) = try await networkService.request(request, skipTokenRefresh: true)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw AuthError.invalidResponse

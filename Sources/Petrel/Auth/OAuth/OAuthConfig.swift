@@ -33,6 +33,8 @@ public struct OAuthConfig: Sendable {
     ///   - clientId: The client ID.
     ///   - redirectUri: The redirect URI.
     ///   - scope: The scope of access.
+    ///   - requireIssInCallback: Whether callbacks must include the authorization server issuer when supported.
+    ///   - enforcePDSAuthorizationBinding: Whether the resolved PDS must authorize the server used for the flow.
     public init(
         clientId: String,
         redirectUri: String,
