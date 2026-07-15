@@ -161,6 +161,7 @@ public actor ATProtoClient {
     ///   - didResolver: Optional custom DID resolver implementation.
     ///   - bskyAppViewDID: Optional custom Bluesky AppView service DID (default: did:web:api.bsky.app#bsky_appview).
     ///   - bskyChatDID: Optional custom Bluesky Chat service DID (default: did:web:api.bsky.chat#bsky_chat).
+    ///   - accessGroup: Optional keychain access group used for credential storage.
     public init(
         baseURL: URL = ATProtoClient.defaultBaseURL,
         oauthConfig: OAuthConfig,
