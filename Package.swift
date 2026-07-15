@@ -67,5 +67,9 @@ let package = Package(
             name: "PetrelTests",
             dependencies: ["Petrel"]
         ),
+        .testTarget(
+            name: "PetrelLoadTests",
+            dependencies: ["PetrelLoad"]
+        ),
     ]
 )

@@ -1,116 +1,223 @@
 import Foundation
 import Petrel
 
+actor AuthEventJSONLWriter {
+    nonisolated let appendOffset: UInt64
+    private let handle: FileHandle
+
+    init(fileURL: URL) throws {
+        let openedHandle = try FileHandle(forWritingTo: fileURL)
+        handle = openedHandle
+        appendOffset = try openedHandle.seekToEnd()
+    }
+
+    deinit {
+        try? handle.close()
+    }
+
+    func write(_ event: AuthEvent) throws {
+        let record: [String: Any] = [
+            "event": String(describing: event),
+            "ts": Int(Date().timeIntervalSince1970),
+        ]
+        var data = try JSONSerialization.data(withJSONObject: record)
+        data.append(0x0A)
+        try handle.write(contentsOf: data)
+    }
+}
+
 enum PetrelLoadCLI {
+    enum ArgumentError: Error, Equatable, CustomStringConvertible {
+        case invalidValue(option: String, value: String)
+        case missingValue(String)
+        case unexpectedArgument(String)
+        case unknownOption(String)
+
+        var description: String {
+            switch self {
+            case let .invalidValue(option, value):
+                "Unsupported value for --\(option): \(value)"
+            case let .missingValue(option):
+                "Missing value for --\(option)"
+            case let .unexpectedArgument(argument):
+                "Unexpected argument: \(argument)"
+            case let .unknownOption(option):
+                "Unknown option: --\(option)"
+            }
+        }
+    }
+
+    static let usage = """
+    Usage: PetrelLoad --namespace <keychain-namespace> --endpoint <xrpc endpoint> [options]
+
+    Required:
+      --namespace    Keychain namespace used by your app (e.g., com.your.app)
+      --endpoint     Supported XRPC endpoint used by the load scenario
+
+    Basic Options:
+      --base-url     Base PDS URL (defaults to stored account's PDS URL)
+      --requests     Total number of requests. Default: 100
+      --concurrency  Concurrent workers. Default: 10
+      --unauth       Use the lightweight unauthenticated client
+      --keep-running Continuously loop the test until terminated
+
+    Logging:
+      --log-file     Append typed authentication events as JSONL
+
+    OAuth Helpers:
+      --oauth-start              Start an OAuth flow
+      --identifier <handle>      Optional handle for --oauth-start
+      --oauth-complete <URL>     Complete OAuth with the callback URL
+
+    OAuth Stress Testing:
+      --oauth-stress                   Run the implemented OAuth stress sequence
+      --oauth-test <scenario>          dpop_nonce_thrash, token_refresh_race,
+                                       or dpop_validation
+      --dpop-test <mode>               compliance, nonce-test, or refresh-test
+      --simulate-ambiguous-timeout     Exercise ambiguous refresh timeout handling
+
+    Examples:
+      PetrelLoad --namespace com.example.petrel --endpoint app.bsky.feed.getTimeline --requests 500 --concurrency 25
+      PetrelLoad --namespace com.example.petrel --endpoint app.bsky.actor.getProfile --oauth-start --identifier alice.bsky.social
+      PetrelLoad --namespace com.example.petrel --endpoint app.bsky.feed.getTimeline --oauth-test dpop_nonce_thrash --requests 200
+      PetrelLoad --namespace com.example.petrel --endpoint app.bsky.actor.getProfile --dpop-test compliance
+    """
+
+    private static let valueOptions: Set<String> = [
+        "base-url",
+        "concurrency",
+        "dpop-test",
+        "endpoint",
+        "identifier",
+        "log-file",
+        "namespace",
+        "oauth-complete",
+        "oauth-test",
+        "requests",
+    ]
+
+    private static let flagOptions: Set<String> = [
+        "keep-running",
+        "oauth-start",
+        "oauth-stress",
+        "simulate-ambiguous-timeout",
+        "unauth",
+    ]
+
+    private static let supportedEndpoints: Set<String> = [
+        "app.bsky.actor.getProfile",
+        "app.bsky.feed.getTimeline",
+    ]
+
+    private static let oauthTestScenarios: Set<String> = [
+        "dpop_nonce_thrash",
+        "dpop_validation",
+        "token_refresh_race",
+    ]
+
+    private static let dpopTestModes: Set<String> = [
+        "compliance",
+        "nonce-test",
+        "refresh-test",
+    ]
+
     static func printUsageAndExit() -> Never {
-        let usage = """
-        Usage: PetrelLoad --namespace <keychain-namespace> --endpoint <xrpc endpoint or URL> [options]
-
-        Required:
-          --namespace    Keychain namespace used by your app (e.g., com.your.app)
-          --endpoint     XRPC endpoint (e.g., com.atproto.server.getSession) or absolute URL
-
-        Basic Options:
-          --base-url     Base PDS URL (defaults to stored account's PDS URL)
-          --method       HTTP method (GET|POST). Default: GET
-          --requests     Total number of requests. Default: 100
-          --concurrency  Concurrent workers. Default: 10
-          --body         JSON string body for POST
-          --unauth       Send without auth/DPoP (for baseline)
-          --timeout      Per-request timeout seconds. Default: 30
-          --keep-running Continuously loop the test until terminated
-          --target-rps   Target requests per second (best-effort)
-
-        Logging:
-          --log-file     Append JSONL logs to this file (incidents + warnings/errors)
-          --incident-only  Only write AUTH_INCIDENT lines to log file
-
-        OAuth Stress Testing:
-          --oauth-stress              Run OAuth stress test suite
-          --oauth-test <scenario>     Run specific OAuth test scenario:
-                                       dpop_nonce_thrash, token_refresh_race,
-                                       account_switch_storm, audience_mismatch,
-                                       pkce_replay, rate_limit_compliance,
-                                       resource_indicator, clock_skew_test
-          --force-refresh-interval    Force token refresh every N seconds
-          --simulate-expiry           Artificially expire tokens to test refresh
-          --dpop-test <mode>          DPoP-specific test modes:
-                                       replay-jti, wrong-ath, clock-skew,
-                                       stale-nonce, malformed-proof, compliance,
-                                       nonce-exhaustion
-          --simulate-ambiguous-timeout  Simulate a token-endpoint timeout and verify defer logic
-          --burst-size               Requests per burst for rate limit testing. Default: 50
-          --burst-delay              Delay between bursts in seconds. Default: 0.1
-          --multi-account            Test with multiple accounts (requires 2+ stored accounts)
-
-        Examples:
-          PetrelLoad --namespace com.example.petrel --endpoint app.bsky.feed.getTimeline --requests 500 --concurrency 25
-          PetrelLoad --namespace com.example.petrel --endpoint app.bsky.actor.getProfile --oauth-stress
-          PetrelLoad --namespace com.example.petrel --endpoint app.bsky.feed.getTimeline --oauth-test dpop_nonce_thrash --requests 200
-          PetrelLoad --namespace com.example.petrel --endpoint app.bsky.actor.getProfile --dpop-test replay-jti
-        """
         fputs(usage + "\n", stderr)
         exit(2)
     }
 
-    static func parseArgs() -> [String: String] {
+    static func parseArgs(_ argv: [String] = CommandLine.arguments) throws -> [String: String] {
         var args: [String: String] = [:]
         var i = 1
-        let argv = CommandLine.arguments
         while i < argv.count {
             let key = argv[i]
-            if key.hasPrefix("--") {
-                let name = String(key.dropFirst(2))
-                if i + 1 < argv.count, !argv[i + 1].hasPrefix("--") {
-                    args[name] = argv[i + 1]
-                    i += 2
-                } else {
-                    args[name] = "true"
-                    i += 1
-                }
-            } else {
+            guard key.hasPrefix("--"), key.count > 2 else {
+                throw ArgumentError.unexpectedArgument(key)
+            }
+
+            let name = String(key.dropFirst(2))
+            if flagOptions.contains(name) {
+                args[name] = "true"
                 i += 1
+            } else if valueOptions.contains(name) {
+                guard i + 1 < argv.count, !argv[i + 1].hasPrefix("--") else {
+                    throw ArgumentError.missingValue(name)
+                }
+                args[name] = argv[i + 1]
+                i += 2
+            } else {
+                throw ArgumentError.unknownOption(name)
             }
         }
+        try validateOptionValues(args)
         return args
     }
 
+    private static func validateOptionValues(_ args: [String: String]) throws {
+        for option in ["requests", "concurrency"] {
+            if let rawValue = args[option] {
+                guard let value = Int(rawValue), value > 0 else {
+                    throw ArgumentError.invalidValue(option: option, value: rawValue)
+                }
+            }
+        }
+        if let endpoint = args["endpoint"], !supportedEndpoints.contains(endpoint) {
+            throw ArgumentError.invalidValue(option: "endpoint", value: endpoint)
+        }
+        if let scenario = args["oauth-test"], !oauthTestScenarios.contains(scenario) {
+            throw ArgumentError.invalidValue(option: "oauth-test", value: scenario)
+        }
+        if let mode = args["dpop-test"], !dpopTestModes.contains(mode) {
+            throw ArgumentError.invalidValue(option: "dpop-test", value: mode)
+        }
+    }
+
+    static func requestDistribution(total: Int, concurrency: Int) -> [Int] {
+        precondition(total > 0)
+        precondition(concurrency > 0)
+
+        let workerCount = min(total, concurrency)
+        let quotient = total / workerCount
+        let remainder = total % workerCount
+        return (0 ..< workerCount).map { workerIndex in
+            quotient + (workerIndex < remainder ? 1 : 0)
+        }
+    }
+
     static func main() async {
-        let args = parseArgs()
+        let args: [String: String]
+        do {
+            args = try parseArgs()
+        } catch {
+            fputs("Argument error: \(error)\n", stderr)
+            printUsageAndExit()
+        }
+
         guard let namespace = args["namespace"], let endpoint = args["endpoint"] else {
             printUsageAndExit()
         }
 
-        let method = (args["method"] ?? "GET").uppercased()
-        let total = Int(args["requests"] ?? "100") ?? 100
-        let concurrency = max(1, Int(args["concurrency"] ?? "10") ?? 10)
+        guard let total = Int(args["requests"] ?? "100"),
+              let concurrency = Int(args["concurrency"] ?? "10")
+        else {
+            preconditionFailure("Validated numeric options became invalid")
+        }
         let unauth = (args["unauth"] ?? "false").lowercased() == "true"
-        let respectRateLimits = (args["no-rate-limit"] ?? "false").lowercased() != "true"
-        let timeout = TimeInterval(args["timeout"] ?? "30") ?? 30
-        let bodyString = args["body"]
-        let targetRps = Double(args["target-rps"] ?? "0") ?? 0
         let keepRunning = (args["keep-running"] ?? "false").lowercased() == "true"
         let logFilePath = args["log-file"]
-        let incidentOnly = (args["incident-only"] ?? "false").lowercased() == "true"
 
         // OAuth stress testing options
         let oauthStressMode = (args["oauth-stress"] ?? "false").lowercased() == "true"
         let oauthTestScenario = args["oauth-test"]
         let dpopTestMode = args["dpop-test"]
         let simulateAmbiguous = (args["simulate-ambiguous-timeout"] ?? "false").lowercased() == "true"
-        _ = TimeInterval(args["force-refresh-interval"] ?? "0") ?? 0
-        _ = (args["simulate-expiry"] ?? "false").lowercased() == "true"
-        _ = Int(args["burst-size"] ?? "50") ?? 50
-        _ = TimeInterval(args["burst-delay"] ?? "0.1") ?? 0.1
-        _ = (args["multi-account"] ?? "false").lowercased() == "true"
 
         // Determine base URL for initial setup
-        var baseURL: URL
-        if let explicit = args["base-url"], let url = URL(string: explicit) {
-            baseURL = url
+        var baseURL: URL = if let explicit = args["base-url"], let url = URL(string: explicit) {
+            url
         } else {
             // Default to bsky.social for OAuth flows and general usage
-            baseURL = URL(string: "https://bsky.social")!
+            URL(string: "https://bsky.social")!
         }
 
         // OAuth config for ATProto development with ngrok-exposed client metadata
@@ -120,47 +227,42 @@ enum PetrelLoadCLI {
             scope: "atproto transition:generic"
         )
 
-        // Initialize ATProtoClient with proper configuration
-        let client = try! await ATProtoClient(
-            baseURL: baseURL,
-            oauthConfig: oauthConfig,
-            namespace: namespace
-        )
+        // Initialize the exact client mode requested by the caller.
+        let client: ATProtoClient = if unauth {
+            await ATProtoClient(baseURL: baseURL)
+        } else {
+            try! await ATProtoClient(
+                baseURL: baseURL,
+                oauthConfig: oauthConfig,
+                namespace: namespace
+            )
+        }
 
         // Setup log forwarder if requested
         if let logFilePath, !logFilePath.isEmpty {
             let fileURL = URL(fileURLWithPath: logFilePath)
-            // Ensure directory exists
-            try? FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-            if !FileManager.default.fileExists(atPath: fileURL.path) {
-                FileManager.default.createFile(atPath: fileURL.path, contents: nil)
-            }
-            if let handle = try? FileHandle(forWritingTo: fileURL) {
-                try? handle.seekToEnd()
-                PetrelLog.addObserver { event in
-                    // Filter if incident-only
-                    if incidentOnly, !event.message.contains("AUTH_INCIDENT") {
-                        return
+            do {
+                try FileManager.default.createDirectory(
+                    at: fileURL.deletingLastPathComponent(),
+                    withIntermediateDirectories: true
+                )
+                if !FileManager.default.fileExists(atPath: fileURL.path) {
+                    guard FileManager.default.createFile(atPath: fileURL.path, contents: nil) else {
+                        throw CocoaError(.fileWriteUnknown)
                     }
-                    let ts = Int(Date().timeIntervalSince1970)
-                    let line = [
-                        "ts": ts,
-                        "level": String(describing: event.level),
-                        "category": String(describing: event.category),
-                        "msg": event.message,
-                    ] as [String: Any]
-                    let data: Data
-                    if JSONSerialization.isValidJSONObject(line), let d = try? JSONSerialization.data(withJSONObject: line, options: []) {
-                        data = d
-                    } else {
-                        data = ("{\"ts\":\(ts),\"msg\":\"" + event.message.replacingOccurrences(of: "\"", with: "\\\"") + "\"}\n").data(using: .utf8) ?? Data()
-                    }
-                    try? handle.write(contentsOf: data)
-                    try? handle.write(contentsOf: "\n".data(using: .utf8)!)
                 }
-                print("✓ Logging Petrel events to \(fileURL.path) (incidentOnly=\(incidentOnly))")
-            } else {
-                fputs("WARN: Failed to open log file: \(logFilePath)\n", stderr)
+
+                let writer = try AuthEventJSONLWriter(fileURL: fileURL)
+                PetrelAuthEvents.addObserver { event in
+                    do {
+                        try await writer.write(event)
+                    } catch {
+                        print("WARN: Failed to append auth event: \(error)")
+                    }
+                }
+                print("✓ Logging typed auth events to \(fileURL.path) from byte \(writer.appendOffset)")
+            } catch {
+                fputs("WARN: Failed to open log file \(logFilePath): \(error)\n", stderr)
             }
         }
 
@@ -168,6 +270,7 @@ enum PetrelLoadCLI {
         print("DEBUG - After ATProtoClient initialization:")
         let (initDid, initHandle, initPdsURL) = await client.getActiveAccountInfo()
         print("  Account found: \(initDid != nil)")
+        print("  Handle: \(initHandle ?? "nil")")
         print("  PDS URL from account: \(initPdsURL?.absoluteString ?? "nil")")
         print("  Initial base URL: \(baseURL)")
 
@@ -222,7 +325,7 @@ enum PetrelLoadCLI {
 
                 // Show account info and test if base URL was switched
                 let (did, handle, pdsURL) = await client.getActiveAccountInfo()
-                if let did = did, let handle = handle, let pdsURL = pdsURL {
+                if let did, let handle, let pdsURL {
                     print("✓ Authenticated as: \(handle)")
                     print("✓ DID: \(did)")
                     print("✓ PDS: \(pdsURL)")
@@ -249,7 +352,7 @@ enum PetrelLoadCLI {
         }
 
         // OAuth stress testing modes
-        if oauthStressMode || oauthTestScenario != nil || dpopTestMode != nil {
+        if oauthStressMode || oauthTestScenario != nil || dpopTestMode != nil || simulateAmbiguous {
             if unauth {
                 fputs("Cannot run OAuth stress tests with --unauth flag.\n", stderr)
                 exit(1)
@@ -397,16 +500,19 @@ func runBasicStressTest(client: ATProtoClient, endpoint: String, iterations: Int
     let startTime = Date()
 
     let results = await withTaskGroup(of: WorkerResult.self) { group in
-        let iterationsPerWorker = iterations / concurrency
+        let requestDistribution = PetrelLoadCLI.requestDistribution(
+            total: iterations,
+            concurrency: concurrency
+        )
 
-        for workerIndex in 0 ..< concurrency {
+        for (workerIndex, workerIterations) in requestDistribution.enumerated() {
             group.addTask {
                 var workerSuccesses = 0
                 var workerFailures = 0
                 var workerLatencies: [TimeInterval] = []
                 var sampleError: String? = nil
 
-                for iteration in 0 ..< iterationsPerWorker {
+                for iteration in 0 ..< workerIterations {
                     let requestStart = Date()
 
                     do {
@@ -453,11 +559,11 @@ func runBasicStressTest(client: ATProtoClient, endpoint: String, iterations: Int
     let totalTime = Date().timeIntervalSince(startTime)
     let successes = results.reduce(0) { $0 + $1.successes }
     let failures = results.reduce(0) { $0 + $1.failures }
-    let latencies = results.flatMap { $0.latencies }
+    let latencies = results.flatMap(\.latencies)
     let totalRequests = successes + failures
     let rps = Double(totalRequests) / totalTime
 
-    if let firstError = results.compactMap({ $0.sampleError }).first {
+    if let firstError = results.compactMap(\.sampleError).first {
         print(firstError)
     }
 
