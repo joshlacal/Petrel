@@ -5,6 +5,7 @@ import Testing
 @Suite("Petrel 0.2.0 compatibility")
 struct Petrel020CompatibilityTests {
     @Test("Legacy generated initializers preserve the new fields as nil")
+    @available(*, deprecated, message: "Exercises Petrel 0.2.0 compatibility initializers")
     func legacyGeneratedInitializers() throws {
         let config = AppBskyAgeassuranceDefs.ConfigRegion(
             countryCode: "US",
