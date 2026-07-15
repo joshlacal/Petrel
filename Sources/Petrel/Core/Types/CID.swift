@@ -38,9 +38,15 @@ public enum DAGCBORError: Error {
 
 // MARK: - ================== CIDAsLink Wrapper ==================
 
-/// Wrapper struct to indicate when a CID should use Tag 42 encoding
+/// Carries a CID's string-vs-link wire representation through CBOR conversion.
 struct CIDAsLink {
+    enum Representation {
+        case link
+        case string
+    }
+
     let cid: CID
+    let representation: Representation
 }
 
 // MARK: - ================== CID Implementation ==================
@@ -187,12 +193,16 @@ public struct ATProtoLink: Codable, ATProtocolCodable, Hashable, Equatable, Send
     /// - When used in a data model like StrongRef, it should encode as a simple string
     /// - When used through ATProtoLink, it needs Tag 42 encoding
     public func toCBORValue() throws -> Any {
-        return CIDAsLink(cid: cid) // Use the wrapper to signal Tag 42 encoding
+        return CIDAsLink(cid: cid, representation: .link)
     }
 }
 
 /// Content Identifier (CID) implementation for AT Protocol (v1, SHA-256)
 public struct CID: Equatable, Hashable, Codable, CustomStringConvertible, ATProtocolValue {
+    private enum CodingKeys: String, CodingKey {
+        case link = "$link"
+    }
+
     static let version: UInt8 = 0x01
     public let codec: CIDCodec
     public let multihash: Multihash
@@ -326,8 +336,15 @@ public struct CID: Equatable, Hashable, Codable, CustomStringConvertible, ATProt
 
     /// --- Codable Conformance ---
     public init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        let cidString = try container.decode(String.self)
+        if let container = try? decoder.singleValueContainer(),
+           let cidString = try? container.decode(String.self)
+        {
+            self = try CID.parse(cidString)
+            return
+        }
+
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let cidString = try container.decode(String.self, forKey: .link)
         self = try CID.parse(cidString)
     }
 
@@ -343,11 +360,10 @@ public struct CID: Equatable, Hashable, Codable, CustomStringConvertible, ATProt
     }
 
     /// --- DAGCBOREncodable Conformance ---
-    /// **IMPORTANT:** For DAG-CBOR, a CID struct itself signals it should be encoded
-    /// using Tag 42 *when it's the value being processed* (e.g., returned by ATProtoLink.toCBORValue).
-    /// It should NOT be encoded this way when it's just a string value within another structure (like StrongRef).
+    /// Lexicon `format: cid` values remain CBOR strings. `ATProtoLink` selects
+    /// the distinct Tag 42 representation used by Lexicon `cid-link` values.
     public func toCBORValue() throws -> Any {
-        return CIDAsLink(cid: self) // Use Tag 42 encoding for all CID contexts
+        return CIDAsLink(cid: self, representation: .string)
     }
 }
 
@@ -368,21 +384,56 @@ public class DAGCBOR {
         //    and StrongRef -> OrderedMap -> CBOR.map(string_keys, string_cid_value)
         let cborItem = try convertToCBORItem(value)
 
-        // 2. Encode the CBOR enum representation into bytes.
-        //    Use the canonical map encoder for maps, otherwise use SwiftCBOR's encoder.
-        if case let .map(dict) = cborItem {
-            // Ensure dictionary is [CBOR: CBOR] as expected by encodeCanonicalMap
-            guard let cborMap = dict as? [CBOR: CBOR] else {
-                throw DAGCBORError.encodingFailed("Internal error: Map conversion failed.")
+        // 2. Canonically encode the typed CBOR tree without decoding it back to
+        //    Swift values. This preserves the distinction between string-format
+        //    CIDs and Tag 42 cid-links at every nesting level.
+        return try encodeCanonicalCBORItem(cborItem)
+    }
+
+    private static func encodeCanonicalCBORItem(_ item: CBOR) throws -> Data {
+        switch item {
+        case let .map(map):
+            return try encodeCanonicalMap(map)
+        case let .array(array):
+            var result = encodeMajorTypeHeader(majorType: 4, argument: UInt64(array.count))
+            for nestedItem in array {
+                try result.append(encodeCanonicalCBORItem(nestedItem))
             }
-            return try encodeCanonicalMap(cborMap)
-        } else {
-            // For non-maps (strings, ints, arrays, TAGGED CIDs), use SwiftCBOR's encode.
-            // Assuming SwiftCBOR encodes these canonically (especially tags).
-            let options = CBOROptions() // Use defaults - SwiftCBOR should handle minimal encoding
-            let bytes = CBOR.encode(cborItem, options: options) // Use SwiftCBOR's encoding for primitives and tags
-            return Data(bytes)
+            return result
+        case let .tagged(tag, nestedItem):
+            var result = encodeMajorTypeHeader(majorType: 6, argument: tag.rawValue)
+            try result.append(encodeCanonicalCBORItem(nestedItem))
+            return result
+        default:
+            return Data(item.encode(options: CBOROptions()))
         }
+    }
+
+    private static func encodeMajorTypeHeader(majorType: UInt8, argument: UInt64) -> Data {
+        let prefix = majorType << 5
+        var result = Data()
+
+        switch argument {
+        case 0 ..< 24:
+            result.append(prefix | UInt8(argument))
+        case 24 ... UInt64(UInt8.max):
+            result.append(prefix | 24)
+            result.append(UInt8(argument))
+        case (UInt64(UInt8.max) + 1) ... UInt64(UInt16.max):
+            result.append(prefix | 25)
+            var value = UInt16(argument).bigEndian
+            result.append(Data(bytes: &value, count: MemoryLayout<UInt16>.size))
+        case (UInt64(UInt16.max) + 1) ... UInt64(UInt32.max):
+            result.append(prefix | 26)
+            var value = UInt32(argument).bigEndian
+            result.append(Data(bytes: &value, count: MemoryLayout<UInt32>.size))
+        default:
+            result.append(prefix | 27)
+            var value = argument.bigEndian
+            result.append(Data(bytes: &value, count: MemoryLayout<UInt64>.size))
+        }
+
+        return result
     }
 
     /// --- Canonical Map Encoding ---
@@ -404,53 +455,17 @@ public class DAGCBOR {
             return a.utf8Bytes.lexicographicallyPrecedes(b.utf8Bytes)
         }
 
-        // 3. Create map header (using minimal encoding based on count)
-        var result = Data()
-        let count = map.count
-        let mapHeaderBase: UInt8 = 0xA0 // Map type indicator
+        // 3. Create a minimal map header.
+        var result = encodeMajorTypeHeader(majorType: 5, argument: UInt64(map.count))
 
-        // Use Int values corresponding to max boundaries for comparison
-        let uInt8MaxAsInt = Int(UInt8.max) // 255
-        let uInt16MaxAsInt = Int(UInt16.max) // 65535
-        let uInt32MaxAsInt = Int(UInt32.max) // 4294967295
-
-        switch count {
-        case 0 ..< 24:
-            result.append(mapHeaderBase + UInt8(count)) // Map(0-23)
-        case 24 ... uInt8MaxAsInt: // Use Int range check
-            result.append(0xB8) // Map(1) - Major type 5, add info 24
-            result.append(UInt8(count))
-        case (uInt8MaxAsInt + 1) ... uInt16MaxAsInt: // Use Int range check
-            result.append(0xB9) // Map(2) - Major type 5, add info 25
-            var countBE = UInt16(count).bigEndian
-            result.append(Data(bytes: &countBE, count: MemoryLayout<UInt16>.size))
-        case (uInt16MaxAsInt + 1) ... uInt32MaxAsInt: // Use Int range check
-            result.append(0xBA) // Map(4) - Major type 5, add info 26
-            var countBE = UInt32(count).bigEndian
-            result.append(Data(bytes: &countBE, count: MemoryLayout<UInt32>.size))
-        default: // Count exceeds UInt32.max, up to UInt64.max
-            // Check if count fits in UInt64 before proceeding
-            guard count >= 0 else { // Should not happen for map.count but good practice
-                throw DAGCBORError.encodingFailed("Invalid map count")
-            }
-            result.append(0xBB) // Map(8) - Major type 5, add info 27
-            var countBE = UInt64(count).bigEndian
-            result.append(Data(bytes: &countBE, count: MemoryLayout<UInt64>.size))
-        }
-
-        // 4. Add sorted key-value pairs, using recursive encodeValue for values
+        // 4. Add sorted key-value pairs while preserving their typed CBOR values.
         let keyEncodingOptions = CBOROptions() // Defaults for simple string keys
         for pair in keyPairs {
             // Encode the key (always a UTF8 string here)
             let keyBytes = pair.key.encode(options: keyEncodingOptions)
             result.append(contentsOf: keyBytes)
 
-            // **CRITICAL:** Recursively call `encodeValue` for the value.
-            // This ensures nested maps use this canonical encoder, and non-maps
-            // (including tagged CIDs) are handled by the main `encodeValue` logic,
-            // which ultimately uses `SwiftCBOR.CBOR.encode`.
-            let valueAny = try decodeCBORItem(pair.value) // Convert CBOR enum back to intermediate Swift type (needed for encodeValue)
-            let valueBytes = try encodeValue(valueAny) // Let encodeValue handle recursion / final encoding of the value
+            let valueBytes = try encodeCanonicalCBORItem(pair.value)
             result.append(contentsOf: valueBytes)
         }
         return result
@@ -462,12 +477,15 @@ public class DAGCBOR {
         // Handle ATProtoLink by using its toCBORValue method
         case let link as ATProtoLink:
             return try convertToCBORItem(link.toCBORValue())
-        // NEW CASE: Handle the CIDAsLink wrapper - this is the Tag 42 path
-        case let cidLink as CIDAsLink:
-            return try encodeCIDLinkForCBOR(cidLink.cid)
-        // CID struct now encodes as a string by default
+        case let cidValue as CIDAsLink:
+            switch cidValue.representation {
+            case .link:
+                return try encodeCIDLinkForCBOR(cidValue.cid)
+            case .string:
+                return .utf8String(cidValue.cid.string)
+            }
         case let cid as CID:
-            return CBOR.utf8String(cid.string)
+            return .utf8String(cid.string)
         // Other cases remain the same...
         case let orderedMap as OrderedCBORMap:
             var cborDict = [CBOR: CBOR]()
@@ -545,7 +563,13 @@ public class DAGCBOR {
         switch item {
         case let .utf8String(string): return string
         case let .unsignedInt(uint): return uint // Consider conversion to Int if needed
-        case let .negativeInt(uint): return -Int64(uint) - 1
+        case let .negativeInt(argument):
+            guard argument <= UInt64(Int64.max) else {
+                throw DAGCBORError.decodingFailed(
+                    "CBOR negative integer argument exceeds the Int64 decoding boundary"
+                )
+            }
+            return -Int64(argument) - 1
         case let .boolean(bool): return bool
         case let .array(array): return try array.map { try decodeCBORItem($0) }
         case let .map(dict):
@@ -556,7 +580,7 @@ public class DAGCBOR {
             }
             return decodedDict
         case let .byteString(bytes): return Data(bytes)
-        case .null: return nil as Any?
+        case .null: return NSNull()
         case let .tagged(tag, value):
             if tag.rawValue == cidTagValue {
                 guard case let .byteString(bytes) = value, bytes.count > 0, bytes[0] == 0x00 else {
@@ -605,31 +629,7 @@ public extension DAGCBORDecodable where Self: Decodable {
             throw DAGCBORError.decodingFailed("Failed to decode CBOR data. Data: \(data.hexDump())")
         }
         let intermediateValue = try DAGCBOR.decodeCBORItem(cborItem)
-
-        // Attempt to convert intermediate Swift type back to JSON Data
-        let jsonData: Data
-        if JSONSerialization.isValidJSONObject(intermediateValue) {
-            // Handles cases where intermediateValue is [String: Any] or [Any]
-            jsonData = try JSONSerialization.data(withJSONObject: intermediateValue, options: [])
-        } else {
-            // Check if the primitive value itself conforms to Encodable
-            if let encodablePrimitive = intermediateValue as? Encodable {
-                // This covers String, Int, UInt, Bool, Double, potentially Data if needed, etc.
-                // It also correctly handles Optional<Encodable>.none (nil)
-                jsonData = try JSONEncoder().encode(encodablePrimitive)
-            }
-            // else if intermediateValue == nil { // Handled by Optional<Encodable> above
-            //    jsonData = Data("null".utf8) // Explicitly handle null if necessary
-            // }
-            else {
-                // If it's not a valid JSON object/array and not directly Encodable, we can't use JSONDecoder
-                throw DAGCBORError.decodingFailed(
-                    "Decoded CBOR root value cannot be represented as JSON for Decodable conformance. Value Type: \(type(of: intermediateValue))"
-                )
-            }
-        }
-
-        // Use JSONDecoder to decode the target Decodable type from the JSON data
+        let jsonData = try DAGCBORJSONBridge.jsonData(from: intermediateValue)
         return try JSONDecoder().decode(Self.self, from: jsonData)
     }
 }
