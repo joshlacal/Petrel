@@ -255,11 +255,14 @@ class SwiftCodeGenerator:
                             sub_conformance = ": ATProtocolCodable, ATProtocolValue"
                             sub_properties = self.generate_properties(value.get('properties', {}), value.get('required', []), convert_to_camel_case(key))
                             sub_structs[convert_to_camel_case(key)] = {
+                                'wire_fragment': key,
                                 'properties': sub_properties, 
                                 'conformance': sub_conformance
                             }
                 
-                lex_definitions[convert_to_camel_case(name)] = {
+                swift_name = convert_to_camel_case(name)
+                lex_definitions[swift_name] = {
+                    'wire_fragment': name,
                     'properties': properties, 
                     'conformance': conformance,
                     'sub_structs': sub_structs
@@ -274,6 +277,7 @@ class SwiftCodeGenerator:
                     'optional': False
                 }]
                 lex_definitions[union_array_name] = {
+                    'wire_fragment': name,
                     'properties': properties,
                     'conformance': ': ATProtocolCodable, ATProtocolValue',
                     'sub_structs': {}
