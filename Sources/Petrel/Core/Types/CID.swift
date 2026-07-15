@@ -541,7 +541,7 @@ public class DAGCBOR {
         // Handle Arrays
         case let array as [Any]:
             var cborArray = [CBOR]()
-            for (index, item) in array.enumerated() {
+            for item in array {
                 try cborArray.append(convertToCBORItem(item)) // Recursive call
             }
             return .array(cborArray)
@@ -720,7 +720,7 @@ public func base32Decode(_ string: String) -> Data? {
     var bits = 0
     var value: UInt32 = 0
 
-    for (index, charCode) in lowercasedString.utf8.enumerated() {
+    for charCode in lowercasedString.utf8 {
         guard let charValue = base32Lookup[charCode] else {
             return nil // Invalid character
         }

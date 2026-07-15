@@ -18,7 +18,7 @@
     ///
     /// The handler uses the logger's label as the subsystem for `os.Logger`, allowing for fine-grained
     /// filtering in Console.app and other log viewing tools.
-    public struct OSLogHandler: LogHandler {
+    public struct OSLogHandler: Logging.LogHandler {
         /// The underlying os.Logger instance
         private let osLogger: os.Logger
 

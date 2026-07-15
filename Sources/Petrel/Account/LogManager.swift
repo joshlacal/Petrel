@@ -351,7 +351,7 @@ public class LogManager {
     }
 
     /// Converts incident type string to strongly-typed AuthEvent
-    private static func convertToAuthEvent(type: String, details: [String: Any]) -> AuthEvent {
+    static func convertToAuthEvent(type: String, details: [String: Any]) -> AuthEvent {
         let did = details["did"] as? String ?? ""
         let previousDid = details["previousDid"] as? String
         let newDid = details["newDid"] as? String
@@ -375,7 +375,7 @@ public class LogManager {
         case "StartupRecovery_StateHealthy":
             return .startupStateHealthy(did: did)
         // Account Switching Events
-        case "AccountAutoSwitchAfterRemoval", "AccountAutoSwitchedAfterLogout":
+        case "AccountAutoSwitchAfterRemoval":
             return .accountAutoSwitched(previousDid: previousDid ?? did, newDid: newDid, reason: reason)
         case "CurrentAccountChanged":
             return .currentAccountChanged(previousDid: previousDid, newDid: did)

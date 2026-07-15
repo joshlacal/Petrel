@@ -2275,7 +2275,8 @@ public actor NetworkService: NetworkServiceProtocol {
                         0,
                         NI_NUMERICHOST
                     ) == 0 {
-                        let ip = String(cString: hostBuffer)
+                        let bytes = hostBuffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }
+                        let ip = String(decoding: bytes, as: UTF8.self)
                         results.append(ip)
                     }
                 }

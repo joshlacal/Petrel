@@ -35,7 +35,7 @@ public enum ATProtoWebSocketFrameDecoder {
         }
 
         if op == UInt64(bitPattern: -1) {
-            let headerData = try headerCBOR.encode()
+            let headerData = headerCBOR.encode()
             offset += headerData.count
 
             let payloadData = data[offset...]
@@ -60,7 +60,7 @@ public enum ATProtoWebSocketFrameDecoder {
             throw NetworkError.invalidResponse(description: "Missing message type in header")
         }
 
-        let headerData = try headerCBOR.encode()
+        let headerData = headerCBOR.encode()
         offset += headerData.count
 
         guard offset < data.count else {

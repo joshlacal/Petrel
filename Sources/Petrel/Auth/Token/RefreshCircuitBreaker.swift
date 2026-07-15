@@ -80,7 +80,7 @@ actor RefreshCircuitBreaker {
                     // Run cleanup every 10 minutes
                     try? await Task.sleep(nanoseconds: 600_000_000_000)
 
-                    await cleanupStaleRecords()
+                    cleanupStaleRecords()
                 }
             }
         }

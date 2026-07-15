@@ -74,7 +74,7 @@ actor RequestDeduplicator {
                     // Wait 30 seconds between cleanup runs
                     try? await Task.sleep(nanoseconds: 30_000_000_000)
 
-                    await cleanupExpiredRequests()
+                    cleanupExpiredRequests()
                 }
             }
         }
@@ -103,11 +103,11 @@ actor RequestDeduplicator {
             do {
                 let result = try await work()
                 // Remove from in-flight map after completion
-                await self.removeInFlightRequest(for: key)
+                self.removeInFlightRequest(for: key)
                 return result
             } catch {
                 // Remove from in-flight map after failure
-                await self.removeInFlightRequest(for: key)
+                self.removeInFlightRequest(for: key)
                 throw error
             }
         }

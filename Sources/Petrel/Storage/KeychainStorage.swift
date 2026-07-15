@@ -453,12 +453,12 @@ public actor KeychainStorage {
     private func migrateLegacyGatewaySessionIfNeeded(for did: String) async -> String? {
         guard await shouldMigrateLegacyGatewaySession(for: did) else { return nil }
 
-        if let legacySession = try? await getGatewaySession(), !legacySession.isEmpty {
+        if let legacySession = await getLegacyGatewaySession(), !legacySession.isEmpty {
             LogManager.logInfo(
                 "KeychainStorage - Migrating legacy gateway session to per-DID storage for DID: \(did.prefix(20))..."
             )
             try? await saveGatewaySession(legacySession, for: did)
-            try? await deleteGatewaySession()
+            try? await deleteLegacyGatewaySession()
             return legacySession
         }
 
@@ -488,6 +488,20 @@ public actor KeychainStorage {
     /// Legacy single-session methods for backward compatibility during migration
     @available(*, deprecated, message: "Use saveGatewaySession(_:for:) for multi-account support")
     func saveGatewaySession(_ session: String) async throws {
+        try await saveLegacyGatewaySession(session)
+    }
+
+    @available(*, deprecated, message: "Use getGatewaySession(for:) for multi-account support")
+    func getGatewaySession() async throws -> String? {
+        await getLegacyGatewaySession()
+    }
+
+    @available(*, deprecated, message: "Use deleteGatewaySession(for:) for multi-account support")
+    func deleteGatewaySession() async throws {
+        try await deleteLegacyGatewaySession()
+    }
+
+    private func saveLegacyGatewaySession(_ session: String) async throws {
         let key = makeKey("gatewaySession")
         let data = session.data(using: .utf8) ?? Data()
         let continuityTicket = await beginAuthContinuityMutation()
@@ -500,8 +514,7 @@ public actor KeychainStorage {
         }
     }
 
-    @available(*, deprecated, message: "Use getGatewaySession(for:) for multi-account support")
-    func getGatewaySession() async throws -> String? {
+    private func getLegacyGatewaySession() async -> String? {
         let key = makeKey("gatewaySession")
         do {
             let data = try await KeychainManager.retrieveAsync(key: key, namespace: namespace, accessGroup: accessGroup)
@@ -511,8 +524,7 @@ public actor KeychainStorage {
         }
     }
 
-    @available(*, deprecated, message: "Use deleteGatewaySession(for:) for multi-account support")
-    func deleteGatewaySession() async throws {
+    private func deleteLegacyGatewaySession() async throws {
         let key = makeKey("gatewaySession")
         let continuityTicket = await beginAuthContinuityMutation()
         do {
@@ -1014,7 +1026,7 @@ public actor KeychainStorage {
     /// Saves DPoP nonces scoped by JKT (key thumbprint) to the keychain.
     /// - Parameters:
     ///   - noncesByJKT: Mapping of JKT -> (domain -> nonce)
-    ///   ///   - did: The DID associated with these nonces
+    ///   - did: The DID associated with these nonces
     public func saveDPoPNoncesByJKT(_ noncesByJKT: [String: [String: String]], for did: String)
         async throws
     {

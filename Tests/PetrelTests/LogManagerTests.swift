@@ -7,6 +7,23 @@ import Testing
 
 @Suite("LogManager Tests")
 struct LogManagerTests {
+    @Test("Logout auto-switch incidents preserve logout semantics")
+    func logoutAutoSwitchIncidentMapping() {
+        let event = LogManager.convertToAuthEvent(
+            type: "AccountAutoSwitchedAfterLogout",
+            details: [
+                "previousDid": "did:plc:previous",
+                "newDid": "did:plc:next",
+                "reason": "logout",
+            ]
+        )
+
+        #expect(event == .logoutAutoSwitched(
+            previousDid: "did:plc:previous",
+            newDid: "did:plc:next"
+        ))
+    }
+
     @Test("LogManager should not crash on nil values")
     func logManagerNilSafety() {
         // These should not crash
