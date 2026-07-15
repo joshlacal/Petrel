@@ -16,12 +16,6 @@ import Synchronization
     import Security
 #endif
 
-#if canImport(Security)
-    typealias PlatformKeychainAccessibility = CFString
-#else
-    typealias PlatformKeychainAccessibility = String
-#endif
-
 enum KeychainError: Error, LocalizedError {
     case itemStoreError(status: Int)
     case itemRetrievalError(status: Int)
@@ -374,7 +368,6 @@ enum KeychainManager {
         key: String,
         value: Data,
         namespace: String,
-        accessibility: PlatformKeychainAccessibility? = nil,
         accessGroup: String? = nil
     ) throws {
         let resolvedAccessGroup = resolvedAccessGroup(accessGroup)
@@ -710,13 +703,12 @@ enum KeychainManager {
         key: String,
         value: Data,
         namespace: String,
-        accessibility: PlatformKeychainAccessibility? = nil,
         accessGroup: String? = nil
     ) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
-                    try store(key: key, value: value, namespace: namespace, accessibility: accessibility, accessGroup: accessGroup)
+                    try store(key: key, value: value, namespace: namespace, accessGroup: accessGroup)
                     continuation.resume()
                 } catch {
                     continuation.resume(throwing: error)

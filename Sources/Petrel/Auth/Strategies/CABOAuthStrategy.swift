@@ -458,7 +458,10 @@ actor CABOAuthStrategy: AuthStrategy {
             )
         }
 
-        throw AuthError.clientAssertionBackendError(httpResponse.statusCode, oauthError?.error)
+        throw ClientAssertionBackendError(
+            statusCode: httpResponse.statusCode,
+            code: oauthError?.error
+        )
     }
 
     // MARK: - Token Exchange (Strategy-Specific)

@@ -126,6 +126,21 @@ public enum TokenRefreshResult: Sendable {
     case skippedDueToRateLimit // Refresh was skipped due to rate limiting
 }
 
+/// A typed refusal from a client assertion backend.
+public struct ClientAssertionBackendError: Error, LocalizedError, Sendable, Equatable {
+    public let statusCode: Int
+    public let code: String?
+
+    public init(statusCode: Int, code: String?) {
+        self.statusCode = statusCode
+        self.code = code
+    }
+
+    public var errorDescription: String? {
+        "The client assertion backend refused the request (HTTP \(statusCode)\(code.map { ": \($0)" } ?? ""))."
+    }
+}
+
 /// Errors that can occur during authentication.
 public enum AuthError: Error, LocalizedError, Equatable {
     case noActiveAccount
@@ -145,9 +160,6 @@ public enum AuthError: Error, LocalizedError, Equatable {
     case rateLimited
     case serverError(Int, String?)
     case serviceMaintenance
-    /// The client assertion backend returned a non-success response.
-    /// Payload: HTTP status code and the OAuth `error` code when present.
-    case clientAssertionBackendError(Int, String?)
 
     public var errorDescription: String? {
         switch self {
@@ -189,8 +201,6 @@ public enum AuthError: Error, LocalizedError, Equatable {
             }
         case .serviceMaintenance:
             return "The service is temporarily under maintenance. Please try again later."
-        case let .clientAssertionBackendError(status, code):
-            return "The client assertion backend refused the request (HTTP \(status)\(code.map { ": \($0)" } ?? ""))."
         }
     }
 
@@ -262,8 +272,6 @@ public enum AuthError: Error, LocalizedError, Equatable {
             return lhs == rhs
         case let (.serverError(lhsCode, lhsMsg), .serverError(rhsCode, rhsMsg)):
             return lhsCode == rhsCode && lhsMsg == rhsMsg
-        case let (.clientAssertionBackendError(lhsStatus, lhsCode), .clientAssertionBackendError(rhsStatus, rhsCode)):
-            return lhsStatus == rhsStatus && lhsCode == rhsCode
         default:
             return false
         }

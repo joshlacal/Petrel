@@ -289,6 +289,11 @@ async def generate_swift_from_lexicons_recursive(
         class_factory_file_path = 'Client/ATProtoClient+Generated.swift'
         add_expected_file(class_factory_file_path, atproto_client)
 
+        # Compatibility shims are generator-owned so a closed regeneration
+        # cannot silently discard the legacy source surface they preserve.
+        compatibility_file_path = 'Compatibility/Petrel020Compatibility.swift'
+        add_expected_file(compatibility_file_path, render_petrel_020_compatibility())
+
     await write_swift_projection(output_folder, expected_files)
 
 def render_atproto_client(generated_classes):
@@ -297,6 +302,12 @@ def render_atproto_client(generated_classes):
     template = template_manager.env.get_template('ATProtoClientGeneratedMain.jinja')
     rendered_code = template.render(generated_classes=generated_classes)
     return rendered_code
+
+def render_petrel_020_compatibility():
+    from templates import TemplateManager
+    template_manager = TemplateManager()
+    template = template_manager.env.get_template('Petrel020Compatibility.jinja')
+    return template.render()
 
 def generate_ATProtocolValueContainer_enum(type_dict):
     from templates import TemplateManager

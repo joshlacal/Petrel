@@ -1326,11 +1326,28 @@ class GeneratorProjectionPublicationTests(unittest.TestCase):
             set(expected_files),
             {
                 "Client/ATProtoClient+Generated.swift",
+                "Compatibility/Petrel020Compatibility.swift",
                 "Core/Types/ATProtocolValueContainer.swift",
                 "Lexicons/Com/Example/ComExampleCoreDefs.swift",
                 "Lexicons/Com/Example/ComExampleCoreGetItem.swift",
             },
         )
+        compatibility = expected_files["Compatibility/Petrel020Compatibility.swift"]
+        self.assertTrue(compatibility.startswith(EXPECTED_HEADER))
+        self.assertIn(
+            "func getUnreadCounts() async throws -> (responseCode: Int, data: ChatBskyConvoGetUnreadCounts.Output?)",
+            compatibility,
+        )
+        self.assertIn(
+            "try await getUnreadCounts(input: ChatBskyConvoGetUnreadCounts.Parameters())",
+            compatibility,
+        )
+        self.assertIn(
+            "additionalVerificationMethods: nil,",
+            compatibility,
+        )
+        self.assertIn("replyTo: nil", compatibility)
+        self.assertEqual(compatibility.count("@available(*, deprecated"), 4)
         self.assertIn("struct ComExampleCoreDefs", expected_files[
             "Lexicons/Com/Example/ComExampleCoreDefs.swift"
         ])

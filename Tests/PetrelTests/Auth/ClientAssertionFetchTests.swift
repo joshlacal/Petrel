@@ -203,7 +203,7 @@ struct ClientAssertionFetchTests {
         }
         defer { MockURLProtocol.setHandler(nil) }
 
-        await #expect(throws: AuthError.clientAssertionBackendError(400, "use_dpop_nonce")) {
+        await #expect(throws: ClientAssertionBackendError(statusCode: 400, code: "use_dpop_nonce")) {
             _ = try await strategy.fetchClientAssertion(
                 aud: "https://auth.pds.test",
                 ephemeralKey: P256.Signing.PrivateKey()
@@ -211,7 +211,7 @@ struct ClientAssertionFetchTests {
         }
     }
 
-    @Test("Backend refusal surfaces as clientAssertionBackendError")
+    @Test("Backend refusal surfaces as ClientAssertionBackendError")
     func backendRefusalIsTyped() async throws {
         let strategy = makeStrategy(namespace: "test.cab.refusal", session: makeMockSession())
         MockURLProtocol.setHandler { request in
@@ -223,7 +223,7 @@ struct ClientAssertionFetchTests {
         }
         defer { MockURLProtocol.setHandler(nil) }
 
-        await #expect(throws: AuthError.clientAssertionBackendError(403, "access_denied")) {
+        await #expect(throws: ClientAssertionBackendError(statusCode: 403, code: "access_denied")) {
             _ = try await strategy.fetchClientAssertion(
                 aud: "https://auth.pds.test",
                 ephemeralKey: P256.Signing.PrivateKey()
