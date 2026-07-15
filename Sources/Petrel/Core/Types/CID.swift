@@ -158,7 +158,9 @@ public struct ATProtoLink: Codable, ATProtocolCodable, Hashable, Equatable, Send
 
     /// Initialize by parsing a CID string (e.g., "bafy...")
     public init(cidString: String) throws {
-        cid = try CID.parse(cidString)
+        let cid = try CID.parse(cidString)
+        try Self.validate(cid)
+        self.cid = cid
     }
 
     // --- Codable Conformance ---
@@ -166,11 +168,11 @@ public struct ATProtoLink: Codable, ATProtocolCodable, Hashable, Equatable, Send
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let cidString = try container.decode(String.self, forKey: .cidString)
-        // Parse the string into the internal CID struct during decoding
-        cid = try CID.parse(cidString)
+        self = try ATProtoLink(cidString: cidString)
     }
 
     public func encode(to encoder: Encoder) throws {
+        try Self.validate(cid)
         var container = encoder.container(keyedBy: CodingKeys.self)
         // Encode back to the string representation for JSON compatibility
         try container.encode(cid.string, forKey: .cidString)
@@ -193,7 +195,34 @@ public struct ATProtoLink: Codable, ATProtocolCodable, Hashable, Equatable, Send
     /// - When used in a data model like StrongRef, it should encode as a simple string
     /// - When used through ATProtoLink, it needs Tag 42 encoding
     public func toCBORValue() throws -> Any {
+        try Self.validate(cid)
         return CIDAsLink(cid: cid, representation: .link)
+    }
+
+    private static func validate(_ cid: CID) throws {
+        guard cid.codec == .raw || cid.codec == .dagCBOR else {
+            throw DAGCBORError.invalidCIDEncoding(
+                "ATProtoLink requires raw or dag-cbor codec, received \(cid.codec.name)"
+            )
+        }
+
+        guard cid.multihash.algorithm == Multihash.sha256Code else {
+            throw DAGCBORError.invalidCIDEncoding(
+                "ATProtoLink requires SHA-256 multihash algorithm"
+            )
+        }
+
+        guard cid.multihash.length == Multihash.sha256Length else {
+            throw DAGCBORError.invalidCIDEncoding(
+                "ATProtoLink requires a declared multihash length of 32 bytes"
+            )
+        }
+
+        guard cid.multihash.digest.count == Int(Multihash.sha256Length) else {
+            throw DAGCBORError.invalidCIDEncoding(
+                "ATProtoLink requires a 32-byte multihash digest"
+            )
+        }
     }
 }
 

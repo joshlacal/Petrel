@@ -75,57 +75,136 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
     }
 
     public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: DynamicCodingKeys.self)
-        if let typeName = container.allKeys.first(where: { $0.stringValue == "$type" }),
-           let typeValue = try? container.decode(String.self, forKey: typeName) {
+        self = try ATProtocolValueContainer.decodeValue(from: decoder)
+    }
 
+    private static func decodeValue(from decoder: Decoder) throws -> ATProtocolValueContainer {
+        let container = try decoder.singleValueContainer()
 
-            if let decoderFunction = ATProtocolValueContainer.decoderFactory.decoder(for: typeValue) {
-                self = try decoderFunction(decoder)
-            } else {
-                let unknownObject = try ATProtocolValueContainer.decodeAny(from: container)
-                self = .unknownType(typeValue, unknownObject)
-            }
-        } else {
-            do {
-                self = try ATProtocolValueContainer.decodeSingleValue(from: decoder)
-            } catch {
-                LogManager.logDebug("Error decoding ATProtocolValueContainer: \(error)")
-                self = .decodeError("Decoding error: \(error)")
+        if container.decodeNil() {
+            return .null
+        }
+        if let boolValue = try decodeIfTypeMatches(Bool.self, from: container) {
+            return .bool(boolValue)
+        }
+        if let intValue = try decodeSignedInteger(from: container) {
+            return .number(intValue)
+        }
+        if let stringValue = try decodeIfTypeMatches(String.self, from: container) {
+            return .string(stringValue)
+        }
+
+        do {
+            var arrayContainer = try decoder.unkeyedContainer()
+            return .array(try decodeAny(from: &arrayContainer))
+        } catch DecodingError.typeMismatch(_, _) {
+            // Continue to the keyed-object shape below.
+        }
+
+        let keyedContainer = try decoder.container(keyedBy: DynamicCodingKeys.self)
+        return try decodeObjectValue(from: keyedContainer, decoder: decoder)
+    }
+
+    private static func decodeIfTypeMatches<T: Decodable>(
+        _ type: T.Type,
+        from container: SingleValueDecodingContainer
+    ) throws -> T? {
+        do {
+            return try container.decode(type)
+        } catch DecodingError.typeMismatch(_, _) {
+            return nil
+        }
+    }
+
+    private static func decodeSignedInteger(
+        from container: SingleValueDecodingContainer
+    ) throws -> Int? {
+        do {
+            return try container.decode(Int.self)
+        } catch let integerError as DecodingError {
+            switch integerError {
+            case .typeMismatch:
+                return nil
+            case .dataCorrupted:
+                let unsignedValue: UInt64
+                do {
+                    unsignedValue = try container.decode(UInt64.self)
+                } catch is DecodingError {
+                    throw integerError
+                }
+                throw DecodingError.dataCorruptedError(
+                    in: container,
+                    debugDescription: "Unsigned integer \(unsignedValue) exceeds the signed 64-bit integer range"
+                )
+            case .keyNotFound, .valueNotFound:
+                throw integerError
+            @unknown default:
+                throw integerError
             }
         }
     }
 
-    private static func decodeSingleValue(from decoder: Decoder) throws -> ATProtocolValueContainer {
-        let container = try decoder.singleValueContainer()
-
-        if let stringValue = try? container.decode(String.self) {
-            return .string(stringValue)
-        }
-        if let intValue = try? container.decode(Int.self) {
-            return .number(intValue)
-        }
-        if let bigNumberString = try? container.decode(String.self) {
-            return .bigNumber(bigNumberString)
-        }
-        if let boolValue = try? container.decode(Bool.self) {
-            return .bool(boolValue)
-        }
-        if container.decodeNil() {
-            return .null
+    private static func decodeObjectValue(
+        from container: KeyedDecodingContainer<DynamicCodingKeys>,
+        decoder: Decoder
+    ) throws -> ATProtocolValueContainer {
+        if let specialObject = try decodeSpecialObject(from: container, decoder: decoder) {
+            return specialObject
         }
 
-
-        if var arrayContainer = try? decoder.unkeyedContainer() {
-            return .array(try decodeAny(from: &arrayContainer))
+        let rawObject = try decodeAny(from: container)
+        guard let typeKey = container.allKeys.first(where: { $0.stringValue == "$type" }) else {
+            return rawObject
         }
 
-        if let nestedContainer = try? decoder.container(keyedBy: DynamicCodingKeys.self) {
-            return try decodeAny(from: nestedContainer)
+        let typeValue: String
+        do {
+            typeValue = try container.decode(String.self, forKey: typeKey)
+        } catch DecodingError.typeMismatch(_, _), DecodingError.valueNotFound(_, _) {
+            return rawObject
         }
 
-        LogManager.logDebug("Failed to decode as Array or Object, throwing DecodingError.dataCorruptedError")
-        throw DecodingError.dataCorruptedError(in: container, debugDescription: "ATProtocolValueContainer cannot be decoded")
+        let rawFallback = ATProtocolValueContainer.unknownType(typeValue, rawObject)
+        guard let decoderFunction = decoderFactory.decoder(for: typeValue) else {
+            return rawFallback
+        }
+
+        let typedValue: ATProtocolValueContainer
+        do {
+            typedValue = try decoderFunction(decoder)
+        } catch {
+            return rawFallback
+        }
+        guard case .knownType = typedValue else {
+            return rawFallback
+        }
+
+        do {
+            guard try typedValue.encodedDAGCBOR() == rawObject.encodedDAGCBOR() else {
+                return rawFallback
+            }
+        } catch {
+            return rawFallback
+        }
+        return typedValue
+    }
+
+    private static func decodeSpecialObject(
+        from container: KeyedDecodingContainer<DynamicCodingKeys>,
+        decoder: Decoder
+    ) throws -> ATProtocolValueContainer? {
+        guard container.allKeys.count == 1, let onlyKey = container.allKeys.first else {
+            return nil
+        }
+
+        switch onlyKey.stringValue {
+        case "$link":
+            return .link(try ATProtoLink(from: decoder))
+        case "$bytes":
+            return .bytes(try Bytes(from: decoder))
+        default:
+            return nil
+        }
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -228,26 +307,13 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
     private static func decodeAny(from container: KeyedDecodingContainer<DynamicCodingKeys>) throws -> ATProtocolValueContainer {
         var dictionary = [String: ATProtocolValueContainer]()
         for key in container.allKeys {
-            if let boolValue = try? container.decode(Bool.self, forKey: key) {
-                dictionary[key.stringValue] = .bool(boolValue)
-            } else if let intValue = try? container.decode(Int.self, forKey: key) {
-                dictionary[key.stringValue] = .number(intValue)
-            } else if let doubleValue = try? container.decode(Double.self, forKey: key) {
-                dictionary[key.stringValue] = .bigNumber(String(doubleValue))
-            } else if let stringValue = try? container.decode(String.self, forKey: key) {
-                dictionary[key.stringValue] = .string(stringValue)
-            } else if let nestedContainer = try? container.nestedContainer(keyedBy: DynamicCodingKeys.self, forKey: key) {
-                dictionary[key.stringValue] = try decodeAny(from: nestedContainer)
-            } else if var arrayContainer = try? container.nestedUnkeyedContainer(forKey: key) {
-                var array = [ATProtocolValueContainer]()
-                while !arrayContainer.isAtEnd {
-                    let value = try arrayContainer.decode(ATProtocolValueContainer.self)
-                    array.append(value)
-                }
-                dictionary[key.stringValue] = .array(array)
+            if try container.decodeNil(forKey: key) {
+                dictionary[key.stringValue] = .null
             } else {
-                LogManager.logDebug("Failed to decode key: \(key.stringValue)")
-                dictionary[key.stringValue] = .decodeError("Cannot decode value for key: \(key.stringValue)")
+                dictionary[key.stringValue] = try container.decode(
+                    ATProtocolValueContainer.self,
+                    forKey: key
+                )
             }
         }
         return .object(dictionary)
@@ -256,22 +322,10 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
     private static func decodeAny(from unkeyedContainer: inout UnkeyedDecodingContainer) throws -> [ATProtocolValueContainer] {
         var array = [ATProtocolValueContainer]()
         while !unkeyedContainer.isAtEnd {
-            if let value = try? unkeyedContainer.decode(Bool.self) {
-                array.append(.bool(value))
-            } else if let value = try? unkeyedContainer.decode(Int.self) {
-                array.append(.number(value))
-            } else if let value = try? unkeyedContainer.decode(Double.self) {
-                array.append(.bigNumber(String(value)))
-            } else if let value = try? unkeyedContainer.decode(String.self) {
-                array.append(.string(value))
-            } else if var nestedArrayContainer = try? unkeyedContainer.nestedUnkeyedContainer() {
-                array.append(.array(try decodeAny(from: &nestedArrayContainer)))
-            } else if let nestedContainer = try? unkeyedContainer.nestedContainer(keyedBy: DynamicCodingKeys.self) {
-                array.append(try decodeAny(from: nestedContainer))
+            if try unkeyedContainer.decodeNil() {
+                array.append(.null)
             } else {
-                LogManager.logDebug("Cannot decode array element at index \(unkeyedContainer.currentIndex)")
-                array.append(.decodeError("Cannot decode array element at index \(unkeyedContainer.currentIndex)"))
-                break
+                array.append(try unkeyedContainer.decode(ATProtocolValueContainer.self))
             }
         }
         return array

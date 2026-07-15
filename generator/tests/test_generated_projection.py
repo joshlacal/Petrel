@@ -1337,6 +1337,26 @@ class GeneratorProjectionPublicationTests(unittest.TestCase):
         self.assertIn("func getItem", expected_files[
             "Lexicons/Com/Example/ComExampleCoreGetItem.swift"
         ])
+        value_container = expected_files["Core/Types/ATProtocolValueContainer.swift"]
+        self.assertIn(
+            "self = try ATProtocolValueContainer.decodeValue(from: decoder)",
+            value_container,
+        )
+        self.assertIn("container.decode(UInt64.self)", value_container)
+        self.assertNotIn("container.decode(Double.self)", value_container)
+        self.assertNotIn("try? decoder.container", value_container)
+        self.assertIn("case \"$link\":", value_container)
+        self.assertIn("case \"$bytes\":", value_container)
+        self.assertIn(
+            "typedValue.encodedDAGCBOR() == rawObject.encodedDAGCBOR()",
+            value_container,
+        )
+        self.assertIn("try container.decodeNil(forKey: key)", value_container)
+        self.assertIn("try unkeyedContainer.decodeNil()", value_container)
+        self.assertLess(
+            value_container.index("decodeSpecialObject("),
+            value_container.index('stringValue == "$type"'),
+        )
         self.assertFalse(output.exists())
 
     def test_overlay_manifest_publishes_one_complete_projection(self):

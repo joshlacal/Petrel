@@ -405,14 +405,73 @@ public struct Bytes: Codable, ATProtocolCodable, Hashable, Equatable, Sendable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let base64String = try container.decode(String.self, forKey: .data)
-        guard let data = Data(base64Encoded: base64String) else {
+        guard let normalizedBase64 = Self.normalizedRFC4648Base64(base64String),
+              let data = Data(base64Encoded: normalizedBase64)
+        else {
             throw DecodingError.dataCorruptedError(
                 forKey: .data,
                 in: container,
-                debugDescription: "Base64 string could not be decoded"
+                debugDescription: "String is not canonical RFC 4648 base64"
             )
         }
         self.data = data
+    }
+
+    private static func normalizedRFC4648Base64(_ value: String) -> String? {
+        let encoded = Array(value.utf8)
+        let paddingStart = encoded.firstIndex(of: Character("=").asciiValue!) ?? encoded.endIndex
+        let payload = encoded[..<paddingStart]
+        let padding = encoded[paddingStart...]
+
+        guard padding.count <= 2, padding.allSatisfy({ $0 == Character("=").asciiValue }) else {
+            return nil
+        }
+
+        let sextets = payload.compactMap(base64SextetValue)
+        guard sextets.count == payload.count else {
+            return nil
+        }
+
+        let remainder = payload.count % 4
+        let canonicalPaddingCount: Int
+        switch remainder {
+        case 0:
+            canonicalPaddingCount = 0
+        case 2:
+            canonicalPaddingCount = 2
+            guard let last = sextets.last, last & 0x0F == 0 else { return nil }
+        case 3:
+            canonicalPaddingCount = 1
+            guard let last = sextets.last, last & 0x03 == 0 else { return nil }
+        default:
+            return nil
+        }
+
+        if !padding.isEmpty {
+            guard encoded.count.isMultiple(of: 4), padding.count == canonicalPaddingCount else {
+                return nil
+            }
+        }
+
+        return String(decoding: payload, as: UTF8.self)
+            + String(repeating: "=", count: canonicalPaddingCount)
+    }
+
+    private static func base64SextetValue(_ byte: UInt8) -> UInt8? {
+        switch byte {
+        case Character("A").asciiValue! ... Character("Z").asciiValue!:
+            return byte - Character("A").asciiValue!
+        case Character("a").asciiValue! ... Character("z").asciiValue!:
+            return byte - Character("a").asciiValue! + 26
+        case Character("0").asciiValue! ... Character("9").asciiValue!:
+            return byte - Character("0").asciiValue! + 52
+        case Character("+").asciiValue!:
+            return 62
+        case Character("/").asciiValue!:
+            return 63
+        default:
+            return nil
+        }
     }
 
     public func encode(to encoder: Encoder) throws {
