@@ -10,6 +10,7 @@ from kotlin_code_generator import KotlinCodeGenerator
 from kotlin_type_converter import convert_to_pascal_case
 from utils import convert_to_camel_case
 from cycle_detector import CycleDetector
+from generated_projection import write_swift_projection
 
 def get_namespace_path(lexicon_id: str) -> str:
     """Convert lexicon ID to hierarchical path.
@@ -171,14 +172,12 @@ async def generate_swift_from_lexicons_recursive(
 ):
     type_dict = {}
     namespace_hierarchy = {}
+    expected_files = {}
     cycle_detector = CycleDetector()
     core_namespace_roots = normalize_core_namespace_roots(core_namespace_roots)
 
     for root in core_namespace_roots:
         namespace_hierarchy[root] = {}
-
-    if not os.path.exists(output_folder):
-        os.makedirs(output_folder)
 
     emit_dirs = folder_path if isinstance(folder_path, (list, tuple)) else [folder_path]
 
@@ -217,7 +216,12 @@ async def generate_swift_from_lexicons_recursive(
     else:
         print("No indirect enums detected")
 
-    async def process_lexicon(filepath, lexicon):
+    def add_expected_file(relative_path, content):
+        if relative_path in expected_files:
+            raise ValueError(f"duplicate generated Swift target: {relative_path}")
+        expected_files[relative_path] = content
+
+    def process_lexicon(filepath, lexicon):
         lexicon_id = lexicon.get('id', '')
         defs = lexicon.get('defs', {})
 
@@ -245,23 +249,13 @@ async def generate_swift_from_lexicons_recursive(
         # Create hierarchical output path based on lexicon namespace
         # e.g., "app.bsky.feed.post" -> "Lexicons/App/Bsky/"
         namespace_path = get_namespace_path(lexicon_id)
-        lexicon_output_dir = os.path.join(output_folder, 'Lexicons', namespace_path)
-        os.makedirs(lexicon_output_dir, exist_ok=True)
-
         output_filename = f"{convert_to_camel_case(lexicon_id)}.swift"
-        output_file_path = os.path.join(lexicon_output_dir, output_filename)
-        async with aiofiles.open(output_file_path, 'w') as swift_file:
-            await swift_file.write(swift_code)
+        output_file_path = f"Lexicons/{namespace_path}/{output_filename}"
+        add_expected_file(output_file_path, swift_code)
 
     # Second pass: Generate code with cycle information
-    tasks = []
     for filepath, lexicon in lexicons:
-        tasks.append(asyncio.create_task(process_lexicon(filepath, lexicon)))
-
-    await asyncio.gather(*tasks)
-
-    client_dir = os.path.join(output_folder, 'Client')
-    os.makedirs(client_dir, exist_ok=True)
+        process_lexicon(filepath, lexicon)
 
     if overlay:
         # Overlay: extend the core client's namespace tree instead of regenerating it,
@@ -276,30 +270,26 @@ async def generate_swift_from_lexicons_recursive(
             f"// Generated namespace extensions for the {package_name} overlay package.\n\n"
             + overlay_namespaces
         )
-        overlay_client_path = os.path.join(client_dir, f'ATProtoClient+{package_name}.swift')
-        async with aiofiles.open(overlay_client_path, 'w') as f:
-            await f.write(overlay_client)
+        overlay_client_path = f'Client/ATProtoClient+{package_name}.swift'
+        add_expected_file(overlay_client_path, overlay_client)
 
         registration_code = generate_overlay_registration(type_dict, package_name)
-        registration_path = os.path.join(client_dir, f'{package_name}Lexicons.swift')
-        async with aiofiles.open(registration_path, 'w') as f:
-            await f.write(registration_code)
+        registration_path = f'Client/{package_name}Lexicons.swift'
+        add_expected_file(registration_path, registration_code)
     else:
         type_factory_code = generate_ATProtocolValueContainer_enum(type_dict)
         swift_namespace_classes = generate_swift_namespace_classes(namespace_hierarchy)
         atproto_client = render_atproto_client(swift_namespace_classes)
 
         # Output ATProtocolValueContainer to Core/Types within output folder
-        core_types_dir = os.path.join(output_folder, 'Core', 'Types')
-        os.makedirs(core_types_dir, exist_ok=True)
-        type_factory_file_path = os.path.join(core_types_dir, 'ATProtocolValueContainer.swift')
-        async with aiofiles.open(type_factory_file_path, 'w') as type_factory_file:
-            await type_factory_file.write(type_factory_code)
+        type_factory_file_path = 'Core/Types/ATProtocolValueContainer.swift'
+        add_expected_file(type_factory_file_path, type_factory_code)
 
         # Output main client file to Client directory within output folder
-        class_factory_file_path = os.path.join(client_dir, 'ATProtoClient+Generated.swift')
-        async with aiofiles.open(class_factory_file_path, 'w') as class_factory_file:
-            await class_factory_file.write(atproto_client)
+        class_factory_file_path = 'Client/ATProtoClient+Generated.swift'
+        add_expected_file(class_factory_file_path, atproto_client)
+
+    await write_swift_projection(output_folder, expected_files)
 
 def render_atproto_client(generated_classes):
     from templates import TemplateManager

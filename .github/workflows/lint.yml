@@ -12,13 +12,56 @@ concurrency:
 jobs:
   swiftformat:
     name: SwiftFormat (generated tree)
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
-      - name: Install SwiftFormat
-        run: brew install swiftformat
+      - uses: actions/setup-python@v5
+        id: release-python
+        with:
+          python-version: '3.12'
+          update-environment: false
+      - name: Select and verify stable release toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          export RELEASE_PYTHON312="${{ steps.release-python.outputs.python-path }}"
+          test -x "$RELEASE_PYTHON312"
+          export RELEASE_TOOLCHAIN_LANE=newest-stable
+          export RELEASE_TOOLCHAIN_SELECTION=official-runner-inventory
+          export RELEASE_EVIDENCE_CLASS=stable-release
+          export RELEASE_DEVELOPER_DIR=/Applications/Xcode_26.6.app/Contents/Developer
+          export RELEASE_XCODE_VERSION=26.6
+          export RELEASE_XCODE_BUILD=17F113
+          export RELEASE_IOS_RUNTIME=26.5
+          export RELEASE_WATCHOS_RUNTIME=26.5
+          export RELEASE_TVOS_RUNTIME=26.5
+          export RELEASE_VISIONOS_RUNTIME=26.5
+          source Scripts/activate-release-toolchain.sh
+          printf 'RELEASE_PYTHON312=%s\n' "$RELEASE_PYTHON312" >> "$GITHUB_ENV"
+          printf 'DEVELOPER_DIR=%s\n' "$DEVELOPER_DIR" >> "$GITHUB_ENV"
+          printf 'RELEASE_SWIFT=%s\n' "$RELEASE_SWIFT" >> "$GITHUB_ENV"
+          printf 'RELEASE_XCODEBUILD=%s\n' "$RELEASE_XCODEBUILD" >> "$GITHUB_ENV"
+          printf 'RELEASE_XCRUN=%s\n' "$RELEASE_XCRUN" >> "$GITHUB_ENV"
+          printf 'RELEASE_MINT=%s\n' "$RELEASE_MINT" >> "$GITHUB_ENV"
+          printf 'MINT_PATH=%s\n' "$MINT_PATH" >> "$GITHUB_ENV"
+          printf 'MINT_LINK_PATH=%s\n' "$MINT_LINK_PATH" >> "$GITHUB_ENV"
+          dirname "$RELEASE_SWIFT" >> "$GITHUB_PATH"
+      - name: Bootstrap locked generator and release tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          Scripts/bootstrap-generator-environment.sh
+          Scripts/verify-generator-environment.sh
+          PETREL_PYTHON="$GITHUB_WORKSPACE/.build/release-generator-venv/bin/python"
+          test -x "$PETREL_PYTHON"
+          printf 'PETREL_PYTHON=%s\n' "$PETREL_PYTHON" >> "$GITHUB_ENV"
+          Scripts/bootstrap-release-tools.sh
       - name: Lint generated sources
-        run: swiftformat --lint Sources/Petrel/Generated
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RELEASE_MINT" run --executable swiftformat nicklockwood/SwiftFormat@0.61.1 \
+            --lint Sources/Petrel/Generated
 
   hygiene:
     name: No print() in library code
