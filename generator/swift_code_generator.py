@@ -441,7 +441,9 @@ class SwiftCodeGenerator:
             output_type=output_type,
             endpoint=endpoint,
             description=self.description,
-            output_encoding=output_encoding  # Pass the output encoding to the template
+            output_encoding=output_encoding,  # Pass the output encoding to the template
+            has_errors=bool(main_def.get('errors')),
+            struct_name=self.struct_name,
         )
 
     def generate_procedure_function(self, lexicon_id, main_def):
@@ -498,7 +500,9 @@ class SwiftCodeGenerator:
             input_encoding=input_encoding,    # Pass the input encoding to the template
             output_encoding=output_encoding,  # Pass the output encoding to the template
             has_parameters=has_parameters,
-            parameters_struct_name=parameters_struct_name
+            parameters_struct_name=parameters_struct_name,
+            has_errors=bool(main_def.get('errors')),
+            struct_name=self.struct_name,
         )
 
     def generate_subscription_function(self, lexicon_id, main_def):

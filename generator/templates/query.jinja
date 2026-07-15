@@ -172,7 +172,7 @@ extension ATProtoClient.{{ template_namespace_name }} {
                 return (responseCode, nil)
             }
         } else {
-            {% if has_errors %}// Try to parse structured error response
+            {% if has_errors %}// Try to parse a declared structured error response
             if let atprotoError = ATProtoErrorParser.parse(
                 data: responseData,
                 statusCode: responseCode,
