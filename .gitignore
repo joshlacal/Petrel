@@ -19,6 +19,7 @@ venv/
 Examples/PostCLIDemo/.build/PetrelTemplate/.build/
 .build/
 .gradle/
+kotlin/.kotlin/
 petrel-kotlin/.build/
 petrel-kotlin/build/
 petrel-kotlin/.gradle/
