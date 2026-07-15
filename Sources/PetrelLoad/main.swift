@@ -47,6 +47,23 @@ enum PetrelLoadCLI {
         }
     }
 
+    enum ScenarioError: Error, Equatable, CustomStringConvertible {
+        case debugBuildRequired(String)
+        case missingAuthenticatedAccount
+        case requestFailures(Int)
+
+        var description: String {
+            switch self {
+            case let .debugBuildRequired(scenario):
+                "\(scenario) requires a debug build"
+            case .missingAuthenticatedAccount:
+                "OAuth completed without an active account"
+            case let .requestFailures(count):
+                "\(count) request(s) failed"
+            }
+        }
+    }
+
     static let usage = """
     Usage: PetrelLoad --namespace <keychain-namespace> --endpoint <xrpc endpoint> [options]
 
@@ -170,6 +187,22 @@ enum PetrelLoadCLI {
         if let mode = args["dpop-test"], !dpopTestModes.contains(mode) {
             throw ArgumentError.invalidValue(option: "dpop-test", value: mode)
         }
+        if let baseURL = args["base-url"] {
+            _ = try validatedBaseURL(baseURL)
+        }
+    }
+
+    private static func validatedBaseURL(_ value: String) throws -> URL {
+        guard let components = URLComponents(string: value),
+              let scheme = components.scheme?.lowercased(),
+              scheme == "http" || scheme == "https",
+              let host = components.host,
+              !host.isEmpty,
+              let url = components.url
+        else {
+            throw ArgumentError.invalidValue(option: "base-url", value: value)
+        }
+        return url
     }
 
     static func requestDistribution(total: Int, concurrency: Int) -> [Int] {
@@ -184,7 +217,7 @@ enum PetrelLoadCLI {
         }
     }
 
-    static func main() async {
+    static func main() async throws {
         let args: [String: String]
         do {
             args = try parseArgs()
@@ -200,7 +233,8 @@ enum PetrelLoadCLI {
         guard let total = Int(args["requests"] ?? "100"),
               let concurrency = Int(args["concurrency"] ?? "10")
         else {
-            preconditionFailure("Validated numeric options became invalid")
+            fputs("Validated numeric options became invalid.\n", stderr)
+            printUsageAndExit()
         }
         let unauth = (args["unauth"] ?? "false").lowercased() == "true"
         let keepRunning = (args["keep-running"] ?? "false").lowercased() == "true"
@@ -213,11 +247,11 @@ enum PetrelLoadCLI {
         let simulateAmbiguous = (args["simulate-ambiguous-timeout"] ?? "false").lowercased() == "true"
 
         // Determine base URL for initial setup
-        var baseURL: URL = if let explicit = args["base-url"], let url = URL(string: explicit) {
-            url
+        let baseURL: URL = if let explicit = args["base-url"] {
+            try validatedBaseURL(explicit)
         } else {
             // Default to bsky.social for OAuth flows and general usage
-            URL(string: "https://bsky.social")!
+            ATProtoClient.defaultBaseURL
         }
 
         // OAuth config for ATProto development with ngrok-exposed client metadata
@@ -231,7 +265,7 @@ enum PetrelLoadCLI {
         let client: ATProtoClient = if unauth {
             await ATProtoClient(baseURL: baseURL)
         } else {
-            try! await ATProtoClient(
+            try await ATProtoClient(
                 baseURL: baseURL,
                 oauthConfig: oauthConfig,
                 namespace: namespace
@@ -325,27 +359,24 @@ enum PetrelLoadCLI {
 
                 // Show account info and test if base URL was switched
                 let (did, handle, pdsURL) = await client.getActiveAccountInfo()
-                if let did, let handle, let pdsURL {
-                    print("✓ Authenticated as: \(handle)")
-                    print("✓ DID: \(did)")
-                    print("✓ PDS: \(pdsURL)")
+                guard let did, let handle, let pdsURL else {
+                    throw ScenarioError.missingAuthenticatedAccount
+                }
+                print("✓ Authenticated as: \(handle)")
+                print("✓ DID: \(did)")
+                print("✓ PDS: \(pdsURL)")
 
-                    // Test if the API actually works now
-                    print("\nDEBUG - Testing API call after OAuth completion and delay...")
-                    do {
-                        let actor = try ATIdentifier(string: handle)
-                        let params = AppBskyActorGetProfile.Parameters(actor: actor)
-                        let result = try await client.app.bsky.actor.getProfile(input: params)
-                        print("✓ API call SUCCESS! Response code: \(result.responseCode)")
-                        if let profile = result.data {
-                            print("✓ Got profile for: \(profile.displayName ?? "N/A")")
-                        }
-                    } catch {
-                        print("✗ API call FAILED: \(error)")
-                    }
+                // Test if the API actually works now
+                print("\nDEBUG - Testing API call after OAuth completion and delay...")
+                let actor = try ATIdentifier(string: handle)
+                let params = AppBskyActorGetProfile.Parameters(actor: actor)
+                let result = try await client.app.bsky.actor.getProfile(input: params)
+                print("✓ API call SUCCESS! Response code: \(result.responseCode)")
+                if let profile = result.data {
+                    print("✓ Got profile for: \(profile.displayName ?? "N/A")")
                 }
             } catch {
-                fputs("Failed to complete OAuth: \(error)\n", stderr)
+                fputs("OAuth completion or verification failed: \(error)\n", stderr)
                 exit(1)
             }
             return
@@ -372,23 +403,19 @@ enum PetrelLoadCLI {
                 print("Simulating ambiguous refresh timeout…")
                 #if DEBUG
                     await client.simulateAmbiguousRefreshTimeout(durationSeconds: 900)
-                #else
-                    print("(simulateAmbiguous is only available in DEBUG builds)")
-                #endif
-                print("Triggering refresh after simulated ambiguous timeout…")
-                let refreshed = try? await client.refreshToken()
-                print("Refresh returned: \(refreshed == true ? "refreshed" : "not refreshed (still valid)")")
-                // Make a quick API call to verify token still works
-                do {
+                    print("Triggering refresh after simulated ambiguous timeout…")
+                    let refreshed = try await client.refreshToken()
+                    print("Refresh returned: \(refreshed == true ? "refreshed" : "not refreshed (still valid)")")
+                    // Make a quick API call to verify token still works
                     let (did, handle, _) = await client.getActiveAccountInfo()
                     let actor = try ATIdentifier(string: handle ?? did ?? "bsky.app")
                     let params = AppBskyActorGetProfile.Parameters(actor: actor)
                     let result = try await client.app.bsky.actor.getProfile(input: params)
                     print("✓ API call after ambiguous path: \(result.responseCode)")
-                } catch {
-                    print("✗ API call after ambiguous path failed: \(error)")
-                }
-                return
+                    return
+                #else
+                    throw ScenarioError.debugBuildRequired("--simulate-ambiguous-timeout")
+                #endif
             }
 
             if oauthStressMode {
@@ -404,18 +431,13 @@ enum PetrelLoadCLI {
 
                 // Try a single API call to see the exact error
                 print("\nDEBUG - Testing single API call...")
-                do {
-                    let actor = try ATIdentifier(string: handle ?? did ?? "bsky.app")
-                    let params = AppBskyActorGetProfile.Parameters(actor: actor)
-                    let result = try await client.app.bsky.actor.getProfile(input: params)
-                    print("SUCCESS: API call worked! Response code: \(result.responseCode)")
-                } catch {
-                    print("ERROR: API call failed with: \(error)")
-                    print("Error type: \(type(of: error))")
-                }
+                let actor = try ATIdentifier(string: handle ?? did ?? "bsky.app")
+                let params = AppBskyActorGetProfile.Parameters(actor: actor)
+                let result = try await client.app.bsky.actor.getProfile(input: params)
+                print("SUCCESS: API call worked! Response code: \(result.responseCode)")
 
                 // Demonstrate with basic API calls
-                await runBasicStressTest(client: client, endpoint: endpoint, iterations: total, concurrency: concurrency)
+                try await runBasicStressTest(client: client, endpoint: endpoint, iterations: total, concurrency: concurrency)
                 return
             }
 
@@ -423,12 +445,12 @@ enum PetrelLoadCLI {
                 switch scenario {
                 case "dpop_nonce_thrash":
                     print("Testing DPoP nonce handling...")
-                    await runBasicStressTest(client: client, endpoint: endpoint, iterations: total, concurrency: concurrency)
+                    try await runBasicStressTest(client: client, endpoint: endpoint, iterations: total, concurrency: concurrency)
                 case "token_refresh_race":
                     print("Testing token refresh...")
                     for _ in 0 ..< 5 {
-                        let refreshed = try? await client.refreshToken()
-                        print("Token refresh result: \(refreshed ?? false)")
+                        let refreshed = try await client.refreshToken()
+                        print("Token refresh result: \(refreshed)")
                     }
                 case "dpop_validation":
                     print("Validating OAuth session...")
@@ -450,11 +472,11 @@ enum PetrelLoadCLI {
                     print("✓ Valid OAuth session: \(hasSession)")
                 case "nonce-test":
                     print("Testing nonce handling...")
-                    await runBasicStressTest(client: client, endpoint: endpoint, iterations: 50, concurrency: 5)
+                    try await runBasicStressTest(client: client, endpoint: endpoint, iterations: 50, concurrency: 5)
                 case "refresh-test":
                     print("Testing token refresh...")
-                    let refreshed = try? await client.refreshToken()
-                    print("✓ Token refresh result: \(refreshed ?? false)")
+                    let refreshed = try await client.refreshToken()
+                    print("✓ Token refresh result: \(refreshed)")
                 default:
                     print("Available DPoP modes: compliance, nonce-test, refresh-test")
                 }
@@ -466,7 +488,7 @@ enum PetrelLoadCLI {
         if unauth {
             print("Note: Running without authentication. For comprehensive testing, use OAuth with --oauth-start.")
             print("Running basic stress test with ATProtoClient...")
-            await runBasicStressTest(client: client, endpoint: endpoint, iterations: total, concurrency: concurrency)
+            try await runBasicStressTest(client: client, endpoint: endpoint, iterations: total, concurrency: concurrency)
             return
         }
 
@@ -474,18 +496,18 @@ enum PetrelLoadCLI {
         if keepRunning {
             print("Running continuous stress test. Press Ctrl+C to stop.")
             while true {
-                await runBasicStressTest(client: client, endpoint: endpoint, iterations: total, concurrency: concurrency)
+                try await runBasicStressTest(client: client, endpoint: endpoint, iterations: total, concurrency: concurrency)
                 try? await Task.sleep(nanoseconds: 2_000_000_000) // 2s pause between loops
             }
         } else {
             print("Running stress test with ATProtoClient...")
-            await runBasicStressTest(client: client, endpoint: endpoint, iterations: total, concurrency: concurrency)
+            try await runBasicStressTest(client: client, endpoint: endpoint, iterations: total, concurrency: concurrency)
         }
     }
 }
 
 /// Helper function for basic stress testing with ATProtoClient
-func runBasicStressTest(client: ATProtoClient, endpoint: String, iterations: Int, concurrency: Int) async {
+func runBasicStressTest(client: ATProtoClient, endpoint: String, iterations: Int, concurrency: Int) async throws {
     print("=== ATProtoClient Stress Test ===")
     print("Endpoint: \(endpoint)")
     print("Iterations: \(iterations), Concurrency: \(concurrency)")
@@ -584,7 +606,16 @@ func runBasicStressTest(client: ATProtoClient, endpoint: String, iterations: Int
 
         print("Latency - avg: \(String(format: "%.3f", avg))s, p50: \(String(format: "%.3f", p50))s, p95: \(String(format: "%.3f", p95))s, p99: \(String(format: "%.3f", p99))s")
     }
+
+    if failures > 0 {
+        throw PetrelLoadCLI.ScenarioError.requestFailures(failures)
+    }
 }
 
 // Main entry point
-await PetrelLoadCLI.main()
+do {
+    try await PetrelLoadCLI.main()
+} catch {
+    fputs("PetrelLoad failed: \(error)\n", stderr)
+    exit(1)
+}

@@ -68,6 +68,38 @@ struct PetrelLoadCLITests {
         }
     }
 
+    @Test("Base URLs must be absolute HTTP or HTTPS URLs")
+    func validBaseURL() {
+        for value in [
+            "not a URL",
+            "relative/path",
+            "ftp://example.com",
+            "https:///missing-host",
+        ] {
+            do {
+                _ = try PetrelLoadCLI.parseArgs([
+                    "PetrelLoad", "--base-url", value,
+                ])
+                Issue.record("Expected --base-url \(value) to be rejected")
+            } catch let error as PetrelLoadCLI.ArgumentError {
+                #expect(error == .invalidValue(option: "base-url", value: value))
+            } catch {
+                Issue.record("Unexpected error: \(error)")
+            }
+        }
+
+        #expect(throws: Never.self) {
+            _ = try PetrelLoadCLI.parseArgs([
+                "PetrelLoad", "--base-url", "http://127.0.0.1:8080",
+            ])
+        }
+        #expect(throws: Never.self) {
+            _ = try PetrelLoadCLI.parseArgs([
+                "PetrelLoad", "--base-url", "https://bsky.social",
+            ])
+        }
+    }
+
     @Test("Worker distribution executes every requested operation exactly once")
     func exactRequestDistribution() {
         #expect(PetrelLoadCLI.requestDistribution(total: 5, concurrency: 2) == [3, 2])
@@ -191,6 +223,8 @@ struct PetrelLoadCLITests {
         #expect(script.contains("source \"$ROOT/Scripts/activate-release-toolchain.sh\""))
         #expect(script.contains("\"$RELEASE_SWIFT\" run"))
         #expect(!script.contains("swift run"), "Harness must not resolve ambient Swift")
+        #expect(script.contains("failures=$((failures + 1))"))
+        #expect(script.contains("if (( failures > 0 )); then"))
     }
 
     @Test("OAuth harness has valid Bash syntax")
@@ -201,6 +235,82 @@ struct PetrelLoadCLITests {
         try process.run()
         process.waitUntilExit()
         #expect(process.terminationStatus == 0)
+    }
+
+    @Test("Failed stress requests make the command exit nonzero")
+    func failedStressRequestIsProcessFailure() throws {
+        let result = try runPetrelLoad([
+            "--namespace", "com.example.petrel.truthfulness.\(UUID().uuidString)",
+            "--endpoint", "app.bsky.actor.getProfile",
+            "--unauth",
+            "--base-url", "http://127.0.0.1:1",
+            "--requests", "1",
+            "--concurrency", "1",
+        ])
+
+        #expect(result.terminationReason == .exit)
+        #expect(result.terminationStatus == 1)
+        #expect(result.standardOutput.contains("Failures: 1"))
+        #expect(result.standardError.contains("PetrelLoad failed:"))
+        #expect(!result.standardError.contains("Fatal error"))
+    }
+
+    @Test("OAuth scenario errors are not erased or force-trapped")
+    func oauthErrorsReachProcessBoundary() throws {
+        let source = try String(
+            contentsOf: packageRoot.appendingPathComponent("Sources/PetrelLoad/main.swift"),
+            encoding: .utf8
+        )
+
+        #expect(!source.contains("try! await ATProtoClient"))
+        #expect(!source.contains("try? await client.refreshToken()"))
+        #expect(!source.contains("print(\"✗ API call FAILED:"))
+        #expect(!source.contains("print(\"✗ API call after ambiguous path failed:"))
+        #expect(!source.contains("print(\"ERROR: API call failed with:"))
+        #expect(!source.contains("print(\"(simulateAmbiguous is only available in DEBUG builds)\")"))
+    }
+
+    private struct ProcessResult {
+        let terminationReason: Process.TerminationReason
+        let terminationStatus: Int32
+        let standardOutput: String
+        let standardError: String
+    }
+
+    private func runPetrelLoad(_ arguments: [String]) throws -> ProcessResult {
+        #if DEBUG
+            let configuration = "debug"
+        #else
+            let configuration = "release"
+        #endif
+        let executableURL = packageRoot
+            .appendingPathComponent(".build/\(configuration)/PetrelLoad")
+        guard FileManager.default.isExecutableFile(atPath: executableURL.path) else {
+            throw CocoaError(.fileNoSuchFile)
+        }
+
+        let standardOutput = Pipe()
+        let standardError = Pipe()
+        let process = Process()
+        process.executableURL = executableURL
+        process.arguments = arguments
+        process.standardOutput = standardOutput
+        process.standardError = standardError
+        try process.run()
+        process.waitUntilExit()
+
+        return ProcessResult(
+            terminationReason: process.terminationReason,
+            terminationStatus: process.terminationStatus,
+            standardOutput: String(
+                decoding: standardOutput.fileHandleForReading.readDataToEndOfFile(),
+                as: UTF8.self
+            ),
+            standardError: String(
+                decoding: standardError.fileHandleForReading.readDataToEndOfFile(),
+                as: UTF8.self
+            )
+        )
     }
 
     private var packageRoot: URL {
