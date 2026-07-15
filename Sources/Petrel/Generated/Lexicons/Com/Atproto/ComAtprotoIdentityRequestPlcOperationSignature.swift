@@ -18,7 +18,7 @@ public extension ATProtoClient.Com.Atproto.Identity {
     ) async throws -> Int {
         let endpoint = "com.atproto.identity.requestPlcOperationSignature"
 
-        var headers: [String: String] = [:]
+        let headers: [String: String] = [:]
 
         let requestData: Data? = nil
 

@@ -105,15 +105,8 @@ public extension ATProtoClient.Com.Atproto.Sync {
         if (200 ... 299).contains(responseCode) {
             // Wildcard encoding ("*/*") — accept any Content-Type, including a missing one.
 
-            do {
-                let decodedData = ComAtprotoSyncGetBlob.Output(data: responseData)
-
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.sync.getBlob: \(error)")
-                return (responseCode, nil)
-            }
+            let decodedData = ComAtprotoSyncGetBlob.Output(data: responseData)
+            return (responseCode, decodedData)
         } else {
             // Try to parse a declared structured error response
             if let atprotoError = ATProtoErrorParser.parse(

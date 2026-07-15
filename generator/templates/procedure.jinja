@@ -44,18 +44,18 @@ extension ATProtoClient.{{ template_namespace_name }} {
         if mimeType.starts(with: "image/"), let compressedData = compressImage(dataToUpload) {
             dataToUpload = compressedData
         }
-        var headers: [String: String] = [
+        {{ 'var' if output_encoding else 'let' }} headers: [String: String] = [
             "Content-Type": mimeType,
             "Content-Length": "\(dataToUpload.count)"
         ]
         {% elif is_binary_data %}
         let dataToUpload = data
-        var headers: [String: String] = [
+        {{ 'var' if output_encoding else 'let' }} headers: [String: String] = [
             "Content-Type": "{{ input_encoding }}",
             "Content-Length": "\(dataToUpload.count)"
         ]
         {% else %}
-        var headers: [String: String] = [:]
+        {{ 'var' if input_encoding or output_encoding else 'let' }} headers: [String: String] = [:]
         {% if input_encoding %}
         headers["Content-Type"] = "{{ input_encoding }}"
         {% endif %}

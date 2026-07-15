@@ -18,7 +18,7 @@ public extension ATProtoClient.Com.Atproto.Server {
     ) async throws -> Int {
         let endpoint = "com.atproto.server.requestEmailConfirmation"
 
-        var headers: [String: String] = [:]
+        let headers: [String: String] = [:]
 
         let requestData: Data? = nil
 

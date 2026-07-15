@@ -53,7 +53,7 @@ public extension ATProtoClient.Com.Atproto.Repo {
         let endpoint = "com.atproto.repo.importRepo"
 
         let dataToUpload = data
-        var headers: [String: String] = [
+        let headers: [String: String] = [
             "Content-Type": "application/vnd.ipld.car",
             "Content-Length": "\(dataToUpload.count)",
         ]

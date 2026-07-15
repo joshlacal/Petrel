@@ -156,21 +156,17 @@ extension ATProtoClient.{{ template_namespace_name }} {
             }
             {% endif %}
 
-            do {
-                {% if output_encoding == "application/json" %}
+            {% if output_encoding == "application/json" %}do {
                 let decoder = JSONDecoder()
                 let decodedData = try decoder.decode({{ output_type }}.self, from: responseData)
-                {% elif output_encoding in ["*/*", "application/vnd.ipld.car", "application/jsonl"] %}
-                let decodedData = {{ output_type }}(data: responseData)
-                {% else %}
-                let decodedData = {{ output_type }}(data: responseData)
-                {% endif %}
+
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
                 LogManager.logError("Failed to decode successful response for {{ endpoint }}: \(error)")
                 return (responseCode, nil)
-            }
+            }{% else %}let decodedData = {{ output_type }}(data: responseData)
+            return (responseCode, decodedData){% endif %}
         } else {
             {% if has_errors %}// Try to parse a declared structured error response
             if let atprotoError = ATProtoErrorParser.parse(

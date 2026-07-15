@@ -82,15 +82,8 @@ public extension ATProtoClient.Chat.Bsky.Actor {
                 throw NetworkError.invalidContentType(expected: "application/jsonl", actual: contentType)
             }
 
-            do {
-                let decodedData = ChatBskyActorExportAccountData.Output(data: responseData)
-
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.actor.exportAccountData: \(error)")
-                return (responseCode, nil)
-            }
+            let decodedData = ChatBskyActorExportAccountData.Output(data: responseData)
+            return (responseCode, decodedData)
         } else {
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
