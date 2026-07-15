@@ -4,6 +4,9 @@
     @preconcurrency import Crypto
 #endif
 import Foundation
+#if canImport(FoundationNetworking)
+    import FoundationNetworking
+#endif
 @testable import Petrel
 import Synchronization
 import Testing
@@ -13,8 +16,14 @@ import Testing
 /// In-memory SecureStorage with scriptable failures, for exercising the
 /// refresh-persistence paths without touching the real keychain.
 final class InMemorySecureStorage: SecureStorage, @unchecked Sendable {
+    enum Operation {
+        case retrieve
+        case delete
+    }
+
     private let lock = NSLock()
     private var items: [String: Data] = [:]
+    private var operationObserver: (@Sendable (Operation, String) -> Void)?
 
     /// Fail the next N store calls (any key), then succeed.
     var storeFailuresRemaining = 0
@@ -38,8 +47,11 @@ final class InMemorySecureStorage: SecureStorage, @unchecked Sendable {
 
     func retrieve(key: String, namespace: String, accessGroup _: String?) throws -> Data {
         lock.lock()
-        defer { lock.unlock() }
-        guard let data = items[fullKey(key, namespace)] else {
+        let data = items[fullKey(key, namespace)]
+        let observer = operationObserver
+        lock.unlock()
+        observer?(.retrieve, key)
+        guard let data else {
             throw KeychainError.itemRetrievalError(status: -25300)
         }
         return data
@@ -47,8 +59,10 @@ final class InMemorySecureStorage: SecureStorage, @unchecked Sendable {
 
     func delete(key: String, namespace: String, accessGroup _: String?) throws {
         lock.lock()
-        defer { lock.unlock() }
         items.removeValue(forKey: fullKey(key, namespace))
+        let observer = operationObserver
+        lock.unlock()
+        observer?(.delete, key)
     }
 
     func deleteAll(namespace: String, accessGroup _: String?) throws {
@@ -71,6 +85,12 @@ final class InMemorySecureStorage: SecureStorage, @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         items[fullKey(key, namespace)] = data
+    }
+
+    func setOperationObserver(_ observer: (@Sendable (Operation, String) -> Void)?) {
+        lock.lock()
+        defer { lock.unlock() }
+        operationObserver = observer
     }
 }
 
@@ -101,6 +121,212 @@ final class MockDIDResolver: DIDResolving, @unchecked Sendable {
     }
 }
 
+private final class AsyncLatch: @unchecked Sendable {
+    private let lock = NSLock()
+    private var signaled = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func signal() {
+        lock.lock()
+        guard !signaled else {
+            lock.unlock()
+            return
+        }
+        signaled = true
+        let currentWaiters = waiters
+        waiters.removeAll()
+        lock.unlock()
+        currentWaiters.forEach { $0.resume() }
+    }
+
+    func wait() async {
+        await withCheckedContinuation { continuation in
+            lock.lock()
+            if signaled {
+                lock.unlock()
+                continuation.resume()
+            } else {
+                waiters.append(continuation)
+                lock.unlock()
+            }
+        }
+    }
+}
+
+private final class RefreshStorageObserver: @unchecked Sendable {
+    let refreshCleared = AsyncLatch()
+    let postClearSessionLookup = AsyncLatch()
+
+    private let lock = NSLock()
+    private let did: String
+    private var didClearRefresh = false
+
+    init(did: String) {
+        self.did = did
+    }
+
+    func observe(_ operation: InMemorySecureStorage.Operation, key: String) {
+        let signals = lock.withLock { () -> (refreshCleared: Bool, sessionLookup: Bool) in
+            switch operation {
+            case .delete where key == "refresh.inProgress.\(did)":
+                didClearRefresh = true
+                return (true, false)
+            case .retrieve where didClearRefresh && key == "session.pending.\(did)":
+                return (false, true)
+            default:
+                return (false, false)
+            }
+        }
+        if signals.refreshCleared {
+            refreshCleared.signal()
+        }
+        if signals.sessionLookup {
+            postClearSessionLookup.signal()
+        }
+    }
+}
+
+private actor AuthenticationRefreshTransport {
+    enum Response {
+        case invalidGrant
+        case serverFailure
+    }
+
+    private let responses: [Response]
+    private var requestCount = 0
+    private var requestWaiters: [(count: Int, continuation: CheckedContinuation<Void, Never>)] = []
+    private var releasePermits = 0
+    private var releaseWaiters: [CheckedContinuation<Void, Never>] = []
+
+    init(responses: [Response]) {
+        self.responses = responses
+    }
+
+    func waitForRequestCount(_ count: Int) async {
+        guard requestCount < count else { return }
+        await withCheckedContinuation { continuation in
+            requestWaiters.append((count, continuation))
+        }
+    }
+
+    func releaseNextRequest() {
+        if let continuation = releaseWaiters.first {
+            releaseWaiters.removeFirst()
+            continuation.resume()
+        } else {
+            releasePermits += 1
+        }
+    }
+
+    func handle(_ box: AuthenticationRefreshURLProtocolBox) async {
+        let responseIndex = requestCount
+        requestCount += 1
+        let readyWaiters = requestWaiters.filter { requestCount >= $0.count }
+        requestWaiters.removeAll { requestCount >= $0.count }
+        readyWaiters.forEach { $0.continuation.resume() }
+
+        if releasePermits > 0 {
+            releasePermits -= 1
+        } else {
+            await withCheckedContinuation { releaseWaiters.append($0) }
+        }
+
+        guard !Task.isCancelled else { return }
+        guard responseIndex < responses.count else {
+            box.protocolInstance.client?.urlProtocol(
+                box.protocolInstance,
+                didFailWithError: URLError(.badServerResponse)
+            )
+            return
+        }
+
+        switch responses[responseIndex] {
+        case .invalidGrant:
+            let response = HTTPURLResponse(
+                url: box.request.url!,
+                statusCode: 400,
+                httpVersion: "HTTP/1.1",
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            let data = Data(#"{"error":"invalid_grant","error_description":"refresh token rejected"}"#.utf8)
+            box.protocolInstance.client?.urlProtocol(
+                box.protocolInstance,
+                didReceive: response,
+                cacheStoragePolicy: .notAllowed
+            )
+            box.protocolInstance.client?.urlProtocol(box.protocolInstance, didLoad: data)
+            box.protocolInstance.client?.urlProtocolDidFinishLoading(box.protocolInstance)
+        case .serverFailure:
+            let response = HTTPURLResponse(
+                url: box.request.url!,
+                statusCode: 400,
+                httpVersion: "HTTP/1.1",
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            let data = Data(#"{"error":"temporarily_unavailable","error_description":"refresh unavailable"}"#.utf8)
+            box.protocolInstance.client?.urlProtocol(
+                box.protocolInstance,
+                didReceive: response,
+                cacheStoragePolicy: .notAllowed
+            )
+            box.protocolInstance.client?.urlProtocol(box.protocolInstance, didLoad: data)
+            box.protocolInstance.client?.urlProtocolDidFinishLoading(box.protocolInstance)
+        }
+    }
+}
+
+private final class AuthenticationRefreshURLProtocol: URLProtocol {
+    struct Installation {
+        let host: String
+        let transport: AuthenticationRefreshTransport
+    }
+
+    private static let installation = Mutex<Installation?>(nil)
+    private var loadingTask: Task<Void, Never>?
+
+    static func install(host: String, transport: AuthenticationRefreshTransport) {
+        installation.withLock { $0 = Installation(host: host, transport: transport) }
+    }
+
+    static func uninstall() {
+        installation.withLock { $0 = nil }
+    }
+
+    override class func canInit(with request: URLRequest) -> Bool {
+        installation.withLock { $0?.host == request.url?.host }
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+        request
+    }
+
+    override func startLoading() {
+        guard let transport = Self.installation.withLock({ $0?.transport }) else {
+            client?.urlProtocol(self, didFailWithError: URLError(.unsupportedURL))
+            return
+        }
+        let box = AuthenticationRefreshURLProtocolBox(protocolInstance: self, request: request)
+        loadingTask = Task {
+            await transport.handle(box)
+        }
+    }
+
+    override func stopLoading() {
+        loadingTask?.cancel()
+        loadingTask = nil
+    }
+}
+
+private final class AuthenticationRefreshURLProtocolBox: @unchecked Sendable {
+    let protocolInstance: AuthenticationRefreshURLProtocol
+    let request: URLRequest
+
+    init(protocolInstance: AuthenticationRefreshURLProtocol, request: URLRequest) {
+        self.protocolInstance = protocolInstance
+        self.request = request
+    }
+}
+
 // MARK: - Fixtures
 
 private let testDID = "did:plc:refreshreliability"
@@ -109,13 +335,18 @@ private func makeAccount() -> Account {
     Account(did: testDID, handle: "test.example", pdsURL: URL(string: "https://pds.test")!)
 }
 
-private func makeSession(refreshToken: String, createdAt: Date = Date(), expiresIn: TimeInterval = 3600) -> Session {
+private func makeSession(
+    refreshToken: String,
+    createdAt: Date = Date(),
+    expiresIn: TimeInterval = 3600,
+    tokenType: TokenType = .dpop
+) -> Session {
     Session(
         accessToken: "access-\(refreshToken)",
         refreshToken: refreshToken,
         createdAt: createdAt,
         expiresIn: expiresIn,
-        tokenType: .dpop,
+        tokenType: tokenType,
         did: testDID
     )
 }
@@ -135,6 +366,32 @@ private func makeCore(storage: KeychainStorage) async -> OAuthCore {
     )
 }
 
+private func makeAuthenticationService(
+    storage: KeychainStorage,
+    transport: AuthenticationRefreshTransport,
+    host: String
+) -> AuthenticationService {
+    let account = Account(
+        did: testDID,
+        handle: "test.example",
+        pdsURL: URL(string: "https://\(host)")!
+    )
+    NetworkService.setNetworkTestProtocolClasses([AuthenticationRefreshURLProtocol.self])
+    let networkService = NetworkService(baseURL: account.pdsURL)
+    AuthenticationRefreshURLProtocol.install(host: host, transport: transport)
+    return AuthenticationService(
+        storage: storage,
+        accountManager: MockAccountManager(account: account),
+        networkService: networkService,
+        oauthConfig: OAuthConfig(
+            clientId: "test-client",
+            redirectUri: "test://callback",
+            scope: "atproto"
+        ),
+        didResolver: MockDIDResolver()
+    )
+}
+
 /// Runs `body` with an injected in-memory storage backend, always restoring the
 /// platform default afterwards.
 private func withInMemoryBackend<T>(
@@ -150,6 +407,81 @@ private func withInMemoryBackend<T>(
 
 @Suite("Refresh token reliability", .serialized)
 struct RefreshTokenReliabilityTests {
+    @Test("AuthenticationService propagates refresh task failures")
+    func authenticationServicePropagatesRefreshTaskFailure() async throws {
+        let backend = InMemorySecureStorage()
+        try await withInMemoryBackend(backend) {
+            let host = "refresh-failure-\(UUID().uuidString.lowercased()).example"
+            let namespace = "test.refresh.authentication.failure"
+            let storage = KeychainStorage(namespace: namespace)
+            let session = makeSession(refreshToken: "rt-auth-failure", tokenType: .bearer)
+            let transport = AuthenticationRefreshTransport(responses: [.serverFailure])
+            let storageObserver = RefreshStorageObserver(did: testDID)
+            backend.setOperationObserver { operation, key in
+                storageObserver.observe(operation, key: key)
+            }
+            defer {
+                backend.setOperationObserver(nil)
+                AuthenticationRefreshURLProtocol.uninstall()
+                NetworkService.setNetworkTestProtocolClasses(nil)
+            }
+
+            try await storage.saveAccountAndSession(makeAccount(), session: session, for: testDID)
+            let service = makeAuthenticationService(storage: storage, transport: transport, host: host)
+            let refresh = Task {
+                try await service.refreshTokenIfNeeded(forceRefresh: true)
+            }
+
+            await transport.waitForRequestCount(1)
+            await transport.releaseNextRequest()
+            let result = await refresh.result
+            await storageObserver.refreshCleared.wait()
+
+            switch result {
+            case let .success(unexpectedResult):
+                Issue.record("Refresh failure returned early as \(unexpectedResult) instead of throwing")
+            case let .failure(error):
+                #expect(error as? AuthError == .tokenRefreshFailed)
+            }
+        }
+    }
+
+    @Test("AuthenticationService returns the completed refresh task result")
+    func authenticationServiceReturnsCompletedRefreshTaskResult() async throws {
+        let backend = InMemorySecureStorage()
+        try await withInMemoryBackend(backend) {
+            let host = "refresh-result-\(UUID().uuidString.lowercased()).example"
+            let namespace = "test.refresh.authentication.result"
+            let storage = KeychainStorage(namespace: namespace)
+            let session = makeSession(refreshToken: "rt-auth-result", tokenType: .bearer)
+            let transport = AuthenticationRefreshTransport(responses: [.invalidGrant])
+            let storageObserver = RefreshStorageObserver(did: testDID)
+            backend.setOperationObserver { operation, key in
+                storageObserver.observe(operation, key: key)
+            }
+            defer {
+                backend.setOperationObserver(nil)
+                AuthenticationRefreshURLProtocol.uninstall()
+                NetworkService.setNetworkTestProtocolClasses(nil)
+            }
+
+            try await storage.saveAccountAndSession(makeAccount(), session: session, for: testDID)
+            let service = makeAuthenticationService(storage: storage, transport: transport, host: host)
+            let refresh = Task {
+                try await service.refreshTokenIfNeeded(forceRefresh: true)
+            }
+
+            await transport.waitForRequestCount(1)
+            KeychainManager.clearCache()
+            await transport.releaseNextRequest()
+            let result = try await refresh.value
+            await storageObserver.refreshCleared.wait()
+            await storageObserver.postClearSessionLookup.wait()
+
+            #expect(result == .stillValid, "Refresh did not preserve the task's transient-safe result")
+        }
+    }
+
     // The core "expires early" regression: a refresh that fails for transient
     // reasons (timeout, offline, 5xx) must not permanently poison the refresh
     // token in-process.

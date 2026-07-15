@@ -2067,12 +2067,12 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
         activeRefreshTasks[did] = refreshTask
 
         do {
-            let result = try await refreshTask
+            let result = try await refreshTask.value
             // Clean up on success
             activeRefreshTasks.removeValue(forKey: did)
             // Keep the old refresh token marked as used, but remove the new one from tracking
             usedRefreshTokens.remove(refreshToken)
-            return .refreshedSuccessfully
+            return result
         } catch {
             // Clean up on failure
             activeRefreshTasks.removeValue(forKey: did)
