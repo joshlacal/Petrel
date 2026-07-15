@@ -2,7 +2,8 @@
   "$comment": "Generation manifest for the public Petrel core package. Paths are relative to the repo root (the directory run.py is invoked from).",
   "package": {
     "kind": "core",
-    "name": "Petrel"
+    "name": "Petrel",
+    "core_namespace_roots": ["blue"]
   },
   "lexicons": {
     "emit": ["generator/lexicons"],
