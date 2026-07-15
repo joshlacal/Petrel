@@ -1,6 +1,6 @@
 name: Sync lexicons from upstream
 
-on:
+'on':
   schedule:
     - cron: '17 6 * * 1'   # weekly, Monday 06:17 UTC
   workflow_dispatch:
@@ -14,8 +14,11 @@ jobs:
     name: Sync and open PR
     runs-on: macos-26
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         id: release-python
         with:
           python-version: '3.12'
@@ -37,14 +40,16 @@ jobs:
           export RELEASE_TVOS_RUNTIME=26.5
           export RELEASE_VISIONOS_RUNTIME=26.5
           source Scripts/activate-release-toolchain.sh
-          printf 'RELEASE_PYTHON312=%s\n' "$RELEASE_PYTHON312" >> "$GITHUB_ENV"
-          printf 'DEVELOPER_DIR=%s\n' "$DEVELOPER_DIR" >> "$GITHUB_ENV"
-          printf 'RELEASE_SWIFT=%s\n' "$RELEASE_SWIFT" >> "$GITHUB_ENV"
-          printf 'RELEASE_XCODEBUILD=%s\n' "$RELEASE_XCODEBUILD" >> "$GITHUB_ENV"
-          printf 'RELEASE_XCRUN=%s\n' "$RELEASE_XCRUN" >> "$GITHUB_ENV"
-          printf 'RELEASE_MINT=%s\n' "$RELEASE_MINT" >> "$GITHUB_ENV"
-          printf 'MINT_PATH=%s\n' "$MINT_PATH" >> "$GITHUB_ENV"
-          printf 'MINT_LINK_PATH=%s\n' "$MINT_LINK_PATH" >> "$GITHUB_ENV"
+          {
+            printf 'RELEASE_PYTHON312=%s\n' "$RELEASE_PYTHON312"
+            printf 'DEVELOPER_DIR=%s\n' "$DEVELOPER_DIR"
+            printf 'RELEASE_SWIFT=%s\n' "$RELEASE_SWIFT"
+            printf 'RELEASE_XCODEBUILD=%s\n' "$RELEASE_XCODEBUILD"
+            printf 'RELEASE_XCRUN=%s\n' "$RELEASE_XCRUN"
+            printf 'RELEASE_MINT=%s\n' "$RELEASE_MINT"
+            printf 'MINT_PATH=%s\n' "$MINT_PATH"
+            printf 'MINT_LINK_PATH=%s\n' "$MINT_LINK_PATH"
+          } >> "$GITHUB_ENV"
           dirname "$RELEASE_SWIFT" >> "$GITHUB_PATH"
       - name: Bootstrap locked generator and release tools
         shell: bash
@@ -79,8 +84,9 @@ jobs:
           "$RELEASE_MINT" run --executable swiftformat nicklockwood/SwiftFormat@0.61.1 \
             Sources/Petrel/Generated
       - name: Open PR if changed
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7.0.11
         with:
+          token: ${{ github.token }}
           branch: bot/sync-lexicons
           title: 'Sync lexicons from bluesky-social/atproto'
           commit-message: 'Sync standard lexicons from upstream + regenerate'

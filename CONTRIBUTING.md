@@ -49,7 +49,7 @@ By participating in this project, you agree to abide by our Code of Conduct:
 ### Prerequisites
 
 - **Xcode 16.0+** with Swift 6.0+
-- **Python 3.8+** (for code generation)
+- **Python 3.12** (for release-equivalent code generation)
 - **Git** for version control
 
 ### Building the Project
@@ -67,13 +67,17 @@ swift package generate-documentation
 
 ### Setting Up Code Generation
 
-The code generator requires Python with Jinja2:
+The development generator dependencies are isolated in a virtual environment:
 
 ```bash
-# Install Python dependencies
-cd Generator
-pip install -r requirements.txt
+python3.12 -m venv .build/generator-dev
+.build/generator-dev/bin/python -m pip install -r generator/requirements.txt
+.build/generator-dev/bin/python -m unittest discover -s generator/tests -v
 ```
+
+Release candidates use the hash-locked `generator/requirements-release.lock`
+through `Scripts/bootstrap-generator-environment.sh`; the hosted release gate is
+the canonical release-equivalent environment.
 
 ## Code Generation
 
@@ -81,33 +85,35 @@ Petrel uses automated code generation from AT Protocol Lexicon files. Understand
 
 ### How Code Generation Works
 
-1. **Lexicon Files**: JSON definitions from the AT Protocol spec are stored in `Generator/lexicons/`
-2. **Templates**: Jinja2 templates in `Generator/templates/` define the Swift code structure
+1. **Lexicon Files**: JSON definitions from the AT Protocol spec are stored in `generator/lexicons/`
+2. **Templates**: Jinja2 templates in `generator/templates/` define the Swift code structure
 3. **Generator**: Python scripts process Lexicons and generate Swift files
 4. **Output**: Generated files are placed in `Sources/Petrel/Generated/`
 
 ### Updating Generated Code
 
 ```bash
-# Run the generator
-cd Petrel
-python Generator/main.py
-
-# Or use the convenience script
-python run.py Generator/lexicons Sources/Petrel/Generated
+# Development projection
+.build/generator-dev/bin/python run.py \
+  --manifest generator/manifests/petrel-core.json \
+  --language swift
 ```
+
+For a release-ready projection, activate a sealed release toolchain, bootstrap
+the locked generator and release tools, and run `Scripts/regenerate-generated.sh`.
+That script requires a clean checkout and applies the pinned SwiftFormat version.
 
 ### Adding New Lexicons
 
-1. Add new Lexicon JSON files to `Generator/lexicons/`
-2. Run the generator
+1. Add new Lexicon JSON files to `generator/lexicons/`
+2. Run the manifest-driven generator
 3. Commit both the Lexicon files and generated Swift code
 
 ### Modifying Templates
 
 If you need to change how code is generated:
 
-1. Edit templates in `Generator/templates/`
+1. Edit templates in `generator/templates/`
 2. Test thoroughly with existing Lexicons
 3. Regenerate all code and ensure tests pass
 
@@ -205,7 +211,7 @@ final class YourFeatureTests: XCTestCase {
 
 1. **Ensure all tests pass**
 2. **Update documentation** if needed
-3. **Run SwiftLint** if available
+3. **Run the pinned SwiftFormat projection** through `Scripts/regenerate-generated.sh` when generated Swift changes
 4. **Rebase on latest main** to avoid conflicts
 
 ### Pull Request Process
@@ -364,7 +370,7 @@ Any other relevant information
 - **Questions**: Open a GitHub Discussion
 - **Bugs**: Create an Issue
 - **Ideas**: Start a Discussion first
-- **Security**: Email security concerns privately
+- **Security**: Follow the private-reporting status and route in [SECURITY.md](SECURITY.md); do not open a public issue for a suspected vulnerability
 
 ## Recognition
 

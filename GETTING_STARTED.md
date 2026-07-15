@@ -21,7 +21,7 @@ Before you begin, ensure you have:
 
 - **Xcode 16.0** or later
 - **Swift 6.0** or later
-- **iOS 17.0+** or **macOS 14.0+** deployment target
+- **iOS 18.0+** or **macOS 15.0+** deployment target
 - A Bluesky account (create one at [bsky.app](https://bsky.app))
 - An app password for your account (create in Settings → Advanced → App Passwords)
 
@@ -39,7 +39,7 @@ Before you begin, ensure you have:
 2. **In Package.swift:**
    ```swift
    dependencies: [
-       .package(url: "https://github.com/joshlacal/Petrel.git", from: "1.0.0")
+       .package(url: "https://github.com/joshlacal/Petrel.git", .upToNextMinor(from: "0.2.0"))
    ],
    targets: [
        .target(

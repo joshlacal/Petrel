@@ -1,9 +1,12 @@
-name: Swift
+name: Swift compatibility
 
-on:
+'on':
   push:
-    branches: [main, restructure]
+    branches: [main]
   pull_request:
+
+permissions:
+  contents: read
 
 concurrency:
   group: swift-${{ github.ref }}
@@ -11,29 +14,103 @@ concurrency:
 
 jobs:
   macos:
-    name: macOS build & test
-    runs-on: macos-15
+    name: macOS (${{ matrix.lane }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - lane: minimum
+            runner: macos-15
+            selection: pinned-minimum
+            evidence-class: stable-release
+            developer-dir: /Applications/Xcode_16.0.app/Contents/Developer
+            xcode-version: '16.0'
+            xcode-build: 16A242d
+            deployment-target: '18.0'
+            ios-runtime: '18.0'
+            watchos-runtime: '11.0'
+            tvos-runtime: '18.0'
+            visionos-runtime: '2.0'
+          - lane: newest-stable
+            runner: macos-26
+            selection: official-runner-inventory
+            evidence-class: stable-release
+            developer-dir: /Applications/Xcode_26.6.app/Contents/Developer
+            xcode-version: '26.6'
+            xcode-build: 17F113
+            deployment-target: '18.0'
+            ios-runtime: '26.5'
+            watchos-runtime: '26.5'
+            tvos-runtime: '26.5'
+            visionos-runtime: '26.5'
+    runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_16.4.app || sudo xcode-select -s /Applications/Xcode_16.2.app
-      - name: Build
-        run: swift build
-      - name: Test
-        run: swift test --no-parallel
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Select and verify stable Xcode
+        shell: bash
+        run: |
+          set -euo pipefail
+          export RELEASE_TOOLCHAIN_LANE='${{ matrix.lane }}'
+          export RELEASE_TOOLCHAIN_SELECTION='${{ matrix.selection }}'
+          export RELEASE_EVIDENCE_CLASS='${{ matrix.evidence-class }}'
+          export RELEASE_DEVELOPER_DIR='${{ matrix.developer-dir }}'
+          export RELEASE_XCODE_VERSION='${{ matrix.xcode-version }}'
+          export RELEASE_XCODE_BUILD='${{ matrix.xcode-build }}'
+          export RELEASE_IOS_RUNTIME='${{ matrix.ios-runtime }}'
+          export RELEASE_WATCHOS_RUNTIME='${{ matrix.watchos-runtime }}'
+          export RELEASE_TVOS_RUNTIME='${{ matrix.tvos-runtime }}'
+          export RELEASE_VISIONOS_RUNTIME='${{ matrix.visionos-runtime }}'
+          source Scripts/activate-release-toolchain.sh
+          test "$("$RELEASE_XCRUN" --sdk iphonesimulator --show-sdk-version)" = "$RELEASE_IOS_RUNTIME"
+          for name in RELEASE_TOOLCHAIN_LANE RELEASE_TOOLCHAIN_SELECTION RELEASE_EVIDENCE_CLASS \
+            RELEASE_DEVELOPER_DIR RELEASE_XCODE_VERSION RELEASE_XCODE_BUILD RELEASE_IOS_RUNTIME \
+            RELEASE_WATCHOS_RUNTIME RELEASE_TVOS_RUNTIME RELEASE_VISIONOS_RUNTIME DEVELOPER_DIR \
+            RELEASE_SWIFT RELEASE_XCODEBUILD RELEASE_XCRUN; do
+            printf '%s=%s\n' "$name" "${!name}" >> "$GITHUB_ENV"
+          done
+          printf '%s\n' "$RELEASE_DEVELOPER_DIR/Toolchains/XcodeDefault.xctoolchain/usr/bin" >> "$GITHUB_PATH"
+      - name: Build, test, and reject package-owned warnings
+        shell: bash
+        run: |
+          set -euo pipefail
+          Scripts/verify-owned-warnings.sh debug-build -- "$RELEASE_SWIFT" build
+          Scripts/verify-owned-warnings.sh tests -- "$RELEASE_SWIFT" test
+          Scripts/verify-owned-warnings.sh dag-cbor-bridge -- \
+            "$RELEASE_SWIFT" test --filter DAGCBORJSONBridgeTests
+          Scripts/verify-owned-warnings.sh release-build -- "$RELEASE_SWIFT" build -c release
+          Scripts/verify-owned-warnings.sh ios-simulator -- "$RELEASE_XCODEBUILD" \
+            -scheme Petrel \
+            -destination 'generic/platform=iOS Simulator' \
+            build
 
   linux:
-    name: Linux build & test
-    runs-on: ubuntu-latest
-    container: swift:6.0
+    name: Linux (Swift 6.0.3)
+    runs-on: ubuntu-24.04
+    container: swift:6.0.3-jammy@sha256:f0bfe313779a0bb99db87f97c88ea6ada014aa6b3359f9c5583bf70b0b721217
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
       - name: Install system dependencies
         run: apt-get update && apt-get install -y libsecret-1-dev libglib2.0-dev pkg-config
-      - name: Build
-        # swift-crypto 3.x key types do not yet satisfy Swift 6.0's Linux
-        # Sendable diagnostics. Keep this compatibility job in Swift 5 mode
-        # until the crypto dependency boundary is migrated.
-        run: swift build -Xswiftc -swift-version -Xswiftc 5
-      - name: Test
-        run: swift test --no-parallel -Xswiftc -swift-version -Xswiftc 5
+      - name: Verify pinned Swift
+        shell: bash
+        run: |
+          set -euo pipefail
+          RELEASE_SWIFT=$(command -v swift)
+          [[ $RELEASE_SWIFT == /* ]]
+          test "$("$RELEASE_SWIFT" --version | head -n 1)" = 'Swift version 6.0.3 (swift-6.0.3-RELEASE)'
+          printf 'RELEASE_SWIFT=%s\n' "$RELEASE_SWIFT" >> "$GITHUB_ENV"
+      - name: Build, test, and reject package-owned warnings
+        shell: bash
+        run: |
+          set -euo pipefail
+          Scripts/verify-owned-warnings.sh debug-build -- "$RELEASE_SWIFT" build
+          Scripts/verify-owned-warnings.sh tests -- "$RELEASE_SWIFT" test
+          Scripts/verify-owned-warnings.sh dag-cbor-bridge -- \
+            "$RELEASE_SWIFT" test --filter DAGCBORJSONBridgeTests
+          Scripts/verify-owned-warnings.sh release-build -- "$RELEASE_SWIFT" build -c release

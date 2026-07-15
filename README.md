@@ -17,7 +17,7 @@ Petrel generates strongly-typed clients from the official atproto lexicons — e
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/joshlacal/Petrel.git", from: "0.3.0")
+    .package(url: "https://github.com/joshlacal/Petrel.git", .upToNextMinor(from: "0.2.0"))
 ]
 ```
 
@@ -77,9 +77,8 @@ val timeline = client.app.bsky.feed.getTimeline(AppBskyFeedGetTimelineParameters
 The generator supports **overlay packages**: keep your own lexicon namespaces in a separate package generated against the public core, without forking Petrel. See `generator/manifests/` and `KOTLIN_GENERATOR.md`.
 
 ```bash
-# Regenerate from lexicons (core)
-python3 run.py --manifest generator/manifests/petrel-core.json
-swiftformat Sources/Petrel/Generated
+# From an activated release environment and a clean checkout
+Scripts/regenerate-generated.sh
 ```
 
 ## Documentation
