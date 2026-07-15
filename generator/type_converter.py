@@ -10,12 +10,18 @@ class TypeConverter:
 
         Per the Lexicon spec, `blob`, `bytes`, and `cid-link` are valid top-level
         definitions and can be `ref`'d. They have no named Swift type of their
-        own, so a local ref to such a def must resolve to the built-in primitive
-        type (matching inline usage), not a mangled name. All other refs
+        own, so a ref to such a def must resolve to the built-in primitive type
+        (matching inline usage), not a mangled name. All other refs
         (object/record/token/array/string defs) keep their generated named type.
+
+        Handles both the `#frag` shorthand and a fully-qualified self-reference
+        (`{current lexicon id}#frag`). External refs to primitive defs would need
+        the reference-lexicon corpus to resolve and fall through unchanged.
         """
-        if ref.startswith('#'):
-            target = self.swift_code_generator.defs.get(ref[1:])
+        nsid, _, fragment = ref.partition('#')
+        fragment = fragment or 'main'
+        if not nsid or nsid == self.swift_code_generator.lexicon_id:
+            target = self.swift_code_generator.defs.get(fragment)
             if isinstance(target, dict):
                 target_type = target.get('type')
                 if target_type == 'blob':
