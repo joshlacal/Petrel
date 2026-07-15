@@ -5,6 +5,27 @@ class TypeConverter:
     def __init__(self, swift_code_generator):
         self.swift_code_generator = swift_code_generator
 
+    def _convert_ref(self, ref: str) -> str:
+        """Resolve a `ref` to a Swift type.
+
+        Per the Lexicon spec, `blob`, `bytes`, and `cid-link` are valid top-level
+        definitions and can be `ref`'d. They have no named Swift type of their
+        own, so a local ref to such a def must resolve to the built-in primitive
+        type (matching inline usage), not a mangled name. All other refs
+        (object/record/token/array/string defs) keep their generated named type.
+        """
+        if ref.startswith('#'):
+            target = self.swift_code_generator.defs.get(ref[1:])
+            if isinstance(target, dict):
+                target_type = target.get('type')
+                if target_type == 'blob':
+                    return 'Blob'
+                if target_type == 'bytes':
+                    return 'Bytes'
+                if target_type == 'cid-link':
+                    return 'CID'
+        return convert_ref(ref)
+
     def determine_swift_type(self, name: str, prop: Dict[str, Any], required_fields: List[str], current_struct_name: str, isOptional: bool = None) -> str:
         swift_type = ""
         prop_type = prop.get('type')
@@ -37,7 +58,7 @@ class TypeConverter:
             else:
                 swift_type = "String"
         elif prop_type == 'ref':
-            swift_type = convert_ref(prop['ref']) 
+            swift_type = self._convert_ref(prop['ref'])
         elif prop_type == 'integer':
             swift_type = "Int" 
         elif prop_type == 'number':
