@@ -496,7 +496,7 @@ struct PetrelLoadCLITests {
             encoding: .utf8
         )
 
-        #expect(source.contains("await PetrelAuthEvents.addObserver"))
+        #expect(source.contains("await PetrelAuthEvents.addObserverAndWait"))
         #expect(source.contains("await PetrelAuthEvents.drain()"))
         #expect(!source.contains("Waiting for you to complete the OAuth flow"))
         #expect(!source.contains("try! await ATProtoClient"))

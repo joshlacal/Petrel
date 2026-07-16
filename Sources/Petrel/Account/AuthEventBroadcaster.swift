@@ -117,6 +117,10 @@ public actor AuthEventBroadcaster {
 
 /// Public API for subscribing to Petrel authentication events
 public enum PetrelAuthEvents {
+    private enum DeliveryContext {
+        @TaskLocal static var isDelivering = false
+    }
+
     private struct DeliveryState {
         var generation: UInt = 0
         var tail: Task<Void, Never>?
@@ -126,6 +130,10 @@ public enum PetrelAuthEvents {
 
     /// Add an observer to receive authentication events
     /// - Parameter observer: Closure called when auth events occur
+    ///
+    /// Registration is scheduled asynchronously and may not be complete when this
+    /// method returns. Use ``addObserverAndWait(_:)`` when an event can be emitted
+    /// immediately after registration.
     ///
     /// Example usage:
     /// ```swift
@@ -148,8 +156,10 @@ public enum PetrelAuthEvents {
 
     /// Add an observer and return only after registration is complete.
     ///
-    /// Await this overload when events may be emitted immediately after registration.
-    public static func addObserver(_ observer: @escaping @Sendable (AuthEvent) async -> Void) async {
+    /// Await this method when events may be emitted immediately after registration.
+    public static func addObserverAndWait(
+        _ observer: @escaping @Sendable (AuthEvent) async -> Void
+    ) async {
         await AuthEventBroadcaster.shared.addObserver(observer)
     }
 
@@ -161,7 +171,11 @@ public enum PetrelAuthEvents {
     }
 
     /// Remove all observers after delivering events that were already enqueued.
-    public static func removeAllObservers() async {
+    /// When called by an observer during delivery, removal happens immediately
+    /// without waiting for that observer to return. The current broadcast uses an
+    /// observer snapshot, so removal affects future broadcasts; other observers in
+    /// the current snapshot still receive the current event.
+    package static func removeAllObservers() async {
         await drain()
         await AuthEventBroadcaster.shared.removeAllObservers()
     }
@@ -169,9 +183,14 @@ public enum PetrelAuthEvents {
     /// Wait until every authentication event enqueued before this method's final
     /// queue-state check has completed delivery to the registered observers.
     ///
-    /// An event enqueued concurrently after that check requires another drain. Do
-    /// not call this method from an authentication event observer.
-    public static func drain() async {
+    /// An event enqueued concurrently after that check requires another drain. When
+    /// called by an authentication event observer, this method returns immediately
+    /// because the current delivery cannot complete until that observer returns.
+    package static func drain() async {
+        guard !DeliveryContext.isDelivering else {
+            return
+        }
+
         while true {
             let snapshot = deliveryState.withLock { state in
                 (state.generation, state.tail)
@@ -193,7 +212,9 @@ public enum PetrelAuthEvents {
             let predecessor = state.tail
             let delivery = Task(priority: .high) {
                 await predecessor?.value
-                await AuthEventBroadcaster.shared.broadcast(event)
+                await DeliveryContext.$isDelivering.withValue(true) {
+                    await AuthEventBroadcaster.shared.broadcast(event)
+                }
             }
             state.generation &+= 1
             state.tail = delivery

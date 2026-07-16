@@ -166,7 +166,7 @@ struct LogManagerTests {
     func unrepresentableIncidentBroadcastIsSuppressed() async {
         await PetrelAuthEvents.removeAllObservers()
         let recorder = AuthEventRecorder()
-        await PetrelAuthEvents.addObserver { event in
+        await PetrelAuthEvents.addObserverAndWait { event in
             await recorder.record(event)
         }
 

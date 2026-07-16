@@ -534,7 +534,7 @@ enum PetrelLoadCLI {
                 }
 
                 let writer = try AuthEventJSONLWriter(fileURL: fileURL)
-                await PetrelAuthEvents.addObserver { event in
+                await PetrelAuthEvents.addObserverAndWait { event in
                     do {
                         try await writer.write(event)
                     } catch {
