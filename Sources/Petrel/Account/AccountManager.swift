@@ -277,6 +277,7 @@ actor AccountManager: AccountManaging {
                     details: [
                         "previousDid": previous,
                         "newDid": firstDID,
+                        "reason": "account_removed",
                         "autoSwitchOnRemoval": true,
                     ]
                 )

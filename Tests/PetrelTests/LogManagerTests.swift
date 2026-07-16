@@ -27,6 +27,19 @@ struct LogManagerTests {
     @Test("Live producer detail keys map to their exact typed values")
     func liveProducerDetailKeys() {
         #expect(LogManager.convertToAuthEvent(
+            type: "AccountAutoSwitchAfterRemoval",
+            details: [
+                "previousDid": "did:plc:removed",
+                "newDid": "did:plc:next",
+                "reason": "account_removed",
+            ]
+        ) == .accountAutoSwitched(
+            previousDid: "did:plc:removed",
+            newDid: "did:plc:next",
+            reason: "account_removed"
+        ))
+
+        #expect(LogManager.convertToAuthEvent(
             type: "CurrentAccountChanged",
             details: [
                 "previousDid": "did:plc:previous",

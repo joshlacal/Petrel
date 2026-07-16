@@ -392,9 +392,10 @@ public class LogManager {
         // Account Switching Events
         case "AccountAutoSwitchAfterRemoval":
             guard let previousDid = requiredString("previousDid"),
-                  let newDid = requiredString("newDid")
+                  let newDid = requiredString("newDid"),
+                  let reason = requiredString("reason")
             else { return nil }
-            return .accountAutoSwitched(previousDid: previousDid, newDid: newDid, reason: "account_removal")
+            return .accountAutoSwitched(previousDid: previousDid, newDid: newDid, reason: reason)
         case "CurrentAccountChanged":
             guard let newDid = requiredString("newDid") else { return nil }
             return .currentAccountChanged(previousDid: optionalString("previousDid"), newDid: newDid)
