@@ -11,7 +11,17 @@ import SwiftCBOR
 public protocol ATProtocolCodable: Codable, DAGCBORCodable, Sendable {}
 
 public protocol ATProtocolValue: ATProtocolCodable, Equatable, Hashable {
+    /// The Lexicon wire discriminator used when this value is framed by an
+    /// `ATProtocolValueContainer`. Standalone helper values leave this empty.
+    static var typeIdentifier: String { get }
+
     func isEqual(to other: any ATProtocolValue) -> Bool
+}
+
+public extension ATProtocolValue {
+    static var typeIdentifier: String {
+        ""
+    }
 }
 
 public enum ATProtocolError: Error {

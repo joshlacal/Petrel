@@ -281,6 +281,29 @@ struct DAGCBORJSONBridgeTests {
         #expect(try decoded.encodedDAGCBOR() == encoded)
     }
 
+    @Test("CAR registered object definitions retain their external discriminator")
+    func carRegisteredObjectDefinitionsRetainDiscriminator() throws {
+        let type = "com.atproto.repo.strongRef"
+        let cid = "bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku"
+        let root = OrderedCBORMap(entries: [
+            (key: "$type", value: type),
+            (key: "uri", value: "at://did:plc:example/app.bsky.feed.post/test"),
+            (key: "cid", value: cid),
+        ])
+        let encoded = try DAGCBOR.encodeValue(root)
+
+        let decoded = try CARRepository.decodeRecordCBOR(encoded)
+
+        guard case let .knownType(value) = decoded,
+              let strongRef = value as? ComAtprotoRepoStrongRef
+        else {
+            Issue.record("Expected CAR StrongRef to use generated decoder dispatch")
+            return
+        }
+        #expect(strongRef.cid.string == cid)
+        #expect(try decoded.encodedDAGCBOR() == encoded)
+    }
+
     @Test("Negative integer boundary decodes as Int64.min")
     func negativeIntegerBoundarySucceeds() throws {
         let decoded = try DAGCBOR.decodeCBORItem(.negativeInt(UInt64(Int64.max)))

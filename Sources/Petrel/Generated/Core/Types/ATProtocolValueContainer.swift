@@ -3399,6 +3399,12 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
             }
         case let .knownType(customValue):
             try customValue.encode(to: encoder)
+            let typeIdentifier = type(of: customValue).typeIdentifier
+            if !typeIdentifier.isEmpty {
+                var objectContainer = encoder.container(keyedBy: DynamicCodingKeys.self)
+                let typeKey = DynamicCodingKeys(stringValue: "$type")!
+                try objectContainer.encode(typeIdentifier, forKey: typeKey)
+            }
         case let .unknownType(_, unknownValue):
             try unknownValue.encode(to: encoder)
         case let .decodeError(errorMessage):
@@ -3410,7 +3416,43 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
     public func toCBORValue() throws -> Any {
         switch self {
         case let .knownType(value):
-            return try value.toCBORValue()
+            let cborValue = try value.toCBORValue()
+            let typeIdentifier = type(of: value).typeIdentifier
+            guard !typeIdentifier.isEmpty else {
+                return cborValue
+            }
+            if let map = cborValue as? OrderedCBORMap {
+                let typeEntries = map.entries.filter { $0.key == "$type" }
+                guard typeEntries.count <= 1 else {
+                    throw DAGCBORError.encodingFailed(
+                        "Typed value \(typeIdentifier) contains duplicate discriminators"
+                    )
+                }
+                if let existingType = typeEntries.first {
+                    guard existingType.value as? String == typeIdentifier else {
+                        throw DAGCBORError.encodingFailed(
+                            "Typed value discriminator does not match \(typeIdentifier)"
+                        )
+                    }
+                    return map
+                }
+                return map.adding(key: "$type", value: typeIdentifier)
+            }
+            if var dictionary = cborValue as? [String: Any] {
+                if let existingType = dictionary["$type"] {
+                    guard existingType as? String == typeIdentifier else {
+                        throw DAGCBORError.encodingFailed(
+                            "Typed value discriminator does not match \(typeIdentifier)"
+                        )
+                    }
+                    return dictionary
+                }
+                dictionary["$type"] = typeIdentifier
+                return dictionary
+            }
+            throw DAGCBORError.encodingFailed(
+                "Typed value \(typeIdentifier) must encode as an object"
+            )
         case let .string(string):
             return string
         case let .number(number):

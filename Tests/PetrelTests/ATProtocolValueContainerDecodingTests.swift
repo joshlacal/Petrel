@@ -270,6 +270,124 @@ struct ATProtocolValueContainerDecodingTests {
         #expect(post.text == "typed value")
     }
 
+    @Test("Registered top-level object definitions preserve their external discriminator")
+    func registeredTopLevelObjectsPreserveExternalDiscriminator() throws {
+        let type = "com.atproto.repo.strongRef"
+        let cid = "bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku"
+        let original = ATProtocolValueContainer.object([
+            "$type": .string(type),
+            "uri": .string("at://did:plc:example/app.bsky.feed.post/test"),
+            "cid": .string(cid),
+        ])
+        let encoded = try original.encodedDAGCBOR()
+
+        let decoded = try ATProtocolValueContainer.decodedFromDAGCBOR(encoded)
+
+        guard case let .knownType(value) = decoded,
+              let strongRef = value as? ComAtprotoRepoStrongRef
+        else {
+            Issue.record("Expected generated ComAtprotoRepoStrongRef dispatch")
+            return
+        }
+        #expect(strongRef.uri.description == "at://did:plc:example/app.bsky.feed.post/test")
+        #expect(strongRef.cid.string == cid)
+        #expect(try decoded.encodedDAGCBOR() == encoded)
+
+        let jsonData = try JSONEncoder().encode(decoded)
+        let rawJSONObject = try JSONSerialization.jsonObject(with: jsonData)
+        let jsonObject = try #require(rawJSONObject as? [String: Any])
+        #expect(jsonObject["$type"] as? String == type)
+        #expect(jsonObject["uri"] as? String == "at://did:plc:example/app.bsky.feed.post/test")
+        #expect(jsonObject["cid"] as? String == cid)
+
+        let jsonRoundTrip = try JSONDecoder().decode(
+            ATProtocolValueContainer.self,
+            from: jsonData
+        )
+        guard case let .knownType(jsonValue) = jsonRoundTrip,
+              jsonValue is ComAtprotoRepoStrongRef
+        else {
+            Issue.record("Expected JSON re-encoding to retain StrongRef dispatch")
+            return
+        }
+    }
+
+    @Test("Direct object definitions remain unframed when embedded normally")
+    func directObjectDefinitionsRemainUnframed() throws {
+        let strongRef = try ComAtprotoRepoStrongRef(
+            uri: ATProtocolURI(
+                uriString: "at://did:plc:example/app.bsky.feed.post/test"
+            ),
+            cid: CID.parse(
+                "bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku"
+            )
+        )
+
+        let jsonData = try JSONEncoder().encode(strongRef)
+        let rawJSONObject = try JSONSerialization.jsonObject(with: jsonData)
+        let jsonObject = try #require(rawJSONObject as? [String: Any])
+        #expect(jsonObject["$type"] == nil)
+
+        let rawCBORValue = try strongRef.toCBORValue()
+        let cborValue = try #require(rawCBORValue as? OrderedCBORMap)
+        #expect(!cborValue.entries.contains(where: { $0.key == "$type" }))
+    }
+
+    @Test("Registered top-level object definitions retain raw future fields")
+    func registeredTopLevelObjectsRetainRawFutureFields() throws {
+        let type = "com.atproto.repo.strongRef"
+        let original = ATProtocolValueContainer.object([
+            "$type": .string(type),
+            "uri": .string("at://did:plc:example/app.bsky.feed.post/test"),
+            "cid": .string("bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku"),
+            "future": .object(["enabled": .bool(true)]),
+        ])
+        let encoded = try original.encodedDAGCBOR()
+
+        let decoded = try ATProtocolValueContainer.decodedFromDAGCBOR(encoded)
+
+        guard case let .unknownType(decodedType, .object(object)) = decoded else {
+            Issue.record("Expected raw fallback for a registered object with future fields")
+            return
+        }
+        #expect(decodedType == type)
+        #expect(object["future"] == .object(["enabled": .bool(true)]))
+        #expect(try decoded.encodedDAGCBOR() == encoded)
+    }
+
+    @Test("Custom typed dictionary objects receive their external discriminator")
+    func customTypedDictionaryObjectsReceiveExternalDiscriminator() throws {
+        let container = ATProtocolValueContainer.knownType(
+            DictionaryBackedTypedValue(value: "fixture")
+        )
+
+        let rawValue = try container.toCBORValue()
+        let object = try #require(rawValue as? [String: Any])
+
+        #expect(
+            object["$type"] as? String ==
+                DictionaryBackedTypedValue.typeIdentifier
+        )
+        #expect(object["value"] as? String == "fixture")
+        _ = try container.encodedDAGCBOR()
+    }
+
+    @Test("Custom ordered objects reject duplicate external discriminators")
+    func customOrderedObjectsRejectDuplicateDiscriminators() {
+        for trailingType in [
+            DuplicateDiscriminatorTypedValue.typeIdentifier,
+            "com.example.mismatched",
+        ] {
+            let container = ATProtocolValueContainer.knownType(
+                DuplicateDiscriminatorTypedValue(trailingType: trailingType)
+            )
+
+            #expect(throws: DAGCBORError.self) {
+                try container.toCBORValue()
+            }
+        }
+    }
+
     @Test("Known typed dispatch falls back to raw values when typed decoding loses wire data")
     func knownTypedDispatchPreservesFutureAndMalformedFields() throws {
         let type = AppBskyFeedPost.typeIdentifier
@@ -364,5 +482,37 @@ private func expectOutOfRangeUnsignedIntegerError(
         // decoder can attach its more specific signed-range description.
     } catch {
         Issue.record("Expected DecodingError.dataCorrupted, got \(error)")
+    }
+}
+
+private struct DictionaryBackedTypedValue: ATProtocolValue {
+    static let typeIdentifier = "com.example.dictionaryBacked"
+
+    let value: String
+
+    func isEqual(to other: any ATProtocolValue) -> Bool {
+        self == other as? Self
+    }
+
+    func toCBORValue() throws -> Any {
+        ["value": value]
+    }
+}
+
+private struct DuplicateDiscriminatorTypedValue: ATProtocolValue {
+    static let typeIdentifier = "com.example.duplicateDiscriminator"
+
+    let trailingType: String
+
+    func isEqual(to other: any ATProtocolValue) -> Bool {
+        self == other as? Self
+    }
+
+    func toCBORValue() throws -> Any {
+        OrderedCBORMap(entries: [
+            (key: "$type", value: Self.typeIdentifier),
+            (key: "$type", value: trailingType),
+            (key: "value", value: "fixture"),
+        ])
     }
 }
