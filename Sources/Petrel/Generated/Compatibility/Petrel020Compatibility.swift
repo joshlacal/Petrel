@@ -26,6 +26,22 @@ public extension AppBskyAgeassuranceDefs.ConfigRegion {
     }
 }
 
+public extension AppBskyActorDefs.BskyAppStatePref {
+    @available(*, deprecated, message: "Use init(activeProgressGuide:isBetaUser:queuedNudges:nuxs:) instead")
+    init(
+        activeProgressGuide: AppBskyActorDefs.BskyAppProgressGuide?,
+        queuedNudges: [String]?,
+        nuxs: [AppBskyActorDefs.Nux]?
+    ) {
+        self.init(
+            activeProgressGuide: activeProgressGuide,
+            isBetaUser: nil,
+            queuedNudges: queuedNudges,
+            nuxs: nuxs
+        )
+    }
+}
+
 public extension ChatBskyConvoDefs.MessageInput {
     @available(*, deprecated, message: "Use init(text:facets:embed:replyTo:) instead")
     init(

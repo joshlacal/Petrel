@@ -3446,13 +3446,15 @@ public struct AppBskyActorDefs {
     public struct BskyAppStatePref: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.actor.defs#bskyAppStatePref"
         public let activeProgressGuide: BskyAppProgressGuide?
+        public let isBetaUser: Bool?
         public let queuedNudges: [String]?
         public let nuxs: [AppBskyActorDefs.Nux]?
 
         public init(
-            activeProgressGuide: BskyAppProgressGuide?, queuedNudges: [String]?, nuxs: [AppBskyActorDefs.Nux]?
+            activeProgressGuide: BskyAppProgressGuide?, isBetaUser: Bool?, queuedNudges: [String]?, nuxs: [AppBskyActorDefs.Nux]?
         ) {
             self.activeProgressGuide = activeProgressGuide
+            self.isBetaUser = isBetaUser
             self.queuedNudges = queuedNudges
             self.nuxs = nuxs
         }
@@ -3466,6 +3468,14 @@ public struct AppBskyActorDefs {
                 // must not fail the whole response.
                 LogManager.logWarning("Decoding error for optional property 'activeProgressGuide' — degrading to nil: \(error)")
                 activeProgressGuide = nil
+            }
+            do {
+                isBetaUser = try container.decodeIfPresent(Bool.self, forKey: .isBetaUser)
+            } catch {
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'isBetaUser' — degrading to nil: \(error)")
+                isBetaUser = nil
             }
             do {
                 queuedNudges = try container.decodeIfPresent([String].self, forKey: .queuedNudges)
@@ -3489,12 +3499,18 @@ public struct AppBskyActorDefs {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encodeIfPresent(activeProgressGuide, forKey: .activeProgressGuide)
+            try container.encodeIfPresent(isBetaUser, forKey: .isBetaUser)
             try container.encodeIfPresent(queuedNudges, forKey: .queuedNudges)
             try container.encodeIfPresent(nuxs, forKey: .nuxs)
         }
 
         public func hash(into hasher: inout Hasher) {
             if let value = activeProgressGuide {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = isBetaUser {
                 hasher.combine(value)
             } else {
                 hasher.combine(nil as Int?)
@@ -3514,6 +3530,9 @@ public struct AppBskyActorDefs {
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
             if activeProgressGuide != other.activeProgressGuide {
+                return false
+            }
+            if isBetaUser != other.isBetaUser {
                 return false
             }
             if queuedNudges != other.queuedNudges {
@@ -3536,6 +3555,10 @@ public struct AppBskyActorDefs {
                 let activeProgressGuideValue = try value.toCBORValue()
                 map = map.adding(key: "activeProgressGuide", value: activeProgressGuideValue)
             }
+            if let value = isBetaUser {
+                let isBetaUserValue = try value.toCBORValue()
+                map = map.adding(key: "isBetaUser", value: isBetaUserValue)
+            }
             if let value = queuedNudges {
                 let queuedNudgesValue = try value.toCBORValue()
                 map = map.adding(key: "queuedNudges", value: queuedNudgesValue)
@@ -3550,6 +3573,7 @@ public struct AppBskyActorDefs {
         private enum CodingKeys: String, CodingKey {
             case typeIdentifier = "$type"
             case activeProgressGuide
+            case isBetaUser
             case queuedNudges
             case nuxs
         }

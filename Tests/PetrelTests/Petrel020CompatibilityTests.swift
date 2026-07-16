@@ -15,6 +15,13 @@ struct Petrel020CompatibilityTests {
         )
         #expect(config.additionalVerificationMethods == nil)
 
+        let appState = AppBskyActorDefs.BskyAppStatePref(
+            activeProgressGuide: nil,
+            queuedNudges: nil,
+            nuxs: nil
+        )
+        #expect(appState.isBetaUser == nil)
+
         let input = ChatBskyConvoDefs.MessageInput(
             text: "hello",
             facets: nil,

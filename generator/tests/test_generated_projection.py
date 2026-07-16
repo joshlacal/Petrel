@@ -1352,7 +1352,12 @@ class GeneratorProjectionPublicationTests(unittest.TestCase):
             compatibility,
         )
         self.assertIn("replyTo: nil", compatibility)
-        self.assertEqual(compatibility.count("@available(*, deprecated"), 4)
+        self.assertIn(
+            "public extension AppBskyActorDefs.BskyAppStatePref",
+            compatibility,
+        )
+        self.assertIn("isBetaUser: nil", compatibility)
+        self.assertEqual(compatibility.count("@available(*, deprecated"), 5)
         self.assertIn("struct ComExampleCoreDefs", expected_files[
             "Lexicons/Com/Example/ComExampleCoreDefs.swift"
         ])
