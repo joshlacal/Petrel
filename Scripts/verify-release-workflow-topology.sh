@@ -210,20 +210,96 @@ expected_claude_permissions = {
   "id-token" => "write",
 }
 claude_review_workflow = loaded_workflows.fetch("claude-code-review.yml")
+fail!("claude-code-review.yml top-level topology must be exact") unless
+  claude_review_workflow.keys == ["name", "on", "permissions", "jobs"] &&
+    claude_review_workflow["name"] == "Claude Code Review"
+expected_claude_review_triggers = {
+  "pull_request" => {
+    "types" => ["opened", "synchronize", "ready_for_review", "reopened"],
+  },
+}
+fail!("claude-code-review.yml triggers must be exact") unless
+  claude_review_workflow["on"] == expected_claude_review_triggers
 fail!("claude-code-review.yml must deny permissions by default") unless
   claude_review_workflow["permissions"] == {}
 fail!("claude-code-review.yml must define exactly the reviewed job") unless
   claude_review_workflow.fetch("jobs").keys == ["claude-review"]
+claude_review_job = claude_review_workflow.fetch("jobs").fetch("claude-review")
+fail!("claude-code-review.yml job topology must be exact") unless
+  claude_review_job.keys == ["runs-on", "permissions", "steps"]
+fail!("claude-code-review.yml runner must be exact") unless
+  claude_review_job["runs-on"] == "ubuntu-24.04"
 fail!("claude-code-review.yml must use the exact reviewed job permissions") unless
-  claude_review_workflow.dig("jobs", "claude-review", "permissions") == expected_claude_permissions
+  claude_review_job["permissions"] == expected_claude_permissions
+expected_checkout_step = {
+  "name" => "Checkout repository",
+  "uses" => "actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+  "with" => {"fetch-depth" => 1, "persist-credentials" => false},
+}
+claude_review_steps = claude_review_job.fetch("steps")
+fail!("claude-code-review.yml step inventory must be exact") unless
+  claude_review_steps.length == 2 &&
+    claude_review_steps.fetch(0) == expected_checkout_step &&
+    claude_review_steps.fetch(1).keys == ["name", "id", "uses", "with"] &&
+    claude_review_steps.fetch(1).slice("name", "id", "uses") == {
+      "name" => "Run Claude Code Review",
+      "id" => "claude-review",
+      "uses" => "anthropics/claude-code-action@1298632ce7736903d02a1435002705aa2a594a6c",
+    }
+expected_claude_review_inputs = {
+  "claude_code_oauth_token" => "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}",
+  "prompt" => "Review this pull request for correctness and security. Report actionable findings with severity and file/line evidence.",
+}
+fail!("claude-code-review.yml action inputs must be the exact reviewed allowlist") unless
+  claude_review_steps.fetch(1)["with"] == expected_claude_review_inputs
 expected_interactive_claude_permissions = expected_claude_permissions.merge("actions" => "read")
 interactive_claude_workflow = loaded_workflows.fetch("claude.yml")
+fail!("claude.yml top-level topology must be exact") unless
+  interactive_claude_workflow.keys == ["name", "on", "permissions", "jobs"] &&
+    interactive_claude_workflow["name"] == "Claude Code"
+expected_interactive_claude_triggers = {
+  "issue_comment" => {"types" => ["created"]},
+  "pull_request_review_comment" => {"types" => ["created"]},
+  "issues" => {"types" => ["opened", "assigned"]},
+  "pull_request_review" => {"types" => ["submitted"]},
+}
+fail!("claude.yml triggers must be exact") unless
+  interactive_claude_workflow["on"] == expected_interactive_claude_triggers
 fail!("claude.yml must deny permissions by default") unless
   interactive_claude_workflow["permissions"] == {}
 fail!("claude.yml must define exactly the reviewed job") unless
   interactive_claude_workflow.fetch("jobs").keys == ["claude"]
+interactive_claude_job = interactive_claude_workflow.fetch("jobs").fetch("claude")
+fail!("claude.yml job topology must be exact") unless
+  interactive_claude_job.keys == ["if", "runs-on", "permissions", "steps"]
+expected_interactive_condition = [
+  "(github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||",
+  "(github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||",
+  "(github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||",
+  "(github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))",
+].join("\n") + "\n"
+fail!("claude.yml job condition must be exact") unless
+  interactive_claude_job["if"] == expected_interactive_condition
+fail!("claude.yml runner must be exact") unless
+  interactive_claude_job["runs-on"] == "ubuntu-24.04"
 fail!("claude.yml must use the exact reviewed job permissions") unless
-  interactive_claude_workflow.dig("jobs", "claude", "permissions") == expected_interactive_claude_permissions
+  interactive_claude_job["permissions"] == expected_interactive_claude_permissions
+interactive_claude_steps = interactive_claude_job.fetch("steps")
+fail!("claude.yml step inventory must be exact") unless
+  interactive_claude_steps.length == 2 &&
+    interactive_claude_steps.fetch(0) == expected_checkout_step &&
+    interactive_claude_steps.fetch(1).keys == ["name", "id", "uses", "with"] &&
+    interactive_claude_steps.fetch(1).slice("name", "id", "uses") == {
+      "name" => "Run Claude Code",
+      "id" => "claude",
+      "uses" => "anthropics/claude-code-action@1298632ce7736903d02a1435002705aa2a594a6c",
+    }
+expected_interactive_claude_inputs = {
+  "claude_code_oauth_token" => "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}",
+  "additional_permissions" => "actions: read\n",
+}
+fail!("claude.yml action inputs must be the exact reviewed allowlist") unless
+  interactive_claude_steps.fetch(1)["with"] == expected_interactive_claude_inputs
 expected_sync_permissions = {"contents" => "write", "pull-requests" => "write"}
 sync_workflow = loaded_workflows.fetch("sync-lexicons.yml")
 fail!("sync-lexicons.yml permissions must be the exact PR-writing set") unless

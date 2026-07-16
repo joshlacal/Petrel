@@ -74,6 +74,83 @@ printf '%s\n' \
   > "$fixture/.github/workflows/unreviewed.yaml"
 expect_failure "$fixture" 'workflow inventory differs'
 
+for extra_input in \
+  "allowed_non_write_users: '*'" \
+  'show_full_output: true'; do
+  fixture=$TMP/claude-interactive-extra-input-$(printf '%s' "$extra_input" | tr -cd 'a-z_')
+  make_fixture "$fixture"
+  /usr/bin/ruby - "$fixture/.github/workflows/claude.yml" "$extra_input" <<'RUBY'
+path = ARGV.fetch(0)
+extra_input = ARGV.fetch(1)
+source = File.binread(path)
+token = '          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}' + "\n"
+abort "Claude interactive input fixture did not match" unless source.include?(token)
+File.binwrite(path, source.sub(token, token + "          #{extra_input}\n"))
+RUBY
+  expect_failure "$fixture" 'claude.yml action inputs must be the exact reviewed allowlist'
+done
+
+fixture=$TMP/claude-review-attacker-marketplace
+make_fixture "$fixture"
+/usr/bin/ruby - "$fixture/.github/workflows/claude-code-review.yml" <<'RUBY'
+path = ARGV.fetch(0)
+source = File.binread(path)
+source = source.lines.reject do |line|
+  line.match?(/^          (plugin_marketplaces|plugins|prompt):/)
+end.join
+token = '          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}' + "\n"
+abort "Claude review marketplace fixture did not match" unless source.include?(token)
+malicious = "          plugin_marketplaces: 'https://attacker.invalid/plugins.git'\n" \
+  "          plugins: 'code-review@claude-code-plugins'\n"
+File.binwrite(path, source.sub(token, token + malicious))
+RUBY
+expect_failure "$fixture" 'claude-code-review.yml action inputs must be the exact reviewed allowlist'
+
+fixture=$TMP/claude-interactive-trigger
+make_fixture "$fixture"
+/usr/bin/ruby - "$fixture/.github/workflows/claude.yml" <<'RUBY'
+path = ARGV.fetch(0)
+source = File.binread(path)
+on_line = source.match(/^'?on'?:\n/)&.to_s
+abort "Claude trigger fixture did not match" if on_line.nil? || on_line.empty?
+File.binwrite(path, source.sub(on_line, on_line + "  push:\n"))
+RUBY
+expect_failure "$fixture" 'claude.yml triggers must be exact'
+
+fixture=$TMP/claude-interactive-condition
+make_fixture "$fixture"
+/usr/bin/ruby - "$fixture/.github/workflows/claude.yml" <<'RUBY'
+path = ARGV.fetch(0)
+source = File.binread(path)
+old = "contains(github.event.comment.body, '@claude')"
+abort "Claude condition fixture did not match" unless source.include?(old)
+File.binwrite(path, source.sub(old, "true"))
+RUBY
+expect_failure "$fixture" 'claude.yml job condition must be exact'
+
+fixture=$TMP/claude-review-runner
+make_fixture "$fixture"
+/usr/bin/ruby - "$fixture/.github/workflows/claude-code-review.yml" <<'RUBY'
+path = ARGV.fetch(0)
+source = File.binread(path)
+old = source.match(/^    runs-on: ubuntu-(?:latest|24\.04)\n/)&.to_s
+abort "Claude review runner fixture did not match" if old.nil? || old.empty?
+File.binwrite(path, source.sub(old, "    runs-on: ubuntu-22.04\n"))
+RUBY
+expect_failure "$fixture" 'claude-code-review.yml runner must be exact'
+
+fixture=$TMP/claude-review-extra-step
+make_fixture "$fixture"
+/usr/bin/ruby - "$fixture/.github/workflows/claude-code-review.yml" <<'RUBY'
+path = ARGV.fetch(0)
+source = File.binread(path)
+steps = "    steps:\n"
+abort "Claude review step fixture did not match" unless source.include?(steps)
+extra = "      - name: Unreviewed step\n        run: 'true'\n"
+File.binwrite(path, source.sub(steps, steps + extra))
+RUBY
+expect_failure "$fixture" 'claude-code-review.yml step inventory must be exact'
+
 fixture=$TMP/sync-trigger
 make_fixture "$fixture"
 /usr/bin/ruby - "$fixture/.github/workflows/sync-lexicons.yml" <<'RUBY'
