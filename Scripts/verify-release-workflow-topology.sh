@@ -138,6 +138,7 @@ expected_action_pins = {
   "actions/setup-java" => "c1e323688fd81a25caa38c78aa6df2d33d3e20d9", # v4.8.0
   "gradle/actions/setup-gradle" => "748248ddd2a24f49513d8f472f81c3a07d4d50e1", # v4.4.4
   "peter-evans/create-pull-request" => "22a9089034f40e5a961c8808d113e2c98fb63676", # v7.0.11
+  "anthropics/claude-code-action" => "1298632ce7736903d02a1435002705aa2a594a6c", # v1.0.175
 }
 loaded_workflows = {}
 workflow_paths = Dir.glob([
@@ -145,6 +146,8 @@ workflow_paths = Dir.glob([
   File.join(workflow_directory, "*.yaml"),
 ]).sort
 expected_workflow_inventory = [
+  "claude-code-review.yml",
+  "claude.yml",
   "docc.yml",
   "generator.yml",
   "kotlin.yml",
@@ -153,6 +156,7 @@ expected_workflow_inventory = [
   "swift.yml",
   "sync-lexicons.yml",
 ]
+claude_workflow_inventory = ["claude-code-review.yml", "claude.yml"]
 actual_workflow_inventory = workflow_paths.map { |path| File.basename(path) }
 fail!("workflow inventory differs from #{expected_workflow_inventory.inspect}") unless
   actual_workflow_inventory == expected_workflow_inventory
@@ -173,7 +177,7 @@ workflow_paths.each do |path|
   fail!("#{label} jobs must be a mapping") unless jobs_for_security.is_a?(Hash)
   jobs_for_security.each do |job_name, job|
     fail!("#{label} #{job_name} must not declare job-level permissions") if
-      job.key?("permissions")
+      job.key?("permissions") && !claude_workflow_inventory.include?(label)
     steps = job["steps"]
     fail!("#{label} #{job_name} steps must be an array") unless steps.is_a?(Array)
     steps.each do |step|
@@ -199,6 +203,27 @@ read_only_permissions = {"contents" => "read"}
   fail!("#{label} must use read-only default permissions") unless
     loaded_workflows.fetch(label)["permissions"] == read_only_permissions
 end
+expected_claude_permissions = {
+  "contents" => "read",
+  "pull-requests" => "read",
+  "issues" => "read",
+  "id-token" => "write",
+}
+claude_review_workflow = loaded_workflows.fetch("claude-code-review.yml")
+fail!("claude-code-review.yml must deny permissions by default") unless
+  claude_review_workflow["permissions"] == {}
+fail!("claude-code-review.yml must define exactly the reviewed job") unless
+  claude_review_workflow.fetch("jobs").keys == ["claude-review"]
+fail!("claude-code-review.yml must use the exact reviewed job permissions") unless
+  claude_review_workflow.dig("jobs", "claude-review", "permissions") == expected_claude_permissions
+expected_interactive_claude_permissions = expected_claude_permissions.merge("actions" => "read")
+interactive_claude_workflow = loaded_workflows.fetch("claude.yml")
+fail!("claude.yml must deny permissions by default") unless
+  interactive_claude_workflow["permissions"] == {}
+fail!("claude.yml must define exactly the reviewed job") unless
+  interactive_claude_workflow.fetch("jobs").keys == ["claude"]
+fail!("claude.yml must use the exact reviewed job permissions") unless
+  interactive_claude_workflow.dig("jobs", "claude", "permissions") == expected_interactive_claude_permissions
 expected_sync_permissions = {"contents" => "write", "pull-requests" => "write"}
 sync_workflow = loaded_workflows.fetch("sync-lexicons.yml")
 fail!("sync-lexicons.yml permissions must be the exact PR-writing set") unless
