@@ -40,34 +40,36 @@ struct AuthRecoveryIntegrationTests {
 
     @Test("Session recovery restores missing session from backup")
     func sessionRecoveryFromBackup() async throws {
-        let storage = KeychainStorage(namespace: "test.session.recovery.\(UUID().uuidString)")
-        let did = "did:plc:session-recovery-\(UUID().uuidString)"
+        try await withSerializedStorageOverrideTest {
+            let storage = KeychainStorage(namespace: "test.session.recovery.\(UUID().uuidString)")
+            let did = "did:plc:session-recovery-\(UUID().uuidString)"
 
-        // Create and save session to backup
-        let originalSession = Session(
-            accessToken: "original-access-token",
-            refreshToken: "original-refresh-token",
-            createdAt: Date(),
-            expiresIn: 3600,
-            tokenType: .dpop,
-            did: did
-        )
-        try await storage.saveSessionBackup(originalSession, for: did)
+            // Create and save session to backup
+            let originalSession = Session(
+                accessToken: "original-access-token",
+                refreshToken: "original-refresh-token",
+                createdAt: Date(),
+                expiresIn: 3600,
+                tokenType: .dpop,
+                did: did
+            )
+            try await storage.saveSessionBackup(originalSession, for: did)
 
-        // getSession transparently recovers from the backup location and
-        // promotes the session to the primary location.
-        let recovered = try await storage.getSession(for: did)
-        #expect(recovered != nil)
-        #expect(recovered?.did == did)
-        #expect(recovered?.accessToken == "original-access-token")
+            // getSession transparently recovers from the backup location and
+            // promotes the session to the primary location.
+            let recovered = try await storage.getSession(for: did)
+            #expect(recovered != nil)
+            #expect(recovered?.did == did)
+            #expect(recovered?.accessToken == "original-access-token")
 
-        // The session should now live at the primary location
-        let primarySession = try await storage.getSession(for: did)
-        #expect(primarySession?.accessToken == "original-access-token")
+            // The session should now live at the primary location
+            let primarySession = try await storage.getSession(for: did)
+            #expect(primarySession?.accessToken == "original-access-token")
 
-        // Cleanup
-        try? await storage.deleteSession(for: did)
-        try? await storage.deleteSessionBackup(for: did)
+            // Cleanup
+            try? await storage.deleteSession(for: did)
+            try? await storage.deleteSessionBackup(for: did)
+        }
     }
 
     @Test("Circuit breaker allows refresh after time-based recovery to half-open")

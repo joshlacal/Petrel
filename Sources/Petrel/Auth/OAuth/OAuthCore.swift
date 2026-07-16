@@ -187,7 +187,7 @@ actor OAuthCore {
         type: DPoPProofType,
         accessToken: String? = nil,
         did: String? = nil,
-        ephemeralKey: P256.Signing.PrivateKey? = nil,
+        ephemeralKeyRawRepresentation: Data? = nil,
         nonce: String? = nil
     ) async throws -> String {
         var targetDID: String? = did
@@ -196,8 +196,8 @@ actor OAuthCore {
         }
 
         let privateKey: P256.Signing.PrivateKey
-        if let key = ephemeralKey {
-            privateKey = key
+        if let keyData = ephemeralKeyRawRepresentation {
+            privateKey = try P256.Signing.PrivateKey(rawRepresentation: keyData)
         } else if let currentDID = targetDID {
             privateKey = try await getOrCreateDPoPKey(for: currentDID)
         } else {
@@ -216,7 +216,10 @@ actor OAuthCore {
         let finalNonce: String?
         if let explicitNonce = nonce {
             finalNonce = explicitNonce
-        } else if did == nil && ephemeralKey != nil, let urlObject = URL(string: url), let domain = urlObject.host?.lowercased() {
+        } else if did == nil && ephemeralKeyRawRepresentation != nil,
+                  let urlObject = URL(string: url),
+                  let domain = urlObject.host?.lowercased()
+        {
             finalNonce = oauthFlowNonces[domain]
         } else if let targetDID = targetDID, let urlObject = URL(string: url), let domain = urlObject.host?.lowercased() {
             // Multi-layer nonce retrieval
@@ -392,7 +395,7 @@ actor OAuthCore {
         endpoint: String,
         authServerURL: URL,
         state: String,
-        ephemeralKeyForFlow: P256.Signing.PrivateKey?,
+        ephemeralKeyRawRepresentation: Data?,
         additionalParameters: [String: String]? = nil
     ) async throws -> (requestURI: String, parNonce: String?) {
         let parameters = buildPARParameters(
@@ -413,19 +416,25 @@ actor OAuthCore {
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
 
         // DPoP Proof Generation
-        var proofKey: P256.Signing.PrivateKey?
+        let proofKeyRawRepresentation: Data
         let dpopProof: String
 
-        if let providedKey = ephemeralKeyForFlow {
-            proofKey = providedKey
+        if let providedKeyData = ephemeralKeyRawRepresentation {
+            proofKeyRawRepresentation = providedKeyData
             dpopProof = try await createDPoPProof(
-                for: "POST", url: endpoint, type: .authorization, ephemeralKey: providedKey
+                for: "POST",
+                url: endpoint,
+                type: .authorization,
+                ephemeralKeyRawRepresentation: providedKeyData
             )
         } else {
             let tempKey = P256.Signing.PrivateKey()
-            proofKey = tempKey
+            proofKeyRawRepresentation = tempKey.rawRepresentation
             dpopProof = try await createDPoPProof(
-                for: "POST", url: endpoint, type: .authorization, ephemeralKey: tempKey
+                for: "POST",
+                url: endpoint,
+                type: .authorization,
+                ephemeralKeyRawRepresentation: proofKeyRawRepresentation
             )
         }
         request.setValue(dpopProof, forHTTPHeaderField: "DPoP")
@@ -450,11 +459,15 @@ actor OAuthCore {
                 isNonceError = true
             }
 
-            if isNonceError, let receivedNonce = dpopNonceHeader, let key = proofKey {
+            if isNonceError, let receivedNonce = dpopNonceHeader {
                 // Retry with nonce
                 var retryRequest = request
                 let retryProof = try await createDPoPProof(
-                    for: "POST", url: endpoint, type: .authorization, ephemeralKey: key, nonce: receivedNonce
+                    for: "POST",
+                    url: endpoint,
+                    type: .authorization,
+                    ephemeralKeyRawRepresentation: proofKeyRawRepresentation,
+                    nonce: receivedNonce
                 )
                 retryRequest.setValue(retryProof, forHTTPHeaderField: "DPoP")
 

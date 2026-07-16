@@ -16,6 +16,7 @@ make_fixture() {
     "$fixture/.github/workflows"
   for relative in \
     Scripts/activate-release-toolchain.sh \
+    Scripts/release-tool-identity.sh \
     Scripts/bootstrap-generator-environment.sh \
     Scripts/bootstrap-release-tools.sh \
     Scripts/extract-documentation-examples.sh \
@@ -29,6 +30,7 @@ make_fixture() {
     Scripts/verify-owned-warnings.sh \
     Scripts/verify-release-workflow-topology.sh \
     Scripts/tests/validate-documentation-contract.sh \
+    Scripts/tests/release-tool-identity-contract.sh \
     Tests/ReleaseScripts/dependency-workflow-coupling-test.sh \
     Tests/ReleaseScripts/install-generated-documentation-test.sh \
     Tests/ReleaseScripts/owned-warning-gate-test.sh \

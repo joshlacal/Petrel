@@ -475,9 +475,11 @@ private func withInMemoryBackend<T>(
     _ backend: InMemorySecureStorage,
     _ body: () async throws -> T
 ) async rethrows -> T {
-    KeychainManager._setStorageOverride(backend)
-    defer { KeychainManager._setStorageOverride(nil) }
-    return try await body()
+    try await withSerializedStorageOverrideTest {
+        KeychainManager._setStorageOverride(backend)
+        defer { KeychainManager._setStorageOverride(nil) }
+        return try await body()
+    }
 }
 
 // MARK: - Tests

@@ -352,7 +352,7 @@ actor CABOAuthStrategy: AuthStrategy {
             endpoint: metadata.pushedAuthorizationRequestEndpoint,
             authServerURL: authServerURL,
             state: stateToken,
-            ephemeralKeyForFlow: ephemeralKey,
+            ephemeralKeyRawRepresentation: ephemeralKey.rawRepresentation,
             additionalParameters: [
                 "client_assertion": parAssertion.clientAssertion,
                 "client_assertion_type": Self.clientAssertionTypeJWTBearer,
@@ -417,7 +417,7 @@ actor CABOAuthStrategy: AuthStrategy {
                 url: assertionURL.absoluteString,
                 type: .tokenRequest,
                 did: did,
-                ephemeralKey: key,
+                ephemeralKeyRawRepresentation: key.rawRepresentation,
                 nonce: nonce
             )
         } else if let did {
@@ -538,7 +538,7 @@ actor CABOAuthStrategy: AuthStrategy {
             url: tokenEndpoint,
             type: .tokenRequest,
             did: nil,
-            ephemeralKey: key,
+            ephemeralKeyRawRepresentation: key.rawRepresentation,
             nonce: nonce
         )
         request.setValue(dpopProof, forHTTPHeaderField: "DPoP")
@@ -569,7 +569,7 @@ actor CABOAuthStrategy: AuthStrategy {
                         url: tokenEndpoint,
                         type: .tokenRequest,
                         did: nil,
-                        ephemeralKey: key,
+                        ephemeralKeyRawRepresentation: key.rawRepresentation,
                         nonce: receivedNonce
                     )
 

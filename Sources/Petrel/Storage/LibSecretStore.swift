@@ -95,7 +95,11 @@
                 &errorMsg
             )
 
-            if let error = errorMsg {
+            if !success {
+                guard let error = errorMsg else {
+                    LogManager.logError("LibSecretStore - Failed to delete key \(namespacedKey)")
+                    throw KeychainError.deletionError(status: -1)
+                }
                 let message = String(cString: error)
                 free(error)
                 // Don't throw if item not found
@@ -103,6 +107,9 @@
                     LogManager.logError("LibSecretStore - Failed to delete: \(message)")
                     throw KeychainError.deletionError(status: -1)
                 }
+            } else if let error = errorMsg {
+                // Defensive ownership handling for a non-null diagnostic on success.
+                free(error)
             }
 
             LogManager.logDebug("LibSecretStore - Deleted key \(namespacedKey)")

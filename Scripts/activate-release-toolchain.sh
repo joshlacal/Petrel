@@ -11,6 +11,9 @@ else
   return 1
 fi
 
+ROOT=$(cd "$(dirname "$_petrel_release_script")/.." && pwd -P)
+source "$ROOT/Scripts/release-tool-identity.sh"
+
 _petrel_release_fail() {
   echo "$*" >&2
   return 1
@@ -102,7 +105,6 @@ if [[ $_petrel_release_approved_beta == 0 ]]; then
   done
 fi
 
-ROOT=$(cd "$(dirname "$_petrel_release_script")/.." && pwd)
 RELEASE_SWIFT="$RELEASE_DEVELOPER_DIR/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift"
 RELEASE_XCODEBUILD="$RELEASE_DEVELOPER_DIR/usr/bin/xcodebuild"
 RELEASE_XCRUN=/usr/bin/xcrun
@@ -158,7 +160,8 @@ fi
   _petrel_release_fail "release Swift is not first on PATH"
   return 1
 }
-[[ $("$RELEASE_XCRUN" --find swift) == "$RELEASE_SWIFT" ]] || {
+_petrel_release_xcrun_swift=$("$RELEASE_XCRUN" --find swift) || return 1
+petrel_release_same_file_identity "$RELEASE_SWIFT" "$_petrel_release_xcrun_swift" || {
   _petrel_release_fail "xcrun did not resolve the selected XcodeDefault Swift"
   return 1
 }

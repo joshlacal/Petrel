@@ -10,6 +10,7 @@ WORKFLOW_DIRECTORY=$ROOT/.github/workflows
 
 required_release_executables=(
   Scripts/activate-release-toolchain.sh
+  Scripts/release-tool-identity.sh
   Scripts/bootstrap-generator-environment.sh
   Scripts/bootstrap-release-tools.sh
   Scripts/extract-documentation-examples.sh
@@ -23,6 +24,7 @@ required_release_executables=(
   Scripts/tests/validate-dependency-requirements-contract.sh
   Scripts/tests/validate-dependency-requirements-gate-test.sh
   Scripts/tests/validate-documentation-contract.sh
+  Scripts/tests/release-tool-identity-contract.sh
   Tests/ReleaseScripts/dependency-workflow-coupling-test.sh
   Tests/ReleaseScripts/install-generated-documentation-test.sh
   Tests/ReleaseScripts/owned-warning-gate-test.sh
@@ -42,6 +44,8 @@ for relative in "${required_release_executables[@]}"; do
     exit 1
   }
 done
+
+"$ROOT/Scripts/tests/release-tool-identity-contract.sh"
 
 [[ -f $WORKFLOW ]] || {
   echo "release workflow is missing: $WORKFLOW" >&2

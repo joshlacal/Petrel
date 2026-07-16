@@ -126,7 +126,7 @@ actor PublicOAuthStrategy: AuthStrategy {
             endpoint: metadata.pushedAuthorizationRequestEndpoint,
             authServerURL: authServerURL,
             state: stateToken,
-            ephemeralKeyForFlow: ephemeralKey
+            ephemeralKeyRawRepresentation: ephemeralKey.rawRepresentation
         )
 
         var finalState = oauthState
@@ -366,7 +366,7 @@ actor PublicOAuthStrategy: AuthStrategy {
             endpoint: metadata.pushedAuthorizationRequestEndpoint,
             authServerURL: authServerURL,
             state: stateToken,
-            ephemeralKeyForFlow: ephemeralKey
+            ephemeralKeyRawRepresentation: ephemeralKey.rawRepresentation
         )
 
         let oauthState = OAuthState(
@@ -467,7 +467,7 @@ actor PublicOAuthStrategy: AuthStrategy {
             url: tokenEndpoint,
             type: .tokenRequest,
             did: nil,
-            ephemeralKey: key,
+            ephemeralKeyRawRepresentation: key.rawRepresentation,
             nonce: nonce
         )
         request.setValue(dpopProof, forHTTPHeaderField: "DPoP")
@@ -498,7 +498,7 @@ actor PublicOAuthStrategy: AuthStrategy {
                         url: tokenEndpoint,
                         type: .tokenRequest,
                         did: nil,
-                        ephemeralKey: key,
+                        ephemeralKeyRawRepresentation: key.rawRepresentation,
                         nonce: receivedNonce
                     )
 
