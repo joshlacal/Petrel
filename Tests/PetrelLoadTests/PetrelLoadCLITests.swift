@@ -250,6 +250,9 @@ struct PetrelLoadCLITests {
         #expect(instructions.contains("com.example.client:/callback"))
         #expect(instructions.contains("--client-id \"https://client.example/oauth-client-metadata.json\""))
         #expect(instructions.contains("--redirect-uri \"com.example.client:/callback\""))
+        #expect(instructions.contains("application registered for that URI"))
+        #expect(instructions.contains("PetrelLoad exits after printing these instructions"))
+        #expect(!instructions.contains("browser's address bar"))
     }
 
     @Test("Scenario plans distinguish concurrent load from serial state checks")
@@ -495,6 +498,7 @@ struct PetrelLoadCLITests {
 
         #expect(source.contains("await PetrelAuthEvents.addObserver"))
         #expect(source.contains("await PetrelAuthEvents.drain()"))
+        #expect(!source.contains("Waiting for you to complete the OAuth flow"))
         #expect(!source.contains("try! await ATProtoClient"))
         #expect(!source.contains("try? await client.refreshToken()"))
         #expect(!source.contains("print(\"✗ API call FAILED:"))

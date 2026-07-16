@@ -420,10 +420,12 @@ enum PetrelLoadCLI {
     ) -> String {
         """
         After authorizing in the browser:
-        1. Look for the callback URL beginning with '\(configuration.redirectUri)'.
-        2. Copy the ENTIRE callback URL from your browser's address bar.
-        3. Run the following command with the copied URL:
+        1. The authorization server redirects to '\(configuration.redirectUri)'.
+        2. The application registered for that URI must capture the ENTIRE callback URL, including its query string.
+        3. Run the following command with that captured URL:
            PetrelLoad --namespace \(namespace) --endpoint \(endpoint) --client-id "\(configuration.clientId)" --redirect-uri "\(configuration.redirectUri)" --oauth-complete "<PASTE_CALLBACK_URL>"
+
+        PetrelLoad exits after printing these instructions; it does not receive the callback itself.
         """
     }
 
@@ -586,7 +588,6 @@ enum PetrelLoadCLI {
                     endpoint: endpoint
                 )
                 print("\n\(completionInstructions)")
-                print("\nWaiting for you to complete the OAuth flow in the browser...")
             } catch {
                 throw ScenarioError.commandFailure("Failed to start OAuth flow: \(error)")
             }
