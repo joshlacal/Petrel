@@ -73,10 +73,21 @@ final class InMemorySecureStorage: SecureStorage, @unchecked Sendable {
         items = items.filter { !$0.key.hasPrefix("\(namespace)|") }
     }
 
-    func storeDPoPKey(_: P256.Signing.PrivateKey, keyTag _: String, accessGroup _: String?) throws {}
+    func storeDPoPKeyRepresentation(_ representation: Data, keyTag: String, accessGroup _: String?) throws {
+        try store(
+            key: keyTag,
+            value: representation,
+            namespace: "dpopkeys",
+            accessGroup: nil
+        )
+    }
 
-    func retrieveDPoPKey(keyTag _: String, accessGroup _: String?) throws -> P256.Signing.PrivateKey {
-        throw KeychainError.itemRetrievalError(status: -25300)
+    func retrieveDPoPKeyRepresentation(keyTag: String, accessGroup _: String?) throws -> Data {
+        try retrieve(
+            key: keyTag,
+            namespace: "dpopkeys",
+            accessGroup: nil
+        )
     }
 
     func deleteDPoPKey(keyTag _: String, accessGroup _: String?) throws {}
@@ -486,6 +497,49 @@ private func withInMemoryBackend<T>(
 
 @Suite("Refresh token reliability", .serialized)
 struct RefreshTokenReliabilityTests {
+    @Test("DPoP key representations round-trip across the storage actor boundary")
+    func dpopKeyRepresentationRoundTrips() async throws {
+        let backend = InMemorySecureStorage()
+        try await withInMemoryBackend(backend) {
+            let storage = KeychainStorage(namespace: "test.dpop.representation.roundtrip")
+            let original = P256.Signing.PrivateKey().x963Representation
+
+            try await storage.saveDPoPKeyRepresentation(original, for: "did:plc:roundtrip")
+
+            let restored = try await storage.getDPoPKeyRepresentation(for: "did:plc:roundtrip")
+            #expect(restored == original)
+        }
+    }
+
+    @Test("Missing DPoP key representation returns nil")
+    func missingDPoPKeyRepresentationReturnsNil() async throws {
+        let backend = InMemorySecureStorage()
+        try await withInMemoryBackend(backend) {
+            let storage = KeychainStorage(namespace: "test.dpop.representation.missing")
+
+            let restored = try await storage.getDPoPKeyRepresentation(for: "did:plc:missing")
+
+            #expect(restored == nil)
+        }
+    }
+
+    @Test("Corrupt DPoP key representation fails closed")
+    func corruptDPoPKeyRepresentationFailsClosed() async {
+        let backend = InMemorySecureStorage()
+        await withInMemoryBackend(backend) {
+            let storage = KeychainStorage(namespace: "test.dpop.representation.corrupt")
+            backend.plant(
+                key: "dpopKey.did:plc:corrupt",
+                namespace: "dpopkeys",
+                data: Data([0x00])
+            )
+
+            await #expect(throws: (any Error).self) {
+                try await storage.getDPoPKeyRepresentation(for: "did:plc:corrupt")
+            }
+        }
+    }
+
     @Test("Named HTTP error path survives AuthenticationService 401 refresh retry")
     func namedHTTPErrorPathSurvivesAuthenticationServiceRetry() async throws {
         let backend = InMemorySecureStorage()

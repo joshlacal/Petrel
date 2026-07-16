@@ -8,11 +8,6 @@
 #if os(Linux)
 
     import CLibSecretShim
-    #if canImport(CryptoKit)
-        import CryptoKit
-    #else
-        @preconcurrency import Crypto
-    #endif
     import Foundation
 
     /// Secure storage implementation using libsecret (GNOME Keyring / KDE Wallet)
@@ -122,13 +117,16 @@
             LogManager.logDebug("LibSecretStore - deleteAll not fully implemented for namespace: \(namespace)")
         }
 
-        func storeDPoPKey(_ key: P256.Signing.PrivateKey, keyTag: String, accessGroup: String?) throws {
-            try store(key: keyTag, value: key.x963Representation, namespace: "dpopkeys", accessGroup: accessGroup)
+        func storeDPoPKeyRepresentation(
+            _ representation: Data,
+            keyTag: String,
+            accessGroup: String?
+        ) throws {
+            try store(key: keyTag, value: representation, namespace: "dpopkeys", accessGroup: accessGroup)
         }
 
-        func retrieveDPoPKey(keyTag: String, accessGroup: String?) throws -> P256.Signing.PrivateKey {
-            let data = try retrieve(key: keyTag, namespace: "dpopkeys", accessGroup: accessGroup)
-            return try P256.Signing.PrivateKey(x963Representation: data)
+        func retrieveDPoPKeyRepresentation(keyTag: String, accessGroup: String?) throws -> Data {
+            try retrieve(key: keyTag, namespace: "dpopkeys", accessGroup: accessGroup)
         }
 
         func deleteDPoPKey(keyTag: String, accessGroup: String?) throws {

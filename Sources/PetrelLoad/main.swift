@@ -217,8 +217,12 @@ enum PetrelLoadCLI {
     ]
 
     static func printUsageAndExit() -> Never {
-        fputs(usage + "\n", stderr)
+        writeStandardError(usage + "\n")
         exit(2)
+    }
+
+    static func writeStandardError(_ message: String) {
+        FileHandle.standardError.write(Data(message.utf8))
     }
 
     static func parseArgs(_ argv: [String] = CommandLine.arguments) throws -> [String: String] {
@@ -470,7 +474,7 @@ enum PetrelLoadCLI {
         do {
             args = try parseArgs()
         } catch {
-            fputs("Argument error: \(error)\n", stderr)
+            writeStandardError("Argument error: \(error)\n")
             printUsageAndExit()
         }
 
@@ -481,7 +485,7 @@ enum PetrelLoadCLI {
         guard let total = Int(args["requests"] ?? "100"),
               let concurrency = Int(args["concurrency"] ?? "10")
         else {
-            fputs("Validated numeric options became invalid.\n", stderr)
+            writeStandardError("Validated numeric options became invalid.\n")
             printUsageAndExit()
         }
         let unauth = (args["unauth"] ?? "false").lowercased() == "true"
@@ -543,7 +547,7 @@ enum PetrelLoadCLI {
                 }
                 print("✓ Logging typed auth events to \(fileURL.path) from byte \(writer.appendOffset)")
             } catch {
-                fputs("WARN: Failed to open log file \(logFilePath): \(error)\n", stderr)
+                writeStandardError("WARN: Failed to open log file \(logFilePath): \(error)\n")
             }
         }
 
@@ -895,7 +899,7 @@ var terminationStatus: Int32 = 0
 do {
     try await PetrelLoadCLI.main()
 } catch {
-    fputs("PetrelLoad failed: \(error)\n", stderr)
+    PetrelLoadCLI.writeStandardError("PetrelLoad failed: \(error)\n")
     terminationStatus = 1
 }
 

@@ -626,7 +626,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
         // CRITICAL FIX: Save the ephemeral key as the persistent DPoP key for this user
         // This ensures the same key used in token exchange is used for subsequent API calls
         do {
-            try await storage.saveDPoPKey(privateKey, for: did)
+            try await storage.saveDPoPKeyRepresentation(privateKey.x963Representation, for: did)
             LogManager.logInfo(
                 "Stored the ephemeral DPoP key used in token exchange as the active key for DID",
                 category: .authentication
@@ -3236,8 +3236,8 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
     private func getOrCreateDPoPKey(for did: String) async throws -> P256.Signing.PrivateKey {
         // Try to get existing key; propagate retrieval errors to avoid accidental key rotation
         do {
-            if let existingKey = try await storage.getDPoPKey(for: did) {
-                return existingKey
+            if let representation = try await storage.getDPoPKeyRepresentation(for: did) {
+                return try P256.Signing.PrivateKey(x963Representation: representation)
             }
         } catch {
             // Treat non-notFound keychain errors as transient; do NOT rotate key here
@@ -3279,7 +3279,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
             "Generating new DPoP key for DID \(LogManager.logDID(did))", category: .authentication
         )
         let newKey = P256.Signing.PrivateKey()
-        try await storage.saveDPoPKey(newKey, for: did)
+        try await storage.saveDPoPKeyRepresentation(newKey.x963Representation, for: did)
         return newKey
     }
 

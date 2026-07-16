@@ -18,7 +18,7 @@
     /// Suitable for server environments and as a fallback when system keyring is unavailable
     final class FileEncryptedStore: SecureStorage {
         private let storageDirectory: URL
-        private let masterKey: SymmetricKey
+        private let masterKeyRepresentation: Data
 
         enum FileEncryptedStoreError: Error, LocalizedError {
             case encryptionFailed
@@ -60,16 +60,18 @@
 
             // Get or create master key from environment or generate
             if let key = masterKey {
-                self.masterKey = key
+                masterKeyRepresentation = key.withUnsafeBytes { Data($0) }
             } else if let keyB64 = ProcessInfo.processInfo.environment["PETREL_MASTER_KEY"] {
                 guard let keyData = Data(base64Encoded: keyB64) else {
                     throw FileEncryptedStoreError.invalidConfiguration
                 }
-                self.masterKey = SymmetricKey(data: keyData)
+                masterKeyRepresentation = keyData
             } else {
                 // Generate and warn
-                self.masterKey = SymmetricKey(size: .bits256)
-                let keyB64 = self.masterKey.withUnsafeBytes { Data($0).base64EncodedString() }
+                let generatedKey = SymmetricKey(size: .bits256)
+                let generatedKeyRepresentation = generatedKey.withUnsafeBytes { Data($0) }
+                masterKeyRepresentation = generatedKeyRepresentation
+                let keyB64 = generatedKeyRepresentation.base64EncodedString()
                 LogManager.logWarning("""
                 FileEncryptedStore: Generated ephemeral master key. Secrets will be lost on restart.
                 Set PETREL_MASTER_KEY environment variable to persist secrets across restarts.
@@ -91,6 +93,7 @@
         }
 
         func store(key: String, value: Data, namespace: String, accessGroup: String?) throws {
+            let masterKey = SymmetricKey(data: masterKeyRepresentation)
             let sealed = try AES.GCM.seal(value, using: masterKey)
             guard let combined = sealed.combined else {
                 throw FileEncryptedStoreError.encryptionFailed
@@ -106,6 +109,7 @@
             }
             let combined = try Data(contentsOf: url)
             let box = try AES.GCM.SealedBox(combined: combined)
+            let masterKey = SymmetricKey(data: masterKeyRepresentation)
             let decrypted = try AES.GCM.open(box, using: masterKey)
             LogManager.logDebug("FileEncryptedStore: Retrieved key \(namespace).\(key)")
             return decrypted
@@ -139,17 +143,16 @@
             LogManager.logInfo("FileEncryptedStore: Deleted \(deletedCount) items for namespace: \(namespace)")
         }
 
-        func storeDPoPKey(
-            _ key: P256.Signing.PrivateKey,
+        func storeDPoPKeyRepresentation(
+            _ representation: Data,
             keyTag: String,
             accessGroup: String?
         ) throws {
-            try store(key: keyTag, value: key.x963Representation, namespace: "dpopkeys", accessGroup: accessGroup)
+            try store(key: keyTag, value: representation, namespace: "dpopkeys", accessGroup: accessGroup)
         }
 
-        func retrieveDPoPKey(keyTag: String, accessGroup: String?) throws -> P256.Signing.PrivateKey {
-            let data = try retrieve(key: keyTag, namespace: "dpopkeys", accessGroup: accessGroup)
-            return try P256.Signing.PrivateKey(x963Representation: data)
+        func retrieveDPoPKeyRepresentation(keyTag: String, accessGroup: String?) throws -> Data {
+            try retrieve(key: keyTag, namespace: "dpopkeys", accessGroup: accessGroup)
         }
 
         func deleteDPoPKey(keyTag: String, accessGroup: String?) throws {

@@ -276,8 +276,8 @@ actor OAuthCore {
 
     func getOrCreateDPoPKey(for did: String) async throws -> P256.Signing.PrivateKey {
         do {
-            if let existingKey = try await storage.getDPoPKey(for: did) {
-                return existingKey
+            if let representation = try await storage.getDPoPKeyRepresentation(for: did) {
+                return try P256.Signing.PrivateKey(x963Representation: representation)
             }
         } catch {
             throw AuthError.dpopKeyError
@@ -289,7 +289,7 @@ actor OAuthCore {
         }
 
         let newKey = P256.Signing.PrivateKey()
-        try await storage.saveDPoPKey(newKey, for: did)
+        try await storage.saveDPoPKeyRepresentation(newKey.x963Representation, for: did)
         return newKey
     }
 

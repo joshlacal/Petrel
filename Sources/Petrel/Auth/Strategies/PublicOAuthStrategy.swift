@@ -185,7 +185,7 @@ actor PublicOAuthStrategy: AuthStrategy {
         let (handle, actualPDS) = try await didResolver.resolveDIDToHandleAndPDSURL(did: did)
 
         // Persist DPoP Key
-        try await storage.saveDPoPKey(ephemeralKey, for: did)
+        try await storage.saveDPoPKeyRepresentation(ephemeralKey.x963Representation, for: did)
 
         // Create Session
         let session = Session(

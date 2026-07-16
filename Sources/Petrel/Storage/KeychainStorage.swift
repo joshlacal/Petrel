@@ -938,14 +938,18 @@ public actor KeychainStorage {
 
     // MARK: - DPoP Key Management
 
-    /// Saves a DPoP key to the keychain.
-    /// - Parameters:
-    ///   - key: The private key to save
-    ///   - did: The DID associated with the key
-    public func saveDPoPKey(_ key: P256.Signing.PrivateKey, for did: String) async throws {
+    /// Saves a DPoP key representation without moving CryptoKit key material
+    /// across this actor's isolation boundary.
+    func saveDPoPKeyRepresentation(_ representation: Data, for did: String) throws {
+        // Validate inside the actor before persisting opaque bytes.
+        let key = try P256.Signing.PrivateKey(x963Representation: representation)
         let keyTag = makeKey("dpopKey", did: did)
         do {
-            try KeychainManager.storeDPoPKey(key, keyTag: keyTag, accessGroup: accessGroup)
+            try KeychainManager.storeDPoPKeyRepresentation(
+                key.x963Representation,
+                keyTag: keyTag,
+                accessGroup: accessGroup
+            )
             LogManager.logDebug(
                 "Successfully saved DPoP key to Keychain for DID \(LogManager.logDID(did))"
             )
@@ -953,31 +957,34 @@ public actor KeychainStorage {
             LogManager.logError(
                 "Failed to save DPoP key to Keychain (error: \(error)). This will likely cause authentication issues."
             )
-            throw error // Re-throw so the calling code can handle this properly
+            throw error
         }
     }
 
-    /// Retrieves a DPoP key from the keychain.
-    /// - Parameter did: The DID associated with the key to retrieve
-    /// - Returns: The private key if found, or nil if not found
-    public func getDPoPKey(for did: String) async throws -> P256.Signing.PrivateKey? {
+    /// Retrieves a DPoP key as a Sendable representation so callers can
+    /// reconstruct it inside their own isolation domain.
+    func getDPoPKeyRepresentation(for did: String) throws -> Data? {
         let keyTag = makeKey("dpopKey", did: did)
         do {
-            return try KeychainManager.retrieveDPoPKey(keyTag: keyTag, accessGroup: accessGroup)
+            let representation = try KeychainManager.retrieveDPoPKeyRepresentation(
+                keyTag: keyTag,
+                accessGroup: accessGroup
+            )
+            // Reject malformed or corrupted storage records before exposing bytes.
+            return try P256.Signing.PrivateKey(
+                x963Representation: representation
+            ).x963Representation
         } catch let KeychainError.itemRetrievalError(status) where status == errSecItemNotFound {
             LogManager.logDebug(
                 "DPoP key not found in Keychain for DID: \(did). A new key will be generated if needed."
             )
             return nil
         } catch let KeychainError.itemRetrievalError(status) {
-            // For any other keychain retrieval error (e.g., errSecAuthFailed while device locked),
-            // do NOT rotate the DPoP key. Propagate the error so callers can treat this as transient.
             LogManager.logError(
                 "Keychain retrieval error for DPoP key (status=\(status)) for DID: \(did). Will NOT rotate key."
             )
             throw KeychainError.itemRetrievalError(status: status)
         } catch {
-            // Unknown error — propagate so callers can avoid key rotation
             LogManager.logError(
                 "Failed to retrieve DPoP key from Keychain (error: \(error)). Will NOT rotate key."
             )
@@ -985,10 +992,28 @@ public actor KeychainStorage {
         }
     }
 
+    /// Saves a DPoP key to the keychain.
+    /// - Parameters:
+    ///   - key: The private key to save
+    ///   - did: The DID associated with the key
+    public func saveDPoPKey(_ key: P256.Signing.PrivateKey, for did: String) async throws {
+        try saveDPoPKeyRepresentation(key.x963Representation, for: did)
+    }
+
+    /// Retrieves a DPoP key from the keychain.
+    /// - Parameter did: The DID associated with the key to retrieve
+    /// - Returns: The private key if found, or nil if not found
+    public func getDPoPKey(for did: String) async throws -> P256.Signing.PrivateKey? {
+        guard let representation = try getDPoPKeyRepresentation(for: did) else {
+            return nil
+        }
+        return try P256.Signing.PrivateKey(x963Representation: representation)
+    }
+
     /// Checks whether a DPoP key exists without moving private key material
     /// across the storage actor boundary.
     public func containsDPoPKey(for did: String) async throws -> Bool {
-        try await getDPoPKey(for: did) != nil
+        try getDPoPKeyRepresentation(for: did) != nil
     }
 
     /// Deletes a DPoP key from the keychain.
