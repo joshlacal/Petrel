@@ -30,7 +30,9 @@ final class InMemorySecureStorage: SecureStorage, @unchecked Sendable {
     /// Fail store calls whose (un-namespaced) key matches this predicate.
     var failStoreMatching: (@Sendable (String) -> Bool)?
 
-    private func fullKey(_ key: String, _ namespace: String) -> String { "\(namespace)|\(key)" }
+    private func fullKey(_ key: String, _ namespace: String) -> String {
+        "\(namespace)|\(key)"
+    }
 
     func store(key: String, value: Data, namespace: String, accessGroup _: String?) throws {
         lock.lock()
@@ -103,19 +105,34 @@ actor MockAccountManager: AccountManaging {
     }
 
     func addAccount(_: Account) async throws {}
-    func getAccount(did: String) async -> Account? { did == account.did ? account : nil }
+    func getAccount(did: String) async -> Account? {
+        did == account.did ? account : nil
+    }
+
     func updateAccountFromStorage(did _: String) async throws {}
     func removeAccount(did _: String) async throws {}
     func setCurrentAccount(did _: String) async throws {}
-    func getCurrentAccount() async -> Account? { account }
-    func listAccounts() async -> [Account] { [account] }
+    func getCurrentAccount() async -> Account? {
+        account
+    }
+
+    func listAccounts() async -> [Account] {
+        [account]
+    }
+
     func clearCurrentAccount() async {}
     func updateServiceDIDs(bskyAppViewDID _: String, bskyChatDID _: String) async throws {}
 }
 
 final class MockDIDResolver: DIDResolving, @unchecked Sendable {
-    func resolveHandleToDID(handle _: String) async throws -> String { "did:plc:test" }
-    func resolveDIDToPDSURL(did _: String) async throws -> URL { URL(string: "https://pds.test")! }
+    func resolveHandleToDID(handle _: String) async throws -> String {
+        "did:plc:test"
+    }
+
+    func resolveDIDToPDSURL(did _: String) async throws -> URL {
+        URL(string: "https://pds.test")!
+    }
+
     func resolveDIDToHandleAndPDSURL(did _: String) async throws -> (String, URL) {
         ("test.example", URL(string: "https://pds.test")!)
     }
@@ -190,6 +207,9 @@ private actor AuthenticationRefreshTransport {
     enum Response {
         case invalidGrant
         case serverFailure
+        case unauthorized
+        case refreshSuccess
+        case conflict
     }
 
     private let responses: [Response]
@@ -216,6 +236,10 @@ private actor AuthenticationRefreshTransport {
         } else {
             releasePermits += 1
         }
+    }
+
+    func observedRequestCount() -> Int {
+        requestCount
     }
 
     func handle(_ box: AuthenticationRefreshURLProtocolBox) async {
@@ -271,7 +295,47 @@ private actor AuthenticationRefreshTransport {
             )
             box.protocolInstance.client?.urlProtocol(box.protocolInstance, didLoad: data)
             box.protocolInstance.client?.urlProtocolDidFinishLoading(box.protocolInstance)
+        case .unauthorized:
+            respond(
+                to: box,
+                statusCode: 401,
+                data: Data(#"{"error":"ExpiredToken"}"#.utf8)
+            )
+        case .refreshSuccess:
+            respond(
+                to: box,
+                statusCode: 200,
+                data: Data(
+                    #"{"accessJwt":"access-refreshed","refreshJwt":"refresh-refreshed","handle":"test.example","did":"did:plc:refreshreliability"}"#.utf8
+                )
+            )
+        case .conflict:
+            respond(
+                to: box,
+                statusCode: 409,
+                data: Data(#"{"error":"DestinationExists"}"#.utf8)
+            )
         }
+    }
+
+    private func respond(
+        to box: AuthenticationRefreshURLProtocolBox,
+        statusCode: Int,
+        data: Data
+    ) {
+        let response = HTTPURLResponse(
+            url: box.request.url!,
+            statusCode: statusCode,
+            httpVersion: "HTTP/1.1",
+            headerFields: ["Content-Type": "application/json"]
+        )!
+        box.protocolInstance.client?.urlProtocol(
+            box.protocolInstance,
+            didReceive: response,
+            cacheStoragePolicy: .notAllowed
+        )
+        box.protocolInstance.client?.urlProtocol(box.protocolInstance, didLoad: data)
+        box.protocolInstance.client?.urlProtocolDidFinishLoading(box.protocolInstance)
     }
 }
 
@@ -371,6 +435,18 @@ private func makeAuthenticationService(
     transport: AuthenticationRefreshTransport,
     host: String
 ) -> AuthenticationService {
+    makeAuthenticationServiceFixture(
+        storage: storage,
+        transport: transport,
+        host: host
+    ).service
+}
+
+private func makeAuthenticationServiceFixture(
+    storage: KeychainStorage,
+    transport: AuthenticationRefreshTransport,
+    host: String
+) -> (service: AuthenticationService, networkService: NetworkService) {
     let account = Account(
         did: testDID,
         handle: "test.example",
@@ -379,7 +455,7 @@ private func makeAuthenticationService(
     NetworkService.setNetworkTestProtocolClasses([AuthenticationRefreshURLProtocol.self])
     let networkService = NetworkService(baseURL: account.pdsURL)
     AuthenticationRefreshURLProtocol.install(host: host, transport: transport)
-    return AuthenticationService(
+    let service = AuthenticationService(
         storage: storage,
         accountManager: MockAccountManager(account: account),
         networkService: networkService,
@@ -390,6 +466,7 @@ private func makeAuthenticationService(
         ),
         didResolver: MockDIDResolver()
     )
+    return (service, networkService)
 }
 
 /// Runs `body` with an injected in-memory storage backend, always restoring the
@@ -407,6 +484,66 @@ private func withInMemoryBackend<T>(
 
 @Suite("Refresh token reliability", .serialized)
 struct RefreshTokenReliabilityTests {
+    @Test("Named HTTP error path survives AuthenticationService 401 refresh retry")
+    func namedHTTPErrorPathSurvivesAuthenticationServiceRetry() async throws {
+        let backend = InMemorySecureStorage()
+        try await withInMemoryBackend(backend) {
+            let host = "typed-error-auth-\(UUID().uuidString.lowercased()).example"
+            let storage = KeychainStorage(
+                namespace: "test.refresh.authentication.typed-error"
+            )
+            let session = makeSession(
+                refreshToken: "refresh-original",
+                tokenType: .bearer
+            )
+            let transport = AuthenticationRefreshTransport(
+                responses: [.unauthorized, .refreshSuccess, .conflict]
+            )
+            defer {
+                AuthenticationRefreshURLProtocol.uninstall()
+                NetworkService.setNetworkTestProtocolClasses(nil)
+            }
+
+            try await storage.saveAccountAndSession(
+                makeAccount(),
+                session: session,
+                for: testDID
+            )
+            let fixture = makeAuthenticationServiceFixture(
+                storage: storage,
+                transport: transport,
+                host: host
+            )
+            await fixture.networkService.setAuthenticationProvider(fixture.service)
+            let request = URLRequest(
+                url: URL(string: "https://\(host)/xrpc/blue.moji.test")!
+            )
+            let operation = Task {
+                try await fixture.networkService
+                    .performRequestReturningHTTPErrorResponses(
+                        request,
+                        skipTokenRefresh: false
+                    )
+            }
+
+            for requestCount in 1 ... 3 {
+                await transport.waitForRequestCount(requestCount)
+                await transport.releaseNextRequest()
+            }
+
+            let (data, response) = try await operation.value
+            let storedSession = try await storage.getSession(for: testDID)
+            let requestCount = await transport.observedRequestCount()
+            #expect(response.statusCode == 409)
+            #expect(
+                String(decoding: data, as: UTF8.self) ==
+                    #"{"error":"DestinationExists"}"#
+            )
+            #expect(storedSession?.accessToken == "access-refreshed")
+            #expect(requestCount == 3)
+        }
+    }
+
     @Test("AuthenticationService propagates refresh task failures")
     func authenticationServicePropagatesRefreshTaskFailure() async throws {
         let backend = InMemorySecureStorage()
@@ -482,9 +619,9 @@ struct RefreshTokenReliabilityTests {
         }
     }
 
-    // The core "expires early" regression: a refresh that fails for transient
-    // reasons (timeout, offline, 5xx) must not permanently poison the refresh
-    // token in-process.
+    /// The core "expires early" regression: a refresh that fails for transient
+    /// reasons (timeout, offline, 5xx) must not permanently poison the refresh
+    /// token in-process.
     @Test("Transient refresh failure does not burn the refresh token")
     func transientFailureDoesNotBurnToken() async throws {
         let backend = InMemorySecureStorage()
@@ -546,9 +683,9 @@ struct RefreshTokenReliabilityTests {
         }
     }
 
-    // The rotation-loss bug: server rotates the (single-use) refresh token, then the
-    // keychain write fails. The new session must survive in memory and via the
-    // pending key, and be promoted on the next read.
+    /// The rotation-loss bug: server rotates the (single-use) refresh token, then the
+    /// keychain write fails. The new session must survive in memory and via the
+    /// pending key, and be promoted on the next read.
     @Test("Keychain write failure after refresh preserves the rotated session")
     func keychainWriteFailurePreservesRotatedSession() async throws {
         let backend = InMemorySecureStorage()

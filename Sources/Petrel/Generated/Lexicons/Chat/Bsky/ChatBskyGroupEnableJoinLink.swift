@@ -124,7 +124,7 @@ public extension ATProtoClient.Chat.Bsky.Group {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "chat.bsky.group.enableJoinLink")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
         // Only validate Content-Type and decode on success. Error responses

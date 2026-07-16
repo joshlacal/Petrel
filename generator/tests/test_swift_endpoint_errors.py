@@ -84,6 +84,12 @@ class SwiftEndpointErrorTests(unittest.TestCase):
             ),
         )
 
+    def assert_uses_http_error_response_transport(self, generated: str):
+        self.assertEqual(
+            generated.count("performRequestReturningHTTPErrorResponses("),
+            1,
+        )
+
     def test_error_wire_values_are_declared_names_and_descriptions_are_docs_only(self):
         cases = (
             (
@@ -142,6 +148,7 @@ class SwiftEndpointErrorTests(unittest.TestCase):
                 )
 
     def test_query_parses_one_declared_error_then_preserves_tuple_fallback(self):
+        self.assert_uses_http_error_response_transport(self.query)
         self.assert_exact_parser_call(
             self.query,
             "BlueCatbirdTestLookupEmoji",
@@ -157,6 +164,7 @@ class SwiftEndpointErrorTests(unittest.TestCase):
         self.assertIn("throw atprotoError", self.query[parser_index:fallback_index])
 
     def test_output_procedure_parses_one_declared_error_then_preserves_tuple_fallback(self):
+        self.assert_uses_http_error_response_transport(self.output_procedure)
         self.assert_exact_parser_call(
             self.output_procedure,
             "BlueCatbirdTestSaveDestination",
@@ -178,6 +186,9 @@ class SwiftEndpointErrorTests(unittest.TestCase):
         )
 
     def test_outputless_procedure_captures_body_and_parses_only_non_success(self):
+        self.assert_uses_http_error_response_transport(
+            self.outputless_procedure
+        )
         self.assertIn(
             "let (responseData, response) = try await networkService.performRequest",
             self.outputless_procedure,
