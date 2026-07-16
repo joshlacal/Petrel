@@ -24,6 +24,7 @@ required_release_executables=(
   Tests/ReleaseScripts/install-generated-documentation-test.sh
   Tests/ReleaseScripts/owned-warning-gate-test.sh
   Tests/ReleaseScripts/release-documentation-gate-test.sh
+  Tests/ReleaseScripts/release-tag-ancestry-gate-test.sh
   Tests/ReleaseScripts/workflow-topology-negative-test.sh
 )
 
@@ -253,6 +254,8 @@ fail!("tag guard run body is missing") unless tag_guard_run.is_a?(String)
   "CANDIDATE_COMMIT",
   "rev-parse HEAD",
   "rev-parse \"$GITHUB_REF_NAME^{commit}\"",
+  "/usr/bin/git show-ref --verify --quiet refs/remotes/origin/main",
+  "/usr/bin/git merge-base --is-ancestor \"$CANDIDATE_COMMIT\" refs/remotes/origin/main",
 ].each do |required|
   fail!("tag guard is missing #{required.inspect}") unless tag_guard_run.include?(required)
 end
@@ -290,6 +293,7 @@ end.join("\n")
   "Tests/ReleaseScripts/install-generated-documentation-test.sh",
   "Scripts/tests/validate-documentation-contract.sh",
   "Tests/ReleaseScripts/release-documentation-gate-test.sh",
+  "Tests/ReleaseScripts/release-tag-ancestry-gate-test.sh",
   "Scripts/validate-documentation.sh",
 ].each do |required|
   fail!("macos release gate does not execute #{required.inspect}") unless macos_run_source.include?(required)

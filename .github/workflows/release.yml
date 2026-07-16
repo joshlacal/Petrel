@@ -63,6 +63,7 @@ jobs:
           Tests/ReleaseScripts/install-generated-documentation-test.sh
           Scripts/tests/validate-documentation-contract.sh
           Tests/ReleaseScripts/release-documentation-gate-test.sh
+          Tests/ReleaseScripts/release-tag-ancestry-gate-test.sh
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         id: release-python
         with:
@@ -181,6 +182,8 @@ jobs:
           test "$GITHUB_REF_NAME" = "$EXPECTED_RELEASE_VERSION"
           CANDIDATE_COMMIT=$(/usr/bin/git rev-parse HEAD)
           test "$(/usr/bin/git rev-parse "$GITHUB_REF_NAME^{commit}")" = "$CANDIDATE_COMMIT"
+          /usr/bin/git show-ref --verify --quiet refs/remotes/origin/main
+          /usr/bin/git merge-base --is-ancestor "$CANDIDATE_COMMIT" refs/remotes/origin/main
           printf 'CANDIDATE_COMMIT=%s\n' "$CANDIDATE_COMMIT" >> "$GITHUB_ENV"
       - name: Select and verify minimum stable Xcode
         shell: bash

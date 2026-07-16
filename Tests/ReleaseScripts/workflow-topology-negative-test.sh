@@ -30,6 +30,7 @@ make_fixture() {
     Tests/ReleaseScripts/install-generated-documentation-test.sh \
     Tests/ReleaseScripts/owned-warning-gate-test.sh \
     Tests/ReleaseScripts/release-documentation-gate-test.sh \
+    Tests/ReleaseScripts/release-tag-ancestry-gate-test.sh \
     Tests/ReleaseScripts/workflow-topology-negative-test.sh; do
     cp "$ROOT/$relative" "$fixture/$relative"
     chmod +x "$fixture/$relative"
@@ -90,5 +91,16 @@ fixture=$TMP/nonexecutable-documentation-validator
 make_fixture "$fixture"
 chmod -x "$fixture/Scripts/validate-documentation.sh"
 expect_failure "$fixture" 'required release executable is not executable: Scripts/validate-documentation.sh'
+
+fixture=$TMP/tag-main-ancestry
+make_fixture "$fixture"
+/usr/bin/ruby - "$fixture/.github/workflows/release.yml" <<'RUBY'
+path = ARGV.fetch(0)
+source = File.binread(path)
+old = '          /usr/bin/git merge-base --is-ancestor "$CANDIDATE_COMMIT" refs/remotes/origin/main' + "\n"
+abort "tag ancestry fixture did not match" unless source.include?(old)
+File.binwrite(path, source.sub(old, ""))
+RUBY
+expect_failure "$fixture" 'tag guard is missing "/usr/bin/git merge-base --is-ancestor'
 
 echo "workflow topology negative contracts: PASS"
