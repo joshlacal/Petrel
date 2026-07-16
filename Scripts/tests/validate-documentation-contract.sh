@@ -113,6 +113,19 @@ actual_examples=$(find "$TMP/examples" -type f -name '*.swift' -exec basename {}
         "$expected_examples" "$actual_examples" >&2
     exit 1
 }
+while IFS= read -r required_manifest_fragment; do
+    /usr/bin/grep -F \
+        "$required_manifest_fragment" \
+        "$TMP/examples/package-manifest.swift" >/dev/null || {
+        echo "DocC package manifest is missing: $required_manifest_fragment" >&2
+        exit 1
+    }
+done <<'MANIFEST'
+.macOS(.v15)
+.iOS(.v18)
+.upToNextMinor(from: "0.2.0")
+.product(name: "Petrel", package: "Petrel")
+MANIFEST
 
 cp "$README" "$TMP/unmarked.md"
 # The fenced Markdown is intentionally literal test data.

@@ -14,13 +14,22 @@ import PackageDescription
 
 let package = Package(
     name: "YourApp",
+    platforms: [
+        .macOS(.v15),
+        .iOS(.v18),
+    ],
     dependencies: [
-        .package(url: "https://github.com/joshlacal/Petrel.git", from: "0.2.0"),
+        .package(
+            url: "https://github.com/joshlacal/Petrel.git",
+            .upToNextMinor(from: "0.2.0")
+        ),
     ],
     targets: [
         .target(
             name: "YourApp",
-            dependencies: ["Petrel"]
+            dependencies: [
+                .product(name: "Petrel", package: "Petrel"),
+            ]
         ),
     ]
 )

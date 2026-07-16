@@ -85,6 +85,27 @@ File.binwrite(path, source.sub(old, "'on':\n  pull_request:\n"))
 RUBY
 expect_failure "$fixture" 'sync workflow events must be exactly schedule and workflow_dispatch'
 
+for workflow in \
+  release.yml \
+  docc.yml \
+  generator.yml \
+  kotlin.yml \
+  lint.yml \
+  swift.yml \
+  sync-lexicons.yml; do
+  fixture=$TMP/job-level-permissions-${workflow%.yml}
+  make_fixture "$fixture"
+  /usr/bin/ruby - "$fixture/.github/workflows/$workflow" <<'RUBY'
+path = ARGV.fetch(0)
+source = File.binread(path)
+runs_on = source.match(/^    runs-on:[^\n]*\n/)
+abort "job-level permissions fixture did not find a runs-on key" unless runs_on
+replacement = runs_on[0] + "    permissions:\n      contents: write\n"
+File.binwrite(path, source.sub(runs_on[0], replacement))
+RUBY
+  expect_failure "$fixture" 'must not declare job-level permissions'
+done
+
 fixture=$TMP/missing-documentation-validator
 make_fixture "$fixture"
 rm "$fixture/Scripts/validate-documentation.sh"

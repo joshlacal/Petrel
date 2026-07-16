@@ -172,6 +172,8 @@ workflow_paths.each do |path|
   jobs_for_security = loaded["jobs"]
   fail!("#{label} jobs must be a mapping") unless jobs_for_security.is_a?(Hash)
   jobs_for_security.each do |job_name, job|
+    fail!("#{label} #{job_name} must not declare job-level permissions") if
+      job.key?("permissions")
     steps = job["steps"]
     fail!("#{label} #{job_name} steps must be an array") unless steps.is_a?(Array)
     steps.each do |step|
