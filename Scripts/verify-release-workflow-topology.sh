@@ -12,6 +12,7 @@ required_release_executables=(
   Scripts/activate-release-toolchain.sh
   Scripts/bootstrap-generator-environment.sh
   Scripts/bootstrap-release-tools.sh
+  Scripts/extract-documentation-examples.sh
   Scripts/install-generated-documentation.sh
   Scripts/regenerate-generated.sh
   Scripts/run-api-compatibility.sh

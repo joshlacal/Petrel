@@ -32,7 +32,10 @@ func authenticateExample(callbackURL: URL) async throws {
 
 ## Legacy Authentication
 
-Password-based flows are deprecated and not exposed by the public API. Use OAuth for production.
+Petrel still exposes legacy password authentication through the public
+``AuthMode/legacy`` mode and `loginWithPassword`. This compatibility path is
+intended for Bluesky app passwords, never a primary account password. Prefer
+OAuth for new production applications.
 
 ## Token Management
 

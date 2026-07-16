@@ -1,92 +1,129 @@
 # Petrel
 
-**A Swift and Kotlin SDK for the [AT Protocol](https://atproto.com) and [Bluesky](https://bsky.app).**
+Petrel is a Swift 6 SDK for the [AT Protocol](https://atproto.com) and
+[Bluesky](https://bsky.app). It generates strongly typed, actor-based APIs from
+the upstream `com.atproto.*`, `app.bsky.*`, and `chat.bsky.*` lexicons.
 
-Petrel generates strongly-typed clients from the official atproto lexicons — every endpoint, record type, and union in `com.atproto.*`, `app.bsky.*`, and `chat.bsky.*` is available as native Swift (actor-based, async/await, Swift 6 strict concurrency) and Kotlin (coroutines, kotlinx.serialization).
+The `0.2.0` package release is scoped to the Swift Package Manager product.
+The repository also contains Kotlin generator output, but Kotlin publication
+and Kotlin/Swift parity are outside the `0.2.0` SPM release gate.
 
 | | |
 |---|---|
-| **Swift** | Swift 6 package; iOS 18+ / macOS 15+ / Linux |
-| **Kotlin** | JVM 17 module (`kotlin/`), Ktor + kotlinx.serialization |
-| **Auth** | Public OAuth (PAR + PKCE + DPoP), confidential gateway/BFF mode, client-assertion backend, legacy app passwords |
+| **Swift** | Swift 6; iOS 18+, macOS 15+, and Linux |
+| **Auth** | OAuth with PAR, PKCE, and DPoP; gateway/CAB modes; legacy app-password compatibility |
+| **API shape** | Async generated namespace methods returning `(responseCode, data)` |
 | **License** | MIT |
 
 ## Installation
 
-### Swift Package Manager
+Add Petrel to a Swift package:
 
+<!-- compile-example: readme-package-manifest -->
 ```swift
-dependencies: [
-    .package(url: "https://github.com/joshlacal/Petrel.git", .upToNextMinor(from: "0.2.0"))
-]
+// swift-tools-version: 6.0
+
+import PackageDescription
+
+let package = Package(
+    name: "YourApp",
+    platforms: [
+        .macOS(.v15),
+        .iOS(.v18),
+    ],
+    dependencies: [
+        .package(
+            url: "https://github.com/joshlacal/Petrel.git",
+            .upToNextMinor(from: "0.2.0")
+        ),
+    ],
+    targets: [
+        .target(
+            name: "YourApp",
+            dependencies: [
+                .product(name: "Petrel", package: "Petrel"),
+            ]
+        ),
+    ]
+)
 ```
 
-### Kotlin
+## OAuth quick start
 
-The Kotlin package lives in `kotlin/` and is consumable today via a Gradle [composite build](https://docs.gradle.org/current/userguide/composite_builds.html) or `publishToMavenLocal`; Maven Central publication is planned.
+OAuth is the recommended authentication mode for production applications. The
+client metadata URL and redirect URI below must describe your own registered
+application.
 
-## Quick start (Swift)
+<!-- compile-example: readme-oauth -->
+```swift
+import Foundation
+import Petrel
 
+func signIn(callbackURL: URL) async throws -> ATProtoClient {
+    let config = OAuthConfig(
+        clientId: "https://yourapp.example/oauth/client-metadata.json",
+        redirectUri: "com.example.yourapp:/oauth/callback",
+        scope: "atproto transition:generic"
+    )
+    let client = try await ATProtoClient(
+        oauthConfig: config,
+        namespace: "com.example.yourapp",
+        userAgent: "YourApp/1.0"
+    )
+
+    let authorizationURL = try await client.startOAuthFlow(
+        identifier: "alice.bsky.social"
+    )
+    print("Open \(authorizationURL)")
+
+    // Present authorizationURL, then pass the received redirect URL here.
+    try await client.handleOAuthCallback(url: callbackURL)
+    return client
+}
+```
+
+## Public endpoint quick start
+
+Unauthenticated clients can call public endpoints. Generated calls accept a
+labeled `input` value and return the HTTP response code plus optional decoded
+data.
+
+<!-- compile-example: readme-public-profile -->
 ```swift
 import Petrel
 
-let oauth = OAuthConfig(
-    clientId: "https://yourapp.example/oauth/client-metadata.json",
-    redirectUri: "yourapp://oauth/callback",
-    scope: "atproto transition:generic"
-)
+func printPublicProfile() async throws {
+    let client = await ATProtoClient(baseURL: ATProtoClient.defaultBaseURL)
+    let actor = try ATIdentifier(string: "alice.bsky.social")
+    let response = try await client.app.bsky.actor.getProfile(
+        input: .init(actor: actor)
+    )
 
-let client = try await ATProtoClient(
-    oauthConfig: oauth,
-    namespace: "com.example.yourapp",   // keychain namespace for this app's sessions
-    userAgent: "YourApp/1.0"
-)
-
-// OAuth sign-in
-let authURL = try await client.startOAuthFlow(identifier: "yourhandle.bsky.social")
-// … present authURL (ASWebAuthenticationSession), receive callbackURL …
-try await client.handleOAuthCallback(url: callbackURL)
-
-// Strongly-typed endpoints, mirroring lexicon namespaces
-let profile = try await client.app.bsky.actor.getProfile(
-    AppBskyActorGetProfile.Parameters(actor: "alice.bsky.social")
-)
+    if let profile = response.data {
+        print(profile.displayName ?? profile.handle.description)
+    } else {
+        print("Profile request returned HTTP \(response.responseCode)")
+    }
+}
 ```
 
-Unauthenticated (public endpoints only):
+## Authentication compatibility
 
-```swift
-let client = await ATProtoClient(baseURL: ATProtoClient.defaultBaseURL)
-```
-
-## Quick start (Kotlin)
-
-```kotlin
-val client = ATProtoClient(networkService)
-val timeline = client.app.bsky.feed.getTimeline(AppBskyFeedGetTimelineParameters(limit = 50))
-```
-
-## Token & session behavior worth knowing
-
-- Refresh tokens are single-use and rotate on every refresh. Petrel serializes concurrent refreshes (single-flight per account), never retries a definitively-consumed token, retries transient failures safely, and survives keychain write failures without losing the rotated session.
-- Sessions are stored in the platform keychain, default accessibility `afterFirstUnlockThisDeviceOnly` (configurable via `KeychainAccessibility`).
-- A circuit breaker with exponential backoff paces refresh attempts after repeated failures.
-
-## Extending with custom lexicons
-
-The generator supports **overlay packages**: keep your own lexicon namespaces in a separate package generated against the public core, without forking Petrel. See `generator/manifests/` and `KOTLIN_GENERATOR.md`.
-
-```bash
-# From an activated release environment and a clean checkout
-Scripts/regenerate-generated.sh
-```
+Petrel publicly retains `AuthMode.legacy` and `loginWithPassword` for existing
+app-password integrations. That path is legacy compatibility: use an app
+password rather than a primary account password, and prefer OAuth for new
+production applications.
 
 ## Documentation
 
-- [GETTING_STARTED.md](GETTING_STARTED.md) — full setup and auth flows
-- [API_REFERENCE.md](API_REFERENCE.md) — API overview
-- [STRUCTURE.md](STRUCTURE.md) — repository layout
-- [KOTLIN_GENERATOR.md](KOTLIN_GENERATOR.md) — Kotlin generation details
+- [Getting Started](GETTING_STARTED.md) covers installation, public calls, and OAuth.
+- [API Reference](API_REFERENCE.md) gives a namespace overview.
+- [Release candidate notes](docs/releases/0.2.0.md) define the `0.2.0` gate and remaining publication prerequisites.
+- [Kotlin generator notes](KOTLIN_GENERATOR.md) describe repository tooling that is outside this SPM release gate.
+
+Every Swift fence in the README, Getting Started guide, and DocC tutorials is
+compiled by `Scripts/validate-documentation.sh` under the selected release
+toolchain.
 
 ## License
 

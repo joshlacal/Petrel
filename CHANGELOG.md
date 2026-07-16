@@ -14,12 +14,13 @@ with a dated `0.2.0` heading only when the release tag is created.
 - A generated-value-container decoder that preserves primitive roots, special link/byte objects, unknown fields, and re-encodable fallback values.
 - Deterministic generated-source ownership, stale-file removal, and pinned release tooling.
 - A two-overlay compiler fixture proving PetrelCatbird and PetrelBluemoji can extend one Petrel-owned `Blue` namespace.
-- A fail-closed DocC validator that treats documentation diagnostics as errors under the sealed release toolchain.
+- A fail-closed DocC validator that treats documentation diagnostics as errors and compile-checks every Swift example in the public guides under the sealed release toolchain.
 
 ### Changed
 - Generated namespace reference classes are immutable `Sendable` structs. This is an intentional pre-1.0 source compatibility break for code that named or relied on namespace class identity.
 - Petrel now owns shared overlay namespace roots; overlays add only their child namespaces.
 - Public installation documentation now targets Petrel 0.2.0 and the iOS 18/macOS 15 platform floors.
+- The 0.2.0 SPM release gate is explicitly Swift-scoped; Kotlin publication and parity remain outside this release candidate.
 - PetrelLoad rejects unsupported scenarios and invalid base URLs, propagates OAuth setup and verification failures, and exits nonzero when stress requests fail.
 
 ### Fixed
