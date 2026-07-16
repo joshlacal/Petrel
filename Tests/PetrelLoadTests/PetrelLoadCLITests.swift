@@ -354,6 +354,12 @@ struct PetrelLoadCLITests {
         #expect(!PetrelLoadCLI.usage.contains("--incident-only"))
     }
 
+    @Test("Usage states the typed-event drain boundary")
+    func usageDoesNotPromiseSignalSafeTypedEventDelivery() {
+        #expect(PetrelLoadCLI.usage.contains("final drain runs on orderly return or error"))
+        #expect(PetrelLoadCLI.usage.contains("signal termination may interrupt pending typed-event delivery"))
+    }
+
     @Test("Typed authentication events append as JSONL")
     func typedAuthEventJSONL() async throws {
         let fileURL = FileManager.default.temporaryDirectory

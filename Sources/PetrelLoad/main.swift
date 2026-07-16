@@ -149,10 +149,10 @@ enum PetrelLoadCLI {
       --requests     Total number of requests. Default: 100
       --concurrency  Concurrent workers. Default: 10
       --unauth       Use the lightweight unauthenticated client
-      --keep-running Continuously loop the test until terminated
+      --keep-running Continuously loop; signal termination may interrupt pending typed-event delivery
 
     Logging:
-      --log-file     Append typed authentication events as JSONL
+      --log-file     Append typed authentication events as JSONL; final drain runs on orderly return or error
 
     OAuth Helpers:
       --client-id <URL>          HTTPS URL of the published OAuth client metadata
@@ -769,7 +769,10 @@ enum PetrelLoadCLI {
 
         // Default: run ATProtoClient stress test
         if keepRunning {
-            print("Running continuous stress test. Press Ctrl+C to stop.")
+            print(
+                "Running continuous stress test. Press Ctrl+C to stop; " +
+                    "signal termination may interrupt pending typed-event delivery."
+            )
             while true {
                 try await runBasicStressTest(client: client, endpoint: endpoint, iterations: total, concurrency: concurrency)
                 try? await Task.sleep(nanoseconds: 2_000_000_000) // 2s pause between loops
