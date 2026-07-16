@@ -90,14 +90,206 @@ struct PetrelLoadCLITests {
 
         #expect(throws: Never.self) {
             _ = try PetrelLoadCLI.parseArgs([
-                "PetrelLoad", "--base-url", "http://127.0.0.1:8080",
+                "PetrelLoad", "--base-url", "http://127.0.0.1:8080", "--unauth",
             ])
         }
         #expect(throws: Never.self) {
             _ = try PetrelLoadCLI.parseArgs([
-                "PetrelLoad", "--base-url", "https://bsky.social",
+                "PetrelLoad", "--base-url", "https://bsky.social", "--unauth",
             ])
         }
+    }
+
+    @Test("OAuth modes require an explicit client ID and redirect URI pair")
+    func oauthConfigurationPairIsRequired() {
+        let common = [
+            "PetrelLoad",
+            "--namespace", "com.example.petrel",
+            "--endpoint", "app.bsky.actor.getProfile",
+            "--oauth-start",
+        ]
+
+        for incomplete in [
+            common,
+            common + ["--client-id", "https://client.example/oauth-client-metadata.json"],
+            common + ["--redirect-uri", "com.example.client:/callback"],
+        ] {
+            do {
+                _ = try PetrelLoadCLI.parseArgs(incomplete)
+                Issue.record("Expected incomplete OAuth configuration to be rejected")
+            } catch {
+                #expect(String(describing: error).contains("--client-id"))
+                #expect(String(describing: error).contains("--redirect-uri"))
+            }
+        }
+
+        #expect(throws: Never.self) {
+            _ = try PetrelLoadCLI.parseArgs(common + [
+                "--client-id", "https://client.example/oauth-client-metadata.json",
+                "--redirect-uri", "com.example.client:/callback",
+            ])
+        }
+    }
+
+    @Test("OAuth client and redirect arguments must be valid absolute URLs")
+    func oauthConfigurationURLsAreValidated() {
+        let common = [
+            "PetrelLoad",
+            "--namespace", "com.example.petrel",
+            "--endpoint", "app.bsky.actor.getProfile",
+            "--oauth-start",
+        ]
+
+        for (option, value, companionOption, companionValue) in [
+            ("client-id", "http://client.example/metadata.json", "redirect-uri", "com.example.client:/callback"),
+            ("client-id", "https://client.example:8443/metadata.json", "redirect-uri", "com.example.client:/callback"),
+            ("client-id", "relative/metadata.json", "redirect-uri", "com.example.client:/callback"),
+            ("redirect-uri", "relative/callback", "client-id", "https://client.example/metadata.json"),
+        ] {
+            do {
+                _ = try PetrelLoadCLI.parseArgs(common + [
+                    "--\(option)", value,
+                    "--\(companionOption)", companionValue,
+                ])
+                Issue.record("Expected --\(option) \(value) to be rejected")
+            } catch let error as PetrelLoadCLI.ArgumentError {
+                #expect(error == .invalidValue(option: option, value: value))
+            } catch {
+                Issue.record("Unexpected error: \(error)")
+            }
+        }
+    }
+
+    @Test("Supplied OAuth arguments produce the exact OAuth configuration")
+    func exactOAuthConfiguration() throws {
+        let arguments = try PetrelLoadCLI.parseArgs([
+            "PetrelLoad",
+            "--namespace", "com.example.petrel",
+            "--endpoint", "app.bsky.actor.getProfile",
+            "--client-id", "https://client.example/oauth-client-metadata.json",
+            "--redirect-uri", "com.example.client:/callback",
+        ])
+
+        let parsedConfiguration = try PetrelLoadCLI.oauthConfiguration(from: arguments)
+        let configuration = try #require(parsedConfiguration)
+        #expect(configuration.clientId == "https://client.example/oauth-client-metadata.json")
+        #expect(configuration.redirectUri == "com.example.client:/callback")
+        #expect(configuration.scope == "atproto transition:generic")
+    }
+
+    @Test("OAuth metadata is fetched and verified before browser launch")
+    func oauthMetadataPreflight() async throws {
+        let configuration = OAuthConfig(
+            clientId: "https://client.example/oauth-client-metadata.json",
+            redirectUri: "com.example.client:/callback",
+            scope: "atproto transition:generic"
+        )
+        let probe = MetadataFetchProbe()
+
+        try await PetrelLoadCLI.validateOAuthMetadata(for: configuration) { url in
+            await probe.record(url)
+            return PetrelLoadCLI.OAuthMetadataResponse(
+                finalURL: url,
+                statusCode: 200,
+                contentType: "application/json; charset=utf-8",
+                data: Data(#"""
+                {
+                  "client_id":"https://client.example/oauth-client-metadata.json",
+                  "redirect_uris":["com.example.client:/callback"],
+                  "grant_types":["authorization_code","refresh_token"],
+                  "scope":"atproto transition:generic",
+                  "response_types":["code"],
+                  "dpop_bound_access_tokens":true
+                }
+                """#.utf8)
+            )
+        }
+
+        #expect(await probe.lastURL == URL(string: configuration.clientId))
+
+        await #expect(throws: URLError.self) {
+            try await PetrelLoadCLI.validateOAuthMetadata(for: configuration) { _ in
+                throw URLError(.cannotConnectToHost)
+            }
+        }
+
+        await #expect(throws: PetrelLoadCLI.OAuthMetadataError.self) {
+            try await PetrelLoadCLI.validateOAuthMetadata(for: configuration) { url in
+                PetrelLoadCLI.OAuthMetadataResponse(
+                    finalURL: url,
+                    statusCode: 200,
+                    contentType: "application/json",
+                    data: Data(#"""
+                    {
+                      "client_id":"https://client.example/oauth-client-metadata.json",
+                      "redirect_uris":["com.example.other:/callback"],
+                      "grant_types":["authorization_code","refresh_token"],
+                      "scope":"atproto transition:generic",
+                      "response_types":["code"],
+                      "dpop_bound_access_tokens":true
+                    }
+                    """#.utf8)
+                )
+            }
+        }
+    }
+
+    @Test("OAuth completion instructions preserve the configured callback identity")
+    func configuredCallbackInstructions() {
+        let configuration = OAuthConfig(
+            clientId: "https://client.example/oauth-client-metadata.json",
+            redirectUri: "com.example.client:/callback",
+            scope: "atproto transition:generic"
+        )
+        let instructions = PetrelLoadCLI.oauthCompletionInstructions(
+            configuration: configuration,
+            namespace: "com.example.petrel",
+            endpoint: "app.bsky.actor.getProfile"
+        )
+
+        #expect(instructions.contains("com.example.client:/callback"))
+        #expect(instructions.contains("--client-id \"https://client.example/oauth-client-metadata.json\""))
+        #expect(instructions.contains("--redirect-uri \"com.example.client:/callback\""))
+    }
+
+    @Test("Scenario plans distinguish concurrent load from serial state checks")
+    func truthfulScenarioPlans() {
+        #expect(PetrelLoadCLI.scenarioPlan(
+            option: "oauth-test",
+            value: "authenticated-load",
+            total: 12,
+            concurrency: 3
+        ) == .concurrentRequests(total: 12, concurrency: 3))
+        #expect(PetrelLoadCLI.scenarioPlan(
+            option: "oauth-test",
+            value: "refresh-sequence",
+            total: 12,
+            concurrency: 3
+        ) == .serialRefreshes(count: 5))
+        #expect(PetrelLoadCLI.scenarioPlan(
+            option: "oauth-test",
+            value: "session-snapshot",
+            total: 12,
+            concurrency: 3
+        ) == .sessionSnapshot)
+        #expect(PetrelLoadCLI.scenarioPlan(
+            option: "dpop-test",
+            value: "session-check",
+            total: 12,
+            concurrency: 3
+        ) == .sessionCheck)
+        #expect(PetrelLoadCLI.scenarioPlan(
+            option: "dpop-test",
+            value: "authenticated-load",
+            total: 12,
+            concurrency: 3
+        ) == .concurrentRequests(total: 50, concurrency: 5))
+        #expect(PetrelLoadCLI.scenarioPlan(
+            option: "dpop-test",
+            value: "refresh-check",
+            total: 12,
+            concurrency: 3
+        ) == .singleRefresh)
     }
 
     @Test("Worker distribution executes every requested operation exactly once")
@@ -151,6 +343,8 @@ struct PetrelLoadCLITests {
     func usageMatchesImplementation() {
         #expect(PetrelLoadCLI.usage.contains("--requests"))
         #expect(PetrelLoadCLI.usage.contains("--oauth-start"))
+        #expect(PetrelLoadCLI.usage.contains("--client-id"))
+        #expect(PetrelLoadCLI.usage.contains("--redirect-uri"))
         #expect(!PetrelLoadCLI.usage.contains("--method"))
         #expect(!PetrelLoadCLI.usage.contains("--target-rps"))
         #expect(!PetrelLoadCLI.usage.contains("--force-refresh-interval"))
@@ -214,11 +408,27 @@ struct PetrelLoadCLITests {
             #expect(!script.contains(unsupported), "Harness still names unsupported scenario \(unsupported)")
         }
 
-        #expect(script.contains("dpop_nonce_thrash"))
-        #expect(script.contains("token_refresh_race"))
-        #expect(script.contains("dpop_validation"))
-        #expect(script.contains("nonce-test"))
-        #expect(script.contains("refresh-test"))
+        for truthfulScenario in [
+            "authenticated-load",
+            "refresh-sequence",
+            "session-snapshot",
+            "session-check",
+            "refresh-check",
+        ] {
+            #expect(script.contains(truthfulScenario))
+        }
+        for overclaim in [
+            "dpop_nonce_thrash",
+            "token_refresh_race",
+            "dpop_validation",
+            "compliance",
+            "nonce-test",
+            "refresh-test",
+        ] {
+            #expect(!script.contains(overclaim), "Harness still overclaims \(overclaim)")
+        }
+        #expect(script.contains("--client-id \"$CLIENT_ID\""))
+        #expect(script.contains("--redirect-uri \"$REDIRECT_URI\""))
         #expect(script.contains("simulate-ambiguous-timeout"))
         #expect(script.contains("source \"$ROOT/Scripts/activate-release-toolchain.sh\""))
         #expect(script.contains("\"$RELEASE_SWIFT\" run"))
@@ -255,6 +465,27 @@ struct PetrelLoadCLITests {
         #expect(!result.standardError.contains("Fatal error"))
     }
 
+    @Test("Missing or partial OAuth configuration exits with usage status")
+    func missingOAuthConfigurationIsUsageFailure() throws {
+        let common = [
+            "--namespace", "com.example.petrel.truthfulness.\(UUID().uuidString)",
+            "--endpoint", "app.bsky.actor.getProfile",
+            "--oauth-start",
+        ]
+        for incomplete in [
+            common,
+            common + ["--client-id", "https://client.example/oauth-client-metadata.json"],
+            common + ["--redirect-uri", "com.example.client:/callback"],
+        ] {
+            let result = try runPetrelLoad(incomplete)
+            #expect(result.terminationReason == .exit)
+            #expect(result.terminationStatus == 2)
+            #expect(result.standardError.contains("--client-id"))
+            #expect(result.standardError.contains("--redirect-uri"))
+            #expect(!result.standardError.contains("Fatal error"))
+        }
+    }
+
     @Test("OAuth scenario errors are not erased or force-trapped")
     func oauthErrorsReachProcessBoundary() throws {
         let source = try String(
@@ -268,6 +499,18 @@ struct PetrelLoadCLITests {
         #expect(!source.contains("print(\"✗ API call after ambiguous path failed:"))
         #expect(!source.contains("print(\"ERROR: API call failed with:"))
         #expect(!source.contains("print(\"(simulateAmbiguous is only available in DEBUG builds)\")"))
+        #expect(!source.contains("87a6c075b410.ngrok-free.app"))
+        for overclaim in [
+            "dpop_nonce_thrash",
+            "token_refresh_race",
+            "dpop_validation",
+            "Running OAuth compliance check",
+        ] {
+            #expect(!source.contains(overclaim), "PetrelLoad still overclaims \(overclaim)")
+        }
+        let metadataPreflight = try #require(source.range(of: "try await validateOAuthMetadata"))
+        let browserLaunch = try #require(source.range(of: "try openProcess.run()"))
+        #expect(metadataPreflight.lowerBound < browserLaunch.lowerBound)
     }
 
     private struct ProcessResult {
@@ -275,6 +518,14 @@ struct PetrelLoadCLITests {
         let terminationStatus: Int32
         let standardOutput: String
         let standardError: String
+    }
+
+    private actor MetadataFetchProbe {
+        private(set) var lastURL: URL?
+
+        func record(_ url: URL) {
+            lastURL = url
+        }
     }
 
     private func runPetrelLoad(_ arguments: [String]) throws -> ProcessResult {

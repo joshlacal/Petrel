@@ -8,8 +8,15 @@ set -u
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 source "$ROOT/Scripts/activate-release-toolchain.sh"
 
-NAMESPACE="${1:-com.petrel.test}"
-ENDPOINT="${2:-app.bsky.actor.getProfile}"
+if (( $# != 4 )); then
+    echo "Usage: $0 <namespace> <endpoint> <client-id> <redirect-uri>" >&2
+    exit 2
+fi
+
+NAMESPACE="$1"
+ENDPOINT="$2"
+CLIENT_ID="$3"
+REDIRECT_URI="$4"
 
 echo "=== PetrelLoad OAuth Stress Scenarios ==="
 echo "Namespace: $NAMESPACE"
@@ -39,51 +46,60 @@ run_test() {
     echo
 }
 
-# 1. Basic DPoP session check
-run_test "DPoP Compliance Validation" \
-    "$RELEASE_SWIFT" run --package-path "$ROOT" PetrelLoad \
-    --namespace "$NAMESPACE" --endpoint "$ENDPOINT" --dpop-test compliance
-
-# 2. DPoP Nonce Thrashing Test
-run_test "DPoP Nonce Thrashing (50 requests, 10 concurrent)" \
+# 1. Basic OAuth session check
+run_test "OAuth Session Check" \
     "$RELEASE_SWIFT" run --package-path "$ROOT" PetrelLoad \
     --namespace "$NAMESPACE" --endpoint "$ENDPOINT" \
-    --oauth-test dpop_nonce_thrash --requests 50 --concurrency 10
+    --client-id "$CLIENT_ID" --redirect-uri "$REDIRECT_URI" \
+    --dpop-test session-check
+
+# 2. Authenticated request load
+run_test "Authenticated Request Load (50 requests, 10 concurrent)" \
+    "$RELEASE_SWIFT" run --package-path "$ROOT" PetrelLoad \
+    --namespace "$NAMESPACE" --endpoint "$ENDPOINT" \
+    --client-id "$CLIENT_ID" --redirect-uri "$REDIRECT_URI" \
+    --oauth-test authenticated-load --requests 50 --concurrency 10
 
 # 3. Token refresh sequence
 run_test "Token Refresh Sequence" \
     "$RELEASE_SWIFT" run --package-path "$ROOT" PetrelLoad \
     --namespace "$NAMESPACE" --endpoint "$ENDPOINT" \
-    --oauth-test token_refresh_race
+    --client-id "$CLIENT_ID" --redirect-uri "$REDIRECT_URI" \
+    --oauth-test refresh-sequence
 
-# 4. DPoP validation snapshot
-run_test "DPoP Validation Snapshot" \
+# 4. OAuth session snapshot
+run_test "OAuth Session Snapshot" \
     "$RELEASE_SWIFT" run --package-path "$ROOT" PetrelLoad \
     --namespace "$NAMESPACE" --endpoint "$ENDPOINT" \
-    --oauth-test dpop_validation
+    --client-id "$CLIENT_ID" --redirect-uri "$REDIRECT_URI" \
+    --oauth-test session-snapshot
 
-# 5. Nonce-handling load
-run_test "DPoP Nonce Handling" \
+# 5. Fixed-size authenticated load
+run_test "Fixed Authenticated Request Load" \
     "$RELEASE_SWIFT" run --package-path "$ROOT" PetrelLoad \
     --namespace "$NAMESPACE" --endpoint "$ENDPOINT" \
-    --dpop-test nonce-test
+    --client-id "$CLIENT_ID" --redirect-uri "$REDIRECT_URI" \
+    --dpop-test authenticated-load
 
 # 6. Explicit refresh check
-run_test "DPoP Refresh Check" \
+run_test "Token Refresh Check" \
     "$RELEASE_SWIFT" run --package-path "$ROOT" PetrelLoad \
     --namespace "$NAMESPACE" --endpoint "$ENDPOINT" \
-    --dpop-test refresh-test
+    --client-id "$CLIENT_ID" --redirect-uri "$REDIRECT_URI" \
+    --dpop-test refresh-check
 
 # 7. Ambiguous refresh timeout handling
 run_test "Ambiguous Refresh Timeout" \
     "$RELEASE_SWIFT" run --package-path "$ROOT" PetrelLoad \
     --namespace "$NAMESPACE" --endpoint "$ENDPOINT" \
+    --client-id "$CLIENT_ID" --redirect-uri "$REDIRECT_URI" \
     --simulate-ambiguous-timeout
 
-# 8. Full implemented OAuth stress sequence
-run_test "Complete OAuth Stress Suite (reduced scale)" \
+# 8. Authenticated load sequence
+run_test "Authenticated Load Sequence (reduced scale)" \
     "$RELEASE_SWIFT" run --package-path "$ROOT" PetrelLoad \
     --namespace "$NAMESPACE" --endpoint "$ENDPOINT" \
+    --client-id "$CLIENT_ID" --redirect-uri "$REDIRECT_URI" \
     --oauth-stress --requests 100 --concurrency 10
 
 echo "=== Test Suite Complete ==="

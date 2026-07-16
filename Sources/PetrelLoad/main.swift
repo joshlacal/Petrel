@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+    import FoundationNetworking
+#endif
 import Petrel
 
 actor AuthEventJSONLWriter {
@@ -30,6 +33,7 @@ enum PetrelLoadCLI {
     enum ArgumentError: Error, Equatable, CustomStringConvertible {
         case invalidValue(option: String, value: String)
         case missingValue(String)
+        case oauthConfigurationRequired
         case unexpectedArgument(String)
         case unknownOption(String)
 
@@ -39,11 +43,77 @@ enum PetrelLoadCLI {
                 "Unsupported value for --\(option): \(value)"
             case let .missingValue(option):
                 "Missing value for --\(option)"
+            case .oauthConfigurationRequired:
+                "OAuth modes require both --client-id and --redirect-uri"
             case let .unexpectedArgument(argument):
                 "Unexpected argument: \(argument)"
             case let .unknownOption(option):
                 "Unknown option: --\(option)"
             }
+        }
+    }
+
+    enum OAuthMetadataError: Error, Equatable, CustomStringConvertible {
+        case clientIDMismatch(expected: String, actual: String)
+        case invalidContentType(String?)
+        case invalidDocument
+        case invalidStatus(Int)
+        case redirected(expected: URL, actual: URL?)
+        case missingRequirement(String)
+        case redirectURIMissing(String)
+
+        var description: String {
+            switch self {
+            case let .clientIDMismatch(expected, actual):
+                "OAuth metadata client_id mismatch: expected \(expected), got \(actual)"
+            case let .invalidContentType(contentType):
+                "OAuth metadata must use application/json, got \(contentType ?? "no Content-Type")"
+            case .invalidDocument:
+                "OAuth client metadata is not a valid metadata document"
+            case let .invalidStatus(status):
+                "OAuth metadata fetch returned HTTP \(status); expected 200"
+            case let .redirected(expected, actual):
+                "OAuth metadata fetch redirected from \(expected) to \(actual?.absoluteString ?? "an unknown URL")"
+            case let .missingRequirement(requirement):
+                "OAuth metadata is missing required value: \(requirement)"
+            case let .redirectURIMissing(redirectURI):
+                "OAuth metadata does not declare redirect URI \(redirectURI)"
+            }
+        }
+    }
+
+    struct OAuthMetadataResponse {
+        let finalURL: URL
+        let statusCode: Int
+        let contentType: String?
+        let data: Data
+    }
+
+    enum ScenarioPlan: Equatable {
+        case concurrentRequests(total: Int, concurrency: Int)
+        case serialRefreshes(count: Int)
+        case sessionSnapshot
+        case sessionCheck
+        case singleRefresh
+    }
+
+    typealias OAuthMetadataFetcher = @Sendable (URL) async throws -> OAuthMetadataResponse
+
+    private struct OAuthClientMetadata: Decodable {
+        let clientID: String
+        let redirectURIs: [String]
+        let grantTypes: [String]
+        let scope: String
+        let responseTypes: [String]
+        let dpopBoundAccessTokens: Bool
+
+        private enum CodingKeys: String, CodingKey {
+            case clientID = "client_id"
+            case redirectURIs = "redirect_uris"
+            case grantTypes = "grant_types"
+            case scope
+            case responseTypes = "response_types"
+            case dpopBoundAccessTokens = "dpop_bound_access_tokens"
         }
     }
 
@@ -82,26 +152,30 @@ enum PetrelLoadCLI {
       --log-file     Append typed authentication events as JSONL
 
     OAuth Helpers:
+      --client-id <URL>          HTTPS URL of the published OAuth client metadata
+      --redirect-uri <URL>       Callback URI declared by that metadata
       --oauth-start              Start an OAuth flow
       --identifier <handle>      Optional handle for --oauth-start
       --oauth-complete <URL>     Complete OAuth with the callback URL
 
     OAuth Stress Testing:
-      --oauth-stress                   Run the implemented OAuth stress sequence
-      --oauth-test <scenario>          dpop_nonce_thrash, token_refresh_race,
-                                       or dpop_validation
-      --dpop-test <mode>               compliance, nonce-test, or refresh-test
+      --oauth-stress                   Run an authenticated load sequence
+      --oauth-test <scenario>          authenticated-load, refresh-sequence,
+                                       or session-snapshot
+      --dpop-test <mode>               session-check, authenticated-load,
+                                       or refresh-check
       --simulate-ambiguous-timeout     Exercise ambiguous refresh timeout handling
 
     Examples:
-      PetrelLoad --namespace com.example.petrel --endpoint app.bsky.feed.getTimeline --requests 500 --concurrency 25
-      PetrelLoad --namespace com.example.petrel --endpoint app.bsky.actor.getProfile --oauth-start --identifier alice.bsky.social
-      PetrelLoad --namespace com.example.petrel --endpoint app.bsky.feed.getTimeline --oauth-test dpop_nonce_thrash --requests 200
-      PetrelLoad --namespace com.example.petrel --endpoint app.bsky.actor.getProfile --dpop-test compliance
+      PetrelLoad --namespace com.example.petrel --endpoint app.bsky.feed.getTimeline --unauth --requests 500 --concurrency 25
+      PetrelLoad --namespace com.example.petrel --endpoint app.bsky.actor.getProfile --client-id https://client.example/oauth-client-metadata.json --redirect-uri com.example.client:/callback --oauth-start --identifier alice.bsky.social
+      PetrelLoad --namespace com.example.petrel --endpoint app.bsky.feed.getTimeline --client-id https://client.example/oauth-client-metadata.json --redirect-uri com.example.client:/callback --oauth-test authenticated-load --requests 200
+      PetrelLoad --namespace com.example.petrel --endpoint app.bsky.actor.getProfile --client-id https://client.example/oauth-client-metadata.json --redirect-uri com.example.client:/callback --dpop-test session-check
     """
 
     private static let valueOptions: Set<String> = [
         "base-url",
+        "client-id",
         "concurrency",
         "dpop-test",
         "endpoint",
@@ -111,6 +185,7 @@ enum PetrelLoadCLI {
         "oauth-complete",
         "oauth-test",
         "requests",
+        "redirect-uri",
     ]
 
     private static let flagOptions: Set<String> = [
@@ -127,15 +202,15 @@ enum PetrelLoadCLI {
     ]
 
     private static let oauthTestScenarios: Set<String> = [
-        "dpop_nonce_thrash",
-        "dpop_validation",
-        "token_refresh_race",
+        "authenticated-load",
+        "refresh-sequence",
+        "session-snapshot",
     ]
 
     private static let dpopTestModes: Set<String> = [
-        "compliance",
-        "nonce-test",
-        "refresh-test",
+        "authenticated-load",
+        "refresh-check",
+        "session-check",
     ]
 
     static func printUsageAndExit() -> Never {
@@ -190,6 +265,18 @@ enum PetrelLoadCLI {
         if let baseURL = args["base-url"] {
             _ = try validatedBaseURL(baseURL)
         }
+        let unauthenticated = args["unauth"] == "true"
+        if !unauthenticated {
+            guard args["client-id"] != nil, args["redirect-uri"] != nil else {
+                throw ArgumentError.oauthConfigurationRequired
+            }
+        }
+        if let clientID = args["client-id"] {
+            _ = try validatedClientID(clientID)
+        }
+        if let redirectURI = args["redirect-uri"] {
+            _ = try validatedRedirectURI(redirectURI)
+        }
     }
 
     private static func validatedBaseURL(_ value: String) throws -> URL {
@@ -205,6 +292,162 @@ enum PetrelLoadCLI {
         return url
     }
 
+    private static func validatedClientID(_ value: String) throws -> URL {
+        guard let components = URLComponents(string: value),
+              components.scheme?.lowercased() == "https",
+              let host = components.host,
+              !host.isEmpty,
+              components.port == nil,
+              components.user == nil,
+              components.password == nil,
+              components.fragment == nil,
+              let url = components.url
+        else {
+            throw ArgumentError.invalidValue(option: "client-id", value: value)
+        }
+        return url
+    }
+
+    private static func validatedRedirectURI(_ value: String) throws -> URL {
+        guard let components = URLComponents(string: value),
+              let scheme = components.scheme,
+              !scheme.isEmpty,
+              components.fragment == nil,
+              let url = components.url
+        else {
+            throw ArgumentError.invalidValue(option: "redirect-uri", value: value)
+        }
+
+        let webScheme = scheme.lowercased() == "http" || scheme.lowercased() == "https"
+        let hasWebHost = components.host?.isEmpty == false
+        let hasCustomPath = !webScheme && components.host == nil && components.path.hasPrefix("/") && components.path.count > 1
+        guard (webScheme && hasWebHost) || hasCustomPath else {
+            throw ArgumentError.invalidValue(option: "redirect-uri", value: value)
+        }
+        return url
+    }
+
+    static func oauthConfiguration(from args: [String: String]) throws -> OAuthConfig? {
+        guard args["unauth"] != "true" else {
+            return nil
+        }
+        guard let clientID = args["client-id"], let redirectURI = args["redirect-uri"] else {
+            throw ArgumentError.oauthConfigurationRequired
+        }
+        _ = try validatedClientID(clientID)
+        _ = try validatedRedirectURI(redirectURI)
+        return OAuthConfig(
+            clientId: clientID,
+            redirectUri: redirectURI,
+            scope: "atproto transition:generic"
+        )
+    }
+
+    static func validateOAuthMetadata(
+        for configuration: OAuthConfig,
+        fetch: OAuthMetadataFetcher
+    ) async throws {
+        let clientIDURL = try validatedClientID(configuration.clientId)
+        let response = try await fetch(clientIDURL)
+        guard response.finalURL == clientIDURL else {
+            throw OAuthMetadataError.redirected(expected: clientIDURL, actual: response.finalURL)
+        }
+        guard response.statusCode == 200 else {
+            throw OAuthMetadataError.invalidStatus(response.statusCode)
+        }
+        let mediaType = response.contentType?
+            .split(separator: ";", maxSplits: 1, omittingEmptySubsequences: false)
+            .first?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        guard mediaType == "application/json" else {
+            throw OAuthMetadataError.invalidContentType(response.contentType)
+        }
+        guard let metadata = try? JSONDecoder().decode(OAuthClientMetadata.self, from: response.data) else {
+            throw OAuthMetadataError.invalidDocument
+        }
+        guard metadata.clientID == configuration.clientId else {
+            throw OAuthMetadataError.clientIDMismatch(
+                expected: configuration.clientId,
+                actual: metadata.clientID
+            )
+        }
+        guard metadata.redirectURIs.contains(configuration.redirectUri) else {
+            throw OAuthMetadataError.redirectURIMissing(configuration.redirectUri)
+        }
+        guard metadata.grantTypes.contains("authorization_code") else {
+            throw OAuthMetadataError.missingRequirement("grant_types.authorization_code")
+        }
+        guard metadata.grantTypes.contains("refresh_token") else {
+            throw OAuthMetadataError.missingRequirement("grant_types.refresh_token")
+        }
+        guard metadata.responseTypes.contains("code") else {
+            throw OAuthMetadataError.missingRequirement("response_types.code")
+        }
+        guard metadata.dpopBoundAccessTokens else {
+            throw OAuthMetadataError.missingRequirement("dpop_bound_access_tokens=true")
+        }
+        let declaredScopes = Set(metadata.scope.split(whereSeparator: { $0.isWhitespace }).map(String.init))
+        let requestedScopes = Set(configuration.scope.split(whereSeparator: { $0.isWhitespace }).map(String.init))
+        guard requestedScopes.isSubset(of: declaredScopes), declaredScopes.contains("atproto") else {
+            throw OAuthMetadataError.missingRequirement("scope=\(configuration.scope)")
+        }
+    }
+
+    private static func fetchOAuthMetadata(at url: URL) async throws -> OAuthMetadataResponse {
+        var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        request.timeoutInterval = 10
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw OAuthMetadataError.invalidDocument
+        }
+        return OAuthMetadataResponse(
+            finalURL: httpResponse.url ?? url,
+            statusCode: httpResponse.statusCode,
+            contentType: httpResponse.value(forHTTPHeaderField: "Content-Type"),
+            data: data
+        )
+    }
+
+    static func oauthCompletionInstructions(
+        configuration: OAuthConfig,
+        namespace: String,
+        endpoint: String
+    ) -> String {
+        """
+        After authorizing in the browser:
+        1. Look for the callback URL beginning with '\(configuration.redirectUri)'.
+        2. Copy the ENTIRE callback URL from your browser's address bar.
+        3. Run the following command with the copied URL:
+           PetrelLoad --namespace \(namespace) --endpoint \(endpoint) --client-id "\(configuration.clientId)" --redirect-uri "\(configuration.redirectUri)" --oauth-complete "<PASTE_CALLBACK_URL>"
+        """
+    }
+
+    static func scenarioPlan(
+        option: String,
+        value: String,
+        total: Int,
+        concurrency: Int
+    ) -> ScenarioPlan? {
+        switch (option, value) {
+        case ("oauth-test", "authenticated-load"):
+            .concurrentRequests(total: total, concurrency: concurrency)
+        case ("oauth-test", "refresh-sequence"):
+            .serialRefreshes(count: 5)
+        case ("oauth-test", "session-snapshot"):
+            .sessionSnapshot
+        case ("dpop-test", "session-check"):
+            .sessionCheck
+        case ("dpop-test", "authenticated-load"):
+            .concurrentRequests(total: 50, concurrency: 5)
+        case ("dpop-test", "refresh-check"):
+            .singleRefresh
+        default:
+            nil
+        }
+    }
+
     static func requestDistribution(total: Int, concurrency: Int) -> [Int] {
         precondition(total > 0)
         precondition(concurrency > 0)
@@ -217,7 +460,7 @@ enum PetrelLoadCLI {
         }
     }
 
-    static func main() async throws {
+    static func main(metadataFetcher: OAuthMetadataFetcher? = nil) async throws {
         let args: [String: String]
         do {
             args = try parseArgs()
@@ -254,18 +497,17 @@ enum PetrelLoadCLI {
             ATProtoClient.defaultBaseURL
         }
 
-        // OAuth config for ATProto development with ngrok-exposed client metadata
-        let oauthConfig = OAuthConfig(
-            clientId: "https://87a6c075b410.ngrok-free.app/client-metadata.json",
-            redirectUri: "https://87a6c075b410.ngrok-free.app/callback",
-            scope: "atproto transition:generic"
-        )
+        let oauthConfig = try oauthConfiguration(from: args)
 
         // Initialize the exact client mode requested by the caller.
-        let client: ATProtoClient = if unauth {
-            await ATProtoClient(baseURL: baseURL)
+        let client: ATProtoClient
+        if unauth {
+            client = await ATProtoClient(baseURL: baseURL)
         } else {
-            try await ATProtoClient(
+            guard let oauthConfig else {
+                throw ArgumentError.oauthConfigurationRequired
+            }
+            client = try await ATProtoClient(
                 baseURL: baseURL,
                 oauthConfig: oauthConfig,
                 namespace: namespace
@@ -310,8 +552,15 @@ enum PetrelLoadCLI {
 
         // OAuth helper modes
         if (args["oauth-start"] ?? "false").lowercased() == "true" {
+            guard let oauthConfig else {
+                throw ArgumentError.oauthConfigurationRequired
+            }
             let identifier = args["identifier"]
             do {
+                let fetcher: OAuthMetadataFetcher = metadataFetcher ?? { url in
+                    try await fetchOAuthMetadata(at: url)
+                }
+                try await validateOAuthMetadata(for: oauthConfig, fetch: fetcher)
                 let url = try await client.startOAuthFlow(identifier: identifier)
                 print("Starting OAuth flow for: \(identifier ?? "user")")
                 print("Opening browser for authentication...")
@@ -328,11 +577,12 @@ enum PetrelLoadCLI {
                     print("Please open this URL in your browser:")
                 #endif
 
-                print("\nAfter authorizing in the browser:")
-                print("1. Look for the callback URL that starts with 'https://87a6c075b410.ngrok-free.app/callback?code=...'")
-                print("2. Copy the ENTIRE callback URL from your browser's address bar")
-                print("3. Run the following command with the copied URL:")
-                print("   PetrelLoad --namespace \(namespace) --endpoint \(endpoint) --oauth-complete \"<PASTE_CALLBACK_URL>\"")
+                let completionInstructions = oauthCompletionInstructions(
+                    configuration: oauthConfig,
+                    namespace: namespace,
+                    endpoint: endpoint
+                )
+                print("\n\(completionInstructions)")
                 print("\nWaiting for you to complete the OAuth flow in the browser...")
             } catch {
                 fputs("Failed to start OAuth flow: \(error)\n", stderr)
@@ -419,7 +669,7 @@ enum PetrelLoadCLI {
             }
 
             if oauthStressMode {
-                print("Running comprehensive OAuth stress test...")
+                print("Running authenticated load sequence...")
 
                 // Debug: Check what base URL the client is actually using
                 let (did, handle, pdsURL) = await client.getActiveAccountInfo()
@@ -442,43 +692,69 @@ enum PetrelLoadCLI {
             }
 
             if let scenario = oauthTestScenario {
-                switch scenario {
-                case "dpop_nonce_thrash":
-                    print("Testing DPoP nonce handling...")
-                    try await runBasicStressTest(client: client, endpoint: endpoint, iterations: total, concurrency: concurrency)
-                case "token_refresh_race":
-                    print("Testing token refresh...")
-                    for _ in 0 ..< 5 {
+                guard let plan = scenarioPlan(
+                    option: "oauth-test",
+                    value: scenario,
+                    total: total,
+                    concurrency: concurrency
+                ) else {
+                    throw ArgumentError.invalidValue(option: "oauth-test", value: scenario)
+                }
+                switch plan {
+                case let .concurrentRequests(iterations, workers):
+                    print("Running authenticated request load...")
+                    try await runBasicStressTest(
+                        client: client,
+                        endpoint: endpoint,
+                        iterations: iterations,
+                        concurrency: workers
+                    )
+                case let .serialRefreshes(count):
+                    print("Running serial token refresh sequence...")
+                    for _ in 0 ..< count {
                         let refreshed = try await client.refreshToken()
                         print("Token refresh result: \(refreshed)")
                     }
-                case "dpop_validation":
-                    print("Validating OAuth session...")
+                case .sessionSnapshot:
+                    print("Reading OAuth session snapshot...")
                     let (did, handle, pdsURL) = await client.getActiveAccountInfo()
                     print("✓ DID: \(did ?? "unknown")")
                     print("✓ Handle: \(handle ?? "unknown")")
                     print("✓ PDS: \(pdsURL?.absoluteString ?? "unknown")")
-                default:
-                    print("Available test scenarios: dpop_nonce_thrash, token_refresh_race, dpop_validation")
+                case .sessionCheck, .singleRefresh:
+                    throw ArgumentError.invalidValue(option: "oauth-test", value: scenario)
                 }
                 return
             }
 
             if let mode = dpopTestMode {
-                switch mode {
-                case "compliance":
-                    print("Running OAuth compliance check...")
+                guard let plan = scenarioPlan(
+                    option: "dpop-test",
+                    value: mode,
+                    total: total,
+                    concurrency: concurrency
+                ) else {
+                    throw ArgumentError.invalidValue(option: "dpop-test", value: mode)
+                }
+                switch plan {
+                case .sessionCheck:
+                    print("Checking for an OAuth session...")
                     let hasSession = await client.hasValidSession()
                     print("✓ Valid OAuth session: \(hasSession)")
-                case "nonce-test":
-                    print("Testing nonce handling...")
-                    try await runBasicStressTest(client: client, endpoint: endpoint, iterations: 50, concurrency: 5)
-                case "refresh-test":
-                    print("Testing token refresh...")
+                case let .concurrentRequests(iterations, workers):
+                    print("Running authenticated request load...")
+                    try await runBasicStressTest(
+                        client: client,
+                        endpoint: endpoint,
+                        iterations: iterations,
+                        concurrency: workers
+                    )
+                case .singleRefresh:
+                    print("Checking token refresh...")
                     let refreshed = try await client.refreshToken()
                     print("✓ Token refresh result: \(refreshed)")
-                default:
-                    print("Available DPoP modes: compliance, nonce-test, refresh-test")
+                case .serialRefreshes, .sessionSnapshot:
+                    throw ArgumentError.invalidValue(option: "dpop-test", value: mode)
                 }
                 return
             }
