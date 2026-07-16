@@ -6,19 +6,28 @@ Learn how to authenticate with the AT Protocol using OAuth or legacy authenticat
 
 OAuth is the preferred authentication method for production applications:
 
+<!-- compile-example: oauth-authentication -->
 ```swift
-let oauth = OAuthConfig(
-    clientId: "YOUR_CLIENT_ID",
-    redirectUri: "yourapp://oauth/callback",
-    scope: "atproto app:bsky"
-)
-let client = await ATProtoClient(oauthConfig: oauth, namespace: "com.example.yourapp")
+import Foundation
+import Petrel
 
-// Start OAuth flow
-let authURL = try await client.startOAuthFlow(identifier: "alice.bsky.social")
+func authenticateExample(callbackURL: URL) async throws {
+    let oauth = OAuthConfig(
+        clientId: "https://yourapp.example.com/oauth-client-metadata.json",
+        redirectUri: "com.example.yourapp:/oauth/callback",
+        scope: "atproto transition:generic"
+    )
+    let client = try await ATProtoClient(
+        oauthConfig: oauth,
+        namespace: "com.example.yourapp"
+    )
 
-// Present authURL, receive callbackURL in your app
-try await client.handleOAuthCallback(url: callbackURL)
+    let authURL = try await client.startOAuthFlow(identifier: "alice.bsky.social")
+    print("Open this URL: \(authURL)")
+
+    // Present authURL, receive callbackURL in your app, then continue the flow.
+    try await client.handleOAuthCallback(url: callbackURL)
+}
 ```
 
 ## Legacy Authentication
@@ -33,17 +42,24 @@ Petrel automatically handles token refresh using the `TokenRefreshCoordinator`. 
 
 On iOS, forward the redirect URI to the client from your app delegate or SwiftUI scene handler:
 
+<!-- compile-example: oauth-callback -->
 ```swift
-func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey : Any] = [:]) -> Bool {
-    Task { try? await client.handleOAuthCallback(url: url) }
-    return true
+import Foundation
+import Petrel
+
+func handleOAuthCallbackExample(url: URL, client: ATProtoClient) {
+    Task {
+        do {
+            try await client.handleOAuthCallback(url: url)
+        } catch {
+            print("OAuth callback failed: \(error)")
+        }
+    }
 }
 ```
 
-On macOS, use the corresponding NSApplicationDelegate method to pass the URL to `client.handleOAuthCallback(url:)`.
+Call this helper from the corresponding iOS scene or application delegate, or from the macOS application delegate.
 
 ## Next Steps
 
-- Explore <doc:BasicUsage> to start making API calls
-- Learn about <doc:TokenManagement> for advanced authentication scenarios
-- Review <doc:OAuthFlow> for detailed OAuth implementation
+- Return to <doc:GettingStarted> to make API calls with ``ATProtoClient``.

@@ -4,20 +4,25 @@ Learn how to integrate Petrel into your Swift project and make your first API ca
 
 ## Installation
 
-Add Petrel to your Swift package dependencies:
+Add Petrel to your Swift package dependencies and target:
 
+<!-- compile-example: package-manifest -->
 ```swift
-dependencies: [
-    .package(url: "https://github.com/joshlacal/Petrel.git", from: "1.0.0")
-]
-```
+// swift-tools-version: 6.0
 
-Then add it to your target:
+import PackageDescription
 
-```swift
-.target(
+let package = Package(
     name: "YourApp",
-    dependencies: ["Petrel"]
+    dependencies: [
+        .package(url: "https://github.com/joshlacal/Petrel.git", from: "0.2.0"),
+    ],
+    targets: [
+        .target(
+            name: "YourApp",
+            dependencies: ["Petrel"]
+        ),
+    ]
 )
 ```
 
@@ -25,21 +30,20 @@ Then add it to your target:
 
 Import Petrel and create a client instance:
 
+<!-- compile-example: getting-started-basic -->
 ```swift
 import Petrel
 
-// Create an unauthenticated client
-let client = ATProtoClient()
-
-// Fetch a user's profile
-let profile = try await client.app.bsky.actor.getProfile(
-    AppBskyActorGetProfile.Parameters(actor: "alice.bsky.social")
-)
-print("Display name: \(profile.displayName ?? "No display name")")
+func fetchProfileExample() async throws {
+    let client = await ATProtoClient(baseURL: ATProtoClient.defaultBaseURL)
+    let actor = try ATIdentifier(string: "alice.bsky.social")
+    let result = try await client.app.bsky.actor.getProfile(
+        input: .init(actor: actor)
+    )
+    print("Display name: \(result.data?.displayName ?? "No display name")")
+}
 ```
 
 ## Next Steps
 
-- Learn about <doc:Authentication> to access protected endpoints
-- Explore <doc:BasicUsage> for common operations
-- Review <doc:ErrorHandling> for robust error management
+- Learn about <doc:Authentication> to access protected endpoints.
