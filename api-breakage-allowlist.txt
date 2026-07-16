@@ -88,3 +88,5 @@ API breakage: accessor ATProtoClient.Com.germnetwork.Set() has been removed
 API breakage: class ATProtoClient.Com.Germnetwork has been changed to a struct
 API breakage: accessor ATProtoClient.Com.Germnetwork.declaration.Set() has been removed
 API breakage: class ATProtoClient.Com.Germnetwork.Declaration has been changed to a struct
+API breakage: enumelement ChatBskyConvoSendMessage.Error.replyTargetNotFound has been added as a new enum case
+API breakage: enumelement ChatBskyConvoSendMessageBatch.Error.replyTargetNotFound has been added as a new enum case
