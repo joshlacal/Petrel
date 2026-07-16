@@ -493,7 +493,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
             actualPDSURL = pds
             resolvedHandle = handle
             LogManager.logInfo(
-                "Resolved DID to actual PDS: \(actualPDSURL.absoluteString) and handle: \(handle ?? "N/A")",
+                "Resolved DID to actual PDS: \(actualPDSURL.absoluteString) and handle: \(handle)",
                 category: .authentication
             )
 
@@ -2918,7 +2918,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
             )
 
             // Clear the inconsistent state and require re-authentication
-            try? await accountManager.clearCurrentAccount()
+            await accountManager.clearCurrentAccount()
 
             throw AuthError.noActiveAccount as Error
         }
@@ -3028,7 +3028,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
             )
 
             // Clear the inconsistent state and require re-authentication
-            try? await accountManager.clearCurrentAccount()
+            await accountManager.clearCurrentAccount()
 
             throw AuthError.noActiveAccount as Error
         }
