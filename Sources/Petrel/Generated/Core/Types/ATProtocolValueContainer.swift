@@ -3198,6 +3198,96 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
 
+            decoders["site.standard.document#contributor"] = { decoder in
+                do {
+                    let decodedObject = try SiteStandardDocument.Contributor(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding SiteStandardDocument.Contributor: \(error)")
+                    return .decodeError("Error decoding SiteStandardDocument.Contributor: \(error)")
+                }
+            }
+
+            decoders["site.standard.document"] = { decoder in
+                do {
+                    let decodedObject = try SiteStandardDocument(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding SiteStandardDocument: \(error)")
+                    return .decodeError("Error decoding SiteStandardDocument: \(error)")
+                }
+            }
+
+            decoders["site.standard.publication"] = { decoder in
+                do {
+                    let decodedObject = try SiteStandardPublication(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding SiteStandardPublication: \(error)")
+                    return .decodeError("Error decoding SiteStandardPublication: \(error)")
+                }
+            }
+
+            decoders["site.standard.publication#preferences"] = { decoder in
+                do {
+                    let decodedObject = try SiteStandardPublication.Preferences(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding SiteStandardPublication.Preferences: \(error)")
+                    return .decodeError("Error decoding SiteStandardPublication.Preferences: \(error)")
+                }
+            }
+
+            decoders["site.standard.graph.recommend"] = { decoder in
+                do {
+                    let decodedObject = try SiteStandardGraphRecommend(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding SiteStandardGraphRecommend: \(error)")
+                    return .decodeError("Error decoding SiteStandardGraphRecommend: \(error)")
+                }
+            }
+
+            decoders["site.standard.graph.subscription"] = { decoder in
+                do {
+                    let decodedObject = try SiteStandardGraphSubscription(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding SiteStandardGraphSubscription: \(error)")
+                    return .decodeError("Error decoding SiteStandardGraphSubscription: \(error)")
+                }
+            }
+
+            decoders["site.standard.theme.basic"] = { decoder in
+                do {
+                    let decodedObject = try SiteStandardThemeBasic(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding SiteStandardThemeBasic: \(error)")
+                    return .decodeError("Error decoding SiteStandardThemeBasic: \(error)")
+                }
+            }
+
+            decoders["site.standard.theme.color#rgb"] = { decoder in
+                do {
+                    let decodedObject = try SiteStandardThemeColor.Rgb(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding SiteStandardThemeColor.Rgb: \(error)")
+                    return .decodeError("Error decoding SiteStandardThemeColor.Rgb: \(error)")
+                }
+            }
+
+            decoders["site.standard.theme.color#rgba"] = { decoder in
+                do {
+                    let decodedObject = try SiteStandardThemeColor.Rgba(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding SiteStandardThemeColor.Rgba: \(error)")
+                    return .decodeError("Error decoding SiteStandardThemeColor.Rgba: \(error)")
+                }
+            }
+
             self.decoders = decoders
         }
 

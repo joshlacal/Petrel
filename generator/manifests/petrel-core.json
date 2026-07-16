@@ -8,7 +8,7 @@
   "lexicons": {
     "emit": ["generator/lexicons"],
     "reference": [],
-    "exclude_namespaces": ["tools.ozone", "site.standard", "internal.bsky"]
+    "exclude_namespaces": ["tools.ozone", "internal.bsky"]
   },
   "swift": {
     "output": "Sources/Petrel/Generated"

@@ -66,6 +66,34 @@ class SwiftWarningFreeGenerationTests(unittest.TestCase):
                 self.assertNotIn("do {", success_path)
                 self.assertNotIn("catch {", success_path)
 
+    def test_open_unions_without_declared_refs_omit_unused_scaffolding(self):
+        generated = self.render("site/standard/document.json")
+
+        for union_name in (
+            "SiteStandardDocumentContentUnion",
+            "SiteStandardDocumentLinksUnion",
+        ):
+            with self.subTest(union=union_name):
+                start = generated.index(f"public enum {union_name}")
+                next_union = generated.find("\npublic enum ", start + 1)
+                outer_end = len(generated)
+                end = min(
+                    position
+                    for position in (next_union, outer_end)
+                    if position >= 0
+                )
+                union = generated[start:end]
+
+                self.assertNotIn(
+                    "var container = encoder.container(keyedBy: CodingKeys.self)",
+                    union,
+                )
+                self.assertNotIn("var map = OrderedCBORMap()", union)
+
+                equality_start = union.index("public static func ==")
+                equality_end = union.index("public func isEqual", equality_start)
+                self.assertNotIn("default:", union[equality_start:equality_end])
+
 
 if __name__ == "__main__":
     unittest.main()

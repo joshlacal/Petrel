@@ -2023,15 +2023,25 @@ class WorkflowDeterminismContractTests(unittest.TestCase):
         )
         self.assertIn("--lint Sources/Petrel/Generated", text)
 
-    def test_sync_uses_explicit_swift_projection_after_intentional_copy(self):
+    def test_sync_includes_site_standard_and_regenerates_both_projections(self):
         text = self.text["sync-lexicons.yml"]
+        manifest = json.loads(
+            (REPOSITORY_ROOT / "generator" / "manifests" / "petrel-core.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertNotIn(
+            "site.standard",
+            manifest["lexicons"]["exclude_namespaces"],
+        )
         self.assertNotIn("Scripts/regenerate-generated.sh", text)
         self.assertIn(
             '"$PETREL_PYTHON" run.py',
             text,
         )
+        self.assertIn("for ns in app chat com tools site; do", text)
         self.assertIn("--manifest generator/manifests/petrel-core.json", text)
-        self.assertIn("--language swift", text)
+        self.assertIn("--language both", text)
         self.assertIn(
             '"$RELEASE_MINT" run --executable swiftformat nicklockwood/SwiftFormat@0.61.1',
             text,
@@ -2049,7 +2059,11 @@ class WorkflowDeterminismContractTests(unittest.TestCase):
             add_paths.append(line.strip())
         self.assertEqual(
             add_paths,
-            ["generator/lexicons/**", "Sources/Petrel/Generated/**"],
+            [
+                "generator/lexicons/**",
+                "Sources/Petrel/Generated/**",
+                "kotlin/src/main/kotlin/blue/catbird/petrel/generated/**",
+            ],
         )
 
 

@@ -71,16 +71,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for ns in app chat com tools; do
+          for ns in app chat com tools site; do
             rsync -a --delete "/tmp/atproto/lexicons/$ns/" "generator/lexicons/$ns/"
           done
-      - name: Regenerate the Swift projection
+      - name: Regenerate the Swift and Kotlin projections
         shell: bash
         run: |
           set -euo pipefail
           "$PETREL_PYTHON" run.py \
             --manifest generator/manifests/petrel-core.json \
-            --language swift
+            --language both
           "$RELEASE_MINT" run --executable swiftformat nicklockwood/SwiftFormat@0.61.1 \
             Sources/Petrel/Generated
       - name: Open PR if changed
@@ -93,9 +93,10 @@ jobs:
           add-paths: |
             generator/lexicons/**
             Sources/Petrel/Generated/**
+            kotlin/src/main/kotlin/blue/catbird/petrel/generated/**
           body: |
-            Automated weekly sync of `app`, `chat`, `com`, `tools` lexicon namespaces
+            Automated weekly sync of `app`, `chat`, `com`, `tools`, `site` lexicon namespaces
             from [bluesky-social/atproto](https://github.com/bluesky-social/atproto),
-            followed by regeneration of the closed Swift projection and SwiftFormat.
+            followed by regeneration of the closed Swift and Kotlin projections and SwiftFormat.
 
             Review the generated-code diff before merging.

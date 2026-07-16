@@ -1305,4 +1305,70 @@ public actor ATProtoClient {
             }
         }
     }
+
+    public var site: Site {
+        Site(networkService: networkService)
+    }
+
+    public struct Site: Sendable {
+        public let networkService: NetworkService
+        public init(networkService: NetworkService) {
+            self.networkService = networkService
+        }
+
+        public var standard: Standard {
+            Standard(networkService: networkService)
+        }
+
+        public struct Standard: Sendable {
+            public let networkService: NetworkService
+            public init(networkService: NetworkService) {
+                self.networkService = networkService
+            }
+
+            public var document: Document {
+                Document(networkService: networkService)
+            }
+
+            public struct Document: Sendable {
+                public let networkService: NetworkService
+                public init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+
+            public var publication: Publication {
+                Publication(networkService: networkService)
+            }
+
+            public struct Publication: Sendable {
+                public let networkService: NetworkService
+                public init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+
+            public var graph: Graph {
+                Graph(networkService: networkService)
+            }
+
+            public struct Graph: Sendable {
+                public let networkService: NetworkService
+                public init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+
+            public var theme: Theme {
+                Theme(networkService: networkService)
+            }
+
+            public struct Theme: Sendable {
+                public let networkService: NetworkService
+                public init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+        }
+    }
 }
