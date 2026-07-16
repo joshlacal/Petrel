@@ -131,5 +131,4 @@ password. OAuth is preferred for new production applications.
 Every Swift example in this guide, the README, and the DocC tutorials is
 extracted and compiled with warnings as errors by
 `Scripts/validate-documentation.sh`. Continue with the DocC Getting Started and
-Authentication articles for the same checked API surface, and consult
-[API_REFERENCE.md](API_REFERENCE.md) for namespace orientation.
+Authentication articles for the same checked API surface.

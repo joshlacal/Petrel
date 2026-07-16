@@ -117,13 +117,12 @@ production applications.
 ## Documentation
 
 - [Getting Started](GETTING_STARTED.md) covers installation, public calls, and OAuth.
-- [API Reference](API_REFERENCE.md) gives a namespace overview.
 - [Release candidate notes](docs/releases/0.2.0.md) define the `0.2.0` gate and remaining publication prerequisites.
 - [Kotlin generator notes](KOTLIN_GENERATOR.md) describe repository tooling that is outside this SPM release gate.
 
-Every Swift fence in the README, Getting Started guide, and DocC tutorials is
-compiled by `Scripts/validate-documentation.sh` under the selected release
-toolchain.
+The release contract typechecks exactly these four launch documents: README,
+Getting Started, and the two DocC tutorials. It does not certify every Markdown file
+elsewhere in the repository.
 
 ## License
 

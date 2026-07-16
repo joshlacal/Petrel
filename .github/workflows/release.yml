@@ -62,6 +62,7 @@ jobs:
           Tests/ReleaseScripts/owned-warning-gate-test.sh
           Tests/ReleaseScripts/install-generated-documentation-test.sh
           Scripts/tests/validate-documentation-contract.sh
+          Tests/ReleaseScripts/dependency-workflow-coupling-test.sh
           Tests/ReleaseScripts/release-documentation-gate-test.sh
           Tests/ReleaseScripts/release-tag-ancestry-gate-test.sh
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
@@ -95,6 +96,14 @@ jobs:
             printf '%s=%s\n' "$name" "${!name}" >> "$GITHUB_ENV"
           done
           printf '%s\n' "$RELEASE_DEVELOPER_DIR/Toolchains/XcodeDefault.xctoolchain/usr/bin" >> "$GITHUB_PATH"
+      - name: Validate bounded dependency requirements
+        if: "${{ startsWith(github.ref, 'refs/tags/') }}"
+        shell: bash
+        run: |
+          set -euo pipefail
+          /bin/test -x /usr/bin/python3
+          Scripts/tests/validate-dependency-requirements-gate-test.sh
+          Scripts/tests/validate-dependency-requirements-contract.sh
       - name: Bootstrap locked generator and release tools
         shell: bash
         run: |

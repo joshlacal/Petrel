@@ -55,8 +55,9 @@ trap 'rm -rf "$TMP"' EXIT
 /usr/bin/grep -F 'compile-example: guide-public-profile' "$GUIDE" >/dev/null
 /usr/bin/grep -F 'compile-example: guide-oauth' "$GUIDE" >/dev/null
 # The backticks are literal Markdown in the required release-scope sentence.
+/usr/bin/grep -F 'Kotlin publication' "$README" >/dev/null
 # shellcheck disable=SC2016
-/usr/bin/grep -F 'Kotlin publication and Kotlin/Swift parity are outside the `0.2.0` SPM release gate.' "$README" >/dev/null
+/usr/bin/grep -F 'outside the `0.2.0` SPM release gate.' "$README" >/dev/null
 /usr/bin/grep -F 'Kotlin' "$GUIDE" >/dev/null
 /usr/bin/grep -F 'outside this SPM release gate' "$GUIDE" >/dev/null
 /usr/bin/grep -F 'loginWithPassword' "$AUTHENTICATION" >/dev/null
@@ -68,6 +69,12 @@ if /usr/bin/grep -F 'not exposed by the public API' "$AUTHENTICATION" >/dev/null
     echo "authentication documentation denies the public password API" >&2
     exit 1
 fi
+if /usr/bin/grep -F 'API_REFERENCE.md' "$README" "$GUIDE" >/dev/null; then
+    echo "launch guides must not link the unvalidated API reference as authoritative" >&2
+    exit 1
+fi
+/usr/bin/grep -F 'exactly these four launch documents' "$README" >/dev/null
+/usr/bin/grep -F 'does not certify every Markdown file' "$README" >/dev/null
 /usr/bin/grep -F -- '-typecheck' "$VALIDATOR" >/dev/null
 /usr/bin/grep -F -- '-parse-as-library' "$VALIDATOR" >/dev/null
 /usr/bin/grep -F -- '-warnings-as-errors' "$VALIDATOR" >/dev/null

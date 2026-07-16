@@ -22,11 +22,14 @@ make_fixture() {
     Scripts/install-generated-documentation.sh \
     Scripts/regenerate-generated.sh \
     Scripts/run-api-compatibility.sh \
+    Scripts/tests/validate-dependency-requirements-contract.sh \
+    Scripts/tests/validate-dependency-requirements-gate-test.sh \
     Scripts/validate-documentation.sh \
     Scripts/verify-generator-environment.sh \
     Scripts/verify-owned-warnings.sh \
     Scripts/verify-release-workflow-topology.sh \
     Scripts/tests/validate-documentation-contract.sh \
+    Tests/ReleaseScripts/dependency-workflow-coupling-test.sh \
     Tests/ReleaseScripts/install-generated-documentation-test.sh \
     Tests/ReleaseScripts/owned-warning-gate-test.sh \
     Tests/ReleaseScripts/release-documentation-gate-test.sh \
@@ -102,5 +105,64 @@ abort "tag ancestry fixture did not match" unless source.include?(old)
 File.binwrite(path, source.sub(old, ""))
 RUBY
 expect_failure "$fixture" 'tag guard is missing "/usr/bin/git merge-base --is-ancestor'
+
+fixture=$TMP/dependency-gate-order
+make_fixture "$fixture"
+/usr/bin/ruby - "$fixture/.github/workflows/swift.yml" <<'RUBY'
+path = ARGV.fetch(0)
+source = File.binread(path)
+dependency = <<'YAML'
+      - name: Validate bounded dependency requirements
+        if: "${{ github.event_name == 'pull_request' }}"
+        shell: bash
+        run: |
+          set -euo pipefail
+          /bin/test -x /usr/bin/python3
+          Scripts/tests/validate-dependency-requirements-gate-test.sh
+          Scripts/tests/validate-dependency-requirements-contract.sh
+YAML
+activation = "      - name: Select and verify stable Xcode\n"
+abort "dependency ordering fixture did not match" unless source.include?(dependency)
+abort "activation ordering fixture did not match" unless source.include?(activation)
+without_dependency = source.sub(dependency, "")
+File.binwrite(path, without_dependency.sub(activation, dependency + activation))
+RUBY
+expect_failure "$fixture" 'Swift compatibility dependency gate must immediately follow Xcode activation'
+
+fixture=$TMP/dependency-python-probe
+make_fixture "$fixture"
+/usr/bin/ruby - "$fixture/.github/workflows/release.yml" <<'RUBY'
+path = ARGV.fetch(0)
+source = File.binread(path)
+probe = "          /bin/test -x /usr/bin/python3\n"
+abort "dependency Python probe fixture did not match" unless source.include?(probe)
+File.binwrite(path, source.sub(probe, ""))
+RUBY
+expect_failure "$fixture" 'release dependency gate has the wrong fail-closed run body'
+
+fixture=$TMP/dependency-release-condition
+make_fixture "$fixture"
+/usr/bin/ruby - "$fixture/.github/workflows/release.yml" <<'RUBY'
+path = ARGV.fetch(0)
+source = File.binread(path)
+condition = %Q(        if: "${{ startsWith(github.ref, 'refs/tags/') }}"\n)
+abort "dependency release condition fixture did not match" unless source.include?(condition)
+File.binwrite(path, source.sub(condition, ""))
+RUBY
+expect_failure "$fixture" 'release dependency gate has the wrong event condition'
+
+for relative in \
+  Scripts/tests/validate-dependency-requirements-contract.sh \
+  Scripts/tests/validate-dependency-requirements-gate-test.sh; do
+  fixture=$TMP/missing-$(basename "$relative")
+  make_fixture "$fixture"
+  rm "$fixture/$relative"
+  expect_failure "$fixture" "required release executable is missing: $relative"
+
+  fixture=$TMP/nonexecutable-$(basename "$relative")
+  make_fixture "$fixture"
+  chmod -x "$fixture/$relative"
+  expect_failure "$fixture" "required release executable is not executable: $relative"
+done
 
 echo "workflow topology negative contracts: PASS"

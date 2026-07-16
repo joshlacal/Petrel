@@ -72,6 +72,14 @@ jobs:
             printf '%s=%s\n' "$name" "${!name}" >> "$GITHUB_ENV"
           done
           printf '%s\n' "$RELEASE_DEVELOPER_DIR/Toolchains/XcodeDefault.xctoolchain/usr/bin" >> "$GITHUB_PATH"
+      - name: Validate bounded dependency requirements
+        if: "${{ github.event_name == 'pull_request' }}"
+        shell: bash
+        run: |
+          set -euo pipefail
+          /bin/test -x /usr/bin/python3
+          Scripts/tests/validate-dependency-requirements-gate-test.sh
+          Scripts/tests/validate-dependency-requirements-contract.sh
       - name: Build, test, and reject package-owned warnings
         shell: bash
         run: |

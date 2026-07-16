@@ -20,7 +20,10 @@ required_release_executables=(
   Scripts/verify-generator-environment.sh
   Scripts/verify-owned-warnings.sh
   Scripts/verify-release-workflow-topology.sh
+  Scripts/tests/validate-dependency-requirements-contract.sh
+  Scripts/tests/validate-dependency-requirements-gate-test.sh
   Scripts/tests/validate-documentation-contract.sh
+  Tests/ReleaseScripts/dependency-workflow-coupling-test.sh
   Tests/ReleaseScripts/install-generated-documentation-test.sh
   Tests/ReleaseScripts/owned-warning-gate-test.sh
   Tests/ReleaseScripts/release-documentation-gate-test.sh
@@ -291,6 +294,9 @@ end.join("\n")
   "Tests/ReleaseScripts/workflow-topology-negative-test.sh",
   "Tests/ReleaseScripts/owned-warning-gate-test.sh",
   "Tests/ReleaseScripts/install-generated-documentation-test.sh",
+  "Tests/ReleaseScripts/dependency-workflow-coupling-test.sh",
+  "Scripts/tests/validate-dependency-requirements-gate-test.sh",
+  "Scripts/tests/validate-dependency-requirements-contract.sh",
   "Scripts/tests/validate-documentation-contract.sh",
   "Tests/ReleaseScripts/release-documentation-gate-test.sh",
   "Tests/ReleaseScripts/release-tag-ancestry-gate-test.sh",
@@ -315,6 +321,54 @@ swift_checkouts.each do |checkout|
   fail!("Swift checkout must define with") unless checkout_with.is_a?(Hash)
   fail!("Swift checkout fetch-depth must stringify to 0") unless checkout_with["fetch-depth"].to_s == "0"
   fail!("Swift checkout must disable persisted credentials") unless checkout_with["persist-credentials"] == false
+end
+
+dependency_gate = "Scripts/tests/validate-dependency-requirements-gate-test.sh"
+dependency_contract = "Scripts/tests/validate-dependency-requirements-contract.sh"
+[
+  ["release", jobs, "${{ startsWith(github.ref, 'refs/tags/') }}"],
+  ["Swift compatibility", swift_jobs, "${{ github.event_name == 'pull_request' }}"],
+].each do |label, workflow_jobs, expected_condition|
+  workflow_macos_steps = workflow_jobs.fetch("macos").fetch("steps")
+  activation_index = workflow_macos_steps.index do |step|
+    step["name"] == "Select and verify stable Xcode"
+  end
+  fail!("#{label} stable Xcode activation step is missing") unless activation_index
+  dependency_step = workflow_macos_steps.fetch(activation_index + 1)
+  fail!("#{label} dependency gate must immediately follow Xcode activation") unless
+    dependency_step["name"] == "Validate bounded dependency requirements"
+  fail!("#{label} dependency gate has the wrong event condition") unless
+    dependency_step["if"] == expected_condition
+  expected_dependency_run = [
+    "set -euo pipefail",
+    "/bin/test -x /usr/bin/python3",
+    dependency_gate,
+    dependency_contract,
+  ].join("\n") + "\n"
+  fail!("#{label} dependency gate has the wrong fail-closed run body") unless
+    dependency_step["shell"] == "bash" && dependency_step["run"] == expected_dependency_run
+
+  gate_occurrences = workflow_jobs.transform_values do |job|
+    job.fetch("steps").sum do |step|
+      step.is_a?(Hash) ? step.fetch("run", "").scan(dependency_gate).length : 0
+    end
+  end
+  contract_occurrences = workflow_jobs.transform_values do |job|
+    job.fetch("steps").sum do |step|
+      step.is_a?(Hash) ? step.fetch("run", "").scan(dependency_contract).length : 0
+    end
+  end
+  fail!("#{label} must invoke each dependency script exactly once in macOS") unless
+    gate_occurrences.fetch("macos") == 1 && contract_occurrences.fetch("macos") == 1
+  fail!("#{label} dependency scripts must not run in another job") unless
+    gate_occurrences.reject { |job, _| job == "macos" }.values.all?(&:zero?) &&
+      contract_occurrences.reject { |job, _| job == "macos" }.values.all?(&:zero?)
+end
+
+["docc.yml", "generator.yml", "kotlin.yml", "lint.yml", "sync-lexicons.yml"].each do |label|
+  body = File.binread(File.join(workflow_directory, label))
+  fail!("dependency gate must not run from #{label}") if body.include?(dependency_gate)
+  fail!("dependency contract must not run from #{label}") if body.include?(dependency_contract)
 end
 
 docc_events = docc_workflow["on"]
