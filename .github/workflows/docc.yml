@@ -1,4 +1,4 @@
-name: Validate and Refresh DocC Documentation
+name: Validate DocC Documentation
 
 'on':
   push:
@@ -17,7 +17,6 @@ concurrency:
 jobs:
   validate-docs:
     name: Validate documentation (read-only)
-    if: "${{ github.event_name != 'push' }}"
     runs-on: macos-15
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -48,106 +47,3 @@ jobs:
       - name: Validate documentation with warnings as errors
         shell: bash
         run: Scripts/validate-documentation.sh
-
-  refresh-docs:
-    name: Refresh documentation (trusted main push)
-    if: "${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}"
-    permissions:
-      contents: write
-    runs-on: macos-15
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - name: Select and verify minimum stable Xcode
-        shell: bash
-        run: |
-          set -euo pipefail
-          export RELEASE_TOOLCHAIN_LANE=minimum
-          export RELEASE_TOOLCHAIN_SELECTION=pinned-minimum
-          export RELEASE_EVIDENCE_CLASS=stable-release
-          export RELEASE_DEVELOPER_DIR=/Applications/Xcode_16.0.app/Contents/Developer
-          export RELEASE_XCODE_VERSION=16.0
-          export RELEASE_XCODE_BUILD=16A242d
-          export RELEASE_IOS_RUNTIME=18.0
-          export RELEASE_WATCHOS_RUNTIME=11.0
-          export RELEASE_TVOS_RUNTIME=18.0
-          export RELEASE_VISIONOS_RUNTIME=2.0
-          source Scripts/activate-release-toolchain.sh
-          for name in RELEASE_TOOLCHAIN_LANE RELEASE_TOOLCHAIN_SELECTION RELEASE_EVIDENCE_CLASS \
-            RELEASE_DEVELOPER_DIR RELEASE_XCODE_VERSION RELEASE_XCODE_BUILD RELEASE_IOS_RUNTIME \
-            RELEASE_WATCHOS_RUNTIME RELEASE_TVOS_RUNTIME RELEASE_VISIONOS_RUNTIME DEVELOPER_DIR \
-            RELEASE_SWIFT RELEASE_XCODEBUILD RELEASE_XCRUN; do
-            printf '%s=%s\n' "$name" "${!name}" >> "$GITHUB_ENV"
-          done
-      - name: Validate documentation with warnings as errors
-        shell: bash
-        run: Scripts/validate-documentation.sh
-      - name: Generate static documentation with warnings as errors
-        shell: bash
-        run: |
-          set -euo pipefail
-          rm -rf "$GITHUB_WORKSPACE/docs-new"
-          "$RELEASE_SWIFT" package \
-            --allow-writing-to-directory "$GITHUB_WORKSPACE/docs-new" \
-            generate-documentation \
-            --target Petrel \
-            --warnings-as-errors \
-            --transform-for-static-hosting \
-            --hosting-base-path Petrel \
-            --output-path "$GITHUB_WORKSPACE/docs-new"
-          Scripts/install-generated-documentation.sh "$GITHUB_WORKSPACE/docs-new"
-          test -f docs/.nojekyll
-          test -z "$(/usr/bin/git status --porcelain -- docs/releases)"
-          rm -rf "$GITHUB_WORKSPACE/docs-new"
-      - name: Commit trusted documentation update without a token
-        shell: bash
-        run: |
-          set -euo pipefail
-          /usr/bin/git config --local user.email "action@github.com"
-          /usr/bin/git config --local user.name "GitHub Actions"
-          /usr/bin/git -c core.hooksPath=/dev/null add docs/
-          if /usr/bin/git diff --staged --quiet; then
-            echo "No documentation changes to commit"
-          else
-            /usr/bin/git -c core.hooksPath=/dev/null commit -m "docs: refresh generated DocC site"
-            DOCS_PUSH_REPOSITORY=$RUNNER_TEMP/petrel-docs-push
-            rm -rf "${DOCS_PUSH_REPOSITORY:?}"
-            /usr/bin/git clone --no-local --no-checkout \
-              "$GITHUB_WORKSPACE" "$DOCS_PUSH_REPOSITORY"
-            /usr/bin/git -C "$DOCS_PUSH_REPOSITORY" remote set-url origin \
-              "https://github.com/$GITHUB_REPOSITORY.git"
-            printf 'DOCS_COMMIT_CREATED=true\n' >> "$GITHUB_ENV"
-            printf 'DOCS_PUSH_REPOSITORY=%s\n' "$DOCS_PUSH_REPOSITORY" >> "$GITHUB_ENV"
-          fi
-      - name: Push trusted documentation update
-        if: "${{ env.DOCS_COMMIT_CREATED == 'true' }}"
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          while IFS= read -r name; do
-            case $name in
-              GIT_*) unset "$name" ;;
-            esac
-          done < <(compgen -v)
-          export GIT_CONFIG_NOSYSTEM=1
-          export GIT_CONFIG_SYSTEM=/dev/null
-          export GIT_CONFIG_GLOBAL=/dev/null
-          export GIT_TERMINAL_PROMPT=0
-          test -d "$DOCS_PUSH_REPOSITORY/.git"
-          expected_remote="https://github.com/$GITHUB_REPOSITORY.git"
-          safe_git() {
-            /usr/bin/git -C "$DOCS_PUSH_REPOSITORY" \
-              -c core.hooksPath=/dev/null "$@"
-          }
-          test "$(safe_git remote get-url origin)" = "$expected_remote"
-          test "$(safe_git remote get-url --push origin)" = "$expected_remote"
-          # The token must expand in Git's credential-helper shell, not here.
-          # shellcheck disable=SC2016
-          safe_git \
-            -c credential.helper= \
-            -c 'credential.helper=!f() { echo username=x-access-token; echo password=$GITHUB_TOKEN; }; f' \
-            push origin HEAD:main

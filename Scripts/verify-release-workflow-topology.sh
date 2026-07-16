@@ -8,6 +8,36 @@ SWIFT_WORKFLOW=$ROOT/.github/workflows/swift.yml
 DOCC_WORKFLOW=$ROOT/.github/workflows/docc.yml
 WORKFLOW_DIRECTORY=$ROOT/.github/workflows
 
+required_release_executables=(
+  Scripts/activate-release-toolchain.sh
+  Scripts/bootstrap-generator-environment.sh
+  Scripts/bootstrap-release-tools.sh
+  Scripts/install-generated-documentation.sh
+  Scripts/regenerate-generated.sh
+  Scripts/run-api-compatibility.sh
+  Scripts/validate-documentation.sh
+  Scripts/verify-generator-environment.sh
+  Scripts/verify-owned-warnings.sh
+  Scripts/verify-release-workflow-topology.sh
+  Scripts/tests/validate-documentation-contract.sh
+  Tests/ReleaseScripts/install-generated-documentation-test.sh
+  Tests/ReleaseScripts/owned-warning-gate-test.sh
+  Tests/ReleaseScripts/release-documentation-gate-test.sh
+  Tests/ReleaseScripts/workflow-topology-negative-test.sh
+)
+
+for relative in "${required_release_executables[@]}"; do
+  path=$ROOT/$relative
+  [[ -f $path ]] || {
+    echo "required release executable is missing: $relative" >&2
+    exit 1
+  }
+  [[ -x $path ]] || {
+    echo "required release executable is not executable: $relative" >&2
+    exit 1
+  }
+done
+
 [[ -f $WORKFLOW ]] || {
   echo "release workflow is missing: $WORKFLOW" >&2
   exit 1
@@ -257,6 +287,9 @@ end.join("\n")
   "Tests/ReleaseScripts/workflow-topology-negative-test.sh",
   "Tests/ReleaseScripts/owned-warning-gate-test.sh",
   "Tests/ReleaseScripts/install-generated-documentation-test.sh",
+  "Scripts/tests/validate-documentation-contract.sh",
+  "Tests/ReleaseScripts/release-documentation-gate-test.sh",
+  "Scripts/validate-documentation.sh",
 ].each do |required|
   fail!("macos release gate does not execute #{required.inspect}") unless macos_run_source.include?(required)
 end
@@ -285,18 +318,12 @@ expected_docc_events = ["push", "pull_request", "workflow_dispatch"]
 fail!("DocC events or order differ from #{expected_docc_events.inspect}") unless docc_events.keys == expected_docc_events
 docc_jobs = docc_workflow["jobs"]
 fail!("DocC jobs must be a mapping") unless docc_jobs.is_a?(Hash)
-expected_docc_jobs = ["validate-docs", "refresh-docs"]
+expected_docc_jobs = ["validate-docs"]
 fail!("DocC jobs or order differ from #{expected_docc_jobs.inspect}") unless docc_jobs.keys == expected_docc_jobs
 validate_docs = docc_jobs.fetch("validate-docs")
-refresh_docs = docc_jobs.fetch("refresh-docs")
 fail!("DocC validation must run on macos-15") unless validate_docs["runs-on"] == "macos-15"
 fail!("DocC validation must inherit read-only permissions") if validate_docs.key?("permissions")
-expected_validate_if = "${{ github.event_name != 'push' }}"
-fail!("DocC validation has the wrong read-only event condition") unless validate_docs["if"] == expected_validate_if
-expected_refresh_if = "${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}"
-fail!("DocC refresh has the wrong trust-boundary condition") unless refresh_docs["if"] == expected_refresh_if
-fail!("DocC refresh must have only contents: write") unless refresh_docs["permissions"] == {"contents" => "write"}
-fail!("DocC refresh must run on macos-15") unless refresh_docs["runs-on"] == "macos-15"
+fail!("DocC validation must run for every configured event") if validate_docs.key?("if")
 
 docc_jobs.each do |job_name, job|
   steps = job["steps"]
@@ -315,70 +342,17 @@ end
 validate_run_source = validate_docs.fetch("steps").map do |step|
   step.is_a?(Hash) ? step.fetch("run", "") : ""
 end.join("\n")
-refresh_run_source = refresh_docs.fetch("steps").map do |step|
-  step.is_a?(Hash) ? step.fetch("run", "") : ""
-end.join("\n")
 fail!("DocC validation must use the strict validator") unless validate_run_source.include?("Scripts/validate-documentation.sh")
-fail!("DocC validation must never push") if validate_run_source.include?("git push")
 [
-  "Scripts/validate-documentation.sh",
-  "generate-documentation",
-  "--warnings-as-errors",
-  "Scripts/install-generated-documentation.sh",
-  "docs/.nojekyll",
-  "docs/releases",
-  "push origin HEAD:main",
-].each do |required|
-  fail!("DocC refresh is missing #{required.inspect}") unless refresh_run_source.include?(required)
-end
-fail!("DocC refresh must not recursively delete the documentation root") if
-  refresh_run_source.match?(%r{rm\s+-rf\s+['\"]?docs/\*})
-
-refresh_steps = refresh_docs.fetch("steps")
-push_steps = refresh_steps.select do |step|
-  step.is_a?(Hash) && step.fetch("run", "").include?("push origin HEAD:main")
-end
-fail!("DocC refresh must have exactly one push step") unless push_steps.length == 1
-push_step = push_steps.fetch(0)
-expected_token = "${{ github.token }}"
-fail!("DocC push token must be scoped to the push step") unless
-  push_step["env"] == {"GITHUB_TOKEN" => expected_token}
-expected_push_if = "${{ env.DOCS_COMMIT_CREATED == 'true' }}"
-fail!("DocC push step must be gated on a newly created docs commit") unless
-  push_step["if"] == expected_push_if
-push_run = push_step.fetch("run", "")
-fail!("DocC token-bearing push step must not stage files") if push_run.include?("git add")
-fail!("DocC token-bearing push step must not create commits") if push_run.include?("commit -m")
-[
-  "DOCS_PUSH_REPOSITORY",
-  "remote get-url origin",
-  "remote get-url --push origin",
-  "core.hooksPath=/dev/null",
-  "GIT_CONFIG_NOSYSTEM=1",
-  "GIT_CONFIG_GLOBAL=/dev/null",
-  "GIT_TERMINAL_PROMPT=0",
-].each do |required|
-  fail!("DocC token-bearing push step is missing #{required.inspect}") unless push_run.include?(required)
-end
-
-commit_steps = refresh_steps.select do |step|
-  step.is_a?(Hash) && step.fetch("run", "").include?("commit -m")
-end
-fail!("DocC refresh must have exactly one token-free commit step") unless commit_steps.length == 1
-commit_step = commit_steps.fetch(0)
-fail!("DocC commit step must not receive an explicit token") if commit_step.fetch("env", {}).key?("GITHUB_TOKEN")
-commit_run = commit_step.fetch("run", "")
-[
-  "clone --no-local --no-checkout",
-  "DOCS_COMMIT_CREATED=true",
-  "DOCS_PUSH_REPOSITORY",
-  "core.hooksPath=/dev/null",
-].each do |required|
-  fail!("DocC token-free commit step is missing #{required.inspect}") unless commit_run.include?(required)
-end
-refresh_steps.each do |step|
-  next if step.equal?(push_step)
-  fail!("DocC token must not be exposed before the push step") if step.to_s.include?(expected_token)
+  "contents: write",
+  "github.token",
+  "GITHUB_TOKEN",
+  "git push",
+  "push origin",
+  "commit -m",
+].each do |forbidden|
+  fail!("DocC workflow contains forbidden mutation primitive #{forbidden.inspect}") if
+    docc_source.include?(forbidden)
 end
 
 matrix = macos.dig("strategy", "matrix")
