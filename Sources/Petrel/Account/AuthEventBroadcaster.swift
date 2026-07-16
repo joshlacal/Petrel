@@ -166,10 +166,11 @@ public enum PetrelAuthEvents {
         await AuthEventBroadcaster.shared.removeAllObservers()
     }
 
-    /// Wait until every authentication event enqueued before or during this call has
-    /// completed delivery to the registered observers.
+    /// Wait until every authentication event enqueued before this method's final
+    /// queue-state check has completed delivery to the registered observers.
     ///
-    /// Do not call this method from an authentication event observer.
+    /// An event enqueued concurrently after that check requires another drain. Do
+    /// not call this method from an authentication event observer.
     public static func drain() async {
         while true {
             let snapshot = deliveryState.withLock { state in
