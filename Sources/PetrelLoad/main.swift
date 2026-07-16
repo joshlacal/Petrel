@@ -118,12 +118,15 @@ enum PetrelLoadCLI {
     }
 
     enum ScenarioError: Error, Equatable, CustomStringConvertible {
+        case commandFailure(String)
         case debugBuildRequired(String)
         case missingAuthenticatedAccount
         case requestFailures(Int)
 
         var description: String {
             switch self {
+            case let .commandFailure(message):
+                message
             case let .debugBuildRequired(scenario):
                 "\(scenario) requires a debug build"
             case .missingAuthenticatedAccount:
@@ -529,7 +532,7 @@ enum PetrelLoadCLI {
                 }
 
                 let writer = try AuthEventJSONLWriter(fileURL: fileURL)
-                PetrelAuthEvents.addObserver { event in
+                await PetrelAuthEvents.addObserver { event in
                     do {
                         try await writer.write(event)
                     } catch {
@@ -585,16 +588,14 @@ enum PetrelLoadCLI {
                 print("\n\(completionInstructions)")
                 print("\nWaiting for you to complete the OAuth flow in the browser...")
             } catch {
-                fputs("Failed to start OAuth flow: \(error)\n", stderr)
-                exit(1)
+                throw ScenarioError.commandFailure("Failed to start OAuth flow: \(error)")
             }
             return
         }
 
         if let callback = args["oauth-complete"], !callback.isEmpty {
             guard let url = URL(string: callback) else {
-                fputs("Invalid callback URL.\n", stderr)
-                exit(1)
+                throw ScenarioError.commandFailure("Invalid callback URL: \(callback)")
             }
             do {
                 print("DEBUG - About to call handleOAuthCallback...")
@@ -626,8 +627,7 @@ enum PetrelLoadCLI {
                     print("✓ Got profile for: \(profile.displayName ?? "N/A")")
                 }
             } catch {
-                fputs("OAuth completion or verification failed: \(error)\n", stderr)
-                exit(1)
+                throw ScenarioError.commandFailure("OAuth completion or verification failed: \(error)")
             }
             return
         }
@@ -635,15 +635,13 @@ enum PetrelLoadCLI {
         // OAuth stress testing modes
         if oauthStressMode || oauthTestScenario != nil || dpopTestMode != nil || simulateAmbiguous {
             if unauth {
-                fputs("Cannot run OAuth stress tests with --unauth flag.\n", stderr)
-                exit(1)
+                throw ScenarioError.commandFailure("Cannot run OAuth stress tests with --unauth flag")
             }
 
             // Check if we have a valid session
             let hasSession = await client.hasValidSession()
             if !hasSession {
-                fputs("No valid OAuth session found. Please run --oauth-start first.\n", stderr)
-                exit(1)
+                throw ScenarioError.commandFailure("No valid OAuth session found. Please run --oauth-start first")
             }
 
             print("OAuth stress testing with ATProtoClient")
@@ -888,10 +886,16 @@ func runBasicStressTest(client: ATProtoClient, endpoint: String, iterations: Int
     }
 }
 
-// Main entry point
+/// Main entry point
+var terminationStatus: Int32 = 0
 do {
     try await PetrelLoadCLI.main()
 } catch {
     fputs("PetrelLoad failed: \(error)\n", stderr)
-    exit(1)
+    terminationStatus = 1
+}
+
+await PetrelAuthEvents.drain()
+if terminationStatus != 0 {
+    exit(terminationStatus)
 }

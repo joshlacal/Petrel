@@ -345,9 +345,7 @@ public class LogManager {
     /// Converts auth incident type and details into AuthEvent and broadcasts it
     private static func broadcastAuthEvent(type: String, details: [String: Any]) {
         let event = convertToAuthEvent(type: type, details: details)
-        Task {
-            await AuthEventBroadcaster.shared.broadcast(event)
-        }
+        PetrelAuthEvents.broadcast(event)
     }
 
     /// Converts incident type string to strongly-typed AuthEvent

@@ -493,6 +493,8 @@ struct PetrelLoadCLITests {
             encoding: .utf8
         )
 
+        #expect(source.contains("await PetrelAuthEvents.addObserver"))
+        #expect(source.contains("await PetrelAuthEvents.drain()"))
         #expect(!source.contains("try! await ATProtoClient"))
         #expect(!source.contains("try? await client.refreshToken()"))
         #expect(!source.contains("print(\"✗ API call FAILED:"))
