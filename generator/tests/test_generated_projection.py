@@ -313,6 +313,11 @@ def workflow_run_lines(text):
             index += 1
 
 
+_PINNED_SETUP_PYTHON_ACTION = (
+    "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0"
+)
+
+
 def has_one_isolated_setup_python_action(text):
     lines = text.splitlines()
     action_indices = [
@@ -324,7 +329,7 @@ def has_one_isolated_setup_python_action(text):
         return False
     action_index = action_indices[0]
     action_line = lines[action_index]
-    if action_line.strip() != "- uses: actions/setup-python@v5":
+    if action_line.strip() != f"- uses: {_PINNED_SETUP_PYTHON_ACTION}":
         return False
     indentation = len(action_line) - len(action_line.lstrip())
     block = []
@@ -1768,8 +1773,18 @@ class WorkflowDeterminismContractTests(unittest.TestCase):
         }
 
     def test_all_macos_release_jobs_use_the_same_verified_stable_tuple_and_bootstrap_order(self):
+        github_environment_block = """          {
+            printf 'RELEASE_PYTHON312=%s\\n' "$RELEASE_PYTHON312"
+            printf 'DEVELOPER_DIR=%s\\n' "$DEVELOPER_DIR"
+            printf 'RELEASE_SWIFT=%s\\n' "$RELEASE_SWIFT"
+            printf 'RELEASE_XCODEBUILD=%s\\n' "$RELEASE_XCODEBUILD"
+            printf 'RELEASE_XCRUN=%s\\n' "$RELEASE_XCRUN"
+            printf 'RELEASE_MINT=%s\\n' "$RELEASE_MINT"
+            printf 'MINT_PATH=%s\\n' "$MINT_PATH"
+            printf 'MINT_LINK_PATH=%s\\n' "$MINT_LINK_PATH"
+          } >> "$GITHUB_ENV"""
         ordered_fragments = (
-            "actions/setup-python@v5",
+            _PINNED_SETUP_PYTHON_ACTION,
             "steps.release-python.outputs.python-path",
             "RELEASE_TOOLCHAIN_LANE=newest-stable",
             "RELEASE_TOOLCHAIN_SELECTION=official-runner-inventory",
@@ -1812,21 +1827,12 @@ class WorkflowDeterminismContractTests(unittest.TestCase):
                     github_path_writes,
                     ['dirname "$RELEASE_SWIFT" >> "$GITHUB_PATH"'],
                 )
+                self.assertEqual(text.count(github_environment_block), 1)
                 positions = []
                 for fragment in ordered_fragments:
                     self.assertIn(fragment, text)
                     positions.append(text.index(fragment))
                 self.assertEqual(positions, sorted(positions))
-                for variable in (
-                    "DEVELOPER_DIR",
-                    "RELEASE_SWIFT",
-                    "RELEASE_XCODEBUILD",
-                    "RELEASE_XCRUN",
-                ):
-                    self.assertRegex(
-                        text,
-                        rf"{variable}=.*GITHUB_ENV|printf .*{variable}.*GITHUB_ENV",
-                    )
                 self.assertNotRegex(text.lower(), r"xcode[-_]?beta|local-validation")
 
     def test_workflows_exclude_ambient_and_homebrew_tool_invocations(self):
@@ -1932,9 +1938,9 @@ class WorkflowDeterminismContractTests(unittest.TestCase):
                 self.assertTrue(workflow_ambient_executables(line))
 
     def test_setup_python_isolation_proof_rejects_a_second_unisolated_action(self):
-        marker = "      - uses: actions/setup-python@v5"
+        marker = f"      - uses: {_PINNED_SETUP_PYTHON_ACTION}"
         unisolated_step = (
-            "      - uses: actions/setup-python@v5\n"
+            f"      - uses: {_PINNED_SETUP_PYTHON_ACTION}\n"
             "        with:\n"
             "          python-version: '3.13'\n"
         )
@@ -1946,7 +1952,7 @@ class WorkflowDeterminismContractTests(unittest.TestCase):
 
     def test_setup_python_isolation_proof_rejects_misnested_or_wrong_step_keys(self):
         original = (
-            "      - uses: actions/setup-python@v5\n"
+            f"      - uses: {_PINNED_SETUP_PYTHON_ACTION}\n"
             "        id: release-python\n"
             "        with:\n"
             "          python-version: '3.12'\n"
@@ -1954,7 +1960,7 @@ class WorkflowDeterminismContractTests(unittest.TestCase):
         )
         mutations = (
             (
-                "      - uses: actions/setup-python@v5\n"
+                f"      - uses: {_PINNED_SETUP_PYTHON_ACTION}\n"
                 "        id: release-python\n"
                 "        with:\n"
                 "          python-version: '3.12'\n"
