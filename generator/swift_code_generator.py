@@ -255,11 +255,14 @@ class SwiftCodeGenerator:
                             sub_conformance = ": ATProtocolCodable, ATProtocolValue"
                             sub_properties = self.generate_properties(value.get('properties', {}), value.get('required', []), convert_to_camel_case(key))
                             sub_structs[convert_to_camel_case(key)] = {
+                                'wire_fragment': key,
                                 'properties': sub_properties, 
                                 'conformance': sub_conformance
                             }
                 
-                lex_definitions[convert_to_camel_case(name)] = {
+                swift_name = convert_to_camel_case(name)
+                lex_definitions[swift_name] = {
+                    'wire_fragment': name,
                     'properties': properties, 
                     'conformance': conformance,
                     'sub_structs': sub_structs
@@ -274,6 +277,7 @@ class SwiftCodeGenerator:
                     'optional': False
                 }]
                 lex_definitions[union_array_name] = {
+                    'wire_fragment': name,
                     'properties': properties,
                     'conformance': ': ATProtocolCodable, ATProtocolValue',
                     'sub_structs': {}
@@ -437,7 +441,9 @@ class SwiftCodeGenerator:
             output_type=output_type,
             endpoint=endpoint,
             description=self.description,
-            output_encoding=output_encoding  # Pass the output encoding to the template
+            output_encoding=output_encoding,  # Pass the output encoding to the template
+            has_errors=bool(main_def.get('errors')),
+            struct_name=self.struct_name,
         )
 
     def generate_procedure_function(self, lexicon_id, main_def):
@@ -494,7 +500,9 @@ class SwiftCodeGenerator:
             input_encoding=input_encoding,    # Pass the input encoding to the template
             output_encoding=output_encoding,  # Pass the output encoding to the template
             has_parameters=has_parameters,
-            parameters_struct_name=parameters_struct_name
+            parameters_struct_name=parameters_struct_name,
+            has_errors=bool(main_def.get('errors')),
+            struct_name=self.struct_name,
         )
 
     def generate_subscription_function(self, lexicon_id, main_def):

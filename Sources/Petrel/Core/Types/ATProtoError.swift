@@ -72,21 +72,12 @@ public enum ATProtoErrorParser {
             return nil
         }
 
-        // Try to match the error name to one of the lexicon-defined errors
-        // Iterate through all possible enum cases to find a match
         let errorName = errorResponse.error
 
-        // Try to create the error enum case from the raw value
-        // The enum raw values are like "NotFound." but the response has "NotFound"
-        if let matchedError = ErrorType(rawValue: "\(errorName).") {
-            return ATProtoError(error: matchedError, message: errorResponse.message, statusCode: statusCode)
+        guard let matchedError = ErrorType(rawValue: errorName) else {
+            return nil
         }
 
-        // Also try with the exact string in case format differs
-        if let matchedError = ErrorType(rawValue: errorName) {
-            return ATProtoError(error: matchedError, message: errorResponse.message, statusCode: statusCode)
-        }
-
-        return nil
+        return ATProtoError(error: matchedError, message: errorResponse.message, statusCode: statusCode)
     }
 }

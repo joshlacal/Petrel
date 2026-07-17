@@ -65,7 +65,9 @@ public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProt
     }
 
     public func encode(to encoder: Encoder) throws {
+        {%- if variants %}
         var container = encoder.container(keyedBy: CodingKeys.self)
+        {%- endif %}
 
         switch self {
         {%- for variant in variants %}
@@ -104,8 +106,10 @@ public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProt
         {%- endfor %}
         case (.unexpected(let lhsValue), .unexpected(let rhsValue)):
             return lhsValue.isEqual(to: rhsValue)
+        {%- if variants %}
         default:
             return false
+        {%- endif %}
         }
     }
     
@@ -116,8 +120,10 @@ public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProt
     
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
+        {%- if variants %}
         // Create an ordered map to maintain field order
         var map = OrderedCBORMap()
+        {%- endif %}
         
         switch self {
         {%- for variant in variants %}

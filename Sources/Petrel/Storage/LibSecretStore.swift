@@ -8,11 +8,6 @@
 #if os(Linux)
 
     import CLibSecretShim
-    #if canImport(CryptoKit)
-        import CryptoKit
-    #else
-        @preconcurrency import Crypto
-    #endif
     import Foundation
 
     /// Secure storage implementation using libsecret (GNOME Keyring / KDE Wallet)
@@ -95,7 +90,11 @@
                 &errorMsg
             )
 
-            if let error = errorMsg {
+            if !success {
+                guard let error = errorMsg else {
+                    LogManager.logError("LibSecretStore - Failed to delete key \(namespacedKey)")
+                    throw KeychainError.deletionError(status: -1)
+                }
                 let message = String(cString: error)
                 free(error)
                 // Don't throw if item not found
@@ -103,6 +102,9 @@
                     LogManager.logError("LibSecretStore - Failed to delete: \(message)")
                     throw KeychainError.deletionError(status: -1)
                 }
+            } else if let error = errorMsg {
+                // Defensive ownership handling for a non-null diagnostic on success.
+                free(error)
             }
 
             LogManager.logDebug("LibSecretStore - Deleted key \(namespacedKey)")
@@ -115,13 +117,16 @@
             LogManager.logDebug("LibSecretStore - deleteAll not fully implemented for namespace: \(namespace)")
         }
 
-        func storeDPoPKey(_ key: P256.Signing.PrivateKey, keyTag: String, accessGroup: String?) throws {
-            try store(key: keyTag, value: key.x963Representation, namespace: "dpopkeys", accessGroup: accessGroup)
+        func storeDPoPKeyRepresentation(
+            _ representation: Data,
+            keyTag: String,
+            accessGroup: String?
+        ) throws {
+            try store(key: keyTag, value: representation, namespace: "dpopkeys", accessGroup: accessGroup)
         }
 
-        func retrieveDPoPKey(keyTag: String, accessGroup: String?) throws -> P256.Signing.PrivateKey {
-            let data = try retrieve(key: keyTag, namespace: "dpopkeys", accessGroup: accessGroup)
-            return try P256.Signing.PrivateKey(x963Representation: data)
+        func retrieveDPoPKeyRepresentation(keyTag: String, accessGroup: String?) throws -> Data {
+            try retrieve(key: keyTag, namespace: "dpopkeys", accessGroup: accessGroup)
         }
 
         func deleteDPoPKey(keyTag: String, accessGroup: String?) throws {

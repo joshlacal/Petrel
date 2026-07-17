@@ -348,6 +348,27 @@ public actor NetworkService: NetworkServiceProtocol {
     private var activeExactAuthRequestScope: ExactAuthGeneratedRequestScope?
     private var exactAuthDestinationGeneration = UUID()
 
+    private struct HTTPErrorResponseRequestIdentity: Equatable {
+        let networkService: ObjectIdentifier
+        let method: String
+        let url: String?
+
+        init(networkService: NetworkService, request: URLRequest) {
+            self.networkService = ObjectIdentifier(networkService)
+            method = request.httpMethod ?? "GET"
+            url = request.url?.absoluteString
+        }
+    }
+
+    /// Scoped by `performRequestReturningHTTPErrorResponses` so an awaited auth
+    /// retry on the same service, with the same method and URL, uses the same
+    /// terminal-status policy without changing the authentication-provider
+    /// contract. Other services and auth subrequests keep strict status
+    /// handling. Detached work intentionally does not inherit this
+    /// request-scoped behavior.
+    @TaskLocal private static var terminalHTTPErrorResponseRequest:
+        HTTPErrorResponseRequestIdentity? = nil
+
     #if DEBUG
         private nonisolated(unsafe) static var networkTestProtocolClasses: [AnyClass]?
         private static let networkTestProtocolClassesLock = NSLock()
@@ -1035,6 +1056,12 @@ public actor NetworkService: NetworkServiceProtocol {
         }
 
         let currentRequest = request
+        let returnsTerminalHTTPErrorResponses =
+            Self.terminalHTTPErrorResponseRequest ==
+            HTTPErrorResponseRequestIdentity(
+                networkService: self,
+                request: currentRequest
+            )
         var retryCount = 0
 
         while retryCount < maxRetries {
@@ -1488,6 +1515,9 @@ public actor NetworkService: NetworkServiceProtocol {
                     LogManager.logError(
                         "Network Service - Client error \(httpResponse.statusCode) for \(requestToSend.url?.absoluteString ?? "Unknown URL")"
                     )
+                    if returnsTerminalHTTPErrorResponses {
+                        return (decompressedData, httpResponse)
+                    }
                     throw NetworkError.responseError(statusCode: httpResponse.statusCode)
 
                 case 500 ..< 600:
@@ -1497,6 +1527,9 @@ public actor NetworkService: NetworkServiceProtocol {
                     )
                     retryCount += 1
                     if retryCount >= maxRetries {
+                        if returnsTerminalHTTPErrorResponses {
+                            return (decompressedData, httpResponse)
+                        }
                         throw NetworkError.responseError(statusCode: httpResponse.statusCode)
                     }
 
@@ -1867,6 +1900,41 @@ public actor NetworkService: NetworkServiceProtocol {
         return (data, httpResponse)
     }
 
+    /// Performs a request while returning terminal HTTP error responses to the
+    /// caller for structured endpoint-error parsing.
+    ///
+    /// This follows the same validation, authentication, DPoP nonce, token
+    /// refresh, and retry pipeline as `performRequest`. Successful responses
+    /// and status 400 are returned as before. Statuses 402 through 499 are
+    /// returned after authentication handling, and 5xx responses are returned
+    /// only after the existing retry budget is exhausted. A 401 remains owned
+    /// by the authentication pipeline; any awaited built-in authentication
+    /// retry inherits this terminal-status policy. Transport, cancellation,
+    /// validation, and authentication failures still throw.
+    ///
+    /// - Parameters:
+    ///   - request: The URL request to perform.
+    ///   - skipTokenRefresh: Whether to skip token refresh.
+    ///   - additionalHeaders: Optional headers for this request.
+    /// - Returns: The response body and final HTTP response.
+    public func performRequestReturningHTTPErrorResponses(
+        _ request: URLRequest,
+        skipTokenRefresh: Bool,
+        additionalHeaders: [String: String]? = nil
+    ) async throws -> (Data, HTTPURLResponse) {
+        let identity = HTTPErrorResponseRequestIdentity(
+            networkService: self,
+            request: request
+        )
+        return try await Self.$terminalHTTPErrorResponseRequest.withValue(identity) {
+            try await self.performRequest(
+                request,
+                skipTokenRefresh: skipTokenRefresh,
+                additionalHeaders: additionalHeaders
+            )
+        }
+    }
+
     /// Performs a network request (protocol compatibility method)
     /// - Parameters:
     ///   - request: The URLRequest to perform.
@@ -2207,7 +2275,8 @@ public actor NetworkService: NetworkServiceProtocol {
                         0,
                         NI_NUMERICHOST
                     ) == 0 {
-                        let ip = String(cString: hostBuffer)
+                        let bytes = hostBuffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }
+                        let ip = String(decoding: bytes, as: UTF8.self)
                         results.append(ip)
                     }
                 }

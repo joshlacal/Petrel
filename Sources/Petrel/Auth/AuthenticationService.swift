@@ -126,6 +126,21 @@ public enum TokenRefreshResult: Sendable {
     case skippedDueToRateLimit // Refresh was skipped due to rate limiting
 }
 
+/// A typed refusal from a client assertion backend.
+public struct ClientAssertionBackendError: Error, LocalizedError, Sendable, Equatable {
+    public let statusCode: Int
+    public let code: String?
+
+    public init(statusCode: Int, code: String?) {
+        self.statusCode = statusCode
+        self.code = code
+    }
+
+    public var errorDescription: String? {
+        "The client assertion backend refused the request (HTTP \(statusCode)\(code.map { ": \($0)" } ?? ""))."
+    }
+}
+
 /// Errors that can occur during authentication.
 public enum AuthError: Error, LocalizedError, Equatable {
     case noActiveAccount
@@ -145,9 +160,6 @@ public enum AuthError: Error, LocalizedError, Equatable {
     case rateLimited
     case serverError(Int, String?)
     case serviceMaintenance
-    /// The client assertion backend returned a non-success response.
-    /// Payload: HTTP status code and the OAuth `error` code when present.
-    case clientAssertionBackendError(Int, String?)
 
     public var errorDescription: String? {
         switch self {
@@ -189,8 +201,6 @@ public enum AuthError: Error, LocalizedError, Equatable {
             }
         case .serviceMaintenance:
             return "The service is temporarily under maintenance. Please try again later."
-        case let .clientAssertionBackendError(status, code):
-            return "The client assertion backend refused the request (HTTP \(status)\(code.map { ": \($0)" } ?? ""))."
         }
     }
 
@@ -262,8 +272,6 @@ public enum AuthError: Error, LocalizedError, Equatable {
             return lhs == rhs
         case let (.serverError(lhsCode, lhsMsg), .serverError(rhsCode, rhsMsg)):
             return lhsCode == rhsCode && lhsMsg == rhsMsg
-        case let (.clientAssertionBackendError(lhsStatus, lhsCode), .clientAssertionBackendError(rhsStatus, rhsCode)):
-            return lhsStatus == rhsStatus && lhsCode == rhsCode
         default:
             return false
         }
@@ -485,7 +493,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
             actualPDSURL = pds
             resolvedHandle = handle
             LogManager.logInfo(
-                "Resolved DID to actual PDS: \(actualPDSURL.absoluteString) and handle: \(handle ?? "N/A")",
+                "Resolved DID to actual PDS: \(actualPDSURL.absoluteString) and handle: \(handle)",
                 category: .authentication
             )
 
@@ -618,7 +626,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
         // CRITICAL FIX: Save the ephemeral key as the persistent DPoP key for this user
         // This ensures the same key used in token exchange is used for subsequent API calls
         do {
-            try await storage.saveDPoPKey(privateKey, for: did)
+            try await storage.saveDPoPKeyRepresentation(privateKey.x963Representation, for: did)
             LogManager.logInfo(
                 "Stored the ephemeral DPoP key used in token exchange as the active key for DID",
                 category: .authentication
@@ -2059,12 +2067,12 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
         activeRefreshTasks[did] = refreshTask
 
         do {
-            let result = try await refreshTask
+            let result = try await refreshTask.value
             // Clean up on success
             activeRefreshTasks.removeValue(forKey: did)
             // Keep the old refresh token marked as used, but remove the new one from tracking
             usedRefreshTokens.remove(refreshToken)
-            return .refreshedSuccessfully
+            return result
         } catch {
             // Clean up on failure
             activeRefreshTasks.removeValue(forKey: did)
@@ -2910,7 +2918,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
             )
 
             // Clear the inconsistent state and require re-authentication
-            try? await accountManager.clearCurrentAccount()
+            await accountManager.clearCurrentAccount()
 
             throw AuthError.noActiveAccount as Error
         }
@@ -3020,7 +3028,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
             )
 
             // Clear the inconsistent state and require re-authentication
-            try? await accountManager.clearCurrentAccount()
+            await accountManager.clearCurrentAccount()
 
             throw AuthError.noActiveAccount as Error
         }
@@ -3228,8 +3236,8 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
     private func getOrCreateDPoPKey(for did: String) async throws -> P256.Signing.PrivateKey {
         // Try to get existing key; propagate retrieval errors to avoid accidental key rotation
         do {
-            if let existingKey = try await storage.getDPoPKey(for: did) {
-                return existingKey
+            if let representation = try await storage.getDPoPKeyRepresentation(for: did) {
+                return try P256.Signing.PrivateKey(x963Representation: representation)
             }
         } catch {
             // Treat non-notFound keychain errors as transient; do NOT rotate key here
@@ -3271,7 +3279,7 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
             "Generating new DPoP key for DID \(LogManager.logDID(did))", category: .authentication
         )
         let newKey = P256.Signing.PrivateKey()
-        try await storage.saveDPoPKey(newKey, for: did)
+        try await storage.saveDPoPKeyRepresentation(newKey.x963Representation, for: did)
         return newKey
     }
 

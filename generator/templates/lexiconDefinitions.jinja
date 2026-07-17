@@ -1,6 +1,6 @@
 {%- for name, def_schema in lex_definitions.items() %}
         public struct {{ name }}{{ def_schema.conformance }} {
-            public static let typeIdentifier = "{{ lexicon_id }}#{{ name|lowerCamelCase }}"
+            public static let typeIdentifier = "{{ lexicon_id }}#{{ def_schema.wire_fragment }}"
 
         {%- for prop in def_schema.properties %}
             {%- if prop.boxed %}
@@ -190,7 +190,7 @@
 
         {%- for sub_struct_name, sub_struct in def_schema.sub_structs.items() %}
         public struct {{ sub_struct_name }}{{ sub_struct.conformance }} {
-            public static let typeIdentifier = "{{ lexicon_id }}#{{ sub_struct_name|lowerCamelCase }}"
+            public static let typeIdentifier = "{{ lexicon_id }}#{{ sub_struct.wire_fragment }}"
 
             {%- for prop in sub_struct.properties %}
             public let {{ prop.name }}: {{ prop.type }}{% if prop.optional %}?{% endif %}

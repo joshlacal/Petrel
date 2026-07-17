@@ -119,19 +119,19 @@ actor PublicOAuthStrategy: AuthStrategy {
         let authServerURL = try await core.resolveAuthServer(for: finalPDSURL)
         let metadata = try await core.fetchAuthorizationServerMetadata(authServerURL: authServerURL)
 
-        let oauthConfig = await core.oauthConfig
+        let oauthConfig = core.oauthConfig
         let (requestURI, parNonce) = try await core.pushAuthorizationRequest(
             codeChallenge: codeChallenge,
             identifier: nil,
             endpoint: metadata.pushedAuthorizationRequestEndpoint,
             authServerURL: authServerURL,
             state: stateToken,
-            ephemeralKeyForFlow: ephemeralKey
+            ephemeralKeyRawRepresentation: ephemeralKey.rawRepresentation
         )
 
         var finalState = oauthState
         finalState.parResponseNonce = parNonce
-        let storage = await core.storage
+        let storage = core.storage
         try await storage.saveOAuthState(finalState)
 
         guard var components = URLComponents(string: metadata.authorizationEndpoint) else {
@@ -154,7 +154,7 @@ actor PublicOAuthStrategy: AuthStrategy {
               let stateToken = await core.extractState(from: url)
         else { throw AuthError.invalidCallbackURL }
 
-        let storage = await core.storage
+        let storage = core.storage
         guard let oauthState = try await storage.getOAuthState(for: stateToken) else {
             throw AuthError.invalidCallbackURL
         }
@@ -181,11 +181,11 @@ actor PublicOAuthStrategy: AuthStrategy {
         guard let did = tokenResponse.sub else { throw AuthError.invalidResponse }
 
         // Resolve real PDS
-        let didResolver = await core.didResolver
+        let didResolver = core.didResolver
         let (handle, actualPDS) = try await didResolver.resolveDIDToHandleAndPDSURL(did: did)
 
         // Persist DPoP Key
-        try await storage.saveDPoPKey(ephemeralKey, for: did)
+        try await storage.saveDPoPKeyRepresentation(ephemeralKey.x963Representation, for: did)
 
         // Create Session
         let session = Session(
@@ -200,7 +200,7 @@ actor PublicOAuthStrategy: AuthStrategy {
         // Create/Update Account
         let account = Account(
             did: did,
-            handle: handle ?? oauthState.initialIdentifier,
+            handle: handle,
             pdsURL: actualPDS,
             protectedResourceMetadata: nil,
             authorizationServerMetadata: metadata,
@@ -209,10 +209,10 @@ actor PublicOAuthStrategy: AuthStrategy {
         )
 
         try await storage.saveAccountAndSession(account, session: session, for: did)
-        let accountManager = await core.accountManager
+        let accountManager = core.accountManager
         try await accountManager.updateAccountFromStorage(did: did)
         try await accountManager.setCurrentAccount(did: did)
-        let networkService = await core.networkService
+        let networkService = core.networkService
         await networkService.setBaseURL(actualPDS)
 
         return (did: did, handle: account.handle, pdsURL: actualPDS)
@@ -228,10 +228,10 @@ actor PublicOAuthStrategy: AuthStrategy {
     }
 
     func logout() async throws {
-        let accountManager = await core.accountManager
+        let accountManager = core.accountManager
         guard let did = await accountManager.getCurrentAccount()?.did else { return }
 
-        let storage = await core.storage
+        let storage = core.storage
         // Revoke token if possible
         if let session = try? await storage.getSession(for: did),
            let refreshToken = session.refreshToken,
@@ -308,7 +308,7 @@ actor PublicOAuthStrategy: AuthStrategy {
         switch result {
         case .refreshedSuccessfully:
             let (newReq, _) = try await core.prepareAuthenticatedRequestWithContext(request)
-            let networkService = await core.networkService
+            let networkService = core.networkService
             let result = try await networkService.request(newReq)
             guard let http = result.1 as? HTTPURLResponse else { throw AuthError.invalidResponse }
             return (result.0, http)
@@ -339,7 +339,7 @@ actor PublicOAuthStrategy: AuthStrategy {
         oauthStartInProgress = true
         defer { oauthStartInProgress = false }
 
-        let didResolver = await core.didResolver
+        let didResolver = core.didResolver
         let pdsURL: URL
         if let identifier {
             await emitProgress(.resolvingHandle(identifier))
@@ -359,14 +359,14 @@ actor PublicOAuthStrategy: AuthStrategy {
         let stateToken = UUID().uuidString
         let ephemeralKey = P256.Signing.PrivateKey()
 
-        let oauthConfig = await core.oauthConfig
+        let oauthConfig = core.oauthConfig
         let (requestURI, parNonce) = try await core.pushAuthorizationRequest(
             codeChallenge: codeChallenge,
             identifier: identifier,
             endpoint: metadata.pushedAuthorizationRequestEndpoint,
             authServerURL: authServerURL,
             state: stateToken,
-            ephemeralKeyForFlow: ephemeralKey
+            ephemeralKeyRawRepresentation: ephemeralKey.rawRepresentation
         )
 
         let oauthState = OAuthState(
@@ -380,7 +380,7 @@ actor PublicOAuthStrategy: AuthStrategy {
             bskyAppViewDID: bskyAppViewDID,
             bskyChatDID: bskyChatDID
         )
-        let storage = await core.storage
+        let storage = core.storage
         try await storage.saveOAuthState(oauthState)
 
         guard var components = URLComponents(string: metadata.authorizationEndpoint) else {
@@ -416,7 +416,7 @@ actor PublicOAuthStrategy: AuthStrategy {
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         request.timeoutInterval = 30.0
 
-        let oauthConfig = await core.oauthConfig
+        let oauthConfig = core.oauthConfig
         var params: [String: String] = [
             "grant_type": "authorization_code",
             "code": code,
@@ -440,7 +440,7 @@ actor PublicOAuthStrategy: AuthStrategy {
             )
         } else {
             // Fallback without DPoP (shouldn't happen in normal flow)
-            let networkService = await core.networkService
+            let networkService = core.networkService
             let (data, urlResponse) = try await networkService.request(request, skipTokenRefresh: true)
             guard let httpResponse = urlResponse as? HTTPURLResponse,
                   (200 ..< 300).contains(httpResponse.statusCode)
@@ -467,13 +467,13 @@ actor PublicOAuthStrategy: AuthStrategy {
             url: tokenEndpoint,
             type: .tokenRequest,
             did: nil,
-            ephemeralKey: key,
+            ephemeralKeyRawRepresentation: key.rawRepresentation,
             nonce: nonce
         )
         request.setValue(dpopProof, forHTTPHeaderField: "DPoP")
 
         do {
-            let networkService = await core.networkService
+            let networkService = core.networkService
             let (data, urlResponse) = try await networkService.request(request, skipTokenRefresh: true)
 
             guard let httpResponse = urlResponse as? HTTPURLResponse else {
@@ -498,7 +498,7 @@ actor PublicOAuthStrategy: AuthStrategy {
                         url: tokenEndpoint,
                         type: .tokenRequest,
                         did: nil,
-                        ephemeralKey: key,
+                        ephemeralKeyRawRepresentation: key.rawRepresentation,
                         nonce: receivedNonce
                     )
 
@@ -576,7 +576,7 @@ actor PublicOAuthStrategy: AuthStrategy {
     }
 
     private func performTokenRefresh(for did: String, session: Session) async throws -> (Data, HTTPURLResponse) {
-        let accountManager = await core.accountManager
+        let accountManager = core.accountManager
         guard let account = await accountManager.getAccount(did: did),
               let metadata = account.authorizationServerMetadata,
               let refreshToken = session.refreshToken
@@ -593,7 +593,7 @@ actor PublicOAuthStrategy: AuthStrategy {
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         request.timeoutInterval = 30.0
 
-        let oauthConfig = await core.oauthConfig
+        let oauthConfig = core.oauthConfig
         let params = [
             "grant_type": "refresh_token",
             "refresh_token": refreshToken,
@@ -606,7 +606,7 @@ actor PublicOAuthStrategy: AuthStrategy {
         )
         request.setValue(proof, forHTTPHeaderField: "DPoP")
 
-        let networkService = await core.networkService
+        let networkService = core.networkService
         let (data, response) = try await networkService.request(request, skipTokenRefresh: true)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw AuthError.invalidResponse

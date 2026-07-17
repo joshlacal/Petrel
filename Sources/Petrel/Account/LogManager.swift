@@ -344,77 +344,130 @@ public class LogManager {
 
     /// Converts auth incident type and details into AuthEvent and broadcasts it
     private static func broadcastAuthEvent(type: String, details: [String: Any]) {
-        let event = convertToAuthEvent(type: type, details: details)
-        Task {
-            await AuthEventBroadcaster.shared.broadcast(event)
+        guard let event = convertToAuthEvent(type: type, details: details) else {
+            return
         }
+        PetrelAuthEvents.broadcast(event)
     }
 
-    /// Converts incident type string to strongly-typed AuthEvent
-    private static func convertToAuthEvent(type: String, details: [String: Any]) -> AuthEvent {
-        let did = details["did"] as? String ?? ""
-        let previousDid = details["previousDid"] as? String
-        let newDid = details["newDid"] as? String
-        let reason = details["reason"] as? String ?? ""
-        let error = details["error"] as? String ?? ""
-        let statusCode = details["status"] as? Int ?? 0
-        let context = details["context"] as? String ?? ""
-        let hasAccount = details["hasAccount"] as? Bool ?? false
-        let hasSession = details["hasSession"] as? Bool ?? false
-        let hasDPoPKey = details["hasDPoPKey"] as? Bool ?? false
-        let retryAttempt = details["retryAttempt"] as? Int ?? 0
+    /// Converts a representable incident and its required fields to a typed event.
+    /// Incidents without a truthful `AuthEvent` representation remain structured logs only.
+    static func convertToAuthEvent(type: String, details: [String: Any]) -> AuthEvent? {
+        func requiredString(_ key: String) -> String? {
+            guard let value = details[key] as? String, !value.isEmpty else {
+                return nil
+            }
+            return value
+        }
+
+        func optionalString(_ key: String) -> String? {
+            guard let value = details[key] as? String, !value.isEmpty else {
+                return nil
+            }
+            return value
+        }
 
         switch type {
         // Startup & Recovery Events
         case "StartupRecovery_InconsistentState":
+            guard let did = requiredString("did"),
+                  let hasAccount = details["hasAccount"] as? Bool,
+                  let hasSession = details["hasSession"] as? Bool,
+                  let hasDPoPKey = details["hasDPoPKey"] as? Bool
+            else { return nil }
             return .startupInconsistentState(did: did, hasAccount: hasAccount, hasSession: hasSession, hasDPoPKey: hasDPoPKey)
         case "StartupRecovery_MissingSession":
+            guard let did = requiredString("did"),
+                  let hasDPoPKey = details["hasDPoPKey"] as? Bool
+            else { return nil }
             return .startupMissingSession(did: did, hasDPoPKey: hasDPoPKey)
         case "StartupRecovery_MissingDPoPKey":
+            guard let did = requiredString("did"),
+                  let hasSession = details["hasSession"] as? Bool
+            else { return nil }
             return .startupMissingDPoPKey(did: did, hasSession: hasSession)
         case "StartupRecovery_StateHealthy":
+            guard let did = requiredString("did") else { return nil }
             return .startupStateHealthy(did: did)
         // Account Switching Events
-        case "AccountAutoSwitchAfterRemoval", "AccountAutoSwitchedAfterLogout":
-            return .accountAutoSwitched(previousDid: previousDid ?? did, newDid: newDid, reason: reason)
+        case "AccountAutoSwitchAfterRemoval":
+            guard let previousDid = requiredString("previousDid"),
+                  let newDid = requiredString("newDid"),
+                  let reason = requiredString("reason")
+            else { return nil }
+            return .accountAutoSwitched(previousDid: previousDid, newDid: newDid, reason: reason)
         case "CurrentAccountChanged":
-            return .currentAccountChanged(previousDid: previousDid, newDid: did)
+            guard let newDid = requiredString("newDid") else { return nil }
+            return .currentAccountChanged(previousDid: optionalString("previousDid"), newDid: newDid)
         // Session & Token Events
         case "SessionMissingForAccount":
-            return .sessionMissing(did: did, context: context)
+            guard let did = requiredString("did"),
+                  let endpoint = requiredString("endpoint")
+            else { return nil }
+            return .sessionMissing(did: did, context: endpoint)
         case "RefreshInvalidGrant":
+            guard let did = requiredString("did"),
+                  let statusCode = details["status"] as? Int,
+                  let error = requiredString("error")
+            else { return nil }
             return .refreshTokenInvalid(did: did, statusCode: statusCode, error: error)
         case "InvalidClientMetadata":
+            guard let did = requiredString("did"),
+                  let statusCode = details["status"] as? Int,
+                  let error = requiredString("error")
+            else { return nil }
             return .invalidClientMetadata(did: did, statusCode: statusCode, error: error)
         case "InvalidClient":
+            guard let did = requiredString("did"),
+                  let statusCode = details["status"] as? Int,
+                  let error = requiredString("error")
+            else { return nil }
             return .invalidClient(did: did, statusCode: statusCode, error: error)
         case "DPoPNonceMismatchRefresh":
+            guard let did = requiredString("did"),
+                  let retryAttempt = details["retry"] as? Int
+            else { return nil }
             return .dpopNonceMismatch(did: did, retryAttempt: retryAttempt)
         // Logout Events
         case "LogoutStart":
-            return .logoutStarted(did: did, reason: reason)
+            guard let did = requiredString("did") else { return nil }
+            return .logoutStarted(did: did, reason: optionalString("reason"))
         case "AccountAutoSwitchedAfterLogout":
-            return .logoutAutoSwitched(previousDid: previousDid ?? did, newDid: newDid ?? "")
+            guard let previousDid = requiredString("previousDid"),
+                  let newDid = requiredString("newDid")
+            else { return nil }
+            return .logoutAutoSwitched(previousDid: previousDid, newDid: newDid)
         case "LogoutNoAutoSwitch":
+            guard let did = requiredString("did") else { return nil }
             return .logoutNoAutoSwitch(did: did)
         case "LogoutClearedCurrentAccount":
-            return .logoutClearedCurrentAccount(previousDid: previousDid ?? did)
+            guard let previousDid = requiredString("previousDid") else { return nil }
+            return .logoutClearedCurrentAccount(previousDid: previousDid)
         case "AutoLogoutTriggered":
+            guard let did = requiredString("did"),
+                  let reason = requiredString("reason")
+            else { return nil }
             return .autoLogoutTriggered(did: did, reason: reason)
         // Error Events
         case "SetCurrentAccount_AccountNotFound":
+            guard let did = requiredString("did") else { return nil }
             return .accountNotFound(did: did)
         case "SetCurrentAccount_NoSession":
+            guard let did = requiredString("did") else { return nil }
             return .setCurrentAccountNoSession(did: did)
         case "SetCurrentAccount_StorageFailed":
+            guard let did = requiredString("did"),
+                  let error = requiredString("error")
+            else { return nil }
             return .storageFailure(did: did, error: error)
         case "InconsistentAuthState_MissingSession":
+            guard let did = requiredString("did") else { return nil }
             return .inconsistentStateMissingSession(did: did)
         case "InconsistentAuthState_MissingAccount":
+            guard let did = requiredString("did") else { return nil }
             return .inconsistentStateMissingAccount(did: did)
-        // Fallback for unknown types - use autoLogoutTriggered as catch-all
         default:
-            return .autoLogoutTriggered(did: did, reason: "Unknown incident type: \(type)")
+            return nil
         }
     }
 

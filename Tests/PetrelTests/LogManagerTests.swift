@@ -5,8 +5,185 @@ import Foundation
 @testable import Petrel
 import Testing
 
-@Suite("LogManager Tests")
+@Suite("LogManager Tests", .serialized)
 struct LogManagerTests {
+    @Test("Logout auto-switch incidents preserve logout semantics")
+    func logoutAutoSwitchIncidentMapping() {
+        let event = LogManager.convertToAuthEvent(
+            type: "AccountAutoSwitchedAfterLogout",
+            details: [
+                "previousDid": "did:plc:previous",
+                "newDid": "did:plc:next",
+                "reason": "logout",
+            ]
+        )
+
+        #expect(event == .logoutAutoSwitched(
+            previousDid: "did:plc:previous",
+            newDid: "did:plc:next"
+        ))
+    }
+
+    @Test("Live producer detail keys map to their exact typed values")
+    func liveProducerDetailKeys() {
+        #expect(LogManager.convertToAuthEvent(
+            type: "AccountAutoSwitchAfterRemoval",
+            details: [
+                "previousDid": "did:plc:removed",
+                "newDid": "did:plc:next",
+                "reason": "account_removed",
+            ]
+        ) == .accountAutoSwitched(
+            previousDid: "did:plc:removed",
+            newDid: "did:plc:next",
+            reason: "account_removed"
+        ))
+
+        #expect(LogManager.convertToAuthEvent(
+            type: "CurrentAccountChanged",
+            details: [
+                "previousDid": "did:plc:previous",
+                "newDid": "did:plc:next",
+                "trigger": "setCurrentAccount",
+            ]
+        ) == .currentAccountChanged(
+            previousDid: "did:plc:previous",
+            newDid: "did:plc:next"
+        ))
+
+        #expect(LogManager.convertToAuthEvent(
+            type: "DPoPNonceMismatchRefresh",
+            details: [
+                "did": "did:plc:nonce",
+                "retry": 1,
+                "status": 400,
+            ]
+        ) == .dpopNonceMismatch(did: "did:plc:nonce", retryAttempt: 1))
+
+        #expect(LogManager.convertToAuthEvent(
+            type: "SessionMissingForAccount",
+            details: [
+                "did": "did:plc:session",
+                "endpoint": "https://pds.example/xrpc/app.bsky.feed.getTimeline",
+                "accountExists": true,
+                "sessionExists": false,
+            ]
+        ) == .sessionMissing(
+            did: "did:plc:session",
+            context: "https://pds.example/xrpc/app.bsky.feed.getTimeline"
+        ))
+    }
+
+    @Test("Unrepresentable live incidents and unknown types remain JSON-only")
+    func unrepresentableIncidentsAreNotFabricated() {
+        let incidents: [(String, [String: Any])] = [
+            ("CircuitBreakerOpened", [
+                "did": "did:plc:breaker",
+                "failures": 3,
+                "lastKind": "network",
+                "backoffExponent": 2,
+            ]),
+            ("InvalidGrantWithValidToken", [
+                "did": "did:plc:valid",
+                "tokenExpiresIn": "3600.0",
+                "description": "refresh rejected while access token remains valid",
+            ]),
+            ("DPoPKeyMissingForOAuthSession", [
+                "did": "did:plc:dpop",
+                "tokenType": "dpop",
+                "action": "signal_reauth_needed",
+            ]),
+            ("LegacyRefreshInvalidToken", [
+                "status": 401,
+                "error": "InvalidToken",
+                "message": "expired",
+            ]),
+            ("FutureUnknownIncident", ["did": "did:plc:unknown"]),
+        ]
+
+        for (type, details) in incidents {
+            #expect(
+                LogManager.convertToAuthEvent(type: type, details: details) == nil,
+                "\(type) must not masquerade as a typed logout event"
+            )
+        }
+    }
+
+    @Test("Typed incidents reject missing required identity")
+    func missingRequiredIdentityIsRejected() {
+        for type in ["RefreshInvalidGrant", "InvalidClientMetadata", "InvalidClient"] {
+            #expect(LogManager.convertToAuthEvent(
+                type: type,
+                details: [
+                    "status": 401,
+                    "error": "invalid",
+                    "desc": "no account identity is available",
+                ]
+            ) == nil)
+        }
+
+        #expect(LogManager.convertToAuthEvent(
+            type: "RefreshInvalidGrant",
+            details: [
+                "did": "did:plc:known",
+                "status": 401,
+                "error": "invalid_grant",
+            ]
+        ) == .refreshTokenInvalid(
+            did: "did:plc:known",
+            statusCode: 401,
+            error: "invalid_grant"
+        ))
+
+        #expect(LogManager.convertToAuthEvent(
+            type: "CurrentAccountChanged",
+            details: ["previousDid": "did:plc:previous"]
+        ) == nil)
+        #expect(LogManager.convertToAuthEvent(
+            type: "DPoPNonceMismatchRefresh",
+            details: [
+                "did": "did:plc:nonce",
+                "retryAttempt": 1,
+            ]
+        ) == nil)
+    }
+
+    @Test("Explicit auto-logout incidents retain their exact semantics")
+    func explicitAutoLogoutMapping() {
+        #expect(LogManager.convertToAuthEvent(
+            type: "AutoLogoutTriggered",
+            details: [
+                "did": "did:plc:logout",
+                "reason": "invalid_grant",
+            ]
+        ) == .autoLogoutTriggered(
+            did: "did:plc:logout",
+            reason: "invalid_grant"
+        ))
+    }
+
+    @Test("Unrepresentable incidents are not delivered to typed observers")
+    func unrepresentableIncidentBroadcastIsSuppressed() async {
+        await PetrelAuthEvents.removeAllObservers()
+        let recorder = AuthEventRecorder()
+        await PetrelAuthEvents.addObserverAndWait { event in
+            await recorder.record(event)
+        }
+
+        LogManager.logAuthIncident(
+            "InvalidGrantWithValidToken",
+            details: [
+                "did": "did:plc:valid",
+                "tokenExpiresIn": "3600.0",
+                "description": "session preserved",
+            ]
+        )
+        await PetrelAuthEvents.drain()
+
+        #expect(await recorder.events.isEmpty)
+        await PetrelAuthEvents.removeAllObservers()
+    }
+
     @Test("LogManager should not crash on nil values")
     func logManagerNilSafety() {
         // These should not crash
@@ -139,5 +316,13 @@ struct LogManagerTests {
 
         // This should log the body since it doesn't contain sensitive data
         LogManager.logRequest(request)
+    }
+}
+
+private actor AuthEventRecorder {
+    private(set) var events: [AuthEvent] = []
+
+    func record(_ event: AuthEvent) {
+        events.append(event)
     }
 }

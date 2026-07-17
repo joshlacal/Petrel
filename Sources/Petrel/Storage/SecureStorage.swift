@@ -5,11 +5,6 @@
 //  Cross-platform secure storage protocol
 //
 
-#if canImport(CryptoKit)
-    import CryptoKit
-#else
-    @preconcurrency import Crypto
-#endif
 import Foundation
 
 /// Keychain accessibility levels for items Petrel stores (tokens, session data,
@@ -43,11 +38,13 @@ protocol SecureStorage: Sendable {
     /// Delete all items in a namespace
     func deleteAll(namespace: String, accessGroup: String?) throws
 
-    /// Store a DPoP private key
-    func storeDPoPKey(_ key: P256.Signing.PrivateKey, keyTag: String, accessGroup: String?) throws
+    /// Store a serialized DPoP private key without carrying a CryptoKit value
+    /// across this Sendable storage boundary.
+    func storeDPoPKeyRepresentation(_ representation: Data, keyTag: String, accessGroup: String?) throws
 
-    /// Retrieve a DPoP private key
-    func retrieveDPoPKey(keyTag: String, accessGroup: String?) throws -> P256.Signing.PrivateKey
+    /// Retrieve a serialized DPoP private key. The caller reconstructs the
+    /// CryptoKit value inside its own isolation domain.
+    func retrieveDPoPKeyRepresentation(keyTag: String, accessGroup: String?) throws -> Data
 
     /// Delete a DPoP private key
     func deleteDPoPKey(keyTag: String, accessGroup: String?) throws

@@ -153,7 +153,6 @@ public class CARReader {
 
   private func indexBlocks() throws {
     while offset < data.count {
-      let blockStart = offset
       let totalLength: Int
       do {
         totalLength = try readVarint()
@@ -197,12 +196,12 @@ public class CARReader {
 
       // CIDv1
       guard offset < data.count else { break }
-      let codec = data[offset]
+      // Skip the one-byte codec. The full CID bytes are retained below.
       offset += 1
 
       // Multihash: algorithm + length + digest
       guard offset < data.count else { break }
-      let hashAlgo = data[offset]
+      // Skip the one-byte hash algorithm. The full CID bytes are retained below.
       offset += 1
 
       guard offset < data.count else { break }

@@ -165,6 +165,10 @@ public extension ATProtocolValueContainer {
             return a == b
         case (.null, .null):
             return true
+        case let (.link(a), .link(b)):
+            return a == b
+        case let (.bytes(a), .bytes(b)):
+            return a == b
         case let (.array(a), .array(b)):
             return a == b
         case let (.object(a), .object(b)):
@@ -192,6 +196,10 @@ public extension ATProtocolValueContainer {
             hasher.combine(value)
         case .null:
             hasher.combine(0) // Arbitrary choice for null
+        case let .link(value):
+            hasher.combine(value)
+        case let .bytes(value):
+            hasher.combine(value)
         case let .array(value):
             hasher.combine(value)
         case let .object(value):
@@ -203,8 +211,6 @@ public extension ATProtocolValueContainer {
             hasher.combine(value)
         case let .decodeError(error):
             hasher.combine(error)
-        default:
-            break
         }
     }
 

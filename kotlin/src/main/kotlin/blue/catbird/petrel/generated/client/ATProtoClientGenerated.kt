@@ -460,5 +460,41 @@ class ATProtoClient(val networkService: NetworkService) {
 
     }
 
+    val site: Site = Site()
+
+    inner class Site {
+        val client: ATProtoClient get() = this@ATProtoClient
+        val standard: Standard = Standard()
+
+        inner class Standard {
+            val client: ATProtoClient get() = this@ATProtoClient
+            val document: Document = Document()
+
+            inner class Document {
+                val client: ATProtoClient get() = this@ATProtoClient
+            }
+
+            val publication: Publication = Publication()
+
+            inner class Publication {
+                val client: ATProtoClient get() = this@ATProtoClient
+            }
+
+            val graph: Graph = Graph()
+
+            inner class Graph {
+                val client: ATProtoClient get() = this@ATProtoClient
+            }
+
+            val theme: Theme = Theme()
+
+            inner class Theme {
+                val client: ATProtoClient get() = this@ATProtoClient
+            }
+
+        }
+
+    }
+
 
 }

@@ -16,12 +16,6 @@ import Synchronization
     import Security
 #endif
 
-#if canImport(Security)
-    typealias PlatformKeychainAccessibility = CFString
-#else
-    typealias PlatformKeychainAccessibility = String
-#endif
-
 enum KeychainError: Error, LocalizedError {
     case itemStoreError(status: Int)
     case itemRetrievalError(status: Int)
@@ -180,11 +174,11 @@ enum KeychainManager {
                 throw unavailable()
             }
 
-            func storeDPoPKey(_: P256.Signing.PrivateKey, keyTag _: String, accessGroup _: String?) throws {
+            func storeDPoPKeyRepresentation(_: Data, keyTag _: String, accessGroup _: String?) throws {
                 throw unavailable()
             }
 
-            func retrieveDPoPKey(keyTag _: String, accessGroup _: String?) throws -> P256.Signing.PrivateKey {
+            func retrieveDPoPKeyRepresentation(keyTag _: String, accessGroup _: String?) throws -> Data {
                 throw unavailable()
             }
 
@@ -199,12 +193,6 @@ enum KeychainManager {
     /// Thread-safe caches with automatic memory management
     private nonisolated(unsafe) static let dataCache: NSCache<NSString, NSData> = {
         let cache = NSCache<NSString, NSData>()
-        cache.countLimit = 100
-        return cache
-    }()
-
-    private nonisolated(unsafe) static let dpopKeyCache: NSCache<NSString, CachedDPoPKey> = {
-        let cache = NSCache<NSString, CachedDPoPKey>()
         cache.countLimit = 100
         return cache
     }()
@@ -266,27 +254,15 @@ enum KeychainManager {
         return status == itemNotFoundStatus
     }
 
-    /// Wrapper class for P256.Signing.PrivateKey to make it cacheable
-    private final class CachedDPoPKey: NSObject, @unchecked Sendable {
-        let key: P256.Signing.PrivateKey
-
-        init(key: P256.Signing.PrivateKey) {
-            self.key = key
-            super.init()
-        }
-    }
-
     /// Configure cache limits
     static func configureCaches(countLimit: Int = 100) {
         dataCache.countLimit = countLimit
-        dpopKeyCache.countLimit = countLimit
     }
 
     // MARK: - Cache Management
 
     private static func clearCacheStorage() {
         dataCache.removeAllObjects()
-        dpopKeyCache.removeAllObjects()
     }
 
     /// Clears all cached items
@@ -309,7 +285,7 @@ enum KeychainManager {
             ]
 
             var result: AnyObject?
-            var status = SecItemCopyMatching(query as CFDictionary, &result)
+            let status = SecItemCopyMatching(query as CFDictionary, &result)
 
             if status == errSecSuccess, let items = result as? [[String: Any]] {
                 for item in items {
@@ -322,26 +298,6 @@ enum KeychainManager {
                 }
             }
 
-            // Do the same for DPoP keys
-            let keysQuery: [String: Any] = [
-                kSecClass as String: kSecClassKey,
-                kSecMatchLimit as String: kSecMatchLimitAll,
-                kSecReturnAttributes as String: true,
-            ]
-
-            status = SecItemCopyMatching(keysQuery as CFDictionary, &result)
-
-            if status == errSecSuccess, let items = result as? [[String: Any]] {
-                for item in items {
-                    if let tagData = item[kSecAttrApplicationTag as String] as? Data,
-                       let tagString = String(data: tagData, encoding: .utf8),
-                       tagString.hasPrefix("\(namespace).")
-                    {
-                        // Remove from dpop key cache
-                        dpopKeyCache.removeObject(forKey: tagString as NSString)
-                    }
-                }
-            }
         #else
             clearCacheStorage()
         #endif
@@ -374,7 +330,6 @@ enum KeychainManager {
         key: String,
         value: Data,
         namespace: String,
-        accessibility: PlatformKeychainAccessibility? = nil,
         accessGroup: String? = nil
     ) throws {
         let resolvedAccessGroup = resolvedAccessGroup(accessGroup)
@@ -533,56 +488,47 @@ enum KeychainManager {
 
     // MARK: - DPoP Key Methods
 
-    /// Stores a DPoP private key in the keychain with a specified key tag.
-    static func storeDPoPKey(
-        _ key: P256.Signing.PrivateKey,
+    /// Stores a serialized DPoP private key in the keychain with a specified key tag.
+    static func storeDPoPKeyRepresentation(
+        _ representation: Data,
         keyTag: String,
         accessGroup: String? = nil
     ) throws {
         let resolvedAccessGroup = resolvedAccessGroup(accessGroup)
-        try storage.storeDPoPKey(key, keyTag: keyTag, accessGroup: resolvedAccessGroup)
-
-        // Update cache
-        dpopKeyCache.setObject(CachedDPoPKey(key: key), forKey: keyTag as NSString)
+        try storage.storeDPoPKeyRepresentation(
+            representation,
+            keyTag: keyTag,
+            accessGroup: resolvedAccessGroup
+        )
     }
 
-    /// Retrieves a DPoP private key from the keychain with a specified key tag.
-    static func retrieveDPoPKey(
+    /// Retrieves a serialized DPoP private key from the keychain with a specified key tag.
+    static func retrieveDPoPKeyRepresentation(
         keyTag: String,
         accessGroup: String? = nil
-    ) throws -> P256.Signing.PrivateKey {
-        // Check cache first
-        if let cachedKey = dpopKeyCache.object(forKey: keyTag as NSString) {
-            LogManager.logDebug("KeychainManager - Retrieved DPoP key from cache for tag \(keyTag).")
-            return cachedKey.key
-        }
-
+    ) throws -> Data {
         let resolvedAccessGroup = resolvedAccessGroup(accessGroup)
 
         if let resolvedAccessGroup {
             do {
-                let key = try storage.retrieveDPoPKey(
+                return try storage.retrieveDPoPKeyRepresentation(
                     keyTag: keyTag,
                     accessGroup: resolvedAccessGroup
                 )
-                dpopKeyCache.setObject(CachedDPoPKey(key: key), forKey: keyTag as NSString)
-                return key
             } catch {
                 if !isItemNotFound(error) {
                     throw error
                 }
             }
 
-            let legacyKey = try storage.retrieveDPoPKey(
+            let legacyRepresentation = try storage.retrieveDPoPKeyRepresentation(
                 keyTag: keyTag,
                 accessGroup: nil
             )
 
-            dpopKeyCache.setObject(CachedDPoPKey(key: legacyKey), forKey: keyTag as NSString)
-
             do {
-                try storage.storeDPoPKey(
-                    legacyKey,
+                try storage.storeDPoPKeyRepresentation(
+                    legacyRepresentation,
                     keyTag: keyTag,
                     accessGroup: resolvedAccessGroup
                 )
@@ -596,14 +542,41 @@ enum KeychainManager {
                 )
             }
 
-            return legacyKey
+            return legacyRepresentation
         }
 
-        let key = try storage.retrieveDPoPKey(keyTag: keyTag, accessGroup: nil)
+        return try storage.retrieveDPoPKeyRepresentation(
+            keyTag: keyTag,
+            accessGroup: nil
+        )
+    }
 
-        // Update cache
-        dpopKeyCache.setObject(CachedDPoPKey(key: key), forKey: keyTag as NSString)
-        return key
+    /// Synchronous compatibility helper. Serialization remains the only value
+    /// that crosses the Sendable storage boundary.
+    static func storeDPoPKey(
+        _ key: P256.Signing.PrivateKey,
+        keyTag: String,
+        accessGroup: String? = nil
+    ) throws {
+        try storeDPoPKeyRepresentation(
+            key.x963Representation,
+            keyTag: keyTag,
+            accessGroup: accessGroup
+        )
+    }
+
+    /// Synchronous compatibility helper that reconstructs the key in the
+    /// caller's current isolation domain.
+    static func retrieveDPoPKey(
+        keyTag: String,
+        accessGroup: String? = nil
+    ) throws -> P256.Signing.PrivateKey {
+        try P256.Signing.PrivateKey(
+            x963Representation: retrieveDPoPKeyRepresentation(
+                keyTag: keyTag,
+                accessGroup: accessGroup
+            )
+        )
     }
 
     /// Deletes a DPoP private key from the keychain with a specified key tag.
@@ -613,9 +586,6 @@ enum KeychainManager {
         if resolvedAccessGroup != nil {
             try? storage.deleteDPoPKey(keyTag: keyTag, accessGroup: nil)
         }
-
-        // Remove from cache
-        dpopKeyCache.removeObject(forKey: keyTag as NSString)
     }
 
     /// Stores a DPoP private key in the keychain within a specified namespace.
@@ -710,13 +680,12 @@ enum KeychainManager {
         key: String,
         value: Data,
         namespace: String,
-        accessibility: PlatformKeychainAccessibility? = nil,
         accessGroup: String? = nil
     ) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
-                    try store(key: key, value: value, namespace: namespace, accessibility: accessibility, accessGroup: accessGroup)
+                    try store(key: key, value: value, namespace: namespace, accessGroup: accessGroup)
                     continuation.resume()
                 } catch {
                     continuation.resume(throwing: error)
@@ -743,16 +712,20 @@ enum KeychainManager {
         }
     }
 
-    /// Async wrapper for retrieveDPoPKey that offloads the blocking Security framework call to a background thread.
-    static func retrieveDPoPKeyAsync(
+    /// Async wrapper that moves only a serialized key representation across the
+    /// continuation boundary.
+    static func retrieveDPoPKeyRepresentationAsync(
         keyTag: String,
         accessGroup: String? = nil
-    ) async throws -> P256.Signing.PrivateKey {
+    ) async throws -> Data {
         try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
-                    let key = try retrieveDPoPKey(keyTag: keyTag, accessGroup: accessGroup)
-                    continuation.resume(returning: key)
+                    let representation = try retrieveDPoPKeyRepresentation(
+                        keyTag: keyTag,
+                        accessGroup: accessGroup
+                    )
+                    continuation.resume(returning: representation)
                 } catch {
                     continuation.resume(throwing: error)
                 }
@@ -760,16 +733,21 @@ enum KeychainManager {
         }
     }
 
-    /// Async wrapper for storeDPoPKey that offloads the blocking Security framework call to a background thread.
-    static func storeDPoPKeyAsync(
-        _ key: P256.Signing.PrivateKey,
+    /// Async wrapper that reconstructs key material inside the storage closure.
+    static func storeDPoPKeyRepresentationAsync(
+        _ representation: Data,
         keyTag: String,
         accessGroup: String? = nil
     ) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
-                    try storeDPoPKey(key, keyTag: keyTag, accessGroup: accessGroup)
+                    let isolatedKey = try P256.Signing.PrivateKey(x963Representation: representation)
+                    try storeDPoPKeyRepresentation(
+                        isolatedKey.x963Representation,
+                        keyTag: keyTag,
+                        accessGroup: accessGroup
+                    )
                     continuation.resume()
                 } catch {
                     continuation.resume(throwing: error)

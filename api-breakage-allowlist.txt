@@ -1,0 +1,92 @@
+API breakage: accessor ATProtoClient.app.Set() has been removed
+API breakage: class ATProtoClient.App has been changed to a struct
+API breakage: accessor ATProtoClient.App.bsky.Set() has been removed
+API breakage: class ATProtoClient.App.Bsky has been changed to a struct
+API breakage: accessor ATProtoClient.App.Bsky.authCreatePosts.Set() has been removed
+API breakage: class ATProtoClient.App.Bsky.AuthCreatePosts has been changed to a struct
+API breakage: accessor ATProtoClient.App.Bsky.authDeleteContent.Set() has been removed
+API breakage: class ATProtoClient.App.Bsky.AuthDeleteContent has been changed to a struct
+API breakage: accessor ATProtoClient.App.Bsky.authFullApp.Set() has been removed
+API breakage: class ATProtoClient.App.Bsky.AuthFullApp has been changed to a struct
+API breakage: accessor ATProtoClient.App.Bsky.authManageFeedDeclarations.Set() has been removed
+API breakage: class ATProtoClient.App.Bsky.AuthManageFeedDeclarations has been changed to a struct
+API breakage: accessor ATProtoClient.App.Bsky.authManageLabelerService.Set() has been removed
+API breakage: class ATProtoClient.App.Bsky.AuthManageLabelerService has been changed to a struct
+API breakage: accessor ATProtoClient.App.Bsky.authManageModeration.Set() has been removed
+API breakage: class ATProtoClient.App.Bsky.AuthManageModeration has been changed to a struct
+API breakage: accessor ATProtoClient.App.Bsky.authManageNotifications.Set() has been removed
+API breakage: class ATProtoClient.App.Bsky.AuthManageNotifications has been changed to a struct
+API breakage: accessor ATProtoClient.App.Bsky.authManageProfile.Set() has been removed
+API breakage: class ATProtoClient.App.Bsky.AuthManageProfile has been changed to a struct
+API breakage: accessor ATProtoClient.App.Bsky.authViewAll.Set() has been removed
+API breakage: class ATProtoClient.App.Bsky.AuthViewAll has been changed to a struct
+API breakage: accessor ATProtoClient.App.Bsky.actor.Set() has been removed
+API breakage: class ATProtoClient.App.Bsky.Actor has been changed to a struct
+API breakage: accessor ATProtoClient.App.Bsky.ageassurance.Set() has been removed
+API breakage: class ATProtoClient.App.Bsky.Ageassurance has been changed to a struct
+API breakage: accessor ATProtoClient.App.Bsky.bookmark.Set() has been removed
+API breakage: class ATProtoClient.App.Bsky.Bookmark has been changed to a struct
+API breakage: accessor ATProtoClient.App.Bsky.contact.Set() has been removed
+API breakage: class ATProtoClient.App.Bsky.Contact has been changed to a struct
+API breakage: accessor ATProtoClient.App.Bsky.draft.Set() has been removed
+API breakage: class ATProtoClient.App.Bsky.Draft has been changed to a struct
+API breakage: accessor ATProtoClient.App.Bsky.embed.Set() has been removed
+API breakage: class ATProtoClient.App.Bsky.Embed has been changed to a struct
+API breakage: accessor ATProtoClient.App.Bsky.feed.Set() has been removed
+API breakage: class ATProtoClient.App.Bsky.Feed has been changed to a struct
+API breakage: accessor ATProtoClient.App.Bsky.graph.Set() has been removed
+API breakage: class ATProtoClient.App.Bsky.Graph has been changed to a struct
+API breakage: accessor ATProtoClient.App.Bsky.labeler.Set() has been removed
+API breakage: class ATProtoClient.App.Bsky.Labeler has been changed to a struct
+API breakage: accessor ATProtoClient.App.Bsky.notification.Set() has been removed
+API breakage: class ATProtoClient.App.Bsky.Notification has been changed to a struct
+API breakage: accessor ATProtoClient.App.Bsky.richtext.Set() has been removed
+API breakage: class ATProtoClient.App.Bsky.Richtext has been changed to a struct
+API breakage: accessor ATProtoClient.App.Bsky.unspecced.Set() has been removed
+API breakage: class ATProtoClient.App.Bsky.Unspecced has been changed to a struct
+API breakage: accessor ATProtoClient.App.Bsky.video.Set() has been removed
+API breakage: class ATProtoClient.App.Bsky.Video has been changed to a struct
+API breakage: accessor ATProtoClient.chat.Set() has been removed
+API breakage: class ATProtoClient.Chat has been changed to a struct
+API breakage: accessor ATProtoClient.Chat.bsky.Set() has been removed
+API breakage: class ATProtoClient.Chat.Bsky has been changed to a struct
+API breakage: accessor ATProtoClient.Chat.Bsky.authFullChatClient.Set() has been removed
+API breakage: class ATProtoClient.Chat.Bsky.AuthFullChatClient has been changed to a struct
+API breakage: accessor ATProtoClient.Chat.Bsky.actor.Set() has been removed
+API breakage: class ATProtoClient.Chat.Bsky.Actor has been changed to a struct
+API breakage: accessor ATProtoClient.Chat.Bsky.convo.Set() has been removed
+API breakage: class ATProtoClient.Chat.Bsky.Convo has been changed to a struct
+API breakage: accessor ATProtoClient.Chat.Bsky.embed.Set() has been removed
+API breakage: class ATProtoClient.Chat.Bsky.Embed has been changed to a struct
+API breakage: accessor ATProtoClient.Chat.Bsky.group.Set() has been removed
+API breakage: class ATProtoClient.Chat.Bsky.Group has been changed to a struct
+API breakage: accessor ATProtoClient.Chat.Bsky.moderation.Set() has been removed
+API breakage: class ATProtoClient.Chat.Bsky.Moderation has been changed to a struct
+API breakage: accessor ATProtoClient.com.Set() has been removed
+API breakage: class ATProtoClient.Com has been changed to a struct
+API breakage: accessor ATProtoClient.Com.atproto.Set() has been removed
+API breakage: class ATProtoClient.Com.Atproto has been changed to a struct
+API breakage: accessor ATProtoClient.Com.Atproto.admin.Set() has been removed
+API breakage: class ATProtoClient.Com.Atproto.Admin has been changed to a struct
+API breakage: accessor ATProtoClient.Com.Atproto.identity.Set() has been removed
+API breakage: class ATProtoClient.Com.Atproto.Identity has been changed to a struct
+API breakage: accessor ATProtoClient.Com.Atproto.label.Set() has been removed
+API breakage: class ATProtoClient.Com.Atproto.Label has been changed to a struct
+API breakage: accessor ATProtoClient.Com.Atproto.lexicon.Set() has been removed
+API breakage: class ATProtoClient.Com.Atproto.Lexicon has been changed to a struct
+API breakage: accessor ATProtoClient.Com.Atproto.moderation.Set() has been removed
+API breakage: class ATProtoClient.Com.Atproto.Moderation has been changed to a struct
+API breakage: accessor ATProtoClient.Com.Atproto.repo.Set() has been removed
+API breakage: class ATProtoClient.Com.Atproto.Repo has been changed to a struct
+API breakage: accessor ATProtoClient.Com.Atproto.server.Set() has been removed
+API breakage: class ATProtoClient.Com.Atproto.Server has been changed to a struct
+API breakage: accessor ATProtoClient.Com.Atproto.sync.Set() has been removed
+API breakage: class ATProtoClient.Com.Atproto.Sync has been changed to a struct
+API breakage: accessor ATProtoClient.Com.Atproto.temp.Set() has been removed
+API breakage: class ATProtoClient.Com.Atproto.Temp has been changed to a struct
+API breakage: accessor ATProtoClient.Com.germnetwork.Set() has been removed
+API breakage: class ATProtoClient.Com.Germnetwork has been changed to a struct
+API breakage: accessor ATProtoClient.Com.Germnetwork.declaration.Set() has been removed
+API breakage: class ATProtoClient.Com.Germnetwork.Declaration has been changed to a struct
+API breakage: enumelement ChatBskyConvoSendMessage.Error.replyTargetNotFound has been added as a new enum case
+API breakage: enumelement ChatBskyConvoSendMessageBatch.Error.replyTargetNotFound has been added as a new enum case

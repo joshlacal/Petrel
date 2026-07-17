@@ -20,10 +20,10 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/beatt83/jose-swift.git", .upToNextMajor(from: "6.0.0")),
-        .package(url: "https://github.com/valpackett/SwiftCBOR.git", .upToNextMajor(from: "0.5.0")),
+        .package(url: "https://github.com/valpackett/SwiftCBOR.git", .upToNextMinor(from: "0.5.0")),
         .package(
             url: "https://github.com/apple/swift-async-dns-resolver",
-            .upToNextMajor(from: "0.1.0")
+            .upToNextMinor(from: "0.4.0")
         ),
         .package(url: "https://github.com/apple/swift-crypto.git", .upToNextMajor(from: "3.0.0")),
         .package(url: "https://github.com/apple/swift-log.git", .upToNextMajor(from: "1.0.0")),
@@ -66,6 +66,10 @@ let package = Package(
         .testTarget(
             name: "PetrelTests",
             dependencies: ["Petrel"]
+        ),
+        .testTarget(
+            name: "PetrelLoadTests",
+            dependencies: ["PetrelLoad"]
         ),
     ]
 )

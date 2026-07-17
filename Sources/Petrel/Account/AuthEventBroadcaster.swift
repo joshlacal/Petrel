@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import Synchronization
 
 /// Authentication event types that can be observed by the application layer
 public enum AuthEvent: Sendable, Equatable {
@@ -106,20 +107,33 @@ public actor AuthEventBroadcaster {
 
     /// Broadcast an authentication event to all observers
     /// - Parameter event: The authentication event to broadcast
-    func broadcast(_ event: AuthEvent) {
+    func broadcast(_ event: AuthEvent) async {
         let currentObservers = observers
-        Task(priority: .high) {
-            for observer in currentObservers {
-                await observer(event)
-            }
+        for observer in currentObservers {
+            await observer(event)
         }
     }
 }
 
 /// Public API for subscribing to Petrel authentication events
 public enum PetrelAuthEvents {
+    private enum DeliveryContext {
+        @TaskLocal static var isDelivering = false
+    }
+
+    private struct DeliveryState {
+        var generation: UInt = 0
+        var tail: Task<Void, Never>?
+    }
+
+    private static let deliveryState = Mutex(DeliveryState())
+
     /// Add an observer to receive authentication events
     /// - Parameter observer: Closure called when auth events occur
+    ///
+    /// Registration is scheduled asynchronously and may not be complete when this
+    /// method returns. Use ``addObserverAndWait(_:)`` when an event can be emitted
+    /// immediately after registration.
     ///
     /// Example usage:
     /// ```swift
@@ -140,10 +154,70 @@ public enum PetrelAuthEvents {
         }
     }
 
+    /// Add an observer and return only after registration is complete.
+    ///
+    /// Await this method when events may be emitted immediately after registration.
+    public static func addObserverAndWait(
+        _ observer: @escaping @Sendable (AuthEvent) async -> Void
+    ) async {
+        await AuthEventBroadcaster.shared.addObserver(observer)
+    }
+
     /// Remove all observers (primarily for testing)
     public static func removeAllObservers() {
         Task {
             await AuthEventBroadcaster.shared.removeAllObservers()
+        }
+    }
+
+    /// Remove all observers after delivering events that were already enqueued.
+    /// When called by an observer during delivery, removal happens immediately
+    /// without waiting for that observer to return. The current broadcast uses an
+    /// observer snapshot, so removal affects future broadcasts; other observers in
+    /// the current snapshot still receive the current event.
+    package static func removeAllObservers() async {
+        await drain()
+        await AuthEventBroadcaster.shared.removeAllObservers()
+    }
+
+    /// Wait until every authentication event enqueued before this method's final
+    /// queue-state check has completed delivery to the registered observers.
+    ///
+    /// An event enqueued concurrently after that check requires another drain. When
+    /// called by an authentication event observer, this method returns immediately
+    /// because the current delivery cannot complete until that observer returns.
+    package static func drain() async {
+        guard !DeliveryContext.isDelivering else {
+            return
+        }
+
+        while true {
+            let snapshot = deliveryState.withLock { state in
+                (state.generation, state.tail)
+            }
+            await snapshot.1?.value
+
+            let isStable = deliveryState.withLock { state in
+                state.generation == snapshot.0
+            }
+            if isStable {
+                return
+            }
+        }
+    }
+
+    /// Enqueue an event synchronously so a subsequent ``drain()`` observes it.
+    static func broadcast(_ event: AuthEvent) {
+        deliveryState.withLock { state in
+            let predecessor = state.tail
+            let delivery = Task(priority: .high) {
+                await predecessor?.value
+                await DeliveryContext.$isDelivering.withValue(true) {
+                    await AuthEventBroadcaster.shared.broadcast(event)
+                }
+            }
+            state.generation &+= 1
+            state.tail = delivery
         }
     }
 }

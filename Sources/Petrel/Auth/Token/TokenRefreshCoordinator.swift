@@ -198,7 +198,7 @@ actor TokenRefreshCoordinator {
                                     refreshedAt: Date(),
                                     originalResponse: (data, response)
                                 )
-                                await self.updateLastResult(result)
+                                self.updateLastResult(result)
                                 LogManager.logDebug("TokenRefreshCoordinator: Refresh successful (OAuth format).")
                                 return result
                             }
@@ -214,7 +214,7 @@ actor TokenRefreshCoordinator {
                                     refreshedAt: Date(),
                                     originalResponse: (data, response)
                                 )
-                                await self.updateLastResult(result)
+                                self.updateLastResult(result)
                                 LogManager.logDebug("TokenRefreshCoordinator: Refresh successful (legacy AT Proto format).")
                                 return result
                             }

@@ -7,11 +7,6 @@
 
 #if os(iOS) || os(macOS)
 
-    #if canImport(CryptoKit)
-        import CryptoKit
-    #else
-        @preconcurrency import Crypto
-    #endif
     import Foundation
     import Security
     import Synchronization
@@ -321,19 +316,31 @@
 
         // MARK: - DPoP Key Methods
 
-        func storeDPoPKey(_ key: P256.Signing.PrivateKey, keyTag: String, accessGroup: String?) throws {
+        func storeDPoPKeyRepresentation(
+            _ representation: Data,
+            keyTag: String,
+            accessGroup: String?
+        ) throws {
             #if os(iOS)
-                try storeDPoPKeyiOS(key, keyTag: keyTag, accessGroup: accessGroup)
+                try storeDPoPKeyRepresentationiOS(
+                    representation,
+                    keyTag: keyTag,
+                    accessGroup: accessGroup
+                )
             #elseif os(macOS)
-                try storeDPoPKeymacOS(key, keyTag: keyTag, accessGroup: accessGroup)
+                try storeDPoPKeyRepresentationmacOS(
+                    representation,
+                    keyTag: keyTag,
+                    accessGroup: accessGroup
+                )
             #endif
         }
 
-        func retrieveDPoPKey(keyTag: String, accessGroup: String?) throws -> P256.Signing.PrivateKey {
+        func retrieveDPoPKeyRepresentation(keyTag: String, accessGroup: String?) throws -> Data {
             #if os(iOS)
-                return try retrieveDPoPKeyiOS(keyTag: keyTag, accessGroup: accessGroup)
+                return try retrieveDPoPKeyRepresentationiOS(keyTag: keyTag, accessGroup: accessGroup)
             #elseif os(macOS)
-                return try retrieveDPoPKeymacOS(keyTag: keyTag, accessGroup: accessGroup)
+                return try retrieveDPoPKeyRepresentationmacOS(keyTag: keyTag, accessGroup: accessGroup)
             #endif
         }
 
@@ -348,8 +355,8 @@
         // MARK: - iOS DPoP Key Implementation
 
         #if os(iOS)
-            private func storeDPoPKeyiOS(
-                _ key: P256.Signing.PrivateKey,
+            private func storeDPoPKeyRepresentationiOS(
+                _ representation: Data,
                 keyTag: String,
                 accessGroup: String?
             ) throws {
@@ -362,7 +369,7 @@
                     kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
                     kSecAttrKeySizeInBits as String: 256,
                     kSecAttrApplicationTag as String: tagData,
-                    kSecValueData as String: key.x963Representation,
+                    kSecValueData as String: representation,
                     kSecAttrAccessible as String: Self.defaultAccessibility,
                 ]
                 query.merge(Self.accessGroupAttributes(accessGroup)) { _, new in new }
@@ -381,7 +388,7 @@
                 if status == errSecDuplicateItem {
                     // Try update
                     let updateAttributes: [String: Any] = [
-                        kSecValueData as String: key.x963Representation,
+                        kSecValueData as String: representation,
                     ]
                     let updateStatus = SecItemUpdate(
                         deleteQuery as CFDictionary, updateAttributes as CFDictionary
@@ -399,10 +406,10 @@
                 }
             }
 
-            private func retrieveDPoPKeyiOS(
+            private func retrieveDPoPKeyRepresentationiOS(
                 keyTag: String,
                 accessGroup: String?
-            ) throws -> P256.Signing.PrivateKey {
+            ) throws -> Data {
                 guard let tagData = keyTag.data(using: .utf8) else {
                     throw KeychainError.dataFormatError
                 }
@@ -425,16 +432,10 @@
                     throw KeychainError.itemRetrievalError(status: Int(status))
                 }
 
-                do {
-                    let key = try P256.Signing.PrivateKey(x963Representation: data)
-                    LogManager.logDebug(
-                        "AppleKeychainStore - iOS successfully retrieved DPoP key for tag \(keyTag)"
-                    )
-                    return key
-                } catch {
-                    LogManager.logError("AppleKeychainStore - iOS failed to reconstruct P256 key: \(error)")
-                    throw KeychainError.unableToCreateKey
-                }
+                LogManager.logDebug(
+                    "AppleKeychainStore - iOS successfully retrieved DPoP key representation for tag \(keyTag)"
+                )
+                return data
             }
 
             private func deleteDPoPKeyiOS(
@@ -467,8 +468,8 @@
         // MARK: - macOS DPoP Key Implementation
 
         #if os(macOS)
-            private func storeDPoPKeymacOS(
-                _ key: P256.Signing.PrivateKey,
+            private func storeDPoPKeyRepresentationmacOS(
+                _ representation: Data,
                 keyTag: String,
                 accessGroup: String?
             ) throws {
@@ -480,7 +481,7 @@
                 try? deleteDPoPKeymacOS(keyTag: keyTag, accessGroup: accessGroup)
 
                 // Convert CryptoKit key to SecKey
-                let keyData = key.x963Representation
+                let keyData = representation
                 let attributes: [String: Any] = [
                     kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
                     kSecAttrKeyClass as String: kSecAttrKeyClassPrivate,
@@ -500,7 +501,11 @@
                     LogManager.logDebug(
                         "AppleKeychainStore - Falling back to generic password storage for tag: \(keyTag)"
                     )
-                    try storeDPoPKeyAsPasswordmacOS(key, keyTag: keyTag, accessGroup: accessGroup)
+                    try storeDPoPKeyRepresentationAsPasswordmacOS(
+                        representation,
+                        keyTag: keyTag,
+                        accessGroup: accessGroup
+                    )
                     return
                 }
 
@@ -533,22 +538,30 @@
                     guard updateStatus == errSecSuccess else {
                         LogManager.logError("AppleKeychainStore - macOS SecKey update failed: \(updateStatus)")
                         // Fallback to password storage
-                        try storeDPoPKeyAsPasswordmacOS(key, keyTag: keyTag, accessGroup: accessGroup)
+                        try storeDPoPKeyRepresentationAsPasswordmacOS(
+                            representation,
+                            keyTag: keyTag,
+                            accessGroup: accessGroup
+                        )
                         return
                     }
                     LogManager.logDebug("AppleKeychainStore - macOS SecKey updated for tag \(keyTag)")
                 } else if status != errSecSuccess {
                     LogManager.logError("AppleKeychainStore - macOS SecKey add failed: \(status)")
                     // Fallback to password storage
-                    try storeDPoPKeyAsPasswordmacOS(key, keyTag: keyTag, accessGroup: accessGroup)
+                    try storeDPoPKeyRepresentationAsPasswordmacOS(
+                        representation,
+                        keyTag: keyTag,
+                        accessGroup: accessGroup
+                    )
                     return
                 } else {
                     LogManager.logDebug("AppleKeychainStore - macOS SecKey added for tag \(keyTag)")
                 }
             }
 
-            private func storeDPoPKeyAsPasswordmacOS(
-                _ key: P256.Signing.PrivateKey,
+            private func storeDPoPKeyRepresentationAsPasswordmacOS(
+                _ representation: Data,
                 keyTag: String,
                 accessGroup: String?
             ) throws {
@@ -557,7 +570,7 @@
                 let passwordKey = "\(keyTag).password"
                 try store(
                     key: passwordKey,
-                    value: key.x963Representation,
+                    value: representation,
                     namespace: "dpopkeys",
                     accessGroup: accessGroup
                 )
@@ -567,29 +580,32 @@
                 )
             }
 
-            private func retrieveDPoPKeymacOS(
+            private func retrieveDPoPKeyRepresentationmacOS(
                 keyTag: String,
                 accessGroup: String?
-            ) throws -> P256.Signing.PrivateKey {
+            ) throws -> Data {
                 // First try to retrieve as SecKey
-                if let key = try? retrieveDPoPKeyAsSecKeymacOS(
+                if let representation = try? retrieveDPoPKeyRepresentationAsSecKeymacOS(
                     keyTag: keyTag,
                     accessGroup: accessGroup
                 ) {
-                    return key
+                    return representation
                 }
 
                 // Fallback: try to retrieve as password
                 LogManager.logDebug(
                     "AppleKeychainStore - SecKey retrieval failed, trying password fallback for tag: \(keyTag)"
                 )
-                return try retrieveDPoPKeyAsPasswordmacOS(keyTag: keyTag, accessGroup: accessGroup)
+                return try retrieveDPoPKeyRepresentationAsPasswordmacOS(
+                    keyTag: keyTag,
+                    accessGroup: accessGroup
+                )
             }
 
-            private func retrieveDPoPKeyAsSecKeymacOS(
+            private func retrieveDPoPKeyRepresentationAsSecKeymacOS(
                 keyTag: String,
                 accessGroup: String?
-            ) throws -> P256.Signing.PrivateKey {
+            ) throws -> Data {
                 guard let tagData = keyTag.data(using: .utf8) else {
                     throw KeychainError.dataFormatError
                 }
@@ -621,24 +637,16 @@
                     throw KeychainError.unableToCreateKey
                 }
 
-                do {
-                    let key = try P256.Signing.PrivateKey(x963Representation: keyData as Data)
-                    LogManager.logDebug(
-                        "AppleKeychainStore - Successfully retrieved DPoP key as SecKey for tag \(keyTag)"
-                    )
-                    return key
-                } catch {
-                    LogManager.logError(
-                        "AppleKeychainStore - Failed to reconstruct P256 key from SecKey data: \(error)"
-                    )
-                    throw KeychainError.unableToCreateKey
-                }
+                LogManager.logDebug(
+                    "AppleKeychainStore - Successfully retrieved DPoP key representation as SecKey for tag \(keyTag)"
+                )
+                return keyData as Data
             }
 
-            private func retrieveDPoPKeyAsPasswordmacOS(
+            private func retrieveDPoPKeyRepresentationAsPasswordmacOS(
                 keyTag: String,
                 accessGroup: String?
-            ) throws -> P256.Signing.PrivateKey {
+            ) throws -> Data {
                 let passwordKey = "\(keyTag).password"
 
                 do {
@@ -647,11 +655,10 @@
                         namespace: "dpopkeys",
                         accessGroup: accessGroup
                     )
-                    let key = try P256.Signing.PrivateKey(x963Representation: data)
                     LogManager.logDebug(
-                        "AppleKeychainStore - Successfully retrieved DPoP key as password for tag \(keyTag)"
+                        "AppleKeychainStore - Successfully retrieved DPoP key representation as password for tag \(keyTag)"
                     )
-                    return key
+                    return data
                 } catch {
                     LogManager.logError(
                         "AppleKeychainStore - Failed to retrieve DPoP key as password for tag \(keyTag): \(error)"

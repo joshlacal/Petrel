@@ -45,3 +45,12 @@ public struct LanguageCodeContainer: Codable, ATProtocolCodable, Hashable, Senda
         hasher.combine(lang)
     }
 }
+
+extension LanguageCodeContainer: QueryParameterConvertible {
+    func asQueryItem(name: String) -> URLQueryItem? {
+        URLQueryItem(
+            name: name,
+            value: lang.languageCode?.identifier ?? lang.minimalIdentifier
+        )
+    }
+}
