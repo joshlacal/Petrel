@@ -102,18 +102,23 @@ class KotlinCodeGenerator(BaseCodeGenerator):
             )
 
             return self.post_process_kotlin_code(kotlin_code)
-
-        except Exception as e:
-            import traceback
-            return f"// Error generating Kotlin code: {str(e)}\n// {traceback.format_exc()}"
+        except Exception:
+            raise
 
     def generate_properties(self, properties: Dict[str, Any], required_fields: List[str],
-                           current_struct_name: str) -> List[Dict[str, Any]]:
+                           current_struct_name: str, context_identity=None) -> List[Dict[str, Any]]:
         """Generate property definitions."""
         kotlin_properties = []
 
         for name, prop in properties.items():
-            kotlin_type = self.type_converter.determine_type(name, prop, required_fields, current_struct_name)
+            if prop.get('x-security-strict-decode') and prop.get('type') != 'ref':
+                raise ValueError(
+                    f"x-security-strict-decode is supported only on ref properties: '{name}'"
+                )
+            kotlin_type = self.type_converter.determine_type(
+                name, prop, required_fields, current_struct_name,
+                context_identity=context_identity,
+            )
             description = prop.get('description', '')
             is_optional = name not in required_fields
 
@@ -167,7 +172,8 @@ class KotlinCodeGenerator(BaseCodeGenerator):
                 properties = self.generate_properties(
                     def_schema.get('properties', {}),
                     def_schema.get('required', []),
-                    class_name
+                    class_name,
+                    context_identity=("definition", name),
                 )
                 definitions.append({
                     'name': class_name,
@@ -176,6 +182,11 @@ class KotlinCodeGenerator(BaseCodeGenerator):
                     'description': def_schema.get('description', ''),
                     'security_strict_documentation': name in strict_documentation_defs,
                 })
+
+            elif def_type == 'string' and 'enum' in def_schema:
+                enum_name = self.class_name + "Defs" + convert_to_pascal_case(name)
+                identity = ("definition", self.lexicon_id, name)
+                self.enum_generator.generate_closed_string_enum(enum_name, def_schema['enum'], identity)
 
             elif def_type == 'string' and 'knownValues' in def_schema:
                 print(f"Generating enum for {name}")

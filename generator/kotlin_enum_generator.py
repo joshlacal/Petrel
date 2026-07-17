@@ -12,6 +12,8 @@ class KotlinEnumGenerator:
         self.code_generator = code_generator
         self.generated_sealed_interfaces = set()
         self.generated_enum_classes = set()
+        self.closed_enums_by_identity = {}
+        self.closed_enum_identity_by_name = {}
 
     def generate_sealed_interface_for_union(self, current_struct_name: str, prop_name: str, refs: List[str], raw_refs: List[str] = None):
         """Generate a sealed interface for a union type property."""
@@ -110,6 +112,72 @@ class KotlinEnumGenerator:
         )
 
         self.code_generator.enum_classes += enum_code + '\n\n'
+
+    @staticmethod
+    def _closed_case_identifier(value: str) -> str:
+        encoded = ''.join(
+            char if char.isascii() and char.isalnum() else f'_u{ord(char):x}_'
+            for char in value
+        )
+        return f"value_{encoded}"
+
+    @staticmethod
+    def _kotlin_string_literal(value: str) -> str:
+        escapes = {
+            '\\': '\\\\',
+            '"': '\\"',
+            '$': '\\$',
+            '\n': '\\n',
+            '\r': '\\r',
+            '\t': '\\t',
+            '\b': '\\b',
+        }
+        encoded = []
+        for char in value:
+            if char in escapes:
+                encoded.append(escapes[char])
+            elif ord(char) < 0x20 or ord(char) == 0x7f or char in ('\u2028', '\u2029'):
+                encoded.append(f"\\u{ord(char):04x}")
+            else:
+                encoded.append(char)
+        return f'"{"".join(encoded)}"'
+
+    def generate_closed_string_enum(self, enum_name: str, values: List[str], identity):
+        if not isinstance(values, list) or not all(isinstance(value, str) for value in values):
+            raise ValueError(f"closed enum '{enum_name}' values must be a list of strings")
+        if len(values) != len(set(values)):
+            raise ValueError(f"closed enum '{enum_name}' contains duplicate wire values")
+
+        vocabulary = tuple(values)
+        existing = self.closed_enums_by_identity.get(identity)
+        if existing is not None:
+            existing_name, existing_vocabulary = existing
+            if existing_name != enum_name or existing_vocabulary != vocabulary:
+                raise ValueError(f"closed enum identity {identity!r} was reused with a different schema")
+            return existing_name
+
+        owner = self.closed_enum_identity_by_name.get(enum_name)
+        if owner is not None and owner != identity:
+            raise ValueError(
+                f"closed enum type name collision for '{enum_name}': {owner!r} vs {identity!r}"
+            )
+
+        constants = [
+            {
+                'identifier': self._closed_case_identifier(value),
+                'wire_literal': self._kotlin_string_literal(value),
+            }
+            for value in values
+        ]
+        template = self.code_generator.template_manager.env.get_template('closedEnumClass.jinja')
+        enum_code = template.render(
+            enum_name=enum_name,
+            constants=constants,
+        )
+        self.code_generator.enum_classes += enum_code + '\n\n'
+        self.closed_enums_by_identity[identity] = (enum_name, vocabulary)
+        self.closed_enum_identity_by_name[enum_name] = identity
+        return enum_name
 
     def _sanitize_enum_constant(self, value: str) -> str:
         """Convert a string value to a valid Kotlin enum constant name."""

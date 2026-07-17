@@ -49,6 +49,37 @@ class SwiftOptionalLocalRefOutputTests(unittest.TestCase):
         self.assertIn("encodeIfPresent(receipt, forKey: .receipt)", generated)
         self.assertIn("case receipt", generated)
 
+    def test_required_security_strict_ref_uses_required_decode(self):
+        lexicon = {
+            "lexicon": 1,
+            "id": "blue.catbird.test.receipt",
+            "defs": {
+                "main": {
+                    "type": "procedure",
+                    "output": {
+                        "encoding": "application/json",
+                        "schema": {
+                            "type": "object",
+                            "required": ["receipt"],
+                            "properties": {
+                                "receipt": {
+                                    "type": "ref",
+                                    "ref": "#sequencerReceipt",
+                                    "x-security-strict-decode": True,
+                                }
+                            },
+                        },
+                    },
+                },
+                "sequencerReceipt": {"type": "object", "properties": {}},
+            },
+        }
+
+        generated = SwiftCodeGenerator(lexicon).convert()
+        self.assertIn("public let receipt: SequencerReceipt", generated)
+        self.assertIn("decode(SequencerReceipt.self, forKey: .receipt)", generated)
+        self.assertNotIn("An error occurred during the Swift code generation", generated)
+
     def test_kotlin_kdoc_is_narrowed_to_security_strict_referenced_definition(self):
         lexicon = {
             "lexicon": 1,

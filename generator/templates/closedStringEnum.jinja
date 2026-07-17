@@ -1,0 +1,14 @@
+public enum {{ enum_name }}: String, Codable, ATProtocolCodable, ATProtocolValue, Sendable {
+    {%- for case in cases %}
+    case {{ case.identifier }} = {{ case.wire_literal }}
+    {%- endfor %}
+
+    public func isEqual(to other: any ATProtocolValue) -> Bool {
+        guard let otherValue = other as? {{ enum_name }} else { return false }
+        return self == otherValue
+    }
+
+    public func toCBORValue() throws -> Any {
+        return rawValue
+    }
+}

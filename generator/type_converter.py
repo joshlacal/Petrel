@@ -1,11 +1,11 @@
 from typing import Dict, Any, List
-from utils import convert_to_camel_case, convert_ref
+from utils import convert_to_camel_case, convert_ref as convert_swift_ref
 
 class TypeConverter:
     def __init__(self, swift_code_generator):
         self.swift_code_generator = swift_code_generator
 
-    def _convert_ref(self, ref: str) -> str:
+    def convert_ref(self, ref: str) -> str:
         """Resolve a `ref` to a Swift type.
 
         Per the Lexicon spec, `blob`, `bytes`, and `cid-link` are valid top-level
@@ -24,22 +24,35 @@ class TypeConverter:
             target = self.swift_code_generator.defs.get(fragment)
             if isinstance(target, dict):
                 target_type = target.get('type')
+                if target_type == 'string' and 'enum' in target:
+                    return f"Defs{convert_to_camel_case(fragment)}"
                 if target_type == 'blob':
                     return 'Blob'
                 if target_type == 'bytes':
                     return 'Bytes'
                 if target_type == 'cid-link':
                     return 'CID'
-        return convert_ref(ref)
+        return convert_swift_ref(ref)
 
-    def determine_swift_type(self, name: str, prop: Dict[str, Any], required_fields: List[str], current_struct_name: str, isOptional: bool = None) -> str:
+    def determine_swift_type(self, name: str, prop: Dict[str, Any], required_fields: List[str], current_struct_name: str, isOptional: bool = None, context_identity=None) -> str:
         swift_type = ""
         prop_type = prop.get('type')
         string_format = prop.get('format')
         is_optional = "?" if isOptional or name not in required_fields else ""
 
         if prop_type == 'string':
-            if string_format == 'datetime':
+            if 'enum' in prop:
+                swift_type = f"{convert_to_camel_case(current_struct_name)}{convert_to_camel_case(name)}"
+                identity = (
+                    "inline",
+                    self.swift_code_generator.lexicon_id,
+                    context_identity if context_identity is not None else ("rendered", current_struct_name),
+                    name,
+                )
+                self.swift_code_generator.enum_generator.generate_closed_string_enum(
+                    swift_type, prop['enum'], identity
+                )
+            elif string_format == 'datetime':
                 swift_type = "ATProtocolDate"
             elif string_format == 'uri':
                 swift_type = "URI" 
@@ -64,7 +77,7 @@ class TypeConverter:
             else:
                 swift_type = "String"
         elif prop_type == 'ref':
-            swift_type = self._convert_ref(prop['ref'])
+            swift_type = self.convert_ref(prop['ref'])
         elif prop_type == 'integer':
             swift_type = "Int" 
         elif prop_type == 'number':
@@ -97,7 +110,10 @@ class TypeConverter:
                 self.swift_code_generator.enum_generator.generate_enum_for_union(current_struct_name, name, refs)
                 item_type = union_name
             else:
-                item_type = self.determine_swift_type(name, items, required_fields, current_struct_name, isOptional=False)
+                item_type = self.determine_swift_type(
+                    name, items, required_fields, current_struct_name,
+                    isOptional=False, context_identity=context_identity,
+                )
             swift_type = f"[{item_type}]"
         else:
             swift_type = prop_type.capitalize()
