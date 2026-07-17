@@ -1,5 +1,5 @@
 {
-  "originHash" : "26efc1c345dec14a8ba28f13d74dc2e50c214b869d99432699f4df6fbf747b46",
+  "originHash" : "97da99090802b1458b717e666abfeef75a4e81a506483e9c36fee80401447d89",
   "pins" : [
     {
       "identity" : "cryptoswift",
@@ -42,8 +42,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-async-dns-resolver",
       "state" : {
-        "revision" : "08c07ff31a745ee5e522ac10132fb4949834d925",
-        "version" : "0.4.0"
+        "revision" : "e145f21e97cc40ee744e1276b21426ed47ab9d88",
+        "version" : "0.7.1"
       }
     },
     {
@@ -96,8 +96,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/valpackett/SwiftCBOR.git",
       "state" : {
-        "revision" : "04ccff117f6549121d5721ec84fdf0162122b90e",
-        "version" : "0.5.0"
+        "revision" : "fd929a6d8f7651ce0f63fc99397fd5762358cc29",
+        "version" : "0.6.0"
       }
     },
     {
