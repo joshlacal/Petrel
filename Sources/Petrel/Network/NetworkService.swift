@@ -662,7 +662,6 @@ public actor NetworkService: NetworkServiceProtocol {
         ]
 
         config.httpMaximumConnectionsPerHost = 5
-        config.httpShouldUsePipelining = true
         #if DEBUG
             config.protocolClasses = Self.networkTestProtocolClassesLock.withLock {
                 Self.networkTestProtocolClasses
@@ -681,7 +680,6 @@ public actor NetworkService: NetworkServiceProtocol {
         exactConfig.urlCredentialStorage = nil
         exactConfig.urlCache = nil
         exactConfig.httpMaximumConnectionsPerHost = 1
-        exactConfig.httpShouldUsePipelining = false
         #if DEBUG
             exactConfig.protocolClasses = Self.networkTestProtocolClassesLock.withLock {
                 Self.networkTestProtocolClasses
