@@ -66,5 +66,30 @@
                 }
             }
         }
+
+        @Test("One zeroizing master key supports concurrent operations")
+        func concurrentRoundTrips() async throws {
+            let directory = FileManager.default.temporaryDirectory
+                .appendingPathComponent("petrel-file-store-concurrency-\(UUID().uuidString)")
+            defer { try? FileManager.default.removeItem(at: directory) }
+            let store = try FileEncryptedStore(
+                storageDirectory: directory,
+                masterKey: SymmetricKey(size: .bits256)
+            )
+
+            try await withThrowingTaskGroup(of: Bool.self) { group in
+                for index in 0 ..< 32 {
+                    group.addTask {
+                        let key = "token-\(index)"
+                        let expected = Data("private-value-\(index)".utf8)
+                        try store.store(key: key, value: expected, namespace: "test", accessGroup: nil)
+                        return try store.retrieve(key: key, namespace: "test", accessGroup: nil) == expected
+                    }
+                }
+                for try await matched in group {
+                    #expect(matched)
+                }
+            }
+        }
     }
 #endif

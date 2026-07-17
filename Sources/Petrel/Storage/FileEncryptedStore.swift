@@ -13,15 +13,71 @@
         @preconcurrency import Crypto
     #endif
     import Foundation
-    import Synchronization
+    #if canImport(Darwin)
+        import Darwin
+    #elseif canImport(Glibc)
+        import Glibc
+    #endif
 
     /// Secure storage implementation using AES-GCM encrypted files
     /// Suitable for server environments and as a fallback when system keyring is unavailable
     final class FileEncryptedStore: SecureStorage {
+        /// Immutable key bytes kept outside general-purpose collection storage.
+        /// The allocation is explicitly cleared before release. Keeping only its
+        /// integer address and length as stored state also avoids transferring a
+        /// non-Sendable CryptoKit value across the `SecureStorage` boundary.
+        private final class ZeroizingMasterKey: Sendable {
+            private let address: UInt
+            private let count: Int
+
+            init(copying key: SymmetricKey) throws {
+                let copy = try key.withUnsafeBytes { bytes -> (address: UInt, count: Int) in
+                    guard let source = bytes.baseAddress, !bytes.isEmpty else {
+                        throw FileEncryptedStoreError.invalidConfiguration
+                    }
+                    let allocation = UnsafeMutableRawPointer.allocate(
+                        byteCount: bytes.count,
+                        alignment: MemoryLayout<UInt8>.alignment
+                    )
+                    allocation.copyMemory(from: source, byteCount: bytes.count)
+                    return (UInt(bitPattern: allocation), bytes.count)
+                }
+                address = copy.address
+                count = copy.count
+            }
+
+            deinit {
+                guard let allocation = UnsafeMutableRawPointer(bitPattern: address) else { return }
+                #if canImport(Darwin)
+                    _ = memset_s(allocation, count, 0, count)
+                #elseif canImport(Glibc)
+                    explicit_bzero(allocation, count)
+                #else
+                    allocation.initializeMemory(as: UInt8.self, repeating: 0, count: count)
+                #endif
+                allocation.deallocate()
+            }
+
+            func seal(_ plaintext: Data) throws -> AES.GCM.SealedBox {
+                let key = SymmetricKey(data: bytes)
+                return try AES.GCM.seal(plaintext, using: key)
+            }
+
+            func open(_ box: AES.GCM.SealedBox) throws -> Data {
+                let key = SymmetricKey(data: bytes)
+                return try AES.GCM.open(box, using: key)
+            }
+
+            private var bytes: UnsafeRawBufferPointer {
+                UnsafeRawBufferPointer(
+                    start: UnsafeRawPointer(bitPattern: address),
+                    count: count
+                )
+            }
+        }
+
         private let storageDirectory: URL
-        /// Owns the zeroizing CryptoKit key behind a synchronization boundary.
-        /// Raw key bytes are never retained in a general-purpose `Data` buffer.
-        private let masterKey: Mutex<SymmetricKey>
+        private let masterKey: ZeroizingMasterKey
 
         enum FileEncryptedStoreError: Error, LocalizedError {
             case encryptionFailed
@@ -63,17 +119,17 @@
 
             // Get or create master key from environment or generate
             if let key = masterKey {
-                self.masterKey = Mutex(key)
+                self.masterKey = try ZeroizingMasterKey(copying: key)
             } else if let keyB64 = ProcessInfo.processInfo.environment["PETREL_MASTER_KEY"] {
                 guard let keyData = Data(base64Encoded: keyB64) else {
                     throw FileEncryptedStoreError.invalidConfiguration
                 }
-                self.masterKey = Mutex(SymmetricKey(data: keyData))
+                self.masterKey = try ZeroizingMasterKey(copying: SymmetricKey(data: keyData))
             } else {
                 // Generate and warn
                 let generatedKey = SymmetricKey(size: .bits256)
-                self.masterKey = Mutex(generatedKey)
                 let keyB64 = generatedKey.withUnsafeBytes { Data($0).base64EncodedString() }
+                self.masterKey = try ZeroizingMasterKey(copying: generatedKey)
                 LogManager.logWarning("""
                 FileEncryptedStore: Generated ephemeral master key. Secrets will be lost on restart.
                 Set PETREL_MASTER_KEY environment variable to persist secrets across restarts.
@@ -95,9 +151,7 @@
         }
 
         func store(key: String, value: Data, namespace: String, accessGroup: String?) throws {
-            let sealed = try masterKey.withLock { key in
-                try AES.GCM.seal(value, using: key)
-            }
+            let sealed = try masterKey.seal(value)
             guard let combined = sealed.combined else {
                 throw FileEncryptedStoreError.encryptionFailed
             }
@@ -112,9 +166,7 @@
             }
             let combined = try Data(contentsOf: url)
             let box = try AES.GCM.SealedBox(combined: combined)
-            let decrypted = try masterKey.withLock { key in
-                try AES.GCM.open(box, using: key)
-            }
+            let decrypted = try masterKey.open(box)
             LogManager.logDebug("FileEncryptedStore: Retrieved key \(namespace).\(key)")
             return decrypted
         }
