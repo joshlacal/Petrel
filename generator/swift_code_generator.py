@@ -75,6 +75,12 @@ class SwiftCodeGenerator:
                 raise ValueError(
                     f"x-security-strict-decode is supported only on ref properties: '{name}'"
                 )
+            strict_allowed_keys_literal = None
+            if strict_decode:
+                strict_allowed_keys_literal = ", ".join(
+                    json.dumps(key)
+                    for key in self.resolve_strict_ref_allowed_keys(prop['ref'])
+                )
 
             # Check if this property should be boxed to break a circular reference
             should_box = False
@@ -94,8 +100,52 @@ class SwiftCodeGenerator:
                 'strict_decode': strict_decode,
                 # Kept for the output template's established compatibility branch.
                 'strict_optional_decode': strict_decode,
+                'strict_allowed_keys_literal': strict_allowed_keys_literal,
             })
         return swift_properties
+
+    def resolve_strict_ref_allowed_keys(self, ref: str) -> List[str]:
+        nsid, separator, fragment = ref.partition('#')
+        if not nsid or nsid == self.lexicon_id:
+            target_name = fragment if separator else 'main'
+            schema = self.defs.get(target_name)
+            qualified_ref = (
+                self.lexicon_id
+                if target_name == 'main'
+                else f"{self.lexicon_id}#{target_name}"
+            )
+        else:
+            qualified_ref = nsid if not separator or fragment == 'main' else ref
+            registry = getattr(self.cycle_detector, 'schemas_by_ref', None)
+            schema = registry.get(qualified_ref) if registry is not None else None
+
+        if not isinstance(schema, dict):
+            raise ValueError(
+                f"strict reference '{ref}' cannot be resolved to a canonical schema"
+            )
+
+        schema_type = schema.get('type')
+        if schema_type == 'record':
+            object_schema = schema.get('record')
+            extra_keys = ['$type']
+        elif schema_type == 'object':
+            object_schema = schema
+            extra_keys = []
+        else:
+            raise ValueError(
+                f"strict reference '{qualified_ref}' must target an object or record schema"
+            )
+
+        properties = (
+            object_schema.get('properties')
+            if isinstance(object_schema, dict)
+            else None
+        )
+        if not isinstance(properties, dict):
+            raise ValueError(
+                f"strict reference '{qualified_ref}' has no canonical object properties"
+            )
+        return sorted(set(properties.keys()) | set(extra_keys))
 
     def generate_query_parameters(self, parameters: Optional[Dict[str, Any]]) -> str:
         if not parameters:

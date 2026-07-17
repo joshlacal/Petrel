@@ -11,6 +11,15 @@ sys.path.insert(0, str(GENERATOR_DIR))
 
 from kotlin_code_generator import KotlinCodeGenerator
 from swift_code_generator import SwiftCodeGenerator
+from cycle_detector import CycleDetector
+
+
+class BoxedStrictRefCycleDetector:
+    def should_box_property(self, type_name, property_name):
+        return property_name in {"child", "optionalStrict"}
+
+    def should_be_indirect(self, _type_name):
+        return False
 
 
 def strict_ref_lexicon():
@@ -49,6 +58,7 @@ def strict_ref_lexicon():
                 "properties": {
                     "sequence": {"type": "integer"},
                     "note": {"type": "string"},
+                    "child": {"type": "ref", "ref": "#receipt"},
                 },
             },
             "envelope": {
@@ -56,6 +66,11 @@ def strict_ref_lexicon():
                 "required": ["requiredStrict"],
                 "properties": {
                     "requiredStrict": {
+                        "type": "ref",
+                        "ref": "#receipt",
+                        "x-security-strict-decode": True,
+                    },
+                    "optionalStrict": {
                         "type": "ref",
                         "ref": "#receipt",
                         "x-security-strict-decode": True,
@@ -68,8 +83,57 @@ def strict_ref_lexicon():
 
 
 class StrictRefUnknownKeysTests(unittest.TestCase):
+    def test_external_strict_ref_uses_corpus_registry_and_unresolved_refs_fail(self):
+        external = {
+            "lexicon": 1,
+            "id": "blue.catbird.test.externalStrictRef",
+            "defs": {
+                "main": {
+                    "type": "procedure",
+                    "input": {
+                        "encoding": "application/json",
+                        "schema": {
+                            "type": "object",
+                            "required": ["receipt"],
+                            "properties": {
+                                "receipt": {
+                                    "type": "ref",
+                                    "ref": "blue.catbird.test.receipt#main",
+                                    "x-security-strict-decode": True,
+                                }
+                            },
+                        },
+                    },
+                }
+            },
+        }
+        registry = CycleDetector()
+        registry.add_type(
+            "blue.catbird.test.receipt",
+            "main",
+            {
+                "type": "object",
+                "properties": {
+                    "sequence": {"type": "integer"},
+                    "signature": {"type": "bytes"},
+                },
+            },
+        )
+
+        swift = SwiftCodeGenerator(external, registry).convert()
+        kotlin = KotlinCodeGenerator(external, registry).convert()
+        self.assertIn('allowedKeys: ["sequence", "signature"]', swift)
+        self.assertIn('setOf("sequence", "signature")', kotlin)
+
+        with self.assertRaisesRegex(ValueError, "cannot be resolved"):
+            SwiftCodeGenerator(external).convert()
+        with self.assertRaisesRegex(ValueError, "cannot be resolved"):
+            KotlinCodeGenerator(external).convert()
+
     def test_swift_strict_refs_reject_unknown_nested_keys_but_ordinary_ref_accepts(self):
-        generated = SwiftCodeGenerator(strict_ref_lexicon()).convert()
+        generated = SwiftCodeGenerator(
+            strict_ref_lexicon(), BoxedStrictRefCycleDetector()
+        ).convert()
         declarations = generated.split("extension ATProtoClient", 1)[0]
         source = textwrap.dedent(
             f"""
@@ -81,6 +145,15 @@ class StrictRefUnknownKeysTests(unittest.TestCase):
             public struct OrderedCBORMap {{
                 public init() {{}}
                 public func adding(key: String, value: Any) -> Self {{ self }}
+            }}
+            public final class IndirectBox<T: Codable & Equatable & Hashable>:
+                Codable, Equatable, Hashable {{
+                public let value: T
+                public init(_ value: T) {{ self.value = value }}
+                public static func == (lhs: IndirectBox, rhs: IndirectBox) -> Bool {{
+                    lhs.value == rhs.value
+                }}
+                public func hash(into hasher: inout Hasher) {{ hasher.combine(value) }}
             }}
             public enum LogManager {{
                 public static func logError(_ message: String) {{}}
@@ -120,6 +193,26 @@ class StrictRefUnknownKeysTests(unittest.TestCase):
                 )) == nil
             )
 
+            let namedOptionalInjection = Data(
+                #"{{"requiredStrict":{{"sequence":1}},"optionalStrict":{{"sequence":2,"extension":"attacker"}}}}"#.utf8
+            )
+            precondition(
+                (try? decoder.decode(
+                    BlueCatbirdTestStrictRefUnknownKeys.Envelope.self,
+                    from: namedOptionalInjection
+                )) == nil
+            )
+
+            let boxedStorageInjection = Data(
+                #"{{"requiredStrict":{{"sequence":1,"_child":null}}}}"#.utf8
+            )
+            precondition(
+                (try? decoder.decode(
+                    BlueCatbirdTestStrictRefUnknownKeys.Input.self,
+                    from: boxedStorageInjection
+                )) == nil
+            )
+
             let ordinaryExtension = Data(
                 #"{{"requiredStrict":{{"sequence":1}},"ordinary":{{"sequence":3,"extension":"compatible"}}}}"#.utf8
             )
@@ -149,7 +242,15 @@ class StrictRefUnknownKeysTests(unittest.TestCase):
             executable_path = pathlib.Path(directory) / "StrictRef"
             source_path.write_text(source)
             compile_result = subprocess.run(
-                ["swiftc", str(source_path), "-o", str(executable_path)],
+                [
+                    "xcrun",
+                    "--toolchain",
+                    "XcodeDefault",
+                    "swiftc",
+                    str(source_path),
+                    "-o",
+                    str(executable_path),
+                ],
                 capture_output=True,
                 text=True,
             )
@@ -157,7 +258,14 @@ class StrictRefUnknownKeysTests(unittest.TestCase):
             run_result = subprocess.run(
                 [str(executable_path)], capture_output=True, text=True
             )
-            self.assertEqual(run_result.returncode, 0, run_result.stderr)
+            numbered_source = "\n".join(
+                f"{number}: {line}"
+                for number, line in enumerate(source.splitlines(), start=1)
+                if 440 <= number <= 470
+            )
+            self.assertEqual(
+                run_result.returncode, 0, run_result.stderr + "\n" + numbered_source
+            )
 
     def test_kotlin_strict_refs_reject_unknown_nested_keys_with_production_json(self):
         generated = KotlinCodeGenerator(strict_ref_lexicon()).convert()
@@ -186,6 +294,16 @@ class StrictRefUnknownKeysTests(unittest.TestCase):
                     assertFailsWith<SerializationException> {{
                         json.decodeFromString<BlueCatbirdTestStrictRefUnknownKeysInput>(
                             """{{"requiredStrict":{{"sequence":1,"extension":"attacker"}}}}"""
+                        )
+                    }}
+                    assertFailsWith<SerializationException> {{
+                        json.decodeFromString<BlueCatbirdTestStrictRefUnknownKeysEnvelope>(
+                            """{{"requiredStrict":{{"sequence":1}},"optionalStrict":{{"sequence":2,"extension":"attacker"}}}}"""
+                        )
+                    }}
+                    assertFailsWith<SerializationException> {{
+                        json.decodeFromString<BlueCatbirdTestStrictRefUnknownKeysInput>(
+                            """{{"requiredStrict":{{"sequence":1,"_child":null}}}}"""
                         )
                     }}
                     assertFailsWith<SerializationException> {{

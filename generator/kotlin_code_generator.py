@@ -1,6 +1,7 @@
 """
 Kotlin code generator - generates Kotlin code from AT Protocol lexicons.
 """
+import json
 from typing import Dict, List, Any, Optional
 from base_code_generator import BaseCodeGenerator
 from kotlin_type_converter import KotlinTypeConverter, convert_to_pascal_case
@@ -127,6 +128,7 @@ class KotlinCodeGenerator(BaseCodeGenerator):
             strict_decode = bool(prop.get('x-security-strict-decode'))
             strict_serializer = None
             if strict_decode:
+                allowed_keys = self.resolve_strict_ref_allowed_keys(prop['ref'])
                 strict_serializer = (
                     current_struct_name
                     + convert_to_pascal_case(name)
@@ -136,6 +138,9 @@ class KotlinCodeGenerator(BaseCodeGenerator):
                     serializer_name=strict_serializer,
                     target_type=kotlin_type.rstrip('?'),
                     nullable=is_optional,
+                    allowed_keys_literal=", ".join(
+                        json.dumps(key) for key in allowed_keys
+                    ),
                 )
                 existing_source = self.strict_ref_serializers.get(strict_serializer)
                 if existing_source is not None and existing_source != serializer_source:
@@ -154,6 +159,49 @@ class KotlinCodeGenerator(BaseCodeGenerator):
             })
 
         return kotlin_properties
+
+    def resolve_strict_ref_allowed_keys(self, ref: str) -> List[str]:
+        nsid, separator, fragment = ref.partition('#')
+        if not nsid or nsid == self.lexicon_id:
+            target_name = fragment if separator else 'main'
+            schema = self.defs.get(target_name)
+            qualified_ref = (
+                self.lexicon_id
+                if target_name == 'main'
+                else f"{self.lexicon_id}#{target_name}"
+            )
+        else:
+            qualified_ref = nsid if not separator or fragment == 'main' else ref
+            registry = getattr(self.cycle_detector, 'schemas_by_ref', None)
+            schema = registry.get(qualified_ref) if registry is not None else None
+
+        if not isinstance(schema, dict):
+            raise ValueError(
+                f"strict reference '{ref}' cannot be resolved to a canonical schema"
+            )
+
+        schema_type = schema.get('type')
+        if schema_type == 'record':
+            object_schema = schema.get('record')
+            extra_keys = {'$type'}
+        elif schema_type == 'object':
+            object_schema = schema
+            extra_keys = set()
+        else:
+            raise ValueError(
+                f"strict reference '{qualified_ref}' must target an object or record schema"
+            )
+
+        properties = (
+            object_schema.get('properties')
+            if isinstance(object_schema, dict)
+            else None
+        )
+        if not isinstance(properties, dict):
+            raise ValueError(
+                f"strict reference '{qualified_ref}' has no canonical object properties"
+            )
+        return sorted(set(properties.keys()) | extra_keys)
 
     def generate_main_properties(self) -> str:
         """Generate properties for main object type."""

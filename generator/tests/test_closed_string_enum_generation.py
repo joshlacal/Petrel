@@ -337,7 +337,10 @@ class ClosedStringEnumGenerationTests(unittest.TestCase):
             executable_path = pathlib.Path(directory) / "NamedRef"
             source_path.write_text(source)
             compile_result = subprocess.run(
-                ["swiftc", str(source_path), "-o", str(executable_path)],
+                [
+                    "xcrun", "--toolchain", "XcodeDefault", "swiftc",
+                    str(source_path), "-o", str(executable_path),
+                ],
                 capture_output=True,
                 text=True,
             )
@@ -351,11 +354,13 @@ class ClosedStringEnumGenerationTests(unittest.TestCase):
         self.assertNotIn("An error occurred during the Swift code generation", generated)
         self.assertIn("public let receipt: Receipt", generated)
         self.assertIn(
-            "decodeStrictReference(Receipt.self, from: container, forKey: .receipt)",
+            "decodeStrictReference(Receipt.self, from: container, forKey: .receipt, "
+            "allowedKeys: [\"sequence\"])",
             generated,
         )
         self.assertIn(
-            "decodeStrictReference(Receipt.self, from: container, forKey: .optionalStrict)",
+            "decodeStrictReference(Receipt.self, from: container, forKey: "
+            ".optionalStrict, allowedKeys: [\"sequence\"])",
             generated,
         )
         self.assertNotIn("property 'optionalStrict' — degrading to nil", generated)
@@ -423,7 +428,10 @@ class ClosedStringEnumGenerationTests(unittest.TestCase):
             executable_path = pathlib.Path(directory) / "ClosedEnum"
             source_path.write_text(source)
             subprocess.run(
-                ["swiftc", str(source_path), "-o", str(executable_path)],
+                [
+                    "xcrun", "--toolchain", "XcodeDefault", "swiftc",
+                    str(source_path), "-o", str(executable_path),
+                ],
                 check=True,
                 capture_output=True,
                 text=True,
@@ -585,7 +593,10 @@ class ClosedStringEnumGenerationTests(unittest.TestCase):
             executable_path = pathlib.Path(directory) / "AdversarialClosedEnum"
             source_path.write_text(swift_source)
             compile_result = subprocess.run(
-                ["swiftc", str(source_path), "-o", str(executable_path)],
+                [
+                    "xcrun", "--toolchain", "XcodeDefault", "swiftc",
+                    str(source_path), "-o", str(executable_path),
+                ],
                 capture_output=True,
                 text=True,
             )

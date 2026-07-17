@@ -31,11 +31,7 @@ private object {{ serializer_name }} : KSerializer<{{ target_type }}{% if nullab
         {% endif %}
         val objectValue = element as? JsonObject
             ?: throw SerializationException("Strict reference must be a JSON object")
-        val allowedKeys = buildSet {
-            repeat(delegate.descriptor.elementsCount) { index ->
-                add(delegate.descriptor.getElementName(index))
-            }
-        }
+        val allowedKeys = setOf({{ allowed_keys_literal }})
         val unknownKeys = objectValue.keys - allowedKeys
         if (unknownKeys.isNotEmpty()) {
             throw SerializationException(
