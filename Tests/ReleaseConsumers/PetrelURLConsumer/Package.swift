@@ -8,7 +8,7 @@ let package = Package(
         .macOS(.v15),
     ],
     dependencies: [
-        .package(url: "https://github.com/joshlacal/Petrel.git", exact: "0.2.0"),
+        .package(url: "https://github.com/joshlacal/Petrel.git", exact: "1.0.1"),
     ],
     targets: [
         .executableTarget(

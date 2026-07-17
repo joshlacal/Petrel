@@ -161,7 +161,7 @@ fail!("Swift workflow root must be a mapping") unless swift_workflow.is_a?(Hash)
 fail!("DocC workflow root must be a mapping") unless docc_workflow.is_a?(Hash)
 
 workflow_control_fingerprints = {
-  "release" => "5f179e79039184718e2190e141e43e018f33997d8af60b7ebd371cd21e769927",
+  "release" => "38e4ed77921be384cfcde4c4e42b34087cb4cff76fa74ac91097068392601122",
   "Swift compatibility" => "5e922b17616b7bab0ae33cb90d7f4ffce6632e91eff63cf225b40d16bf1e215f",
 }
 [
@@ -374,7 +374,7 @@ expected_permissions = {"contents" => "read"}
 fail!("workflow permissions must be contents: read") unless workflow["permissions"] == expected_permissions
 fail!("Swift workflow permissions must be contents: read") unless swift_workflow["permissions"] == expected_permissions
 fail!("DocC default permissions must be contents: read") unless docc_workflow["permissions"] == expected_permissions
-fail!("expected release version must be exactly 0.2.0") unless workflow.dig("env", "EXPECTED_RELEASE_VERSION") == "0.2.0"
+fail!("expected release version must be exactly 1.0.1") unless workflow.dig("env", "EXPECTED_RELEASE_VERSION") == "1.0.1"
 jobs = workflow["jobs"]
 fail!("jobs must be a mapping") unless jobs.is_a?(Hash)
 
@@ -835,7 +835,7 @@ end
   end
 end
 
-expected_container = "swift:6.0.3-jammy@sha256:f0bfe313779a0bb99db87f97c88ea6ada014aa6b3359f9c5583bf70b0b721217"
+expected_container = "swift:6.1.2-jammy@sha256:5910655d205a5a54b0b9efdf72c4066a8de1932513fdc81793e2544b5d5a0709"
 fail!("linux container is not the pinned Swift image") unless linux["container"] == expected_container
 
 consumer = "Tests/ReleaseConsumers/PetrelURLConsumer"
@@ -870,8 +870,8 @@ end
 # messages, while these canonical fingerprints cover every remaining parsed
 # workflow, job, and step control surface without depending on shell spellings.
 complete_workflow_fingerprints = {
-  "release" => "3a28ae18f4f4215b009566f51d445b8aee5dbe5101b1de7f36da06f09015d5e3",
-  "Swift compatibility" => "53000fea50e642c60a40f24cb06a0c077c5c1ee50a21e093f27ac8779740a3bd",
+  "release" => "3db1a2bd1ae951e59a138c7643ffb3ae680cc76b7e2a0cd44336e19c1409c639",
+  "Swift compatibility" => "a79abc7627a6d4db03844deed88739a9e8b2ffb3e3c53f3e27e6527621e24599",
   "DocC" => "c30190bbe4dbf04d1797b218953fd2a118e5ba6a847c774e296fcdd2c6b8b128",
 }
 [

@@ -115,9 +115,9 @@ jobs:
           fi
 
   linux:
-    name: Linux (Swift 6.0.3)
+    name: Linux (Swift 6.1.2)
     runs-on: ubuntu-24.04
-    container: swift:6.0.3-jammy@sha256:f0bfe313779a0bb99db87f97c88ea6ada014aa6b3359f9c5583bf70b0b721217
+    container: swift:6.1.2-jammy@sha256:5910655d205a5a54b0b9efdf72c4066a8de1932513fdc81793e2544b5d5a0709
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
@@ -131,7 +131,7 @@ jobs:
           set -euo pipefail
           RELEASE_SWIFT=$(command -v swift)
           [[ $RELEASE_SWIFT == /* ]]
-          test "$("$RELEASE_SWIFT" --version | head -n 1)" = 'Swift version 6.0.3 (swift-6.0.3-RELEASE)'
+          test "$("$RELEASE_SWIFT" --version | head -n 1)" = 'Swift version 6.1.2 (swift-6.1.2-RELEASE)'
           printf 'RELEASE_SWIFT=%s\n' "$RELEASE_SWIFT" >> "$GITHUB_ENV"
       - name: Build, test, and reject package-owned warnings
         shell: bash

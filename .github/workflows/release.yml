@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 env:
-  EXPECTED_RELEASE_VERSION: '0.2.0'
+  EXPECTED_RELEASE_VERSION: '1.0.1'
 
 concurrency:
   group: petrel-release-${{ github.ref }}
@@ -168,7 +168,7 @@ jobs:
   linux:
     name: Linux release gate
     runs-on: ubuntu-24.04
-    container: swift:6.0.3-jammy@sha256:f0bfe313779a0bb99db87f97c88ea6ada014aa6b3359f9c5583bf70b0b721217
+    container: swift:6.1.2-jammy@sha256:5910655d205a5a54b0b9efdf72c4066a8de1932513fdc81793e2544b5d5a0709
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
@@ -182,7 +182,7 @@ jobs:
           set -euo pipefail
           RELEASE_SWIFT=$(command -v swift)
           [[ $RELEASE_SWIFT == /* ]]
-          test "$("$RELEASE_SWIFT" --version | head -n 1)" = 'Swift version 6.0.3 (swift-6.0.3-RELEASE)'
+          test "$("$RELEASE_SWIFT" --version | head -n 1)" = 'Swift version 6.1.2 (swift-6.1.2-RELEASE)'
           printf 'RELEASE_SWIFT=%s\n' "$RELEASE_SWIFT" >> "$GITHUB_ENV"
       - name: Build, test, and reject package-owned warnings
         shell: bash
@@ -261,7 +261,7 @@ jobs:
           test ! -e "$TMP/consumer/.swiftpm/configuration/mirrors.json"
           test ! -e "$TMP/home/.swiftpm/configuration/mirrors.json"
           test -z "$(find "$TMP/swiftpm-config" -mindepth 1 -print -quit)"
-          grep -F '.package(url: "https://github.com/joshlacal/Petrel.git", exact: "0.2.0")' \
+          grep -F '.package(url: "https://github.com/joshlacal/Petrel.git", exact: "1.0.1")' \
             "$TMP/consumer/Package.swift" >/dev/null
           test -z "$(grep -E '\.package\(path:' "$TMP/consumer/Package.swift" || true)"
           test -z "$(env HOME="$TMP/home" XDG_CACHE_HOME="$TMP/xdg-cache" \
