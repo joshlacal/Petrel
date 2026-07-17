@@ -70,8 +70,8 @@ class SwiftCodeGenerator:
             )
             description = prop.get('description', '')
             is_optional = name not in required_fields
-            strict_optional_decode = prop.get('x-security-strict-decode', False)
-            if strict_optional_decode and prop.get('type') != 'ref':
+            strict_decode = prop.get('x-security-strict-decode', False)
+            if strict_decode and prop.get('type') != 'ref':
                 raise ValueError(
                     f"x-security-strict-decode is supported only on ref properties: '{name}'"
                 )
@@ -91,7 +91,9 @@ class SwiftCodeGenerator:
                 'optional': is_optional,
                 'description': description,
                 'boxed': should_box,
-                'strict_optional_decode': strict_optional_decode,
+                'strict_decode': strict_decode,
+                # Kept for the output template's established compatibility branch.
+                'strict_optional_decode': strict_decode,
             })
         return swift_properties
 

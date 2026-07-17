@@ -1,3 +1,4 @@
+{% set strict_ref_properties = properties | selectattr('strict_decode') | list %}
 {% if is_type_alias %}
     public typealias Output = {{ type_alias_target }}
     {% else %}
@@ -35,10 +36,17 @@
             {% if properties and properties|length > 0 %}
             let container = try decoder.container(keyedBy: CodingKeys.self)
             {%- for prop in properties %}
+            {% if prop.strict_decode %}
             {% if prop.optional %}
-            {% if prop.strict_optional_decode %}
-            self.{{ prop.name }} = try container.decodeIfPresent({{ prop.type }}.self, forKey: .{{ prop.name }})
+            if container.contains(.{{ prop.name }}), try !container.decodeNil(forKey: .{{ prop.name }}) {
+                self.{{ prop.name }} = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name }})
+            } else {
+                self.{{ prop.name }} = nil
+            }
             {% else %}
+            self.{{ prop.name }} = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name }})
+            {% endif %}
+            {% elif prop.optional %}
             do {
                 self.{{ prop.name }} = try container.decodeIfPresent({{ prop.type }}.self, forKey: .{{ prop.name }})
             } catch {
@@ -46,7 +54,6 @@
                 LogManager.logWarning("Decoding error for optional property '{{ prop.name }}' — degrading to nil: \(error)")
                 self.{{ prop.name }} = nil
             }
-            {% endif %}
             {% else %}
             self.{{ prop.name }} = try container.decode({{ prop.type }}.self, forKey: .{{ prop.name }})
             {% endif %}
@@ -108,6 +115,10 @@
         }
         
         {% if properties and properties|length > 0 %}
+        {% if strict_ref_properties %}
+        {% include 'strictRefDecoding.jinja' %}
+        {% endif %}
+
         private enum CodingKeys: String, CodingKey {
             {%- for prop in properties %}
             case {{ prop.name }}

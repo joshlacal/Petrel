@@ -1,3 +1,4 @@
+{%- set strict_ref_properties = properties | selectattr('strict_decode') | list %}
 {%- for prop in properties %}
         public let {{ prop.name }}: {{ prop.type }}{% if prop.optional %}?{% endif %}
         {%- endfor %}
@@ -13,7 +14,17 @@
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             {%- for prop in properties %}
+            {% if prop.strict_decode -%}
             {% if prop.optional -%}
+            if container.contains(.{{ prop.name }}), try !container.decodeNil(forKey: .{{ prop.name }}) {
+                self.{{ prop.name }} = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name }})
+            } else {
+                self.{{ prop.name }} = nil
+            }
+            {%- else -%}
+            self.{{ prop.name }} = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name }})
+            {%- endif %}
+            {%- elif prop.optional -%}
             do {
                 self.{{ prop.name }} = try container.decodeIfPresent({{ prop.type }}.self, forKey: .{{ prop.name }})
             } catch {
@@ -83,6 +94,10 @@
             {%- endfor %}
             return map
         }
+
+        {% if strict_ref_properties %}
+        {% include 'strictRefDecoding.jinja' %}
+        {% endif %}
 
         private enum CodingKeys: String, CodingKey {
             case typeIdentifier = "$type"

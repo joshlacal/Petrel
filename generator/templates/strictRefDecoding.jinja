@@ -1,0 +1,50 @@
+        private struct StrictReferenceCodingKey: CodingKey {
+            let stringValue: String
+            let intValue: Int? = nil
+
+            init?(stringValue: String) {
+                self.stringValue = stringValue
+            }
+
+            init?(intValue: Int) {
+                return nil
+            }
+        }
+
+        private static func decodeStrictReference<T: Codable>(
+            _ type: T.Type,
+            from container: KeyedDecodingContainer<CodingKeys>,
+            forKey key: CodingKeys
+        ) throws -> T {
+            let nestedDecoder = try container.superDecoder(forKey: key)
+            let nestedContainer = try nestedDecoder.container(keyedBy: StrictReferenceCodingKey.self)
+            let incomingKeys = Set(nestedContainer.allKeys.map(\.stringValue))
+            let value = try T(from: nestedDecoder)
+
+            // Codable has no public schema descriptor. Re-encoding supplies the wire keys
+            // emitted for present values, while Mirror retains nil optional property names.
+            // The check remains attached to this annotated property; decoding T elsewhere
+            // keeps the normal forward-compatible behavior.
+            let encoded = try JSONEncoder().encode(value)
+            guard let encodedObject = try JSONSerialization.jsonObject(with: encoded) as? [String: Any] else {
+                throw DecodingError.typeMismatch(
+                    [String: Any].self,
+                    DecodingError.Context(
+                        codingPath: nestedDecoder.codingPath,
+                        debugDescription: "Strict reference must encode as a JSON object"
+                    )
+                )
+            }
+            var allowedKeys = Set(encodedObject.keys)
+            allowedKeys.formUnion(Mirror(reflecting: value).children.compactMap(\.label))
+            let unknownKeys = incomingKeys.subtracting(allowedKeys)
+            guard unknownKeys.isEmpty else {
+                throw DecodingError.dataCorrupted(
+                    DecodingError.Context(
+                        codingPath: nestedDecoder.codingPath,
+                        debugDescription: "Strict reference contains unknown keys: \(unknownKeys.sorted())"
+                    )
+                )
+            }
+            return value
+        }

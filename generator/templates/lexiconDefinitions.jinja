@@ -1,5 +1,6 @@
 {%- for name, def_schema in lex_definitions.items() %}
         public struct {{ name }}{{ def_schema.conformance }} {
+            {%- set strict_ref_properties = def_schema.properties | selectattr('strict_decode') | list %}
             public static let typeIdentifier = "{{ lexicon_id }}#{{ def_schema.wire_fragment }}"
 
         {%- for prop in def_schema.properties %}
@@ -40,8 +41,20 @@
             let container = try decoder.container(keyedBy: CodingKeys.self)
             {%- for prop in def_schema.properties %}
             do {
-                {% if prop.boxed -%}
+                {% if prop.strict_decode -%}
                 {% if prop.optional -%}
+                if container.contains(.{{ prop.name }}), try !container.decodeNil(forKey: .{{ prop.name }}) {
+                    let decoded = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name }})
+                    self.{% if prop.boxed %}_{{ prop.name }} = IndirectBox(decoded){% else %}{{ prop.name }} = decoded{% endif %}
+                } else {
+                    self.{% if prop.boxed %}_{{ prop.name }}{% else %}{{ prop.name }}{% endif %} = nil
+                }
+                {%- else -%}
+                let decoded = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name }})
+                self.{% if prop.boxed %}_{{ prop.name }} = IndirectBox(decoded){% else %}{{ prop.name }} = decoded{% endif %}
+                {%- endif %}
+                {%- elif prop.boxed -%}
+                {% if prop.optional and not prop.strict_decode -%}
                 let decoded = try container.decodeIfPresent({{ prop.type }}.self, forKey: .{{ prop.name }})
                 self._{{ prop.name }} = decoded.map { IndirectBox($0) }
                 {%- else -%}
@@ -181,6 +194,10 @@
             return map
         }
 
+        {% if strict_ref_properties %}
+        {% include 'strictRefDecoding.jinja' %}
+        {% endif %}
+
         private enum CodingKeys: String, CodingKey {
             case typeIdentifier = "$type"
             {%- for prop in def_schema.properties %}
@@ -190,6 +207,7 @@
 
         {%- for sub_struct_name, sub_struct in def_schema.sub_structs.items() %}
         public struct {{ sub_struct_name }}{{ sub_struct.conformance }} {
+            {%- set sub_strict_ref_properties = sub_struct.properties | selectattr('strict_decode') | list %}
             public static let typeIdentifier = "{{ lexicon_id }}#{{ sub_struct.wire_fragment }}"
 
             {%- for prop in sub_struct.properties %}
@@ -209,18 +227,29 @@
                 let container = try decoder.container(keyedBy: CodingKeys.self)
                 {%- for prop in sub_struct.properties %}
                 do {
+                    {% if prop.strict_decode -%}
                     {% if prop.optional -%}
+                    if container.contains(.{{ prop.name }}), try !container.decodeNil(forKey: .{{ prop.name }}) {
+                        self.{{ prop.name }} = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name }})
+                    } else {
+                        self.{{ prop.name }} = nil
+                    }
+                    {%- else -%}
+                    self.{{ prop.name }} = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name }})
+                    {%- endif %}
+                    {%- elif prop.optional -%}
                     self.{{ prop.name }} = try container.decodeIfPresent({{ prop.type }}.self, forKey: .{{ prop.name }})
                     {%- else -%}
                     self.{{ prop.name }} = try container.decode({{ prop.type }}.self, forKey: .{{ prop.name }})
                     {%- endif %}
                 } catch {
-                    {% if prop.optional -%}
+                    {% if prop.optional and not prop.strict_decode -%}
                     LogManager.logDebug("Decoding error for optional sub-struct property '{{ prop.name }}': \(error)")
+                    self.{{ prop.name }} = nil
                     {%- else -%}
                     LogManager.logError("Decoding error for required sub-struct property '{{ prop.name }}': \(error)")
-                    {%- endif %}
                     throw error
+                    {%- endif %}
                 }
                 {%- endfor %}
                 {%- else %}
@@ -290,6 +319,10 @@
                 {%- endfor %}
                 return map
             }
+
+            {% if sub_strict_ref_properties %}
+            {% include 'strictRefDecoding.jinja' %}
+            {% endif %}
 
             private enum CodingKeys: String, CodingKey {
                 case typeIdentifier = "$type"

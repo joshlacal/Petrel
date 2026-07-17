@@ -350,8 +350,14 @@ class ClosedStringEnumGenerationTests(unittest.TestCase):
 
         self.assertNotIn("An error occurred during the Swift code generation", generated)
         self.assertIn("public let receipt: Receipt", generated)
-        self.assertIn("decode(Receipt.self, forKey: .receipt)", generated)
-        self.assertIn("decodeIfPresent(Receipt.self, forKey: .optionalStrict)", generated)
+        self.assertIn(
+            "decodeStrictReference(Receipt.self, from: container, forKey: .receipt)",
+            generated,
+        )
+        self.assertIn(
+            "decodeStrictReference(Receipt.self, from: container, forKey: .optionalStrict)",
+            generated,
+        )
         self.assertNotIn("property 'optionalStrict' — degrading to nil", generated)
         self.assertIn("decodeIfPresent(Receipt.self, forKey: .optionalOrdinary)", generated)
 

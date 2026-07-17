@@ -19,6 +19,7 @@ class KotlinCodeGenerator(BaseCodeGenerator):
         self.object_name = self.class_name + "Defs"
         self.sealed_interfaces = ""
         self.enum_classes = ""
+        self.strict_ref_serializers = {}
 
         self.template_manager = KotlinTemplateManager()
         self.type_converter = KotlinTypeConverter(self)
@@ -88,6 +89,7 @@ class KotlinCodeGenerator(BaseCodeGenerator):
                 object_name=self.object_name,
                 sealed_interfaces=self.sealed_interfaces,
                 enum_classes=self.enum_classes,
+                strict_ref_serializers="\n\n".join(self.strict_ref_serializers.values()),
                 lex_definitions=lex_definitions_code,
                 record=record_code,
                 main_properties=main_properties_code,
@@ -122,11 +124,33 @@ class KotlinCodeGenerator(BaseCodeGenerator):
             description = prop.get('description', '')
             is_optional = name not in required_fields
 
+            strict_decode = bool(prop.get('x-security-strict-decode'))
+            strict_serializer = None
+            if strict_decode:
+                strict_serializer = (
+                    current_struct_name
+                    + convert_to_pascal_case(name)
+                    + "StrictReferenceSerializer"
+                )
+                serializer_source = self.template_manager.strict_ref_serializer_template.render(
+                    serializer_name=strict_serializer,
+                    target_type=kotlin_type.rstrip('?'),
+                    nullable=is_optional,
+                )
+                existing_source = self.strict_ref_serializers.get(strict_serializer)
+                if existing_source is not None and existing_source != serializer_source:
+                    raise ValueError(
+                        f"strict reference serializer collision for '{strict_serializer}'"
+                    )
+                self.strict_ref_serializers[strict_serializer] = serializer_source
+
             kotlin_properties.append({
                 'name': name,
                 'type': kotlin_type,
                 'optional': is_optional,
-                'description': description
+                'description': description,
+                'strict_decode': strict_decode,
+                'strict_serializer': strict_serializer,
             })
 
         return kotlin_properties

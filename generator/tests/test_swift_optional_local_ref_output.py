@@ -44,12 +44,15 @@ class SwiftOptionalLocalRefOutputTests(unittest.TestCase):
         generated = SwiftCodeGenerator(lexicon).convert()
         self.assertIn("public struct SequencerReceipt", generated)
         self.assertIn("public let receipt: SequencerReceipt?", generated)
-        self.assertIn("decodeIfPresent(SequencerReceipt.self, forKey: .receipt)", generated)
+        self.assertIn(
+            "decodeStrictReference(SequencerReceipt.self, from: container, forKey: .receipt)",
+            generated,
+        )
         self.assertNotIn("property 'receipt' — degrading to nil", generated)
         self.assertIn("encodeIfPresent(receipt, forKey: .receipt)", generated)
         self.assertIn("case receipt", generated)
 
-    def test_required_security_strict_ref_uses_required_decode(self):
+    def test_required_security_strict_ref_uses_property_scoped_strict_decode(self):
         lexicon = {
             "lexicon": 1,
             "id": "blue.catbird.test.receipt",
@@ -77,7 +80,10 @@ class SwiftOptionalLocalRefOutputTests(unittest.TestCase):
 
         generated = SwiftCodeGenerator(lexicon).convert()
         self.assertIn("public let receipt: SequencerReceipt", generated)
-        self.assertIn("decode(SequencerReceipt.self, forKey: .receipt)", generated)
+        self.assertIn(
+            "decodeStrictReference(SequencerReceipt.self, from: container, forKey: .receipt)",
+            generated,
+        )
         self.assertNotIn("An error occurred during the Swift code generation", generated)
 
     def test_kotlin_kdoc_is_narrowed_to_security_strict_referenced_definition(self):

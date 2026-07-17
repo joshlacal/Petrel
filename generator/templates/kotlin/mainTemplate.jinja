@@ -24,6 +24,10 @@ object {{ object_name }} {
 {{ enum_classes }}
 {% endif %}
 
+{% if strict_ref_serializers %}
+{{ strict_ref_serializers }}
+{% endif %}
+
 {% if lex_definitions %}
 {{ lex_definitions }}
 {% endif %}

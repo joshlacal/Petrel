@@ -78,4 +78,5 @@ class KotlinTemplateManager:
         self.record_template = self.env.get_template('record.jinja')
         self.message_template = self.env.get_template('message.jinja')
         self.lex_definitions_template = self.env.get_template('lexiconDefinitions.jinja')
+        self.strict_ref_serializer_template = self.env.get_template('strictRefSerializer.jinja')
         self.client_main_template = self.env.get_template('KotlinClientMain.jinja')
