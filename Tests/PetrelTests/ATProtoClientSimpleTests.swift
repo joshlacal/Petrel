@@ -134,7 +134,8 @@ struct ATProtoClientSimpleTests {
   func clientDeallocation() async throws {
     var client: ATProtoClient? = try await createTestClient()
 
-    weak let weakClient = client
+    weak var weakClient: ATProtoClient?
+    weakClient = client
     client = nil
 
     // Allow deallocation
