@@ -197,24 +197,6 @@ enum KeychainManager {
         return cache
     }()
 
-    private struct DPoPKeyRepresentationCache {
-        var values: [String: Data] = [:]
-        var countLimit = 100
-
-        mutating func set(_ representation: Data, for keyTag: String) {
-            if countLimit > 0,
-               values[keyTag] == nil,
-               values.count >= countLimit,
-               let evictionKey = values.keys.min()
-            {
-                values.removeValue(forKey: evictionKey)
-            }
-            values[keyTag] = representation
-        }
-    }
-
-    private static let dpopKeyCache = Mutex(DPoPKeyRepresentationCache())
-
     private static let defaultAccessGroupState = Mutex<String?>(nil)
 
     /// Configures the keychain accessibility level applied to new writes on Apple
@@ -275,23 +257,12 @@ enum KeychainManager {
     /// Configure cache limits
     static func configureCaches(countLimit: Int = 100) {
         dataCache.countLimit = countLimit
-        dpopKeyCache.withLock { cache in
-            cache.countLimit = countLimit
-            if countLimit > 0 {
-                while cache.values.count > countLimit,
-                      let evictionKey = cache.values.keys.min()
-                {
-                    cache.values.removeValue(forKey: evictionKey)
-                }
-            }
-        }
     }
 
     // MARK: - Cache Management
 
     private static func clearCacheStorage() {
         dataCache.removeAllObjects()
-        dpopKeyCache.withLock { $0.values.removeAll() }
     }
 
     /// Clears all cached items
@@ -314,7 +285,7 @@ enum KeychainManager {
             ]
 
             var result: AnyObject?
-            var status = SecItemCopyMatching(query as CFDictionary, &result)
+            let status = SecItemCopyMatching(query as CFDictionary, &result)
 
             if status == errSecSuccess, let items = result as? [[String: Any]] {
                 for item in items {
@@ -327,26 +298,6 @@ enum KeychainManager {
                 }
             }
 
-            // Do the same for DPoP keys
-            let keysQuery: [String: Any] = [
-                kSecClass as String: kSecClassKey,
-                kSecMatchLimit as String: kSecMatchLimitAll,
-                kSecReturnAttributes as String: true,
-            ]
-
-            status = SecItemCopyMatching(keysQuery as CFDictionary, &result)
-
-            if status == errSecSuccess, let items = result as? [[String: Any]] {
-                for item in items {
-                    if let tagData = item[kSecAttrApplicationTag as String] as? Data,
-                       let tagString = String(data: tagData, encoding: .utf8),
-                       tagString.hasPrefix("\(namespace).")
-                    {
-                        // Remove from dpop key cache
-                        _ = dpopKeyCache.withLock { $0.values.removeValue(forKey: tagString) }
-                    }
-                }
-            }
         #else
             clearCacheStorage()
         #endif
@@ -549,9 +500,6 @@ enum KeychainManager {
             keyTag: keyTag,
             accessGroup: resolvedAccessGroup
         )
-
-        // Update cache
-        dpopKeyCache.withLock { $0.set(representation, for: keyTag) }
     }
 
     /// Retrieves a serialized DPoP private key from the keychain with a specified key tag.
@@ -559,22 +507,14 @@ enum KeychainManager {
         keyTag: String,
         accessGroup: String? = nil
     ) throws -> Data {
-        // Check cache first
-        if let cachedRepresentation = dpopKeyCache.withLock({ $0.values[keyTag] }) {
-            LogManager.logDebug("KeychainManager - Retrieved DPoP key from cache for tag \(keyTag).")
-            return cachedRepresentation
-        }
-
         let resolvedAccessGroup = resolvedAccessGroup(accessGroup)
 
         if let resolvedAccessGroup {
             do {
-                let representation = try storage.retrieveDPoPKeyRepresentation(
+                return try storage.retrieveDPoPKeyRepresentation(
                     keyTag: keyTag,
                     accessGroup: resolvedAccessGroup
                 )
-                dpopKeyCache.withLock { $0.set(representation, for: keyTag) }
-                return representation
             } catch {
                 if !isItemNotFound(error) {
                     throw error
@@ -585,8 +525,6 @@ enum KeychainManager {
                 keyTag: keyTag,
                 accessGroup: nil
             )
-
-            dpopKeyCache.withLock { $0.set(legacyRepresentation, for: keyTag) }
 
             do {
                 try storage.storeDPoPKeyRepresentation(
@@ -607,14 +545,10 @@ enum KeychainManager {
             return legacyRepresentation
         }
 
-        let representation = try storage.retrieveDPoPKeyRepresentation(
+        return try storage.retrieveDPoPKeyRepresentation(
             keyTag: keyTag,
             accessGroup: nil
         )
-
-        // Update cache
-        dpopKeyCache.withLock { $0.set(representation, for: keyTag) }
-        return representation
     }
 
     /// Synchronous compatibility helper. Serialization remains the only value
@@ -652,9 +586,6 @@ enum KeychainManager {
         if resolvedAccessGroup != nil {
             try? storage.deleteDPoPKey(keyTag: keyTag, accessGroup: nil)
         }
-
-        // Remove from cache
-        _ = dpopKeyCache.withLock { $0.values.removeValue(forKey: keyTag) }
     }
 
     /// Stores a DPoP private key in the keychain within a specified namespace.

@@ -540,6 +540,28 @@ struct RefreshTokenReliabilityTests {
         }
     }
 
+    @Test("DPoP key reads always consult secure storage")
+    func dpopKeyReadsDoNotUseLongLivedPrivateKeyCache() async throws {
+        let backend = InMemorySecureStorage()
+        try await withInMemoryBackend(backend) {
+            let storage = KeychainStorage(namespace: "test.dpop.no-private-key-cache")
+            let did = "did:plc:no-private-key-cache"
+            let original = P256.Signing.PrivateKey().x963Representation
+            let replacement = P256.Signing.PrivateKey().x963Representation
+
+            try await storage.saveDPoPKeyRepresentation(original, for: did)
+            #expect(try await storage.getDPoPKeyRepresentation(for: did) == original)
+
+            backend.plant(
+                key: "dpopKey.\(did)",
+                namespace: "dpopkeys",
+                data: replacement
+            )
+
+            #expect(try await storage.getDPoPKeyRepresentation(for: did) == replacement)
+        }
+    }
+
     @Test("Named HTTP error path survives AuthenticationService 401 refresh retry")
     func namedHTTPErrorPathSurvivesAuthenticationServiceRetry() async throws {
         let backend = InMemorySecureStorage()

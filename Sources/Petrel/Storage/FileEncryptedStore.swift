@@ -13,12 +13,15 @@
         @preconcurrency import Crypto
     #endif
     import Foundation
+    import Synchronization
 
     /// Secure storage implementation using AES-GCM encrypted files
     /// Suitable for server environments and as a fallback when system keyring is unavailable
     final class FileEncryptedStore: SecureStorage {
         private let storageDirectory: URL
-        private let masterKeyRepresentation: Data
+        /// Owns the zeroizing CryptoKit key behind a synchronization boundary.
+        /// Raw key bytes are never retained in a general-purpose `Data` buffer.
+        private let masterKey: Mutex<SymmetricKey>
 
         enum FileEncryptedStoreError: Error, LocalizedError {
             case encryptionFailed
@@ -60,18 +63,17 @@
 
             // Get or create master key from environment or generate
             if let key = masterKey {
-                masterKeyRepresentation = key.withUnsafeBytes { Data($0) }
+                self.masterKey = Mutex(key)
             } else if let keyB64 = ProcessInfo.processInfo.environment["PETREL_MASTER_KEY"] {
                 guard let keyData = Data(base64Encoded: keyB64) else {
                     throw FileEncryptedStoreError.invalidConfiguration
                 }
-                masterKeyRepresentation = keyData
+                self.masterKey = Mutex(SymmetricKey(data: keyData))
             } else {
                 // Generate and warn
                 let generatedKey = SymmetricKey(size: .bits256)
-                let generatedKeyRepresentation = generatedKey.withUnsafeBytes { Data($0) }
-                masterKeyRepresentation = generatedKeyRepresentation
-                let keyB64 = generatedKeyRepresentation.base64EncodedString()
+                self.masterKey = Mutex(generatedKey)
+                let keyB64 = generatedKey.withUnsafeBytes { Data($0).base64EncodedString() }
                 LogManager.logWarning("""
                 FileEncryptedStore: Generated ephemeral master key. Secrets will be lost on restart.
                 Set PETREL_MASTER_KEY environment variable to persist secrets across restarts.
@@ -93,8 +95,9 @@
         }
 
         func store(key: String, value: Data, namespace: String, accessGroup: String?) throws {
-            let masterKey = SymmetricKey(data: masterKeyRepresentation)
-            let sealed = try AES.GCM.seal(value, using: masterKey)
+            let sealed = try masterKey.withLock { key in
+                try AES.GCM.seal(value, using: key)
+            }
             guard let combined = sealed.combined else {
                 throw FileEncryptedStoreError.encryptionFailed
             }
@@ -109,8 +112,9 @@
             }
             let combined = try Data(contentsOf: url)
             let box = try AES.GCM.SealedBox(combined: combined)
-            let masterKey = SymmetricKey(data: masterKeyRepresentation)
-            let decrypted = try AES.GCM.open(box, using: masterKey)
+            let decrypted = try masterKey.withLock { key in
+                try AES.GCM.open(box, using: key)
+            }
             LogManager.logDebug("FileEncryptedStore: Retrieved key \(namespace).\(key)")
             return decrypted
         }
